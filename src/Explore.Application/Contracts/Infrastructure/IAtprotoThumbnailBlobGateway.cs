@@ -5,12 +5,12 @@ namespace Explore.Application.Contracts.Infrastructure;
 
 public interface IAtprotoThumbnailBlobGateway
 {
-    Task<FileStorageWriteResult?> FetchAndStageAsync(
+    Task<StagedStorageWrite?> FetchAndStageAsync(
         AtprotoThumbnailBlobCandidate? candidate,
         Guid tenantId,
         CancellationToken cancellationToken);
 
     Task CleanupAsync(
-        FileStorageWriteResult staged,
+        StagedStorageWrite staged,
         CancellationToken cancellationToken);
 }

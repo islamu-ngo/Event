@@ -25,6 +25,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -93,7 +94,6 @@ public sealed class AnonymousRetentionReadBoundaryTests
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
             Uri = "unused",
-            ObjectKey = "missing.csv",
             Provider = StorageProviders.Local,
             FullName = "private.csv",
             SafeDisplayName = "private.csv",
@@ -106,13 +106,17 @@ public sealed class AnonymousRetentionReadBoundaryTests
             OwningResourceId = Guid.CreateVersion7(),
             ConcurrencyStamp = Guid.CreateVersion7()
         };
-        fixture.Context.Add(storage);
+        var binding = await fixture.Services.GetRequiredService<IStorageProviderBindingService>()
+            .CaptureAsync(StorageProviders.Local, fixture.TenantId, CancellationToken.None);
+        storage.StorageProviderBindingId = binding.Id;
         await fixture.Context.SaveChangesAsync();
-        var provider = fixture.Services.GetRequiredService<IFileStorageProviderResolver>().GetRequired(StorageProviders.Local);
+        var provider = await fixture.Services.GetRequiredService<IStorageProviderBindingService>()
+            .ResolveAsync(binding.Id, CancellationToken.None);
         await using var content = new MemoryStream("private answer"u8.ToArray());
         var written = await provider.WriteAsync(new(fixture.TenantId, content, "text/csv", "private.csv", ".csv",
             content.Length, 1024, $"tenants/{fixture.TenantId:N}/retention-tests/{storage.Id:N}.csv"), CancellationToken.None);
         storage.ObjectKey = written.ObjectKey;
+        fixture.Context.Add(storage);
         await fixture.Context.SaveChangesAsync();
         try
         {
@@ -381,8 +385,11 @@ public sealed class AnonymousRetentionReadBoundaryTests
         var clock = new Clock();
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services => services.AddSingleton<TimeProvider>(clock));
         var scope = await SeedReadScopeAsync(fixture, legalHold: true, anonymous: anonymous);
-        var provider = new OpenBarrier(fixture.Services.GetRequiredService<IFileStorageProviderResolver>().GetRequired(StorageProviders.Local));
-        var reader = new StorageObjectContentReader(fixture.Services.GetRequiredService<IStorageObjectRepository>(), provider,
+        var provider = new OpenBarrier(await fixture.Services.GetRequiredService<IStorageProviderBindingService>()
+            .ResolveAsync(scope.Storage.StorageProviderBindingId!.Value, CancellationToken.None));
+        var bindings = Substitute.For<IStorageProviderBindingService>();
+        bindings.ResolveAsync(scope.Storage.StorageProviderBindingId.Value, Arg.Any<CancellationToken>()).Returns(provider);
+        var reader = new StorageObjectContentReader(fixture.Services.GetRequiredService<IStorageObjectRepository>(), bindings,
             fixture.Services.GetRequiredService<ICurrentUserService>(), fixture.Services.GetRequiredService<ILogger<StorageObjectContentReader>>(),
             fixture.Services.GetRequiredService<BusinessMetrics>(), clock);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -730,8 +737,14 @@ public sealed class AnonymousRetentionReadBoundaryTests
             RegistrationContentRetentionUntilUtc = deadline,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
+        var binding = await fixture.Services.GetRequiredService<IStorageProviderBindingService>()
+            .CaptureAsync(StorageProviders.Local, fixture.TenantId, CancellationToken.None);
+        storage.StorageProviderBindingId = binding.Id;
+        await fixture.Context.SaveChangesAsync();
         await using var content = new MemoryStream("private answer"u8.ToArray());
-        var written = await fixture.Services.GetRequiredService<IFileStorageProviderResolver>().GetRequired(StorageProviders.Local)
+        var provider = await fixture.Services.GetRequiredService<IStorageProviderBindingService>()
+            .ResolveAsync(binding.Id, CancellationToken.None);
+        var written = await provider
             .WriteAsync(new(fixture.TenantId, content, "text/csv", "private.csv", ".csv", content.Length, 1024,
                 $"tenants/{fixture.TenantId:N}/retention-tests/{storage.Id:N}.csv"), CancellationToken.None);
         storage.ObjectKey = written.ObjectKey;
@@ -741,9 +754,12 @@ public sealed class AnonymousRetentionReadBoundaryTests
         return new(order.Id, order.EventId, form.Id, version.Id, ticket.Id, effect.Id, deadline, storage);
     }
 
-    private static Task<FileStorageDeleteResult> DeleteStorageAsync(EventVisitorCapabilitySqliteFixture fixture, StorageObject storage) =>
-        fixture.Services.GetRequiredService<IFileStorageProviderResolver>().GetRequired(StorageProviders.Local)
-            .DeleteAsync(new(storage.ObjectKey!), CancellationToken.None);
+    private static async Task<FileStorageDeleteResult> DeleteStorageAsync(EventVisitorCapabilitySqliteFixture fixture, StorageObject storage)
+    {
+        var provider = await fixture.Services.GetRequiredService<IStorageProviderBindingService>()
+            .ResolveAsync(storage.StorageProviderBindingId!.Value, CancellationToken.None);
+        return await provider.DeleteAsync(new(storage.ObjectKey!), CancellationToken.None);
+    }
 
     private sealed record ReadScope(Guid OrderId, Guid EventId, Guid FormId, Guid VersionId, Guid TicketId,
         Guid EffectId, DateTime Deadline, StorageObject Storage);

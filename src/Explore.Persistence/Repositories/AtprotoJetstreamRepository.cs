@@ -144,7 +144,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
-            var consumed = new List<FileStorageWriteResult>();
+            var consumed = new List<StagedStorageWrite>();
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
             try
             {
@@ -236,7 +236,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                 _dbContext.ChangeTracker.Clear();
             }
             firstAttempt = false;
-            var consumed = new List<FileStorageWriteResult>();
+            var consumed = new List<StagedStorageWrite>();
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
             try
@@ -691,7 +691,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
 
     private async Task<bool> ApplyRecordAsync(
         AtprotoJetstreamApplyRequest request,
-        ICollection<FileStorageWriteResult> consumed,
+        ICollection<StagedStorageWrite> consumed,
         CancellationToken cancellationToken)
     {
         var incoming = request.Record!;
@@ -824,7 +824,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         DateTime observedAt,
         string filterBypassReason,
         bool updateExisting,
-        ICollection<FileStorageWriteResult> consumed,
+        ICollection<StagedStorageWrite> consumed,
         CancellationToken cancellationToken,
         bool forceTombstone = false)
     {
@@ -1276,7 +1276,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         DateTime observedAt,
         string filterBypassReason,
         bool updateExisting,
-        ICollection<FileStorageWriteResult> consumed,
+        ICollection<StagedStorageWrite> consumed,
         CancellationToken cancellationToken)
     {
         StorageObject? existing = importedEvent.FeaturedImageId is null
@@ -1305,7 +1305,8 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             return;
         }
 
-        FileStorageWriteResult staged = import.StagedThumbnail;
+        var receipt = import.StagedThumbnail;
+        FileStorageWriteResult staged = receipt.Write;
         if (!TryValidateStagedThumbnail(import.Thumbnail, staged, out string? mimeType, out string? extension))
         {
             return;
@@ -1319,6 +1320,15 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             return;
         }
 
+        if (receipt.TenantId != import.TenantId)
+            throw new InvalidOperationException("storage_producer_identity_mismatch");
+        var storage = new StorageObjectRepository(_dbContext);
+        var operation = await storage.FenceProducerAsync(receipt.OperationId, import.TenantId, cancellationToken);
+        if (operation is null || !operation.ProducerSettled
+            || operation.ProviderBindingId != receipt.BindingId || operation.Provider != staged.Provider
+            || operation.ObjectKey != staged.ObjectKey || operation.ProviderVersionId != staged.ProviderVersionId)
+            throw new InvalidOperationException("storage_producer_identity_mismatch");
+
         if (existing is not null)
         {
             existing.RequestDelete();
@@ -1328,12 +1338,14 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         string displayName = $"{import.Thumbnail.Cid}{extension}";
         var image = new StorageObject
         {
-            Id = Guid.CreateVersion7(),
+            Id = operation.Id,
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
             Uri = provenanceUri,
             ObjectKey = staged.ObjectKey,
             Provider = staged.Provider,
+            StorageProviderBindingId = operation.ProviderBindingId,
+            ProviderVersionId = operation.ProviderVersionId,
             FullName = displayName,
             SafeDisplayName = displayName,
             Extension = extension,
@@ -1357,9 +1369,9 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             return;
         }
 
-        await _dbContext.StorageObjects.AddAsync(image, cancellationToken);
+        await storage.CompleteProducerAsync(operation, image, cancellationToken);
         importedEvent.FeaturedImageId = image.Id;
-        consumed.Add(staged);
+        consumed.Add(receipt);
     }
 
     private static bool TryValidateStagedThumbnail(

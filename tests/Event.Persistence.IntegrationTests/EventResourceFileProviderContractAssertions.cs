@@ -459,6 +459,7 @@ internal static class EventResourceFileProviderContractAssertions
                 1_000_000, false, true, SettingSource.SystemDefault, SettingSource.SystemDefault,
                 SettingSource.SystemDefault));
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
         {
             if (beforeWrite is not null) await beforeWrite(call.ArgAt<CancellationToken>(1));
@@ -491,6 +492,7 @@ internal static class EventResourceFileProviderContractAssertions
         Func<FileStorageReadInput, CancellationToken, Task<FileStorageReadResult>>? versionedOpen = null)
     {
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
             .Returns(call => versionedOpen is null ? open(call.ArgAt<CancellationToken>(1))
                 : versionedOpen(call.ArgAt<FileStorageReadInput>(0), call.ArgAt<CancellationToken>(1)));

@@ -21,6 +21,7 @@ public class StorageUploadSessionTests
         var session = CreateSession();
         var utcNow = new DateTime(2026, 5, 29, 12, 0, 0, DateTimeKind.Utc);
 
+        session.ReserveObjectKey("tenants/default/uploads/reserved.png");
         session.MarkUploading(utcNow);
 
         await Assert.That(session.Status).IsEqualTo(StorageUploadSessionStates.Uploading);
@@ -32,9 +33,12 @@ public class StorageUploadSessionTests
     {
         var session = CreateSession();
         var utcNow = new DateTime(2026, 5, 29, 12, 1, 0, DateTimeKind.Utc);
-        var objectId = Guid.CreateVersion7();
+        var objectId = session.Id;
 
+        session.ReserveObjectKey("tenants/default/final.png");
         session.MarkUploading(utcNow.AddMinutes(-1));
+        session.RecordProducerSettlement(objectId, session.StorageProviderBindingId!.Value,
+            session.ObjectKey!, null);
         session.Finalize(objectId, "tenants/default/final.png", new string('a', 64), utcNow);
 
         await Assert.That(session.Status).IsEqualTo(StorageUploadSessionStates.Finalized);
@@ -47,7 +51,11 @@ public class StorageUploadSessionTests
     public async Task Cancel_WhenFinalized_ThrowsInvalidOperationException()
     {
         var session = CreateSession();
-        session.Finalize(Guid.CreateVersion7(), "tenants/default/final.png", null, DomainTestClock.UtcNow);
+        session.ReserveObjectKey("tenants/default/final.png");
+        session.MarkUploading(DomainTestClock.UtcNow);
+        session.RecordProducerSettlement(session.Id, session.StorageProviderBindingId!.Value,
+            session.ObjectKey!, null);
+        session.Finalize(session.Id, session.ObjectKey!, null, DomainTestClock.UtcNow);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
         {
@@ -73,9 +81,11 @@ public class StorageUploadSessionTests
     {
         return new StorageUploadSession
         {
+            Id = Guid.CreateVersion7(),
             TenantId = Guid.CreateVersion7(),
             UserId = Guid.CreateVersion7(),
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = StorageProviderBinding.Local(Path.GetTempPath()).Id,
             ExpectedSizeBytes = 1024,
             ReservedBytes = 1024,
             ContentType = "image/png",

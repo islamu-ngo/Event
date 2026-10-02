@@ -30198,12 +30198,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasIndex("FileTypeId")
                         .HasDatabaseName("ix_storage_objects_file_type_id");
 
-                    b.HasIndex("StorageProviderBindingId")
-                        .HasDatabaseName("ix_storage_objects_storage_provider_binding_id");
-
-                    b.HasIndex("Provider", "ObjectKey")
+                    b.HasIndex("StorageProviderBindingId", "ObjectKey")
                         .IsUnique()
-                        .HasDatabaseName("ix_storage_objects_provider_object_key")
+                        .HasDatabaseName("ix_storage_objects_storage_provider_binding_id_object_key")
                         .HasFilter("object_key IS NOT NULL");
 
                     b.HasIndex("TenantId", "OwningResourceKind", "OwningResourceId")
@@ -30223,6 +30220,8 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                             t.HasCheckConstraint("ck_storage_objects_inspection_binding", "document_safety_state <> 'unscanned' OR (purpose = 'event_resource' AND inspected_object_id IS NOT NULL AND inspected_object_id = id AND inspected_sha256_checksum IS NOT NULL AND sha256_checksum IS NOT NULL AND inspected_sha256_checksum = sha256_checksum)");
 
                             t.HasCheckConstraint("ck_storage_objects_lifecycle_state", "lifecycle_state IN ('pending', 'active', 'quarantined', 'delete_requested', 'deleted')");
+
+                            t.HasCheckConstraint("ck_storage_objects_managed_target", "(provider = 'legacy_external' AND storage_provider_binding_id IS NULL AND object_key IS NULL) OR (provider IN ('local', 's3_compatible') AND storage_provider_binding_id IS NOT NULL AND storage_provider_binding_id <> '00000000-0000-0000-0000-000000000000' AND ((object_key IS NOT NULL AND object_key <> '') OR (lifecycle_state = 'deleted' AND object_key IS NULL)))");
 
                             t.HasCheckConstraint("ck_storage_objects_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
 
@@ -30304,6 +30303,63 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_storage_deletion_state", "(state = 1 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL) OR (state = 2 AND next_attempt_at_utc IS NOT NULL AND lease_expires_at_utc IS NULL) OR (state = 3 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NOT NULL) OR (state = 4 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL)");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageProducerOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("object_key");
+
+                    b.Property<bool>("ProducerSettled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("producer_settled");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("ProviderBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_binding_id");
+
+                    b.Property<string>("ProviderVersionId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_version_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_storage_producer_operations");
+
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_storage_producer_operations_created_at_utc");
+
+                    b.HasIndex("ProviderBindingId", "ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_storage_producer_operations_provider_binding_id_object_key");
+
+                    b.ToTable("ie_storage_producer_operations", (string)null);
                 });
 
             modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>
@@ -30535,14 +30591,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_storage_upload_sessions");
 
-                    b.HasIndex("StorageProviderBindingId")
-                        .HasDatabaseName("ix_storage_upload_sessions_storage_provider_binding_id");
-
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_storage_upload_sessions_user_id");
 
-                    b.HasIndex("Provider", "ObjectKey")
-                        .HasDatabaseName("ix_storage_upload_sessions_provider_object_key")
+                    b.HasIndex("StorageProviderBindingId", "ObjectKey")
+                        .HasDatabaseName("ix_storage_upload_sessions_storage_provider_binding_id_object_key")
                         .HasFilter("object_key IS NOT NULL");
 
                     b.HasIndex("TenantId", "IdempotencyKey")
@@ -30562,11 +30615,13 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_storage_upload_sessions", null, t =>
                         {
+                            t.HasCheckConstraint("ck_storage_upload_sessions_bound_target", "storage_provider_binding_id IS NOT NULL AND storage_provider_binding_id <> '00000000-0000-0000-0000-000000000000'");
+
                             t.HasCheckConstraint("ck_storage_upload_sessions_expected_size_nonnegative", "expected_size_bytes >= 0");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_policy_max_upload_bytes_nonnegative", "policy_max_upload_bytes >= 0");
 
-                            t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
+                            t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible')");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
 
@@ -47529,6 +47584,16 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_storage_object_deletion_tombstones_storage_provider_bindings_provider_binding_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageProducerOperation", b =>
+                {
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("ProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_storage_producer_operations_storage_provider_bindings_provider_binding_id");
                 });
 
             modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>

@@ -3,6 +3,7 @@ using Explore.Application.Authorization;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
@@ -27,14 +28,16 @@ public sealed class StorageObjectDeletionRepositoryTests(PostgreSqlContainerFixt
         await context.SaveChangesAsync();
 
         var eventId = Guid.CreateVersion7();
-        var matching = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.DeleteRequested);
-        var missingKey = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.DeleteRequested);
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
+        var matching = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.DeleteRequested, binding);
+        var missingKey = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.DeleteRequested, binding);
         missingKey.ObjectKey = null;
-        var active = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.Active);
-        var otherEvent = CreateStorageObject(tenant.Id, Guid.CreateVersion7(), StorageObjectLifecycleStates.DeleteRequested);
-        var alreadyDeleted = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.DeleteRequested);
+        var active = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.Active, binding);
+        var otherEvent = CreateStorageObject(tenant.Id, Guid.CreateVersion7(), StorageObjectLifecycleStates.DeleteRequested, binding);
+        var alreadyDeleted = CreateStorageObject(tenant.Id, eventId, StorageObjectLifecycleStates.DeleteRequested, binding);
         alreadyDeleted.MarkDeleted(null, new DateTime(2026, 6, 23, 10, 0, 0, DateTimeKind.Utc));
-        context.StorageObjects.AddRange(matching, missingKey, active, otherEvent, alreadyDeleted);
+        context.StorageObjects.AddRange(matching, active, otherEvent, alreadyDeleted);
         await context.SaveChangesAsync();
         var repository = new StorageObjectRepository(context);
 
@@ -45,10 +48,13 @@ public sealed class StorageObjectDeletionRepositoryTests(PostgreSqlContainerFixt
             limit: 10,
             CancellationToken.None);
 
-        await Assert.That(results.Select(storageObject => storageObject.Id)).IsEquivalentTo([matching.Id, missingKey.Id]);
+        await Assert.That(results.Select(storageObject => storageObject.Id)).IsEquivalentTo([matching.Id]);
+        await using var invalid = fixture.CreateDbContext();
+        invalid.StorageObjects.Add(missingKey);
+        await Assert.ThrowsAsync<DbUpdateException>(() => invalid.SaveChangesAsync());
     }
 
-    private static StorageObject CreateStorageObject(Guid tenantId, Guid eventId, string lifecycleState) => new()
+    private static StorageObject CreateStorageObject(Guid tenantId, Guid eventId, string lifecycleState, StorageProviderBinding binding) => new()
     {
         Id = Guid.CreateVersion7(),
         TenantId = tenantId,
@@ -56,6 +62,7 @@ public sealed class StorageObjectDeletionRepositoryTests(PostgreSqlContainerFixt
         FileTypeId = (int)FileTypeEnum.Image,
         FileType = null!,
         Provider = StorageProviders.Local,
+        StorageProviderBindingId = binding.Id,
         ObjectKey = $"tenants/{tenantId:N}/{Guid.CreateVersion7():N}.png",
         Uri = "/images/redacted.png",
         FullName = "redacted.png",

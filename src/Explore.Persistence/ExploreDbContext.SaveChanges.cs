@@ -354,9 +354,14 @@ public partial class ExploreDbContext
                         : null;
                     break;
                 case StorageObject storageObject:
-                    entry.Property("ProviderObjectKeyUniquenessHash").CurrentValue = storageObject.ObjectKey is { } objectKey
-                        ? ComputeMySqlUniquenessHash(storageObject.Provider, objectKey)
+                    entry.Property("BindingObjectKeyUniquenessHash").CurrentValue =
+                        storageObject.ObjectKey is { } objectKey && storageObject.StorageProviderBindingId is { } bindingId
+                        ? ComputeMySqlUniquenessHash(bindingId.ToString("D"), objectKey)
                         : null;
+                    break;
+                case StorageProducerOperation producer:
+                    entry.Property("BindingObjectKeyUniquenessHash").CurrentValue =
+                        ComputeMySqlUniquenessHash(producer.ProviderBindingId.ToString("D"), producer.ObjectKey);
                     break;
                 case WebPushSubscription webPushSubscription:
                     var active = webPushSubscription.IsActive && !webPushSubscription.IsDeleted;

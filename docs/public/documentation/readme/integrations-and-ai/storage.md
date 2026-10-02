@@ -18,6 +18,34 @@ ISLAMU Event implements a clean storage abstraction supporting both **Local Moun
 
 ## 2. Choosing Your Storage Provider
 
+### Existing files keep their original target
+
+Changing the default local root, S3 bucket or provider affects new reservations,
+not existing files. Uploads, generated registration CSVs and imported thumbnails
+capture their storage target before writing persistent bytes. Downloads and
+cleanup continue using that captured target. Keep old mounts, buckets and retained
+credential references available while files or pending cleanup still depend on them.
+Local files use application content links; they do not advertise S3 presigned
+downloads. S3 downloads retain the saved object version rather than selecting a
+newer object at the same key.
+
+A missing historical binding is an error, not permission to try today's backend.
+Before upgrading development data, inventory the original bytes and verify their
+target, relative keys and checksums. Use an explicitly reviewed historical mapping
+only where that evidence is conclusive; otherwise re-upload from a trusted source.
+Recreate a disposable development environment only after approving the data loss.
+No automatic target guessing or unbound-row deletion is performed.
+
+Install the matching generated database migrations with the application upgrade.
+Do not deploy source changes against the old schema. Preserve pending producer
+records with backups: a timeout or absent current object is not proof that an
+unacknowledged write can never finish.
+
+For generated registration CSVs, set the connection's workspace to `local` or
+`s3_compatible`. Other workspace values are rejected rather than silently choosing
+local storage. If disclosure permission expires while a write is in flight, its
+captured bytes remain tracked for cleanup and no downloadable artifact is activated.
+
 Configured via `STORAGE_PROVIDER` in [Environment Variables](../configuration-and-operations/environment-variables.md#5-storage-providers-local--cloud-s3):
 
 | Storage Provider | Configuration | Best Fit | Operational Considerations |
@@ -138,6 +166,8 @@ changing a root setting never migrates existing files.
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):
 * Restoring a database without the corresponding storage volume causes broken image links.
 * Restoring a storage volume without the database leaves orphaned, unreferenced files.
+* Include every captured target, even if it is no longer the default. Bound local
+  files must remain reachable at their captured absolute mount path.
 * After restoring the Compose MinIO volume, rerun `minio-init` before reopening traffic so the existing bucket is private.
 * [Configuration Manifests](../configuration-and-operations/configuration-manifests.md) deliberately exclude binary media and do not replace storage volume backups.
 * Retain required Data Protection keys and the selected secret authority with the

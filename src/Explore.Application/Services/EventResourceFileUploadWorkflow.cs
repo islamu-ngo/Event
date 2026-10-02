@@ -65,12 +65,14 @@ public sealed class EventResourceFileUploadWorkflow(
                 if (quotaDenial is not null) return quotaDenial;
                 counter.Reserve(dto.ExpectedSizeBytes, policy.TenantQuotaBytes);
                 await counters.Update(counter);
+                var binding = await providers.CaptureAsync(policy.Provider, tenant.TenantId, ct);
                 var session = new StorageUploadSession
                 {
                     Id = Guid.CreateVersion7(),
                     TenantId = tenant.TenantId,
                     UserId = user.UserId,
                     Provider = policy.Provider,
+                    StorageProviderBindingId = binding.Id,
                     RouteKey = policy.RouteKey,
                     PolicyMaxUploadBytes = policy.MaxUploadBytes,
                     PolicyVersion = policy.PolicyVersion.ToString(CultureInfo.InvariantCulture),
@@ -104,7 +106,7 @@ public sealed class EventResourceFileUploadWorkflow(
         await using var authorized = await AuthorizeAsync(session!.OwningResourceId!.Value, cancellationToken);
         if (authorized.Lease is not { } lease) return Denied(authorized.Outcome);
         var policy = await PolicyAsync(session.OwningResourceId.Value, session.ContentType, session.ExpectedSizeBytes, cancellationToken);
-        if (!Permitted(lease, session.ContentType, session.ExpectedSizeBytes, policy) || policy.Provider != session.Provider)
+        if (!Permitted(lease, session.ContentType, session.ExpectedSizeBytes, policy))
             return Fail("resource_upload_policy_denied");
         if (session.Status == StorageUploadSessionStates.Finalized)
             return await ReplayAsync(session.Id, lease, policy, cancellationToken);
@@ -133,8 +135,6 @@ public sealed class EventResourceFileUploadWorkflow(
                 if (await FencedAsync(ct)) return Fail("privacy_erasure_fenced");
                 if (current.Status != StorageUploadSessionStates.Reserved) return Fail(FailureCodes.StorageUploadSessionInvalidState);
                 if (current.ExpiresAt <= clock.GetUtcNow().UtcDateTime) return Fail(FailureCodes.StorageUploadSessionExpired);
-                var binding = await providers.CaptureAsync(current.Provider, current.TenantId, ct);
-                current.StorageProviderBindingId = binding.Id;
                 current.ReserveObjectKey($"tenants/{current.TenantId:N}/uploads/{current.Id:N}.{current.Extension}");
                 current.MarkUploading(clock.GetUtcNow().UtcDateTime);
                 var stagedObject = NewStagedObject(current);
@@ -154,7 +154,7 @@ public sealed class EventResourceFileUploadWorkflow(
         FileStorageWriteResult write;
         try
         {
-            var provider = await providers.ResolveAsync(producer.BindingId, cancellationToken);
+            var provider = await providers.ResolveTargetAsync(producer.BindingId, producer.Provider, cancellationToken);
             write = await provider.WriteAsync(new FileStorageWriteInput(
                 session.TenantId, inspected, session.ContentType, session.SafeDisplayName, session.Extension,
                 session.ExpectedSizeBytes, session.ExpectedSizeBytes, session.ObjectKey), cancellationToken);
@@ -193,7 +193,7 @@ public sealed class EventResourceFileUploadWorkflow(
                 if (current.ExpiresAt <= clock.GetUtcNow().UtcDateTime)
                     return await FailUploadingAsync(current, FailureCodes.StorageUploadSessionExpired, ct);
                 var latestPolicy = await PolicyAsync(current.OwningResourceId!.Value, current.ContentType, current.ExpectedSizeBytes, ct);
-                if (!Permitted(lease, current.ContentType, current.ExpectedSizeBytes, latestPolicy) || latestPolicy.Provider != current.Provider)
+                if (!Permitted(lease, current.ContentType, current.ExpectedSizeBytes, latestPolicy))
                     return await FailUploadingAsync(current, "resource_upload_policy_denied", ct);
                 var resource = await resources.GetByIdForUpdateAsync(current.TenantId, lease.Snapshot.Facts.Access.Parent.EventId,
                     current.OwningResourceId.Value, ct);

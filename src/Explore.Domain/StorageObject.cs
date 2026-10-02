@@ -10,8 +10,31 @@ public class StorageObject : ITenantEntity, IAuditableEntity, ISoftDeletable, IC
     public required FileType FileType { get; set; }
 
     public required string Uri { get; set; }
-    public string? ObjectKey { get; set; }
-    public Guid? StorageProviderBindingId { get; set; }
+    private string? _objectKey;
+    private string? _capturedObjectKey;
+    public string? ObjectKey
+    {
+        get => _objectKey;
+        set
+        {
+            _capturedObjectKey ??= _objectKey;
+            if (value is not null && _capturedObjectKey is not null && _capturedObjectKey != value)
+                throw new InvalidOperationException("A managed object key cannot be changed.");
+            _objectKey = value;
+            _capturedObjectKey ??= value;
+        }
+    }
+    private Guid? _storageProviderBindingId;
+    public Guid? StorageProviderBindingId
+    {
+        get => _storageProviderBindingId;
+        set
+        {
+            if (_storageProviderBindingId.HasValue && _storageProviderBindingId != value)
+                throw new InvalidOperationException("A managed storage target cannot be changed.");
+            _storageProviderBindingId = value;
+        }
+    }
     public string? ProviderVersionId { get; set; }
     public required string Provider { get; set; }
     public required string FullName { get; set; }

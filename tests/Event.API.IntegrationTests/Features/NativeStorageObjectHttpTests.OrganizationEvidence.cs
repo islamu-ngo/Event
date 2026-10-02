@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Seeds;
+using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
@@ -398,6 +399,8 @@ public sealed partial class NativeStorageObjectHttpTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var participation = await db.OrganizationTenants.SingleAsync(item => item.OrganizationId == scenario.OrganizationId);
+        var targetBinding = CapturedStorageProviders.LocalBinding();
+        db.Add(targetBinding);
         var document = new StorageObject
         {
             Id = Guid.CreateVersion7(),
@@ -406,6 +409,7 @@ public sealed partial class NativeStorageObjectHttpTests
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = targetBinding.Id,
             Uri = string.Empty,
             ObjectKey = $"tenants/{scenario.TenantId:N}/private-evidence.pdf",
             FullName = "evidence.pdf",

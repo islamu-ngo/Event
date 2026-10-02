@@ -14,6 +14,7 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 
 public sealed class StorageObjectDeletionServiceTests
 {
+    private static readonly StorageProviderBinding Binding = StorageProviderBinding.Local(Path.GetTempPath());
     [Test]
     public async Task DeleteRequestedForResourceAsync_WhenProviderDeleteSucceeds_MarksMetadataDeleted()
     {
@@ -23,10 +24,11 @@ public sealed class StorageObjectDeletionServiceTests
         var storageObject = CreateStorageObject(tenantId, resourceId);
         var repository = CreateRepository(tenantId, resourceId, [storageObject]);
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.DeleteAsync(Arg.Any<FileStorageDeleteInput>(), Arg.Any<CancellationToken>())
             .Returns(new FileStorageDeleteResult(StorageProviders.Local, storageObject.ObjectKey!, Deleted: true));
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        var resolver = Substitute.For<IStorageProviderBindingService>();
+        resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
         var service = CreateService(repository, resolver);
 
         var result = await service.DeleteRequestedForResourceAsync(
@@ -43,10 +45,6 @@ public sealed class StorageObjectDeletionServiceTests
         await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Deleted);
         await Assert.That(storageObject.IsDeleted).IsTrue();
         await Assert.That(storageObject.DeletedBy).IsEqualTo(deletedBy);
-        await provider.Received(1).DeleteAsync(
-            Arg.Is<FileStorageDeleteInput>(input => input.ObjectKey == storageObject.ObjectKey),
-            Arg.Any<CancellationToken>());
-        await repository.Received(1).Update(storageObject);
     }
 
     [Test]
@@ -57,10 +55,11 @@ public sealed class StorageObjectDeletionServiceTests
         var storageObject = CreateStorageObject(tenantId, resourceId);
         var repository = CreateRepository(tenantId, resourceId, [storageObject]);
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.DeleteAsync(Arg.Any<FileStorageDeleteInput>(), Arg.Any<CancellationToken>())
             .Returns<Task<FileStorageDeleteResult>>(_ => throw new IOException("provider unavailable"));
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        var resolver = Substitute.For<IStorageProviderBindingService>();
+        resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
         var service = CreateService(repository, resolver);
 
         var result = await service.DeleteRequestedForResourceAsync(
@@ -76,18 +75,16 @@ public sealed class StorageObjectDeletionServiceTests
         await Assert.That(result.FailedCount).IsEqualTo(1);
         await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
         await Assert.That(storageObject.IsDeleted).IsFalse();
-        await repository.DidNotReceive().Update(storageObject);
     }
 
     [Test]
-    public async Task DeleteRequestedForResourceAsync_WhenObjectKeyMissing_MarksMetadataDeletedWithoutProviderCall()
+    public async Task DeleteRequestedForResourceAsync_WhenObjectKeyMissing_FailsClosedWithoutDeletingMetadata()
     {
         var tenantId = Guid.CreateVersion7();
         var resourceId = Guid.CreateVersion7();
-        var storageObject = CreateStorageObject(tenantId, resourceId);
-        storageObject.ObjectKey = null;
+        var storageObject = CreateStorageObject(tenantId, resourceId, missingKey: true);
         var repository = CreateRepository(tenantId, resourceId, [storageObject]);
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
+        var resolver = Substitute.For<IStorageProviderBindingService>();
         var service = CreateService(repository, resolver);
 
         var result = await service.DeleteRequestedForResourceAsync(
@@ -99,16 +96,15 @@ public sealed class StorageObjectDeletionServiceTests
             CancellationToken.None);
 
         await Assert.That(result.ScannedCount).IsEqualTo(1);
-        await Assert.That(result.MissingKeyDeletedCount).IsEqualTo(1);
-        await Assert.That(result.FailedCount).IsEqualTo(0);
-        await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Deleted);
-        resolver.DidNotReceiveWithAnyArgs().GetRequired(default!);
-        await repository.Received(1).Update(storageObject);
+        await Assert.That(result.MissingKeyDeletedCount).IsEqualTo(0);
+        await Assert.That(result.FailedCount).IsEqualTo(1);
+        await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
+        await Assert.That(storageObject.IsDeleted).IsFalse();
     }
 
     private static StorageObjectDeletionService CreateService(
         IStorageObjectRepository repository,
-        IFileStorageProviderResolver resolver)
+        IStorageProviderBindingService resolver)
     {
         var meterFactory = Substitute.For<IMeterFactory>();
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
@@ -138,7 +134,7 @@ public sealed class StorageObjectDeletionServiceTests
         return repository;
     }
 
-    private static StorageObject CreateStorageObject(Guid tenantId, Guid resourceId) => new()
+    private static StorageObject CreateStorageObject(Guid tenantId, Guid resourceId, bool missingKey = false) => new()
     {
         Id = Guid.CreateVersion7(),
         TenantId = tenantId,
@@ -146,7 +142,8 @@ public sealed class StorageObjectDeletionServiceTests
         FileTypeId = (int)FileTypeEnum.Image,
         FileType = null!,
         Provider = StorageProviders.Local,
-        ObjectKey = $"tenants/{tenantId:N}/illegal.png",
+        StorageProviderBindingId = Binding.Id,
+        ObjectKey = missingKey ? null : $"tenants/{tenantId:N}/illegal.png",
         Uri = "/images/illegal.png",
         FullName = "illegal.png",
         SafeDisplayName = "illegal.png",

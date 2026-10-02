@@ -150,9 +150,39 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             operations,
             Dependencies.SqlGenerationHelper,
             sqlite: false);
+        var executableOperations = new List<MigrationOperation>(operations.Count);
+        foreach (MigrationOperation operation in operations)
+        {
+            executableOperations.Add(operation);
+            if (operation is not RenameColumnOperation rename ||
+                !((rename.Name == "provider_object_key_uniqueness_hash" &&
+                   rename.NewName == "binding_object_key_uniqueness_hash") ||
+                  (rename.Name == "binding_object_key_uniqueness_hash" &&
+                   rename.NewName == "provider_object_key_uniqueness_hash")))
+                continue;
+
+            var sql = Dependencies.SqlGenerationHelper;
+            string identity = sql.DelimitIdentifier(rename.NewName == "binding_object_key_uniqueness_hash"
+                ? "storage_provider_binding_id" : "provider");
+            string key = sql.DelimitIdentifier("object_key");
+            string identityBytes = $"CAST(CONVERT(LOWER({identity}) USING utf8mb4) AS BINARY)";
+            string keyBytes = $"CAST(CONVERT({key} USING utf8mb4) AS BINARY)";
+            executableOperations.Add(new SqlOperation
+            {
+                Sql = $"""
+                    UPDATE {sql.DelimitIdentifier(rename.Table, rename.Schema)}
+                    SET {sql.DelimitIdentifier(rename.NewName)} = CASE
+                        WHEN {identity} IS NULL OR {key} IS NULL THEN NULL
+                        ELSE UNHEX(SHA2(CONCAT(
+                            UNHEX(LPAD(HEX(OCTET_LENGTH({identityBytes})), 8, '0')), {identityBytes},
+                            UNHEX(LPAD(HEX(OCTET_LENGTH({keyBytes})), 8, '0')), {keyBytes}), 256))
+                    END;
+                    """
+            });
+        }
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
-            base.Generate(operations, model, sqlOptions),
-            operations,
+            base.Generate(executableOperations, model, sqlOptions),
+            executableOperations,
             Dependencies);
     }
 }

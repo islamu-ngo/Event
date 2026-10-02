@@ -68,9 +68,10 @@ public sealed class EventResourceUploadTests
         const string key = "objects/resource.pdf";
         session.BindEventResourceVersion(Guid.CreateVersion7());
         session.ReserveObjectKey(key);
-        session.MarkUploading(now);
+        await Assert.That(() => session.MarkUploading(now)).Throws<InvalidOperationException>();
         await Assert.That(() => session.StageEventResourceObject(objectId)).Throws<InvalidOperationException>();
         session.StorageProviderBindingId = bindingId;
+        session.MarkUploading(now);
         session.StageEventResourceObject(objectId);
         await Assert.That(() => session.Finalize(objectId, key, null, now)).Throws<InvalidOperationException>();
         session.RecordProducerSettlement(objectId, bindingId, key, "version-one");
@@ -101,6 +102,7 @@ public sealed class EventResourceUploadTests
 
     private static StorageUploadSession Session() => new()
     {
+        Id = Guid.CreateVersion7(),
         TenantId = Guid.CreateVersion7(),
         UserId = Guid.CreateVersion7(),
         Provider = StorageProviders.Local,

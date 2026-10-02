@@ -51,7 +51,7 @@ public sealed record AtprotoJetstreamApplyRequest(
 
 public sealed record AtprotoPersistenceApplyResult(
     bool Applied,
-    IReadOnlyList<FileStorageWriteResult> ConsumedStagedThumbnails)
+    IReadOnlyList<StagedStorageWrite> ConsumedStagedThumbnails)
 {
     public static AtprotoPersistenceApplyResult Rejected { get; } = new(false, []);
 }

@@ -57,7 +57,8 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
                 "Public image content");
         }
 
-        if (CanReadContent(dto) && dto.ContentEligibility.PresignedDownloadAllowed)
+        if (CanReadContent(dto) && dto.ContentEligibility.PresignedDownloadAllowed
+            && dto.Provider == StorageProviders.S3Compatible)
         {
             yield return new LinkDefinition(
                 "presigned-download",

@@ -12,7 +12,7 @@ public sealed class StoragePresentationUrlResolverTests
     public StoragePresentationUrlResolverTests()
     {
         _objectStorageService
-            .GeneratePresignedDownloadUrl(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>())
+            .GeneratePresignedDownloadUrl(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string?>())
             .Returns("https://storage.example.test/presigned");
     }
 
@@ -23,9 +23,11 @@ public sealed class StoragePresentationUrlResolverTests
 
         await Assert.That(result).IsNull();
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
     }
 
     [Test]
@@ -35,9 +37,11 @@ public sealed class StoragePresentationUrlResolverTests
 
         await Assert.That(result).IsEqualTo("https://cdn.example.test/images/object.png");
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
     }
 
     [Test]
@@ -50,9 +54,11 @@ public sealed class StoragePresentationUrlResolverTests
 
         await Assert.That(result).IsEqualTo(expected);
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
     }
 
     [Test]
@@ -62,9 +68,11 @@ public sealed class StoragePresentationUrlResolverTests
 
         await Assert.That(result).IsNull();
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
     }
 
     private Task<string?> Resolve(string? value)

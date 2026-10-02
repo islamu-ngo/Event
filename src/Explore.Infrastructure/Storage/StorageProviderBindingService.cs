@@ -69,7 +69,7 @@ public sealed class StorageProviderBindingService(
             new S3PreflightVerifier(config, clientFactory, loggerFactory.CreateLogger<S3PreflightVerifier>()), boundTarget: true);
     }
 
-    private sealed class BoundS3Configuration(StorageProviderBinding binding, IRetainedSecretResolver secrets) : IS3ConfigResolver
+    internal sealed class BoundS3Configuration(StorageProviderBinding binding, IRetainedSecretResolver secrets) : IS3ConfigResolver
     {
         public async Task<S3Configuration?> ResolveAsync(CancellationToken cancellationToken = default)
         {

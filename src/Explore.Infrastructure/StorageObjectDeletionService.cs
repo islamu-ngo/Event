@@ -10,7 +10,7 @@ namespace Explore.Infrastructure;
 
 public sealed class StorageObjectDeletionService(
     IStorageObjectRepository storageObjectRepository,
-    IFileStorageProviderResolver providerResolver,
+    IStorageProviderBindingService providerResolver,
     BusinessMetrics metrics,
     ILogger<StorageObjectDeletionService> logger) : IStorageObjectDeletionService
 {
@@ -60,18 +60,20 @@ public sealed class StorageObjectDeletionService(
 
             if (string.IsNullOrWhiteSpace(storageObject.ObjectKey))
             {
-                storageObject.MarkDeleted(deletedBy, utcNow);
-                await storageObjectRepository.Update(storageObject);
-                missingKeyDeletedCount++;
+                failedCount++;
                 continue;
             }
 
             try
             {
-                var provider = providerResolver.GetRequired(storageObject.Provider);
-                await provider.DeleteAsync(
-                    new FileStorageDeleteInput(storageObject.ObjectKey),
+                var provider = await providerResolver.ResolveTargetAsync(
+                    storageObject.StorageProviderBindingId, storageObject.Provider, cancellationToken);
+                var deleted = await provider.DeleteAsync(
+                    new FileStorageDeleteInput(storageObject.ObjectKey, storageObject.ProviderVersionId),
                     cancellationToken);
+                if (deleted.Provider != storageObject.Provider || deleted.ObjectKey != storageObject.ObjectKey
+                    || deleted.DeleteMarkerCreated)
+                    throw new InvalidOperationException("storage_deletion_unconfirmed");
 
                 storageObject.MarkDeleted(deletedBy, utcNow);
                 await storageObjectRepository.Update(storageObject);

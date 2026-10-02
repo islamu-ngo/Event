@@ -80,7 +80,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         using var meters = new TestMeterFactory();
         using var metrics = new BusinessMetrics(meters);
         var policy = Substitute.For<IStoragePolicyResolver>();
-        var handler = new FinalizeStorageUploadSessionCommandHandler(Substitute.For<IFileStorageProviderResolver>(), policy,
+        var handler = new FinalizeStorageUploadSessionCommandHandler(Substitute.For<IStorageProviderBindingService>(), policy,
             sessions, new StorageUsageCounterRepository(context), new StorageObjectRepository(context),
             new PrivacyErasureStateRepository(context), tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
         var result = await handler.ExecuteAsync(command, default);
@@ -1017,6 +1017,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             new ResolvedStoragePolicy(seed.TenantId, StorageProviders.Local, 1_000_000, quotaBytes, 1_000_000,
                 false, true, SettingSource.SystemDefault, SettingSource.SystemDefault, SettingSource.SystemDefault));
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
         {
             await Assert.That(context.Database.CurrentTransaction).IsNull();

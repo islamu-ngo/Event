@@ -38,6 +38,8 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         var file = Draft(fileId, EventResourceDeliveryTypeEnum.StoredFile);
         var link = Draft(linkId, EventResourceDeliveryTypeEnum.ExternalLink);
         string checksum = Convert.ToHexString(SHA256.HashData("%PDF-1.7\ncleanup\n%%EOF"u8));
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
         var storage = new StorageObject
         {
             Id = objectId,
@@ -46,6 +48,7 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             ObjectKey = $"tenants/{scope.TenantAId:N}/{objectId:N}.pdf",
             Uri = $"/api/eventresource/{fileId}/content",
             FullName = "handout.pdf",

@@ -1,17 +1,100 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, IStorageObjectRepository
+public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, IStorageObjectRepository, IStorageProducerOperationRepository
 {
     private readonly ExploreDbContext _dbContext;
 
     public StorageObjectRepository(ExploreDbContext dbContext) : base(dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task AddProducerAsync(StorageProducerOperation producer, CancellationToken cancellationToken)
+    {
+        RequireProducerTransaction();
+        await _dbContext.Set<StorageProducerOperation>().AddAsync(producer, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<StorageProducerOperation?> FenceProducerAsync(
+        Guid id, Guid tenantId, CancellationToken cancellationToken)
+    {
+        RequireProducerTransaction();
+        var producer = await _dbContext.Set<StorageProducerOperation>().AsNoTracking()
+            .SingleOrDefaultAsync(value => value.Id == id && value.TenantId == tenantId, cancellationToken);
+        if (producer is null) return null;
+        var stamp = Guid.CreateVersion7();
+        int changed = await _dbContext.Set<StorageProducerOperation>()
+            .Where(value => value.Id == id && value.TenantId == tenantId
+                && value.ConcurrencyStamp == producer.ConcurrencyStamp
+                && !_dbContext.StorageObjectDeletionTombstones.Any(work => work.Id == id))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ConcurrencyStamp, stamp),
+                cancellationToken);
+        if (changed != 1)
+            throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
+                "Storage production changed concurrently.");
+        foreach (var entry in _dbContext.ChangeTracker.Entries<StorageProducerOperation>()
+            .Where(entry => entry.Entity.Id == id).ToArray())
+            entry.State = EntityState.Detached;
+        return await _dbContext.Set<StorageProducerOperation>()
+            .SingleAsync(value => value.Id == id && value.TenantId == tenantId, cancellationToken);
+    }
+
+    public async Task SettleProducerAsync(
+        StorageProducerOperation identity, string? providerVersion, CancellationToken cancellationToken)
+    {
+        RequireProducerTransaction();
+        var tombstones = new StorageObjectDeletionTombstoneRepository(_dbContext);
+        var tombstone = await tombstones.GetByIdAsync(identity.Id, cancellationToken);
+        if (tombstone is not null)
+        {
+            if (tombstone.TenantId != identity.TenantId || tombstone.Provider != identity.Provider)
+                throw new InvalidOperationException("storage_producer_identity_mismatch");
+            await tombstones.TrySettleProducerAsync(identity.Id, identity.ProviderBindingId,
+                identity.ObjectKey, providerVersion, DateTime.UtcNow, cancellationToken);
+            return;
+        }
+        var producer = await FenceProducerAsync(identity.Id, identity.TenantId, cancellationToken)
+            ?? throw new InvalidOperationException("storage_producer_unavailable");
+        producer.Settle(identity.ProviderBindingId, identity.Provider, identity.ObjectKey, providerVersion);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task CompleteProducerAsync(
+        StorageProducerOperation producer, StorageObject storageObject, CancellationToken cancellationToken)
+    {
+        RequireProducerTransaction();
+        if (!producer.ProducerSettled || storageObject.Id != producer.Id
+            || storageObject.TenantId != producer.TenantId || storageObject.Provider != producer.Provider
+            || storageObject.StorageProviderBindingId != producer.ProviderBindingId
+            || storageObject.ObjectKey != producer.ObjectKey || storageObject.ProviderVersionId != producer.ProviderVersionId
+            || _dbContext.Entry(producer).State != EntityState.Unchanged)
+            throw new InvalidOperationException("storage_producer_identity_mismatch");
+        _dbContext.Set<StorageProducerOperation>().Remove(producer);
+        await _dbContext.StorageObjects.AddAsync(storageObject, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RetireProducerAsync(Guid id, Guid tenantId, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        var producer = await FenceProducerAsync(id, tenantId, cancellationToken);
+        // Activation or an earlier retirement already transferred this producer's authority.
+        if (producer is null) return;
+        await _dbContext.StorageObjectDeletionTombstones.AddAsync(producer.Retire(utcNow), cancellationToken);
+        _dbContext.Set<StorageProducerOperation>().Remove(producer);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private void RequireProducerTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Storage production requires a caller-owned transaction.");
     }
 
     public Task<StorageObject?> GetForAuthorizationAsync(Guid id, Guid tenantId, CancellationToken cancellationToken) =>
@@ -155,11 +238,11 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
     }
 
     public async Task<IReadOnlyList<string>> ListKnownObjectKeysAsync(
-        string provider,
+        IReadOnlyCollection<Guid> bindingIds,
         IReadOnlyCollection<string> objectKeys,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(provider) || objectKeys.Count == 0)
+        if (bindingIds.Count == 0 || objectKeys.Count == 0)
         {
             return [];
         }
@@ -168,13 +251,23 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
             .AsNoTracking()
             .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceStorageAdministration)
             .Where(storageObject =>
-                storageObject.Provider == provider &&
+                storageObject.StorageProviderBindingId.HasValue &&
+                bindingIds.Contains(storageObject.StorageProviderBindingId.Value) &&
                 storageObject.ObjectKey != null &&
                 objectKeys.Contains(storageObject.ObjectKey))
             .Select(storageObject => storageObject.ObjectKey!)
             .Union(_dbContext.StorageObjectDeletionTombstones.AsNoTracking()
-                .Where(work => work.Provider == provider && objectKeys.Contains(work.ObjectKey))
+                .Where(work => bindingIds.Contains(work.ProviderBindingId) && objectKeys.Contains(work.ObjectKey))
                 .Select(work => work.ObjectKey))
+            .Union(_dbContext.StorageUploadSessions.AsNoTracking()
+                .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceStorageAdministration)
+                .Where(session => session.StorageProviderBindingId.HasValue
+                    && bindingIds.Contains(session.StorageProviderBindingId.Value)
+                    && session.ObjectKey != null && objectKeys.Contains(session.ObjectKey))
+                .Select(session => session.ObjectKey!))
+            .Union(_dbContext.Set<StorageProducerOperation>().AsNoTracking()
+                .Where(producer => bindingIds.Contains(producer.ProviderBindingId) && objectKeys.Contains(producer.ObjectKey))
+                .Select(producer => producer.ObjectKey))
             .ToListAsync(cancellationToken);
     }
 

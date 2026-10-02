@@ -100,6 +100,74 @@ Destructive cleanup requires both `DryRun=false` and the specific mutation flag.
 
 ## Upload And Download Flow
 
+### Captured target and producer ownership
+
+Managed objects use an immutable `StorageProviderBinding`, not the current provider
+label as their physical destination. Generic and resource upload reservations capture
+the binding before finalization. Finalization records the exact key before provider
+I/O and preserves acknowledged provider versions. Reads, presigning, reconciliation
+and deletion resolve that binding; missing or mismatched bindings fail closed.
+
+CSV submission output and federation thumbnail staging use
+`StorageProducerOperation` because they have no user upload session. The operation
+and binding commit before the persistent write. A compare-and-swap transaction
+transfers a settled producer into `StorageObject`; abandonment instead transfers
+its exact target/version into `StorageObjectDeletionTombstone`. These transfers
+cannot both win. An unknown write remains unsettled cleanup authority, not a
+successful deletion. Provider calls stay outside database transactions.
+
+CSV storage connections must select `local` or `s3_compatible` explicitly in
+`ProviderWorkspaceId`; an arbitrary workspace identifier is not a storage target.
+The captured binding still owns the physical root/bucket and retained credential
+references. Disclosure expiry before handoff prevents producer admission. Expiry
+after a settled write transfers the producer to deletion authority without
+activating a readable storage row.
+
+Local inventory groups captured bindings by their physical root and recognizes
+object metadata, upload sessions, producer operations and tombstones. A different
+binding row for the same root does not make another producer's key an orphan.
+Inspection spools and bounded federation downloads remain temporary inputs.
+Explicit `legacy_external` references do not own managed bytes or gain a fabricated
+binding.
+
+The producer port is not the shared-reference retirement API. Attachment fences,
+reference/hold checks and generalized source retirement remain separate work.
+Future retirement must consume producer operations under their operation fence
+before transferring authority, and use the storage-row fence after activation.
+Never discard an unsettled operation merely because its creation time is old.
+The existing erasure owner may clear a deleted metadata row's key while retaining
+its captured binding. The model permits that terminal metadata shape, but not a
+different replacement key; a cleared key is not evidence of provider absence.
+Retirement integration must preserve the retained provider work that owns cleanup.
+
+Schema integration requires generated provider migrations for the producer table,
+binding-scoped key indexes and managed-target checks. The captured-target migrations
+follow canonical identity ownership in each application catalog; no retained
+erasure, credential or Data Protection catalog changes are part of targeting.
+Existing managed rows must already have a trustworthy captured binding. Never
+infer an old root or bucket from the current provider settings to make migration
+or reads succeed.
+
+MySQL and MariaDB replace the long `(binding, object key)` index with a persisted
+`binary(32)` SHA-256 identity populated by `ExploreDbContext.SaveChanges`.
+`PortableRelationalModelPolicy` applies this to metadata and producer operations.
+Length-prefixed UTF-8 components include the binding UUID, not the provider label:
+the same key on two targets is distinct, while producer-to-metadata transfer
+retains the same byte identity. Other providers retain their binding-scoped
+relational key indexes.
+
+The native MySQL migration SQL generator recomputes that derived identity when
+the hash column changes between provider-wide and binding-scoped inputs. A
+column rename alone would retain old digests and permit a later duplicate target
+key. Both directions use the same length-prefixed byte encoding as the runtime;
+the generated migration and snapshot files remain untouched. Downgrading data
+that now uses one provider key on multiple targets can fail the older uniqueness
+constraint rather than silently merging distinct byte owners.
+
+Local files expose the mediated content route, not the S3-only presign affordance.
+S3 signing uses the captured bucket and exact version; a missing version in a
+versioned bucket is rejected instead of signing the latest object.
+
 1. Browser callers ask the Blazor BFF for an upload session with filename, content type, and expected byte count.
 2. The BFF calls the provider-neutral API upload-session endpoint. The API resolves tenant policy, max upload size, provider, quota, and reservation state.
 3. The BFF stores only the API upload-session id, owner, content type, expected size, and expiry in distributed cache, then returns an opaque `uploadSessionId` to the browser.
@@ -161,10 +229,22 @@ Object storage is always part of the backup set when users can upload files.
 - Back up storage secrets and environment configuration with the same release manifest as the database backup.
 - Restore object storage before reopening user traffic, then verify representative object metadata resolves to actual objects.
 - During rollback, verify the application version still understands the stored `StorageObject` metadata and key layout.
+- Preserve every captured root/bucket, provider version and retained secret reference,
+  including targets no longer selected by current settings. Back up outstanding
+  producer operations and tombstones with the database.
 
 See [BACKUP_RESTORE_UPGRADE.md](BACKUP_RESTORE_UPGRADE.md) for the full operational runbook.
 
 ### Relocating Earlier Standalone Uploads
+
+For already-bound files, preserve the captured absolute mount path. Changing
+`Storage:Local:RootPath` selects a target for future reservations; it does not
+relocate existing files. Before upgrading unbound development rows, inventory
+metadata and verify original bytes, keys, checksums and target identity. An
+operator-reviewed repair must establish that historical target explicitly;
+otherwise re-upload from a trusted source. An approved disposable development
+environment may be recreated through its existing reset procedure. There is no
+automatic historical-binding backfill or runtime deletion of unbound rows.
 
 The new Standalone default does not move existing bytes. Before replacing an
 older container, stop application writes and reconciliation/deletion workers.
@@ -194,7 +274,8 @@ The reconciliation worker compares `StorageObject` metadata with provider backin
 These generic loops exclude event-resource purpose, ownership, retained
 attachment references and deletion tombstones. The same job separately invokes
 the fenced resource lifecycle worker; it never treats upload staging as an
-ordinary deletion request. Tombstone keys remain known to inventory after
+ordinary deletion request. Upload-session and producer keys are also known.
+Tombstone keys remain known to inventory after
 source metadata is removed. Resource retirement, unknown-producer handling and
 immutable target recovery are specified in
 [Event Resources](EVENT_RESOURCES.md#retirement-and-producer-settlement).

@@ -571,6 +571,109 @@ public sealed class ExploreDbContextModelProviderTests
     }
 
     [Test]
+    [Arguments("MariaDb")]
+    [Arguments("MySql")]
+    public async Task ManagedStorageUniquenessUsesCapturedTargetInsteadOfProviderLabel(string provider)
+    {
+        using var context = CreateContext(provider);
+        Guid tenantId = Guid.CreateVersion7();
+        var firstTarget = Explore.Domain.StorageProviderBinding.Local(
+            Path.Combine(Path.GetTempPath(), Guid.CreateVersion7().ToString("N")));
+        var secondTarget = Explore.Domain.StorageProviderBinding.Local(
+            Path.Combine(Path.GetTempPath(), Guid.CreateVersion7().ToString("N")));
+        const string objectKey = "objects/shared-key.png";
+        var first = new Explore.Domain.StorageObject
+        {
+            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
+            ActorId = Guid.CreateVersion7(), Actor = null!,
+            Provider = "local", StorageProviderBindingId = firstTarget.Id, ObjectKey = objectKey,
+            FileType = null!, Uri = string.Empty, FullName = "shared-key.png",
+            SafeDisplayName = "shared-key.png", Extension = "png",
+            Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
+        };
+        var duplicate = new Explore.Domain.StorageObject
+        {
+            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
+            ActorId = Guid.CreateVersion7(), Actor = null!,
+            Provider = "local", StorageProviderBindingId = firstTarget.Id, ObjectKey = objectKey,
+            FileType = null!, Uri = string.Empty, FullName = "shared-key.png",
+            SafeDisplayName = "shared-key.png", Extension = "png",
+            Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
+        };
+        var otherTarget = new Explore.Domain.StorageObject
+        {
+            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
+            ActorId = Guid.CreateVersion7(), Actor = null!,
+            Provider = "local", StorageProviderBindingId = secondTarget.Id, ObjectKey = objectKey,
+            FileType = null!, Uri = string.Empty, FullName = "shared-key.png",
+            SafeDisplayName = "shared-key.png", Extension = "png",
+            Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
+        };
+        var producer = Explore.Domain.StorageProducerOperation.Create(
+            Guid.CreateVersion7(), tenantId, firstTarget, objectKey,
+            new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc));
+        context.AddRange(first, duplicate, otherTarget, producer);
+        context.SavingChanges += (_, _) => throw new StorageStoreBoundaryReachedException();
+
+        await Assert.That(async () => await context.SaveChangesAsync())
+            .Throws<StorageStoreBoundaryReachedException>();
+
+        byte[] firstHash = (byte[])context.Entry(first).Property("BindingObjectKeyUniquenessHash").CurrentValue!;
+        byte[] duplicateHash = (byte[])context.Entry(duplicate).Property("BindingObjectKeyUniquenessHash").CurrentValue!;
+        byte[] otherHash = (byte[])context.Entry(otherTarget).Property("BindingObjectKeyUniquenessHash").CurrentValue!;
+        byte[] producerHash = (byte[])context.Entry(producer).Property("BindingObjectKeyUniquenessHash").CurrentValue!;
+        await Assert.That(firstHash.SequenceEqual(duplicateHash)).IsTrue();
+        await Assert.That(firstHash.SequenceEqual(otherHash)).IsFalse();
+        await Assert.That(firstHash.SequenceEqual(producerHash)).IsTrue();
+        foreach (Type owner in new[] { typeof(Explore.Domain.StorageObject), typeof(Explore.Domain.StorageProducerOperation) })
+        {
+            var model = context.GetService<IDesignTimeModel>().Model.FindEntityType(owner)!;
+            await Assert.That(model.GetIndexes().Any(index => index.IsUnique &&
+                index.Properties.Select(property => property.Name).SequenceEqual(["BindingObjectKeyUniquenessHash"]))).IsTrue();
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task StorageHashRenameRecomputesTheChangedIdentityBeforeFurtherMigrationOperations(bool rollback)
+    {
+        using var providerContext = CreateContext("MySql");
+        var options = new DbContextOptionsBuilder<ExploreDbContext>(
+            (DbContextOptions<ExploreDbContext>)providerContext.GetService<IDbContextOptions>());
+        options.ReplaceService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsSqlGenerator,
+            ConfigurableMySqlMigrationsSqlGenerator>();
+        using var context = new ExploreDbContext(options.Options);
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var storage = model.FindEntityType(typeof(Explore.Domain.StorageObject))!;
+        IModel targetModel = rollback
+            ? context.GetService<IModelRuntimeInitializer>().Initialize(
+                new Explore.Persistence.Migrations.MySql.Migrations.CanonicalIdentityEmailOwnership().TargetModel,
+                designTime: true)
+            : model;
+        var generator = context.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsSqlGenerator>();
+        var commands = generator.Generate(
+        [
+            new Microsoft.EntityFrameworkCore.Migrations.Operations.RenameColumnOperation
+            {
+                Table = storage.GetTableName()!, Schema = storage.GetSchema(),
+                Name = rollback ? "binding_object_key_uniqueness_hash" : "provider_object_key_uniqueness_hash",
+                NewName = rollback ? "provider_object_key_uniqueness_hash" : "binding_object_key_uniqueness_hash"
+            }
+        ], targetModel);
+
+        string identityTransform = commands.Single(command =>
+            command.CommandText.TrimStart().StartsWith("UPDATE ", StringComparison.Ordinal)).CommandText;
+        await Assert.That(identityTransform.Contains(
+            rollback ? "`provider`" : "`storage_provider_binding_id`", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(identityTransform.Contains("`object_key`", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(identityTransform.Contains("OCTET_LENGTH(", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(identityTransform.Contains("SHA2(", StringComparison.Ordinal)).IsTrue();
+    }
+
+    private sealed class StorageStoreBoundaryReachedException : Exception;
+
+    [Test]
     [Arguments("PostgreSql")]
     [Arguments("Sqlite")]
     [Arguments("SqlServer")]

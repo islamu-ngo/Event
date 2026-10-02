@@ -27,8 +27,28 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
     public Guid? ExpectedResourceVersion { get; private set; }
     public Guid? FinalizedResourceVersion { get; private set; }
     public required string Status { get; set; }
-    public string? ObjectKey { get; set; }
-    public Guid? StorageProviderBindingId { get; set; }
+    private string? _objectKey;
+    public string? ObjectKey
+    {
+        get => _objectKey;
+        set
+        {
+            if (_objectKey is not null && _objectKey != value)
+                throw new InvalidOperationException("A reserved object key cannot be changed.");
+            _objectKey = value;
+        }
+    }
+    private Guid? _storageProviderBindingId;
+    public Guid? StorageProviderBindingId
+    {
+        get => _storageProviderBindingId;
+        set
+        {
+            if (_storageProviderBindingId.HasValue && _storageProviderBindingId != value)
+                throw new InvalidOperationException("A captured upload target cannot be changed.");
+            _storageProviderBindingId = value;
+        }
+    }
     public string? ProviderVersionId { get; set; }
     public bool ProducerSettled { get; private set; }
     public string? Sha256Checksum { get; set; }
@@ -80,9 +100,9 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
     /// <summary>Acknowledges an exact completed write without reopening a canceled or failed session.</summary>
     public void RecordProducerSettlement(Guid objectId, Guid bindingId, string objectKey, string? providerVersion)
     {
-        if (Purpose != StorageObjectPurposes.EventResource || !ExpectedResourceVersion.HasValue
-            || objectId == Guid.Empty || bindingId == Guid.Empty
-            || StorageObjectId != objectId || StorageProviderBindingId != bindingId
+        var expectedObjectId = Purpose == StorageObjectPurposes.EventResource ? StorageObjectId : Id;
+        if (UploadStartedAt is null || objectId == Guid.Empty || bindingId == Guid.Empty
+            || expectedObjectId != objectId || StorageProviderBindingId != bindingId
             || !string.Equals(ObjectKey, objectKey, StringComparison.Ordinal)
             || providerVersion is { Length: 0 or > 1024 }
             || ProducerSettled && !string.Equals(ProviderVersionId, providerVersion, StringComparison.Ordinal))
@@ -93,7 +113,7 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
 
     public void ReserveObjectKey(string objectKey)
     {
-        if (Status != StorageUploadSessionStates.Reserved)
+        if (Status != StorageUploadSessionStates.Reserved || ObjectKey is not null)
         {
             throw new InvalidOperationException("Only reserved upload sessions can reserve an object key.");
         }
@@ -108,7 +128,10 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
 
     public void MarkUploading(DateTime utcNow)
     {
-        if (Status != StorageUploadSessionStates.Reserved)
+        if (Status != StorageUploadSessionStates.Reserved || Id == Guid.Empty
+            || StorageProviderBindingId is null || StorageProviderBindingId == Guid.Empty
+            || Provider is not (StorageProviders.Local or StorageProviders.S3Compatible)
+            || string.IsNullOrWhiteSpace(ObjectKey))
         {
             throw new InvalidOperationException("Only reserved upload sessions can start uploading.");
         }
@@ -129,10 +152,10 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
             throw new ArgumentException("Finalized storage sessions require a provider object key.", nameof(objectKey));
         }
 
-        if (Purpose == StorageObjectPurposes.EventResource
-            && (!ProducerSettled || StorageObjectId != storageObjectId
-                || !string.Equals(ObjectKey, objectKey, StringComparison.Ordinal)))
-            throw new InvalidOperationException("Resource attachment requires the exact settled producer identity.");
+        var expectedObjectId = Purpose == StorageObjectPurposes.EventResource ? StorageObjectId : Id;
+        if (!ProducerSettled || expectedObjectId != storageObjectId
+            || !string.Equals(ObjectKey, objectKey, StringComparison.Ordinal))
+            throw new InvalidOperationException("Finalization requires the exact settled producer identity.");
 
         StorageObjectId = storageObjectId;
         ObjectKey = objectKey;

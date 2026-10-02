@@ -92,7 +92,9 @@ public class IssuePresignedDownloadUrlCommandHandler : ICommandHandler<IssuePres
                 return null;
         }
 
-        if (string.IsNullOrWhiteSpace(storageObject.ObjectKey))
+        if (string.IsNullOrWhiteSpace(storageObject.ObjectKey)
+            || storageObject.StorageProviderBindingId is null || storageObject.StorageProviderBindingId == Guid.Empty
+            || storageObject.Provider != StorageProviders.S3Compatible)
         {
             _logger.LogWarning(
                 "Storage object has no provider object key for presigned download. StorageObjectId={StorageObjectId}",
@@ -104,9 +106,11 @@ public class IssuePresignedDownloadUrlCommandHandler : ICommandHandler<IssuePres
         {
             var safeDisplayName = ResolveSafeDisplayName(storageObject);
             var presignedUrl = await _objectStorageService.GeneratePresignedDownloadUrl(
+                storageObject.StorageProviderBindingId.Value,
                 storageObject.ObjectKey,
                 safeDisplayName,
-                request.ExpirationMinutes);
+                request.ExpirationMinutes,
+                storageObject.ProviderVersionId);
 
             return new PresignedDownloadUrlResponseDto
             {

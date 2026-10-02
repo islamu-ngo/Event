@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3X8G5F95F2VDAMGRX1JQCJK
+Title: "Pin managed files to immutable storage targets"
+Type: feat
+Scope: storage
+Summary: "Managed uploads, generated CSVs and imported thumbnails capture durable targets before provider I/O. Reads, signing, finalization and cleanup use the captured binding, key and version without current-backend fallback; ordered migrations enforce the same identity across supported providers."
+Group: storage-targeting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

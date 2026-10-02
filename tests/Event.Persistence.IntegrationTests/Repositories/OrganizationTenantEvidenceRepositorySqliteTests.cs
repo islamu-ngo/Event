@@ -170,6 +170,8 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
             ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
             ApprovalStatus = null!
         };
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
         var document = new StorageObject
         {
             Id = Guid.CreateVersion7(),
@@ -182,6 +184,7 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
             Uri = string.Empty,
             ObjectKey = $"tenants/{tenantId:N}/evidence.pdf",
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             Extension = "pdf",
             ContentType = "application/pdf",
             Size = 5,

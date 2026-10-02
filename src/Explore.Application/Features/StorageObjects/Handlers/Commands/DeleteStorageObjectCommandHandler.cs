@@ -10,12 +10,12 @@ namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 public class DeleteStorageObjectCommandHandler : ICommandHandler<DeleteStorageObjectCommand, bool>
 {
     private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IFileStorageProviderResolver _providerResolver;
+    private readonly IStorageProviderBindingService _providerResolver;
     private readonly BusinessMetrics _metrics;
 
     public DeleteStorageObjectCommandHandler(
         IStorageObjectRepository storageObjectRepository,
-        IFileStorageProviderResolver providerResolver,
+        IStorageProviderBindingService providerResolver,
         BusinessMetrics metrics)
     {
         _storageObjectRepository = storageObjectRepository;
@@ -47,8 +47,12 @@ public class DeleteStorageObjectCommandHandler : ICommandHandler<DeleteStorageOb
 
         try
         {
-            var provider = _providerResolver.GetRequired(entity.Provider);
-            await provider.DeleteAsync(new FileStorageDeleteInput(entity.ObjectKey), cancellationToken);
+            var provider = await _providerResolver.ResolveTargetAsync(
+                entity.StorageProviderBindingId, entity.Provider, cancellationToken);
+            var deleted = await provider.DeleteAsync(
+                new FileStorageDeleteInput(entity.ObjectKey, entity.ProviderVersionId), cancellationToken);
+            if (deleted.Provider != entity.Provider || deleted.ObjectKey != entity.ObjectKey || deleted.DeleteMarkerCreated)
+                throw new InvalidOperationException("storage_deletion_unconfirmed");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

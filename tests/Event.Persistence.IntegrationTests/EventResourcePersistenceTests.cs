@@ -568,8 +568,10 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
                 AdmissionTargetTypeEnum.EventDay, dayC.Id, null);
             context.AdmissionTargets.AddRange(targetA, targetB, targetC);
             FileType fileType = await context.FileTypes.FirstAsync();
-            StorageObject storageA = NewStorage(tenantA, fileType, (long)int.MaxValue + 42L);
-            StorageObject storageB = NewStorage(tenantB, fileType, 10);
+            var binding = StorageProviderBinding.Local(Path.GetTempPath());
+            context.Add(binding);
+            StorageObject storageA = NewStorage(tenantA, fileType, (long)int.MaxValue + 42L, binding);
+            StorageObject storageB = NewStorage(tenantB, fileType, 10, binding);
             context.StorageObjects.AddRange(storageA, storageB);
             await SaveSeedAsync(context, "session/catalog/target/storage graph");
 
@@ -652,7 +654,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             return catalog;
         }
 
-        private static StorageObject NewStorage(Tenant tenant, FileType fileType, long size) => new()
+        private static StorageObject NewStorage(Tenant tenant, FileType fileType, long size, StorageProviderBinding binding) => new()
         {
             Id = Guid.CreateVersion7(),
             TenantId = tenant.Id,
@@ -661,6 +663,8 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             FileType = fileType,
             Uri = $"private://{Guid.CreateVersion7():N}",
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = $"fixtures/{Guid.CreateVersion7():N}.pdf",
             FullName = "resource.pdf",
             SafeDisplayName = "resource.pdf",
             Extension = ".pdf",

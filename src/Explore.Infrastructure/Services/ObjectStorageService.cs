@@ -6,8 +6,13 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Secrets;
+using Explore.Application.Models;
+using Explore.Domain;
 using Explore.Infrastructure.Storage;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry;
 
 namespace Explore.Infrastructure.Services;
 
@@ -16,34 +21,43 @@ public class ObjectStorageService : IObjectStorageService
     private readonly IS3ConfigResolver _configResolver;
     private readonly IS3ClientFactory _clientFactory;
     private readonly ILogger<ObjectStorageService> _logger;
+    private readonly IStorageProviderBindingRepository _bindings;
+    private readonly IRetainedSecretResolver _secrets;
 
     public ObjectStorageService(
         IS3ConfigResolver configResolver,
         IS3ClientFactory clientFactory,
-        ILogger<ObjectStorageService> logger)
+        ILogger<ObjectStorageService> logger,
+        IStorageProviderBindingRepository bindings,
+        IRetainedSecretResolver secrets)
     {
         _configResolver = configResolver;
         _clientFactory = clientFactory;
         _logger = logger;
+        _bindings = bindings;
+        _secrets = secrets;
     }
 
-    public async Task<(Stream FileStream, string ContentType)> GetFileStream(string fileKey)
+    public async Task<(Stream FileStream, string ContentType)> GetFileStream(
+        Guid bindingId, string fileKey, string? providerVersionId = null)
     {
+        using var instrumentation = SuppressInstrumentationScope.Begin();
         if (string.IsNullOrWhiteSpace(fileKey))
             throw new ArgumentException("fileKey must be provided", nameof(fileKey));
 
-        var config = await _configResolver.ResolveAsync();
-        if (config is null)
-            throw new InvalidOperationException("S3 storage is not configured.");
+        var config = await ResolveBoundAsync(bindingId);
 
         var client = _clientFactory.CreateDataClient(config);
+        await S3FileStorageProvider.RequireCapturedVersionAsync(
+            client, config.BucketName, providerVersionId, CancellationToken.None);
 
         try
         {
             var request = new GetObjectRequest
             {
                 BucketName = config.BucketName,
-                Key = fileKey
+                Key = fileKey,
+                VersionId = providerVersionId
             };
 
             var response = await client.GetObjectAsync(request);
@@ -51,24 +65,24 @@ public class ObjectStorageService : IObjectStorageService
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            throw new KeyNotFoundException($"S3 object not found. Key: {fileKey}", ex);
+            throw new KeyNotFoundException("Storage object not found.", ex);
         }
     }
 
-    Task<(Stream FileStream, string ContentType)> IObjectStorageService.GetFileStream(string fileKey)
-        => GetFileStream(fileKey);
-
     public async Task<string> GeneratePresignedDownloadUrl(
+        Guid bindingId,
         string objectKey,
         string safeDisplayName,
-        int expirationMinutes = 60)
+        int expirationMinutes = 60,
+        string? providerVersionId = null)
     {
+        using var instrumentation = SuppressInstrumentationScope.Begin();
         if (string.IsNullOrWhiteSpace(objectKey))
             throw new ArgumentException("objectKey must be provided", nameof(objectKey));
 
-        var config = await _configResolver.ResolveAsync();
-        if (config is null)
-            throw new InvalidOperationException("S3 storage is not configured.");
+        var config = await ResolveBoundAsync(bindingId);
+        await S3FileStorageProvider.RequireCapturedVersionAsync(
+            _clientFactory.CreateDataClient(config), config.BucketName, providerVersionId, CancellationToken.None);
 
         var presignClient = _clientFactory.CreatePresignClient(config);
 
@@ -76,6 +90,7 @@ public class ObjectStorageService : IObjectStorageService
         {
             BucketName = config.BucketName,
             Key = objectKey,
+            VersionId = providerVersionId,
             Verb = HttpVerb.GET,
             Expires = DateTime.UtcNow.AddMinutes(expirationMinutes),
             ResponseHeaderOverrides = new ResponseHeaderOverrides
@@ -100,6 +115,18 @@ public class ObjectStorageService : IObjectStorageService
         }
 
         return downloadUrl;
+    }
+
+    private async Task<S3Configuration> ResolveBoundAsync(Guid bindingId)
+    {
+        if (bindingId == Guid.Empty)
+            throw new InvalidOperationException("storage_provider_binding_unavailable");
+        var binding = await _bindings.GetByIdAsync(bindingId, CancellationToken.None)
+            ?? throw new InvalidOperationException("storage_provider_binding_unavailable");
+        if (binding.Provider != StorageProviders.S3Compatible)
+            throw new InvalidOperationException("storage_provider_binding_mismatch");
+        return await new StorageProviderBindingService.BoundS3Configuration(binding, _secrets).ResolveAsync()
+            ?? throw new InvalidOperationException("storage_provider_binding_unavailable");
     }
 
     private static string BuildAttachmentContentDisposition(string safeDisplayName)

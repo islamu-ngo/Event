@@ -91,6 +91,8 @@ public sealed class EventHeavyRedactionRepositoryTests(PostgreSqlContainerFixtur
         context.Actors.Add(actor);
         await context.SaveChangesAsync();
 
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
         var image = new StorageObject
         {
             Id = Guid.NewGuid(),
@@ -101,6 +103,7 @@ public sealed class EventHeavyRedactionRepositoryTests(PostgreSqlContainerFixtur
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             ObjectKey = $"tenants/{tenant.Id:N}/illegal.png",
             Uri = "/images/illegal.png",
             FullName = "illegal.png",

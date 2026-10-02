@@ -8,6 +8,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Federation.Atproto.Handlers.Commands;
 using Explore.Application.Features.Federation.Atproto.Models;
@@ -16,6 +17,7 @@ using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Features.Federation.Atproto.Validators;
 using Explore.Application.Models.Storage;
 using Explore.Application.Services;
+using Explore.Application.Settings;
 using Explore.Atproto.Transport;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -31,6 +33,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Federation;
 
@@ -511,7 +514,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             Provider = stagedProvider,
             ObjectKey = stagedObjectKey
         };
-        var gateway = new DeterministicStagedThumbnailGateway(staged);
+        var gateway = new DeterministicStagedThumbnailGateway(PersistStagedThumbnail(scope.TenantId, staged));
         var handler = new ImportAtprotoFederatedEventCommandHandler(repository, gateway);
 
         bool applied = await handler.ExecuteAsync(
@@ -1594,13 +1597,15 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await using ServiceProvider serviceProvider = services.BuildIsolatedServiceProvider();
             IFileStorageProvider storage = serviceProvider.GetRequiredService<IFileStorageProvider>();
             var transport = new DeterministicThumbnailTransport(RealPipelineImageBytes);
+            await using ExploreDbContext context = fixture.CreateDbContext();
+            var production = CreateProducer(context, storageRoot);
             var gateway = new AtprotoThumbnailBlobGateway(
                 transport.CreatePrimaryHandler,
-                storage,
+                production.Producer,
+                production.Policy,
                 maximumBytes: RealPipelineImageBytes.Length,
                 requestTimeout: TimeSpan.FromSeconds(5));
 
-            await using ExploreDbContext context = fixture.CreateDbContext();
             var repository = new AtprotoJetstreamRepository(context);
             DateTime observedAt = CurrentUtc();
             AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
@@ -1714,12 +1719,14 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                     Options.Create(new LocalFileStorageOptions { RootPath = storageRoot }),
                     NullLogger<LocalFileStorageProvider>.Instance);
                 var transport = new DeterministicThumbnailTransport(bytes, mimeType);
+                await using ExploreDbContext context = fixture.CreateDbContext();
+                var production = CreateProducer(context, storageRoot);
                 var gateway = new AtprotoThumbnailBlobGateway(
                     transport.CreatePrimaryHandler,
-                    storage,
+                    production.Producer,
+                    production.Policy,
                     maximumBytes: bytes.Length,
                     requestTimeout: TimeSpan.FromSeconds(5));
-                await using ExploreDbContext context = fixture.CreateDbContext();
                 var repository = new AtprotoJetstreamRepository(context);
                 DateTime observedAt = CurrentUtc();
                 AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
@@ -1805,12 +1812,14 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                     Options.Create(new LocalFileStorageOptions { RootPath = storageRoot }),
                     NullLogger<LocalFileStorageProvider>.Instance);
                 var transport = new DeterministicThumbnailTransport(bytes, mimeType);
+                await using ExploreDbContext context = fixture.CreateDbContext();
+                var production = CreateProducer(context, storageRoot);
                 var gateway = new AtprotoThumbnailBlobGateway(
                     transport.CreatePrimaryHandler,
-                    storage,
+                    production.Producer,
+                    production.Policy,
                     maximumBytes: bytes.Length,
                     requestTimeout: TimeSpan.FromSeconds(5));
-                await using ExploreDbContext context = fixture.CreateDbContext();
                 var repository = new AtprotoJetstreamRepository(context);
                 DateTime observedAt = CurrentUtc();
                 AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
@@ -1898,13 +1907,15 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await using ServiceProvider serviceProvider = services.BuildIsolatedServiceProvider();
             IFileStorageProvider storage = serviceProvider.GetRequiredService<IFileStorageProvider>();
             var transport = new DeterministicThumbnailTransport(bytes, "image/png");
+            await using ExploreDbContext context = fixture.CreateDbContext();
+            var production = CreateProducer(context, storageRoot);
             var gateway = new AtprotoThumbnailBlobGateway(
                 transport.CreatePrimaryHandler,
-                storage,
+                production.Producer,
+                production.Policy,
                 maximumBytes: bytes.Length,
                 requestTimeout: TimeSpan.FromSeconds(5));
 
-            await using ExploreDbContext context = fixture.CreateDbContext();
             var repository = new AtprotoJetstreamRepository(context);
             DateTime observedAt = CurrentUtc();
             AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
@@ -2015,7 +2026,8 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 CancellationToken.None)).Single();
             byte[] initialBytes = RealPipelineImageBytes;
             await using var initialContent = new MemoryStream(initialBytes, writable: false);
-            FileStorageWriteResult initialStage = await storage.WriteAsync(
+            var producer = CreateProducer(context, storageRoot).Producer;
+            StagedStorageWrite initialStage = await producer.WriteAsync(StorageProviders.Local,
                 new FileStorageWriteInput(
                     scope.TenantId,
                     initialContent,
@@ -2068,11 +2080,11 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await Assert.That(session.Slug).IsEqualTo(sessionSlug);
             await Assert.That(session.LocalStartTime).IsEqualTo(new TimeOnly(15, 0));
             await Assert.That(session.LocalEndTime).IsEqualTo(new TimeOnly(16, 0));
-            await Assert.That(initialImage.ObjectKey).IsEqualTo(initialStage.ObjectKey);
-            await Assert.That(initialImage.Size).IsEqualTo(initialStage.SizeBytes);
-            await Assert.That(initialImage.Sha256Checksum).IsEqualTo(initialStage.Sha256Checksum);
+            await Assert.That(initialImage.ObjectKey).IsEqualTo(initialStage.Write.ObjectKey);
+            await Assert.That(initialImage.Size).IsEqualTo(initialStage.Write.SizeBytes);
+            await Assert.That(initialImage.Sha256Checksum).IsEqualTo(initialStage.Write.Sha256Checksum);
             FileStorageReadResult storedInitial = await storage.OpenReadAsync(
-                new FileStorageReadInput(initialStage.ObjectKey, "image/png"),
+                new FileStorageReadInput(initialStage.Write.ObjectKey, "image/png"),
                 CancellationToken.None);
             await using (storedInitial.Content)
             {
@@ -2122,7 +2134,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                     CancellationToken.None)).Single();
             byte[] replacementBytes = ReplacementPipelineImageBytes;
             await using var replacementContent = new MemoryStream(replacementBytes, writable: false);
-            FileStorageWriteResult replacementStage = await storage.WriteAsync(
+            StagedStorageWrite replacementStage = await producer.WriteAsync(StorageProviders.Local,
                 new FileStorageWriteInput(
                     scope.TenantId,
                     replacementContent,
@@ -2176,20 +2188,20 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await Assert.That(session.LocalEndTime).IsEqualTo(new TimeOnly(18, 0));
             await Assert.That(images.Length).IsEqualTo(2);
             await Assert.That(retiredImage.Uri.Contains(RealPipelineThumbnailCid, StringComparison.Ordinal)).IsTrue();
-            await Assert.That(retiredImage.Provider).IsEqualTo(initialStage.Provider);
-            await Assert.That(retiredImage.ObjectKey).IsEqualTo(initialStage.ObjectKey);
+            await Assert.That(retiredImage.Provider).IsEqualTo(initialStage.Write.Provider);
+            await Assert.That(retiredImage.ObjectKey).IsEqualTo(initialStage.Write.ObjectKey);
             await Assert.That(retiredImage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
             await Assert.That(replacementImage.Id).IsNotEqualTo(initialImageId);
             await Assert.That(replacementImage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
             await Assert.That(replacementImage.Uri.Contains(ReplacementPipelineThumbnailCid, StringComparison.Ordinal))
                 .IsTrue();
-            await Assert.That(replacementImage.Provider).IsEqualTo(replacementStage.Provider);
-            await Assert.That(replacementImage.ObjectKey).IsEqualTo(replacementStage.ObjectKey);
+            await Assert.That(replacementImage.Provider).IsEqualTo(replacementStage.Write.Provider);
+            await Assert.That(replacementImage.ObjectKey).IsEqualTo(replacementStage.Write.ObjectKey);
             await Assert.That(images.All(value =>
                 value.OwningResourceKind == ResourceKinds.Event
                 && value.OwningResourceId == eventId)).IsTrue();
             FileStorageReadResult storedRetired = await storage.OpenReadAsync(
-                new FileStorageReadInput(initialStage.ObjectKey, "image/png"),
+                new FileStorageReadInput(initialStage.Write.ObjectKey, "image/png"),
                 CancellationToken.None);
             await using (storedRetired.Content)
             {
@@ -2198,7 +2210,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 await Assert.That(storedBytes.ToArray()).IsEquivalentTo(initialBytes);
             }
             FileStorageReadResult storedReplacement = await storage.OpenReadAsync(
-                new FileStorageReadInput(replacementStage.ObjectKey, "image/png"),
+                new FileStorageReadInput(replacementStage.Write.ObjectKey, "image/png"),
                 CancellationToken.None);
             await using (storedReplacement.Content)
             {
@@ -2255,7 +2267,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                         ThumbnailCid,
                         "image/png",
                         8),
-                    StagedThumbnail = StagedThumbnail("thumbnail-pds-absence")
+                    StagedThumbnail = PersistStagedThumbnail(importedScope.TenantId, StagedThumbnail("thumbnail-pds-absence"))
                 }
             ]
         }, CancellationToken.None);
@@ -2506,7 +2518,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         };
     }
 
-    private static AtprotoJetstreamApplyRequest WithStagedThumbnail(
+    private AtprotoJetstreamApplyRequest WithStagedThumbnail(
         AtprotoJetstreamApplyRequest request,
         FileStorageWriteResult stagedThumbnail,
         string thumbnailCid = ThumbnailCid,
@@ -2522,10 +2534,38 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                         thumbnailCid,
                         mimeType,
                         8),
-                    StagedThumbnail = stagedThumbnail
+                    StagedThumbnail = PersistStagedThumbnail(request.EventImports.Single().TenantId, stagedThumbnail)
                 }
             ]
         };
+
+    private StagedStorageWrite PersistStagedThumbnail(Guid tenantId, FileStorageWriteResult written)
+    {
+        using var context = fixture.CreateDbContext();
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        var operation = StorageProducerOperation.Create(Guid.CreateVersion7(), tenantId, binding,
+            string.IsNullOrWhiteSpace(written.ObjectKey) ? $"invalid-result/{Guid.CreateVersion7():N}" : written.ObjectKey,
+            DateTime.UtcNow);
+        operation.Settle(binding.Id, binding.Provider, operation.ObjectKey, written.ProviderVersionId);
+        context.AddRange(binding, operation);
+        context.SaveChanges();
+        return new(operation.Id, tenantId, binding.Id, written);
+    }
+
+    private static (ManagedStorageProducer Producer, IStoragePolicyResolver Policy) CreateProducer(
+        ExploreDbContext context, string root)
+    {
+        Directory.CreateDirectory(root);
+        var options = Options.Create(new LocalFileStorageOptions { RootPath = root });
+        var settings = Substitute.For<IHierarchicalSettingsResolver>();
+        settings.ResolveBatchAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<SettingContext>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        var bindings = new StorageProviderBindingService(new StorageProviderBindingRepository(context), settings,
+            Substitute.For<IRetainedSecretResolver>(), options, Substitute.For<IS3ClientFactory>(), NullLoggerFactory.Instance);
+        var policy = new StoragePolicyResolver(settings, new FileStorageProviderResolver(
+            [new LocalFileStorageProvider(options, NullLogger<LocalFileStorageProvider>.Instance)]));
+        return (new ManagedStorageProducer(bindings, new StorageObjectRepository(context), new EfCoreUnitOfWork(context)), policy);
+    }
 
     private static FileStorageWriteResult StagedThumbnail(
         string suffix,
@@ -2615,30 +2655,30 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         };
     }
 
-    private sealed class DeterministicStagedThumbnailGateway(FileStorageWriteResult staged)
+    private sealed class DeterministicStagedThumbnailGateway(StagedStorageWrite staged)
         : IAtprotoThumbnailBlobGateway
     {
         public int FetchCount { get; private set; }
         public int CleanupCount { get; private set; }
         public FileStorageWriteResult? CleanedStage { get; private set; }
 
-        public Task<FileStorageWriteResult?> FetchAndStageAsync(
+        public Task<StagedStorageWrite?> FetchAndStageAsync(
             AtprotoThumbnailBlobCandidate? candidate,
             Guid tenantId,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             FetchCount++;
-            return Task.FromResult<FileStorageWriteResult?>(staged);
+            return Task.FromResult<StagedStorageWrite?>(staged);
         }
 
         public Task CleanupAsync(
-            FileStorageWriteResult value,
+            StagedStorageWrite value,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             CleanupCount++;
-            CleanedStage = value;
+            CleanedStage = value.Write;
             return Task.CompletedTask;
         }
     }

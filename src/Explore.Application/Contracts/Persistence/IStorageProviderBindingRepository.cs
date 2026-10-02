@@ -7,4 +7,5 @@ public interface IStorageProviderBindingRepository
 {
     Task<StorageProviderBinding?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
     Task AddAsync(StorageProviderBinding binding, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StorageProviderBinding>> ListLocalAsync(CancellationToken cancellationToken);
 }

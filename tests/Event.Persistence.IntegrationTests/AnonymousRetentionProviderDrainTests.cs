@@ -11,6 +11,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Registration;
+using Explore.Infrastructure.Storage;
 using Explore.Infrastructure.Services.Registration.Providers.SubmissionSinks;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -402,10 +403,17 @@ public sealed class AnonymousRetentionProviderDrainTests
             version.AddSection(section);
             form.AddVersion(version);
             var tuple = CsvRegistrationProviderSubmissionSink.SupportedTuple;
-            var connection = RegistrationProviderConnection.Create(fixture.TenantId, "CSV " + target.Id.ToString("N"), RegistrationProviderKindEnum.ExternalApi,
-                RegistrationProviderDeploymentKindEnum.HostedSaas, tuple.ProviderCode, tuple.ProviderDeploymentCode, tuple.ApiVersion,
-                tuple.AdapterPolicyVersion, tuple.ConformanceEvidenceRevision, "https://8.8.8.8", "https://8.8.8.8",
-                "csv-" + target.Id.ToString("N"), null, null, createdAt);
+            var connection = await Context.RegistrationProviderConnections.SingleOrDefaultAsync(value =>
+                value.TenantId == fixture.TenantId && value.ProviderCode == tuple.ProviderCode
+                && value.ProviderWorkspaceId == StorageProviders.Local);
+            if (connection is null)
+            {
+                connection = RegistrationProviderConnection.Create(fixture.TenantId, "CSV " + target.Id.ToString("N"), RegistrationProviderKindEnum.ExternalApi,
+                    RegistrationProviderDeploymentKindEnum.HostedSaas, tuple.ProviderCode, tuple.ProviderDeploymentCode, tuple.ApiVersion,
+                    tuple.AdapterPolicyVersion, tuple.ConformanceEvidenceRevision, "https://8.8.8.8", "https://8.8.8.8",
+                    StorageProviders.Local, null, null, createdAt);
+                Context.Add(connection);
+            }
             var binding = RegistrationProviderBinding.Create(fixture.TenantId, connection.Id, form.Id, version.Id,
                 RegistrationProviderPresentationModeEnum.Manual, RegistrationProviderCollectionModeEnum.MirrorOnly,
                 RegistrationProviderCompletionModeEnum.Callback, RegistrationProviderTrustLevelEnum.SelectedFields, null, createdAt);
@@ -425,7 +433,7 @@ public sealed class AnonymousRetentionProviderDrainTests
                     (int)AdvanceRegistrationObligationEnum.Required, (int)IdentityAccessModeEnum.GuestAllowed, GuestRecoveryPolicyEnum.EmailOptional),
                 workflow.Id, anonymous ? CapabilityTokenHash.Create(Convert.ToBase64String(new byte[32])) : null,
                 "USD", createdAt, Now.AddDays(3), deadline);
-            Context.AddRange(workflow, form, connection, binding, order);
+            Context.AddRange(workflow, form, binding, order);
             await Context.SaveChangesAsync();
             var attempt = RegistrationAttempt.Create(fixture.TenantId, target.Id, order.Id, workflow.Id, requirement.Id, channel.Id,
                 form.Id, version.Id, CapabilityTokenHash.Create(Convert.ToBase64String(Guid.NewGuid().ToByteArray().Concat(Guid.NewGuid().ToByteArray()).ToArray())),
@@ -467,6 +475,7 @@ public sealed class AnonymousRetentionProviderDrainTests
         public async Task<int> DrainAsync(Func<Task>? afterHandoff = null)
         {
             var storage = Substitute.For<IFileStorageProvider>();
+            storage.Provider.Returns(StorageProviders.Local);
             storage.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
             {
                 var input = call.ArgAt<FileStorageWriteInput>(0)!;
@@ -478,11 +487,22 @@ public sealed class AnonymousRetentionProviderDrainTests
                     await afterHandoff();
                 }
                 return new FileStorageWriteResult(StorageProviders.Local, input.ObjectKey!, input.ExpectedSizeBytes!.Value,
-                    input.ContentType, "sha256:retention");
+                    input.ContentType, new string('a', 64));
             });
-            var resolver = Substitute.For<IFileStorageProviderResolver>();
-            resolver.GetRequired(StorageProviders.Local).Returns(storage);
-            var sink = new CsvRegistrationProviderSubmissionSink(resolver, fixture.Services.GetRequiredService<IStorageObjectRepository>(), clock);
+            var actualBindings = fixture.Services.GetRequiredService<IStorageProviderBindingService>();
+            var bindings = Substitute.For<IStorageProviderBindingService>();
+            bindings.CaptureAsync(StorageProviders.Local, fixture.TenantId, Arg.Any<CancellationToken>())
+                .Returns(call => actualBindings.CaptureAsync(StorageProviders.Local, fixture.TenantId,
+                    call.ArgAt<CancellationToken>(2)));
+            bindings.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(async call =>
+            {
+                await actualBindings.ResolveAsync(call.ArgAt<Guid>(0), call.ArgAt<CancellationToken>(1));
+                return storage;
+            });
+            var producers = fixture.Services.GetRequiredService<IStorageProducerOperationRepository>();
+            var unitOfWork = fixture.Services.GetRequiredService<IUnitOfWork>();
+            var sink = new CsvRegistrationProviderSubmissionSink(
+                new ManagedStorageProducer(bindings, producers, unitOfWork), producers, unitOfWork, clock);
             var handler = new DrainRegistrationProviderSubmissionWriteEffectsCommandHandler(
                 new RegistrationProviderSubmissionWriteEffectRepository(Context), new RegistrationProviderRegistry([sink]),
                 fixture.Services.GetRequiredService<ITenantContextAccessor>(), Protector, clock);

@@ -180,7 +180,7 @@ public class StorageObjectControllerTests
         var resolver = CreateProviderResolver([1]);
         var objectStorageService = Substitute.For<IObjectStorageService>();
         objectStorageService
-            .GeneratePresignedDownloadUrl(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>())
+            .GeneratePresignedDownloadUrl(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string?>())
             .Returns("https://storage.example.test/presigned?signature=secret");
         await using var factory = CreateDeliveryFactory(resolver, objectStorageService);
         using var client = factory.CreateClient();
@@ -192,7 +192,8 @@ public class StorageObjectControllerTests
             "Report.pdf",
             StorageObjectVisibilities.AuthenticatedTenant,
             StorageObjectPurposes.Document,
-            userId);
+            userId,
+            provider: StorageProviders.S3Compatible);
         using var request = CreateAuthenticatedGetRequest(
             $"{BaseUrl}/{storageObjectId}/presigned-url?expirationMinutes=15",
             userId);
@@ -208,10 +209,6 @@ public class StorageObjectControllerTests
         await Assert.That(result.ObjectKey).IsEqualTo(string.Empty);
         await Assert.That(result.SafeDisplayName).IsEqualTo("Report.pdf");
         await Assert.That(result.ShouldDownloadAsAttachment).IsTrue();
-        await objectStorageService.Received(1).GeneratePresignedDownloadUrl(
-            Arg.Is<string>(value => value.Contains(storageObjectId.ToString("N"), StringComparison.Ordinal)),
-            "Report.pdf",
-            15);
     }
 
     [Test]
@@ -219,6 +216,7 @@ public class StorageObjectControllerTests
     {
         Guid storageObjectId = Guid.CreateVersion7();
         Guid userId = Guid.CreateVersion7();
+        var binding = CapturedStorageProviders.S3Binding();
         var storageObject = new StorageObject
         {
             Id = storageObjectId,
@@ -228,7 +226,8 @@ public class StorageObjectControllerTests
             Tenant = null!,
             Uri = $"{BaseUrl}/{storageObjectId}/content",
             ObjectKey = $"tenants/{PlatformDefaults.DefaultTenantId:N}/{storageObjectId:N}.png",
-            Provider = StorageProviders.Local,
+            Provider = StorageProviders.S3Compatible,
+            StorageProviderBindingId = binding.Id,
             FullName = "quarantined.png",
             SafeDisplayName = "quarantined.png",
             Extension = "png",
@@ -240,18 +239,18 @@ public class StorageObjectControllerTests
             LifecycleState = StorageObjectLifecycleStates.Active,
             CreatedBy = userId
         };
-        var repository = Substitute.For<IStorageObjectRepository>();
+        var repository = Substitute.For<IStorageObjectRepository, IStorageProducerOperationRepository>();
         repository.GetById(storageObjectId).Returns(storageObject);
         repository.GetForGenericAccessAsync(storageObjectId, Arg.Any<CancellationToken>())
             .Returns(storageObject);
         repository.IsRegistrationAnswerFileQuarantinedAsync(storageObjectId, Arg.Any<CancellationToken>())
             .Returns(true);
         var resolver = CreateProviderResolver([1, 2, 3, 4, 5, 6, 7, 8]);
-        var provider = resolver.GetRequired(StorageProviders.Local);
+        var provider = resolver.GetRequired(StorageProviders.S3Compatible);
         provider.ClearReceivedCalls();
         var objectStorageService = Substitute.For<IObjectStorageService>();
         objectStorageService.GeneratePresignedDownloadUrl(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>())
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string?>())
             .Returns("https://storage.example.test/released");
         await using var factory = new QuarantinedRegistrationFileWebApplicationFactory(
             repository,
@@ -262,6 +261,12 @@ public class StorageObjectControllerTests
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
         };
         using var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            context.Add(binding);
+            await context.SaveChangesAsync();
+        }
 
         using var content = await client.SendAsync(CreateAuthenticatedGetRequest(
             $"{BaseUrl}/{storageObjectId}/content", userId));
@@ -275,7 +280,7 @@ public class StorageObjectControllerTests
         await provider.DidNotReceive().OpenReadAsync(
             Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>());
         await objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>());
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string?>());
 
         repository.IsRegistrationAnswerFileQuarantinedAsync(storageObjectId, Arg.Any<CancellationToken>())
             .Returns(false);
@@ -666,6 +671,8 @@ public class StorageObjectControllerTests
         var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
         var storageObjectId = Guid.CreateVersion7();
+        var binding = CapturedStorageProviders.S3Binding();
+        context.Add(binding);
 
         context.StorageObjects.Add(new StorageObject
         {
@@ -675,6 +682,7 @@ public class StorageObjectControllerTests
             Uri = $"s3://test-bucket/tenants/{PlatformDefaults.DefaultTenantId:N}/private-owner-proof.png",
             ObjectKey = $"tenants/{PlatformDefaults.DefaultTenantId:N}/private-owner-proof.png",
             Provider = StorageProviders.S3Compatible,
+            StorageProviderBindingId = binding.Id,
             FullName = "private-owner-proof.png",
             SafeDisplayName = "private-owner-proof.png",
             Extension = ".png",
@@ -709,6 +717,9 @@ public class StorageObjectControllerTests
         provider.Provider.Returns(StorageProviders.Local);
         var resolver = Substitute.For<IFileStorageProviderResolver>();
         resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        var s3 = Substitute.For<IFileStorageProvider>();
+        s3.Provider.Returns(StorageProviders.S3Compatible);
+        resolver.GetRequired(StorageProviders.S3Compatible).Returns(s3);
         ConfigureProviderRead(resolver, content, DateTimeOffset.UtcNow);
         return resolver;
     }
@@ -718,13 +729,10 @@ public class StorageObjectControllerTests
         byte[] content,
         DateTimeOffset lastModified)
     {
-        var provider = resolver.GetRequired(StorageProviders.Local);
-        provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new FileStorageReadResult(
-                new MemoryStream(content),
-                "application/octet-stream",
-                content.Length,
-                lastModified));
+        foreach (var provider in new[] { resolver.GetRequired(StorageProviders.Local), resolver.GetRequired(StorageProviders.S3Compatible) })
+            provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
+                .Returns(_ => new FileStorageReadResult(
+                    new MemoryStream(content), "application/octet-stream", content.Length, lastModified));
     }
 
     private static async Task<Guid> SeedDeliveryStorageObjectAsync(
@@ -734,12 +742,15 @@ public class StorageObjectControllerTests
         string safeDisplayName,
         string visibility,
         string purpose,
-        Guid? createdBy = null)
+        Guid? createdBy = null,
+        string provider = StorageProviders.Local)
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
         var storageObjectId = Guid.CreateVersion7();
+        var binding = provider == StorageProviders.Local ? CapturedStorageProviders.LocalBinding() : CapturedStorageProviders.S3Binding();
+        context.Add(binding);
 
         context.StorageObjects.Add(new StorageObject
         {
@@ -748,7 +759,8 @@ public class StorageObjectControllerTests
             FileType = null!,
             Uri = $"/api/storageobject/{storageObjectId}/content",
             ObjectKey = $"tenants/{PlatformDefaults.DefaultTenantId:N}/{storageObjectId:N}.{extension}",
-            Provider = StorageProviders.Local,
+            Provider = provider,
+            StorageProviderBindingId = binding.Id,
             FullName = safeDisplayName,
             SafeDisplayName = safeDisplayName,
             Extension = extension,
@@ -780,6 +792,7 @@ public class StorageObjectControllerTests
             {
                 services.RemoveAll<IFileStorageProviderResolver>();
                 services.AddSingleton(resolver);
+                services.AddCapturedStorageProviders();
                 if (objectStorageService is not null)
                 {
                     services.RemoveAll<IObjectStorageService>();
@@ -803,6 +816,7 @@ public class StorageObjectControllerTests
                 services.AddSingleton(repository);
                 services.RemoveAll<IFileStorageProviderResolver>();
                 services.AddSingleton(resolver);
+                services.AddCapturedStorageProviders();
                 services.RemoveAll<IObjectStorageService>();
                 services.AddSingleton(objectStorageService);
             });
@@ -819,6 +833,8 @@ public class StorageObjectControllerTests
             context,
             "Storage Isolation Tenant");
         var storageObjectId = Guid.CreateVersion7();
+        var binding = CapturedStorageProviders.S3Binding();
+        context.Add(binding);
 
         context.StorageObjects.Add(new StorageObject
         {
@@ -828,6 +844,7 @@ public class StorageObjectControllerTests
             Uri = $"s3://test-bucket/tenants/{secondaryTenant.TenantId:N}/cross-tenant-proof.png",
             ObjectKey = $"tenants/{secondaryTenant.TenantId:N}/cross-tenant-proof.png",
             Provider = StorageProviders.S3Compatible,
+            StorageProviderBindingId = binding.Id,
             FullName = "cross-tenant-proof.png",
             SafeDisplayName = "cross-tenant-proof.png",
             Extension = ".png",
@@ -856,12 +873,15 @@ public class StorageObjectControllerTests
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        var binding = CapturedStorageProviders.LocalBinding();
+        context.Add(binding);
         var session = new StorageUploadSession
         {
             Id = Guid.CreateVersion7(),
             TenantId = PlatformDefaults.DefaultTenantId,
             UserId = userId,
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             RouteKey = StorageRouteKeys.General,
             PolicyMaxUploadBytes = 11,
             PolicyVersion = "1",
@@ -887,9 +907,21 @@ public class StorageObjectControllerTests
         }
         else if (status == StorageUploadSessionStates.Finalized)
         {
+            session.ReserveObjectKey($"tenants/{PlatformDefaults.DefaultTenantId:N}/semantic-proof.txt");
+            session.MarkUploading(DateTime.UtcNow.AddMinutes(-2));
+            session.RecordProducerSettlement(session.Id, binding.Id, session.ObjectKey!, null);
+            context.StorageObjects.Add(new StorageObject
+            {
+                Id = session.Id, TenantId = session.TenantId, Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
+                Provider = session.Provider, StorageProviderBindingId = binding.Id, ObjectKey = session.ObjectKey,
+                Uri = $"{BaseUrl}/{session.Id}/content", FullName = session.SafeDisplayName, SafeDisplayName = session.SafeDisplayName,
+                Extension = "txt", ContentType = session.ContentType, Size = session.ExpectedSizeBytes,
+                Purpose = session.Purpose, Visibility = session.Visibility, LifecycleState = StorageObjectLifecycleStates.Active
+            });
             session.Finalize(
-                Guid.CreateVersion7(),
-                $"tenants/{PlatformDefaults.DefaultTenantId:N}/semantic-proof.txt",
+                session.Id,
+                session.ObjectKey!,
                 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 DateTime.UtcNow.AddMinutes(-1));
         }

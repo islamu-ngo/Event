@@ -55,10 +55,10 @@ public class StorageObjectConfiguration : IEntityTypeConfiguration<StorageObject
         builder.HasIndex(e => new { e.TenantId, e.Visibility, e.Purpose })
             .HasDatabaseName("ix_storage_objects_tenant_visibility_purpose");
 
-        builder.HasIndex(e => new { e.Provider, e.ObjectKey })
+        builder.HasIndex(e => new { e.StorageProviderBindingId, e.ObjectKey })
             .IsUnique()
             .HasFilter("object_key IS NOT NULL")
-            .HasDatabaseName("ux_storage_objects_provider_object_key");
+            .HasDatabaseName("ux_storage_objects_binding_object_key");
 
         builder.HasIndex(e => new { e.TenantId, e.OwningResourceKind, e.OwningResourceId })
             .HasFilter("owning_resource_kind IS NOT NULL AND owning_resource_id IS NOT NULL")
@@ -68,6 +68,8 @@ public class StorageObjectConfiguration : IEntityTypeConfiguration<StorageObject
         {
             t.HasCheckConstraint("ck_storage_objects_size_nonnegative", "size >= 0");
             t.HasCheckConstraint("ck_storage_objects_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
+            t.HasCheckConstraint("ck_storage_objects_managed_target",
+                "(provider = 'legacy_external' AND storage_provider_binding_id IS NULL AND object_key IS NULL) OR (provider IN ('local', 's3_compatible') AND storage_provider_binding_id IS NOT NULL AND storage_provider_binding_id <> '00000000-0000-0000-0000-000000000000' AND ((object_key IS NOT NULL AND object_key <> '') OR (lifecycle_state = 'deleted' AND object_key IS NULL)))");
             t.HasCheckConstraint("ck_storage_objects_visibility", "visibility IN ('public_image', 'authenticated_tenant', 'private_owner')");
             t.HasCheckConstraint("ck_storage_objects_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
             t.HasCheckConstraint("ck_storage_objects_resource_owner", "(purpose <> 'event_resource' AND (owning_resource_kind IS NULL OR owning_resource_kind <> 'event_resource')) OR (purpose = 'event_resource' AND owning_resource_kind IS NOT NULL AND owning_resource_kind = 'event_resource' AND owning_resource_id IS NOT NULL AND owning_resource_id <> '00000000-0000-0000-0000-000000000000' AND visibility = 'private_owner')");

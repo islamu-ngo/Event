@@ -172,6 +172,8 @@ public sealed class StorageRetentionHateoasTests
             submission.TenantId = other.TenantId;
         }
         Guid id = Guid.CreateVersion7();
+        var storageBinding = CapturedStorageProviders.S3Binding();
+        db.Add(storageBinding);
         var storage = new StorageObject
         {
             Id = id,
@@ -181,7 +183,8 @@ public sealed class StorageRetentionHateoasTests
             FileType = null!,
             Uri = $"{BaseUrl}/{id}/content",
             ObjectKey = $"tenants/{tenant.TenantId:N}/{id:N}.csv",
-            Provider = StorageProviders.Local,
+            Provider = StorageProviders.S3Compatible,
+            StorageProviderBindingId = storageBinding.Id,
             FullName = "retained.csv",
             SafeDisplayName = "retained.csv",
             Extension = "csv",
@@ -250,15 +253,18 @@ public sealed class StorageRetentionHateoasTests
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton<TimeProvider>(clock);
                 var provider = Substitute.For<IFileStorageProvider>();
+                provider.Provider.Returns(StorageProviders.S3Compatible);
                 provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
                     .Returns(_ => new FileStorageReadResult(new MemoryStream("retained content"u8.ToArray()),
                         "text/csv", 16, new DateTimeOffset(Deadline.AddDays(-1))));
                 var resolver = Substitute.For<IFileStorageProviderResolver>();
-                resolver.GetRequired(StorageProviders.Local).Returns(provider);
+                resolver.GetRequired(StorageProviders.S3Compatible).Returns(provider);
                 services.RemoveAll<IFileStorageProviderResolver>();
                 services.AddSingleton(resolver);
+                services.AddCapturedStorageProviders();
                 var storage = Substitute.For<IObjectStorageService>();
-                storage.GeneratePresignedDownloadUrl(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>())
+                storage.GeneratePresignedDownloadUrl(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(),
+                    Arg.Any<int>(), Arg.Any<string?>())
                     .Returns("https://storage.example.test/download");
                 services.RemoveAll<IObjectStorageService>();
                 services.AddSingleton(storage);

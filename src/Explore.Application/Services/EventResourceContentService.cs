@@ -29,7 +29,8 @@ public sealed class EventResourceContentService(
                 || EventResourceFileSafety.Generation(storage) != facts.AttachmentGeneration)
                 throw new InvalidOperationException("Resource file is unavailable.");
 
-            var provider = await providers.ResolveAsync(storage.StorageProviderBindingId!.Value, ct);
+            var provider = await providers.ResolveTargetAsync(
+                storage.StorageProviderBindingId, storage.Provider, ct);
             var opened = await provider.OpenReadAsync(new(storage.ObjectKey!, storage.ContentType, storage.ProviderVersionId), ct);
             try
             {

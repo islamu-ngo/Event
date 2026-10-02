@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Telemetry;
 using Explore.Application.Models.Storage;
 using Explore.Application.Services;
@@ -105,8 +106,10 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
         var bindings = Substitute.For<IStorageProviderBindingService>();
         bindings.ResolveAsync(work.ProviderBindingId, Arg.Any<CancellationToken>()).Returns(provider);
         using var metrics = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var inventoryBindings = Substitute.For<IStorageProviderBindingRepository>();
+        inventoryBindings.ListLocalAsync(Arg.Any<CancellationToken>()).Returns([]);
         var service = new StorageReconciliationService(
-            new StorageObjectRepository(context), Substitute.For<IFileStorageProviderResolver>(), [],
+            new StorageObjectRepository(context), bindings, inventoryBindings, new StorageObjectRepository(context),
             Options.Create(new StorageReconciliationSettings
             {
                 DryRun = dryRun,

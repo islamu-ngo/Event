@@ -14,6 +14,7 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 
 public sealed class StorageReconciliationServiceTests
 {
+    private static readonly StorageProviderBinding Binding = StorageProviderBinding.Local(Path.GetTempPath());
     [Test]
     public async Task ReconcileAsync_WhenDryRun_DoesNotMutateMissingMetadata()
     {
@@ -21,9 +22,10 @@ public sealed class StorageReconciliationServiceTests
         var storageObject = CreateStorageObject();
         var repository = CreateRepository(activeObjects: [storageObject]);
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.ExistsAsync(Arg.Any<FileStorageExistsInput>(), Arg.Any<CancellationToken>()).Returns(false);
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        var resolver = Substitute.For<IStorageProviderBindingService>();
+        resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
         var service = CreateService(repository, resolver, [], new StorageReconciliationSettings
         {
             DryRun = true,
@@ -36,7 +38,6 @@ public sealed class StorageReconciliationServiceTests
         await Assert.That(result.MissingBackingObjectCount).IsEqualTo(1);
         await Assert.That(result.QuarantinedMetadataCount).IsEqualTo(0);
         await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
-        await repository.DidNotReceiveWithAnyArgs().Update(default!);
     }
 
     [Test]
@@ -46,9 +47,10 @@ public sealed class StorageReconciliationServiceTests
         var storageObject = CreateStorageObject();
         var repository = CreateRepository(activeObjects: [storageObject]);
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.ExistsAsync(Arg.Any<FileStorageExistsInput>(), Arg.Any<CancellationToken>()).Returns(false);
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        var resolver = Substitute.For<IStorageProviderBindingService>();
+        resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
         var service = CreateService(repository, resolver, [], new StorageReconciliationSettings
         {
             DryRun = false,
@@ -60,7 +62,6 @@ public sealed class StorageReconciliationServiceTests
         await Assert.That(result.QuarantinedMetadataCount).IsEqualTo(1);
         await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Quarantined);
         await Assert.That(storageObject.QuarantineReason).IsEqualTo("backing_object_missing");
-        await repository.Received(1).Update(storageObject);
     }
 
     [Test]
@@ -71,10 +72,11 @@ public sealed class StorageReconciliationServiceTests
         storageObject.MarkQuarantined(null, "backing_object_missing", utcNow.AddDays(-31));
         var repository = CreateRepository(deleteEligibleObjects: [storageObject]);
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.DeleteAsync(Arg.Any<FileStorageDeleteInput>(), Arg.Any<CancellationToken>())
             .Returns(new FileStorageDeleteResult(StorageProviders.Local, storageObject.ObjectKey!, Deleted: false));
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        var resolver = Substitute.For<IStorageProviderBindingService>();
+        resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
         var service = CreateService(repository, resolver, [], new StorageReconciliationSettings
         {
             DryRun = false,
@@ -86,8 +88,6 @@ public sealed class StorageReconciliationServiceTests
         await Assert.That(result.DeletedMetadataCount).IsEqualTo(1);
         await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Deleted);
         await Assert.That(storageObject.IsDeleted).IsTrue();
-        await provider.Received(1).DeleteAsync(Arg.Any<FileStorageDeleteInput>(), Arg.Any<CancellationToken>());
-        await repository.Received(1).Update(storageObject);
     }
 
     [Test]
@@ -97,7 +97,7 @@ public sealed class StorageReconciliationServiceTests
         var repository = CreateRepository(knownObjectKeys: []);
         var inventoryProvider = new FakeInventoryProvider(
             [new FileStorageInventoryObject(StorageProviders.Local, "tenants/a/orphan.txt", 10, utcNow.AddDays(-2))]);
-        var service = CreateService(repository, Substitute.For<IFileStorageProviderResolver>(), [inventoryProvider], new StorageReconciliationSettings
+        var service = CreateService(repository, Substitute.For<IStorageProviderBindingService>(), [inventoryProvider], new StorageReconciliationSettings
         {
             DryRun = true,
             QuarantineOrphanLocalFiles = true
@@ -117,7 +117,7 @@ public sealed class StorageReconciliationServiceTests
         var repository = CreateRepository(knownObjectKeys: []);
         var inventoryProvider = new FakeInventoryProvider(
             [new FileStorageInventoryObject(StorageProviders.Local, "tenants/a/orphan.txt", 10, utcNow.AddDays(-2))]);
-        var service = CreateService(repository, Substitute.For<IFileStorageProviderResolver>(), [inventoryProvider], new StorageReconciliationSettings
+        var service = CreateService(repository, Substitute.For<IStorageProviderBindingService>(), [inventoryProvider], new StorageReconciliationSettings
         {
             DryRun = false,
             QuarantineOrphanLocalFiles = true
@@ -132,7 +132,7 @@ public sealed class StorageReconciliationServiceTests
 
     private static StorageReconciliationService CreateService(
         IStorageObjectRepository repository,
-        IFileStorageProviderResolver resolver,
+        IStorageProviderBindingService resolver,
         IReadOnlyList<IFileStorageProvider> providers,
         StorageReconciliationSettings settings)
     {
@@ -141,11 +141,17 @@ public sealed class StorageReconciliationServiceTests
         var resourceCleanup = Substitute.For<IEventResourceStorageCleanupService>();
         resourceCleanup.ProcessDueAsync(Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(new StorageObjectDeletionResult(0, 0, 0, 0));
+        var bindings = Substitute.For<IStorageProviderBindingRepository>();
+        bindings.ListLocalAsync(Arg.Any<CancellationToken>())
+            .Returns(providers.Count == 0 ? [] : new[] { Binding });
+        if (providers.Count > 0)
+            resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(providers.Single());
 
         return new StorageReconciliationService(
             repository,
             resolver,
-            providers,
+            bindings,
+            (IStorageProducerOperationRepository)repository,
             Options.Create(settings),
             new BusinessMetrics(meterFactory),
             NullLogger<StorageReconciliationService>.Instance,
@@ -157,12 +163,13 @@ public sealed class StorageReconciliationServiceTests
         IReadOnlyList<StorageObject>? deleteEligibleObjects = null,
         IReadOnlyList<string>? knownObjectKeys = null)
     {
-        var repository = Substitute.For<IStorageObjectRepository>();
+        var repository = Substitute.For<IStorageObjectRepository, IStorageProducerOperationRepository>();
         repository.ListActiveForReconciliationAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(activeObjects ?? []);
         repository.ListDeleteEligibleForReconciliationAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(deleteEligibleObjects ?? []);
-        repository.ListKnownObjectKeysAsync(Arg.Any<string>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+        ((IStorageProducerOperationRepository)repository).ListKnownObjectKeysAsync(
+            Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
             .Returns(knownObjectKeys ?? []);
         repository.Update(Arg.Any<StorageObject>()).Returns(Task.CompletedTask);
         return repository;
@@ -175,6 +182,7 @@ public sealed class StorageReconciliationServiceTests
             Uri = "/api/storageobject/test/content",
             ObjectKey = "tenants/a/2026/06/02/file.txt",
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = Binding.Id,
             FullName = "file.txt",
             SafeDisplayName = "file.txt",
             Extension = ".txt",

@@ -355,6 +355,8 @@ public sealed class EventModerationConcurrencyTests(PostgreSqlContainerFixture f
         StorageObject? image = null;
         if (withImage)
         {
+            var binding = StorageProviderBinding.Local(Path.GetTempPath());
+            context.Add(binding);
             image = new StorageObject
             {
                 Id = Guid.NewGuid(),
@@ -365,6 +367,7 @@ public sealed class EventModerationConcurrencyTests(PostgreSqlContainerFixture f
                 FileTypeId = (int)FileTypeEnum.Image,
                 FileType = null!,
                 Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
                 ObjectKey = $"tenants/{tenant.Id:N}/illegal.png",
                 Uri = "/images/illegal.png",
                 FullName = "illegal.png",

@@ -1,4 +1,5 @@
 using System.Net;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
@@ -10,10 +11,12 @@ using Explore.Infrastructure;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Services.Registration.Providers.Formbricks;
 using Explore.Infrastructure.Services.Registration.Providers.SubmissionSinks;
+using Explore.Infrastructure.Storage;
 using Explore.Infrastructure.Webhooks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
@@ -150,22 +153,21 @@ public sealed class AnonymousRetentionProviderHandoffTests
         var storage = Substitute.For<IFileStorageProvider>();
         storage.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>())
             .Returns(call => Written(call.ArgAt<FileStorageWriteInput>(0)!));
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(storage);
-        var metadata = Substitute.For<IStorageObjectRepository>();
-        using var services = new ServiceCollection().AddSingleton<TimeProvider>(clock).BuildServiceProvider();
-        var sink = ActivatorUtilities.CreateInstance<CsvRegistrationProviderSubmissionSink>(services, resolver, metadata);
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(
+            services => services.AddSingleton<TimeProvider>(clock));
+        var sink = CsvSink(fixture, storage, clock);
 
-        var failure = await FailureAsync(sink.AcceptAsync(Request("csv", Deadline), CancellationToken.None));
+        var failure = await FailureAsync(sink.AcceptAsync(Request("csv", Deadline, fixture.TenantId), CancellationToken.None));
 
         await Assert.That(failure.FailureCode).IsEqualTo("registration_data_retention_expired");
         await Assert.That(failure.FailureKind).IsEqualTo(RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff);
         await storage.DidNotReceive().WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>());
-        await metadata.DidNotReceive().Create(Arg.Any<StorageObject>());
+        await Assert.That(await fixture.Context.StorageObjects.CountAsync()).IsEqualTo(0);
+        await Assert.That(await fixture.Context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
     }
 
     [Test]
-    public async Task CsvStorageCompletionAfterExpiryPersistsExactBoundedMetadata()
+    public async Task CsvStorageCompletionAfterExpiryRetiresProducerWithoutActivatingMetadata()
     {
         var clock = new Clock(Deadline.AddTicks(-1));
         var entered = new TaskCompletionSource<FileStorageWriteInput>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -173,14 +175,10 @@ public sealed class AnonymousRetentionProviderHandoffTests
         var storage = Substitute.For<IFileStorageProvider>();
         storage.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>())
             .Returns(call => { entered.SetResult(call.ArgAt<FileStorageWriteInput>(0)!); return release.Task; });
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(storage);
-        var metadata = Substitute.For<IStorageObjectRepository>();
-        StorageObject? artifact = null;
-        metadata.Create(Arg.Do<StorageObject>(value => artifact = value)).Returns(call => call.ArgAt<StorageObject>(0)!);
-        using var services = new ServiceCollection().AddSingleton<TimeProvider>(clock).BuildServiceProvider();
-        var sink = ActivatorUtilities.CreateInstance<CsvRegistrationProviderSubmissionSink>(services, resolver, metadata);
-        var request = Request("csv", Deadline);
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(
+            services => services.AddSingleton<TimeProvider>(clock));
+        var sink = CsvSink(fixture, storage, clock);
+        var request = Request("csv", Deadline, fixture.TenantId);
 
         Task send = sink.AcceptAsync(request, CancellationToken.None);
         FileStorageWriteInput input = await entered.Task.WaitAsync(Timeout);
@@ -188,12 +186,15 @@ public sealed class AnonymousRetentionProviderHandoffTests
         string csv = await reader.ReadToEndAsync();
         clock.Now = Deadline.AddMinutes(1);
         release.SetResult(Written(input));
-        await send.WaitAsync(Timeout);
+        var failure = await FailureAsync(send);
 
         await Assert.That(csv).Contains("included-name");
-        await Assert.That(artifact).IsNotNull();
-        await Assert.That(artifact!.OwningResourceId).IsEqualTo(request.RegistrationSubmissionId);
-        await Assert.That(artifact.RegistrationContentRetentionUntilUtc).IsEqualTo(Deadline);
+        await Assert.That(failure.FailureCode).IsEqualTo("registration_data_retention_expired");
+        await Assert.That(await fixture.Context.StorageObjects.CountAsync()).IsEqualTo(0);
+        await Assert.That(await fixture.Context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
+        var retired = await fixture.Context.Set<StorageObjectDeletionTombstone>().AsNoTracking().SingleAsync();
+        await Assert.That(retired.ObjectKey).IsEqualTo(input.ObjectKey);
+        await Assert.That(retired.State).IsEqualTo(StorageObjectDeletionState.Ready);
     }
 
     private static Task SendAsync(string provider, IRegistrationProviderSubmissionSink sink, RegistrationProviderSubmissionSinkRequest request) =>
@@ -216,7 +217,26 @@ public sealed class AnonymousRetentionProviderHandoffTests
             new WebhookEndpointSafetyPolicy(options), options);
     }
 
-    internal static RegistrationProviderSubmissionSinkRequest Request(string provider, DateTime? deadline)
+    private static CsvRegistrationProviderSubmissionSink CsvSink(
+        EventVisitorCapabilitySqliteFixture fixture, IFileStorageProvider storage, Clock clock)
+    {
+        storage.Provider.Returns(StorageProviders.Local);
+        var actual = fixture.Services.GetRequiredService<IStorageProviderBindingService>();
+        var bindings = Substitute.For<IStorageProviderBindingService>();
+        bindings.CaptureAsync(StorageProviders.Local, fixture.TenantId, Arg.Any<CancellationToken>())
+            .Returns(call => actual.CaptureAsync(StorageProviders.Local, fixture.TenantId,
+                call.ArgAt<CancellationToken>(2)));
+        bindings.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(async call =>
+        {
+            await actual.ResolveAsync(call.ArgAt<Guid>(0), call.ArgAt<CancellationToken>(1));
+            return storage;
+        });
+        var producers = fixture.Services.GetRequiredService<IStorageProducerOperationRepository>();
+        var unitOfWork = fixture.Services.GetRequiredService<IUnitOfWork>();
+        return new(new ManagedStorageProducer(bindings, producers, unitOfWork), producers, unitOfWork, clock);
+    }
+
+    internal static RegistrationProviderSubmissionSinkRequest Request(string provider, DateTime? deadline, Guid? tenantIdOverride = null)
     {
         var tuple = provider switch
         {
@@ -225,7 +245,7 @@ public sealed class AnonymousRetentionProviderHandoffTests
             "csv" => CsvRegistrationProviderSubmissionSink.SupportedTuple,
             _ => new RegistrationProviderTuple("FORMBRICKS", "CLOUD", "v1", "ISLAMU_EVENT_FORMBRICKS_V1", "2026-08-10")
         };
-        Guid tenantId = Guid.CreateVersion7();
+        Guid tenantId = tenantIdOverride ?? Guid.CreateVersion7();
         var connection = RegistrationProviderConnection.Create(tenantId, "retention",
             RegistrationProviderKindEnum.ExternalApi, RegistrationProviderDeploymentKindEnum.HostedSaas,
             tuple.ProviderCode, tuple.ProviderDeploymentCode, tuple.ApiVersion, tuple.AdapterPolicyVersion, tuple.ConformanceEvidenceRevision,
@@ -245,7 +265,7 @@ public sealed class AnonymousRetentionProviderHandoffTests
         new ResolvedSecret("provider", "external-secret", SecretSourceType.EnvironmentVariable, SecretScope.Tenant, tenantId, new DateTimeOffset(Deadline)));
 
     private static FileStorageWriteResult Written(FileStorageWriteInput input) =>
-        new(StorageProviders.Local, input.ObjectKey!, input.ExpectedSizeBytes!.Value, input.ContentType, "sha256:test");
+        new(StorageProviders.Local, input.ObjectKey!, input.ExpectedSizeBytes!.Value, input.ContentType, new string('a', 64));
 
     private static async Task<RegistrationProviderSubmissionDeliveryException> FailureAsync(Task action)
     {

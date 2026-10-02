@@ -28,6 +28,7 @@ public class CreateStorageUploadSessionCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly BusinessMetrics _metrics;
+    private readonly IStorageProviderBindingService _bindings;
 
     public CreateStorageUploadSessionCommandHandler(
         IStoragePolicyResolver storagePolicyResolver,
@@ -37,7 +38,8 @@ public class CreateStorageUploadSessionCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork,
-        BusinessMetrics metrics)
+        BusinessMetrics metrics,
+        IStorageProviderBindingService bindings)
     {
         _storagePolicyResolver = storagePolicyResolver;
         _uploadSessionRepository = uploadSessionRepository;
@@ -47,6 +49,7 @@ public class CreateStorageUploadSessionCommandHandler
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
         _metrics = metrics;
+        _bindings = bindings;
     }
 
     public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
@@ -200,11 +203,14 @@ public class CreateStorageUploadSessionCommandHandler
         };
 
         var utcNow = DateTime.UtcNow;
+        var binding = await _bindings.CaptureAsync(policy.Provider, tenantId, cancellationToken);
         var session = new StorageUploadSession
         {
+            Id = Guid.CreateVersion7(),
             TenantId = tenantId,
             UserId = userId,
             Provider = policy.Provider,
+            StorageProviderBindingId = binding.Id,
             RouteKey = policy.RouteKey,
             PolicyMaxUploadBytes = policy.MaxUploadBytes,
             PolicyVersion = policy.PolicyVersion.ToString(CultureInfo.InvariantCulture),

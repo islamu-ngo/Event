@@ -1,15 +1,1 @@
-<svg width="1600" height="500" viewBox="0 0 1600 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">ISLAMU text logo</title>
-  <desc id="desc">Text-only uppercase ISLAMU logo in black on a white background.</desc>
-  <rect width="100%" height="100%" fill="#ffffff"/>
-  <text
-    x="50%"
-    y="50%"
-    text-anchor="middle"
-    dominant-baseline="central"
-    font-family="Inter, Avenir Next, Montserrat, Helvetica Neue, Arial, sans-serif"
-    font-size="210"
-    font-weight="800"
-    letter-spacing="34"
-    fill="#000000">ISLAMU</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="500" aria-labelledby="title desc" role="img" viewBox="0 0 1600 500"><title id="title">ISLAMU text logo</title><desc id="desc">Text-only uppercase ISLAMU logo in black on a white background.</desc><rect width="100%" height="100%" fill="#fff"/><text x="50%" y="50%" fill="#000" dominant-baseline="central" font-family="Inter, Avenir Next, Montserrat, Helvetica Neue, Arial, sans-serif" font-size="210" font-weight="800" letter-spacing="34" text-anchor="middle">ISLAMU</text></svg>

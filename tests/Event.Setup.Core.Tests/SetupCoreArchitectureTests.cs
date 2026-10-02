@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using ISLAMU.Event.Setup.Core;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
+[Category("Architecture")]
 public sealed class SetupCoreArchitectureTests
 {
     private static readonly Assembly ProductAssembly = typeof(SetupProfile).Assembly;

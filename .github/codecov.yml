@@ -1,0 +1,29 @@
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+flag_management:
+  default_rules:
+    carryforward: false
+
+ignore:
+  - "tests/**"
+  - "eng/**"
+  - "src/Explore.AppHost/**"
+  - "**/obj/**"
+  - "**/bin/**"
+  - "**/Migrations/**"
+  - "**/*.g.cs"
+  - "**/*.generated.cs"
+  - "**/*.Designer.cs"
+  - "**/*ModelSnapshot.cs"
+  - "**/Generated/**"
+
+comment:
+  require_base: true
+  require_head: true

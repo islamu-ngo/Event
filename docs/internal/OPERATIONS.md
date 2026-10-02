@@ -1408,6 +1408,56 @@ or repair cannot invalidate a signed release or authorize retagging, rebuilding
 binaries, moving stable `main` or changing notes at `B`. Docs-only transport
 must remain excluded from application deployment.
 
+## Codecov Coverage Publication
+
+Coverage publication combines the test suites for shipped Event C# projects:
+backend logic and services, Persistence and API, Blazor and BFF hosting,
+wire contracts and diagnostics, standalone hosting, and setup libraries and
+frontends. Repository engineering tools, development AppHost, benchmarks,
+mutation wrappers, test fixtures, generated code, and migrations are excluded.
+Repository maintainers own publication and triage; project and patch statuses
+are informational, not required merge gates.
+
+Fast PR lanes publish the suites selected by normal CI routing. Integration
+coverage belongs to the existing runtime lanes rather than making the full
+provider matrix an every-PR prerequisite. Explicit MTP coverage arguments in
+`_build-test.yml` produce uniquely named reports, validated before one Codecov
+upload per lane with the `fast` or `runtime` flag. No shell command is intercepted.
+The weekly/manual `Coverage Evidence` workflow requests all fast selections
+and the established runtime/provider lanes from that reusable workflow.
+
+`eng/coverage/product.config` owns collector exclusions. The report validator
+rejects empty coverage, unexpected assemblies, and generated/test/tooling
+sources, and lists unmeasured product assemblies. A nonempty XML file alone
+is insufficient: the file must contain product classes with coverable lines.
+Setup Core's `Architecture` category runs without coverage before the
+complementary business-test coverage run. Both partitions are required and
+retain the original assertions. Do not weaken compiled-assembly guards to
+accept injected coverage tracker methods. Dynamic-only collection was tested
+but produced empty reports with the pinned collector in this environment.
+
+Configure the organization or repository GitHub Actions secret `CODECOV_TOKEN`
+with the Codecov upload token and grant Event access to that secret. Confirm
+the Codecov GitHub App has repository access. Public fork PRs use the action's
+tokenless fork support; do not expose organization secrets through
+`pull_request_target`. No application environment variable is required.
+
+After merging, confirm push uploads for the base branch and subsequent PR
+uploads for the head commit, then inspect Codecov feedback. Comments require
+both base and head reports. Check the included suite flags and commit before
+interpreting an aggregate: fast-only uploads are partial evidence, and older
+runtime reports must not be carried forward as complete coverage of a new PR.
+Reports measure code actually exercised and collected, not every platform
+behavior or browser JavaScript/CSS.
+
+For failures, inspect test, coverage, and upload outcomes and download the
+`coverage-fast` and `coverage-runtime` artifacts within their 30-day retention
+window. TRX/build logs remain in the existing test-result artifacts. Check
+report generation before checking token access or GitHub App permissions.
+Runtime suites require their documented container and secret-provider
+prerequisites. A local build or schema-validation pass does not prove live
+uploads, runtime execution, or complete same-commit coverage.
+
 ## Deployment Protection and Evidence
 
 GitHub Actions deploys use the `staging` and `production` environments. Configure environment rules in GitHub repository settings, not in application runtime configuration. Code scanning is owned by the `CodeQL Advanced` workflow; keep GitHub CodeQL default setup disabled so advanced SARIF uploads are accepted:

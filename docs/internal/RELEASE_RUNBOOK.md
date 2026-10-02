@@ -15,6 +15,12 @@ tags and manually authored GitHub Releases. Do not invoke imagined release-engin
 commands, claim automatic approval, or create generated changelog writes on
 `develop`.
 
+Treat Codecov feedback as advisory shipped-product evidence. Check the commit
+and included suite flags before interpreting a percentage; never combine
+different commits or label missing runtime lanes as complete. If publication fails,
+follow [coverage publication operations](OPERATIONS.md#codecov-coverage-publication);
+do not substitute coverage percentages for the checklist's required tests.
+
 Generate the existing durable evidence bundle only as the checklist directs:
 
 ```sh

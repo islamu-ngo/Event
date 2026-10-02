@@ -84,10 +84,11 @@ public sealed partial class NativeEventAspectsHttpTests
         var data = await SeedAsync(factory);
         using var owner = factory.Client(data.OwnerId);
         var cache = factory.Services.GetRequiredService<HybridCache>();
-        var detailKey = $"event:detail:{data.EmptyId}";
+        var detailKey = $"event:detail:{PlatformDefaults.DefaultTenantId:D}:{data.EmptyId:D}";
         var listKey = $"aspect-list:{data.EmptyId}";
         var tags = new[] { CacheTags.EventListByTenant(PlatformDefaults.DefaultTenantId) };
-        await cache.SetAsync(detailKey, "before");
+        var detailTags = new[] { CacheTags.Events, CacheTags.EventDetails, CacheTags.Event(data.EmptyId) };
+        await cache.SetAsync(detailKey, "before", tags: detailTags);
         await cache.SetAsync(listKey, "before", tags: tags);
         using (var created = await owner.PostAsJsonAsync(Public(data.EmptyId, kind), CreateBody(kind)))
         {
@@ -101,7 +102,7 @@ public sealed partial class NativeEventAspectsHttpTests
             await Assert.That(duplicate.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         using (var invalid = await owner.PatchAsJsonAsync(Public(data.EmptyId, kind), new { }))
             await Assert.That(invalid.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
-        await cache.SetAsync(detailKey, "before");
+        await cache.SetAsync(detailKey, "before", tags: detailTags);
         await cache.SetAsync(listKey, "before", tags: tags);
         using (var changed = await owner.PatchAsJsonAsync(Public(data.EmptyId, kind), PatchBody(kind)))
             await Assert.That(changed.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -120,7 +121,7 @@ public sealed partial class NativeEventAspectsHttpTests
             await Assert.That(after.GetProperty("requiresLaptop").GetBoolean()).IsTrue();
             await Assert.That(after.GetProperty("hackathonTrack").GetString()).IsEqualTo("Tools");
         }
-        await cache.SetAsync(detailKey, "before-delete");
+        await cache.SetAsync(detailKey, "before-delete", tags: detailTags);
         await cache.SetAsync(listKey, "before-delete", tags: tags);
         using (var deleted = await owner.DeleteAsync(Public(data.EmptyId, kind)))
             await Assert.That(deleted.StatusCode).IsEqualTo(HttpStatusCode.NoContent);

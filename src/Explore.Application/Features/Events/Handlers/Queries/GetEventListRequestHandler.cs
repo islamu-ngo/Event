@@ -360,7 +360,7 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
             request.DateFrom,
             request.DateTo,
             request.View ?? (hasExplicitDateSearch ? TemporalView.All : TemporalView.UpcomingAndOngoing),
-            _clock.GetUtcNow(),
+            request.OperationNow ?? _clock.GetUtcNow(),
             request.LocationIds));
     }
 

@@ -16,6 +16,10 @@ An additional-session count describes other currently eligible matches. If the c
 
 ## Regional visibility
 
+The home page assigns each event to one section. Earlier sections take priority, and later sections refill with other eligible events instead of repeating the same listing.
+
+A short section can mean its eligible candidates are exhausted. If a section cannot finish within its bounded work or deadline, it reports failure separately from an empty result; other completed sections remain available.
+
 Operators configure named discovery areas with locations belonging to their directory. Public search uses these areas rather than accepting arbitrary private venue identifiers.
 
 A regional occurrence must currently permit disclosure of both city and country. Private, undisclosed, to-be-announced or review-required venue associations must not reveal regional membership. An unknown or inactive area returns no matches.

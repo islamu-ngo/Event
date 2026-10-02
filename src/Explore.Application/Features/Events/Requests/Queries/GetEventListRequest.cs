@@ -33,6 +33,11 @@ public sealed record GetEventListRequest : IQuery<PaginatedResult<EventListDto>>
     public Guid? AreaId { get; init; }
 
     /// <summary>
+    /// Trusted application batch instant, shared across home section reads and refill pages.
+    /// </summary>
+    public DateTimeOffset? OperationNow { get; init; }
+
+    /// <summary>
     /// Filter by actor ownership directly.
     /// </summary>
     public Guid? ActorId { get; init; }

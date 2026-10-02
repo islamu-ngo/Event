@@ -146,6 +146,10 @@ The tenant settings navigation never exposes this instance-authority action.
 
 ## Public Home Discovery Boundary
 
+The server allocates each canonical event to at most one home section in fixed priority order. Later sections refill from ordered eligible batches, bounded to 1000 candidates and 10 batches per section. Proven exhaustion is empty/short; timeout, uncertain exhaustion and budget limits are failed states. The browser renders these assignments directly and does not reallocate them.
+
+Home responses use `PrivateNoStore`, and public-experience configuration reads are authoritative. One application-controlled `OperationNow` is shared across section and refill occurrence reads; the HTTP model accepts only the public selection context, not this timestamp. Component tests compare assigned identities with the rendered hero, upcoming and card layouts.
+
 `/home` renders the same discovery composition for anonymous and authenticated visitors unless the existing organization-centric shell branch is authoritative. `HomeDiscoveryExperience` owns one persisted `HomeDiscoveryDto`, so PublicSeo prerendering can hydrate without issuing a duplicate discovery request. The obsolete standalone marketing page has been removed.
 
 `HomeDiscoveryService` is the only client orchestrator for `GET /api/public-experience/home`. It resolves URL context before saved user context, sends only `areaId` and `mode`, and persists only `home_discovery.area_id` and `home_discovery.mode`. Area names and centroids come from the server-owned coarse public area DTO; generic location/address DTOs are not consumed.

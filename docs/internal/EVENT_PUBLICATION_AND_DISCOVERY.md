@@ -1,7 +1,7 @@
 # Event Publication And Discovery
 
-Scope: public occurrence selection, governed regional matching and card presentation.
-Implementation checkpoint: occurrence discovery; identity correction and bounded traversal are subsequent slices.
+Scope: public occurrence selection, governed regional matching, home allocation and card presentation.
+Implementation checkpoint: occurrence discovery and unique home allocation; identity correction and bounded traversal are subsequent slices.
 
 ## Occurrence authority
 
@@ -32,6 +32,16 @@ Area policy reads bypass the process settings cache. SQL applies structural publ
 Country is the existing public location value, not an invented ISO-code conversion. No street address, postcode, coordinates or private owner contact is added to the card payload.
 
 ## HTTP and client boundaries
+
+### Home allocation
+
+`GetHomeDiscoveryQueryHandler` owns one response-local `HomeDiscoveryAllocator`. Sections claim canonical keys sequentially in the approved priority order. Local and ATProto namespaces remain distinct, while known local ATProto bindings share one key. A section excludes earlier assignments before its final take and reads ordered next-page batches to refill duplicates.
+
+Refill examines at most 1000 candidates in 10 batches per section. A source-confirmed end permits an empty or short result. Exhausted budget or an empty page contradicting remaining-count metadata is `Failed`, not a claim that no eligible events exist. Partial returned candidates remain reserved, and completed curated sections survive cancellation of a later section.
+
+The 1-second section and 3-second composite limits use `TimeProvider` cancellation timers. One sampled operation instant travels through the allocator's immutable candidate requests into the occurrence filter, including refill pages. HTTP does not accept that trusted `OperationNow` field.
+
+Public home uses `PrivateNoStore`; current `public_experience.*` settings bypass the process cache. Its existing client consumes the assigned sections directly rather than inventing a browser allocation policy. Empty and failed sections retain distinct states.
 
 `GetEventListRequestHandler` reads the current entity graph rather than a cached page of DTOs. `GetEventDetailsRequestHandler` builds a current projection, so a still-public program cannot replay fields removed by a committed redaction. Its fresh tenant and public-parent checks remain in place. Anonymous discovery and public details use `PrivateNoStore`, bypassing shared output-cache and conditional ETag shortcuts. Unavailable discovery returns `503` with `discovery_unavailable` and no-store headers.
 

@@ -78,7 +78,7 @@ public class PublicExperienceController : ControllerBase
     [EndpointDescription("Returns the tenant-aware event discovery sections for the public home page.")]
     [ProducesResponseType(typeof(HomeDiscoveryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [OutputCache(PolicyName = "PublicHomeDiscovery")]
+    [PrivateNoStore]
     public async Task<ActionResult<HomeDiscoveryDto>> GetHomeDiscovery(
         [FromQuery] Guid? areaId = null,
         [FromQuery] string? mode = null,

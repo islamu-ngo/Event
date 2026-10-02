@@ -110,6 +110,47 @@ public sealed class EventDiscoveryDisclosureRaceTests
     }
 
     [Test]
+    public async Task HomeDoesNotReplayARegionalEventAfterCommittedRestriction()
+    {
+        await using var factory = new NativeEventTagsFactory(relational: true);
+        using var client = factory.CreateClient();
+        string marker = $"home-{Guid.CreateVersion7():N}";
+        Guid areaId = Guid.CreateVersion7();
+        var seeded = await SeedAsync(factory, marker, areaId);
+        string route = $"/api/public-experience/home?areaId={areaId:D}";
+        using var initial = await client.GetAsync(route);
+        await Assert.That(initial.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(await initial.Content.ReadAsStringAsync()).Contains(marker);
+
+        var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        Task<HttpResponseMessage> read = ReadAfterRestrictionAsync();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var entity = await context.Events.FindAsync([seeded.EventId], deadline.Token);
+            entity!.VisibilityTypeId = (int)VisibilityTypeEnum.Private;
+            await context.SaveChangesAsync(deadline.Token);
+        }
+        committed.SetResult();
+
+        using var response = await read;
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync(deadline.Token);
+        await Assert.That(body).DoesNotContain(marker);
+        await Assert.That(body).DoesNotContain(seeded.EventId.ToString());
+
+        async Task<HttpResponseMessage> ReadAfterRestrictionAsync()
+        {
+            await committed.Task.WaitAsync(deadline.Token);
+            using var request = new HttpRequestMessage(HttpMethod.Get, route);
+            request.Headers.IfNoneMatch.Add(
+                initial.Headers.ETag ?? new EntityTagHeaderValue("\"previous-home-frame\""));
+            return await client.SendAsync(request, deadline.Token);
+        }
+    }
+
+    [Test]
     public async Task RegionalMembershipAndCountDisappearAfterCityDisclosureIsRevoked()
     {
         await using var factory = new NativeEventTagsFactory(relational: true);

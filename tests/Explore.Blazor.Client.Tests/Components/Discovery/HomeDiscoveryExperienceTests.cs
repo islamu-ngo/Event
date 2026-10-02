@@ -33,6 +33,31 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
     public void Dispose() => context.Dispose();
 
     [Test]
+    public async Task ServerAllocatedIdentitiesReachEveryLayoutOnceWithoutBrowserReallocation()
+    {
+        var home = CompleteHome(Guid.CreateVersion7());
+        discoveryService.LoadAsync(null, null, Arg.Any<CancellationToken>()).Returns(home);
+        var cut = context.RenderMudComponent<HomeDiscoveryExperience>();
+        cut.WaitForElement("[data-testid='home-discovery-context']", TimeSpan.FromSeconds(2));
+
+        var rendered = cut.FindComponent<Explore.Blazor.Client.Components.Presentation.HeroCarousel>()
+            .Instance.Events.Select(item => item.Id)
+            .Concat(cut.FindComponent<UpcomingEventList>().Instance.Events.Select(item => item.Id))
+            .Concat(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()
+                .Select(card => card.Instance.Event.Id)).ToArray();
+        var assigned = home.Hero!.Concat(home.UpcomingInArea!)
+            .Concat(home.Spotlight!.Items!)
+            .Concat(home.MostViewedInArea!)
+            .Concat(home.MostViewedOnline!)
+            .Concat(home.RecentlyAdded!)
+            .Concat(home.CuratedSections!.SelectMany(section => section.Items!))
+            .Select(item => item.Event!.Id).ToArray();
+
+        await Assert.That(rendered.Distinct().Count()).IsEqualTo(rendered.Length);
+        await Assert.That(rendered).IsEquivalentTo(assigned);
+    }
+
+    [Test]
     public async Task OneCompositePayloadRendersHeroAndThreeEventLayouts()
     {
         var areaId = Guid.NewGuid();

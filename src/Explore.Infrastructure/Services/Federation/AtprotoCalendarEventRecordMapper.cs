@@ -9,7 +9,7 @@ namespace Explore.Infrastructure.Services.Federation;
 
 public static class AtprotoCalendarEventRecordMapper
 {
-    public static Event Map(AtprotoEventPublicationSnapshot snapshot)
+    public static Event Map(AtprotoEventPublicationSnapshot snapshot, Uri? publicAddress)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         return new()
@@ -24,7 +24,14 @@ public static class AtprotoCalendarEventRecordMapper
             RsvpExpected = snapshot.RsvpExpected,
             Locations = MapLocations(snapshot.Locations),
             Uris = snapshot.Uris
-                .Select(value => new EventUri { Uri = value.Uri, Name = value.Name })
+                .Select(value => new EventUri
+                {
+                    Uri = value.Uri.StartsWith("/", StringComparison.Ordinal)
+                        ? new Uri(publicAddress ?? throw new ArgumentNullException(nameof(publicAddress)),
+                            value.Uri.TrimStart('/')).AbsoluteUri
+                        : value.Uri,
+                    Name = value.Name
+                })
                 .ToList()
         };
     }

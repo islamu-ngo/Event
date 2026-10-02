@@ -47,6 +47,13 @@ they do not replace fresh content eligibility, tenant checks, selected authority
 or byte-signature validation. Actor media keeps its stricter C5a owner checks and
 fresh current-user display projection.
 
+AT Protocol publication resolves managed image routes at the payload boundary.
+`AtprotoPublicationPayloadBuilder` uses `PublicAddressResolver` to read an explicit
+deployment override or authorized setup address, never the ambient request host.
+The native record mapper preserves that address's path base and the stable
+storage UUID. Missing or invalid authority rejects publication with
+`public_origin_unavailable`; imported `SourceUri` cannot fill the gap.
+
 Ordinary storage DTO `uri` is nullable derived delivery, never `SourceUri` or a
 provider locator. Storage detail/list and upload-session JSON omit backend
 provider identity. Binding, key, bucket, version, and origin remain server-side;

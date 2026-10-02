@@ -28,6 +28,12 @@ provider address or a foreign-origin locator. Ordinary detail/list and upload
 responses omit backend provider identity, bucket, key, binding, version, and
 origin. Explicit operator diagnostics remain separately scoped.
 
+Federated managed-image links use the deployment's `PUBLIC_BASE_URL` or the
+public address established during authorized setup. Event preserves its path
+base when producing absolute image links for external readers. Publication
+with managed images fails if that address is missing or invalid; Event does
+not substitute a provider address or imported origin.
+
 When applying the pre-release provenance cutover, first classify and clear old
 locator values deliberately. A generated rename rejects every nonempty old
 value rather than guessing whether it is provenance. Blank old values become

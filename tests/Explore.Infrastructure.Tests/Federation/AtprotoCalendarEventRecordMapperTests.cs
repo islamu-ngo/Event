@@ -10,11 +10,28 @@ namespace Explore.Infrastructure.Tests.Federation;
 public sealed class AtprotoCalendarEventRecordMapperTests
 {
     [Test]
+    public async Task Map_ManagedMediaRetainsItsStableIdentityInAValidAbsolutePublicationUri()
+    {
+        Guid imageId = Guid.CreateVersion7();
+        var snapshot = CreateSnapshot() with
+        {
+            Uris = [new($"/api/storageobject/{imageId}/public", "Featured image")]
+        };
+
+        Event record = AtprotoCalendarEventRecordMapper.Map(snapshot,
+            new Uri("https://events.example.test/community/"));
+
+        await Assert.That(AtprotoCalendarEventRecordValidator.Validate(record).IsValid).IsTrue();
+        await Assert.That(record.Uris!.Single().Uri)
+            .IsEqualTo($"https://events.example.test/community/api/storageobject/{imageId}/public");
+    }
+
+    [Test]
     public async Task Map_UsesGeneratedNativeFields_AndPreservesNonnativeValuesInDescription()
     {
         AtprotoEventPublicationSnapshot snapshot = CreateSnapshot();
 
-        Event record = AtprotoCalendarEventRecordMapper.Map(snapshot);
+        Event record = AtprotoCalendarEventRecordMapper.Map(snapshot, null);
         AtprotoCalendarRecordValidationResult validation = AtprotoCalendarEventRecordValidator.Validate(record);
 
         await Assert.That(record.Name).IsEqualTo(snapshot.Name);
@@ -33,7 +50,7 @@ public sealed class AtprotoCalendarEventRecordMapperTests
     [Test]
     public async Task Validate_RejectsInvalidSemanticFieldsBeforeSizeEligibility()
     {
-        Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot());
+        Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot(), null);
         record.Mode = "community.lexicon.calendar.event#invalid";
         record.Uris = [new EventUri { Uri = "https://user:secret@example.test/path#fragment", Name = "Unsafe" }];
 
@@ -48,7 +65,7 @@ public sealed class AtprotoCalendarEventRecordMapperTests
     [Test]
     public async Task Validate_LexiconMinimumNameAndCreatedAt_DoesNotRequireDescription()
     {
-        Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot());
+        Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot(), null);
         record.Description = null;
 
         AtprotoCalendarRecordValidationResult result = AtprotoCalendarEventRecordValidator.Validate(record);

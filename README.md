@@ -13,6 +13,7 @@ ISLAMU Event will power ISLAMU’s upcoming community events instance, but the s
 > 🚧 **Active Pre-Release Development:** ISLAMU Event has **no official release yet**. We are actively fixing startup bugs and preparing for our very first release soon! Pre-built container images and release tags are not yet published.
 
 ![GitHub Workflow Status][github-workflow-status-shield]
+[![Coverity Scan Build Status][coverity-scan-shield]][coverity-scan-link]
 [![GitHub License][github-license-shield]][github-license-link]
 [![GitHub Repo Stars][github-stars-shield]][github-stars-link]
 [![GitHub Last Commit][github-last-commit-shield]][github-last-commit-link]
@@ -449,6 +450,8 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [github-contributors-link]: https://github.com/islamu-ngo/Event/graphs/contributors
 
 [github-workflow-status-shield]: https://img.shields.io/github/actions/workflow/status/islamu-ngo/Event/test.yml?branch=develop&logo=github&style=flat-square
+[coverity-scan-shield]: https://img.shields.io/coverity/scan/33311.svg
+[coverity-scan-link]: https://scan.coverity.com/projects/islamu-ngo-event
 [github-stars-shield]: https://img.shields.io/github/stars/islamu-ngo/Event?color=594ae2&style=flat-square&logo=github
 [github-stars-link]: https://github.com/islamu-ngo/Event/stargazers
 [github-license-shield]: https://img.shields.io/github/license/islamu-ngo/Event?color=594ae2&logo=github&style=flat-square

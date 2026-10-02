@@ -63,13 +63,6 @@ public class Actor : IAuditableEntity, ISoftDeletable, IConcurrencyAware
     public string? BackgroundEffect { get; set; }
     public string? BannerColor { get; set; }
 
-    [NotMapped]
-    public string? ProfilePictureUri
-    {
-        get => Pii.ProfilePictureUri;
-        set => Pii.ProfilePictureUri = value;
-    }
-
     // Audit fields
     public DateTime CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }

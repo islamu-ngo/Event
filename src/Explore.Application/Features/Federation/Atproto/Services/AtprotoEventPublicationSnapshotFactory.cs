@@ -353,7 +353,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
                 .Where(link => link.EventSessionId == session.Id)
                 .OrderBy(link => link.Actor.Pii.DisplayName, StringComparer.Ordinal)
                 .ThenBy(link => PrimaryAtprotoHandle(link.Actor), StringComparer.Ordinal)
-                .ThenBy(link => link.Actor.Pii.ProfilePictureUri, StringComparer.Ordinal)
+                .ThenBy(link => Explore.Application.Services.StoragePresentationUrlResolver.ActorProfilePictureUri(link.Actor.Pii), StringComparer.Ordinal)
                 .ThenBy(link => link.Actor.Description, StringComparer.Ordinal)
                 .ThenBy(link => link.ActorId)
                 .ThenBy(link => link.Id)
@@ -361,7 +361,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
                     Normalize(link.Actor.Pii.DisplayName)!,
                     Normalize(PrimaryAtprotoHandle(link.Actor)),
                     Normalize(link.Actor.Description),
-                    Normalize(link.Actor.Pii.ProfilePictureUri),
+                    Normalize(Explore.Application.Services.StoragePresentationUrlResolver.ActorProfilePictureUri(link.Actor.Pii)),
                     null,
                     null,
                     Normalize(link.Actor.BackgroundColor),
@@ -458,7 +458,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
             Normalize(organization?.Pii.City),
             Normalize(actor.Group?.FullName),
             Normalize(actor.Group?.Description),
-            Normalize(actor.Pii.ProfilePictureUri),
+            Normalize(Explore.Application.Services.StoragePresentationUrlResolver.ActorProfilePictureUri(actor.Pii)),
             null,
             null,
             Normalize(actor.BackgroundColor),

@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3XZC203SMRZ2XG4HJBCX9HJ
+Title: "Distinguish managed and external Actor images"
+Type: feat
+Scope: privacy
+Summary: "Actor profiles retain either a managed storage UUID or an explicitly external HTTP(S) source. Eligible managed display routes derive from stable IDs, current-user media is reprojected outside global account caching, and native migration preflight rejects unclassified legacy URLs."
+Group: actor-media-ownership
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

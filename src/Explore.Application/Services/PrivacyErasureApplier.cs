@@ -175,7 +175,7 @@ public sealed class PrivacyErasureApplier(
             }
 
             actor.Pii.DisplayName = "Deleted user";
-            actor.Pii.ProfilePictureUri = null;
+            actor.Pii.SetProfilePicture(null, null);
         }
 
         await erasureRepository.SaveChangesAsync(audits, cancellationToken);

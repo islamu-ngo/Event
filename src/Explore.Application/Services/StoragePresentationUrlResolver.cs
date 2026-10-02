@@ -1,10 +1,41 @@
 using Microsoft.Extensions.Logging;
+using Explore.Domain;
 
 namespace Explore.Application.Services;
 
 public static class StoragePresentationUrlResolver
 {
     private const string StorageObjectApiPathPrefix = "/api/storageobject/";
+
+    public static bool IsManagedProfileImage(StorageObject? image) =>
+        SafeRasterContentPolicy.IsSafePublicImageMetadata(image)
+        && image!.StorageProviderBindingId is { } bindingId && bindingId != Guid.Empty
+        && image.Provider is "local" or "s3_compatible"
+        && image.OwningResourceKind is null
+        && image.OwningResourceId is null;
+
+    public static Guid? ManagedProfilePictureId(ActorPii? pii) =>
+        pii is { ExternalProfilePictureUri: null, ProfilePictureStorageObjectId: { } id }
+        && pii.ProfilePicture?.Id == id
+        && IsManagedProfileImage(pii.ProfilePicture)
+            ? id
+            : null;
+
+    public static string? ExternalProfilePictureUri(ActorPii? pii) =>
+        pii is { ProfilePictureStorageObjectId: null }
+        && ActorPii.IsValidProfilePicture(null, pii.ExternalProfilePictureUri)
+            ? pii.ExternalProfilePictureUri
+            : null;
+
+    public static string? ActorProfilePictureUri(ActorPii? pii) =>
+        ManagedProfilePictureId(pii) is { } id
+            ? $"{StorageObjectApiPathPrefix}{id}/public"
+            : ExternalProfilePictureUri(pii);
+
+    public static string? PublicProfileImageUri(StorageObject? image, Guid tenantId) =>
+        IsManagedProfileImage(image) && image!.TenantId == tenantId && tenantId != Guid.Empty
+            ? $"{StorageObjectApiPathPrefix}{image.Id}/public"
+            : null;
 
     public static Task<string?> ResolveImageUrlAsync(
         string? objectKeyOrUri,

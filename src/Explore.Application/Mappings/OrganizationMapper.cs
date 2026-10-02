@@ -6,6 +6,7 @@ using Explore.Application.DTOs.OrganizationReview;
 using Explore.Application.DTOs.StatusType;
 using Explore.Domain.Enums;
 using Explore.Domain;
+using Explore.Application.Services;
 using Riok.Mapperly.Abstractions;
 
 namespace Explore.Application.Mappings;
@@ -241,7 +242,7 @@ public static partial class OrganizationMapper
     private static Guid? ProfileId(Actor? actor) => actor?.Id;
     private static string? ProfileName(Actor? actor) => actor?.Pii?.DisplayName;
     private static string? ProfileHandle(Actor? actor) => actor?.AtprotoIdentities.FirstOrDefault()?.Handle;
-    private static string? ProfilePicture(Actor? actor) => actor?.Pii?.ProfilePictureUri;
+    private static string? ProfilePicture(Actor? actor) => StoragePresentationUrlResolver.ActorProfilePictureUri(actor?.Pii);
     private static string? BackgroundColor(Actor? actor) => actor?.BackgroundColor;
     private static string? BackgroundEffect(Actor? actor) => actor?.BackgroundEffect;
     private static string? BannerColor(Actor? actor) => actor?.BannerColor;

@@ -477,7 +477,8 @@ public class GetPublicExperienceShellQueryHandler(
             DisplayName = organization.Actor.DisplayName,
             Handle = organization.Actor.AtprotoIdentities.Select(identity => identity.Handle).FirstOrDefault() ?? string.Empty,
             WebsiteUrl = organization.WebsiteUrl ?? string.Empty,
-            ProfilePictureUri = organization.Actor.ProfilePictureUri ?? string.Empty
+            ProfilePictureUri = Explore.Application.Services.StoragePresentationUrlResolver.ActorProfilePictureUri(
+                organization.Actor.Pii) ?? string.Empty
         };
     }
 

@@ -182,6 +182,46 @@ Direct object-key read routes are not part of the local-first contract. The remo
 
 ## Blazor Client Boundary
 
+### Actor profile-media ownership
+
+`ActorPii` persists either `ProfilePictureStorageObjectId` or
+`ExternalProfilePictureUri`, never both. Both null means no image.
+`SetProfilePicture` switches or clears the reference atomically; property writes
+validate the same shape. External sources must be absolute HTTP(S) URIs without
+embedded credentials. A foreign URL resembling an Event content route is still
+external and never becomes an ownership or deletion claim.
+
+The managed FK uses restricted deletion and stays in the hard-deleteable PII
+extension. Its optional navigation retains normal storage tenant and soft-delete
+filters. Profile selection requires an active, public safe-raster managed object
+in the current tenant, with a captured storage target, no resource-only owner,
+and no different Actor owner. `UpdateUserCommandHandler` loads the tracked Actor
+and stores the UUID, not `StorageObject.Uri`. Clearing or replacing a profile
+does not retire the previous bytes.
+
+`StoragePresentationUrlResolver` derives `/api/storageobject/{id}/public` only
+from eligible managed references. Actor/User responses explicitly expose the
+managed ID or external source alongside a policy-filtered display URL; no
+provider, bucket, key or binding is projected. The current-user account cache
+does not cache media authority: media is re-projected from the current
+tenant-filtered graph on each read. Existing tenant-participation banners and
+backgrounds remain managed-only and derive their display routes from IDs.
+No global Actor background-image source or remote asset service is introduced.
+
+The API/OpenAPI/NSwag owners generate the response changes. Existing Blazor
+profile uploads already submit storage IDs, and avatar components consume the
+derived display URL. HAL affordances remain the action authority. Install the
+parent-owned generated migrations before deployment; do not guess an ownership
+mapping from old profile URLs.
+
+The native migration generator rejects any non-null legacy `profile_picture_uri`
+before the generated rename executes. This includes absolute HTTP(S) values:
+syntax cannot distinguish foreign provenance from a historical provider locator.
+An empty-profile database upgrades directly. For development data with images,
+review and retain explicit UUID/source decisions before an approved recreation,
+then reselect the managed object or external source through the new profile
+contract. The migration does not clear, classify or backfill those values.
+
 The Blazor client must treat metadata-backed API URLs as the display contract. `StorageObjectUrlResolver` accepts a storage object `Guid`, an existing `/api/storageobject/...` path, or an absolute application URL whose path is already metadata-backed. It rejects provider object keys such as bucket-relative paths because those bypass storage metadata, lifecycle, and visibility decisions.
 
 Browser-first upload UI uses `/bff/storage/upload-session` and `/bff/storage/upload-proxy`. The BFF keeps the API session binding server-side, rejects raw destination fields, and proxies the bytes to the API finalizer; no direct-provider PUT compatibility path remains.

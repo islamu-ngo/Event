@@ -218,7 +218,7 @@ public class AiContextGatewayE2ETests
             new Dictionary<string, object?>
             {
                 ["DisplayName"] = "Public Name",
-                ["ProfilePictureUri"] = "https://cdn.example.com/pic.jpg",
+                ["ExternalProfilePictureUri"] = "https://cdn.example.com/pic.jpg",
                 ["ActorId"] = Guid.NewGuid()
             },
             maxSensitivity: AiContextSensitivityEnum.Internal);

@@ -132,7 +132,8 @@ public class CreateActorDtoValidator : AbstractValidator<CreateActorDto>
         RuleFor(x => x.ProfilePictureCid)
             .MaximumLength(500).WithMessage("Profile picture CID cannot exceed 500 characters");
 
-        RuleFor(x => x.ProfilePictureUri)
-            .MaximumLength(500).WithMessage("Profile picture URI cannot exceed 500 characters");
+        RuleFor(x => x)
+            .Must(x => Explore.Domain.ActorPii.IsValidProfilePicture(x.ProfilePictureId, x.ExternalProfilePictureUri))
+            .WithMessage("Profile image must be absent, a managed storage ID, or an external HTTP(S) URI.");
     }
 }

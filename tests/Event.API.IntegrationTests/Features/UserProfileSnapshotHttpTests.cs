@@ -17,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel]
-public sealed class UserProfileSnapshotHttpTests
+public sealed partial class UserProfileSnapshotHttpTests
 {
     [Test]
     public async Task PersistedProfileNameEditPreservesOrderContactAndPinnedConsentEvidence()

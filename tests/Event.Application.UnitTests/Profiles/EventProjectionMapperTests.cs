@@ -56,7 +56,7 @@ public sealed class EventProjectionMapperTests
     {
         var source = Entity();
         source.ActorId = ActorId;
-        source.Actor = new Actor { Id = ActorId, ActorTypeId = 3, ActorType = new ActorType { FullName = "Group", MasterCode = "GROUP" }, GroupId = ActorId, Pii = new ActorPii { DisplayName = "Publisher", ProfilePictureUri = "https://images.example.test/actor.png" } };
+        source.Actor = new Actor { Id = ActorId, ActorTypeId = 3, ActorType = new ActorType { FullName = "Group", MasterCode = "GROUP" }, GroupId = ActorId, Pii = new ActorPii { DisplayName = "Publisher", ExternalProfilePictureUri = "https://images.example.test/actor.png" } };
         source.OrganizerActorId = ActorId;
         source.OrganizerActor = source.Actor;
         source.EventType = new EventType { Id = 8, FullName = "Lecture", MasterCode = "LECTURE" };

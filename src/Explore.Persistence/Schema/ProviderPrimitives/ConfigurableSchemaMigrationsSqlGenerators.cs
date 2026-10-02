@@ -31,6 +31,8 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
             operations,
             Dependencies.SqlGenerationHelper,
             sqlite: false);
+        operations = ActorMediaCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false);
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -55,6 +57,8 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
             operations,
             Dependencies.SqlGenerationHelper,
             sqlite: false);
+        operations = ActorMediaCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false);
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -80,6 +84,8 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             executableOperations,
             Dependencies.SqlGenerationHelper,
             sqlite: true);
+        executableOperations = ActorMediaCutoverGuard.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
         executableOperations =
             ConfigurableSchemaMigrationOperations.RemoveRedundantForeignKeyDrops(executableOperations);
         if (executableOperations.Any(operation => operation is RenameIndexOperation))
@@ -150,6 +156,8 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             operations,
             Dependencies.SqlGenerationHelper,
             sqlite: false);
+        operations = ActorMediaCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false);
         var executableOperations = new List<MigrationOperation>(operations.Count);
         foreach (MigrationOperation operation in operations)
         {

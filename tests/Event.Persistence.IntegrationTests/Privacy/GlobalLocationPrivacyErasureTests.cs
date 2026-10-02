@@ -504,7 +504,8 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             await Assert.That(ownerIdentity.Handle).IsNull();
             await Assert.That(ownerIdentity.PdsHost).IsEqualTo(string.Empty);
             await Assert.That(ownerIdentity.IsDeleted).IsTrue();
-            await Assert.That(ownerActorPii.ProfilePictureUri).IsNull();
+            await Assert.That(ownerActorPii.ExternalProfilePictureUri).IsNull();
+            await Assert.That(ownerActorPii.ProfilePictureStorageObjectId).IsNull();
             await Assert.That(await committedContext.AtprotoIdentities
                 .AnyAsync(identity => identity.ActorId == graph.UnrelatedActorId
                     && identity.Did == "did:plc:unrelated"
@@ -690,7 +691,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             Pii = new ActorPii
             {
                 DisplayName = "ACTOR-NAME-CANARY",
-                ProfilePictureUri = "https://example.com/actor-canary.jpg",
+                ExternalProfilePictureUri = "https://example.com/actor-canary.jpg",
             },
             ConcurrencyStamp = Guid.CreateVersion7(),
         };

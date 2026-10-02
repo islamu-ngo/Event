@@ -309,7 +309,7 @@ public static partial class EventMapper
     private static int? MinimumAge(AudienceAge? source) => source?.MinAge;
     private static int? MaximumAge(AudienceAge? source) => source?.MaxAge;
     private static string? EventActorName(Actor? source) => source?.Pii?.DisplayName;
-    private static string? EventActorPicture(Actor? source) => source?.Pii?.ProfilePictureUri;
+    private static string? EventActorPicture(Actor? source) => StoragePresentationUrlResolver.ActorProfilePictureUri(source?.Pii);
     private static string? EventActorHandle(Actor? source) => source?.AtprotoIdentities.Select(identity => identity.Handle).FirstOrDefault();
     private static string? EventActorDid(Actor? source) => source?.AtprotoIdentities.Select(identity => identity.Did).FirstOrDefault();
     private static string? EventActorTypeName(Actor? source) => source?.ActorType?.FullName;

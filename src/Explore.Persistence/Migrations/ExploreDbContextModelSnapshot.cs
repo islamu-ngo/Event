@@ -567,15 +567,25 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("display_name");
 
-                    b.Property<string>("ProfilePictureUri")
+                    b.Property<string>("ExternalProfilePictureUri")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("profile_picture_uri");
+                        .HasColumnName("external_profile_picture_uri");
+
+                    b.Property<Guid?>("ProfilePictureStorageObjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_picture_storage_object_id");
 
                     b.HasKey("ActorId")
                         .HasName("pk_actor_pii");
 
-                    b.ToTable("actor_pii", "islamu_event");
+                    b.HasIndex("ProfilePictureStorageObjectId")
+                        .HasDatabaseName("ix_actor_pii_profile_picture_storage_object_id");
+
+                    b.ToTable("actor_pii", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_actor_pii_profile_picture_shape", "(profile_picture_storage_object_id IS NULL OR (profile_picture_storage_object_id <> '00000000-0000-0000-0000-000000000000' AND external_profile_picture_uri IS NULL)) AND (external_profile_picture_uri IS NULL OR (LOWER(external_profile_picture_uri) LIKE 'https://_%' OR LOWER(external_profile_picture_uri) LIKE 'http://_%'))");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.ActorSubscription", b =>
@@ -38227,7 +38237,15 @@ namespace Explore.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_actor_pii_actors_actor_id");
 
+                    b.HasOne("Explore.Domain.StorageObject", "ProfilePicture")
+                        .WithMany()
+                        .HasForeignKey("ProfilePictureStorageObjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_actor_pii_storage_objects_profile_picture_storage_object_id");
+
                     b.Navigation("Actor");
+
+                    b.Navigation("ProfilePicture");
                 });
 
             modelBuilder.Entity("Explore.Domain.ActorSubscription", b =>

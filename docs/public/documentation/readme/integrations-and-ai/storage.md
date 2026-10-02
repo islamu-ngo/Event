@@ -18,6 +18,38 @@ ISLAMU Event implements a clean storage abstraction supporting both **Local Moun
 
 ## 2. Choosing Your Storage Provider
 
+### Profile images: managed files and external sources
+
+An uploaded profile image is selected by its Event storage-object UUID. Event
+checks that it belongs to the current tenant and is an active public safe-raster
+image, not private/resource-only content or another Actor's assigned image.
+Public delivery uses `/api/storageobject/{id}/public`; clients never need the
+provider bucket, object key or filesystem location.
+
+An external profile image is explicitly a foreign HTTP(S) URL. Loading it
+contacts that external host; Event does not acquire or delete those bytes.
+Even a foreign URL that resembles an Event content route remains external.
+Replacing or clearing either kind of profile reference does not delete a
+previous uploaded file.
+
+For API integrations, `PATCH /api/user/{id}` accepts a `profileImage` group with
+either `profilePictureId` or `externalProfilePictureUri`. Supply neither value
+in a present group to clear; omit the group to preserve the image. Supplying both
+values, a relative URL, credentials in a URL, or an empty UUID is rejected.
+Use the current concurrency stamp in `If-Match`.
+Actor/User responses expose `profilePictureStorageObjectId` or
+`externalProfilePictureUri` alongside the display URL. The former User
+`profileImageKey` field is removed. Existing organization/group backgrounds
+remain managed images rather than introducing another external-image setting.
+
+Apply the matching database upgrade before deploying this contract. Old profile
+URLs are not proof of ownership: operators must use verified file identity or
+explicitly classify a source as external rather than guess from the URL.
+The upgrade stops if any old profile URL remains, including an absolute HTTP(S)
+URL. Preserve the reviewed file/source selections before approved development
+data recreation, then apply them through the new profile API. An empty-profile
+database upgrades directly; no automatic URL classification or data clearing runs.
+
 ### Existing files keep their original target
 
 Changing the default local root, S3 bucket or provider affects new reservations,

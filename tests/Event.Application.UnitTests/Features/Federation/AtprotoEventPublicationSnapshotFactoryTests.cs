@@ -431,7 +431,7 @@ public sealed class AtprotoEventPublicationSnapshotFactoryTests
             LastResolvedAt = now,
             ConcurrencyStamp = Guid.CreateVersion7()
         });
-        eventEntity.Actor.ProfilePictureUri = "organizer-profile-canary";
+        eventEntity.Actor.Pii.ExternalProfilePictureUri = "https://example.test/organizer-profile-canary";
         eventEntity.Actor.BackgroundColor = "#445566";
         eventEntity.Actor.BackgroundEffect = "organizer-effect-canary";
         eventEntity.Actor.BannerColor = "#778899";
@@ -623,7 +623,7 @@ public sealed class AtprotoEventPublicationSnapshotFactoryTests
             Id = Guid.CreateVersion7(),
             ActorTypeId = 1,
             ActorType = eventEntity.Actor.ActorType,
-            Pii = new ActorPii { DisplayName = "speaker-canary", ProfilePictureUri = "speaker-profile-canary" },
+            Pii = new ActorPii { DisplayName = "speaker-canary", ExternalProfilePictureUri = "https://example.test/speaker-profile-canary" },
             Description = "speaker-description-canary",
             BackgroundColor = "speaker-color-canary",
             BackgroundEffect = "speaker-effect-canary",

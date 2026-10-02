@@ -155,6 +155,82 @@ public sealed class ActorFederationMapperTests
     }
 
     [Test]
+    [Arguments("both")]
+    [Arguments("relative")]
+    [Arguments("script")]
+    public async Task CreateConsumer_RejectsAmbiguousOrNonHttpProfileMedia(string shape)
+    {
+        var actors = new ActorStore([]);
+        var image = CreateStorage();
+        image.IsDeleted = false;
+        image.LifecycleState = StorageObjectLifecycleStates.Active;
+        image.Visibility = StorageObjectVisibilities.PublicImage;
+        image.Purpose = StorageObjectPurposes.ProfileImage;
+        image.OwningResourceKind = null;
+        image.OwningResourceId = null;
+        image.ActorId = null;
+        image.StorageProviderBindingId = Guid.CreateVersion7();
+        var handler = new CreateActorCommandHandler(
+            actors, new ActorTypeStore(), new CustodyTypeStore(), new StorageStore([image]),
+            null!, new UserStore(), null!, new TenantContext(TenantId));
+
+        var result = await handler.ExecuteAsync(new CreateActorCommand
+        {
+            ActorDto = new CreateActorDto
+            {
+                ActorTypeId = 7,
+                UserId = OwnerId,
+                DisplayName = "Rejected media",
+                ProfilePictureId = shape == "both" ? image.Id : null,
+                ExternalProfilePictureUri = shape switch
+                {
+                    "both" => "https://foreign.example.test/avatar.png",
+                    "relative" => $"/api/storageobject/{image.Id}/public",
+                    _ => "javascript:alert(1)"
+                }
+            }
+        }, default);
+
+        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(actors.Items).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("active", true)]
+    [Arguments("private", false)]
+    [Arguments("quarantined", false)]
+    [Arguments("deleted", false)]
+    [Arguments("resource", false)]
+    [Arguments("unsafe", false)]
+    [Arguments("unloaded", false)]
+    public async Task ManagedProfilePresentationUsesOnlyEligibleStableIds(string state, bool visible)
+    {
+        var actor = CreateActor();
+        var image = CreateStorage();
+        image.IsDeleted = state == "deleted";
+        image.LifecycleState = state == "quarantined"
+            ? StorageObjectLifecycleStates.Quarantined : StorageObjectLifecycleStates.Active;
+        image.Visibility = state == "private"
+            ? StorageObjectVisibilities.PrivateOwner : StorageObjectVisibilities.PublicImage;
+        image.Purpose = StorageObjectPurposes.ProfileImage;
+        image.OwningResourceKind = state == "resource" ? StorageOwningResourceKinds.EventResource : null;
+        image.OwningResourceId = state == "resource" ? ActorId : null;
+        image.ContentType = state == "unsafe" ? "image/svg+xml" : "image/png";
+        image.StorageProviderBindingId = Guid.CreateVersion7();
+        image.Uri = "https://provider.example.test/private-bucket/provider-key";
+        actor.Pii.SetProfilePicture(image.Id, null);
+        actor.Pii.ProfilePicture = state == "unloaded" ? null : image;
+
+        var dto = ActorFederationMapper.ToActorDetail(actor);
+        await Assert.That(dto.ProfilePictureStorageObjectId).IsEqualTo(visible ? image.Id : null);
+        await Assert.That(dto.ExternalProfilePictureUri).IsNull();
+        await Assert.That(dto.ProfilePictureUri).IsEqualTo(
+            visible ? "/api/storageobject/01900000-0000-7000-8000-000000000004/public" : null);
+        await Assert.That(JsonSerializer.Serialize(dto)).DoesNotContain("provider-key");
+        await Assert.That(JsonSerializer.Serialize(dto)).DoesNotContain("private-bucket");
+    }
+
+    [Test]
     public async Task CreateConsumer_ConstructsOnlyValidatedProfileFieldsWithoutFederationAuthority()
     {
         var actors = new ActorStore([]);
@@ -168,7 +244,7 @@ public sealed class ActorFederationMapperTests
                 TenantId = Stamp,
                 DisplayName = "New display",
                 Description = "New description",
-                ProfilePictureUri = "https://images.example.test/new.png",
+                ExternalProfilePictureUri = "https://images.example.test/new.png",
                 ProfilePictureCid = "new-cid",
                 BackgroundColor = "blue",
                 BackgroundEffect = "none",
@@ -184,7 +260,8 @@ public sealed class ActorFederationMapperTests
         var created = actors.Items.Single();
         await Assert.That(created.Id).IsEqualTo(ActorId);
         await Assert.That(created.Pii.DisplayName).IsEqualTo("New display");
-        await Assert.That(created.Pii.ProfilePictureUri).IsEqualTo("https://images.example.test/new.png");
+        await Assert.That(created.Pii.ExternalProfilePictureUri).IsEqualTo("https://images.example.test/new.png");
+        await Assert.That(created.Pii.ProfilePictureStorageObjectId).IsNull();
         await Assert.That(created.ActorTypeId).IsEqualTo(7);
         await Assert.That(created.UserId).IsEqualTo(OwnerId);
         await Assert.That(created.Description).IsEqualTo("New description");
@@ -236,7 +313,7 @@ public sealed class ActorFederationMapperTests
             case "pii":
                 actor.Pii = null!;
                 expected["displayName"] = string.Empty;
-                fields = ["profilePictureUri"];
+                fields = ["profilePictureUri", "externalProfilePictureUri"];
                 break;
             default:
                 actor.AtprotoIdentities.Clear();
@@ -308,11 +385,13 @@ public sealed class ActorFederationMapperTests
     {
         var actor = CreateActor();
         actor.Pii.DisplayName = value!;
-        actor.Pii.ProfilePictureUri = value;
+        actor.Pii.ExternalProfilePictureUri = null;
         actor.ActorType.FullName = value!;
         actor.ActorType.MasterCode = value!;
         var expected = ExpectedActor(list);
-        foreach (var field in new[] { "displayName", "profilePictureUri", "actorTypeFullName", "actorTypeMasterCode" })
+        expected["profilePictureUri"] = null;
+        expected["externalProfilePictureUri"] = null;
+        foreach (var field in new[] { "displayName", "actorTypeFullName", "actorTypeMasterCode" })
             expected[field] = JsonValue.Create(value);
         await AssertContract(MapActor(actor, list), expected);
     }
@@ -333,6 +412,7 @@ public sealed class ActorFederationMapperTests
         expected["concurrencyStamp"] = actor.ConcurrencyStamp.ToString();
         expected["displayName"] = string.Empty;
         expected["profilePictureUri"] = null;
+        expected["externalProfilePictureUri"] = null;
         expected["did"] = "did:deleted:01900000000070008000000000000004";
         expected["handle"] = null;
         expected["pdsHost"] = string.Empty;
@@ -393,6 +473,7 @@ public sealed class ActorFederationMapperTests
               "concurrencyStamp":"01900000-0000-7000-8000-000000000004",
               "actorTypeId":7,"actorTypeMasterCode":"COMMUNITY","actorTypeFullName":"Community",
               "displayName":"Public display","profilePictureUri":"https://images.example.test/avatar.png",
+              "profilePictureStorageObjectId":null,"externalProfilePictureUri":"https://images.example.test/avatar.png",
               "did":"did:plc:first","handle":"first.example.test","pdsHost":"https://pds.example.test",
               "indexedAt":"2026-09-03T12:00:00Z",
               "didCustodyTypeId":null,"didCustodyTypeMasterCode":null,"didCustodyTypeFullName":null,
@@ -446,7 +527,7 @@ public sealed class ActorFederationMapperTests
             Id = ActorId,
             ActorTypeId = 7,
             ActorType = new ActorType { Id = 7, MasterCode = "COMMUNITY", FullName = "Community", Description = "private lookup metadata" },
-            Pii = new ActorPii { DisplayName = "Public display", ProfilePictureUri = "https://images.example.test/avatar.png" },
+            Pii = new ActorPii { DisplayName = "Public display", ExternalProfilePictureUri = "https://images.example.test/avatar.png" },
             UserId = OwnerId,
             OrganizationId = OwnerId,
             GroupId = TenantId,

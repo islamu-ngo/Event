@@ -169,14 +169,14 @@ public sealed class NotificationMapperTests
             Id = SourceId,
             ActorType = null!,
             User = user,
-            Pii = new ActorPii { DisplayName = "Source display", ProfilePictureUri = "https://private.example.test/source" }
+            Pii = new ActorPii { DisplayName = "Source display", ExternalProfilePictureUri = "https://private.example.test/source" }
         };
         var recipientActor = new Actor
         {
             Id = RecipientId,
             ActorType = null!,
             User = user,
-            Pii = new ActorPii { DisplayName = "Recipient display", ProfilePictureUri = "https://private.example.test/recipient" }
+            Pii = new ActorPii { DisplayName = "Recipient display", ExternalProfilePictureUri = "https://private.example.test/recipient" }
         };
         sourceActor.Pii.Actor = sourceActor;
         recipientActor.Pii.Actor = recipientActor;

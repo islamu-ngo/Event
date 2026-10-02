@@ -75,6 +75,16 @@ public class CreateActorCommandHandler : ICommandHandler<CreateActorCommand, Bas
         // custody and tenant participation remain owned by their authoritative workflows;
         // persistence supplies IDs, audit and concurrency state.
         var dto = request.ActorDto;
+        var profilePicture = dto.ProfilePictureId is { } imageId
+            ? await _storageObjectRepository.GetById(imageId)
+            : null;
+        if (profilePicture is not null
+            && (!StoragePresentationUrlResolver.IsManagedProfileImage(profilePicture)
+                || profilePicture.ActorId is not null))
+        {
+            return BaseCommandResponse.Validation<Guid>(
+                ["Profile image must be an unassigned managed public image."], "Actor creation failed.");
+        }
         var actor = new Actor
         {
             ActorTypeId = dto.ActorTypeId,
@@ -84,7 +94,9 @@ public class CreateActorCommandHandler : ICommandHandler<CreateActorCommand, Bas
             Pii = new ActorPii
             {
                 DisplayName = dto.DisplayName,
-                ProfilePictureUri = dto.ProfilePictureUri
+                ProfilePictureStorageObjectId = dto.ProfilePictureId,
+                ExternalProfilePictureUri = dto.ExternalProfilePictureUri,
+                ProfilePicture = profilePicture
             },
             Description = dto.Description,
             ProfilePictureCid = dto.ProfilePictureCid,

@@ -398,10 +398,10 @@ public static class AtprotoEventSourceFieldManifest
 
         .. ExcludedMany(
             [
-                "Event.Actor.ProfilePictureCid", "Event.Actor.Pii.ProfilePictureUri",
-                "Event.Actor.ProfilePictureUri",
-                "EventSession.Speaker.Actor.Pii.ProfilePictureUri",
-                "EventSession.Speaker.Actor.ProfilePictureCid", "EventSession.Speaker.Actor.ProfilePictureUri"
+                "Event.Actor.ProfilePictureCid", "Event.Actor.Pii.ExternalProfilePictureUri",
+                "Event.Actor.Pii.ProfilePictureStorageObjectId",
+                "EventSession.Speaker.Actor.Pii.ExternalProfilePictureUri",
+                "EventSession.Speaker.Actor.ProfilePictureCid", "EventSession.Speaker.Actor.Pii.ProfilePictureStorageObjectId"
             ],
             "provider identity or legacy remote-media bookkeeping"),
 
@@ -467,7 +467,8 @@ public static class AtprotoEventSourceFieldManifest
         Description("Event.Category.Parent.MasterCode"),
         Excluded("Event.Category.Parent.ParentId", "internal parent-category relationship identifier"),
         Excluded("Event.EventSeries.Actor.Pii.ActorId", "internal actor relationship identifier"),
-        Excluded("Event.EventSeries.Actor.Pii.ProfilePictureUri", "legacy remote-media bookkeeping"),
+        Excluded("Event.EventSeries.Actor.Pii.ExternalProfilePictureUri", "external profile media"),
+        Excluded("Event.EventSeries.Actor.Pii.ProfilePictureStorageObjectId", "managed profile media"),
         Excluded("Event.Actor.AtprotoIdentity.*", "identity authority metadata; only the verified handle is rendered"),
         Excluded("Event.EventSeries.Actor.AtprotoIdentity.*", "identity authority metadata; only the verified handle is rendered"),
         Excluded("EventSession.Speaker.Actor.AtprotoIdentity.*", "identity authority metadata; only the verified handle is rendered"),

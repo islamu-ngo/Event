@@ -3,6 +3,19 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-10-02
+
+- **Breaking: explicit Actor profile-media ownership.** Actor/User responses
+  distinguish `profilePictureStorageObjectId` from `externalProfilePictureUri`.
+  Display URLs are derived independently; User `profileImageKey` is removed.
+  The user `profileImage` PATCH group selects a managed `profilePictureId` or
+  explicit external source, rejects both together, and clears with an empty
+  group. Omission preserves the image. Managed selection retains tenant/public
+  safe-raster checks and rejects resource-only or differently Actor-owned bytes.
+  External URLs never authorize ownership or deletion. Existing participation
+  background/banner delivery is ID-derived. API and client artifacts are
+  generator-owned; the database upgrade must accompany deployment.
+
 ## 2026-10-01
 
 - **Private administrator sessions.** Current-user and administrator-authority

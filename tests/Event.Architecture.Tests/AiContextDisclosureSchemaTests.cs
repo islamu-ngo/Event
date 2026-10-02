@@ -22,7 +22,8 @@ public class AiContextDisclosureSchemaTests
         typeof(User),
         typeof(Organization),
         typeof(Actor),
-        typeof(Location)
+        typeof(Location),
+        typeof(StorageObject)
     };
 
     private static readonly HashSet<string> ExplicitNonPiiKeys = new(StringComparer.Ordinal)

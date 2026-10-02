@@ -164,14 +164,20 @@ public class UpdateActorCommandHandler : ICommandHandler<UpdateActorCommand, Bas
 
     private async Task<bool> ApplyProfileImageAsync(Actor actor, UpdateActorProfileImageDto? dto)
     {
-        if (dto?.ProfilePictureId.HasValue != true)
+        if (dto is null)
         {
+            return true;
+        }
+
+        if (dto.ExternalProfilePictureUri.HasValue)
+        {
+            actor.Pii.SetProfilePicture(null, dto.ExternalProfilePictureUri.Value);
             return true;
         }
 
         if (dto.ProfilePictureId.Value is not { } profilePictureId)
         {
-            actor.ProfilePictureUri = null;
+            actor.Pii.SetProfilePicture(null, null);
             return true;
         }
 
@@ -179,13 +185,16 @@ public class UpdateActorCommandHandler : ICommandHandler<UpdateActorCommand, Bas
         if (storageObject is null
             || !SafeRasterContentPolicy.IsEligibleImageReference(
                 storageObject,
-                _tenantContext.TenantId))
+                _tenantContext.TenantId)
+            || !StoragePresentationUrlResolver.IsManagedProfileImage(storageObject)
+            || storageObject.ActorId is { } ownerId && ownerId != actor.Id)
         {
             return false;
         }
 
         storageObject.ActorId = actor.Id;
-        actor.ProfilePictureUri = storageObject.Uri;
+        actor.Pii.SetProfilePicture(storageObject.Id, null);
+        actor.Pii.ProfilePicture = storageObject;
         return true;
     }
 

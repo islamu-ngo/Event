@@ -112648,6 +112648,19 @@
           "displayName": {
             "type": "string"
           },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "profilePictureCid": {
             "type": [
               "null",
@@ -112806,6 +112819,19 @@
             ]
           },
           "didCustodyTypeFullName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"
@@ -137407,6 +137433,19 @@
           "displayName": {
             "type": "string"
           },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "profilePictureCid": {
             "type": [
               "null",
@@ -137579,6 +137618,19 @@
             ]
           },
           "didCustodyTypeFullName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"
@@ -157819,7 +157871,14 @@
             "type": "string",
             "format": "uuid"
           },
-          "profileImageKey": {
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"
@@ -185401,8 +185460,17 @@
         "type": "object",
         "properties": {
           "profilePictureId": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
+          },
+          "externalProfilePictureUri": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -185877,7 +185945,14 @@
             "type": "string",
             "format": "uuid"
           },
-          "profileImageKey": {
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"

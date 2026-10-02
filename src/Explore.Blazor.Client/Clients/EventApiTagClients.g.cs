@@ -153977,6 +153977,12 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("displayName")]
         public string? DisplayName { get; init; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; init; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureCid")]
         public string? ProfilePictureCid { get; init; } = default!;
 
@@ -154077,6 +154083,12 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("didCustodyTypeFullName")]
         public string? DidCustodyTypeFullName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureUri")]
         public string? ProfilePictureUri { get; init; } = default!;
@@ -175036,6 +175048,12 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("displayName")]
         public string? DisplayName { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureCid")]
         public string? ProfilePictureCid { get; set; } = default!;
 
@@ -175143,6 +175161,12 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("didCustodyTypeFullName")]
         public string? DidCustodyTypeFullName { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureUri")]
         public string? ProfilePictureUri { get; set; } = default!;
@@ -187191,8 +187215,11 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("concurrencyStamp")]
         public System.Guid? ConcurrencyStamp { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("profileImageKey")]
-        public string? ProfileImageKey { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profileImageUri")]
         public string? ProfileImageUri { get; set; } = default!;
@@ -211723,6 +211750,9 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureId")]
         public System.Guid? ProfilePictureId { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -212151,8 +212181,11 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("concurrencyStamp")]
         public System.Guid? ConcurrencyStamp { get; init; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("profileImageKey")]
-        public string? ProfileImageKey { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profileImageUri")]
         public string? ProfileImageUri { get; init; } = default!;

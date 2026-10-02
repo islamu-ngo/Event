@@ -1,0 +1,52 @@
+Change-Id: CHG-01M3RRK33FXQB3PQYBETNNMT3T
+Title: Match regions and dates against the same public session
+Type: fix
+Scope: discovery
+Summary: >-
+  Public event cards select a currently eligible occurrence for dates and
+  governed areas, with truthful additional matches and current disclosure.
+Group: event-publication-and-identity-discovery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Dates and regions now match eligible sessions rather than independent
+      program summaries. Cards expose matchingSession and nullable
+      additionalSessionCount; public regional searches use areaId.
+  Security:
+    Reference: docs/internal/EVENT_PUBLICATION_AND_DISCOVERY.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Current tenant, parent and location authority govern results and counts.
+      Discovery removes cached DTO/output-cache/conditional-304 shortcuts and
+      fails unavailable without safe regional city and country disclosure.
+      Public details rebuild fields after committed redaction.
+  Migration:
+    Reference: docs/internal/EVENT_PUBLICATION_AND_DISCOVERY.md
+    Disposition: not-applicable
+    Detail: >-
+      No database schema migration is needed for this occurrence slice.
+      Additional-session read metadata is explicitly nonmapped.
+  Configuration:
+    Reference: docs/internal/EVENT_PUBLICATION_AND_DISCOVERY.md
+    Disposition: documented
+    Detail: >-
+      Existing tenant DiscoveryAreas configuration resolves areaId.
+      Area policy reads are authoritative across replicas; this slice adds
+      no environment variables, secrets or deployment topology.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Generated schema and clients include governed area filtering, matching
+      occurrence fields, nullable additional counts and discovery_unavailable.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/publication-and-sessions.md
+    Disposition: documented
+    Detail: >-
+      Configure active tenant-owned areas and preserve current venue
+      disclosure. Attendees see the matching occurrence; unavailable searches
+      must not be replaced by old cached results.

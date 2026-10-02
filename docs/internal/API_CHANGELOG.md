@@ -1,7 +1,18 @@
-ABOUTME: API change log aligned with the current repository state and versioning in source.
-ABOUTME: Keeps release notes short and focused on externally observable API behavior.
+Scope: externally observable API behavior and source-defined versioning.
+Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
+
+## 2026-10-02
+
+- **Occurrence-correct discovery.** Public date, temporal and governed-area
+  filters match the same published session. Cards expose `matchingSession`
+  and nullable `additionalSessionCount`, with permitted regional city/country.
+  Unknown or inactive `areaId` values no longer become unfiltered searches.
+- **Current disclosure reads.** Public discovery no longer replays cached DTO
+  pages or shared/conditional-304 responses; public details no longer replay
+  fields removed by committed redaction. Unresolved configuration or
+  regional authority returns no-store `503` with `discovery_unavailable`.
 
 ## 2026-10-01
 

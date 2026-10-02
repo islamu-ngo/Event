@@ -100,7 +100,8 @@ public class EventController : EventControllerBase
         "Send 'Prefer: return=minimal' header to strip links.")]
     [ProducesResponseType(typeof(HalCollectionResource<EventDiscoveryItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [OutputCache(PolicyName = "EventDiscovery")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    [PrivateNoStore]
     public async Task<ActionResult<HalCollectionResource<EventDiscoveryItemDto>>> GetAll(
         [FromQuery] EventFilterRequest filter,
         CancellationToken cancellationToken = default)
@@ -118,6 +119,7 @@ public class EventController : EventControllerBase
             PageNumber = filter.PageNumber,
             PageSize = filter.PageSize,
             SearchTerm = filter.SearchTerm,
+            AreaId = filter.AreaId,
             ActorId = filter.ActorId,
             OrganizationId = filter.OrganizationId,
             GroupId = filter.GroupId,

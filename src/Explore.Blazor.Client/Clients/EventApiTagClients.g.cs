@@ -36221,7 +36221,7 @@ namespace Explore.Blazor.Client.Clients
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalCollectionResourceOfEventDiscoveryItemDto> GetEventsAsync(int? pageNumber = null, int? pageSize = null, string? searchTerm = null, System.Guid? actorId = null, System.Guid? organizationId = null, System.Guid? groupId = null, System.Guid? categoryId = null, System.Collections.Generic.IEnumerable<System.Guid>? includedCategoryIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedCategoryIds = null, string? categoryInclusionMode = null, string? categoryExclusionMode = null, System.Collections.Generic.IEnumerable<System.Guid>? includedTagIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedTagIds = null, string? inclusionMode = null, string? exclusionMode = null, System.Collections.Generic.IEnumerable<int>? formatIds = null, System.Collections.Generic.IEnumerable<int>? madhabIds = null, System.Collections.Generic.IEnumerable<int>? registrationModeIds = null, System.Collections.Generic.IEnumerable<int>? languageIds = null, System.DateTimeOffset? dateFrom = null, System.DateTimeOffset? dateTo = null, System.Collections.Generic.IEnumerable<int>? eventTypeIds = null, System.Collections.Generic.IEnumerable<int>? audienceGenderIds = null, System.Collections.Generic.IEnumerable<int>? audienceAgeIds = null, System.Collections.Generic.IEnumerable<int>? eventStatusIds = null, System.Collections.Generic.IEnumerable<int>? genderModeIds = null, bool? includesQuranRecitation = null, System.Collections.Generic.IEnumerable<int>? referencePrayerIds = null, System.Collections.Generic.IEnumerable<int>? islamicPrimaryLanguageIds = null, bool? hasIslamicAspect = null, int? skillLevelId = null, bool? isCodingCompetition = null, bool? isHackathon = null, bool? requiresLaptop = null, string? techStackTag = null, bool? hasTechAspect = null, string? sortBy = null, bool? sortDescending = null, string? view = null, System.Collections.Generic.IEnumerable<CustomPropertyFilterCriterion>? customPropertyFilters = null, string? customPropertySearchTerm = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalCollectionResourceOfEventDiscoveryItemDto> GetEventsAsync(int? pageNumber = null, int? pageSize = null, string? searchTerm = null, System.Guid? areaId = null, System.Guid? actorId = null, System.Guid? organizationId = null, System.Guid? groupId = null, System.Guid? categoryId = null, System.Collections.Generic.IEnumerable<System.Guid>? includedCategoryIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedCategoryIds = null, string? categoryInclusionMode = null, string? categoryExclusionMode = null, System.Collections.Generic.IEnumerable<System.Guid>? includedTagIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedTagIds = null, string? inclusionMode = null, string? exclusionMode = null, System.Collections.Generic.IEnumerable<int>? formatIds = null, System.Collections.Generic.IEnumerable<int>? madhabIds = null, System.Collections.Generic.IEnumerable<int>? registrationModeIds = null, System.Collections.Generic.IEnumerable<int>? languageIds = null, System.DateTimeOffset? dateFrom = null, System.DateTimeOffset? dateTo = null, System.Collections.Generic.IEnumerable<int>? eventTypeIds = null, System.Collections.Generic.IEnumerable<int>? audienceGenderIds = null, System.Collections.Generic.IEnumerable<int>? audienceAgeIds = null, System.Collections.Generic.IEnumerable<int>? eventStatusIds = null, System.Collections.Generic.IEnumerable<int>? genderModeIds = null, bool? includesQuranRecitation = null, System.Collections.Generic.IEnumerable<int>? referencePrayerIds = null, System.Collections.Generic.IEnumerable<int>? islamicPrimaryLanguageIds = null, bool? hasIslamicAspect = null, int? skillLevelId = null, bool? isCodingCompetition = null, bool? isHackathon = null, bool? requiresLaptop = null, string? techStackTag = null, bool? hasTechAspect = null, string? sortBy = null, bool? sortDescending = null, string? view = null, System.Collections.Generic.IEnumerable<CustomPropertyFilterCriterion>? customPropertyFilters = null, string? customPropertySearchTerm = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -37528,7 +37528,7 @@ namespace Explore.Blazor.Client.Clients
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalCollectionResourceOfEventDiscoveryItemDto> GetEventsAsync(int? pageNumber = null, int? pageSize = null, string? searchTerm = null, System.Guid? actorId = null, System.Guid? organizationId = null, System.Guid? groupId = null, System.Guid? categoryId = null, System.Collections.Generic.IEnumerable<System.Guid>? includedCategoryIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedCategoryIds = null, string? categoryInclusionMode = null, string? categoryExclusionMode = null, System.Collections.Generic.IEnumerable<System.Guid>? includedTagIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedTagIds = null, string? inclusionMode = null, string? exclusionMode = null, System.Collections.Generic.IEnumerable<int>? formatIds = null, System.Collections.Generic.IEnumerable<int>? madhabIds = null, System.Collections.Generic.IEnumerable<int>? registrationModeIds = null, System.Collections.Generic.IEnumerable<int>? languageIds = null, System.DateTimeOffset? dateFrom = null, System.DateTimeOffset? dateTo = null, System.Collections.Generic.IEnumerable<int>? eventTypeIds = null, System.Collections.Generic.IEnumerable<int>? audienceGenderIds = null, System.Collections.Generic.IEnumerable<int>? audienceAgeIds = null, System.Collections.Generic.IEnumerable<int>? eventStatusIds = null, System.Collections.Generic.IEnumerable<int>? genderModeIds = null, bool? includesQuranRecitation = null, System.Collections.Generic.IEnumerable<int>? referencePrayerIds = null, System.Collections.Generic.IEnumerable<int>? islamicPrimaryLanguageIds = null, bool? hasIslamicAspect = null, int? skillLevelId = null, bool? isCodingCompetition = null, bool? isHackathon = null, bool? requiresLaptop = null, string? techStackTag = null, bool? hasTechAspect = null, string? sortBy = null, bool? sortDescending = null, string? view = null, System.Collections.Generic.IEnumerable<CustomPropertyFilterCriterion>? customPropertyFilters = null, string? customPropertySearchTerm = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalCollectionResourceOfEventDiscoveryItemDto> GetEventsAsync(int? pageNumber = null, int? pageSize = null, string? searchTerm = null, System.Guid? areaId = null, System.Guid? actorId = null, System.Guid? organizationId = null, System.Guid? groupId = null, System.Guid? categoryId = null, System.Collections.Generic.IEnumerable<System.Guid>? includedCategoryIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedCategoryIds = null, string? categoryInclusionMode = null, string? categoryExclusionMode = null, System.Collections.Generic.IEnumerable<System.Guid>? includedTagIds = null, System.Collections.Generic.IEnumerable<System.Guid>? excludedTagIds = null, string? inclusionMode = null, string? exclusionMode = null, System.Collections.Generic.IEnumerable<int>? formatIds = null, System.Collections.Generic.IEnumerable<int>? madhabIds = null, System.Collections.Generic.IEnumerable<int>? registrationModeIds = null, System.Collections.Generic.IEnumerable<int>? languageIds = null, System.DateTimeOffset? dateFrom = null, System.DateTimeOffset? dateTo = null, System.Collections.Generic.IEnumerable<int>? eventTypeIds = null, System.Collections.Generic.IEnumerable<int>? audienceGenderIds = null, System.Collections.Generic.IEnumerable<int>? audienceAgeIds = null, System.Collections.Generic.IEnumerable<int>? eventStatusIds = null, System.Collections.Generic.IEnumerable<int>? genderModeIds = null, bool? includesQuranRecitation = null, System.Collections.Generic.IEnumerable<int>? referencePrayerIds = null, System.Collections.Generic.IEnumerable<int>? islamicPrimaryLanguageIds = null, bool? hasIslamicAspect = null, int? skillLevelId = null, bool? isCodingCompetition = null, bool? isHackathon = null, bool? requiresLaptop = null, string? techStackTag = null, bool? hasTechAspect = null, string? sortBy = null, bool? sortDescending = null, string? view = null, System.Collections.Generic.IEnumerable<CustomPropertyFilterCriterion>? customPropertyFilters = null, string? customPropertySearchTerm = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -37558,6 +37558,10 @@ namespace Explore.Blazor.Client.Clients
                     if (searchTerm != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("SearchTerm")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(searchTerm, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (areaId != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("AreaId")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(areaId, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     if (actorId != null)
                     {
@@ -37758,6 +37762,16 @@ namespace Explore.Blazor.Client.Clients
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 503)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Service Unavailable", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -165194,6 +165208,13 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("madhabFullName")]
         public string? MadhabFullName { get; init; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("matchingSession")]
+        public EventMatchingSessionDto? MatchingSession { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("additionalSessionCount")]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int? AdditionalSessionCount { get; init; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("sessionCount")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? SessionCount { get; init; } = default!;
@@ -165592,6 +165613,64 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("geohash")]
         public string? Geohash { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class EventMatchingSessionDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid Id { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        public string? Title { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localStartDate")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(DateFormatConverter))]
+        public System.DateTimeOffset LocalStartDate { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localStartTime")]
+        public System.TimeSpan? LocalStartTime { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localEndDate")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(DateFormatConverter))]
+        public System.DateTimeOffset? LocalEndDate { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localEndTime")]
+        public System.TimeSpan? LocalEndTime { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("startsAtUtc")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset StartsAtUtc { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("endsAtUtc")]
+        public System.DateTimeOffset? EndsAtUtc { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("isOpenEnded")]
+        public bool IsOpenEnded { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("city")]
+        public string? City { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("country")]
+        public string? Country { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -178593,6 +178672,13 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("madhabFullName")]
         public string? MadhabFullName { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("matchingSession")]
+        public MatchingSession? MatchingSession { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("additionalSessionCount")]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int? AdditionalSessionCount { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("sessionCount")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -216074,6 +216160,64 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("guestRecoveryPolicy")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<GuestRecoveryPolicyEnum>))]
         public GuestRecoveryPolicyEnum? GuestRecoveryPolicy { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class MatchingSession
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid Id { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        public string? Title { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localStartDate")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(DateFormatConverter))]
+        public System.DateTimeOffset LocalStartDate { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localStartTime")]
+        public System.TimeSpan? LocalStartTime { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localEndDate")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(DateFormatConverter))]
+        public System.DateTimeOffset? LocalEndDate { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("localEndTime")]
+        public System.TimeSpan? LocalEndTime { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("startsAtUtc")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset StartsAtUtc { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("endsAtUtc")]
+        public System.DateTimeOffset? EndsAtUtc { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("isOpenEnded")]
+        public bool IsOpenEnded { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("city")]
+        public string? City { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("country")]
+        public string? Country { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

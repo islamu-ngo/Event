@@ -24,16 +24,36 @@ public static partial class EventMapper
         };
     }
 
-    public static EventListDto ToListItem(Event source) => MapEventList(source) with
+    public static EventListDto ToListItem(Event source)
     {
-        FeaturedImageId = source.FeaturedImageId ?? Guid.Empty,
-        EventTypeId = source.EventTypeId ?? 0,
-        AudienceGenderId = source.AudienceGenderId ?? 0,
-        AudienceAgeId = source.AudienceAgeId ?? 0,
-        ActorTypeId = source.Actor?.ActorTypeId ?? 0,
-        IsPast = source.LastSessionEndUtc is not null && source.LastSessionEndUtc <= DateTimeOffset.UtcNow,
-        TicketPriceSummary = EventTicketPriceSummaryMapper.Map(source)
-    };
+        EventSession? matchingSession = source.DiscoveryAdditionalSessionCount.HasValue
+            ? source.Sessions.SingleOrDefault()
+            : null;
+        return MapEventList(source) with
+        {
+            FeaturedImageId = source.FeaturedImageId ?? Guid.Empty,
+            EventTypeId = source.EventTypeId ?? 0,
+            AudienceGenderId = source.AudienceGenderId ?? 0,
+            AudienceAgeId = source.AudienceAgeId ?? 0,
+            ActorTypeId = source.Actor?.ActorTypeId ?? 0,
+            IsPast = source.LastSessionEndUtc is not null && source.LastSessionEndUtc <= DateTimeOffset.UtcNow,
+            TicketPriceSummary = EventTicketPriceSummaryMapper.Map(source),
+            MatchingSession = matchingSession is null ? null : new EventMatchingSessionDto(
+                matchingSession.Id,
+                matchingSession.Title,
+                matchingSession.LocalStartDate!.Value,
+                matchingSession.LocalStartTime,
+                matchingSession.LocalEndDate,
+                matchingSession.LocalEndTime,
+                matchingSession.StartTime!.Value,
+                matchingSession.EndTime,
+                matchingSession.EndTimeType == SessionEndTimeType.OpenEnded),
+            AdditionalSessionCount = source.DiscoveryAdditionalSessionCount,
+            SessionCount = source.DiscoveryAdditionalSessionCount is { } additionalCount
+                ? (matchingSession is null ? 0 : additionalCount + 1)
+                : source.SessionCount
+        };
+    }
 
     // Domain graphs, provenance internals, lifecycle/audit and scheduling caches are not response graphs.
     // The wrapper owns the filtered actions, aspect names and ticket summary. Services own enrichment/flags.
@@ -122,6 +142,7 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.ParticipationConfiguration), nameof(EventDto.ParticipationConfiguration), Use = nameof(Participation))]
     [MapProperty(nameof(Event.IslamicAspect), nameof(EventDto.IslamicAspect), Use = nameof(MapIslamicAspect))]
     [MapProperty(nameof(Event.TechAspect), nameof(EventDto.TechAspect), Use = nameof(MapTechAspect))]
+    [MapperIgnoreSource(nameof(Event.DiscoveryAdditionalSessionCount))]
     private static partial EventDto MapEventDetail(Event source);
 
     // List is a scalar summary. It never traverses series children or aspect/session/action graphs.
@@ -168,6 +189,8 @@ public static partial class EventMapper
     [MapperIgnoreSource(nameof(Event.BackgroundImage))]
     [MapperIgnoreSource(nameof(Event.AtprotoRecord))]
     [MapperIgnoreTarget(nameof(EventListDto.IsManagementView))]
+    [MapperIgnoreTarget(nameof(EventListDto.MatchingSession))]
+    [MapperIgnoreTarget(nameof(EventListDto.AdditionalSessionCount))]
     [MapperIgnoreTarget(nameof(EventListDto.IsReportingIntakeEnabled))]
     [MapperIgnoreTarget(nameof(EventListDto.AtprotoDeliveryStatus))]
     [MapperIgnoreTarget(nameof(EventListDto.AtprotoDeliveryFailureCode))]
@@ -205,6 +228,7 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.RegistrationPolicy), nameof(EventListDto.RegistrationPolicyFullName), Use = nameof(PolicyName))]
     [MapProperty(nameof(Event.ParticipationConfiguration), nameof(EventListDto.ParticipationConfiguration), Use = nameof(Participation))]
     [MapProperty(nameof(Event.CreatedAt), nameof(EventListDto.CreatedAtUtc), Use = nameof(CreatedAtUtc))]
+    [MapperIgnoreSource(nameof(Event.DiscoveryAdditionalSessionCount))]
     private static partial EventListDto MapEventList(Event source);
 
     public static EventPublicActionDto ToDetail(EventPublicAction source) => MapPublicAction(source) with

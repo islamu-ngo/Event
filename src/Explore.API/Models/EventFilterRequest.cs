@@ -9,6 +9,7 @@ public sealed class EventFilterRequest : IValidatableObject
     public int PageSize { get; set; } = 20;
 
     public string? SearchTerm { get; set; }
+    public Guid? AreaId { get; set; }
     public Guid? ActorId { get; set; }
     public Guid? OrganizationId { get; set; }
     public Guid? GroupId { get; set; }
@@ -103,6 +104,9 @@ public sealed class EventFilterRequest : IValidatableObject
             yield return result;
 
         foreach (var result in QueryValidationRules.ValidateOptionalGuid(ActorId, nameof(ActorId)))
+            yield return result;
+
+        foreach (var result in QueryValidationRules.ValidateOptionalGuid(AreaId, nameof(AreaId)))
             yield return result;
 
         foreach (var result in QueryValidationRules.ValidateOptionalGuid(OrganizationId, nameof(OrganizationId)))

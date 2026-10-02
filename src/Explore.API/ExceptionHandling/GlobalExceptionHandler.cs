@@ -97,6 +97,11 @@ internal sealed class GlobalExceptionHandler(
                 "Admission check-in unavailable",
                 "Admission check-in is temporarily unavailable. Stop queued scans and try again later.",
                 ApiProblemCodes.AdmissionCheckInUnavailable),
+            EventDiscoveryUnavailableException => (
+                StatusCodes.Status503ServiceUnavailable,
+                "Event discovery unavailable",
+                "Event discovery is temporarily unavailable.",
+                ApiProblemCodes.EventDiscoveryUnavailable),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "Internal server error",
@@ -120,7 +125,7 @@ internal sealed class GlobalExceptionHandler(
         }
 
         httpContext.Response.StatusCode = statusCode;
-        if (exception is AdmissionCheckInUnavailableException)
+        if (exception is AdmissionCheckInUnavailableException or EventDiscoveryUnavailableException)
         {
             httpContext.Response.Headers[HeaderNames.CacheControl] = "no-store";
             httpContext.Response.Headers["Referrer-Policy"] = "no-referrer";

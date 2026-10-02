@@ -111,7 +111,21 @@
                                         <span class="hero-carousel__badge">@badge.ToUpperInvariant()</span>
                                     }
                                 </div>
-                                <p class="hero-carousel__metadata">@GetMetadata(slide)</p>
+                                <p class="hero-carousel__metadata">
+                                    @if (slide.MatchingSession?.Title is { Length: > 0 } sessionTitle)
+                                    {
+                                        <span>@sessionTitle · </span>
+                                    }
+                                    <time datetime="@((slide.MatchingSession?.LocalStartDate ?? slide.FirstSessionDate)?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))">@GetMetadata(slide)</time>
+                                    @if (slide.AdditionalSessionCount is > 0)
+                                    {
+                                        <span data-additional-session-count="@slide.AdditionalSessionCount"> · @slide.AdditionalSessionCount additional matching sessions</span>
+                                    }
+                                </p>
+                                @if (string.Equals(slide.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <p class="hero-carousel__metadata">Community reported</p>
+                                }
                                 @if (!string.IsNullOrWhiteSpace(slide.Description))
                                 {
                                     <p class="hero-carousel__description">@slide.Description</p>
@@ -139,8 +153,12 @@
                                                 @slide.ActorDisplayName.Trim()[0]
                                             </span>
                                         }
-                                        <span class="hero-carousel__actor-name">@slide.ActorDisplayName</span>
+                                        <span class="hero-carousel__actor-name">@(string.Equals(slide.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase) ? $"Contributor: {slide.ActorDisplayName}" : slide.ActorDisplayName)</span>
                                     </a>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(slide.ActorDisplayName))
+                                {
+                                    <p class="hero-carousel__metadata">@(string.Equals(slide.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase) ? $"Contributor: {slide.ActorDisplayName}" : slide.ActorDisplayName)</p>
                                 }
                             </div>
                         </div>
@@ -320,7 +338,15 @@
 
     private static string GetMetadata(EventListDto slide)
     {
-        return slide.FirstSessionDate?.ToString("ddd, MMM d") ?? "Date to be announced";
+        var date = (slide.MatchingSession?.LocalStartDate ?? slide.FirstSessionDate)?.ToString("ddd, MMM d") ?? "Date to be announced";
+        if (slide.MatchingSession is { } session)
+        {
+            if (session.LocalStartTime is { } time)
+                date += $" · {time:hh\\:mm}";
+            if (session.IsOpenEnded)
+                date += " · Open ended";
+        }
+        return date;
     }
 
     private static string GetPosterAlt(EventListDto slide) => $"Poster for {slide.Title}";
@@ -336,7 +362,9 @@
         : EventUrlHelper.BuildPublicPath(slide.Slug, slide.PublicCode) ?? "/events";
 
     private static string? GetExternalEventUrl(EventListDto slide) =>
-        slide.IsFederatedDiscoveryEvent() ? slide.GetHalHref("source") : null;
+        slide.IsFederatedDiscoveryEvent() ||
+        string.Equals(slide.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase)
+            ? slide.GetHalHref("source") : null;
 
     private static string GetExternalEventLinkLabel(EventListDto slide) =>
         $"Open {slide.Title} on its external platform in a new tab";

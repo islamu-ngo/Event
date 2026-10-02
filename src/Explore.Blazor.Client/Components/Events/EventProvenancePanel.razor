@@ -24,9 +24,17 @@
 
         @if (!string.IsNullOrWhiteSpace(Event.SourcePublisherName))
         {
-            <div class="event-provenance-panel__fact">
+            <div class="event-provenance-panel__fact" data-attribution="source-publisher">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Source publisher</MudText>
                 <MudText Typo="Typo.body2">@Event.SourcePublisherName</MudText>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Event.ActorDisplayName))
+        {
+            <div class="event-provenance-panel__fact" data-attribution="contributor">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Contributor</MudText>
+                <MudText Typo="Typo.body2">@Event.ActorDisplayName</MudText>
             </div>
         }
 

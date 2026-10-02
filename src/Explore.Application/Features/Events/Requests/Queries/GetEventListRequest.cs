@@ -28,6 +28,11 @@ public sealed record GetEventListRequest : IQuery<PaginatedResult<EventListDto>>
     public string? SearchTerm { get; init; }
 
     /// <summary>
+    /// Tenant-governed public area, resolved to eligible location references by the server.
+    /// </summary>
+    public Guid? AreaId { get; init; }
+
+    /// <summary>
     /// Filter by actor ownership directly.
     /// </summary>
     public Guid? ActorId { get; init; }

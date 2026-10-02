@@ -163,6 +163,7 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
 
     private static bool HasUnsupportedFederatedFilter(GetEventListRequest value) =>
         value.Id != Guid.Empty
+        || value.AreaId.HasValue
         || value.ActorId.HasValue
         || value.OrganizationId.HasValue
         || value.GroupId.HasValue

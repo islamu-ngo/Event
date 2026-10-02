@@ -1,20 +1,22 @@
-using System.Security.Cryptography;
-using System.Text;
+using System.Text.Json;
 using Explore.Application.Mappings;
-using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.Event;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.Events.Requests.Queries;
+using Explore.Application.Models.PublicExperience;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Specifications.Events;
+using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Application.Contracts.Operations;
 using Explore.Domain.Enums;
-using Microsoft.Extensions.Caching.Hybrid;
+using Explore.Domain.Constants;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
@@ -25,32 +27,44 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
     private readonly IActorRepository _actorRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetEventListRequestHandler> _logger;
-    private readonly HybridCache _cache;
     private readonly IModuleService _moduleService;
     private readonly ITenantContext _tenantContext;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantLifecycleAccessService _lifecycle;
+    private readonly IHierarchicalSettingsResolver _settingsResolver;
+    private readonly ILocationRepository _locationRepository;
+    private readonly TimeProvider _clock;
+    private readonly ILocationPrivacyGovernanceService _locationPrivacy;
+    private readonly IEventLocationDisclosureService _locationDisclosure;
 
     public GetEventListRequestHandler(
         IEventRepository eventRepository,
         IActorRepository actorRepository,
         IObjectStorageService objectStorageService,
         ILogger<GetEventListRequestHandler> logger,
-        HybridCache cache,
         IModuleService moduleService,
         ITenantContext tenantContext,
         ICustomPropertyQuotaResolver quotaResolver,
-        ITenantLifecycleAccessService lifecycle)
+        ITenantLifecycleAccessService lifecycle,
+        IHierarchicalSettingsResolver settingsResolver,
+        ILocationRepository locationRepository,
+        TimeProvider clock,
+        ILocationPrivacyGovernanceService locationPrivacy,
+        IEventLocationDisclosureService locationDisclosure)
     {
         _eventRepository = eventRepository;
         _actorRepository = actorRepository;
         _objectStorageService = objectStorageService;
         _logger = logger;
-        _cache = cache;
         _moduleService = moduleService;
         _tenantContext = tenantContext;
         _quotaResolver = quotaResolver;
         _lifecycle = lifecycle;
+        _settingsResolver = settingsResolver;
+        _locationRepository = locationRepository;
+        _clock = clock;
+        _locationPrivacy = locationPrivacy;
+        _locationDisclosure = locationDisclosure;
     }
 
     public async Task<PaginatedResult<EventListDto>> QueryAsync(GetEventListRequest request, CancellationToken cancellationToken)
@@ -64,44 +78,105 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
             return PaginatedResult<EventListDto>.Create([], 0, request.PageNumber, request.PageSize);
         }
 
-        var specification = await BuildSpecificationAsync(request, ownershipActorId, cancellationToken);
-        var tenantCacheKey = _tenantContext.TenantId.ToString("N");
-        var ownershipCacheKey = ownershipActorId?.ToString("N") ?? "none";
-        var cacheKeySuffix = specification.ToCacheKeySuffix();
-        var cacheKeyDigest = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(cacheKeySuffix)));
-        var cacheKey = $"events:list:tenant:{tenantCacheKey}:{request.PageNumber}:{request.PageSize}:owner:{ownershipCacheKey}:{cacheKeyDigest}";
+        var criteria = request;
+        if (request.AreaId is { } areaId)
+        {
+            string? rawConfig = await _settingsResolver.ResolveAsync<string>(
+                GovernanceSettingKeys.PublicExperience.DiscoveryAreas,
+                new SettingContext(TenantId: _tenantContext.TenantId),
+                cancellationToken);
+            PublicDiscoveryAreasConfig config;
+            try
+            {
+                config = string.IsNullOrWhiteSpace(rawConfig)
+                    ? new PublicDiscoveryAreasConfig()
+                    : JsonSerializer.Deserialize<PublicDiscoveryAreasConfig>(
+                        rawConfig, JsonSerializerOptions.Web)
+                        ?? throw new EventDiscoveryUnavailableException();
+            }
+            catch (JsonException)
+            {
+                throw new EventDiscoveryUnavailableException();
+            }
 
-        var cachedResult = await _cache.GetOrCreateAsync(
-            cacheKey,
-            async _ =>
+            Guid[] references = (config.Areas ?? [])
+                .SelectMany(area => area.LocationIds ?? [])
+                .Distinct()
+                .ToArray();
+            var tenantLocationIds = (await _locationRepository.GetExistingTenantLocationIdsAsync(
+                _tenantContext.TenantId, references, cancellationToken)).ToHashSet();
+            if (PublicDiscoveryAreasConfigValidator.Validate(config, tenantLocationIds).Count > 0)
+                throw new EventDiscoveryUnavailableException();
+
+            var area = (config.Areas ?? []).SingleOrDefault(area => area.IsActive && area.Id == areaId);
+            Guid[] locationIds = (area?.LocationIds ?? [])
+                .Where(id => request.LocationIds is null || request.LocationIds.Contains(id))
+                .ToArray();
+            if (locationIds.Length == 0)
+                return PaginatedResult<EventListDto>.Create([], 0, request.PageNumber, request.PageSize);
+
+            criteria = request with { LocationIds = locationIds };
+        }
+
+        bool regionalSearch = criteria.LocationIds is { Count: > 0 };
+        if (regionalSearch
+            && !(await _locationPrivacy.ResolveAsync(_tenantContext.TenantId, cancellationToken)).IsResolved)
+            throw new EventDiscoveryUnavailableException();
+
+        var specification = await BuildSpecificationAsync(criteria, ownershipActorId, cancellationToken);
+        var (events, totalCount) = await _eventRepository.GetEventsWithDetailsPaged(
+            request.PageNumber, request.PageSize, specification, cancellationToken);
+        IReadOnlyDictionary<Guid, EventLocationDisclosureResult>? locationProjections = null;
+        if (regionalSearch)
+        {
+            var requests = events.Select(entity =>
             {
-                var (events, totalCount) = await _eventRepository.GetEventsWithDetailsPaged(
-                    request.PageNumber, request.PageSize, specification);
-                var eventDtos = events.Select(EventMapper.ToListItem).ToList();
-                return PaginatedResult<EventListDto>.Create(eventDtos, totalCount, request.PageNumber, request.PageSize);
-            },
-            new HybridCacheEntryOptions
+                var session = entity.Sessions.Single();
+                return new EventLocationDisclosureRequest(
+                    entity.TenantId,
+                    entity.Id,
+                    session.EventLocationId ?? throw new EventDiscoveryUnavailableException(),
+                    session.RoomId,
+                    RequesterUserId: null,
+                    EventLocationDisclosurePurpose.Public);
+            }).ToArray();
+            locationProjections = await _locationDisclosure.ResolveManyAsync(requests, cancellationToken);
+            foreach (var location in requests)
             {
-                Expiration = TimeSpan.FromMinutes(5),
-                LocalCacheExpiration = TimeSpan.FromMinutes(1)
-            },
-            tags:
-            [
-                CacheTags.Events,
-                CacheTags.EventLists,
-                CacheTags.EventListByTenant(_tenantContext.TenantId)
-            ],
-            cancellationToken: cancellationToken);
+                if (!locationProjections.TryGetValue(location.EventLocationId, out var projection)
+                    || !projection.DisclosedFields.Contains(EventLocationDisclosureField.City)
+                    || !projection.DisclosedFields.Contains(EventLocationDisclosureField.Country))
+                    throw new EventDiscoveryUnavailableException();
+            }
+        }
+
+        var result = PaginatedResult<EventListDto>.Create(
+            events.Select(entity =>
+            {
+                var dto = EventMapper.ToListItem(entity);
+                if (locationProjections is not null)
+                {
+                    var projection = locationProjections[entity.Sessions.Single().EventLocationId!.Value];
+                    dto = dto with
+                    {
+                        MatchingSession = dto.MatchingSession! with
+                        {
+                            City = projection.Values!.City,
+                            Country = projection.Values.Country
+                        }
+                    };
+                }
+                return dto;
+            }).ToList(), totalCount, request.PageNumber, request.PageSize);
 
         // Resolve presigned URLs for images
-        foreach (var dto in cachedResult.Items)
+        foreach (var dto in result.Items)
         {
             dto.FeaturedImageUri = await ResolveImageUrl(dto.FeaturedImageUri);
             dto.ActorProfilePictureUri = await ResolveImageUrl(dto.ActorProfilePictureUri);
         }
 
-        return cachedResult;
+        return result;
     }
 
     /// <summary>
@@ -116,14 +191,6 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
 
         spec = spec.And(EventFilter.PubliclyDiscoverable());
         spec = spec.And(EventFilter.Status((int)EventStatusEnum.Published));
-        if (request.View.HasValue)
-        {
-            spec = spec.And(EventSubqueryFilter.Temporal(request.View.Value, DateTimeOffset.UtcNow));
-        }
-        else if (!hasExplicitDateSearch)
-        {
-            spec = spec.And(EventSubqueryFilter.CurrentOrUpcomingPublishedSession());
-        }
 
         // ===== Core Event filters (always available) =====
 
@@ -151,11 +218,6 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
         if (request.EventStatusIds is { Count: > 0 })
             spec = spec.And(EventFilter.Statuses(request.EventStatusIds.ToList()));
 
-        if (request.DateFrom.HasValue)
-            spec = spec.And(EventFilter.DateFrom(request.DateFrom.Value));
-
-        if (request.DateTo.HasValue)
-            spec = spec.And(EventFilter.DateTo(request.DateTo.Value));
 
         // ===== Subquery filters (junction tables — always available) =====
 
@@ -190,8 +252,6 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
                 : spec.And(EventSubqueryFilter.TagsExcludedAll(request.ExcludedTagIds.ToList()));
         }
 
-        if (request.LocationIds is { Count: > 0 })
-            spec = spec.And(EventSubqueryFilter.Locations(request.LocationIds.ToList()));
 
         if (request.LanguageIds is { Count: > 0 })
             spec = spec.And(EventSubqueryFilter.Languages(request.LanguageIds.ToList()));
@@ -296,7 +356,12 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
             spec = spec.SortByDescending(EventSort.Date);
         }
 
-        return spec;
+        return spec.WithOccurrence(new EventOccurrenceDiscoveryFilter(
+            request.DateFrom,
+            request.DateTo,
+            request.View ?? (hasExplicitDateSearch ? TemporalView.All : TemporalView.UpcomingAndOngoing),
+            _clock.GetUtcNow(),
+            request.LocationIds));
     }
 
     private static readonly Guid MissingOwnershipActorId = Guid.Empty;

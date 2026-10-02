@@ -248,6 +248,25 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
         RecalculateScheduleSummaryFromSessions();
     }
 
+    [NotMapped]
+    public int? DiscoveryAdditionalSessionCount { get; private set; }
+
+    /// <summary>
+    /// Retains only the selected occurrence in a read graph, with a count of other eligible matches.
+    /// </summary>
+    public void SetDiscoveryOccurrence(EventSession? matchingSession, int matchingSessionCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(matchingSessionCount);
+        if ((matchingSession is null) != (matchingSessionCount == 0))
+            throw new ArgumentException("A matching occurrence and a positive match count must be supplied together.");
+        if (matchingSession is not null
+            && (matchingSession.EventId != Id || matchingSession.TenantId != TenantId))
+            throw new ArgumentException("The matching occurrence must belong to this event and tenant.", nameof(matchingSession));
+
+        Sessions = matchingSession is null ? [] : [matchingSession];
+        DiscoveryAdditionalSessionCount = matchingSessionCount == 0 ? 0 : matchingSessionCount - 1;
+    }
+
     public void RecalculateScheduleSummaryFromSessions()
     {
         var activeSessions = Sessions

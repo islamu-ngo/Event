@@ -21,7 +21,7 @@
                                  @onerror="() => HandleImageError(eventItem)" />
                             <span class="upcoming-event-list__copy">
                                 <span class="upcoming-event-list__title" title="@eventItem.Title">@eventItem.Title</span>
-                                <span class="upcoming-event-list__metadata">@GetScheduleAndFormat(eventItem)</span>
+                                @Schedule(eventItem)
                                 @if (GetContext(eventItem) is { } context)
                                 {
                                     <span class="upcoming-event-list__context">@context</span>
@@ -45,7 +45,7 @@
                                  @onerror="() => HandleImageError(eventItem)" />
                             <span class="upcoming-event-list__copy">
                                 <span class="upcoming-event-list__title" title="@eventItem.Title">@eventItem.Title</span>
-                                <span class="upcoming-event-list__metadata">@GetScheduleAndFormat(eventItem)</span>
+                                @Schedule(eventItem)
                                 @if (GetContext(eventItem) is { } context)
                                 {
                                     <span class="upcoming-event-list__context">@context</span>
@@ -109,14 +109,38 @@
 
     private string GetScheduleAndFormat(EventListDto eventItem)
     {
-        var date = eventItem.FirstSessionDate?.ToString("ddd, MMM d") ?? DateToBeAnnouncedLabel;
+        var date = (eventItem.MatchingSession?.LocalStartDate ?? eventItem.FirstSessionDate)?.ToString("ddd, MMM d") ?? DateToBeAnnouncedLabel;
+        if (eventItem.MatchingSession is { } session)
+        {
+            if (session.LocalStartTime is { } time)
+                date += $" · {time:hh\\:mm}";
+            if (session.IsOpenEnded)
+                date += " · Open ended";
+        }
         return string.IsNullOrWhiteSpace(eventItem.EventFormatFullName)
             ? date
             : $"{date} · {eventItem.EventFormatFullName}";
     }
 
+    private RenderFragment Schedule(EventListDto eventItem) => @<span class="upcoming-event-list__metadata">
+        @if (eventItem.MatchingSession?.Title is { Length: > 0 } title)
+        {
+            <span>@title · </span>
+        }
+        <time datetime="@((eventItem.MatchingSession?.LocalStartDate ?? eventItem.FirstSessionDate)?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))">@GetScheduleAndFormat(eventItem)</time>
+        @if (eventItem.AdditionalSessionCount is > 0)
+        {
+            <span data-additional-session-count="@eventItem.AdditionalSessionCount"> · @eventItem.AdditionalSessionCount additional matching sessions</span>
+        }
+    </span>;
+
     private static string? GetContext(EventListDto eventItem)
     {
+        if (string.Equals(eventItem.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase))
+            return string.IsNullOrWhiteSpace(eventItem.ActorDisplayName)
+                ? "Community reported"
+                : $"Community reported · Contributor: {eventItem.ActorDisplayName}";
+
         if (!string.IsNullOrWhiteSpace(eventItem.ActorDisplayName))
         {
             return eventItem.ActorDisplayName;
@@ -138,7 +162,9 @@
         : EventUrlHelper.BuildPublicPath(eventItem.Slug, eventItem.PublicCode) ?? "/events";
 
     private static string? GetExternalEventUrl(EventListDto eventItem) =>
-        eventItem.IsFederatedDiscoveryEvent() ? eventItem.GetHalHref("source") : null;
+        eventItem.IsFederatedDiscoveryEvent() ||
+        string.Equals(eventItem.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase)
+            ? eventItem.GetHalHref("source") : null;
 
     private static string GetExternalEventLinkLabel(EventListDto eventItem) =>
         $"Open {eventItem.Title} on its external platform in a new tab";

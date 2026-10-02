@@ -26105,6 +26105,14 @@
             }
           },
           {
+            "name": "AreaId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "ActorId",
             "in": "query",
             "schema": {
@@ -26537,10 +26545,26 @@
               "application/json": { },
               "application/hal+json": { }
             }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
           }
         },
-        "x-endpoint-class": "Public",
-        "x-output-cache-policy": "EventDiscovery"
+        "x-endpoint-class": "Public"
       },
       "post": {
         "tags": [
@@ -125892,6 +125916,25 @@
               "string"
             ]
           },
+          "matchingSession": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EventMatchingSessionDto"
+              }
+            ]
+          },
+          "additionalSessionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
           "sessionCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -126398,6 +126441,83 @@
             ]
           },
           "geohash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "EventMatchingSessionDto": {
+        "required": [
+          "id",
+          "title",
+          "localStartDate",
+          "localStartTime",
+          "localEndDate",
+          "localEndTime",
+          "startsAtUtc",
+          "endsAtUtc",
+          "isOpenEnded"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "localStartDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "localStartTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "localEndDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "localEndTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isOpenEnded": {
+            "type": "boolean"
+          },
+          "city": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "country": {
             "type": [
               "null",
               "string"
@@ -143069,6 +143189,92 @@
               "null",
               "string"
             ]
+          },
+          "matchingSession": {
+            "required": [
+              "id",
+              "title",
+              "localStartDate",
+              "localStartTime",
+              "localEndDate",
+              "localEndTime",
+              "startsAtUtc",
+              "endsAtUtc",
+              "isOpenEnded"
+            ],
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "localStartDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "localStartTime": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "format": "time"
+              },
+              "localEndDate": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "format": "date"
+              },
+              "localEndTime": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "format": "time"
+              },
+              "startsAtUtc": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "endsAtUtc": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "format": "date-time"
+              },
+              "isOpenEnded": {
+                "type": "boolean"
+              },
+              "city": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "country": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          },
+          "additionalSessionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           },
           "sessionCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",

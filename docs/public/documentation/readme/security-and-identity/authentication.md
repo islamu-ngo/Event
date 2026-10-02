@@ -62,6 +62,18 @@ Signing in again does not silently recreate that erased identity under a fresh
 account ID. Operators must preserve the configured fingerprint key across
 restore; see [Privacy Erasure](privacy-erasure.md).
 
+## Profile Names
+
+Your sign-in provider can supply initial first, last and display names when an
+Event account is created. After creation, signing in again preserves the names
+you edited in Event instead of replacing them with the provider's current
+profile. This also applies when an eligible existing account gains another
+external sign-in identity.
+
+Changing names does not verify an address or change the identity claims used
+for mail delivery. Previous registration contact details and recorded consent
+retain their captured values.
+
 ## Browser Authentication Flow
 
 The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of the selected provider:

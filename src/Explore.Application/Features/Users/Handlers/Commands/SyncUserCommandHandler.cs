@@ -299,18 +299,9 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                         user.Email = email;
                     }
 
-                    user.FirstName = ResolveFirstName(userDto.FirstName);
-                    user.LastName = ResolveLastName(userDto.LastName);
                     if (emailVerified.HasValue)
                     {
                         user.EmailVerified = emailVerified;
-                    }
-
-                    var actor = await _actorRepository.GetActorByUserId(user.Id);
-                    if (actor != null)
-                    {
-                        actor.DisplayName = BuildDisplayName(userDto.FirstName, userDto.LastName);
-                        await _actorRepository.Update(actor);
                     }
 
                     await _userRepository.Update(user);

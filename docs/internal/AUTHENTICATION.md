@@ -82,6 +82,21 @@ writers cannot transfer ownership between its pre-read and graph mutation.
 Retained keyed account fingerprints also prevent an erased external identity
 from returning under a new User UUID. See [Privacy Erasure](PRIVACY_ERASURE.md).
 
+## Editable Profile Ownership
+
+Provider names initialize `UserPii.FirstName`, `UserPii.LastName` and the personal
+Actor's display name only when synchronization creates that identity graph.
+Subsequent synchronization retains all three editable values, including when a
+new external binding is added to an existing eligible account. Names continue
+to be edited through `UpdateUserCommandHandler`; Actor display editing retains
+its existing authorized update path.
+
+Credential verification and canonical identity-address proof reconciliation
+still run on sign-in. They do not derive authority from a names update, and
+recipient selection remains independent of the editable contact snapshot.
+Historical order contact details and pinned consent evidence remain owned by
+their registration records rather than the live profile.
+
 ## External OIDC Callback Identity
 
 Both static and dynamically registered BFF OIDC schemes preserve protocol claim

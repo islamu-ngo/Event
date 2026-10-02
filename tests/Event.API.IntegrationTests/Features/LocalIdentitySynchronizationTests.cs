@@ -751,6 +751,41 @@ public sealed class LocalIdentitySynchronizationTests
             .IsEqualTo(other.UserId);
     }
 
+    [Test]
+    [Arguments(AuthenticationProviderKind.Local)]
+    [Arguments(AuthenticationProviderKind.Keycloak)]
+    [Arguments(AuthenticationProviderKind.Google)]
+    public async Task SubsequentSignInPreservesEditedNamesAndActorDisplay(AuthenticationProviderKind provider)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        Guid userId = Guid.CreateVersion7();
+        ProviderAccountKey key = provider == AuthenticationProviderKind.Local
+            ? LocalKey(userId) : ExternalKey(provider);
+        string address = $"profile-{userId:N}@example.test";
+        Graph graph = await SeedGraphAsync(factory, userId, address, key);
+        await SeedIdentityClaimAsync(factory, graph, address);
+        await using (ExploreDbContext edit = factory.CreateDatabase())
+        {
+            User user = await edit.Users.Include(candidate => candidate.Pii)
+                .Include(candidate => candidate.Actor).ThenInclude(actor => actor!.Pii)
+                .SingleAsync(candidate => candidate.Id == userId, CancellationToken);
+            user.FirstName = "Chosen";
+            user.LastName = "Family";
+            user.Actor!.DisplayName = "Chosen Public Name";
+            await edit.SaveChangesAsync(CancellationToken);
+        }
+
+        BaseCommandResponse<Guid> result = await SynchronizeAsync(factory, Command(key, userId, address));
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id).IsEqualTo(userId);
+        Profile stored = await ReadProfileAsync(factory, userId);
+        await Assert.That(stored.FirstName).IsEqualTo("Chosen");
+        await Assert.That(stored.LastName).IsEqualTo("Family");
+        await Assert.That(stored.ActorName).IsEqualTo("Chosen Public Name");
+        await Assert.That(stored.ActorId).IsEqualTo(graph.ActorId);
+    }
+
     private static void ConfigureNativeAdministrator(IServiceCollection services, string subject, string email)
     {
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

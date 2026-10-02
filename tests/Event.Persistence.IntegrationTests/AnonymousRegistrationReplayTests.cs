@@ -165,16 +165,18 @@ public sealed class AnonymousRegistrationReplayTests
     }
 
     [Test]
+    [Timeout(120_000)]
     public async Task ProofExpiringDuringOrderedLeaseWait_CannotAllocateAndReadOnlyRecoveryRemainsAbsent()
     {
+        CancellationToken cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var clock = new Clock();
         var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        async Task BeforeLease(string key, CancellationToken token)
+        async Task BeforeLease(string key, CancellationToken _)
         {
             if (key != VisitorAccessCapabilityResolver.AuthoritySettingKeys[0]) return;
             arrived.TrySetResult();
-            await release.Task.WaitAsync(TimeSpan.FromSeconds(20), token);
+            await release.Task.WaitAsync(cancellationToken);
         }
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services =>
         {
@@ -193,7 +195,7 @@ public sealed class AnonymousRegistrationReplayTests
             clock.Now = proof.Challenge.ExpiresAt;
             await using var observer = fixture.CreateScope();
             await Assert.That(await observer.ServiceProvider.GetRequiredService<IRegistrationOrderStarter>()
-                .TryRecoverCommittedGuestAsync(proof.Request, CancellationToken.None)).IsNull();
+                .TryRecoverCommittedGuestAsync(proof.Request, cancellationToken)).IsNull();
         }
         finally { release.TrySetResult(); }
         var response = await pending.WaitAsync(TimeSpan.FromSeconds(20));

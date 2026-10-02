@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3YSB0Y37TKG612WFEJV01NG
+Title: "Add fenced shared-reference retirement admission"
+Type: feat
+Scope: storage
+Summary: "Admit authorized cleanup through bounded reference/retention outcomes and atomic exact-target custody transfer. Preserve unknown producers, versions and quota, and fence resource redaction before detach-first retirement."
+Group: storage-retirement-foundation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

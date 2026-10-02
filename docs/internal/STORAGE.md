@@ -206,11 +206,25 @@ In particular, retiring a previously uncounted CSV or imported file cannot
 subtract another file's charge, and replacement finalization cannot add bytes
 already counted by the retirement projection.
 
-The producer port is not the shared-reference retirement API. Explicit bulk and
-indirect-hold writer enrollment, generalized source retirement and runtime wiring
-remain separate work.
-Future retirement must consume producer operations under their operation fence
-before transferring authority, and use the storage-row fence after activation.
+The lifecycle owner's `TryQueueRetirementAsync` is transaction-bound admission
+for an already-authorized object. It fences the row, flushes tracked detachment,
+checks physical uses and CSV holds, validates source/session/operation target
+agreement and transfers exact identity into the existing tombstone. Bounded
+acknowledgements are `NotFound`, `InUse`, `RetentionBlocked`, `InvalidTarget`
+and `Pending`. `Pending` is custody transfer, not provider absence. Unsettled
+custody overrides Active metadata and remains `AwaitingProducer`; a known
+captured version cannot be replaced by a later acknowledgement.
+
+Transferred-source removal checks every mapped owner and hold, closes session/
+operation custody under CAS and projects quota in the same transaction. Worker
+claims and absence confirmation reject any surviving source, session or producer.
+Heavy resource redaction declares its whole object set and persists detachment
+before retirement; retained organization evidence remains outside that removal
+batch, while attached ordinary sources still fail closed.
+
+Explicit bulk/indirect-hold writer enrollment, generic API/HAL adoption and the
+complete runtime inventory remain separate work. The producer port is not the
+shared-reference admission API; no second deletion engine is introduced.
 Never discard an unsettled operation merely because its creation time is old.
 The existing erasure owner may clear a deleted metadata row's key while retaining
 its captured binding. The model permits that terminal metadata shape, but not a

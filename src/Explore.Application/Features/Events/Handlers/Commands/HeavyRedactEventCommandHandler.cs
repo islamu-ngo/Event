@@ -35,7 +35,8 @@ public sealed class HeavyRedactEventCommandHandler(
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
     TimeProvider timeProvider,
     ISettingMutationLock mutationLock,
-    EventResourceStorageLifecycleService resourceStorageLifecycle)
+    EventResourceStorageLifecycleService resourceStorageLifecycle,
+    IStorageObjectReferenceRepository storageReferences)
     : ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>>
 {
     private const int ImmediateDeletionBatchSize = 100;
@@ -134,13 +135,17 @@ public sealed class HeavyRedactEventCommandHandler(
                         "event_heavy_redaction_source_report_decision_invalid");
                 }
 
-                foreach (var resourceIds in graph.Resources.Select(resource => resource.Id).Chunk(500))
-                    await resourceStorageLifecycle.RetireAsync(@event.TenantId, resourceIds, [],
-                        redactedAt.UtcDateTime, token);
-
+                await storageReferences.FenceAsync(graph.ImageStorageObjects.Select(storage => storage.Id)
+                    .Concat(graph.ResourceStorageObjects.Select(storage => storage.Id))
+                    .Concat(graph.Resources.Where(resource => resource.StorageObjectId.HasValue)
+                        .Select(resource => resource.StorageObjectId!.Value))
+                    .Distinct().ToArray(), token);
                 EventHeavyRedactionApplicator.Apply(graph, moderatorUserId, redactedAt);
 
                 await redactionRepository.SaveChangesAsync(token);
+                foreach (var resourceIds in graph.Resources.Select(resource => resource.Id).Chunk(500))
+                    await resourceStorageLifecycle.RetireAsync(@event.TenantId, resourceIds, [],
+                        redactedAt.UtcDateTime, token);
                 await atprotoPublicationPlanner.PlanEventAsync(
                     new AtprotoEventPublicationInput(
                         @event.TenantId,

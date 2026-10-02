@@ -639,10 +639,12 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
                 var resources = await redacting.EventResources.Where(item =>
                     item.Id == seed.ResourceId || item.Id == retainedResource.Id).ToArrayAsync(ct);
                 var lifecycle = new EventResourceStorageLifecycleRepository(redacting);
-                await lifecycle.RetireAsync(seed.TenantId, resources.Select(item => item.Id).ToArray(), [], Now, ct);
+                await new StorageObjectReferenceRepository(redacting).FenceAsync(
+                    [ordinaryObjectId, retainedObjectId], ct);
                 foreach (var resource in resources)
                     resource.ApplyParentModeration("Removed", seed.UserId, Now);
                 await redacting.SaveChangesAsync(ct);
+                await lifecycle.RetireAsync(seed.TenantId, resources.Select(item => item.Id).ToArray(), [], Now, ct);
                 await lifecycle.RemoveTransferredSourcesAsync(seed.TenantId,
                     resources.Select(item => item.Id).ToArray(), [], ct);
                 return true;

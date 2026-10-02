@@ -70,6 +70,11 @@ storage reference. These checks do not reveal other owners' private identities.
 Cleanup must keep its captured target and retry authority after an uncertain
 provider response; requesting cleanup is not confirmation that bytes are absent.
 
+Heavy resource redaction detaches the moderated resource before scheduling its
+file cleanup. A retained organization evidence document stays stored even when
+the resource is redacted. Pending producer work keeps its original target until
+that exact write is acknowledged; age alone cannot authorize deletion.
+
 For API integrations, `PATCH /api/user/{id}` accepts a `profileImage` group with
 either `profilePictureId` or `externalProfilePictureUri`. Supply neither value
 in a present group to clear; omit the group to preserve the image. Supplying both

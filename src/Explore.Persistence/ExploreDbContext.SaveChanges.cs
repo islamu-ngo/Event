@@ -16,8 +16,11 @@ public partial class ExploreDbContext
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        PrepareTrackedEntities();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
+        return SaveWithStorageReferences(() =>
+        {
+            PrepareTrackedEntities();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
@@ -27,11 +30,18 @@ public partial class ExploreDbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        PrepareTrackedEntities();
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        return await SaveWithStorageReferencesAsync(async () =>
+        {
+            PrepareTrackedEntities();
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }, cancellationToken);
     }
 
     internal async Task<int> SavePrivacyErasureChangesAsync(CancellationToken cancellationToken)
+        => await SaveWithStorageReferencesAsync(
+            () => SavePrivacyErasureGraphAsync(cancellationToken), cancellationToken);
+
+    private async Task<int> SavePrivacyErasureGraphAsync(CancellationToken cancellationToken)
     {
         PrepareTrackedEntities();
         foreach (var entry in ChangeTracker.Entries()

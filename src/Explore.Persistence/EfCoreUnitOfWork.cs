@@ -101,7 +101,14 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         {
             if (_dbContext.IdentityFenceTransactionFailed)
                 throw new InvalidOperationException("The identity enrollment transaction has failed.");
-            try { return await operation(ct); }
+            try
+            {
+                var result = await operation(ct);
+                if (_dbContext.StorageReferenceTransactionFailed)
+                    throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
+                        "The storage reference transaction has failed.");
+                return result;
+            }
             catch
             {
                 // A handler may translate this exception into a failure response.
@@ -140,6 +147,9 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             try
             {
                 var result = await operation(ct);
+                if (_dbContext.StorageReferenceTransactionFailed)
+                    throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
+                        "The storage reference transaction has failed.");
                 await transaction.CommitAsync(ct);
                 return result;
             }

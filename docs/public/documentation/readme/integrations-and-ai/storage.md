@@ -51,6 +51,10 @@ contacts that external host; Event does not acquire or delete those bytes.
 Even a foreign URL that resembles an Event content route remains external.
 Replacing or clearing either kind of profile reference does not delete a
 previous uploaded file.
+An upload whose retirement has already committed cannot be attached as a new
+profile image. The failed attachment leaves both the profile and retained
+cleanup work unchanged; select another eligible upload rather than retrying
+the retired UUID.
 
 For API integrations, `PATCH /api/user/{id}` accepts a `profileImage` group with
 either `profilePictureId` or `externalProfilePictureUri`. Supply neither value

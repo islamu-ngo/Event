@@ -164,8 +164,17 @@ Inspection spools and bounded federation downloads remain temporary inputs.
 Explicit `legacy_external` references do not own managed bytes or gain a fabricated
 binding.
 
-The producer port is not the shared-reference retirement API. Attachment fences,
-reference/hold checks and generalized source retirement remain separate work.
+Tracked storage foreign-key writes enroll their persisted old and proposed new
+object identities in the storage-row concurrency fence before SaveChanges.
+Discovery, fencing and persistence share one transaction; failed enrollment
+poisons a joined unit of work even when a handler translates its exception.
+A committed tombstone or deleted source rejects a new attachment. Actor PII
+profile references participate; upload sessions remain producer custody.
+Acquisitions follow tenant/object order within the transaction.
+
+The producer port is not the shared-reference retirement API. Bulk attachment
+enrollment, complete reference/hold checks and generalized source retirement
+remain separate work.
 Future retirement must consume producer operations under their operation fence
 before transferring authority, and use the storage-row fence after activation.
 Never discard an unsettled operation merely because its creation time is old.

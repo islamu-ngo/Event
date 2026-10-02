@@ -125,9 +125,10 @@ public sealed partial class NativeEventSessionLanguageHttpTests
             await Assert.That(duplicate.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That((await factory.DetailAsync(id))!.ConcurrencyStamp).IsEqualTo(before.ConcurrencyStamp);
         var cache = factory.Services.GetRequiredService<HybridCache>();
-        var detailKey = $"event:detail:{factory.PublicEventId}";
+        var detailKey = $"event:detail:{PlatformDefaults.DefaultTenantId:D}:{factory.PublicEventId:D}";
         var listKey = $"native-session-language-list:{factory.PublicEventId}";
-        await cache.SetAsync(detailKey, "before");
+        await cache.SetAsync(detailKey, "before",
+            tags: [CacheTags.Events, CacheTags.EventDetails, CacheTags.Event(factory.PublicEventId)]);
         await cache.SetAsync(listKey, "before", tags: [CacheTags.EventListByTenant(PlatformDefaults.DefaultTenantId)]);
         using (var changed = await PatchAsync(owner, id,
             new { session = new { eventSessionId = factory.DraftSessionId }, language = new { languageId = 3 } }, before.ConcurrencyStamp))

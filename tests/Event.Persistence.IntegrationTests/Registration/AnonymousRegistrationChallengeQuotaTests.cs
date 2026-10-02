@@ -28,11 +28,15 @@ public sealed class AnonymousRegistrationChallengeQuotaTests
         var first = await fixture.SeedEventAsync();
         var second = sameEvent ? first : await fixture.SeedEventAsync();
         await LimitsAsync(fixture.Context, sameEvent ? "10" : "1", sameEvent ? "1" : "10");
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var holder = new TransactionBarrier(holdAfterStart: true);
         var contender = new TransactionBarrier(holdAfterStart: false);
         await using var left = Context(fixture, fixture.TenantId, holder);
         await using var right = Context(fixture, fixture.TenantId, contender);
+        _ = left.Model;
+        _ = right.Model;
+        await left.Database.OpenConnectionAsync();
+        await right.Database.OpenConnectionAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         Task<bool> leftResult = Task.Run(() => AcquireAsync(left, fixture.TenantId, first.Id, timeout.Token));
         await holder.Started.Task.WaitAsync(timeout.Token);
         Task<bool> rightResult = Task.Run(() => AcquireAsync(right, fixture.TenantId, second.Id, timeout.Token));

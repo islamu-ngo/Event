@@ -14,6 +14,11 @@ policy governs release invariants; [ADR-025](adr/ADR-025-provider-neutral-releas
 explains their architecture; [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md) defines operator
 steps.
 
+Codecov publication is advisory shipped-product evidence, not release approval.
+Reports are comparable only within their declared suite scope; incomplete
+runtime lanes must not be presented as complete platform coverage. Its scope and ownership are defined in
+[CI/CD Governance](CI_CD_GOVERNANCE.md#coverage-publication-policy).
+
 ## Governed release contract
 
 - **The tag is the release.** `refs/tags/v<major>.<minor>.<patch>[-prerelease]` MUST be

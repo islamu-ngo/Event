@@ -202,6 +202,7 @@ Use `Not applicable` only when the change has no release-impact category. If the
 
 ## CI/CD Evidence Contract
 
+- [ ] If citing coverage evidence, identify the commit, included test-suite flags, and any missing runtime lanes, and retain the coverage artifacts. Only combine reports from the same commit; fast-only evidence is not a complete platform report. Codecov project/patch statuses are informational and do not replace required build/test evidence; see [coverage publication operations](OPERATIONS.md#codecov-coverage-publication).
 - [ ] OpenAPI drift artifacts are clean, or generated `openapi.json` / NSwag client changes are reviewed and committed.
 - [ ] `schemas/configuration-manifest-v1alpha2.schema.json` passes the generator `--check` command, is staged with release contract assets, and its exact SHA-256 is included in durable release evidence.
 - [ ] Intentional breaking API contract changes include a matching `docs/API_CHANGELOG.md` entry with affected route/schema/client method, old/new behavior, affected clients, migration guidance, release target, and retained OpenAPI / advisory `oasdiff` evidence links when available.
@@ -216,6 +217,7 @@ Expected artifact names:
 
 - `test-results-fast`
 - `test-results-integration`
+- `coverage-fast` / `coverage-runtime` (advisory shipped-product coverage; record included suites and commit)
 - `openapi-contract-guard`
 - `configuration-manifest-v1alpha2.schema.json`
 - `security-test-evidence`

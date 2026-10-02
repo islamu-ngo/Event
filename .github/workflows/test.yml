@@ -257,7 +257,10 @@ jobs:
   run-tests:
     needs: detect-build-test-changes
     uses: ./.github/workflows/_build-test.yml
+    secrets:
+      CODECOV_TOKEN: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
     with:
+      collect-coverage: true
       run-fast-tests: ${{ needs.detect-build-test-changes.outputs.run-tests == 'true' }}
       run-app-tests: ${{ needs.detect-build-test-changes.outputs.run-app-tests == 'true' }}
       run-domain-tests: ${{ needs.detect-build-test-changes.outputs.run-domain-tests == 'true' }}

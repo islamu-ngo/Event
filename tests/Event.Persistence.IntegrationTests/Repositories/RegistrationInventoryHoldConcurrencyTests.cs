@@ -463,8 +463,10 @@ public sealed class RegistrationInventoryHoldConcurrencyTests(PostgreSqlContaine
     }
 
     [Test]
+    [Timeout(180_000)]
     public async Task ConcurrentFreshPaymentClaimsWithDifferentCompositionRevisionsConvergeOnOneActiveAttempt()
     {
+        CancellationToken testCancellationToken = TestContext.Current!.Execution.CancellationToken;
         PaymentRaceSeed seed = await SeedPaymentRaceAsync(PaymentAttemptStatusEnum.Created);
         using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
         await using (ExploreDbContext cleanup = CreateRetryingTenantContext(seed.TenantId))
@@ -485,12 +487,12 @@ public sealed class RegistrationInventoryHoldConcurrencyTests(PostgreSqlContaine
         await using ExploreDbContext verification = CreateRetryingTenantContext(seed.TenantId);
         PaymentAttempt[] attempts = await verification.PaymentAttempts
             .Where(value => value.RegistrationOrderId == seed.OrderId)
-            .ToArrayAsync(timeout.Token);
+            .ToArrayAsync(testCancellationToken);
         await Assert.That(attempts.Length).IsEqualTo(1);
         await Assert.That(attempts.Single().ActiveUniquenessSlot).IsEqualTo(PaymentAttempt.ActiveUniquenessSlotValue);
         await Assert.That(attempts.Select(value => value.ProviderIdempotencyKey).Distinct().Count()).IsEqualTo(1);
         await Assert.That(await verification.CheckoutDispatchEffects.CountAsync(
-            value => value.RegistrationOrderId == seed.OrderId, timeout.Token)).IsEqualTo(1);
+            value => value.RegistrationOrderId == seed.OrderId, testCancellationToken)).IsEqualTo(1);
     }
 
     [Test]
@@ -647,8 +649,10 @@ public sealed class RegistrationInventoryHoldConcurrencyTests(PostgreSqlContaine
     }
 
     [Test]
+    [Timeout(180_000)]
     public async Task ConcurrentExplicitTerminalRetryServicesCreateOrReuseOneActiveReplacement()
     {
+        CancellationToken testCancellationToken = TestContext.Current!.Execution.CancellationToken;
         PaymentRaceSeed seed = await SeedPaymentRaceAsync(PaymentAttemptStatusEnum.RequiresAction);
         using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(60));
         await using (ExploreDbContext reconciliationContext = CreateRetryingTenantContext(seed.TenantId))
@@ -734,12 +738,12 @@ public sealed class RegistrationInventoryHoldConcurrencyTests(PostgreSqlContaine
             .Where(value => value.RegistrationOrderId == seed.OrderId)
             .OrderBy(value => value.CreatedAt)
             .ThenBy(value => value.Id)
-            .ToArrayAsync(timeout.Token);
+            .ToArrayAsync(testCancellationToken);
         await Assert.That(attempts.Length).IsEqualTo(3);
         await Assert.That(attempts.Count(value => value.ActiveUniquenessSlot == PaymentAttempt.ActiveUniquenessSlotValue)).IsEqualTo(1);
         await Assert.That(attempts.Select(value => value.ProviderIdempotencyKey).Distinct().Count()).IsEqualTo(3);
         await Assert.That(await verification.CheckoutDispatchEffects.CountAsync(
-            value => value.RegistrationOrderId == seed.OrderId, timeout.Token)).IsEqualTo(3);
+            value => value.RegistrationOrderId == seed.OrderId, testCancellationToken)).IsEqualTo(3);
     }
 
     private async Task<RegistrationPaymentAttemptClaimResult> RetryThroughServiceAsync(

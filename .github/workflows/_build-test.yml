@@ -5,7 +5,14 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        required: false
     inputs:
+      collect-coverage:
+        required: false
+        type: boolean
+        default: false
       run-integration-tests:
         required: false
         type: boolean
@@ -89,8 +96,11 @@ jobs:
     name: Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      coverage-ready: ${{ steps.coverage_reports.outputs.ready }}
     env:
       DOTNET_CONFIGURATION: ${{ inputs.configuration }}
+      COLLECT_COVERAGE: ${{ inputs.collect-coverage }}
 
     steps:
       - name: No-Op for Non-Code Changes
@@ -208,6 +218,10 @@ jobs:
           mkdir -p artifacts/build
           dotnet build --configuration "$DOTNET_CONFIGURATION" --no-restore --verbosity minimal -p:RunAnalyzers=false -p:RunAnalyzersDuringBuild=false 2>&1 | tee artifacts/build/fast-build.log
 
+      - name: Prepare coverage output
+        if: ${{ inputs.run-fast-tests && inputs.collect-coverage }}
+        run: mkdir -p artifacts/coverage
+
       - name: Setup Project Gates
         if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
         shell: bash
@@ -223,13 +237,27 @@ jobs:
             tests/Event.SetupAssistant.Terminal.Tests/Event.SetupAssistant.Terminal.Tests.csproj
           do
             dotnet build "$project" --configuration "$DOTNET_CONFIGURATION" --no-restore --verbosity minimal
-            dotnet test --project "$project" --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --minimum-expected-tests 1 --no-progress
+            coverage_args=()
+            test_filters=()
+            if [[ "$COLLECT_COVERAGE" == true ]]; then
+              coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-$(basename "$project" .csproj).cobertura.xml" --coverage-output-format cobertura)
+              if [[ "$project" == tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj ]]; then
+                dotnet test --project "$project" --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+                  --treenode-filter "/*/*/*/*[Category=Architecture]" --minimum-expected-tests 1 --no-progress
+                test_filters=(--treenode-filter "/*/*/*/*[Category!=Architecture]")
+              fi
+            fi
+            dotnet test --project "$project" --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --minimum-expected-tests 1 --no-progress "${coverage_args[@]}" "${test_filters[@]}"
           done
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-SetupLiveAuthoritySecurityTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
           dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj \
             --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
             --treenode-filter "/*/*/*SetupLiveAuthoritySecurityTests/*" \
             --minimum-expected-tests 35 --maximum-parallel-tests 1 --no-progress \
-            --report-trx --report-trx-filename SetupLiveAuthoritySecurityTests.trx
+            --report-trx --report-trx-filename SetupLiveAuthoritySecurityTests.trx "${coverage_args[@]}"
 
       - name: Publish public Setup Assistant browser
         if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
@@ -246,12 +274,22 @@ jobs:
       - name: Unit Tests — Application
         if: ${{ inputs.run-fast-tests && inputs.run-app-tests }}
         id: test_application
-        run: dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Application.UnitTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Event.Application.UnitTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Application.UnitTests.trx "${coverage_args[@]}"
 
       - name: Unit Tests — Domain
         if: ${{ inputs.run-fast-tests && inputs.run-domain-tests }}
         id: test_domain
-        run: dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Domain.UnitTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Event.Domain.UnitTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Domain.UnitTests.trx "${coverage_args[@]}"
 
       - name: Architecture Tests
         if: ${{ inputs.run-fast-tests && inputs.run-architecture-tests }}
@@ -261,27 +299,52 @@ jobs:
       - name: Unit Tests — Secrets
         if: ${{ inputs.run-fast-tests && inputs.run-secrets-tests }}
         id: test_secrets
-        run: dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Secrets.UnitTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Explore.Secrets.UnitTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Secrets.UnitTests.trx "${coverage_args[@]}"
 
       - name: Unit Tests — Infrastructure
         if: ${{ inputs.run-fast-tests && inputs.run-infrastructure-tests }}
         id: test_infrastructure
-        run: dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Infrastructure.Tests.trx --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Explore.Infrastructure.Tests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Infrastructure.Tests.trx --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1 "${coverage_args[@]}"
 
       - name: Blazor Client Tests
         if: ${{ inputs.run-fast-tests && inputs.run-blazor-tests }}
         id: test_blazor_client
-        run: dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Blazor.Client.Tests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Explore.Blazor.Client.Tests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Blazor.Client.Tests.trx "${coverage_args[@]}"
 
       - name: Blazor Integration Tests
         if: ${{ inputs.run-fast-tests && inputs.run-blazor-tests }}
         id: test_blazor_integration
-        run: dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --maximum-parallel-tests 8 --report-trx --report-trx-filename Explore.Blazor.IntegrationTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Explore.Blazor.IntegrationTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --maximum-parallel-tests 8 --report-trx --report-trx-filename Explore.Blazor.IntegrationTests.trx "${coverage_args[@]}"
 
       - name: Wire Contract Tests
         if: ${{ inputs.run-fast-tests }}
         id: test_wire_contracts
-        run: dotnet test --project tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Wire.Contracts.UnitTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Event.Wire.Contracts.UnitTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Wire.Contracts.UnitTests.trx "${coverage_args[@]}"
 
       - name: Generated Contract Tooling Tests
         if: ${{ inputs.run-fast-tests }}
@@ -291,12 +354,46 @@ jobs:
       - name: Diagnostic Command Tests
         if: ${{ inputs.run-fast-tests }}
         id: test_diagnostic
-        run: dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Diagnostic.UnitTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Explore.Diagnostic.UnitTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Diagnostic.UnitTests.trx "${coverage_args[@]}"
 
       - name: Standalone Host Tests
         if: ${{ inputs.run-fast-tests }}
         id: test_standalone
-        run: dotnet test --project tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Standalone.IntegrationTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Event.Standalone.IntegrationTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Standalone.IntegrationTests.trx "${coverage_args[@]}"
+
+      - name: Validate coverage reports
+        id: coverage_reports
+        if: ${{ always() && inputs.run-fast-tests && inputs.collect-coverage }}
+        shell: bash
+        run: |
+          mkdir -p artifacts/coverage
+          dotnet run eng/coverage/validate-reports.cs -- artifacts/coverage
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Coverage: selected fast suites only"
+            echo "Commit: $GITHUB_SHA"
+            echo "Artifact: coverage-fast; Codecov flag: fast"
+            echo "Skipped suites and runtime-only paths are not complete platform coverage."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain fast coverage
+        if: ${{ always() && inputs.run-fast-tests && inputs.collect-coverage }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-fast
+          path: artifacts/coverage/*.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload Test Results
         if: ${{ always() && inputs.run-fast-tests }}
@@ -354,8 +451,11 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      coverage-ready: ${{ steps.coverage_reports.outputs.ready }}
     env:
       DOTNET_CONFIGURATION: ${{ inputs.configuration }}
+      COLLECT_COVERAGE: ${{ inputs.collect-coverage }}
       PrivacyErasure__Authority__Topology: EmbeddedSqlite
       PrivacyErasureAuthorityEmbedded__WriterReplicaCount: "1"
       PrivacyErasureAuthorityEmbedded__BusyTimeoutSeconds: "30"
@@ -406,9 +506,18 @@ jobs:
           mkdir -p artifacts/build
           dotnet build --configuration "$DOTNET_CONFIGURATION" --no-restore --verbosity minimal -p:RunAnalyzers=false -p:RunAnalyzersDuringBuild=false 2>&1 | tee artifacts/build/integration-build.log
 
+      - name: Prepare runtime coverage output
+        if: ${{ inputs.collect-coverage }}
+        run: mkdir -p artifacts/coverage
+
       - name: Persistence Integration Tests
         id: test_persistence_integration
-        run: dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Persistence.IntegrationTests.trx
+        run: |
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-Event.Persistence.IntegrationTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Persistence.IntegrationTests.trx "${coverage_args[@]}"
         env:
           Database__Provider: PostgreSql
           Database__Host: localhost
@@ -429,7 +538,11 @@ jobs:
           export SETUP_SECRET KEYCLOAK_BLAZOR_CLIENT_SECRET
           echo "::add-mask::$SETUP_SECRET"
           echo "::add-mask::$KEYCLOAK_BLAZOR_CLIENT_SECRET"
-          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.API.IntegrationTests.trx
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-Event.API.IntegrationTests.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.API.IntegrationTests.trx "${coverage_args[@]}"
         env:
           Database__Provider: PostgreSql
           Database__Host: localhost
@@ -446,7 +559,11 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p artifacts/runtime
-          dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Infrastructure.Tests.Email.trx --treenode-filter "/*/*/*/*[Category=Email]" --minimum-expected-tests 1 2>&1 | tee artifacts/runtime/infrastructure-email.log
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-Explore.Infrastructure.Tests.Email.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Infrastructure.Tests.Email.trx --treenode-filter "/*/*/*/*[Category=Email]" --minimum-expected-tests 1 "${coverage_args[@]}" 2>&1 | tee artifacts/runtime/infrastructure-email.log
 
       - name: Infrastructure RabbitMQ Runtime Tests
         id: test_infrastructure_rabbitmq
@@ -454,7 +571,35 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p artifacts/runtime
-          dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Infrastructure.Tests.RabbitMQ.trx --treenode-filter "/*/*/*/*[Category=RabbitMQ]" --minimum-expected-tests 1 2>&1 | tee artifacts/runtime/infrastructure-rabbitmq.log
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-Explore.Infrastructure.Tests.RabbitMQ.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Infrastructure.Tests.RabbitMQ.trx --treenode-filter "/*/*/*/*[Category=RabbitMQ]" --minimum-expected-tests 1 "${coverage_args[@]}" 2>&1 | tee artifacts/runtime/infrastructure-rabbitmq.log
+
+      - name: Validate runtime coverage reports
+        id: coverage_reports
+        if: ${{ always() && inputs.collect-coverage }}
+        shell: bash
+        run: |
+          mkdir -p artifacts/coverage
+          dotnet run eng/coverage/validate-reports.cs -- artifacts/coverage
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Coverage: existing runtime suites"
+            echo "Commit: $GITHUB_SHA"
+            echo "Artifact: coverage-runtime; Codecov flag: runtime"
+            echo "Persistence fixtures can require multiple database providers; matrix migration processes are not instrumented."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain runtime coverage
+        if: ${{ always() && inputs.collect-coverage }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-runtime
+          path: artifacts/coverage/*.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Capture Runtime Container Diagnostics
         if: always()
@@ -507,6 +652,26 @@ jobs:
             echo
             echo "Inspect the uploaded \`test-results-integration\` artifact for project-specific TRX files, runtime command logs, container diagnostics, and build/analyzer warning output."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  upload-fast-coverage:
+    if: ${{ always() && inputs.collect-coverage && needs.build-and-test.outputs.coverage-ready == 'true' }}
+    needs: build-and-test
+    uses: ./.github/workflows/_coverage-upload.yml
+    with:
+      flag: fast
+      artifact: coverage-fast
+    secrets:
+      CODECOV_TOKEN: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
+
+  upload-runtime-coverage:
+    if: ${{ always() && inputs.collect-coverage && needs.integration-tests.outputs.coverage-ready == 'true' }}
+    needs: integration-tests
+    uses: ./.github/workflows/_coverage-upload.yml
+    with:
+      flag: runtime
+      artifact: coverage-runtime
+    secrets:
+      CODECOV_TOKEN: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
 
   database-provider-matrix:
     name: Database Provider (${{ matrix.provider }})

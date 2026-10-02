@@ -78,11 +78,15 @@ public sealed class NativeEventTagsOperationTests
         using var scope = Scope(factory, data.OwnerId);
         var original = await Send(scope, new GetEventTagsDetailsRequest(data.AssignmentId));
         var cache = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>();
-        var sourceKey = $"event:detail:{data.EventId}";
-        var destinationKey = $"event:detail:{data.OtherEventId}";
+        var sourceKey = $"event:detail:{PlatformDefaults.DefaultTenantId:D}:{data.EventId:D}";
+        var destinationKey = $"event:detail:{PlatformDefaults.DefaultTenantId:D}:{data.OtherEventId:D}";
         var listKey = $"tag-assignment-test:{data.EventId}";
-        await cache.SetAsync(sourceKey, "original-source");
-        await cache.SetAsync(destinationKey, "original-destination");
+        await cache.SetAsync(sourceKey, "original-source", tags:
+            [Explore.Application.Caching.CacheTags.Events, Explore.Application.Caching.CacheTags.EventDetails,
+                Explore.Application.Caching.CacheTags.Event(data.EventId)]);
+        await cache.SetAsync(destinationKey, "original-destination", tags:
+            [Explore.Application.Caching.CacheTags.Events, Explore.Application.Caching.CacheTags.EventDetails,
+                Explore.Application.Caching.CacheTags.Event(data.OtherEventId)]);
         await cache.SetAsync(listKey, "original-list", tags:
             [Explore.Application.Caching.CacheTags.EventListByTenant(PlatformDefaults.DefaultTenantId)]);
         var result = await Send(scope, Move(original, data.OtherEventId, data.SecondTagId));
@@ -159,8 +163,10 @@ public sealed class NativeEventTagsOperationTests
         using var scope = Scope(factory, data.OwnerId);
         var original = await Send(scope, new GetEventTagsDetailsRequest(data.AssignmentId));
         var cache = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>();
-        var key = $"event:detail:{data.EventId}";
-        await cache.SetAsync(key, "original");
+        var key = $"event:detail:{PlatformDefaults.DefaultTenantId:D}:{data.EventId:D}";
+        await cache.SetAsync(key, "original", tags:
+            [Explore.Application.Caching.CacheTags.Events, Explore.Application.Caching.CacheTags.EventDetails,
+                Explore.Application.Caching.CacheTags.Event(data.EventId)]);
         Func<Task> move = async () => { await Send(scope, Move(original, destinationId, data.SecondTagId)); };
         if (unavailable)
             await Assert.That(move).Throws<AuthorizationProviderUnavailableException>();

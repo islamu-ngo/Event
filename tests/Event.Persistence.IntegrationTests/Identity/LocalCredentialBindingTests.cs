@@ -26,6 +26,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
+[Timeout(180_000)]
 public sealed class LocalCredentialBindingTests
 {
     public enum RejectedAuthority
@@ -458,7 +459,8 @@ public sealed class LocalCredentialBindingTests
     {
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"binding-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"binding-identity-{Guid.CreateVersion7():N}.db");
-        private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
+        private readonly CancellationTokenSource _timeout = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current!.Execution.CancellationToken);
         private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private ServiceProvider? _provider;
         private IdentityDatabaseTopology _topology;

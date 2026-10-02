@@ -24,6 +24,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 public sealed class InstanceSmtpSettingsMutationTests
 {
     [Test]
+    [Timeout(180_000)]
     [Arguments(false, true)]
     [Arguments(true, false)]
     [Arguments(true, true)]
@@ -45,14 +46,15 @@ public sealed class InstanceSmtpSettingsMutationTests
 
             var reachedFence = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            using var cancellation = new CancellationTokenSource();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                TestContext.Current!.Execution.CancellationToken);
             await using var waitingContext = CreateContext(databasePath);
             var waitingLock = new RelationalSettingMutationLock(waitingContext, new EfCoreUnitOfWork(waitingContext),
                 async (key, token) =>
                 {
                     if (key != GovernanceSettingKeys.Email.DeliveryEnabled) return;
                     reachedFence.TrySetResult();
-                    await resume.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
+                    await resume.Task.WaitAsync(token);
                 });
             using var waiting = new InstanceSettingsCommandFixture(waitingContext, actor, waitingLock);
             await using var concurrentContext = CreateContext(databasePath);

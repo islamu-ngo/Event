@@ -185,10 +185,11 @@ public sealed partial class EventSeriesDisclosureHttpTests
         var data = await SeedAsync(factory);
         using var scope = Scope(factory, data.AdminId);
         var cache = scope.ServiceProvider.GetRequiredService<HybridCache>();
-        var detailKey = $"event:detail:{data.PublicEventId}";
+        var detailKey = $"event:detail:{PlatformDefaults.DefaultTenantId:D}:{data.PublicEventId:D}";
         var localKey = $"series-test-list:{data.PublicId}";
         var foreignKey = $"series-test-list:{data.ForeignId}";
-        await cache.SetAsync(detailKey, 1);
+        await cache.SetAsync(detailKey, 1,
+            tags: [CacheTags.Events, CacheTags.EventDetails, CacheTags.Event(data.PublicEventId)]);
         await cache.SetAsync(localKey, 1, tags: [CacheTags.EventListByTenant(PlatformDefaults.DefaultTenantId)]);
         await cache.SetAsync(foreignKey, 1, tags: [CacheTags.EventListByTenant(data.ForeignTenantId)]);
         var read = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSeriesDetailRequest, EventSeriesDto?>>();

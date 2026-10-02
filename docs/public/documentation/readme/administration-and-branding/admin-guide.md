@@ -27,6 +27,11 @@ This guide walks administrators through the web consoles in the Blazor managemen
 In multi-tenant deployments, the **Instance Console** (`/admin/instance`) manages
 tenants and platform operations. Instance settings are available in both deployment modes.
 
+The authentication provider card names Local when Local Identity is selected,
+alongside any enabled external sign-in providers. An SMTP warning means the
+instance's saved host or sender settings are missing; running a development
+Mailpit service alone does not configure or enable platform email delivery.
+
 ### Getting Started After Setup
 
 Open `/settings/instance?section=getting-started` after fresh sign-in. The checklist

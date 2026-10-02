@@ -134,6 +134,12 @@ URLs, or provider diagnostics. No secret mutation control is rendered because th
 overview advertises no such HAL action; deployment-owned recovery stays in the
 operator runbook.
 
+`GetControlPlaneOverviewQueryHandler` includes the selected Local provider in
+the authentication summary before enabled external providers. Its SMTP warning
+uses persisted instance settings rather than AppHost environment values;
+optional disabled SMTP can remain healthy while the overview reports missing
+host or sender configuration.
+
 Domain inventory remains an Event-owned read model. The domain page follows its HAL `settings` or `edit` relation into `/settings/instance?section=domain`; DNS-provider verification and certificate probing are operator-managed because Event does not expose verification, test, or retry endpoints for that resource.
 
 Whole-instance configuration export lives at

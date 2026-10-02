@@ -237,6 +237,11 @@ public sealed class GetControlPlaneOverviewQueryHandler(
     {
         var providers = new List<string>();
 
+        if (configuration.PrimaryProviderId == (int)AuthenticationProviderKind.Local)
+        {
+            providers.Add(nameof(AuthenticationProviderKind.Local));
+        }
+
         if (configuration.PrimaryProviderId == (int)AuthenticationProviderKind.Keycloak
             && !string.IsNullOrWhiteSpace(configuration.KeycloakAuthority)
             && !string.IsNullOrWhiteSpace(configuration.KeycloakClientId))

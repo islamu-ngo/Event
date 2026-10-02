@@ -146,7 +146,6 @@ public static class DataBuilder
         .RuleFor(s => s.Id, f => Guid.NewGuid())
         .RuleFor(s => s.FullName, f => f.System.FileName())
         .RuleFor(s => s.Extension, f => f.System.FileExt())
-        .RuleFor(s => s.Uri, f => f.Internet.Url())
         .RuleFor(s => s.Size, f => f.Random.Long(1000, 10000000))
         .RuleFor(s => s.FileTypeId, f => f.Random.Int(1, 4));
 

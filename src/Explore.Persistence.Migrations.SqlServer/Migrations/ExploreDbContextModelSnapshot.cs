@@ -30186,6 +30186,11 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("size");
 
+                    b.Property<string>("SourceUri")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("source_uri");
+
                     b.Property<Guid?>("StorageProviderBindingId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("storage_provider_binding_id");
@@ -30201,12 +30206,6 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("updated_by");
-
-                    b.Property<string>("Uri")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)")
-                        .HasColumnName("uri");
 
                     b.Property<string>("Visibility")
                         .IsRequired()

@@ -1315,8 +1315,13 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         string provenanceUri = $"at://{import.Thumbnail.Did}/blob/{import.Thumbnail.Cid}";
         if (existing is not null
             && existing.LifecycleState == StorageObjectLifecycleStates.Active
-            && string.Equals(existing.Uri, provenanceUri, StringComparison.Ordinal))
+            && StoragePresentationUrlResolver.HasManagedBytes(existing)
+            && SafeRasterContentPolicy.IsSafePublicImageMetadata(existing)
+            && existing.Size == staged.SizeBytes
+            && string.Equals(existing.ContentType, staged.ContentType, StringComparison.Ordinal)
+            && string.Equals(existing.Sha256Checksum, staged.Sha256Checksum, StringComparison.OrdinalIgnoreCase))
         {
+            existing.SourceUri = provenanceUri;
             return;
         }
 
@@ -1341,7 +1346,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             Id = operation.Id,
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
-            Uri = provenanceUri,
+            SourceUri = provenanceUri,
             ObjectKey = staged.ObjectKey,
             Provider = staged.Provider,
             StorageProviderBindingId = operation.ProviderBindingId,

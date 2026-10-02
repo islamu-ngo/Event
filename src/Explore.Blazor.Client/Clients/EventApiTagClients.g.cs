@@ -185918,12 +185918,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeMasterCode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; set; } = default!;
+        public string? Uri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -186027,12 +186022,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; set; } = default!;
+        public string? Uri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -204510,12 +204500,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeMasterCode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; init; } = default!;
+        public string? Uri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -204612,12 +204597,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; init; } = default!;
+        public string? Uri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -204761,10 +204741,6 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("userId")]
         public System.Guid? UserId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("routeKey")]
         public string? RouteKey { get; init; } = default!;

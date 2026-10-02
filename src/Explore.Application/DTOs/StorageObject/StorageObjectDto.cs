@@ -7,16 +7,18 @@ public sealed record StorageObjectDto
     [JsonIgnore]
     public StorageObjectContentEligibilityDto ContentEligibility { get; init; } = StorageObjectContentEligibilityDto.Unrestricted;
 
+    [JsonIgnore]
+    public bool SupportsPresignedDownload { get; init; }
+
     public StorageObjectDto ForDisclosureAt(DateTime utcNow) => ContentEligibility.CanReadAt(utcNow)
         ? this
-        : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = string.Empty };
+        : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = null };
 
     public Guid Id { get; init; }
     public int FileTypeId { get; init; }
     public string? FileTypeFullName { get; init; }
     public string? FileTypeMasterCode { get; init; } // For i18n with Tolgee
-    public required string Uri { get; init; }
-    public required string Provider { get; init; }
+    public string? Uri { get; init; }
     public required string FullName { get; init; }
     public required string SafeDisplayName { get; init; }
     public required string Extension { get; init; }

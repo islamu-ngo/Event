@@ -156087,8 +156087,6 @@
       },
       "HalResourceOfStorageObjectDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -156123,10 +156121,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -156243,8 +156241,6 @@
       },
       "HalResourceOfStorageObjectListDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -156273,10 +156269,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -178430,8 +178426,6 @@
       },
       "StorageObjectDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -178466,10 +178460,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -178572,8 +178566,6 @@
       },
       "StorageObjectListDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -178602,10 +178594,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -178717,7 +178709,6 @@
       },
       "StorageUploadSessionDto": {
         "required": [
-          "provider",
           "contentType",
           "safeDisplayName",
           "purpose",
@@ -178740,9 +178731,6 @@
               "string"
             ],
             "format": "uuid"
-          },
-          "provider": {
-            "type": "string"
           },
           "routeKey": {
             "type": "string"

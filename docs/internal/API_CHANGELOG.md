@@ -5,6 +5,16 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-10-02
 
+- **Breaking: storage provenance versus delivery.** Persisted `StorageObject.Uri`
+  is replaced by nullable `SourceUri` foreign-origin provenance. Ordinary storage
+  `uri` is now nullable and derived only from eligible captured managed IDs:
+  public safe-raster `/public`, authenticated `/content`, with resource files
+  retaining their resource-only content route. `legacy_external` records do not
+  acquire managed delivery. Detail/list and upload-session responses omit backend
+  provider identity; source, binding, bucket, key and version are not disclosed.
+  HAL remains the action authority. API schema, inventory, NSwag client and
+  generated records are refreshed through their native generators.
+
 - **Breaking: explicit Actor profile-media ownership.** Actor/User responses
   distinguish `profilePictureStorageObjectId` from `externalProfilePictureUri`.
   Display URLs are derived independently; User `profileImageKey` is removed.

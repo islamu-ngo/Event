@@ -28,6 +28,40 @@ Storage is moving to a local-first, provider-neutral model. New upload/read flow
 
 The API delete endpoint exists, but `Explore.Blazor.Client/Services/ImageStorageService.cs` still returns `false` from `DeleteImageAsync`. Do not document a completed Blazor client delete flow until that helper is implemented.
 
+## Origin provenance and derived delivery
+
+`StorageObject.SourceUri` is nullable foreign-origin provenance, not byte identity,
+ownership, or permission to read content. Generic native finalization, resource
+uploads, and CSV production leave it null. Federation thumbnail capture records
+the truthful foreign blob URI separately from the captured managed binding,
+object key, version, and checksum. Explicit `legacy_external` records remain
+non-owning; neither their source nor a missing binding creates managed delivery.
+
+`StoragePresentationUrlResolver` projects active managed IDs. Public safe-raster
+images use `/api/storageobject/{id}/public`; private-owner and authenticated-tenant
+content use `/api/storageobject/{id}/content`. Event/series/session/federation
+image projections also require the image's tenant to match its owner. Resource
+files remain on the authenticated `/api/eventresource/{id}/content` route and
+have no generic storage projection. These URLs select an existing policy gate;
+they do not replace fresh content eligibility, tenant checks, selected authority,
+or byte-signature validation. Actor media keeps its stricter C5a owner checks and
+fresh current-user display projection.
+
+Ordinary storage DTO `uri` is nullable derived delivery, never `SourceUri` or a
+provider locator. Storage detail/list and upload-session JSON omit backend
+provider identity. Binding, key, bucket, version, and origin remain server-side;
+explicit operator binding/diagnostic APIs retain their scoped detail. HAL
+presigning uses a nonserialized capability fact and rechecks authorization.
+
+The native migration SQL generators fence an inferred `uri` to `source_uri`
+rename: any nonempty legacy value fails before schema mutation, including a
+foreign URL or a native route. Empty legacy values normalize to null after the
+native nullable alteration/rebuild. Operators must explicitly classify and
+clear old locator semantics before cutover and reapply only verified foreign
+origins afterward; never classify by URL shape. The parent workstream owns the
+ordered generated catalogs and deployed-data procedure. Real SQLite DDL tests
+check rejection, successful absent provenance, and transaction rollback.
+
 ## Configuration
 
 Local storage is the default provider. Its filesystem root is deployment-managed and bound from `Storage:Local:*`; it is never saved as a tenant/admin-editable setting. Optional S3-compatible storage composes non-secret governance with credentials from the selected authority.

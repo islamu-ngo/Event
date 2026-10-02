@@ -64,7 +64,6 @@ public sealed class StorageObjectDeletionRepositoryTests(PostgreSqlContainerFixt
         Provider = StorageProviders.Local,
         StorageProviderBindingId = binding.Id,
         ObjectKey = $"tenants/{tenantId:N}/{Guid.CreateVersion7():N}.png",
-        Uri = "/images/redacted.png",
         FullName = "redacted.png",
         SafeDisplayName = "redacted.png",
         Extension = ".png",

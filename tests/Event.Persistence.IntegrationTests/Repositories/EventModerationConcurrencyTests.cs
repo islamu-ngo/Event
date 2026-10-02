@@ -369,7 +369,6 @@ public sealed class EventModerationConcurrencyTests(PostgreSqlContainerFixture f
                 Provider = StorageProviders.Local,
                 StorageProviderBindingId = binding.Id,
                 ObjectKey = $"tenants/{tenant.Id:N}/illegal.png",
-                Uri = "/images/illegal.png",
                 FullName = "illegal.png",
                 SafeDisplayName = "illegal.png",
                 Extension = ".png",

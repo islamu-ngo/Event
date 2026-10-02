@@ -183,7 +183,7 @@ public sealed class ManagedStorageBindingTests
             Id = Guid.CreateVersion7(), TenantId = env.Database.TenantId, Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document, FileType = null!, Provider = binding.Provider,
             StorageProviderBindingId = binding.Id, ObjectKey = "objects/retired.pdf",
-            Uri = "/content", FullName = "file.pdf", SafeDisplayName = "file.pdf", Extension = "pdf",
+            FullName = "file.pdf", SafeDisplayName = "file.pdf", Extension = "pdf",
             Purpose = StorageObjectPurposes.Document, Visibility = StorageObjectVisibilities.AuthenticatedTenant,
             LifecycleState = StorageObjectLifecycleStates.Active
         };

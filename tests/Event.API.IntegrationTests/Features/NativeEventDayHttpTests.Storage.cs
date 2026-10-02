@@ -105,7 +105,6 @@ public sealed partial class NativeEventDayHttpTests
                 Tenant = null!,
                 FileTypeId = (int)FileTypeEnum.Image,
                 FileType = null!,
-                Uri = "https://images.example.test/day.png",
                 Provider = "legacy_external",
                 FullName = "day.png",
                 SafeDisplayName = "day.png",

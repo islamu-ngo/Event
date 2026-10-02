@@ -30234,6 +30234,11 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("size");
 
+                    b.Property<string>("SourceUri")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("source_uri");
+
                     b.Property<Guid?>("StorageProviderBindingId")
                         .HasColumnType("char(36)")
                         .HasColumnName("storage_provider_binding_id");
@@ -30249,12 +30254,6 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("char(36)")
                         .HasColumnName("updated_by");
-
-                    b.Property<string>("Uri")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
-                        .HasColumnName("uri");
 
                     b.Property<string>("Visibility")
                         .IsRequired()

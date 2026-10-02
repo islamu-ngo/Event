@@ -375,7 +375,6 @@ public sealed class EventResourceFileUploadWorkflow(
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
-            Uri = $"/api/storageobject/{id}/content",
             Provider = session.Provider,
             ObjectKey = session.ObjectKey,
             StorageProviderBindingId = session.StorageProviderBindingId,

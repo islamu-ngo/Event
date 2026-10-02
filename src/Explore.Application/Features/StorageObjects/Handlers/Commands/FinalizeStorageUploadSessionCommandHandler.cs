@@ -375,7 +375,6 @@ public class FinalizeStorageUploadSessionCommandHandler
             Id = session.Id,
             FileTypeId = ResolveFileTypeId(session.ContentType, session.Extension),
             FileType = null!,
-            Uri = $"/api/storageobject/{session.Id}/content",
             ObjectKey = writeResult.ObjectKey,
             Provider = session.Provider,
             StorageProviderBindingId = session.StorageProviderBindingId,
@@ -395,8 +394,6 @@ public class FinalizeStorageUploadSessionCommandHandler
             Tenant = null!,
             ActorId = null
         };
-        storageObject.Uri = $"/api/storageobject/{storageObject.Id}/content";
-
         storageObject = await _storageObjectRepository.Create(storageObject);
         counter.FinalizeReservation(writeResult.SizeBytes);
         await _usageCounterRepository.Update(counter);

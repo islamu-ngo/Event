@@ -181,7 +181,6 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
             FileType = null!,
             FullName = "Retained document",
             SafeDisplayName = "evidence.pdf",
-            Uri = string.Empty,
             ObjectKey = $"tenants/{tenantId:N}/evidence.pdf",
             Provider = StorageProviders.Local,
             StorageProviderBindingId = binding.Id,

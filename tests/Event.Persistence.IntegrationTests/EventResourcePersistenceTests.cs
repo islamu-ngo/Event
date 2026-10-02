@@ -661,7 +661,6 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             Tenant = tenant,
             FileTypeId = fileType.Id,
             FileType = fileType,
-            Uri = $"private://{Guid.CreateVersion7():N}",
             Provider = StorageProviders.Local,
             StorageProviderBindingId = binding.Id,
             ObjectKey = $"fixtures/{Guid.CreateVersion7():N}.pdf",

@@ -170,7 +170,7 @@ internal sealed record PopulatedIntegrationLifecycleData(
         await Assert.That(await context.Set<StorageObject>().Where(row => row.Id == RowId)
             .Select(row => row.Size).SingleAsync()).IsEqualTo(37L);
         await Assert.That(await context.Set<StorageObject>().Where(row => row.Id == RowId)
-            .Select(row => row.Uri).SingleAsync()).IsEqualTo("retained/document.txt");
+            .Select(row => row.ObjectKey).SingleAsync()).IsEqualTo("retained/document.txt");
     }
 
     internal async Task AssertIntegratedAsync(ExploreDbContext context)

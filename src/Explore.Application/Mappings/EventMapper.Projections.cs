@@ -105,8 +105,8 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.OrganizerActor), nameof(EventDto.OrganizerActorUserId), Use = nameof(EventActorUserId))]
     [MapProperty(nameof(Event.OrganizerActor), nameof(EventDto.OrganizerActorOrganizationId), Use = nameof(EventActorOrganizationId))]
     [MapProperty(nameof(Event.OrganizerActor), nameof(EventDto.OrganizerActorGroupId), Use = nameof(EventActorGroupId))]
-    [MapProperty(nameof(Event.FeaturedImage), nameof(EventDto.FeaturedImageUri), Use = nameof(EventImageUri))]
-    [MapProperty(nameof(Event.BackgroundImage), nameof(EventDto.BackgroundImageUri), Use = nameof(EventImageUri))]
+    [MapPropertyFromSource(nameof(EventDto.FeaturedImageUri), Use = nameof(EventFeaturedImageUri))]
+    [MapPropertyFromSource(nameof(EventDto.BackgroundImageUri), Use = nameof(EventBackgroundImageUri))]
     [MapProperty(nameof(Event.EventStatus), nameof(EventDto.EventStatusFullName), Use = nameof(EventStatusName))]
     [MapProperty(nameof(Event.EventStatus), nameof(EventDto.EventStatusMasterCode), Use = nameof(EventStatusCode))]
     [MapProperty(nameof(Event.VisibilityType), nameof(EventDto.VisibilityTypeFullName), Use = nameof(VisibilityName))]
@@ -196,7 +196,7 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.Actor), nameof(EventListDto.ActorOrganizationId), Use = nameof(EventActorOrganizationId))]
     [MapProperty(nameof(Event.Actor), nameof(EventListDto.ActorGroupId), Use = nameof(EventActorGroupId))]
     [MapProperty(nameof(Event.Actor), nameof(EventListDto.ActorProfilePictureUri), Use = nameof(EventActorPicture))]
-    [MapProperty(nameof(Event.FeaturedImage), nameof(EventListDto.FeaturedImageUri), Use = nameof(EventImageUri))]
+    [MapPropertyFromSource(nameof(EventListDto.FeaturedImageUri), Use = nameof(EventFeaturedImageUri))]
     [MapProperty(nameof(Event.EventStatus), nameof(EventListDto.EventStatusFullName), Use = nameof(EventStatusName))]
     [MapProperty(nameof(Event.VisibilityType), nameof(EventListDto.VisibilityTypeFullName), Use = nameof(VisibilityName))]
     [MapProperty(nameof(Event.EventFormat), nameof(EventListDto.EventFormatFullName), Use = nameof(FormatName))]
@@ -318,7 +318,8 @@ public static partial class EventMapper
     private static Guid? EventActorGroupId(Actor? source) => source?.GroupId;
     private static string? ProvenanceName(EventProvenanceType? source) => source?.FullName;
     private static string? ProvenanceCode(EventProvenanceType? source) => source?.MasterCode;
-    private static string? EventImageUri(StorageObject? source) => source?.Uri;
+    private static string? EventFeaturedImageUri(Event source) => Explore.Application.Services.StoragePresentationUrlResolver.PublicImageUri(source.FeaturedImage, source.TenantId);
+    private static string? EventBackgroundImageUri(Event source) => Explore.Application.Services.StoragePresentationUrlResolver.PublicImageUri(source.BackgroundImage, source.TenantId);
     private static string? EventStatusName(EventStatus? source) => source?.FullName;
     private static string? EventStatusCode(EventStatus? source) => source?.MasterCode;
     private static string? VisibilityName(VisibilityType? source) => source?.FullName;

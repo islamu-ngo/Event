@@ -314,7 +314,7 @@ public static class AtprotoEventSourceFieldManifest
         Description("EventSessionCustomPropertyValue.DateTimeValue"),
         Description("EventSessionCustomPropertyValue.Option.DisplayName"),
 
-        Native("StorageObject.Uri", "public media URI used by native URI fields and description media entries"),
+        Native("StorageObject.Id", "policy-derived public media route used by native URI fields and description media entries"),
         Description("StorageObject.SafeDisplayName"),
         Description("StorageObject.Extension"),
         Description("StorageObject.ContentType"),
@@ -328,7 +328,7 @@ public static class AtprotoEventSourceFieldManifest
             ],
             "private resource inspection and document-safety state, never federation metadata"),
         .. ExcludedMany(
-            ["StorageObject.ProviderVersionId", "StorageObject.StorageProviderBindingId"],
+            ["StorageObject.SourceUri", "StorageObject.ProviderVersionId", "StorageObject.StorageProviderBindingId"],
             "internal storage provider identity, never a federation reference"),
         Description("StorageObject.FileType.MasterCode"),
         Description("StorageObject.FileType.FullName"),

@@ -7,11 +7,38 @@ public static class StoragePresentationUrlResolver
 {
     private const string StorageObjectApiPathPrefix = "/api/storageobject/";
 
+    public static bool HasManagedBytes(StorageObject? storageObject) =>
+        storageObject is { Id: var id, StorageProviderBindingId: { } bindingId }
+        && id != Guid.Empty && bindingId != Guid.Empty
+        && storageObject.Provider is StorageProviders.Local or StorageProviders.S3Compatible
+        && !string.IsNullOrWhiteSpace(storageObject.ObjectKey);
+
+    public static string? PublicImageUri(StorageObject? image) =>
+        HasManagedBytes(image)
+        && SafeRasterContentPolicy.IsSafePublicImageMetadata(image)
+        && image!.Purpose != StorageObjectPurposes.EventResource
+        && image.OwningResourceKind != StorageOwningResourceKinds.EventResource
+            ? $"{StorageObjectApiPathPrefix}{image.Id}/public"
+            : null;
+
+    public static string? PublicImageUri(StorageObject? image, Guid tenantId) =>
+        tenantId != Guid.Empty && image?.TenantId == tenantId ? PublicImageUri(image) : null;
+
+    public static string? DeliveryUri(StorageObject storageObject) =>
+        !HasManagedBytes(storageObject) || storageObject.IsDeleted
+        || storageObject.LifecycleState != StorageObjectLifecycleStates.Active
+        || storageObject.Purpose == StorageObjectPurposes.EventResource
+        || storageObject.OwningResourceKind == StorageOwningResourceKinds.EventResource
+            ? null
+            : storageObject.Visibility == StorageObjectVisibilities.PublicImage
+                ? PublicImageUri(storageObject)
+                : storageObject.Visibility is StorageObjectVisibilities.AuthenticatedTenant or StorageObjectVisibilities.PrivateOwner
+                    ? $"{StorageObjectApiPathPrefix}{storageObject.Id}/content"
+                    : null;
+
     public static bool IsManagedProfileImage(StorageObject? image) =>
-        SafeRasterContentPolicy.IsSafePublicImageMetadata(image)
-        && image!.StorageProviderBindingId is { } bindingId && bindingId != Guid.Empty
-        && image.Provider is "local" or "s3_compatible"
-        && image.OwningResourceKind is null
+        PublicImageUri(image) is not null
+        && image!.OwningResourceKind is null
         && image.OwningResourceId is null;
 
     public static Guid? ManagedProfilePictureId(ActorPii? pii) =>
@@ -81,8 +108,8 @@ public static class StoragePresentationUrlResolver
 
         return segments.Length == 2
             && Guid.TryParse(segments[0], out var storageObjectId)
-            && (segments[1].Equals("content", StringComparison.OrdinalIgnoreCase)
-                || segments[1].Equals("public", StringComparison.OrdinalIgnoreCase))
+            && storageObjectId != Guid.Empty
+            && segments[1].Equals("public", StringComparison.OrdinalIgnoreCase)
                 ? $"{StorageObjectApiPathPrefix}{storageObjectId}/public"
                 : null;
     }

@@ -44,7 +44,6 @@ public sealed class StorageResourceReconciliationTests(EventResourceFileUploadTe
             Provider = StorageProviders.Local,
             StorageProviderBindingId = binding.Id,
             ObjectKey = $"objects/{id:N}",
-            Uri = "/private",
             FullName = "file.pdf",
             SafeDisplayName = "file.pdf",
             Extension = "pdf",

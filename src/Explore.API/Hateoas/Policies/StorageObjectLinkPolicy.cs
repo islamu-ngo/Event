@@ -58,7 +58,7 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
         }
 
         if (CanReadContent(dto) && dto.ContentEligibility.PresignedDownloadAllowed
-            && dto.Provider == StorageProviders.S3Compatible)
+            && dto.SupportsPresignedDownload)
         {
             yield return new LinkDefinition(
                 "presigned-download",
@@ -90,6 +90,7 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
     private static bool CanReadContent(StorageObjectDto dto) =>
         string.Equals(dto.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal)
         && !dto.IsDeleted
+        && !string.IsNullOrEmpty(dto.Uri)
         && dto.ContentEligibility.ContentAllowed;
 
     private static bool CanReadPublicImage(StorageObjectDto dto) =>
@@ -194,6 +195,7 @@ public sealed class StorageObjectCollectionLinkPolicy : ICollectionLinkPolicy<St
 
     private static bool CanReadContent(StorageObjectListDto dto) =>
         string.Equals(dto.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal)
+        && !string.IsNullOrEmpty(dto.Uri)
         && dto.ContentEligibility.ContentAllowed;
 
     private static bool CanReadPublicImage(StorageObjectListDto dto) =>

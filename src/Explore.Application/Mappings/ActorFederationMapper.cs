@@ -106,6 +106,10 @@ public static partial class ActorFederationMapper
 
     // Operational detail exposes lifecycle and quarantine reason, never provider keys or audit authors.
     // Content eligibility is resolved by the consuming handler, not by the mapper.
+    [MapperIgnoreSource(nameof(StorageObject.SourceUri))]
+    [MapperIgnoreSource(nameof(StorageObject.Provider))]
+    [MapPropertyFromSource(nameof(StorageObjectDto.Uri), Use = nameof(StorageDeliveryUri))]
+    [MapPropertyFromSource(nameof(StorageObjectDto.SupportsPresignedDownload), Use = nameof(SupportsPresignedDownload))]
     [MapperIgnoreSource(nameof(StorageObject.StorageProviderBindingId))]
     [MapperIgnoreSource(nameof(StorageObject.ProviderVersionId))]
     [MapperIgnoreSource(nameof(StorageObject.ObjectKey))]
@@ -129,6 +133,9 @@ public static partial class ActorFederationMapper
     public static partial StorageObjectDto ToStorageDetail(StorageObject source);
 
     // Storage lists omit ownership graphs, checksum, quarantine detail and deletion/audit metadata.
+    [MapperIgnoreSource(nameof(StorageObject.SourceUri))]
+    [MapperIgnoreSource(nameof(StorageObject.Provider))]
+    [MapPropertyFromSource(nameof(StorageObjectListDto.Uri), Use = nameof(StorageDeliveryUri))]
     [MapperIgnoreSource(nameof(StorageObject.StorageProviderBindingId))]
     [MapperIgnoreSource(nameof(StorageObject.ProviderVersionId))]
     [MapperIgnoreSource(nameof(StorageObject.ObjectKey))]
@@ -174,4 +181,7 @@ public static partial class ActorFederationMapper
     private static string? FileTypeCode(FileType? type) => type?.MasterCode;
     private static string? TenantName(Tenant? tenant) => tenant?.FullName;
     private static string? StorageActorName(Actor? actor) => actor?.Pii?.DisplayName;
+    private static string? StorageDeliveryUri(StorageObject source) => StoragePresentationUrlResolver.DeliveryUri(source);
+    private static bool SupportsPresignedDownload(StorageObject source) =>
+        StoragePresentationUrlResolver.HasManagedBytes(source) && source.Provider == StorageProviders.S3Compatible;
 }

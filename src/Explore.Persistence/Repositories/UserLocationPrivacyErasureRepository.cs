@@ -324,7 +324,7 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
                 && value.Actor.UserId == subjectId
                 && !resourceStorageObjectIds.Contains(value.Id))
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(value => value.Uri, string.Empty)
+                .SetProperty(value => value.SourceUri, (string?)null)
                 .SetProperty(value => value.ObjectKey, (string?)null)
                 .SetProperty(value => value.Provider, StorageProviders.Local)
                 .SetProperty(value => value.FullName, string.Empty)
@@ -672,7 +672,7 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
         DateTime utcNow = DateTime.UtcNow;
         foreach (StorageObject storage in storageObjects)
         {
-            storage.Uri = string.Empty;
+            storage.SourceUri = null;
             storage.ObjectKey = null;
             storage.FullName = string.Empty;
             storage.SafeDisplayName = string.Empty;

@@ -118,7 +118,7 @@ public sealed class StorageTargetBindingTests
         {
             Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!, FileType = null!,
             Provider = binding.Provider, StorageProviderBindingId = binding.Id, ObjectKey = "objects/original.pdf",
-            Uri = "/content", FullName = "file.pdf", SafeDisplayName = "file.pdf", Extension = "pdf",
+            FullName = "file.pdf", SafeDisplayName = "file.pdf", Extension = "pdf",
             Purpose = StorageObjectPurposes.Document, Visibility = StorageObjectVisibilities.PrivateOwner,
             LifecycleState = StorageObjectLifecycleStates.Active
         };

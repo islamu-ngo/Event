@@ -255,7 +255,7 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
             row.ObjectKey is null
             && row.LifecycleState == StorageObjectLifecycleStates.Deleted
             && row.IsDeleted
-            && row.Uri == string.Empty
+            && row.SourceUri == null
             && row.FullName == string.Empty
             && row.SafeDisplayName == string.Empty
             && row.Provider == StorageProviders.Local)).IsTrue();
@@ -968,7 +968,6 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
             FileTypeId = fileType.Id,
             FileType = fileType,
             Provider = "s3_compatible",
-            Uri = objectKey is null ? string.Empty : $"/storage/{objectKey}",
             ObjectKey = objectKey,
             FullName = fullName,
             SafeDisplayName = safeDisplayName,

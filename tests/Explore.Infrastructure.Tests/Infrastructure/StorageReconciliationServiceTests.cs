@@ -179,7 +179,6 @@ public sealed class StorageReconciliationServiceTests
         => new()
         {
             Id = Guid.CreateVersion7(),
-            Uri = "/api/storageobject/test/content",
             ObjectKey = "tenants/a/2026/06/02/file.txt",
             Provider = StorageProviders.Local,
             StorageProviderBindingId = Binding.Id,

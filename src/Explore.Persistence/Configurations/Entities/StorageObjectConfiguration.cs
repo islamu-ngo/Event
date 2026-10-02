@@ -12,7 +12,7 @@ public class StorageObjectConfiguration : IEntityTypeConfiguration<StorageObject
         builder.HasAlternateKey(e => new { e.TenantId, e.Id })
             .HasName("ak_storage_objects_tenant_id_id");
 
-        builder.Property(e => e.Uri).HasMaxLength(1000).IsRequired();
+        builder.Property(e => e.SourceUri).HasMaxLength(1000);
         builder.Property(e => e.ObjectKey).HasMaxLength(1024);
         builder.Property(e => e.ProviderVersionId).HasMaxLength(1024);
         builder.HasOne<StorageProviderBinding>().WithMany()

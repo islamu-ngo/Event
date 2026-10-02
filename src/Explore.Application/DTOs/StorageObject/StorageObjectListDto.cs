@@ -9,13 +9,12 @@ public sealed record StorageObjectListDto
 
     public StorageObjectListDto ForDisclosureAt(DateTime utcNow) => ContentEligibility.CanReadAt(utcNow)
         ? this
-        : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = string.Empty };
+        : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = null };
 
     public Guid Id { get; init; }
     public int FileTypeId { get; init; }
     public string? FileTypeFullName { get; init; }
-    public required string Uri { get; init; }
-    public required string Provider { get; init; }
+    public string? Uri { get; init; }
     public required string FullName { get; init; }
     public required string SafeDisplayName { get; init; }
     public required string Extension { get; init; }

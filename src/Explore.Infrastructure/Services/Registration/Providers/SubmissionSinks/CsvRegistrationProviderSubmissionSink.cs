@@ -95,7 +95,6 @@ public sealed class CsvRegistrationProviderSubmissionSink(
                     Tenant = null!,
                     FileTypeId = (int)FileTypeEnum.Document,
                     FileType = null!,
-                    Uri = $"/api/storageobject/{operation.Id}/content",
                     ObjectKey = operation.ObjectKey,
                     Provider = operation.Provider,
                     StorageProviderBindingId = operation.ProviderBindingId,

@@ -28,7 +28,6 @@ public sealed class StorageUploadSessionStoreTests
             new StorageUploadSessionDto
             {
                 Id = Guid.Empty,
-                Provider = "local",
                 ExpectedSizeBytes = 4,
                 ReservedBytes = 4,
                 ContentType = "image/png",
@@ -52,7 +51,6 @@ public sealed class StorageUploadSessionStoreTests
             new StorageUploadSessionDto
             {
                 Id = ApiUploadSessionId,
-                Provider = "local",
                 ExpectedSizeBytes = 4,
                 ReservedBytes = 4,
                 ContentType = "image/png",
@@ -134,7 +132,6 @@ public sealed class StorageUploadSessionStoreTests
             new StorageUploadSessionDto
             {
                 Id = ApiUploadSessionId,
-                Provider = "local",
                 ExpectedSizeBytes = 4,
                 ReservedBytes = 4,
                 ContentType = contentType,

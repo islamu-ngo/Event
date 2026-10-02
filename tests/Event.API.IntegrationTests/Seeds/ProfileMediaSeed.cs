@@ -21,7 +21,7 @@ internal static class ProfileMediaSeed
             Provider = StorageProviders.Local,
             StorageProviderBindingId = binding.Id,
             ObjectKey = $"private-profile/{id:N}",
-            Uri = "https://provider.example.test/private-bucket/raw-key",
+            SourceUri = "https://provider.example.test/private-bucket/raw-key",
             FullName = "profile.png",
             SafeDisplayName = "profile.png",
             ContentType = "image/png",

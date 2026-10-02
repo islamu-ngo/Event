@@ -587,7 +587,7 @@ public sealed class ExploreDbContextModelProviderTests
             Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
             ActorId = Guid.CreateVersion7(), Actor = null!,
             Provider = "local", StorageProviderBindingId = firstTarget.Id, ObjectKey = objectKey,
-            FileType = null!, Uri = string.Empty, FullName = "shared-key.png",
+            FileType = null!, FullName = "shared-key.png",
             SafeDisplayName = "shared-key.png", Extension = "png",
             Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
         };
@@ -596,7 +596,7 @@ public sealed class ExploreDbContextModelProviderTests
             Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
             ActorId = Guid.CreateVersion7(), Actor = null!,
             Provider = "local", StorageProviderBindingId = firstTarget.Id, ObjectKey = objectKey,
-            FileType = null!, Uri = string.Empty, FullName = "shared-key.png",
+            FileType = null!, FullName = "shared-key.png",
             SafeDisplayName = "shared-key.png", Extension = "png",
             Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
         };
@@ -605,7 +605,7 @@ public sealed class ExploreDbContextModelProviderTests
             Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
             ActorId = Guid.CreateVersion7(), Actor = null!,
             Provider = "local", StorageProviderBindingId = secondTarget.Id, ObjectKey = objectKey,
-            FileType = null!, Uri = string.Empty, FullName = "shared-key.png",
+            FileType = null!, FullName = "shared-key.png",
             SafeDisplayName = "shared-key.png", Extension = "png",
             Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
         };

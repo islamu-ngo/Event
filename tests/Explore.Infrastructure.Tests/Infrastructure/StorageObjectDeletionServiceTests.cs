@@ -144,7 +144,6 @@ public sealed class StorageObjectDeletionServiceTests
         Provider = StorageProviders.Local,
         StorageProviderBindingId = Binding.Id,
         ObjectKey = missingKey ? null : $"tenants/{tenantId:N}/illegal.png",
-        Uri = "/images/illegal.png",
         FullName = "illegal.png",
         SafeDisplayName = "illegal.png",
         Extension = ".png",

@@ -303,7 +303,6 @@ public sealed class EventHeavyRedactionApplicatorTests
         FileType = null!,
         Provider = StorageProviders.Local,
         ObjectKey = "tenants/test/illegal.png",
-        Uri = "/images/illegal.png",
         FullName = "illegal.png",
         SafeDisplayName = "illegal.png",
         Extension = ".png",

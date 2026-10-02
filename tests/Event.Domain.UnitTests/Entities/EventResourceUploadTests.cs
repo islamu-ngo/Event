@@ -124,7 +124,6 @@ public sealed class EventResourceUploadTests
         Tenant = null!,
         FileType = null!,
         Provider = StorageProviders.Local,
-        Uri = "/private",
         FullName = "file.pdf",
         SafeDisplayName = "file.pdf",
         Extension = "pdf",

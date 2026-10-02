@@ -274,8 +274,8 @@ public sealed class AtprotoEventPublicationSnapshotFactoryTests
                      "session-option-canary", "17.25", "91.75", "2026-07-21T08:00:00.0000000+00:00",
                      "Islamic", "hackathon-canary", "Room canary", "Brussels", "organization-canary",
                      "organizer-group-canary", "Conference canary", "Open registration canary",
-                     "https://cdn.example.test/event-image-canary.png",
-                     "https://cdn.example.test/session-image-canary.png"
+                     $"/api/storageobject/{graph.Event.FeaturedImage!.Id}/public",
+                     $"/api/storageobject/{graph.Sessions[0].FeaturedImage!.Id}/public"
                  })
         {
             await Assert.That(description).Contains(canary);
@@ -893,8 +893,10 @@ public sealed class AtprotoEventPublicationSnapshotFactoryTests
             Id = Guid.CreateVersion7(),
             FileTypeId = 1,
             FileType = new FileType { Id = 1, MasterCode = "IMAGE", FullName = "Image" },
-            Uri = $"https://cdn.example.test/{name}.png",
-            Provider = "test-provider-private-canary",
+            SourceUri = $"https://cdn.example.test/{name}.png",
+            Provider = StorageProviders.Local,
+            ObjectKey = $"private/{name}.png",
+            StorageProviderBindingId = Guid.CreateVersion7(),
             FullName = $"{name}.png",
             SafeDisplayName = name,
             Extension = ".png",

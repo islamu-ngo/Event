@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3YC5VGVGHEDJ6HEDT5EXJ8E
+Title: "Separate storage provenance from delivery"
+Type: feat
+Scope: storage
+Summary: "Storage origins are explicit nullable provenance, never delivery authority. Public response URLs derive from managed object identity and eligible delivery routes; internal provider details stay out of ordinary contracts. Native cutover validation rejects unclassified legacy locators before rename or drop/add operations."
+Group: storage-source-provenance
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

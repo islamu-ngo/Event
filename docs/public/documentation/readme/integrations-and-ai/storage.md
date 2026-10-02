@@ -11,8 +11,28 @@ ISLAMU Event implements a clean storage abstraction supporting both **Local Moun
 ## 1. Object Authority & Presigned Security
 
 * **Metadata-Backed Storage**: The primary PostgreSQL database owns the metadata record (UUID, owning tenant, mime-type, byte size, authorization rules); the storage provider stores the raw binary bytes.
-* **ID-Based Retrieval**: Files are accessed via authorized storage-object IDs (`/api/storage/{id}`), never via raw filesystem paths or raw S3 bucket URLs submitted by users.
+* **ID-Based Retrieval**: Files are accessed via stable storage-object IDs (`/api/storageobject/{id}/content`), never via raw filesystem paths or raw S3 bucket URLs submitted by users. Public safe-raster images use `/api/storageobject/{id}/public`; resource files use the separately authenticated `/api/eventresource/{id}/content` route.
 * **Presigned Download URLs**: For S3-compatible storage, the API generates short-lived, cryptographically signed presigned download URLs only after verifying caller authorization (see [Authorization Guide](../security-and-identity/authorization.md)).
+
+### Origin is not a download URL
+
+Storage keeps optional foreign-origin provenance separately from captured
+managed file ownership. Native uploads and generated CSV files have no invented
+origin; an imported thumbnail can retain its foreign origin without serving
+bytes from that address. A legacy external reference does not become a managed
+file automatically.
+
+Use the returned ID-derived `uri` for display and HAL links for permitted
+actions. `uri` can be null when no delivery is allowed. It never contains a
+provider address or a foreign-origin locator. Ordinary detail/list and upload
+responses omit backend provider identity, bucket, key, binding, version, and
+origin. Explicit operator diagnostics remain separately scoped.
+
+When applying the pre-release provenance cutover, first classify and clear old
+locator values deliberately. A generated rename rejects every nonempty old
+value rather than guessing whether it is provenance. Blank old values become
+null; reapply only confirmed foreign origins after cutover. Follow the ordered
+migration procedure supplied with the deployment, not a URL-shape conversion.
 
 ---
 

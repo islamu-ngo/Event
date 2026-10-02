@@ -172,7 +172,6 @@ public sealed class StorageContentSignaturePolicySecurityTests
         StorageObject storageObject = new()
         {
             FileType = null!,
-            Uri = "",
             Provider = StorageProviders.Local,
             FullName = "image.png",
             SafeDisplayName = "image.png",

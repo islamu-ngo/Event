@@ -166,7 +166,6 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
         FileTypeId = 1,
         FileType = null!,
         Tenant = null!,
-        Uri = "/api/storageobject/file/content",
         ObjectKey = $"tenants/{tenantId:N}/{Guid.NewGuid():N}.pdf",
         Provider = StorageProviders.Local,
         FullName = "document.pdf",

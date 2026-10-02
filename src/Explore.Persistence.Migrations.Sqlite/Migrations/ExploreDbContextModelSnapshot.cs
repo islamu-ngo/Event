@@ -30168,6 +30168,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("size");
 
+                    b.Property<string>("SourceUri")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_uri");
+
                     b.Property<Guid?>("StorageProviderBindingId")
                         .HasColumnType("TEXT")
                         .HasColumnName("storage_provider_binding_id");
@@ -30183,12 +30188,6 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("TEXT")
                         .HasColumnName("updated_by");
-
-                    b.Property<string>("Uri")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("uri");
 
                     b.Property<string>("Visibility")
                         .IsRequired()

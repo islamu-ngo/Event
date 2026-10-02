@@ -110,7 +110,6 @@ public sealed class RegistrationAnswerFileTests
         FileTypeId = 1,
         FileType = null!,
         Tenant = null!,
-        Uri = "/api/storageobject/file/content",
         ObjectKey = "tenants/test/file.pdf",
         Provider = StorageProviders.Local,
         FullName = "document.pdf",

@@ -315,8 +315,8 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await Assert.That(image.TenantId).IsEqualTo(scope.TenantId);
         await Assert.That(image.Provider).IsEqualTo(StorageProviders.Local);
         await Assert.That(image.ObjectKey).IsEqualTo("atproto/thumbnail-a");
-        await Assert.That(image.Uri.Contains(Did, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(image.Uri.Contains(ThumbnailCid, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(image.SourceUri!.Contains(Did, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(image.SourceUri.Contains(ThumbnailCid, StringComparison.Ordinal)).IsTrue();
         await Assert.That(image.ContentType).IsEqualTo("image/png");
         await Assert.That(image.Size).IsEqualTo(8);
         await Assert.That(image.Sha256Checksum).IsEqualTo(ThumbnailChecksum);
@@ -615,12 +615,12 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await Assert.That(await context.EventSessions.Select(value => value.Id).SingleAsync()).IsEqualTo(sessionId);
         await Assert.That(images.Length).IsEqualTo(2);
         StorageObject original = images.Single(value => value.Id == firstImageId);
-        await Assert.That(original.Uri.Contains(ThumbnailCid, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(original.SourceUri!.Contains(ThumbnailCid, StringComparison.Ordinal)).IsTrue();
         await Assert.That(original.LifecycleState)
             .IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
         StorageObject replacement = images.Single(value => value.ObjectKey == "atproto/thumbnail-b");
         await Assert.That(replacement.Id).IsNotEqualTo(firstImageId);
-        await Assert.That(replacement.Uri.Contains(ReplacementThumbnailCid, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(replacement.SourceUri!.Contains(ReplacementThumbnailCid, StringComparison.Ordinal)).IsTrue();
         await Assert.That(replacement.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
         await Assert.That(imported.FeaturedImageId).IsEqualTo(replacement.Id);
         await Assert.That(images.All(value =>
@@ -1673,7 +1673,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await Assert.That(image.Size).IsEqualTo(RealPipelineImageBytes.Length);
             await Assert.That(image.Sha256Checksum)
                 .IsEqualTo(Convert.ToHexStringLower(SHA256.HashData(RealPipelineImageBytes)));
-            await Assert.That(image.Uri.Contains(RealPipelineThumbnailCid, StringComparison.Ordinal)).IsTrue();
+            await Assert.That(image.SourceUri!.Contains(RealPipelineThumbnailCid, StringComparison.Ordinal)).IsTrue();
             await Assert.That(image.TenantId).IsEqualTo(scope.TenantId);
             await Assert.That(image.OwningResourceKind).IsEqualTo(ResourceKinds.Event);
             await Assert.That(image.OwningResourceId).IsEqualTo(imported.Id);
@@ -2187,13 +2187,13 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await Assert.That(session.LocalStartTime).IsEqualTo(new TimeOnly(17, 0));
             await Assert.That(session.LocalEndTime).IsEqualTo(new TimeOnly(18, 0));
             await Assert.That(images.Length).IsEqualTo(2);
-            await Assert.That(retiredImage.Uri.Contains(RealPipelineThumbnailCid, StringComparison.Ordinal)).IsTrue();
+            await Assert.That(retiredImage.SourceUri!.Contains(RealPipelineThumbnailCid, StringComparison.Ordinal)).IsTrue();
             await Assert.That(retiredImage.Provider).IsEqualTo(initialStage.Write.Provider);
             await Assert.That(retiredImage.ObjectKey).IsEqualTo(initialStage.Write.ObjectKey);
             await Assert.That(retiredImage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
             await Assert.That(replacementImage.Id).IsNotEqualTo(initialImageId);
             await Assert.That(replacementImage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
-            await Assert.That(replacementImage.Uri.Contains(ReplacementPipelineThumbnailCid, StringComparison.Ordinal))
+            await Assert.That(replacementImage.SourceUri!.Contains(ReplacementPipelineThumbnailCid, StringComparison.Ordinal))
                 .IsTrue();
             await Assert.That(replacementImage.Provider).IsEqualTo(replacementStage.Write.Provider);
             await Assert.That(replacementImage.ObjectKey).IsEqualTo(replacementStage.Write.ObjectKey);

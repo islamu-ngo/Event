@@ -276,7 +276,6 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
-            Uri = "lifecycle.png",
             ObjectKey = $"tenants/{TenantId:N}/lifecycle.png",
             Provider = StorageProviders.Local,
             FullName = "lifecycle.png",

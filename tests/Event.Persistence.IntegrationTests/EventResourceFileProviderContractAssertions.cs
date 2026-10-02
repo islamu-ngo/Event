@@ -372,7 +372,6 @@ internal static class EventResourceFileProviderContractAssertions
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
-            Uri = $"/api/storageobject/{storageId}/content",
             Provider = StorageProviders.Local,
             ObjectKey = $"provider-contract/{storageId:N}.pdf",
             FullName = "provider-contract.pdf",

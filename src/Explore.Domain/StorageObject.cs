@@ -9,7 +9,8 @@ public class StorageObject : ITenantEntity, IAuditableEntity, ISoftDeletable, IC
     public int FileTypeId { get; set; }
     public required FileType FileType { get; set; }
 
-    public required string Uri { get; set; }
+    /// <summary>Optional foreign origin provenance, never a delivery URL or managed byte identity.</summary>
+    public string? SourceUri { get; set; }
     private string? _objectKey;
     private string? _capturedObjectKey;
     public string? ObjectKey

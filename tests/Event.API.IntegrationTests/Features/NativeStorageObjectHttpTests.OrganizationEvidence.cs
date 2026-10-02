@@ -231,7 +231,6 @@ public sealed partial class NativeStorageObjectHttpTests
     [Arguments("lifecycle")]
     [Arguments("deleted")]
     [Arguments("file-type")]
-    [Arguments("object-key")]
     public async Task EvidenceSubmissionRejectsIneligibleDocumentsWithoutAttaching(string defect)
     {
         await using var factory = await StorageFactory.CreateAsync(useProductionAuthorization: true);
@@ -252,13 +251,34 @@ public sealed partial class NativeStorageObjectHttpTests
                 case "lifecycle": document.LifecycleState = StorageObjectLifecycleStates.Quarantined; break;
                 case "deleted": document.IsDeleted = true; break;
                 case "file-type": document.FileTypeId = (int)FileTypeEnum.Image; break;
-                case "object-key": document.ObjectKey = null; break;
                 default: throw new ArgumentOutOfRangeException(nameof(defect));
             }
             await db.SaveChangesAsync();
         }
         using var denied = await owner.PostAsJsonAsync(root, new SubmitOrganizationTenantEvidenceDto { DocumentStorageObjectId = documentId });
         await AssertEvidenceProblemAsync(denied, HttpStatusCode.BadRequest);
+        await AssertEvidenceCountAsync(owner, root, 0);
+    }
+
+    [Test]
+    public async Task EvidenceDocumentCannotLoseItsCapturedManagedKey()
+    {
+        await using var factory = await StorageFactory.CreateAsync(useProductionAuthorization: true);
+        var scenario = await SeedEvidenceAsync(factory);
+        using var owner = Client(factory, scenario.UserId);
+        string root = EvidenceRoot(scenario.OrganizationId);
+        Guid documentId = await SeedEvidenceDocumentAsync(factory, scenario);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var document = await db.StorageObjects.SingleAsync(item => item.Id == documentId);
+            string? capturedKey = document.ObjectKey;
+            document.ObjectKey = null;
+            await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            db.ChangeTracker.Clear();
+            await Assert.That((await db.StorageObjects.SingleAsync(item => item.Id == documentId)).ObjectKey)
+                .IsEqualTo(capturedKey);
+        }
         await AssertEvidenceCountAsync(owner, root, 0);
     }
 
@@ -410,7 +430,6 @@ public sealed partial class NativeStorageObjectHttpTests
             FileType = null!,
             Provider = StorageProviders.Local,
             StorageProviderBindingId = targetBinding.Id,
-            Uri = string.Empty,
             ObjectKey = $"tenants/{scenario.TenantId:N}/private-evidence.pdf",
             FullName = "evidence.pdf",
             SafeDisplayName = "evidence.pdf",

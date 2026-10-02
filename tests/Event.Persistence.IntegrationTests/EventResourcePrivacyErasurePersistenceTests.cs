@@ -104,7 +104,7 @@ public sealed class EventResourcePrivacyErasurePersistenceTests(
             .SingleAsync(session => session.Id == ordinarySessionId);
 
         await Assert.That(shared.ObjectKey).IsEqualTo(resourceKey);
-        await Assert.That(shared.Uri).IsEqualTo($"private://{resourceStorageId:N}");
+        await Assert.That(shared.SourceUri).IsNull();
         await Assert.That(shared.Sha256Checksum).IsEqualTo(checksum);
         await Assert.That(shared.InspectedObjectId).IsEqualTo(resourceStorageId);
         await Assert.That(shared.InspectedSha256Checksum).IsEqualTo(checksum);
@@ -208,7 +208,6 @@ public sealed class EventResourcePrivacyErasurePersistenceTests(
             Tenant = null!,
             FileTypeId = fileType.Id,
             FileType = fileType,
-            Uri = $"private://{id:N}",
             ObjectKey = objectKey,
             Provider = StorageProviders.Local,
             FullName = $"{id:N}.pdf",

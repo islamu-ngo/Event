@@ -33,6 +33,8 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
             sqlite: false);
         operations = ActorMediaCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = StorageSourceUriCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -59,6 +61,8 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
             sqlite: false);
         operations = ActorMediaCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = StorageSourceUriCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "DATALENGTH");
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -86,6 +90,8 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             sqlite: true);
         executableOperations = ActorMediaCutoverGuard.Prepare(
             executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
+        executableOperations = StorageSourceUriCutoverGuard.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, sqlite: true, byteLengthFunction: "LENGTH");
         executableOperations =
             ConfigurableSchemaMigrationOperations.RemoveRedundantForeignKeyDrops(executableOperations);
         if (executableOperations.Any(operation => operation is RenameIndexOperation))
@@ -158,6 +164,8 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             sqlite: false);
         operations = ActorMediaCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = StorageSourceUriCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
         var executableOperations = new List<MigrationOperation>(operations.Count);
         foreach (MigrationOperation operation in operations)
         {

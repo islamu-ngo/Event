@@ -104,7 +104,6 @@ public sealed class EventResourceMetadataExportTests
                     Tenant = null!,
                     FileTypeId = (int)FileTypeEnum.Document,
                     FileType = null!,
-                    Uri = $"/api/eventresource/{item.Id:D}/content",
                     ObjectKey = $"{providerKey}-{item.Id:N}",
                     Provider = StorageProviders.Local,
                     StorageProviderBindingId = binding.Id,

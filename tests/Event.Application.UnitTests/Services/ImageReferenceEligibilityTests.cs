@@ -75,7 +75,6 @@ public sealed class ImageReferenceEligibilityTests
         Tenant = null!,
         FileType = null!,
         Provider = "local",
-        Uri = "storage://image",
         FullName = "image.png",
         SafeDisplayName = "image.png",
         Extension = "png",

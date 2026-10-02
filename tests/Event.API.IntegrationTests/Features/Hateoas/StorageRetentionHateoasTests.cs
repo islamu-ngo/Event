@@ -128,7 +128,7 @@ public sealed class StorageRetentionHateoasTests
         await Assert.That(resource.GetProperty("safeDisplayName").GetString()).IsEqualTo(allowed ? "retained.csv" : string.Empty);
         if (!allowed)
         {
-            await Assert.That(resource.GetProperty("uri").GetString()).IsEqualTo(string.Empty);
+            await Assert.That(resource.GetProperty("uri").GetString()).IsNull();
             await Assert.That(resource.GetRawText()).DoesNotContain("retained.csv");
         }
     }
@@ -181,7 +181,6 @@ public sealed class StorageRetentionHateoasTests
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
-            Uri = $"{BaseUrl}/{id}/content",
             ObjectKey = $"tenants/{tenant.TenantId:N}/{id:N}.csv",
             Provider = StorageProviders.S3Compatible,
             StorageProviderBindingId = storageBinding.Id,

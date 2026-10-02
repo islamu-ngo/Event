@@ -106,7 +106,7 @@ public sealed class ActorFederationMapperTests
         if (registrationOwned)
         {
             expected["owningResourceKind"] = "registration_submission_sink";
-            foreach (var field in new[] { "uri", "fullName", "safeDisplayName" })
+            foreach (var field in new[] { "fullName", "safeDisplayName" })
             {
                 expected[field] = string.Empty;
                 expectedList[field] = string.Empty;
@@ -217,7 +217,7 @@ public sealed class ActorFederationMapperTests
         image.OwningResourceId = state == "resource" ? ActorId : null;
         image.ContentType = state == "unsafe" ? "image/svg+xml" : "image/png";
         image.StorageProviderBindingId = Guid.CreateVersion7();
-        image.Uri = "https://provider.example.test/private-bucket/provider-key";
+        image.SourceUri = "https://provider.example.test/private-bucket/provider-key";
         actor.Pii.SetProfilePicture(image.Id, null);
         actor.Pii.ProfilePicture = state == "unloaded" ? null : image;
 
@@ -496,8 +496,8 @@ public sealed class ActorFederationMapperTests
         var expected = JsonNode.Parse("""
             {
               "id":"01900000-0000-7000-8000-000000000004",
-              "fileTypeId":8,"fileTypeFullName":"Image","uri":"https://images.example.test/file.png",
-              "provider":"local","fullName":"file.png","safeDisplayName":"Safe file","extension":"png",
+              "fileTypeId":8,"fileTypeFullName":"Image","uri":null,
+              "fullName":"file.png","safeDisplayName":"Safe file","extension":"png",
               "contentType":"image/png","size":9223372036854775806,"visibility":"public-image",
               "purpose":"profile-image","lifecycleState":"quarantined",
               "tenantId":"01900000-0000-7000-8000-000000000002"
@@ -569,7 +569,7 @@ public sealed class ActorFederationMapperTests
         Id = Stamp,
         FileTypeId = 8,
         FileType = new FileType { Id = 8, MasterCode = "IMAGE", FullName = "Image", Description = "private file metadata" },
-        Uri = "https://images.example.test/file.png",
+        SourceUri = "https://images.example.test/file.png",
         ObjectKey = "private/object-key",
         Provider = "local",
         FullName = "file.png",

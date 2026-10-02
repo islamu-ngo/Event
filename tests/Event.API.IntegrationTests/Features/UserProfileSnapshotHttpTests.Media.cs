@@ -77,7 +77,7 @@ public sealed partial class UserProfileSnapshotHttpTests
         await Assert.That(cleared.Pii.ExternalProfilePictureUri).IsNull();
         var retained = await finalDb.StorageObjects.SingleAsync(value => value.Id == imageId);
         await Assert.That(retained.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
-        await Assert.That(retained.Uri).IsEqualTo("https://provider.example.test/private-bucket/raw-key");
+        await Assert.That(retained.SourceUri).IsEqualTo("https://provider.example.test/private-bucket/raw-key");
     }
 
     [Test]

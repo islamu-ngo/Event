@@ -65,7 +65,7 @@ public static partial class EventSessionMapper
     [MapProperty(nameof(EventSession.EventSessionStatus), nameof(EventSessionDto.EventSessionStatusMasterCode), Use = nameof(StatusCode))]
     [MapProperty(nameof(EventSession.RegistrationMode), nameof(EventSessionDto.RegistrationModeFullName), Use = nameof(RegistrationName))]
     [MapProperty(nameof(EventSession.RegistrationMode), nameof(EventSessionDto.RegistrationModeMasterCode), Use = nameof(RegistrationCode))]
-    [MapProperty(nameof(EventSession.FeaturedImage), nameof(EventSessionDto.FeaturedImageUri), Use = nameof(ImageUri))]
+    [MapPropertyFromSource(nameof(EventSessionDto.FeaturedImageUri), Use = nameof(ImageUri))]
     [MapProperty(nameof(EventSession.IslamicAspect), nameof(EventSessionDto.IslamicAspect), Use = nameof(MapAspect))]
     [MapProperty(nameof(EventSession.SessionGroups), nameof(EventSessionDto.SessionGroups), Use = nameof(PublishedGroups))]
     private static partial EventSessionDto MapDetail(EventSession source);
@@ -110,7 +110,7 @@ public static partial class EventSessionMapper
     [MapProperty(nameof(EventSession.EventSessionStatus), nameof(EventSessionListDto.EventSessionStatusFullName), Use = nameof(StatusName))]
     [MapProperty(nameof(EventSession.EventSessionStatus), nameof(EventSessionListDto.EventSessionStatusMasterCode), Use = nameof(StatusCode))]
     [MapProperty(nameof(EventSession.RegistrationMode), nameof(EventSessionListDto.RegistrationModeFullName), Use = nameof(RegistrationName))]
-    [MapProperty(nameof(EventSession.FeaturedImage), nameof(EventSessionListDto.FeaturedImageUri), Use = nameof(ImageUri))]
+    [MapPropertyFromSource(nameof(EventSessionListDto.FeaturedImageUri), Use = nameof(ImageUri))]
     [MapProperty(nameof(EventSession.IslamicAspect), nameof(EventSessionListDto.IslamicAspect), Use = nameof(MapAspect))]
     [MapProperty(nameof(EventSession.SessionGroups), nameof(EventSessionListDto.SessionGroups), Use = nameof(PublishedGroups))]
     private static partial EventSessionListDto MapListItem(EventSession source);
@@ -256,7 +256,7 @@ public static partial class EventSessionMapper
     private static string? StatusCode(EventSessionStatus? status) => status?.MasterCode;
     private static string? RegistrationName(RegistrationMode? mode) => mode?.FullName;
     private static string? RegistrationCode(RegistrationMode? mode) => mode?.MasterCode;
-    private static string? ImageUri(StorageObject? image) => image?.Uri;
+    private static string? ImageUri(EventSession source) => Explore.Application.Services.StoragePresentationUrlResolver.PublicImageUri(source.FeaturedImage, source.TenantId);
     private static Guid SessionEventId(EventSession? session) => session?.EventId ?? Guid.Empty;
     private static string? SessionTitle(EventSession? session) => session?.Title;
     private static string? ActorName(Actor? actor) => actor?.Pii?.DisplayName;

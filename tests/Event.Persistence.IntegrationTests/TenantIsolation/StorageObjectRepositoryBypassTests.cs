@@ -141,7 +141,6 @@ public class StorageObjectRepositoryBypassTests(PostgreSqlContainerFixture fixtu
             Provider = binding?.Provider ?? StorageProviders.LegacyExternal,
             StorageProviderBindingId = binding?.Id,
             ObjectKey = binding is null || missingKey ? null : $"tenants/{tenantId:N}/{objectId:N}.png",
-            Uri = $"/storage/{objectId:N}.png",
             FullName = "storage-bypass.png",
             SafeDisplayName = "storage-bypass.png",
             Extension = ".png",

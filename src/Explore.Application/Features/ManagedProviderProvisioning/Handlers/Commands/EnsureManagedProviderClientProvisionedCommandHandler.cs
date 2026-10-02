@@ -64,7 +64,8 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
     IOptions<ManagedControlPlaneOptions> managedControlPlaneOptions,
     ISettingMutationLock mutationLock,
     IUnitOfWork unitOfWork,
-    ILogger<EnsureManagedProviderClientProvisionedCommandHandler> logger)
+    ILogger<EnsureManagedProviderClientProvisionedCommandHandler> logger,
+    Explore.Application.Services.PrivacyIdentityFenceOperation identityFence)
     : ICommandHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>,
         IManagedProviderClientProvisioner
 {
@@ -114,6 +115,8 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         ProviderAccountKey accountKey = dto.LocalIdentity is not null
             ? new ProviderAccountKey(AuthenticationProviderKind.Local, normalizedSubject)
             : CreateManagedProviderAccountKey(normalizedIdentityProvider, identityAuthority!, normalizedSubject);
+        return await identityFence.ExecuteEnrollmentAsync(accountKey, async cancellationToken =>
+        {
         ManagedTenantProvisioningOperation? managedOperation = null;
         if (managementRequest is not null)
         {
@@ -284,7 +287,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             Tenant tenant = creation.Tenant;
             tenant.Description = $"Provisioned from {dto.ExternalSystem.Trim()} customer {dto.ExternalCustomerId.Trim()} by provider {dto.ProviderKey.Trim()}.";
             var user = localBinding is not null ? existingUser!
-                : await EnsureUserAsync(dto.ExternalAdmin!, normalizedIdentityProvider, accountKey, existingUser, userId);
+                : await EnsureUserAsync(dto.ExternalAdmin!, normalizedIdentityProvider, accountKey, existingUser, userId, ct);
             var userActor = localBinding is not null
                 ? (await actorRepository.GetActorWithDetails(localBinding.PersonalActorId, ct))!
                 : await EnsureUserActorAsync(dto.ExternalAdmin!, user, userActorId);
@@ -616,15 +619,20 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
 
         if (managementRequest is not null)
         {
-            settingsResolver.InvalidateCache(SettingScope.Tenant, result.TenantId);
-            typedSettingsDocumentResolver.InvalidateTenantDocumentCache(
-                result.TenantId,
-                SettingsDocumentKeys.Tenant.Branding);
+            await identityFence.AfterEnrollmentCommitAsync(() =>
+            {
+                settingsResolver.InvalidateCache(SettingScope.Tenant, result.TenantId);
+                typedSettingsDocumentResolver.InvalidateTenantDocumentCache(
+                    result.TenantId,
+                    SettingsDocumentKeys.Tenant.Branding);
+                return Task.CompletedTask;
+            });
         }
 
         return BaseCommandResponse.Success(
             result,
             "Managed provider client provisioned successfully.");
+        }, cancellationToken);
     }
 
     private async Task<ManagementTenantProvisioningBlockerDto?> EvaluateAuthorityAsync(
@@ -652,8 +660,10 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         string normalizedIdentityProvider,
         ProviderAccountKey accountKey,
         User? existingUser,
-        Guid userId)
+        Guid userId,
+        CancellationToken cancellationToken)
     {
+        await identityFence.EnsureSubjectMayEnrollAsync(existingUser?.Id ?? userId, cancellationToken);
         if (existingUser != null)
         {
             if (admin.EmailVerified && existingUser.EmailVerified != true)

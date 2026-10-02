@@ -8,6 +8,10 @@ public interface IUserPrivacyErasureRepository
         Guid subjectId,
         CancellationToken cancellationToken);
 
+    Task EraseIdentityEmailOwnershipAsync(
+        Guid subjectId,
+        CancellationToken cancellationToken);
+
     Task EraseProviderBackedLocalUserMetadataAsync(
         Guid subjectId,
         CancellationToken cancellationToken);

@@ -61,7 +61,9 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
     public Task<T> ExecuteBootstrapConvergenceAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct = default) =>
-        ExecuteBootstrapConflictRetryAsync(() => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct), ct);
+        _dbContext.IdentityFenceOwnsTransaction
+            ? ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct)
+            : ExecuteBootstrapConflictRetryAsync(() => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct), ct);
 
     public Task<T> ExecuteReadCommittedAsync<T>(
         Func<CancellationToken, Task<T>> operation,
@@ -93,6 +95,23 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         IsolationLevel? isolationLevel,
         CancellationToken ct)
     {
+        // Co-located SQLite shares the authority write transaction: the gate
+        // commits both contexts after this operation returns.
+        if (_dbContext.IdentityFenceOwnsTransaction && _dbContext.Database.CurrentTransaction is not null)
+        {
+            if (_dbContext.IdentityFenceTransactionFailed)
+                throw new InvalidOperationException("The identity enrollment transaction has failed.");
+            try { return await operation(ct); }
+            catch
+            {
+                // A handler may translate this exception into a failure response.
+                // The owning authority gate must still roll back the entire unit.
+                _dbContext.IdentityFenceTransactionFailed = true;
+                _dbContext.ChangeTracker.Clear();
+                throw;
+            }
+        }
+
         // Nested transaction guard — fail fast with a deterministic error
         if (_dbContext.Database.CurrentTransaction != null)
             throw new InvalidOperationException(

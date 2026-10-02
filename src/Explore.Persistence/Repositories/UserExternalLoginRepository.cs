@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public class UserExternalLoginRepository : GenericRepository<UserExternalLogin, Guid>, IUserExternalLoginRepository
+public class UserExternalLoginRepository : GenericRepository<UserExternalLogin, Guid>,
+    IUserExternalLoginRepository, Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityBindingReader
 {
     private readonly ExploreDbContext _dbContext;
 
@@ -31,5 +32,12 @@ public class UserExternalLoginRepository : GenericRepository<UserExternalLogin, 
             .Where(l => l.UserId == userId)
             .ToListAsync();
     }
+
+    public async Task<IReadOnlyList<UserExternalLogin>> ReadExternalBindingsAfterAsync(
+        Guid? afterId, int limit, CancellationToken cancellationToken) =>
+        await _dbContext.UserExternalLogins.AsNoTracking()
+            .Where(login => login.AuthenticationProviderId != (int)Explore.Domain.Enums.AuthenticationProviderKind.Local
+                && (!afterId.HasValue || login.Id.CompareTo(afterId.Value) > 0))
+            .OrderBy(login => login.Id).Take(limit).ToListAsync(cancellationToken);
 
 }

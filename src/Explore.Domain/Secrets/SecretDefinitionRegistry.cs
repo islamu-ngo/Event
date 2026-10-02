@@ -52,7 +52,8 @@ public static class SecretDefinitionRegistry
         var mode = settingKey switch
         {
             Keys.SetupSecret or Keys.Authentication.LocalBootstrapPassword
-                or Keys.Authentication.AgentBrowserPersonaPassword => SecretRotationMode.UnsupportedLive,
+                or Keys.Authentication.AgentBrowserPersonaPassword
+                or Keys.PrivacyIdentityFenceKey => SecretRotationMode.UnsupportedLive,
             Keys.Promotions.CodeLookupHmacKey
                 or Keys.Admissions.CredentialLookupHmacKey
                 or Keys.Admissions.RecoveryCapabilityHmacKey
@@ -103,6 +104,7 @@ public static class SecretDefinitionRegistry
     public static class Keys
     {
         public const string SetupSecret = "api.setup_secret";
+        public const string PrivacyIdentityFenceKey = "privacy.identity_fence_key";
         public const string SetupSecretBindingCommitmentHmacKey =
             "setup.secret_binding_commitment_hmac_key";
 
@@ -323,6 +325,18 @@ public static class SecretDefinitionRegistry
                 DefaultEnvironmentVariableName = "AGENT_BROWSER_REDIS_PASSWORD",
                 IsBootstrapSecret = true,
                 Description = "Dedicated cache credential for the isolated development agent profile.",
+            },
+
+            new()
+            {
+                Key = Keys.PrivacyIdentityFenceKey,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/privacy",
+                DefaultInfisicalKey = "PRIVACY_ERASURE_IDENTITY_FENCE_KEY",
+                DefaultEnvironmentVariableName = "PRIVACY_ERASURE_IDENTITY_FENCE_KEY",
+                IsBootstrapSecret = true,
+                Description = "Persistent identity-erasure HMAC key; retain with all supported authority backups.",
             },
 
             // --- storage/STORAGE_S3_* ---

@@ -262,6 +262,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IUserNotificationPreferenceRepository, UserNotificationPreferenceRepository>();
         services.AddScoped<IUserAuthenticationTokenRepository, UserAuthenticationTokenRepository>();
         services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
+        services.AddScoped<IUserIdentityEmailRepository, UserIdentityEmailRepository>();
         services.AddScoped<IExternalBindingRepository, ExternalBindingRepository>();
 
         // Actor Repositories
@@ -503,8 +504,8 @@ public static class PersistenceServicesRegistration
                         options,
                         applicationRuntimeOptions));
                 services.TryAddSingleton<TimeProvider>(TimeProvider.System);
-                services.AddSingleton<IPrivacyErasureAuthority, EmbeddedPrivacyErasureAuthorityRepository>();
-                services.AddSingleton<IPrivacyErasureAuthorityMaintenance>(provider =>
+                services.AddScoped<IPrivacyErasureAuthority, EmbeddedPrivacyErasureAuthorityRepository>();
+                services.AddScoped<IPrivacyErasureAuthorityMaintenance>(provider =>
                     (IPrivacyErasureAuthorityMaintenance)provider.GetRequiredService<IPrivacyErasureAuthority>());
             }
             else
@@ -528,10 +529,19 @@ public static class PersistenceServicesRegistration
             services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>(options =>
                 EmbeddedPrivacyErasureAuthorityDbContextFactory.Configure(options, embedded));
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
-            services.AddSingleton<IPrivacyErasureAuthority, EmbeddedPrivacyErasureAuthorityRepository>();
+            services.AddSingleton<IPrivacyErasureAuthority>(provider =>
+                new EmbeddedPrivacyErasureAuthorityRepository(
+                    provider.GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>(),
+                    provider.GetRequiredService<TimeProvider>(),
+                    provider.GetRequiredService<IOptions<PrivacyErasureOptions>>(),
+                    provider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>()));
             services.AddSingleton<IPrivacyErasureAuthorityMaintenance>(provider =>
                 (IPrivacyErasureAuthorityMaintenance)provider.GetRequiredService<IPrivacyErasureAuthority>());
         }
+
+        services.AddScoped<IPrivacyIdentityFenceAuthority>(provider =>
+            (IPrivacyIdentityFenceAuthority)provider.GetRequiredService<IPrivacyErasureAuthority>());
+        services.AddScoped<IPrivacyIdentityBindingReader, UserExternalLoginRepository>();
 
         // Storage Repository
         services.AddScoped<IStorageObjectRepository, StorageObjectRepository>();

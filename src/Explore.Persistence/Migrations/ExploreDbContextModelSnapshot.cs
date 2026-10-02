@@ -33877,6 +33877,9 @@ namespace Explore.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_user_external_logins");
 
+                    b.HasAlternateKey("Id", "UserId")
+                        .HasName("ak_user_external_logins_id_user_id");
+
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_user_external_logins_user_id");
 
@@ -33885,6 +33888,80 @@ namespace Explore.Persistence.Migrations
                         .HasDatabaseName("ix_user_external_logins_authentication_provider_id_provider_key");
 
                     b.ToTable("user_external_logins", "islamu_event");
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("normalized_email");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_identity_email_claims");
+
+                    b.HasAlternateKey("Id", "UserId")
+                        .HasName("ak_user_identity_email_claims_id_user_id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_identity_email_claims_normalized_email");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_identity_email_claims_user_id");
+
+                    b.ToTable("user_identity_email_claims", "islamu_event");
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claim_id");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime>("ObservedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("observed_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_identity_email_evidence");
+
+                    b.HasIndex("ExternalLoginId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_identity_email_evidence_external_login_id");
+
+                    b.HasIndex("ClaimId", "UserId")
+                        .HasDatabaseName("ix_user_identity_email_evidence_claim_id_user_id");
+
+                    b.HasIndex("ExternalLoginId", "UserId")
+                        .HasDatabaseName("ix_user_identity_email_evidence_external_login_id_user_id");
+
+                    b.ToTable("user_identity_email_evidence", "islamu_event");
                 });
 
             modelBuilder.Entity("Explore.Domain.UserNotificationPreference", b =>
@@ -49241,6 +49318,35 @@ namespace Explore.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailClaim", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany("IdentityEmailClaims")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identity_email_claims_users_user_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailEvidence", b =>
+                {
+                    b.HasOne("Explore.Domain.UserIdentityEmailClaim", null)
+                        .WithMany("Evidence")
+                        .HasForeignKey("ClaimId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identity_email_evidence_user_identity_emai_2286743766bb");
+
+                    b.HasOne("Explore.Domain.UserExternalLogin", null)
+                        .WithMany()
+                        .HasForeignKey("ExternalLoginId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identity_email_evidence_user_external_logi_a40508d2f1ff");
+                });
+
             modelBuilder.Entity("Explore.Domain.UserNotificationPreference", b =>
                 {
                     b.HasOne("Explore.Domain.Tenant", "Tenant")
@@ -50526,8 +50632,15 @@ namespace Explore.Persistence.Migrations
                 {
                     b.Navigation("Actor");
 
+                    b.Navigation("IdentityEmailClaims");
+
                     b.Navigation("Pii")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailClaim", b =>
+                {
+                    b.Navigation("Evidence");
                 });
 
             modelBuilder.Entity("Explore.Domain.WebhookConsumer", b =>

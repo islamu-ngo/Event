@@ -41,8 +41,9 @@ observation even when the issuer is not trusted for correlation. ATProto profile
 claims cannot gain verified-email correlation authority.
 
 For unbound OIDC identities, only trusted verified evidence may select one
-unambiguous non-Local account. Otherwise permitted first signup remains separate
-from adoption, including absent or unverified email; ATProto's email-free
+canonical non-Local owner. Otherwise permitted first signup remains separate
+from adoption, including absent or unverified email, but cannot bypass an
+existing canonical address claim; ATProto's email-free
 enrollment stays with its verified-DID bootstrap. Local native receipts and
 explicit Local bindings retain their credential, subject and actor checks.
 Local-owned accounts cannot be automatically adopted by an external issuer.
@@ -53,6 +54,33 @@ Actor or binding writes. Ambiguity and binding conflicts return the bounded
 recovery/support outcome without identifying another account. The shipped
 recovery path is the original credential provider or operator support, not a
 self-service merge or an unimplemented Link action.
+
+## Canonical Identity Email Ownership
+
+`UserIdentityEmailClaim` owns an instance-global normalized address.
+`UserIdentityEmailEvidence` records the binding that supports that claim.
+Owner-qualified composite foreign keys prevent a proof from joining another
+User's claim or external login. An exact binding may support one address;
+independent bindings may support the same owner's address. Registry mutations
+require the User/Actor/binding transaction, and removing the last proof removes
+the claim rather than leaving an unsupported address eligible for correlation.
+
+Editable `UserPii.Email` and its verification snapshot are contact/profile data,
+not ownership authority. Correlation, mail recipient selection and guest-order
+adoption consume supported canonical claims. A changed verified address already
+owned by another User never moves the authenticated binding: synchronization
+removes that binding's obsolete proof, retains independently supported proof,
+and leaves the conflicting owner's claim intact. Validated native Local
+receipts and configured-administrator completion write evidence with their
+identity graph; provider kind alone never supplies verification.
+
+External enrollment enters `PrivacyIdentityFenceOperation` before resolution
+and holds retained-authority serialization through application commit.
+Co-located SQLite enlists both contexts in the same write transaction. Changes
+committed before this gate are resolved from the current canonical owner;
+writers cannot transfer ownership between its pre-read and graph mutation.
+Retained keyed account fingerprints also prevent an erased external identity
+from returning under a new User UUID. See [Privacy Erasure](PRIVACY_ERASURE.md).
 
 ## External OIDC Callback Identity
 

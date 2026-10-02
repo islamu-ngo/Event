@@ -114,6 +114,8 @@ x-privacy-erasure-authority-env: &privacy-erasure-authority-env
 
 x-privacy-erasure-runtime-env: &privacy-erasure-runtime-env
   <<: *privacy-erasure-authority-env
+  PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID: ${PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID:-}
+  PRIVACY_ERASURE_IDENTITY_FENCE_KEY: ${PRIVACY_ERASURE_IDENTITY_FENCE_KEY:-}
   PrivacyErasureAuthorityDatabase__Runtime__Username: ${ERASURE_DATABASE_RUNTIME_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME:-privacy_erasure_runtime}}
   PrivacyErasureAuthorityDatabase__Runtime__Password: ${ERASURE_DATABASE_RUNTIME_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_PASSWORD:-}}
   Database__Erasure__Runtime__Username: ${ERASURE_DATABASE_RUNTIME_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME:-privacy_erasure_runtime}}

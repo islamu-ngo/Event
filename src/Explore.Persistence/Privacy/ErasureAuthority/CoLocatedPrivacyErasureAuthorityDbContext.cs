@@ -21,5 +21,6 @@ public sealed class CoLocatedPrivacyErasureAuthorityDbContext(
         modelBuilder.HasDefaultSchema(schema);
         modelBuilder.ApplyConfiguration(new PrivacyErasureIntentConfiguration());
         modelBuilder.ApplyConfiguration(new PrivacyErasureCounterConfiguration());
+        modelBuilder.ApplyConfiguration(new PrivacyErasureIdentityFenceConfiguration(embedded: false));
     }
 }

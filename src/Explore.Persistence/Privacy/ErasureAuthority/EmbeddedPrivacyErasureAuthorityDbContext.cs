@@ -19,5 +19,6 @@ public sealed class EmbeddedPrivacyErasureAuthorityDbContext(
     {
         modelBuilder.ApplyConfiguration(new EmbeddedPrivacyErasureIntentConfiguration());
         modelBuilder.ApplyConfiguration(new EmbeddedPrivacyErasureCounterConfiguration());
+        modelBuilder.ApplyConfiguration(new PrivacyErasureIdentityFenceConfiguration(embedded: true));
     }
 }

@@ -28,6 +28,7 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
         return await _dbContext.Users
             .AsNoTracking()
             .Include(u => u.Pii)
+            .Include(u => u.IdentityEmailClaims).ThenInclude(claim => claim.Evidence)
             .Include(u => u.Actor)
                 .ThenInclude(a => a!.Pii)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
@@ -63,6 +64,7 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
             var chunkResults = await _dbContext.Users
                 .AsNoTracking()
                 .Include(u => u.Pii)
+                .Include(u => u.IdentityEmailClaims).ThenInclude(claim => claim.Evidence)
                 .Where(u => chunk.Contains(u.Id))
                 .ToListAsync();
             results.AddRange(chunkResults);

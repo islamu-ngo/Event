@@ -625,6 +625,15 @@ public class UserExternalLoginIntegrationTests
                 });
         }
 
+        var fenceAuthority = Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>();
+        fenceAuthority.ExecuteSerializedAsync(
+                Arg.Any<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>()(
+                call.Arg<CancellationToken>()));
+        var fenceKeys = Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceKeyProvider>();
+        fenceKeys.ResolveAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+            new Explore.Application.Contracts.PrivacyErasure.PrivacyIdentityFenceKey(
+                "unit-key", System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
         return new BootstrapAtprotoSessionCommandHandler(
             gateway,
             tokenIssuer,
@@ -644,7 +653,11 @@ public class UserExternalLoginIntegrationTests
             Substitute.For<IVisitorAccessCapabilityResolver>(),
             tenantContext,
             configuration,
-            TimeProvider.System);
+            TimeProvider.System,
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority,
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyErasureAuthority>(),
+                fenceKeys,
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityBindingReader>()));
     }
 
     private async Task EnsureUserExistsAsync(Guid userId, string? email = null)

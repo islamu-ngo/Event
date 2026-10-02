@@ -13,6 +13,8 @@ namespace Explore.Application.Services;
 public sealed class IdentityAccountResolver(
     IUserRepository users,
     IUserExternalLoginRepository logins,
+    IUserIdentityEmailRepository identityEmails,
+    IPrivacyErasureStateRepository privacyErasure,
     IOptions<IdentityCorrelationOptions> options) : IIdentityAccountResolver
 {
     private readonly HashSet<string> _trustedIssuers = options.Value.TrustedIssuers
@@ -32,31 +34,34 @@ public sealed class IdentityAccountResolver(
         string? issuer = evidence?.Issuer;
         bool verifiedEmail = evidence is { EmailVerified: true }
             && !string.IsNullOrWhiteSpace(evidence.Email);
+        bool canClaim = !conflictingEvidence && IdentityCorrelationPolicy.CanCorrelate(
+            accountKey.ProviderKind, issuer, verifiedEmail, _trustedIssuers);
         int matches = 0;
         bool localOwned = false;
 
-        if (binding is null && !bindingConflict
-            && IdentityCorrelationPolicy.CanCorrelate(
-                accountKey.ProviderKind, issuer, verifiedEmail, _trustedIssuers))
+        if (binding is null && !bindingConflict && canClaim)
         {
-            IReadOnlyList<User> candidates = await users.GetUsersByNormalizedEmailAsync(
+            UserIdentityEmailClaim? claim = await identityEmails.GetByNormalizedEmailAsync(
                 evidence!.Email, cancellationToken);
-            matches = candidates.Count;
-            if (matches == 1)
+            if (claim is not null)
             {
-                List<UserExternalLogin> candidateBindings = await logins.GetByUser(candidates[0].Id);
+                matches = 1;
+                List<UserExternalLogin> candidateBindings = await logins.GetByUser(claim.UserId);
                 localOwned = candidateBindings.Any(login =>
                     login.AuthenticationProviderId == (int)AuthenticationProviderKind.Local);
-                if (!localOwned)
-                    user = await users.GetById(candidates[0].Id);
-                bindingConflict = !localOwned && user is null;
+                user = await users.GetById(claim.UserId);
+                IReadOnlyList<UserIdentityEmailClaim> supported = await identityEmails.GetByUserAsync(
+                    claim.UserId, cancellationToken);
+                bindingConflict = localOwned || user is null || !supported.Any(value => value.Id == claim.Id);
             }
         }
 
+        if (user is not null && await privacyErasure.GetBySubjectAsync(user.Id, cancellationToken) is not null)
+            bindingConflict = true;
         cancellationToken.ThrowIfCancellationRequested();
         IdentityCorrelationDecision decision = IdentityCorrelationPolicy.Evaluate(
             binding is not null, bindingConflict, accountKey.ProviderKind,
             issuer, verifiedEmail, _trustedIssuers, matches, localOwned);
-        return new IdentityAccountResolution(decision, user);
+        return new IdentityAccountResolution(decision, user, canClaim);
     }
 }

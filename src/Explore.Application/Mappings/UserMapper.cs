@@ -11,6 +11,7 @@ public static partial class UserMapper
     // The current-user response discloses identity scalars, not PII/navigation graphs,
     // tenant history or audit/deletion state. Authorization and erasure fencing stay in callers.
     [MapperIgnoreSource(nameof(User.Pii))]
+    [MapperIgnoreSource(nameof(User.IdentityEmailClaims))]
     [MapperIgnoreSource(nameof(User.LastActiveTenantId))]
     [MapperIgnoreSource(nameof(User.CreatedAt))]
     [MapperIgnoreSource(nameof(User.CreatedBy))]

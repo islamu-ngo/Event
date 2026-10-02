@@ -33,7 +33,8 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
     IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
     ITenantContext tenantContext,
     IConfiguration configuration,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    PrivacyIdentityFenceOperation identityFence)
     : ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>
 {
     public async Task<AtprotoSessionBootstrapResult> ExecuteAsync(
@@ -68,6 +69,17 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
         ProviderAccountKey accountKey =
             PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(
                 verified.Did);
+        return await identityFence.ExecuteEnrollmentAsync(accountKey,
+            token => CompleteVerifiedAsync(request, verified, accountKey, tenantId, token), cancellationToken);
+    }
+
+    private async Task<AtprotoSessionBootstrapResult> CompleteVerifiedAsync(
+        BootstrapAtprotoSessionCommand request,
+        AtprotoVerifiedOAuthSession verified,
+        ProviderAccountKey accountKey,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
         AuthenticationProviderKind primaryProvider =
             await authenticationProviderDispatcher
                 .GetActivePrimaryProviderAsync(cancellationToken)
@@ -85,6 +97,8 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
 
         var login = await externalLoginRepository
             .GetByProviderAndKey(accountKey).ConfigureAwait(false);
+        if (login is not null)
+            await identityFence.EnsureSubjectMayEnrollAsync(login.UserId, cancellationToken);
         InstanceBootstrapState? bootstrap = await bootstrapRepository
             .GetCurrent(cancellationToken).ConfigureAwait(false);
         // Pending configured setup admits only its verified claimant. After completion,

@@ -38,6 +38,7 @@ namespace Event.Persistence.IntegrationTests.Privacy;
 [NotInParallel("PersistenceDb")]
 public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyErasurePostgreSqlFixture fixture)
 {
+    private static readonly RetainedIdentityFenceTests.TestKeyProvider IdentityFenceKeys = new();
     [Test]
     public async Task OwnerPrivateHomeQuery_ReturnsExactCrossTenantSetWithoutEnumeratingOtherRows()
     {
@@ -315,6 +316,10 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
                 .CountAsync(login => login.UserId == graph.OwnerUserId)).IsEqualTo(2);
             await Assert.That(await rollbackContext.UserExternalLogins
                 .CountAsync(login => login.UserId == graph.UnrelatedUserId)).IsEqualTo(1);
+            await Assert.That(await rollbackContext.UserIdentityEmailClaims
+                .CountAsync(claim => claim.UserId == graph.OwnerUserId)).IsEqualTo(1);
+            await Assert.That(await rollbackContext.UserIdentityEmailEvidence
+                .CountAsync(evidence => evidence.UserId == graph.OwnerUserId)).IsEqualTo(2);
             await Assert.That(await rollbackContext.AtprotoIdentities
                 .AnyAsync(identity => identity.ActorId == graph.OwnerActorId && !identity.IsDeleted)).IsTrue();
             await Assert.That(await rollbackContext.AtprotoIdentities
@@ -608,7 +613,8 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
 
     internal static ErasureRuntime CreateRuntime(
         ExploreDbContext context,
-        IPrivacyErasureAuthority authority)
+        IPrivacyErasureAuthority authority,
+        IPrivacyIdentityFenceKeyProvider? identityFenceKeys = null)
     {
         var services = new ServiceCollection();
         services.AddHybridCache();
@@ -641,6 +647,8 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             checkpointRepository,
             stateRepository,
             authority,
+            new PrivacyIdentityFenceOperation((IPrivacyIdentityFenceAuthority)authority, authority,
+                identityFenceKeys ?? IdentityFenceKeys, new UserExternalLoginRepository(context)),
             new EfCoreUnitOfWork(context),
             applier,
             Options.Create(new PrivacyErasureOptions()),
@@ -756,6 +764,29 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             CreatePreference(tenantA, owner.Id, "owner-a"),
             CreatePreference(tenantB, owner.Id, "owner-b"),
             CreatePreference(tenantA, unrelated.Id, "unrelated"));
+        await context.SaveChangesAsync();
+
+        UserIdentityEmailClaim ownerClaim = UserIdentityEmailClaim.Create(
+            owner.Id, $"erasure-owner{identitySuffix}@example.test");
+        UserIdentityEmailClaim unrelatedClaim = UserIdentityEmailClaim.Create(
+            unrelated.Id, $"erasure-unrelated{identitySuffix}@example.test");
+        context.UserIdentityEmailClaims.AddRange(ownerClaim, unrelatedClaim);
+        await context.SaveChangesAsync();
+        UserExternalLogin[] identityBindings = await context.UserExternalLogins
+            .IgnoreQueryFilters()
+            .Where(login => login.UserId == owner.Id || login.UserId == unrelated.Id)
+            .ToArrayAsync();
+        foreach (UserExternalLogin binding in identityBindings)
+        {
+            UserIdentityEmailEvidence evidence = UserIdentityEmailEvidence.Create(
+                binding.UserId,
+                binding.UserId == owner.Id ? ownerClaim.Id : unrelatedClaim.Id,
+                binding.Id,
+                new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc));
+            if (binding.UserId == owner.Id && binding.ProviderKey == $"owner-b{identitySuffix}")
+                evidence.Invalidate();
+            context.UserIdentityEmailEvidence.Add(evidence);
+        }
         await context.SaveChangesAsync();
 
         Location homeA = CreatePrivateHome(tenantA.Id, owner.Id, "HOME-A-NAME-CANARY");

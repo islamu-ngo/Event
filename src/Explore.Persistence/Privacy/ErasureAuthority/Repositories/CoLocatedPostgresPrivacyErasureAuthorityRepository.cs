@@ -8,11 +8,11 @@ using Microsoft.Extensions.Options;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed class CoLocatedPostgresPrivacyErasureAuthorityRepository(
+public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
     CoLocatedPrivacyErasureAuthorityDbContext dbContext,
     TimeProvider timeProvider,
     IOptions<PrivacyErasureOptions> options)
-    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance
+    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority
 {
     public const int MaximumReadBatchSize = 500;
 
@@ -22,37 +22,38 @@ public sealed class CoLocatedPostgresPrivacyErasureAuthorityRepository(
         PrivacyErasureCounter? counter = await dbContext.AuthorityCounters
             .AsNoTracking()
             .SingleOrDefaultAsync(cancellationToken);
+        if (counter is null && await dbContext.ErasureIntents.AnyAsync(cancellationToken))
+            throw new InvalidOperationException("privacy_identity_fence_authority_state_unavailable");
         return counter?.GetState() ?? new PrivacyErasureAuthorityState(0, 0);
     }
 
-    public async Task<PrivacyErasureIntent> AppendAsync(
+    public Task<PrivacyErasureIntent> AppendAsync(
         PrivacyErasureRequest intent,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(intent);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted,
-            cancellationToken);
-        _ = await RelationalNamedLock.AcquireTransactionAsync(
-            dbContext,
-            "privacy-erasure-authority-counter",
-            cancellationToken);
+        return ExecuteSerializedAsync(async token =>
+        {
+        if (intent.IdentityKeyId is not null)
+            await ValidateKeyAsync(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!, token);
         PrivacyErasureCounter? counter = await dbContext.AuthorityCounters
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(token);
         if (counter is null)
         {
             counter = PrivacyErasureCounter.Start();
             dbContext.AuthorityCounters.Add(counter);
         }
         PrivacyErasureIntent? existing = await dbContext.ErasureIntents
-            .SingleOrDefaultAsync(item => item.IntentId == intent.IntentId, cancellationToken);
+            .Include(item => item.IdentityFences)
+            .SingleOrDefaultAsync(item => item.IntentId == intent.IntentId, token);
         if (existing is not null)
         {
             EnsureSamePayload(existing, intent);
-            await transaction.CommitAsync(cancellationToken);
             return existing;
         }
 
+        if (intent.IdentityKeyId is not null)
+            counter.BindIdentityKey(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!);
         long sequence = counter.AllocateNext();
         DateTime recordedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
         var fact = PrivacyErasureIntent.Record(
@@ -64,11 +65,12 @@ public sealed class CoLocatedPostgresPrivacyErasureAuthorityRepository(
             intent.PolicyVersion,
             recordedAtUtc,
             recordedAtUtc,
-            recordedAtUtc + options.Value.AuthorityRetention);
+            recordedAtUtc + options.Value.AuthorityRetention,
+            intent.IdentityFences);
         dbContext.ErasureIntents.Add(fact);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(token);
         return fact;
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<PrivacyErasureIntent>> ReadAfterAsync(
@@ -92,6 +94,7 @@ public sealed class CoLocatedPostgresPrivacyErasureAuthorityRepository(
 
         return await dbContext.ErasureIntents
             .AsNoTracking()
+            .Include(item => item.IdentityFences)
             .Where(item => item.AuthoritySequence > authoritySequence)
             .OrderBy(item => item.AuthoritySequence)
             .Take(limit)
@@ -306,7 +309,8 @@ public sealed class CoLocatedPostgresPrivacyErasureAuthorityRepository(
         if (existing.SubjectKind != requested.SubjectKind
             || existing.SubjectId != requested.SubjectId
             || existing.ReasonCode != requested.ReasonCode
-            || existing.PolicyVersion != requested.PolicyVersion)
+            || existing.PolicyVersion != requested.PolicyVersion
+            || !existing.HasSameIdentityFences(requested.IdentityFences))
         {
             throw new InvalidOperationException(
                 "The erasure authority rejected the append payload for this IntentId.");

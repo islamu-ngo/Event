@@ -228,6 +228,9 @@ public static class ExploreDatabaseMigrator
             PrivacyErasureAuthorityDatabaseContract.RetentionLifecycleMigrationSql,
             cancellationToken);
         await authorityDatabase.Database.ExecuteSqlRawAsync(
+            PrivacyIdentityFenceDatabaseContract.MigrationSql,
+            cancellationToken);
+        await authorityDatabase.Database.ExecuteSqlRawAsync(
             PrivacyErasureAuthorityDatabaseContract.RoleIsolationSql,
             cancellationToken);
         await lifecycleTransaction.CommitAsync(cancellationToken);

@@ -92,6 +92,8 @@ public static class ApplicationServicesRegistration
                 "Identity correlation issuers must be valid, distinct exact OIDC authorities.")
             .ValidateOnStart();
         services.AddScoped<IIdentityAccountResolver, IdentityAccountResolver>();
+        services.AddScoped<IdentityEmailSynchronizationOperation>();
+        services.AddScoped<PrivacyIdentityFenceOperation>();
         PrivacyErasureDurabilityOptions erasureDurability =
             PrivacyErasureDurabilityOptions.FromConfiguration(configuration);
         services.AddOptions<PrivacyErasureDurabilityOptions>()

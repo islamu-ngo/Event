@@ -150,6 +150,23 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
             .ToArray();
     }
 
+    public async Task EraseIdentityEmailOwnershipAsync(
+        Guid subjectId,
+        CancellationToken cancellationToken)
+    {
+        RequireId(subjectId, nameof(subjectId));
+        string reason = TenantFilterBypassReasons.UserPrivacyErasure;
+        // Binding proof FKs restrict deletion; remove active and invalidated proofs first.
+        await dbContext.UserIdentityEmailEvidence
+            .IgnoreAllFilters(reason)
+            .Where(value => value.UserId == subjectId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await dbContext.UserIdentityEmailClaims
+            .IgnoreAllFilters(reason)
+            .Where(value => value.UserId == subjectId)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
     public async Task EraseProviderBackedLocalUserMetadataAsync(
         Guid subjectId,
         CancellationToken cancellationToken)

@@ -123,6 +123,9 @@ public sealed class PrivacyErasureApplier(
         int providerWorkCount = await providerWorkRepository.AddMissingAsync(providerWork, cancellationToken);
         await stateRepository.SaveChangesAsync(cancellationToken);
 
+        await privacyErasureRepository.EraseIdentityEmailOwnershipAsync(
+            intent.SubjectId,
+            cancellationToken);
         await privacyErasureRepository.EraseProviderBackedLocalUserMetadataAsync(
             intent.SubjectId,
             cancellationToken);

@@ -158,7 +158,12 @@ public sealed class AtprotoOAuthSecurityGatewayTests
                     new InstanceBootstrapStateRepository(visitorSettings.Context))),
             tenantContext,
             configuration,
-            TimeProvider.System);
+            TimeProvider.System,
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>(),
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyErasureAuthority>(),
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceKeyProvider>(),
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityBindingReader>()));
         var payload = JsonSerializer.SerializeToUtf8Bytes(CreateSession());
 
         var result = await handler.ExecuteAsync(new BootstrapAtprotoSessionCommand(

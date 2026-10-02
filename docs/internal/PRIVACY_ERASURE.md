@@ -47,6 +47,89 @@ erasure request -> append authority fact (committed first)
 5. **Startup & Restore Replay**: At application startup, the startup gate replays all authority facts missing from the local checkpoint before serving traffic.
 6. **Bounded Retention**: The authority publishes a PII-free high-water/floor state. Compaction deletes only an expired contiguous prefix, preserves and pseudonymizes held evidence, and advances the floor in the same transaction.
 
+### Retained External Identity Fence
+
+`PrivacyIdentityFenceOperation` serializes external enrollment and erasure
+capture through `IPrivacyIdentityFenceAuthority`. Enrollment checks the exact
+existing `ProviderAccountKey` before its first binding lookup and holds the
+authority gate through the application commit. Erasure captures every current
+external binding under the same gate and atomically appends its fingerprints
+with the ordinary retained intent before any primary deletion. Sync,
+instance/configured onboarding, DID bootstrap and managed external administrator
+provisioning all use this gate. Native Local identity continues to use its
+credential-operation receipts and User UUID fences.
+
+Before linking to an existing user, each external writer also checks the indexed
+retained subject fact under that gate. This closes the interval between retained
+append and saving the primary saga: a different external key cannot join the
+erased user while its primary UUID fence is not yet visible.
+
+`PrivacyIdentityFenceKey` uses HMAC-SHA-256 over length-prefixed UTF-8 fields
+(32-bit big-endian byte lengths): purpose/version, closed provider kind and the
+already-canonical account key. It never normalizes an opaque subject again.
+The separate key-verification purpose binds the nonsecret key ID. Authority
+state retains that ID and verification tag; `PrivacyErasureIdentityFence` retains
+only provider kind, key ID, digest, expiry and immutable `AuthoritySequence`.
+Its composite lookup index excludes raw subjects, issuer-account strings, DIDs,
+email addresses and User UUIDs. Duplicate append compares the complete digest
+set; a failed append rolls back both the intent and its index.
+
+Dedicated SQLite holds a real write transaction. CoLocated SQLite enlists the
+application context in that same connection/transaction; `EfCoreUnitOfWork`
+recognizes only this explicit enlistment, while ordinary nested transactions
+remain rejected. CoLocated PostgreSQL locks the authority counter row in its
+transaction. External PostgreSQL retains function-only runtime privileges through
+`PrivacyIdentityFenceDatabaseContract`; it does not grant raw table access.
+Secret resolution happens before the gate, never as network I/O inside it.
+
+Replay exports include the intent's fingerprints, and authority state includes
+the key commitment. Physical authority backups must include the counter, intents
+and identity index together. After ordinary sequence replay, startup checks all
+restored external bindings against retained fingerprints, even if their User UUID
+differs or a legal hold has pseudonymized both audit UUIDs. A match appends another
+ordinary erasure fact for the restored user and drains the existing applier
+before readiness; it does not introduce a second purge engine.
+
+Fences expire only through the existing contiguous-prefix authority compaction:
+`MaximumBackupHorizon + AuthorityRetentionSafetyMargin`. Held audit UUID
+pseudonymization never moves the index's sequence association. A legal hold
+retains matching until its fact is actually compacted. Missing/wrong key,
+missing retained key metadata and unavailable authority fail closed. No automatic
+reenrollment or bypass mode exists.
+
+Provision `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` as base64-encoded 32 random bytes
+in the selected approved secret authority, with nonsecret
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` (or `PrivacyErasure:IdentityFence:KeyId`).
+The bootstrap catalogue entry is `privacy.identity_fence_key`, Infisical path
+`/privacy`. Environment reads use explicit process injection; shared User Secrets
+are accepted only when explicitly selected in Development/Testing. No application
+database binding or configuration fallback supplies this key. Retain the same key
+for every replica and all supported authority backups. Live rotation is unsupported.
+
+### Verified Identity Email Ownership
+
+`UserIdentityEmailClaim` and `UserIdentityEmailEvidence` are subject-owned PII,
+not retained audit evidence. `PrivacyErasureApplier` invokes
+`IUserPrivacyErasureRepository.EraseIdentityEmailOwnershipAsync` after protected
+provider work has been materialized and before deleting external account
+bindings or `UserPii`. `UserLocationPrivacyErasureRepository` explicitly deletes
+all proofs by `UserId`, including invalidated proofs, then deletes the subject's
+claims. Owner-qualified foreign keys make this subject predicate cover the
+claim/binding graph without enumerating another account's evidence. The
+binding-to-proof foreign key is restrictive to avoid SQL Server multiple
+cascade paths; binding deletion must not precede proof disposal.
+
+These deletes share the existing serializable settlement transaction, retained
+authority fence, policy coverage and replay checkpoint. A failed settlement
+rolls back claims/proofs with the other local PII while the committed authority
+fact remains available for replay. Restoring a primary backup restores neither
+authority nor permission to recreate PII: startup replay removes restored
+claims/proofs before admitting traffic. Identity synchronization and proof
+writers must honor the existing subject fence in their serialized mutation;
+releasing an email claim does not release an erased subject's fence. The
+machine inventory classifies the normalized address and proof linkage,
+observation and activity fields as hard-delete copies.
+
 ### Configuration Portability Privacy Boundary
 
 Configuration-manifest and tenant-package exports are not subject-data export

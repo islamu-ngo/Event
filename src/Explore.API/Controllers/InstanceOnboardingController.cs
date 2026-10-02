@@ -241,7 +241,8 @@ public class InstanceOnboardingController : EventControllerBase
             Username = User.GetUsername(),
             AuthProvider = authProvider,
             AuthProviderId = User.GetProviderId(providerSubject, authProvider),
-            EmailVerified = User.GetEmailVerified()
+            EmailVerified = User.GetEmailVerified(),
+            AuthorityEvidence = User.GetProviderIdentity()?.AuthorityEvidence
         };
 
         var response = await _completeOnboardingCommand.ExecuteAsync(command, cancellationToken);

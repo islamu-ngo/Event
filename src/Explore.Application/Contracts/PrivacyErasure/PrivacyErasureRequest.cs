@@ -12,7 +12,10 @@ public sealed record PrivacyErasureRequest
         PrivacyErasureSubjectKind subjectKind,
         Guid subjectId,
         PrivacyErasureReasonCode reasonCode,
-        int policyVersion)
+        int policyVersion,
+        IReadOnlyList<PrivacyIdentityFingerprint>? identityFences = null,
+        string? identityKeyId = null,
+        string? identityKeyVerificationTag = null)
     {
         Validate(intentId, subjectKind, subjectId, reasonCode, policyVersion);
 
@@ -21,6 +24,16 @@ public sealed record PrivacyErasureRequest
         SubjectId = subjectId;
         ReasonCode = reasonCode;
         PolicyVersion = policyVersion;
+        IdentityFences = Array.AsReadOnly((identityFences ?? []).Distinct().ToArray());
+        if (identityKeyId is not null || identityKeyVerificationTag is not null || IdentityFences.Count > 0)
+        {
+            PrivacyIdentityFingerprint.ValidateKeyId(identityKeyId!);
+            PrivacyIdentityFingerprint.ValidateDigest(identityKeyVerificationTag!);
+            if (IdentityFences.Any(fence => fence.KeyId != identityKeyId))
+                throw new ArgumentException("Identity fence key metadata does not match.");
+        }
+        IdentityKeyId = identityKeyId;
+        IdentityKeyVerificationTag = identityKeyVerificationTag;
     }
 
     public Guid IntentId { get; }
@@ -28,6 +41,9 @@ public sealed record PrivacyErasureRequest
     public Guid SubjectId { get; }
     public PrivacyErasureReasonCode ReasonCode { get; }
     public int PolicyVersion { get; }
+    public IReadOnlyList<PrivacyIdentityFingerprint> IdentityFences { get; }
+    public string? IdentityKeyId { get; }
+    public string? IdentityKeyVerificationTag { get; }
 
     public static PrivacyErasureRequest Create(
         Guid intentId,

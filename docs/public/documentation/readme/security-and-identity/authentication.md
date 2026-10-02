@@ -37,7 +37,9 @@ An already linked issuer and subject always resolve the same Event account,
 even if the email changes or the operator removes the issuer from matching
 trust. Removing trust stops new email-based matches; it does not unlink users.
 Ordinary permitted first signup remains available without matching trust,
-including unverified or absent email. AT Protocol continues to support
+including unverified or absent email, but a verified address already owned by
+another account cannot be used to bypass ownership through separate signup.
+AT Protocol continues to support
 email-free signup through a verified DID. Mail settings do not manufacture or
 erase a provider's verification statement.
 
@@ -45,6 +47,20 @@ An ambiguous or conflicting identity is not silently merged or used to select
 another account. Recover access through the original sign-in provider or
 contact the instance operator. Event does not currently offer a general
 self-service account-merge or explicit-linking screen.
+
+Account matching uses verified identity-address claims, not the editable contact
+email displayed in a profile. Supported identity addresses are unique across
+the instance; contact addresses may be shared. A provider changing its verified
+address to one already claimed by another account does not move its linked Event
+account. Event discards that provider's obsolete address proof while preserving
+proof supplied independently by another linked identity. Mail recipient
+selection uses supported identity-address claims.
+
+Erasing an account retains a purpose-bound keyed fingerprint of its external
+sign-in identities for the configured erasure-authority retention period.
+Signing in again does not silently recreate that erased identity under a fresh
+account ID. Operators must preserve the configured fingerprint key across
+restore; see [Privacy Erasure](privacy-erasure.md).
 
 ## Browser Authentication Flow
 

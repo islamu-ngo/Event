@@ -7,6 +7,7 @@ using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Validators;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Application.Contracts.Operations;
 
@@ -72,7 +73,7 @@ public sealed class ClaimGuestRegistrationOrderCommandHandler(
         }
 
         User? user = await users.GetUserWithDetails(userId, cancellationToken);
-        string? verifiedEmail = user is { EmailVerified: true } ? user.Pii.Email.Trim().ToUpperInvariant() : null;
+        string? verifiedEmail = RecipientEmailAddressResolver.Resolve(user, userId).Email?.ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(verifiedEmail))
         {
             return Invalid(request.OrderId, "registration_order_verified_email_required", "A verified account email is required to claim this registration order.");

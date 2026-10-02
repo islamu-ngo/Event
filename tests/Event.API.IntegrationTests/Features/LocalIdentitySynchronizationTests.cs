@@ -144,12 +144,13 @@ public sealed class LocalIdentitySynchronizationTests
     }
 
     [Test]
-    public async Task NewlyCommittedLocalOwnershipCannotBeAdoptedFromStaleEmailPreRead()
+    public async Task LocalOwnershipCommittedBeforeEnrollmentCannotBeAdopted()
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         Graph existing = await SeedGraphAsync(factory: factory, userId: Guid.CreateVersion7(),
             email: $"race-{Guid.CreateVersion7():N}@example.test", accountKey: ExternalKey(AuthenticationProviderKind.Keycloak));
         Profile original = await ReadProfileAsync(factory, existing.UserId);
+        await SeedIdentityClaimAsync(factory, existing, original.Email);
         Counts before = await ReadCountsAsync(factory);
         var boundary = new TransactionBoundaryInterceptor(beforeStart: _ => AddLoginAsync(
             factory: factory, userId: existing.UserId, accountKey: LocalKey(existing.UserId)));
@@ -157,6 +158,8 @@ public sealed class LocalIdentitySynchronizationTests
         {
             services.Configure<IdentityCorrelationOptions>(options => options.TrustedIssuers = ["https://accounts.google.com"]);
             services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+            services.ConfigureDbContext<Explore.Persistence.Privacy.ErasureAuthority.EmbeddedPrivacyErasureAuthorityDbContext>(
+                options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
         }));
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
@@ -179,24 +182,27 @@ public sealed class LocalIdentitySynchronizationTests
     [Test]
     [Arguments(AuthenticationProviderKind.Keycloak)]
     [Arguments(AuthenticationProviderKind.Google)]
-    public async Task VerifiedExternalEmailCreatesSeparateAccountInsteadOfAdoptingLocal(AuthenticationProviderKind provider)
+    public async Task ClaimedVerifiedEmailRejectsSeparateAccountAndLocalAdoption(AuthenticationProviderKind provider)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value.TrustedIssuers =
+            ["https://accounts.google.com", "https://identity.example.test/realms/synchronization"];
         Graph local = await SeedLocalGraphAsync(factory);
         Profile original = await ReadProfileAsync(factory, local.UserId);
+        await SeedIdentityClaimAsync(factory, local, original.Email);
+        Counts before = await ReadCountsAsync(factory);
         ProviderAccountKey incoming = ExternalKey(provider);
 
         BaseCommandResponse<Guid> response = await SynchronizeAsync(factory,
             Command(accountKey: incoming, userId: Guid.Empty, email: original.Email));
 
-        await Assert.That(response.IsSuccess).IsTrue();
-        await Assert.That(response.Id == local.UserId).IsFalse();
+        await Assert.That(response.IsSuccess).IsFalse();
+        await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(before);
         await Assert.That(await ReadProfileAsync(factory, local.UserId)).IsEqualTo(original);
         await using ExploreDbContext database = factory.CreateDatabase();
-        UserExternalLogin linked = await database.UserExternalLogins.SingleAsync(
-            login => login.AuthenticationProviderId == (int)provider && login.ProviderKey == incoming.Value, CancellationToken);
-        await Assert.That(linked.UserId).IsEqualTo(response.Id);
-        await Assert.That(await database.Actors.CountAsync(actor => actor.UserId == linked.UserId, CancellationToken)).IsEqualTo(1);
+        await Assert.That(await database.UserExternalLogins.AnyAsync(
+            login => login.AuthenticationProviderId == (int)provider
+                && login.ProviderKey == incoming.Value, CancellationToken)).IsFalse();
         await Assert.That(await database.UserExternalLogins.AnyAsync(login => login.Id == local.LoginId
             && login.UserId == local.UserId, CancellationToken)).IsTrue();
     }
@@ -235,6 +241,7 @@ public sealed class LocalIdentitySynchronizationTests
         string email = $"external-{Guid.CreateVersion7():N}@example.test";
         Graph existing = await SeedGraphAsync(factory: factory, userId: Guid.CreateVersion7(), email: email,
             accountKey: ExternalKey(AuthenticationProviderKind.Keycloak));
+        await SeedIdentityClaimAsync(factory, existing, email);
         ProviderAccountKey incoming = ExternalKey(provider);
         factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value.TrustedIssuers =
             ["https://accounts.google.com", "https://identity.example.test/realms/synchronization"];
@@ -362,7 +369,11 @@ public sealed class LocalIdentitySynchronizationTests
                 .ExecuteDeleteAsync(cancellationToken);
         });
         await using var instrumented = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton)));
+        {
+            services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+            services.ConfigureDbContext<Explore.Persistence.Privacy.ErasureAuthority.EmbeddedPrivacyErasureAuthorityDbContext>(
+                options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+        }));
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
             .SetTenant(PlatformDefaults.DefaultTenantId);
@@ -476,6 +487,8 @@ public sealed class LocalIdentitySynchronizationTests
         {
             ConfigureNativeAdministrator(services: services, subject: subject, email: original.Email);
             services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+            services.ConfigureDbContext<Explore.Persistence.Privacy.ErasureAuthority.EmbeddedPrivacyErasureAuthorityDbContext>(
+                options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
         }));
         await using AsyncServiceScope scope = configured.Services.CreateAsyncScope();
         await PrepareNativeAdministratorAsync(factory: factory, services: scope.ServiceProvider, accountKey: incoming);
@@ -542,6 +555,7 @@ public sealed class LocalIdentitySynchronizationTests
         string email = $"authority-{Guid.CreateVersion7():N}@example.test";
         Graph target = await SeedGraphAsync(factory, Guid.CreateVersion7(), email,
             ExternalKey(AuthenticationProviderKind.Keycloak));
+        await SeedIdentityClaimAsync(factory, target, email);
         Profile original = await ReadProfileAsync(factory, target.UserId);
         Counts before = await ReadCountsAsync(factory);
         ProviderAccountKey incoming = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
@@ -635,23 +649,35 @@ public sealed class LocalIdentitySynchronizationTests
     }
 
     [Test]
-    public async Task NewlyAmbiguousEmailCannotUseAStaleAdoptionCandidate()
+    public async Task CanonicalOwnershipCommittedBeforeEnrollmentUsesCurrentOwner()
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         string email = $"ambiguous-{Guid.CreateVersion7():N}@example.test";
         Graph target = await SeedGraphAsync(factory, Guid.CreateVersion7(), email,
             ExternalKey(AuthenticationProviderKind.Keycloak));
+        await SeedIdentityClaimAsync(factory, target, email);
         Profile original = await ReadProfileAsync(factory, target.UserId);
+        Guid replacementUserId = Guid.CreateVersion7();
         var boundary = new TransactionBoundaryInterceptor(async _ =>
         {
-            await SeedGraphAsync(factory, Guid.CreateVersion7(), email,
+            await using (ExploreDbContext mutation = factory.CreateDatabase())
+            {
+                await using var transaction = await mutation.Database.BeginTransactionAsync(CancellationToken);
+                await new Explore.Persistence.Repositories.UserIdentityEmailRepository(mutation)
+                    .RemoveEvidenceByBindingAsync(target.LoginId, CancellationToken);
+                await transaction.CommitAsync(CancellationToken);
+            }
+            Graph replacement = await SeedGraphAsync(factory, replacementUserId, email,
                 ExternalKey(AuthenticationProviderKind.Keycloak));
+            await SeedIdentityClaimAsync(factory, replacement, email);
         });
         await using var instrumented = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.Configure<IdentityCorrelationOptions>(options => options.TrustedIssuers =
                 ["https://identity.example.test/realms/synchronization"]);
             services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+            services.ConfigureDbContext<Explore.Persistence.Privacy.ErasureAuthority.EmbeddedPrivacyErasureAuthorityDbContext>(
+                options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
         }));
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
@@ -662,12 +688,13 @@ public sealed class LocalIdentitySynchronizationTests
             .GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(Command(incoming, Guid.Empty, email), CancellationToken);
 
-        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id).IsEqualTo(replacementUserId);
         await Assert.That(boundary.TransactionsStarted).IsEqualTo(1);
         await Assert.That(await ReadProfileAsync(factory, target.UserId)).IsEqualTo(original);
         await using ExploreDbContext stored = factory.CreateDatabase();
-        await Assert.That(await stored.UserExternalLogins.AnyAsync(login =>
-            login.ProviderKey == incoming.Value, CancellationToken)).IsFalse();
+        await Assert.That((await stored.UserExternalLogins.SingleAsync(login =>
+            login.ProviderKey == incoming.Value, CancellationToken)).UserId).IsEqualTo(replacementUserId);
     }
 
     private static ProviderAccountKey ConfiguredKey(string subject)
@@ -675,6 +702,53 @@ public sealed class LocalIdentitySynchronizationTests
         ProviderAccountKey oidc = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
             issuer: "https://identity.example.test/realms/configured", subject: subject);
         return new ProviderAccountKey(providerKind: AuthenticationProviderKind.Keycloak, value: oidc.Value);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ChangedVerifiedAddressConflictPreservesBindingAndOnlyIndependentProof(bool independentProof)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        ProviderAccountKey boundKey = ExternalKey(AuthenticationProviderKind.Keycloak);
+        string originalAddress = $"original-{Guid.CreateVersion7():N}@example.test";
+        string conflictingAddress = $"claimed-{Guid.CreateVersion7():N}@example.test";
+        Graph bound = await SeedGraphAsync(factory, Guid.CreateVersion7(), originalAddress, boundKey);
+        Graph other = await SeedGraphAsync(factory, Guid.CreateVersion7(), conflictingAddress,
+            ExternalKey(AuthenticationProviderKind.Keycloak));
+        Guid? independentBindingId = null;
+        if (independentProof)
+        {
+            ProviderAccountKey independentKey = ExternalKey(AuthenticationProviderKind.Keycloak);
+            await AddLoginAsync(factory, bound.UserId, independentKey);
+            await using ExploreDbContext database = factory.CreateDatabase();
+            independentBindingId = (await new Explore.Persistence.Repositories.UserExternalLoginRepository(database)
+                .GetByProviderAndKey(independentKey))!.Id;
+        }
+        await SeedIdentityClaimAsync(factory, bound, originalAddress, independentBindingId);
+        await SeedIdentityClaimAsync(factory, other, conflictingAddress);
+        await using var trusted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.Configure<IdentityCorrelationOptions>(options => options.TrustedIssuers =
+                ["https://identity.example.test/realms/synchronization"])));
+        await using AsyncServiceScope scope = trusted.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
+
+        BaseCommandResponse<Guid> result = await scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(Command(boundKey, Guid.Empty, conflictingAddress), CancellationToken);
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id).IsEqualTo(bound.UserId);
+        Profile profile = await ReadProfileAsync(factory, bound.UserId);
+        await Assert.That(profile.Email).IsEqualTo(originalAddress);
+        await Assert.That(profile.EmailVerified).IsEqualTo(true);
+        await using ExploreDbContext verification = factory.CreateDatabase();
+        var registry = new Explore.Persistence.Repositories.UserIdentityEmailRepository(verification);
+        await Assert.That(await registry.GetEvidenceByBindingAsync(bound.LoginId, CancellationToken)).IsNull();
+        UserIdentityEmailClaim? remaining = await registry.GetByNormalizedEmailAsync(originalAddress, CancellationToken);
+        await Assert.That(remaining is not null).IsEqualTo(independentProof);
+        await Assert.That((await registry.GetByNormalizedEmailAsync(conflictingAddress, CancellationToken))!.UserId)
+            .IsEqualTo(other.UserId);
     }
 
     private static void ConfigureNativeAdministrator(IServiceCollection services, string subject, string email)
@@ -833,6 +907,22 @@ public sealed class LocalIdentitySynchronizationTests
             CreatedAt = DateTime.UtcNow
         });
         await database.SaveChangesAsync(CancellationToken);
+    }
+
+    private static async Task SeedIdentityClaimAsync(
+        LocalAdmissionWebApplicationFactory factory, Graph graph, string address, Guid? independentBindingId = null)
+    {
+        await using ExploreDbContext database = factory.CreateDatabase();
+        await using var transaction = await database.Database.BeginTransactionAsync(CancellationToken);
+        var registry = new Explore.Persistence.Repositories.UserIdentityEmailRepository(database);
+        UserIdentityEmailClaim claim = await registry.CreateClaimAsync(
+            UserIdentityEmailClaim.Create(graph.UserId, address.Trim().ToLowerInvariant()), CancellationToken);
+        await registry.CreateEvidenceAsync(UserIdentityEmailEvidence.Create(
+            graph.UserId, claim.Id, graph.LoginId, DateTime.UtcNow), CancellationToken);
+        if (independentBindingId is Guid bindingId)
+            await registry.CreateEvidenceAsync(UserIdentityEmailEvidence.Create(
+                graph.UserId, claim.Id, bindingId, DateTime.UtcNow), CancellationToken);
+        await transaction.CommitAsync(CancellationToken);
     }
 
     private static async Task<Counts> ReadCountsAsync(LocalAdmissionWebApplicationFactory factory)

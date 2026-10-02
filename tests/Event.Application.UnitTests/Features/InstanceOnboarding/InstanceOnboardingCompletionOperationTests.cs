@@ -563,6 +563,14 @@ internal sealed class OnboardingCompletionScenario
         var roles = Substitute.For<IRoleRepository>();
         var actors = Substitute.For<IActorRepository>();
         var externalLogins = Substitute.For<IUserExternalLoginRepository>();
+        var identityEmails = Substitute.For<IUserIdentityEmailRepository>();
+        var privacyState = Substitute.For<IPrivacyErasureStateRepository>();
+        identityEmails.GetByUserAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<UserIdentityEmailClaim>());
+        identityEmails.CreateClaimAsync(Arg.Any<UserIdentityEmailClaim>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<UserIdentityEmailClaim>());
+        identityEmails.CreateEvidenceAsync(Arg.Any<UserIdentityEmailEvidence>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<UserIdentityEmailEvidence>());
         var tenants = Substitute.For<ITenantRepository>();
         var tenantCreation = Substitute.For<ITenantCreationService>();
         var tenantSettings = Substitute.For<ITenantSettingsDocumentRepository>();
@@ -802,6 +810,12 @@ internal sealed class OnboardingCompletionScenario
             UserRepository,
             actors,
             externalLogins,
+            identityEmails,
+            privacyState,
+            new Explore.Application.Services.IdentityAccountResolver(UserRepository, externalLogins,
+                identityEmails, privacyState,
+                Microsoft.Extensions.Options.Options.Create(new Explore.Application.Configuration.IdentityCorrelationOptions())),
+            new Explore.Application.Services.IdentityEmailSynchronizationOperation(identityEmails),
             tenants,
             tenantCreation,
             systemSettings,
@@ -812,7 +826,12 @@ internal sealed class OnboardingCompletionScenario
             jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance,
             _unitOfWork,
-            GenerationReader, HostConfiguration);
+            GenerationReader, HostConfiguration,
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(
+                new Event.Application.UnitTests.Services.FenceTestAuthority(),
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyErasureAuthority>(),
+                new Event.Application.UnitTests.Services.FenceTestKeyProvider(),
+                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityBindingReader>()));
     }
 
     public CompleteInstanceOnboardingRequest Configuration { get; set; } = Settings();

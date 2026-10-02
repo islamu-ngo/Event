@@ -229,6 +229,8 @@ providers retain their own verification and recovery delivery configuration.
 |---|---|---|---|
 | `ERASURE_DATABASE_TOPOLOGY` | **Baseline** | `EmbeddedSqlite` | Storage topology: `EmbeddedSqlite` (dedicated local file), `CoLocated`, or `ExternalDatabase`. |
 | `ERASURE_EMBEDDED_PATH` | **Baseline** | `/app/data/privacy_erasure_authority.db` | File path when `ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite`. |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` | **Required** | None | Nonsecret persistent key ID (1-64 ASCII letters, digits, `_` or `-`); identical on every replica. |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` | **Required secret** | None | Base64-encoded 32 random bytes from the selected secret authority; Infisical path `/privacy`. Retain with all supported authority backups; no live rotation or fallback. |
 | `ERASURE_WRITER_REPLICA_COUNT` | Advanced | `1` | Maximum write concurrency for the embedded authority database. |
 | `ERASURE_BUSY_TIMEOUT_SECONDS` | Advanced | `30` | SQLite busy timeout before serializable retry. |
 | `ERASURE_DATABASE_HOST` | Advanced | None | Hostname if using `ExternalDatabase` topology. |
@@ -431,6 +433,8 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
 | `ERASURE_DATABASE_TOPOLOGY` | platform | public | None | optional | process |
 | `ERASURE_EMBEDDED_PATH` | platform | public | None | optional | process |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` | platform | public | None | required | process |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` | platform | secret | None (secret) | required | process |
 | `SETUP_SECRET` | platform | secret | None (secret) | required | process |
 | `INSTANCE_BOOTSTRAP_MODE` | identity | public | None | required | process |
 | `INSTANCE__OPERATORIDENTITY__OPERATORID` | identity | public | None | required | process |

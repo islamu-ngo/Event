@@ -13,4 +13,4 @@ public interface IIdentityAccountResolver
 }
 
 public sealed record IdentityAccountResolution(
-    IdentityCorrelationDecision Decision, User? User);
+    IdentityCorrelationDecision Decision, User? User, bool CanClaimVerifiedEmail);

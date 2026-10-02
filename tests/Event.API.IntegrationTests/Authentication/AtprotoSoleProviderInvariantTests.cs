@@ -325,9 +325,22 @@ public sealed class AtprotoSoleProviderInvariantTests(
         using var process = new Process { StartInfo = startInfo };
         process.Start();
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        string output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
-        string error = await process.StandardError.ReadToEndAsync(timeout.Token);
-        await process.WaitForExitAsync(timeout.Token);
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        Task<string> errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
+        try
+        {
+            await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync(timeout.Token));
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        }
+        string output = await outputTask;
+        string error = await errorTask;
 
         await Assert.That(process.ExitCode).IsEqualTo(0)
             .Because(error);

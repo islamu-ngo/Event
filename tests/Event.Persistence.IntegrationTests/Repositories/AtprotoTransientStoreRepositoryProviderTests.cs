@@ -37,9 +37,11 @@ public sealed class AtprotoTransientStoreRepositoryProviderTests(AdmissionAuthor
             await Assert.That(await repository.TryCreateAsync(duplicate)).IsFalse();
         }
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task<AtprotoTransientRecord?>[] attempts = Enumerable.Range(0, 8).Select(async _ =>
+        Task<AtprotoTransientRecord?>[] attempts = Enumerable.Range(0, 8).Select(async index =>
         {
             await using ExploreDbContext context = CreateContext(provider);
+            // Model construction is setup, not part of the simultaneous consume deadline.
+            _ = context.Model;
             await start.Task;
             return await new AtprotoTransientStoreRepository(context, new FixedTimeProvider(now)).ConsumeAsync(record.Id, record.Purpose, record.TokenDigest, tenant);
         }).ToArray();

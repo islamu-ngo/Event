@@ -62,6 +62,14 @@ profile image. The failed attachment leaves both the profile and retained
 cleanup work unchanged; select another eligible upload rather than retrying
 the retired UUID.
 
+Changing a retired upload's metadata back to active does not make it attachable.
+Only the verified upload-finalization flow can activate its settled target.
+Shared-use and retention checks include hidden or deleted owner records: hiding
+an item, rejecting evidence or releasing an answer file does not detach its
+storage reference. These checks do not reveal other owners' private identities.
+Cleanup must keep its captured target and retry authority after an uncertain
+provider response; requesting cleanup is not confirmation that bytes are absent.
+
 For API integrations, `PATCH /api/user/{id}` accepts a `profileImage` group with
 either `profilePictureId` or `externalProfilePictureUri`. Supply neither value
 in a present group to clear; omit the group to preserve the image. Supplying both

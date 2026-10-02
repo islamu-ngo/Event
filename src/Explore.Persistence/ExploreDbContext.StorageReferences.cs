@@ -13,6 +13,21 @@ public partial class ExploreDbContext
     private Guid? _failedStorageReferenceTransactionId;
     private readonly HashSet<Guid> _fencedStorageReferences = [];
     private (Guid TenantId, Guid ObjectId)? _lastStorageReferenceFence;
+    private Guid? _storageActivationTransactionId;
+    private readonly HashSet<Guid> _authorizedStorageActivations = [];
+
+    /// <summary>Records the settled-session activation CAS for this transaction only.</summary>
+    internal void RecordStorageActivationProof(Guid objectId)
+    {
+        var transaction = Database.CurrentTransaction
+            ?? throw new InvalidOperationException("Storage activation proof requires the owning transaction.");
+        if (_storageActivationTransactionId != transaction.TransactionId)
+        {
+            _storageActivationTransactionId = transaction.TransactionId;
+            _authorizedStorageActivations.Clear();
+        }
+        _authorizedStorageActivations.Add(objectId);
+    }
 
     internal bool StorageReferenceTransactionFailed =>
         Database.CurrentTransaction is { } transaction
@@ -113,17 +128,9 @@ public partial class ExploreDbContext
             }
             var sources = await StorageReferenceSources(references.Keys).ToListAsync(cancellationToken);
             ValidateMissingStorageReferences(references, sources);
-            foreach (var source in sources.OrderBy(item => item.TenantId).ThenBy(item => item.Id))
+            await FenceStorageReferenceRowsAsync(sources, cancellationToken);
+            foreach (var source in sources)
             {
-                if (EnrollStorageReferenceFence(source))
-                {
-                    Guid stamp = Guid.CreateVersion7();
-                    if (await StorageReferenceSources([source.Id]).Where(item => item.ConcurrencyStamp == source.ConcurrencyStamp)
-                        .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.ConcurrencyStamp, stamp),
-                            cancellationToken) != 1)
-                        throw StorageReferenceConflict();
-                    RefreshStorageReferenceStamp(source.Id, stamp);
-                }
                 if (references[source.Id])
                     ValidateStorageAttachment(source,
                         await StorageObjectDeletionTombstones.AnyAsync(item => item.Id == source.Id, cancellationToken));
@@ -139,6 +146,44 @@ public partial class ExploreDbContext
             if (owned is not null)
                 await owned.RollbackAsync(CancellationToken.None);
             throw;
+        }
+    }
+
+    internal async Task<IReadOnlyList<StorageObject>> FenceStorageObjectsAsync(
+        IReadOnlyCollection<Guid> objectIds, CancellationToken cancellationToken)
+    {
+        if (Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Storage reference fencing requires the caller's transaction.");
+        try
+        {
+            var ids = objectIds.Distinct().ToArray();
+            var sources = await StorageReferenceSources(ids).ToListAsync(cancellationToken);
+            if (sources.Count != ids.Length)
+                throw StorageReferenceConflict();
+            await FenceStorageReferenceRowsAsync(sources, cancellationToken);
+            return sources;
+        }
+        catch
+        {
+            PoisonStorageReferenceTransaction();
+            throw;
+        }
+    }
+
+    private async Task FenceStorageReferenceRowsAsync(
+        IReadOnlyCollection<StorageObject> sources, CancellationToken cancellationToken)
+    {
+        foreach (var source in sources.OrderBy(item => item.TenantId).ThenBy(item => item.Id))
+        {
+            if (!EnrollStorageReferenceFence(source))
+                continue;
+            Guid stamp = Guid.CreateVersion7();
+            if (await StorageReferenceSources([source.Id]).Where(item => item.ConcurrencyStamp == source.ConcurrencyStamp)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.ConcurrencyStamp, stamp),
+                    cancellationToken) != 1)
+                throw StorageReferenceConflict();
+            source.ConcurrencyStamp = stamp;
+            RefreshStorageReferenceStamp(source.Id, stamp);
         }
     }
 
@@ -191,7 +236,10 @@ public partial class ExploreDbContext
         var pending = ChangeTracker.Entries<StorageObject>()
             .SingleOrDefault(entry => entry.Entity.Id == source.Id)?.Entity;
         if (retirementCommitted || source.IsDeleted
-            || (pending?.LifecycleState ?? source.LifecycleState) != StorageObjectLifecycleStates.Active)
+            || (pending?.LifecycleState ?? source.LifecycleState) != StorageObjectLifecycleStates.Active
+            || source.LifecycleState != StorageObjectLifecycleStates.Active
+                && (_storageActivationTransactionId != Database.CurrentTransaction?.TransactionId
+                    || !_authorizedStorageActivations.Contains(source.Id)))
             throw StorageReferenceConflict();
     }
 

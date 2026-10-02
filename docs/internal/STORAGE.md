@@ -179,8 +179,23 @@ A committed tombstone or deleted source rejects a new attachment. Actor PII
 profile references participate; upload sessions remain producer custody.
 Acquisitions follow tenant/object order within the transaction.
 
-The producer port is not the shared-reference retirement API. Bulk attachment
-enrollment, complete reference/hold checks and generalized source retirement
+`IStorageObjectReferenceRepository.FenceAsync` declares the complete persisted
+object set before multi-save or bulk mutations, using the same CAS and transaction
+ordering ledger as tracked saves. A missing row or reversed acquisition poisons
+the transaction. Returned entities carry refreshed stamps, not deletion authority.
+The reference predicate scans mapped physical FK constraints, including hidden,
+soft-deleted and other-tenant owners, without returning their identities. Sessions
+and producer operations are custody rather than readable references. The hold
+predicate checks published registration CSV retention and unresolved provider
+delivery using a server-owned UTC instant. Both predicates require the caller's
+transaction; neither a false predicate nor fence acquisition authorizes provider I/O.
+
+A tracked `DeleteRequested` to `Active` change is not activation proof.
+Resource activation records its existing successful settled-session CAS in the
+owning transaction before the attachment save may accept that transition.
+
+The producer port is not the shared-reference retirement API. Explicit bulk and
+indirect-hold writer enrollment, generalized source retirement and runtime wiring
 remain separate work.
 Future retirement must consume producer operations under their operation fence
 before transferring authority, and use the storage-row fence after activation.

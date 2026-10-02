@@ -10,7 +10,9 @@ namespace Event.Persistence.IntegrationTests.Storage;
 public sealed class ManagedStorageRetirementTests(EventResourceFileUploadTests.Database database)
 {
     [Test]
-    public async Task CommittedRetirementPreventsANewManagedProfileReference()
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task RetiredSourceCannotBeAttachedWithoutAuthorizedActivationProof(bool committedAuthority)
     {
         Guid actorId = Guid.CreateVersion7();
         Guid objectId = Guid.CreateVersion7();
@@ -57,21 +59,28 @@ public sealed class ManagedStorageRetirementTests(EventResourceFileUploadTests.D
             seed.AddRange(binding, source, actor);
             await seed.SaveChangesAsync();
             source.RequestDelete();
-            seed.Add(StorageObjectDeletionTombstone.Create(objectId, tenant.Id,
-                source.Provider, binding.Id, source.ObjectKey!, null, true,
-                new DateTime(2040, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+            if (committedAuthority)
+                seed.Add(StorageObjectDeletionTombstone.Create(objectId, tenant.Id,
+                    source.Provider, binding.Id, source.ObjectKey!, null, true,
+                    new DateTime(2040, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
             await seed.SaveChangesAsync();
         }
 
         await using (var attach = database.CreateContext())
         {
             var actor = await attach.Actors.SingleAsync(row => row.Id == actorId);
+            if (!committedAuthority)
+                (await attach.StorageObjects.SingleAsync(row => row.Id == objectId)).LifecycleState =
+                    StorageObjectLifecycleStates.Active;
             actor.Pii.SetProfilePicture(objectId, null);
             await Assert.ThrowsAsync<ConcurrencyConflictException>(() => attach.SaveChangesAsync());
         }
         await using var verify = database.CreateContext();
         await Assert.That((await verify.Set<ActorPii>().SingleAsync(row => row.ActorId == actorId))
             .ProfilePictureStorageObjectId).IsNull();
-        await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == objectId)).IsTrue();
+        await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == objectId))
+            .IsEqualTo(committedAuthority);
+        await Assert.That((await verify.StorageObjects.SingleAsync(row => row.Id == objectId)).LifecycleState)
+            .IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
     }
 }

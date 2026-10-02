@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3YKQ42MQAVSKJNXWWGV3PA6
+Title: "Require verified activation and shared storage reference fences"
+Type: fix
+Scope: storage
+Summary: "Prevent unproven retired-file reactivation and provide transaction-bound complete-set fencing plus hidden-owner and retention predicates for durable retirement integration."
+Group: storage-reference-foundation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

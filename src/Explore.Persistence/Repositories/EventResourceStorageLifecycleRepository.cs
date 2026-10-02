@@ -266,6 +266,7 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
                     && producer.Status == StorageUploadSessionStates.Uploading))
             .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.ConcurrencyStamp, stamp), cancellationToken);
         if (changed != 1) return null;
+        database.RecordStorageActivationProof(source.Id);
         DetachObject(source.Id);
         source.ConcurrencyStamp = stamp;
         return source;

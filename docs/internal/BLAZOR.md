@@ -473,6 +473,8 @@ Notification preference UI consumes the generated API client through `INotificat
 7. `IWebPushBrowserInterop` loads `/js/web-push.js`. `Notification.requestPermission()` and `PushManager.subscribe()` run only from the explicit Enable action, never during page load or component initialization.
 8. `/push-service-worker.js` suppresses OS popups while an app window is visible, posts a refresh message to the notification bell, replaces displayed notifications by tag, summarizes excessive visible entries, and focuses an existing same-origin window on click.
 9. `INotificationService.GetVapidPublicKeyAsync()` calls the NSwag-generated `GetVapidPublicKeyAsync()` operation through the BFF's exact `/vapid-public-key` proxy route. Browser code receives only the plain-text public key; access tokens and the VAPID private key remain behind the BFF/API boundary.
+10. Notification polling originates in `/js/notification-refresh.js` and invokes `NotificationRefreshStreamClient.HandleNotificationPoll`. Server-side timer callbacks must not issue tenant-scoped requests outside inbound circuit activity. Refresh callbacks are serialized and stop with the component's browser lifecycle.
+11. `ETagMiddleware` bypasses response capture for endpoints declaring `text/event-stream`. The initial notification event must reach the client while the stream remains open; waiting for stream completion buffers it indefinitely.
 
 ## Render And Public Experience
 

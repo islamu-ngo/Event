@@ -43,6 +43,12 @@ Event publication, ticket confirmations, and moderation alerts utilize the **Tra
 * Background workers process fanout with deterministic deduplication keys, ensuring idempotent processing even during network interruptions.
 * **Server-Sent Events (SSE)** and **Browser Web Push** deliver non-authoritative wake-up signals; the client always fetches the authoritative message from the API.
 
+The notification stream sends an initial unread-count hint without waiting for
+the connection to close. Reverse proxies must not buffer this response. If SSE
+is unavailable, the browser continues periodic inbox-count refreshes in its
+current signed-in tenant context. Reconnects do not replay durable inbox
+delivery; clients retrieve authoritative state from the inbox API.
+
 When a push service reports a retired endpoint (`404` or `410`), the dispatch
 failure and subscription deactivation are stored together. A database failure
 does not leave half-completed cleanup, and another tenant's subscription is

@@ -12,6 +12,9 @@ public sealed class NotificationRefreshStreamClient : INotificationRefreshStream
     private IJSObjectReference? _module;
     private DotNetObjectReference<NotificationRefreshStreamClient>? _dotNetReference;
     private bool _started;
+    private bool _stopped;
+    private bool _disposed;
+    private int _callbackActive;
 
     public NotificationRefreshStreamClient(
         IJSRuntime jsRuntime,
@@ -27,7 +30,7 @@ public sealed class NotificationRefreshStreamClient : INotificationRefreshStream
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        if (_started)
+        if (_started || _disposed)
             return;
 
         try
@@ -37,8 +40,12 @@ public sealed class NotificationRefreshStreamClient : INotificationRefreshStream
                 cancellationToken,
                 "/js/notification-refresh.js");
 
+            if (_disposed)
+                return;
+
             _dotNetReference ??= DotNetObjectReference.Create(this);
             var streamUrl = _navigationManager.ToAbsoluteUri("api/notification/stream").ToString();
+            _stopped = false;
 
             await _module.InvokeVoidAsync(
                 "startNotificationRefresh",
@@ -50,11 +57,11 @@ public sealed class NotificationRefreshStreamClient : INotificationRefreshStream
         }
         catch (JSDisconnectedException)
         {
-            // Circuit disconnected during startup; polling remains the fallback.
+            // Browser/circuit is already gone.
         }
         catch (JSException ex)
         {
-            _logger.LogDebug(ex, "Notification refresh SSE startup failed; polling fallback remains active");
+            _logger.LogDebug(ex, "Notification browser refresh startup failed");
         }
         catch (InvalidOperationException ex)
         {
@@ -64,7 +71,8 @@ public sealed class NotificationRefreshStreamClient : INotificationRefreshStream
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        if (!_started || _module is null)
+        _stopped = true;
+        if (_module is null)
             return;
 
         try
@@ -100,11 +108,7 @@ public sealed class NotificationRefreshStreamClient : INotificationRefreshStream
             ? parsed
             : DateTimeOffset.UtcNow;
 
-        var handler = RefreshReceived;
-        if (handler is null)
-            return;
-
-        await handler(new NotificationRefreshHintReceivedEventArgs(
+        await DispatchRefreshAsync(new NotificationRefreshHintReceivedEventArgs(
             unreadCount,
             hasUnread,
             string.IsNullOrWhiteSpace(reason) ? "refresh" : reason,
@@ -119,23 +123,48 @@ public sealed class NotificationRefreshStreamClient : INotificationRefreshStream
     }
 
     [JSInvokable]
-    public async Task HandleWebPushRefresh()
+    public Task HandleWebPushRefresh()
     {
-        var handler = RefreshReceived;
-        if (handler is null)
-        {
-            return;
-        }
-
-        await handler(new NotificationRefreshHintReceivedEventArgs(
+        return DispatchRefreshAsync(new NotificationRefreshHintReceivedEventArgs(
             -1,
             true,
             "web-push",
             DateTimeOffset.UtcNow));
     }
 
+    [JSInvokable]
+    public Task HandleNotificationPoll()
+    {
+        return DispatchRefreshAsync(new NotificationRefreshHintReceivedEventArgs(
+            -1,
+            false,
+            "poll",
+            DateTimeOffset.UtcNow));
+    }
+
+    private async Task DispatchRefreshAsync(NotificationRefreshHintReceivedEventArgs hint)
+    {
+        // Do not queue callbacks with captured authority across circuit activities.
+        if (_stopped || _disposed || Interlocked.CompareExchange(ref _callbackActive, 1, 0) != 0)
+            return;
+
+        try
+        {
+            if (RefreshReceived is { } handlers)
+            {
+                foreach (Func<NotificationRefreshHintReceivedEventArgs, Task> handler in handlers.GetInvocationList())
+                    await handler(hint);
+            }
+        }
+        finally
+        {
+            Volatile.Write(ref _callbackActive, 0);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         await StopAsync();
 
         _dotNetReference?.Dispose();

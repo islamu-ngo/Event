@@ -27,7 +27,7 @@ using Microsoft.Extensions.Options;
 namespace Event.API.IntegrationTests.Features;
 
 [NotInParallel]
-public sealed class LocalIdentitySynchronizationTests
+public sealed partial class LocalIdentitySynchronizationTests
 {
     public enum UnlinkedLocalAttempt
     {

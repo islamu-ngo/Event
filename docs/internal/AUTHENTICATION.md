@@ -47,6 +47,9 @@ existing canonical address claim; ATProto's email-free
 enrollment stays with its verified-DID bootstrap. Local native receipts and
 explicit Local bindings retain their credential, subject and actor checks.
 Local-owned accounts cannot be automatically adopted by an external issuer.
+Canonical address lookup trims surrounding whitespace and lowercases evidence
+before querying the normalized claim key, matching claim creation and the
+transactional ownership recheck. This does not widen issuer trust.
 
 The handler re-runs resolution inside its existing serializable mutation and
 rejects changed/removed bindings or changed candidate ownership before profile,

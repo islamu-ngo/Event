@@ -42,7 +42,7 @@ public sealed class IdentityAccountResolver(
         if (binding is null && !bindingConflict && canClaim)
         {
             UserIdentityEmailClaim? claim = await identityEmails.GetByNormalizedEmailAsync(
-                evidence!.Email, cancellationToken);
+                evidence!.Email.Trim().ToLowerInvariant(), cancellationToken);
             if (claim is not null)
             {
                 matches = 1;

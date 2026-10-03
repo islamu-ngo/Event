@@ -566,6 +566,13 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 .CreateDbContextAsync();
             await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
         }
+        else
+        {
+            await using var scope = Services.CreateAsyncScope();
+            var authority = scope.ServiceProvider
+                .GetRequiredService<CoLocatedPrivacyErasureAuthorityDbContext>();
+            await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
+        }
         await LookupTableSeeder.SeedAsync(database);
         DateTime now = DateTime.UtcNow;
         var bootstrapUser = new User
@@ -637,7 +644,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
     private void SetEnvironment(string name, string? value)
     {
-        _previousEnvironment.Add(name, Environment.GetEnvironmentVariable(name));
+        _previousEnvironment.TryAdd(name, Environment.GetEnvironmentVariable(name));
         Environment.SetEnvironmentVariable(name, value);
     }
 }

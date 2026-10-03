@@ -50,7 +50,9 @@ self-service account-merge or explicit-linking screen.
 
 Account matching uses verified identity-address claims, not the editable contact
 email displayed in a profile. Supported identity addresses are unique across
-the instance; contact addresses may be shared. A provider changing its verified
+the instance; contact addresses may be shared. Verified-address matching ignores
+letter case and surrounding whitespace without trusting additional issuers.
+A provider changing its verified
 address to one already claimed by another account does not move its linked Event
 account. Event discards that provider's obsolete address proof while preserving
 proof supplied independently by another linked identity. Mail recipient

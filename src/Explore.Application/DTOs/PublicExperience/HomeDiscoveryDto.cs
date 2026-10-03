@@ -92,6 +92,9 @@ public sealed record EventDiscoveryItemDto
     }
 
     public string Source { get; init; } = "local";
+    /// <summary>Server-only ownership key; a private primary's identity never enters public card JSON.</summary>
+    [JsonIgnore]
+    public Guid? DiscoveryIdentityId { get; init; }
     public EventListDto? Event { get; init; }
     public FederatedEventDto? FederatedEvent { get; init; }
     public EventFederationMetadataDto? Federation { get; init; }

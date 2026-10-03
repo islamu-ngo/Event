@@ -5,6 +5,14 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-02
 
+- **Reversible discovery identity surfaces.** Event identity status and bounded
+  duplicate candidates are no-store HAL resources. The status route accepts an
+  optional public candidate and advertises current group-authorized review and
+  reversal actions. Unavailable primaries expose no target or relationship hint.
+  Decisions preserve original event/session/registration targets; stale tenant
+  identity revisions return `409` ProblemDetails, and denied authority returns
+  `403`. Candidate fields remain flattened alongside `_links`.
+
 - **Occurrence-correct discovery.** Public date, temporal and governed-area
   filters match the same published session. Cards expose `matchingSession`
   and nullable `additionalSessionCount`, with permitted regional city/country.

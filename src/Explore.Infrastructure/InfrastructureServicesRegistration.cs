@@ -816,6 +816,7 @@ public static class InfrastructureServicesRegistration
 
         // Generic Outbox Processor settings and dispatcher
         services.Configure<OutboxProcessorSettings>(configuration.GetSection(OutboxProcessorSettings.SectionName));
+        services.AddScoped<EventDiscoveryIdentityCorrectionDispatcher>();
         services.AddScoped<LocationPrivacyCorrectionDispatcher>();
         services.AddScoped<PrivacyErasureCacheInvalidationDispatcher>();
         services.AddScoped<IOutboxMessageDispatcher, CompositeOutboxMessageDispatcher>();

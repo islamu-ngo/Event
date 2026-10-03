@@ -2274,6 +2274,9 @@ public static class LookupTableSeeder
             IsActive = true
         });
 
+        AddPermissions("event", "Discovery Identity Review", RoleScopeEnum.Event,
+            ["review-discovery-identity", "reverse-discovery-identity"]);
+
         var existingCodes = await context.Permissions
             .AsNoTracking()
             .Select(x => x.MasterCode)
@@ -2330,6 +2333,8 @@ public static class LookupTableSeeder
             PermissionCodes.EventManageTickets,
             PermissionCodes.EventViewOrganizerClaims,
             PermissionCodes.EventReviewOrganizerClaim,
+            PermissionCodes.EventReviewDiscoveryIdentity,
+            PermissionCodes.EventReverseDiscoveryIdentity,
             PermissionCodes.EventRegistrationManage,
             PermissionCodes.EventCheckInView,
             PermissionCodes.EventCheckInManage

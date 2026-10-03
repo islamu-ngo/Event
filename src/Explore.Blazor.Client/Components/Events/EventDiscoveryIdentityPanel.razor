@@ -1,0 +1,255 @@
+@implements IDisposable
+@using Explore.Blazor.Client.Components.EventReporting
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@inject IEventDiscoveryIdentityService IdentityService
+@inject ITranslationService Translation
+@inject IDialogService DialogService
+@inject IAccessibilityFocusService FocusService
+
+@if (Event.HasHalLink("discovery-identity") && (_identity is not null || _message is not null))
+{
+    <section class="event-discovery-identity" aria-labelledby="@HeadingId" aria-busy="@_busy.ToString().ToLowerInvariant()">
+        <h2 id="@HeadingId">@Text("heading", "Listing identity")</h2>
+        <p>@Text("commitments", "Your registration, tickets, sessions and payments stay with this original event. A discovery correction does not move them.")</p>
+        @if (Has("canonical") && _identity?.PublicPrimaryEventId is { } primaryId)
+        {
+            <a data-identity-canonical href="@($"/events/{primaryId:D}")">
+                @Text("canonical", "View the related public listing")
+            </a>
+        }
+        @if (_identity?.ReasonCode is { Length: > 0 } reason)
+        {
+            <p><strong>@Text("reason", "Decision reason"):</strong> <span data-identity-reason>@reason</span></p>
+        }
+        @if (Event.HasHalLink("suggest-correction"))
+        {
+            <AppButton Variant="Variant.Outlined" Disabled="_busy" OnClick="SuggestCorrectionAsync">
+                @Text("suggest", "Suggest a correction")
+            </AppButton>
+        }
+        @if (Has("candidates"))
+        {
+            <div class="event-discovery-identity__actions">
+                <AppButton Variant="Variant.Outlined" Disabled="_busy" OnClick="LoadCandidatesAsync" data-identity-candidates>
+                    @Text("candidates", "Find possible duplicates")
+                </AppButton>
+            </div>
+            @if (_candidates is not null)
+            {
+                <p id="@($"{HeadingId}-evidence")">@Text("evidence", "Similarity is evidence, not proof of one offering. Only public candidates are shown.")</p>
+                <label for="@($"{HeadingId}-candidate")">@Text("candidate", "Public candidate")</label>
+                <select id="@($"{HeadingId}-candidate")" value="@_selectedCandidate" @onchange="SelectCandidateAsync"
+                        disabled="@_busy" aria-describedby="@($"{HeadingId}-evidence")">
+                    <option value="">@Text("choose", "Choose a candidate")</option>
+                    @foreach (var candidate in _candidates.Candidates ?? [])
+                    {
+                        <option value="@candidate.Id">@candidate.Title</option>
+                    }
+                </select>
+                @if (_candidates.IsBounded == true)
+                {
+                    <p>@Text("bounded", "This is a bounded selection, not every possible match.")</p>
+                }
+            }
+        }
+        @if (Has("review") || Has("reverse"))
+        {
+            <fieldset disabled="@(_busy || _mustReload)">
+                <legend>@Text("decision", "Review the selected relationship")</legend>
+                <label for="@($"{HeadingId}-reason")">@Text("reason", "Decision reason")</label>
+                <select id="@($"{HeadingId}-reason")" @bind="_reasonCode">
+                    <option value="duplicate_listing">@Text("duplicate", "Duplicate listing")</option>
+                    <option value="separate_programs">@Text("separate", "Separate programs")</option>
+                    <option value="incorrect_relationship">@Text("incorrect", "Incorrect relationship")</option>
+                </select>
+                <label class="event-discovery-identity__confirmation">
+                    <input type="checkbox" @bind="_confirmed" />
+                    @Text("confirm", "I checked the selected records. Original attendee commitments must remain unchanged.")
+                </label>
+                <div class="event-discovery-identity__actions">
+                    @if (Has("review"))
+                    {
+                        <AppButton Disabled="@(!_confirmed)" OnClick="@(() => DecideAsync("same-offering"))" data-identity-same>
+                            @Text("same", "Same offering")
+                        </AppButton>
+                        <AppButton Variant="Variant.Outlined" Disabled="@(!_confirmed)" OnClick="@(() => DecideAsync("different-offering"))" data-identity-different>
+                            @Text("different", "Different offering")
+                        </AppButton>
+                    }
+                    @if (Has("reverse"))
+                    {
+                        <AppButton Variant="Variant.Outlined" Disabled="@(!_confirmed)" OnClick="@(() => DecideAsync("reverse"))" data-identity-reverse>
+                            @Text("reverse", "Reverse relationship")
+                        </AppButton>
+                    }
+                </div>
+            </fieldset>
+        }
+        @if (_mustReload)
+        {
+            <AppButton Variant="Variant.Outlined" Disabled="_busy" OnClick="ReloadAsync" data-identity-reload>
+                @Text("reload", "Reload current identity")
+            </AppButton>
+        }
+        <p role="status" aria-live="polite" aria-atomic="true">@_message</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public EventDto Event { get; set; } = default!;
+
+    private HalResourceOfEventDiscoveryIdentityDto? _identity;
+    private HalResourceOfEventDuplicateCandidatesDto? _candidates;
+    private CancellationTokenSource _lifetime = new();
+    private EventDto? _loadedEvent;
+    private Guid? _selectedCandidate;
+    private string _reasonCode = "duplicate_listing";
+    private string? _message;
+    private bool _confirmed;
+    private bool _busy;
+    private bool _mustReload;
+    private string HeadingId => $"discovery-identity-{Event.Id:N}";
+    private string Text(string key, string fallback) => Translation.T($"event.discovery_identity.{key}", fallback);
+    private bool Has(string relation) => _identity?._links?.ContainsKey(relation) == true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ReferenceEquals(_loadedEvent, Event))
+            return;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        _lifetime = new();
+        _loadedEvent = Event;
+        _identity = null;
+        _candidates = null;
+        _selectedCandidate = null;
+        _message = null;
+        _confirmed = false;
+        _mustReload = false;
+        if (Event.HasHalLink("discovery-identity"))
+            await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (Event.Id is not { } eventId)
+            return;
+        var token = _lifetime.Token;
+        _busy = true;
+        _confirmed = false;
+        try
+        {
+            var result = await IdentityService.GetAsync(eventId, _selectedCandidate, token);
+            if (token.IsCancellationRequested)
+                return;
+            _identity = result;
+            _mustReload = false;
+            _message = null;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            if (token.IsCancellationRequested) return;
+            _identity = null;
+            _candidates = null;
+            _mustReload = true;
+            _message = Text("unavailable", "Identity guidance is unavailable. Your original event and commitments are unchanged.");
+        }
+        finally { if (!token.IsCancellationRequested) _busy = false; }
+    }
+
+    private async Task LoadCandidatesAsync()
+    {
+        if (!Has("candidates") || Event.Id is not { } eventId)
+            return;
+        var token = _lifetime.Token;
+        _busy = true;
+        try
+        {
+            var result = await IdentityService.GetCandidatesAsync(eventId, token);
+            if (!token.IsCancellationRequested) _candidates = result;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            if (token.IsCancellationRequested) return;
+            _candidates = null;
+            _identity = null;
+            _mustReload = true;
+            _message = Text("candidates_unavailable", "Candidate access changed or is unavailable. Reload before continuing.");
+        }
+        finally { if (!token.IsCancellationRequested) _busy = false; }
+    }
+
+    private async Task SelectCandidateAsync(ChangeEventArgs change)
+    {
+        _selectedCandidate = Guid.TryParse(change.Value?.ToString(), out var id) ? id : null;
+        await ReloadAsync();
+    }
+
+    private async Task DecideAsync(string decision)
+    {
+        if (_busy || _mustReload || !_confirmed || !Has(decision == "reverse" ? "reverse" : "review")
+            || Event.Id is not { } eventId || _identity?.ReviewTargetEventId is not { } targetId
+            || _identity.ExpectedRevision is not { } revision)
+            return;
+        var token = _lifetime.Token;
+        _busy = true;
+        try
+        {
+            var result = await IdentityService.ReviewAsync(eventId, new ReviewEventDiscoveryAliasDto
+            {
+                PrimaryEventId = targetId, ExpectedRevision = revision, Decision = decision, ReasonCode = _reasonCode
+            }, token);
+            if (token.IsCancellationRequested) return;
+            _mustReload = true;
+            _message = result.Success == true
+                ? Text("saved", "Decision saved. Reload to see current guidance. Original commitments are unchanged.")
+                : Text("rejected", "The decision was not accepted. Your input is retained; reload current authority before trying again.");
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (ApiException exception) when (exception.StatusCode == 409)
+        {
+            if (token.IsCancellationRequested) return;
+            _mustReload = true;
+            _message = Text("stale", "The identity revision changed. Your input is retained. Reload, review the current relationship, and confirm again.");
+        }
+        catch (Exception)
+        {
+            if (token.IsCancellationRequested) return;
+            _mustReload = true;
+            _message = Text("uncertain", "The decision could not be confirmed. Reload current identity before submitting again.");
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested) { _busy = false; _confirmed = false; }
+        }
+    }
+
+    private async Task SuggestCorrectionAsync()
+    {
+        if (!Event.HasHalLink("suggest-correction") || Event.Id is not { } eventId)
+            return;
+        var parameters = new DialogParameters<ReportEventDialog>
+        {
+            { dialog => dialog.EventId, eventId },
+            { dialog => dialog.EventTitle, Event.Title },
+            { dialog => dialog.FixedSubcategoryCode, "event_correction_suggestion" }
+        };
+        await FocusService.SaveFocusAsync();
+        try
+        {
+            var dialog = await ReportEventDialog.ShowAsync(
+                DialogService, Text("suggest", "Suggest a correction"), parameters, DialogOptionsFactory.Medium());
+            await dialog.Result;
+        }
+        finally { await FocusService.RestoreFocusAsync(); }
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        GC.SuppressFinalize(this);
+    }
+}

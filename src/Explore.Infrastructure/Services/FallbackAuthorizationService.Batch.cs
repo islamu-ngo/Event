@@ -31,7 +31,10 @@ public partial class FallbackAuthorizationService
             return boundedResults;
         }
 
-        if (checks.Count <= 2 || _machinePrincipalAccessor.IsMachineCaller)
+        if (checks.Count <= 2 || _machinePrincipalAccessor.IsMachineCaller
+            || checks.Any(check => check.ResourceKind == ResourceKinds.Event
+                && (check.Facts is EventDiscoveryIdentityAuthorizationFacts
+                    || EventDiscoveryIdentityAuthorizationFacts.IsDecisionAction(check.Action))))
         {
             var smallResults = new AuthorizationDecision[checks.Count];
             for (var i = 0; i < checks.Count; i++)

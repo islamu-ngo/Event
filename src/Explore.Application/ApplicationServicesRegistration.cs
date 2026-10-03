@@ -31,6 +31,7 @@ using Explore.Application.Features.EventOrganizerClaims.Authorization;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 using Explore.Application.Features.EventReporting;
 using Explore.Application.Features.Events;
+using Explore.Application.Features.Events.Discovery;
 using Explore.Application.Features.EventTicketing.Services;
 using Explore.Application.Features.EventSessionAgendaItems.Authorization;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Commands;
@@ -378,7 +379,10 @@ public static class ApplicationServicesRegistration
         services.AddScoped<INotificationOwnershipResolver, DefaultNotificationOwnershipResolver>();
         services.AddScoped<INotificationOrchestrator, DefaultNotificationOrchestrator>();
         services.AddScoped<IRecipientNotificationMaterializer, RecipientNotificationMaterializer>();
+        services.AddScoped<IEventDiscoveryIdentityCorrectionNotificationService,
+            EventDiscoveryIdentityCorrectionNotificationService>();
         services.AddSingleton<NotificationDeliveryPolicyResolver>();
+        services.AddSingleton<EventDiscoveryIdentityCorrectionNotificationFactory>();
         services.AddSingleton<ReportReceiptNotificationFactory>();
         services.AddSingleton<ReportOutcomeNotificationFactory>();
         services.AddSingleton<ReportNeedsMoreInformationNotificationFactory>();

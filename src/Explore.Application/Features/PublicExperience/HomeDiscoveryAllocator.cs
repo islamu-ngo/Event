@@ -65,10 +65,12 @@ public sealed class HomeDiscoveryAllocator(DateTimeOffset operationNow)
 
     /// <summary>
     /// Keeps source namespaces distinct while recognizing a local record's ATProto binding.
-    /// Direct reviewed aliases can later supply the canonical DTO key at this seam.
+    /// Reviewed aliases use the same server-only root key as the discovery reader.
     /// </summary>
     public static (string Source, Guid Id)? CanonicalIdentity(EventDiscoveryItemDto item)
     {
+        if (item.DiscoveryIdentityId is { } reviewedId && reviewedId != Guid.Empty)
+            return ("reviewed", reviewedId);
         if (item.Event is { Id: var localId } && localId != Guid.Empty)
         {
             var recordId = item.Event.AtprotoRecordId ?? item.Federation?.AtprotoRecordId;

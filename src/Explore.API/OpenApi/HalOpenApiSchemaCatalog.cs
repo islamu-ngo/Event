@@ -10,6 +10,9 @@ internal static class HalOpenApiSchemaCatalog
         typeof(Explore.Application.Contracts.Identity.LocalCredentialResetReceipt),
         typeof(Explore.Application.Features.Authentication.Local.Models.LocalCredentialIssueDto),
         // Event DTOs
+        typeof(Explore.Application.Features.Events.Discovery.EventDiscoveryIdentityDto),
+        typeof(Explore.Application.Features.Events.Discovery.EventDuplicateCandidatesDto),
+        typeof(Explore.Application.Features.Events.Discovery.EventDuplicateCandidateDto),
         typeof(Explore.Application.DTOs.Event.EventDto),
         typeof(Explore.Application.DTOs.Event.EventListDto),
         typeof(Explore.Application.DTOs.EventResource.EventResourceManagementDto),
@@ -357,6 +360,10 @@ internal static class HalOpenApiSchemaCatalog
         ["HalResourceOfRegistrationOrderAddOnSummaryDto"] =
             typeof(Explore.Application.DTOs.EventAddOns.RegistrationOrderAddOnSummaryDto),
         ["HalResourceOfEventDto"] = typeof(Explore.Application.DTOs.Event.EventDto),
+        ["HalResourceOfEventDiscoveryIdentityDto"] =
+            typeof(Explore.Application.Features.Events.Discovery.EventDiscoveryIdentityDto),
+        ["HalResourceOfEventDuplicateCandidatesDto"] =
+            typeof(Explore.Application.Features.Events.Discovery.EventDuplicateCandidatesDto),
         ["HalResourceOfEventListDto"] = typeof(Explore.Application.DTOs.Event.EventListDto),
         ["HalResourceOfEventSeriesDto"] = typeof(Explore.Application.DTOs.EventSeries.EventSeriesDto),
         ["HalResourceOfEventSeriesListDto"] = typeof(Explore.Application.DTOs.EventSeries.EventSeriesListDto),

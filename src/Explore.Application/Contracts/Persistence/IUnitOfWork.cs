@@ -18,6 +18,8 @@ public interface IUnitOfWork
     /// <summary>
     /// Executes capacity-sensitive work under the provider execution strategy and a serializable transaction.
     /// Stable identities and timestamps must be created before entering the retryable delegate.
+    /// Replays the complete transaction up to four attempts after rollback-known serialization,
+    /// deadlock or busy conflicts; business concurrency and unique-key failures are not replayed.
     /// </summary>
     Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default);
 

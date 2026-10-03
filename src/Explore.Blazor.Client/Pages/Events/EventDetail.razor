@@ -382,6 +382,11 @@
                         <EventProvenancePanel Event="_eventDetails" />
                     }
 
+                    @if (_eventDetails.HasHalLink("discovery-identity"))
+                    {
+                        <EventDiscoveryIdentityPanel Event="_eventDetails" @key="_eventDetails.Id" />
+                    }
+
                     @* Date & Time Block *@
                     <div class="d-flex align-center gap-4 mb-6">
                         <div class="event-icon-box event-icon-box--calendar">

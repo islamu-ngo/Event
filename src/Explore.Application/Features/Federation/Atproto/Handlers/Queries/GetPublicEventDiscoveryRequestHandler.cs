@@ -9,6 +9,10 @@ using Explore.Application.Features.Federation.Atproto.Validators;
 using Explore.Application.Responses;
 using Explore.Application.Services.Federation;
 using Explore.Application.Specifications.Events;
+using Explore.Application.Features.PublicExperience;
+using Explore.Domain;
+using Explore.Application.Exceptions;
+using Explore.Domain.Services.Discovery;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using FluentValidation;
@@ -21,7 +25,8 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
     AtprotoEventGovernanceResolver governanceResolver,
     Explore.Application.Contracts.Infrastructure.ITenantContext tenantContext,
     TimeProvider timeProvider,
-    ITenantLifecycleAccessService lifecycle)
+    ITenantLifecycleAccessService lifecycle,
+    IEventDiscoveryIdentityRepository identities)
     : IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>
 {
     public async Task<PaginatedResult<EventDiscoveryItemDto>> QueryAsync(
@@ -52,10 +57,32 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
             .Take(window)
             .Select(value => MapLocal(value, governance.EventsEnabled))
             .ToList();
+        var bindings = await identities.GetBindingsAsync(tenantContext.TenantId,
+            EventDiscoverySourceKind.LocalEvent,
+            localItems.Select(item => item.Event!.Id.ToString("D")).ToArray(), cancellationToken);
+        if (bindings.Any(binding => binding.TenantId != tenantContext.TenantId
+                || binding.Alias is { Primary: null }
+                || !binding.IsDeleted && EventDiscoveryIdentityRules.SelectRepresentation(
+                    binding.Alias is { } alias ? [binding, alias.Primary] : [binding],
+                    new HashSet<Guid> { binding.Id }) is null))
+            throw new EventDiscoveryUnavailableException();
+        var bindingsByKey = bindings.ToDictionary(binding => binding.SourceKey, StringComparer.Ordinal);
+        localItems.RemoveAll(item => bindingsByKey.TryGetValue(item.Event!.Id.ToString("D"), out var binding)
+            && binding.IsDeleted);
+        for (int index = 0; index < localItems.Count; index++)
+        {
+            var item = localItems[index];
+            if (bindingsByKey.TryGetValue(item.Event!.Id.ToString("D"), out var binding))
+                localItems[index] = item with
+                {
+                    DiscoveryIdentityId = binding.Alias?.PrimaryIdentityId ?? binding.Id
+                };
+        }
 
         int federatedTotalCount = 0;
         var federatedItems = new List<EventDiscoveryItemDto>();
-        if (governance.EventsEnabled && TryCreateProjectionQuery(criteria, window, timeProvider.GetUtcNow(), out var projectionQuery))
+        if (governance.EventsEnabled && TryCreateProjectionQuery(
+                criteria, window, criteria.OperationNow ?? timeProvider.GetUtcNow(), out var projectionQuery))
         {
             (IReadOnlyList<AtprotoEventProjection> projections, federatedTotalCount) =
                 await projectionRepository.GetPublicWindowAsync(projectionQuery, cancellationToken);
@@ -76,12 +103,24 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
             {
                 item.Federation!.HasSourceLink = sourceAvailable.Contains(item.Federation.AtprotoRecordId);
             }
+            var reviewedEchoes = localItems.Where(item => item.Federation is not null
+                    && item.DiscoveryIdentityId.HasValue)
+                .ToDictionary(item => item.Federation!.AtprotoRecordId, item => item.DiscoveryIdentityId);
+            for (int index = 0; index < federatedItems.Count; index++)
+                if (reviewedEchoes.TryGetValue(federatedItems[index].FederatedEvent!.Id, out var root))
+                    federatedItems[index] = federatedItems[index] with { DiscoveryIdentityId = root };
         }
 
         List<EventDiscoveryItemDto> merged = localItems
             .Concat(federatedItems)
-            .GroupBy(StableIdentity)
-            .Select(group => group.OrderBy(item => item.Source == "local" ? 0 : 1).First())
+            .GroupBy(HomeDiscoveryAllocator.CanonicalIdentity)
+            .Select(group => group
+                .OrderBy(item => item.Event is not null
+                    && bindingsByKey.TryGetValue(item.Event.Id.ToString("D"), out var binding)
+                    && binding.Alias is null ? 0 : 1)
+                .ThenBy(item => item.Source == "local" ? 0 : 1)
+                .ThenBy(item => item.Event?.Id ?? item.FederatedEvent!.Id)
+                .First())
             .ToList();
         merged.Sort(CreateComparer(criteria.SortBy, criteria.SortDescending));
         int offset = checked((requestedPage - 1) * requestedPageSize);

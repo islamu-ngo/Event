@@ -1,0 +1,53 @@
+Change-Id: CHG-01M3RRK388KK1HQQ6PF9DM022S
+Title: Correct duplicate listings without moving attendee commitments
+Type: feat
+Scope: discovery
+Summary: >-
+  Tenant-scoped reviewed aliases group duplicate discovery listings, expose
+  safe original-record guidance and support audited reversal with durable
+  publisher corrections.
+Group: event-publication-and-identity-discovery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: >-
+      Identity endpoints are additive. Original event, session, registration,
+      payment and cancellation resource identifiers remain authoritative.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Reviews require fresh active membership, management and explicit
+      decision permission on every affected local record. Native row fences
+      protect authority through commit; conflicts of interest fail closed.
+      Private primaries expose no identifier, reason or canonical URL.
+  Migration:
+    Reference: docs/internal/EVENT_PUBLICATION_AND_DISCOVERY.md
+    Disposition: documented
+    Detail: >-
+      Apply the provider-specific EventDiscoveryIdentity migration for source
+      bindings, direct reviewed relationships and tenant identity/disclosure
+      epochs. Existing attendee commitments are not rewritten.
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: >-
+      Explicit review and reversal permissions are seeded without automatic
+      role grants. This slice adds no secret, environment or topology settings.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Generated identity and candidate HAL contracts preserve flattened data
+      and action links. Review failures expose denied, stale and unavailable
+      outcomes; clients require refreshed authority after a failed decision.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/publication-and-sessions.md
+    Disposition: documented
+    Detail: >-
+      Assign independent reviewers with authority on both records. Corrections
+      preserve original attendee actions and notify current publishers through
+      the existing durable in-app notification and outbox lifecycle.

@@ -310,6 +310,8 @@ public sealed class ActorSubscriptionMapperTests
 
     private sealed class MembershipStore(List<TenantUser> memberships) : ReadStore<TenantUser>, ITenantUserRepository
     {
+        public Task<bool> FenceActiveTenantUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
         public Task<TenantUser?> GetByTenantAndUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default) =>
             Task.FromResult(memberships.SingleOrDefault(member => member.TenantId == tenantId && member.UserId == userId));
         public Task<TenantUser?> GetByTenantAndActorAsync(Guid tenantId, Guid actorId, CancellationToken cancellationToken = default) => throw new NotSupportedException();

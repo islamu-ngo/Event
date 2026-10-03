@@ -383,6 +383,9 @@ public sealed class LocalProviderParityLaneTests
 
     private sealed class ParityEventAuthoritySnapshotService(ParitySubject subject) : IEventAuthoritySnapshotService
     {
+        public Task<EventAuthoritySnapshot> GetCommitBoundForUserAndEventsAsync(
+            Guid tenantId, Guid userId, IReadOnlyCollection<Guid> eventIds,
+            DateTime evaluationTimeUtc, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<EventAuthoritySnapshot> GetForUserAndEventsAsync(
             Guid tenantId,
             Guid userId,

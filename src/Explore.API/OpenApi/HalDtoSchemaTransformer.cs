@@ -1,6 +1,7 @@
 // Ensures NSwag generates proper DTO classes by adding them as explicit schemas in the OpenAPI document.
 
 using System.Text.Json.Serialization;
+using System.Collections.Immutable;
 using Explore.Application.Hateoas;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
@@ -181,7 +182,8 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
         var genericDefinition = propertyType.GetGenericTypeDefinition();
         if (genericDefinition != typeof(List<>)
             && genericDefinition != typeof(IReadOnlyList<>)
-            && genericDefinition != typeof(IList<>))
+            && genericDefinition != typeof(IList<>)
+            && genericDefinition != typeof(ImmutableArray<>))
         {
             return false;
         }

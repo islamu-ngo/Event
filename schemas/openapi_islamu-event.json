@@ -28889,6 +28889,407 @@
         "x-endpoint-class": "Authenticated"
       }
     },
+    "/api/event/{eventId}/discovery-identity": {
+      "get": {
+        "tags": [
+          "EventDiscoveryIdentity"
+        ],
+        "operationId": "GetEventDiscoveryIdentity",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "candidateEventId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEventDiscoveryIdentityDto"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEventDiscoveryIdentityDto"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEventDiscoveryIdentityDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "Authenticated",
+        "x-output-cache-policy": "PrivateNoStore"
+      }
+    },
+    "/api/event/{eventId}/discovery-identity/candidates": {
+      "get": {
+        "tags": [
+          "EventDiscoveryIdentity"
+        ],
+        "operationId": "GetEventDuplicateCandidates",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEventDuplicateCandidatesDto"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEventDuplicateCandidatesDto"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEventDuplicateCandidatesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "Authenticated",
+        "x-output-cache-policy": "PrivateNoStore"
+      }
+    },
+    "/api/event/{eventId}/discovery-identity/review": {
+      "post": {
+        "tags": [
+          "EventDiscoveryIdentity"
+        ],
+        "operationId": "ReviewEventDiscoveryAlias",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewEventDiscoveryAliasDto"
+              }
+            },
+            "text/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewEventDiscoveryAliasDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewEventDiscoveryAliasDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
     "/api/eventformat": {
       "get": {
         "tags": [
@@ -83097,8 +83498,7 @@
             }
           }
         },
-        "x-endpoint-class": "Public",
-        "x-output-cache-policy": "PublicHomeDiscovery"
+        "x-endpoint-class": "Public"
       }
     },
     "/api/events/{eventId}/refund-campaigns": {
@@ -117517,93 +117917,7 @@
           "operations": {
             "type": "array",
             "items": {
-              "required": [
-                "operationId",
-                "sessionId",
-                "kind",
-                "status",
-                "targetScope",
-                "targetTenantId",
-                "sourceOperationId",
-                "selectedSectionKeys",
-                "snapshotAvailable",
-                "effectStatus",
-                "effectRetryCount",
-                "fidelityVerified",
-                "fidelityDigest",
-                "omittedSectionKeys",
-                "completedAt"
-              ],
-              "type": "object",
-              "properties": {
-                "operationId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "sessionId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "kind": {
-                  "type": "integer"
-                },
-                "status": {
-                  "type": "integer"
-                },
-                "targetScope": {
-                  "type": "integer"
-                },
-                "targetTenantId": {
-                  "type": [
-                    "null",
-                    "string"
-                  ],
-                  "format": "uuid"
-                },
-                "sourceOperationId": {
-                  "type": [
-                    "null",
-                    "string"
-                  ],
-                  "format": "uuid"
-                },
-                "selectedSectionKeys": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "snapshotAvailable": {
-                  "type": "boolean"
-                },
-                "effectStatus": {
-                  "type": "integer"
-                },
-                "effectRetryCount": {
-                  "pattern": "^-?(?:0|[1-9]\\d*)$",
-                  "type": [
-                    "integer",
-                    "string"
-                  ],
-                  "format": "int32"
-                },
-                "fidelityVerified": {
-                  "type": "boolean"
-                },
-                "fidelityDigest": {
-                  "type": "string"
-                },
-                "omittedSectionKeys": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "completedAt": {
-                  "type": "string",
-                  "format": "date-time"
-                }
-              }
+              "$ref": "#/components/schemas/ConfigurationImportOperationResult"
             }
           }
         }
@@ -117831,37 +118145,7 @@
           "items": {
             "type": "array",
             "items": {
-              "required": [
-                "sectionKey",
-                "category",
-                "reasonCode",
-                "sourceMappingIdentity",
-                "targetMappingIdentity"
-              ],
-              "type": "object",
-              "properties": {
-                "sectionKey": {
-                  "type": "string"
-                },
-                "category": {
-                  "type": "integer"
-                },
-                "reasonCode": {
-                  "type": "string"
-                },
-                "sourceMappingIdentity": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                },
-                "targetMappingIdentity": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                }
-              }
+              "$ref": "#/components/schemas/ConfigurationImportPreviewItem"
             }
           }
         }
@@ -123329,28 +123613,7 @@
           "affectedScopes": {
             "type": "array",
             "items": {
-              "required": [
-                "tenantId",
-                "revision"
-              ],
-              "type": "object",
-              "properties": {
-                "tenantId": {
-                  "type": [
-                    "null",
-                    "string"
-                  ],
-                  "format": "uuid"
-                },
-                "revision": {
-                  "pattern": "^-?(?:0|[1-9]\\d*)$",
-                  "type": [
-                    "integer",
-                    "string"
-                  ],
-                  "format": "int64"
-                }
-              }
+              "$ref": "#/components/schemas/EmailDeliveryDisableAffectedScopeDto"
             }
           },
           "confirmationToken": {
@@ -124831,6 +125094,51 @@
           }
         }
       },
+      "EventDiscoveryIdentityDto": {
+        "required": [
+          "eventId",
+          "expectedRevision",
+          "publicPrimaryEventId",
+          "reviewTargetEventId",
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "publicPrimaryEventId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "reviewTargetEventId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "EventDiscoveryItemDto": {
         "type": "object",
         "properties": {
@@ -125500,6 +125808,93 @@
           "tenantId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "EventDuplicateCandidateDto": {
+        "required": [
+          "id",
+          "title",
+          "publicCode",
+          "sourceKind",
+          "sourcePublisherName",
+          "matchingSessionId",
+          "startsAtUtc",
+          "endsAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "publicCode": {
+            "type": "string"
+          },
+          "sourceKind": {
+            "type": "string"
+          },
+          "sourcePublisherName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "matchingSessionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "startsAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "EventDuplicateCandidatesDto": {
+        "required": [
+          "eventId",
+          "expectedRevision",
+          "candidates",
+          "isBounded"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventDuplicateCandidateDto"
+            }
+          },
+          "isBounded": {
+            "type": "boolean"
           }
         }
       },
@@ -139550,93 +139945,7 @@
           "operations": {
             "type": "array",
             "items": {
-              "required": [
-                "operationId",
-                "sessionId",
-                "kind",
-                "status",
-                "targetScope",
-                "targetTenantId",
-                "sourceOperationId",
-                "selectedSectionKeys",
-                "snapshotAvailable",
-                "effectStatus",
-                "effectRetryCount",
-                "fidelityVerified",
-                "fidelityDigest",
-                "omittedSectionKeys",
-                "completedAt"
-              ],
-              "type": "object",
-              "properties": {
-                "operationId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "sessionId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "kind": {
-                  "type": "integer"
-                },
-                "status": {
-                  "type": "integer"
-                },
-                "targetScope": {
-                  "type": "integer"
-                },
-                "targetTenantId": {
-                  "type": [
-                    "null",
-                    "string"
-                  ],
-                  "format": "uuid"
-                },
-                "sourceOperationId": {
-                  "type": [
-                    "null",
-                    "string"
-                  ],
-                  "format": "uuid"
-                },
-                "selectedSectionKeys": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "snapshotAvailable": {
-                  "type": "boolean"
-                },
-                "effectStatus": {
-                  "type": "integer"
-                },
-                "effectRetryCount": {
-                  "pattern": "^-?(?:0|[1-9]\\d*)$",
-                  "type": [
-                    "integer",
-                    "string"
-                  ],
-                  "format": "int32"
-                },
-                "fidelityVerified": {
-                  "type": "boolean"
-                },
-                "fidelityDigest": {
-                  "type": "string"
-                },
-                "omittedSectionKeys": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "completedAt": {
-                  "type": "string",
-                  "format": "date-time"
-                }
-              }
+              "$ref": "#/components/schemas/ConfigurationImportOperationResult"
             }
           },
           "_links": {
@@ -140954,28 +141263,7 @@
           "affectedScopes": {
             "type": "array",
             "items": {
-              "required": [
-                "tenantId",
-                "revision"
-              ],
-              "type": "object",
-              "properties": {
-                "tenantId": {
-                  "type": [
-                    "null",
-                    "string"
-                  ],
-                  "format": "uuid"
-                },
-                "revision": {
-                  "pattern": "^-?(?:0|[1-9]\\d*)$",
-                  "type": [
-                    "integer",
-                    "string"
-                  ],
-                  "format": "int64"
-                }
-              }
+              "$ref": "#/components/schemas/EmailDeliveryDisableAffectedScopeDto"
             }
           },
           "confirmationToken": {
@@ -142143,6 +142431,65 @@
           }
         }
       },
+      "HalResourceOfEventDiscoveryIdentityDto": {
+        "required": [
+          "eventId",
+          "expectedRevision",
+          "publicPrimaryEventId",
+          "reviewTargetEventId",
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "publicPrimaryEventId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "reviewTargetEventId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfEventDiscoveryItemDto": {
         "type": "object",
         "properties": {
@@ -142805,6 +143152,52 @@
           "tenantId": {
             "type": "string",
             "format": "uuid"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfEventDuplicateCandidatesDto": {
+        "required": [
+          "eventId",
+          "expectedRevision",
+          "candidates",
+          "isBounded"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventDuplicateCandidateDto"
+            }
+          },
+          "isBounded": {
+            "type": "boolean"
           },
           "_links": {
             "type": "object",
@@ -177049,6 +177442,35 @@
           }
         }
       },
+      "ReviewEventDiscoveryAliasDto": {
+        "required": [
+          "primaryEventId",
+          "expectedRevision",
+          "decision",
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "primaryEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          }
+        }
+      },
       "ReviewEventOrganizerClaimDto": {
         "required": [
           "reasonCode"
@@ -187951,6 +188373,9 @@
     },
     {
       "name": "EventDay"
+    },
+    {
+      "name": "EventDiscoveryIdentity"
     },
     {
       "name": "EventFormat"

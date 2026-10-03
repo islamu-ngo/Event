@@ -94,6 +94,23 @@ public sealed record EventScopedAuthorizationFacts(
     Guid EventId,
     Guid? EventSessionId = null) : IAuthorizationFacts;
 
+/// <summary>Fresh identity-decision facts, resolved for every affected root inside its transaction fence.</summary>
+public sealed record EventDiscoveryIdentityAuthorizationFacts(
+    Guid TenantId, Guid EventId, Guid ReviewerUserId, string Action,
+    bool ActiveMembership, bool ManagementAuthority, bool ExplicitGrant, bool HasConflict)
+    : IAuthorizationFacts
+{
+    public bool Allows(Guid tenantId, Guid userId, Guid eventId, string action) =>
+        TenantId != Guid.Empty && ReviewerUserId != Guid.Empty && EventId != Guid.Empty
+        && TenantId == tenantId && ReviewerUserId == userId && EventId == eventId
+        && Action == action && (IsDecisionAction(action) || action == AuthorizationActions.Events.ViewManagement)
+        && ActiveMembership && ManagementAuthority && ExplicitGrant && !HasConflict;
+
+    public static bool IsDecisionAction(string action) =>
+        action is AuthorizationActions.Events.ReviewDiscoveryIdentity
+            or AuthorizationActions.Events.ReverseDiscoveryIdentity;
+}
+
 public sealed record EventOrganizerClaimAuthorizationFacts(
     Guid TenantId,
     Guid EventId,

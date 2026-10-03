@@ -1,0 +1,38 @@
+.event-discovery-identity {
+    display: grid;
+    gap: var(--isl-space-3);
+    margin-block: var(--isl-space-4);
+    padding: var(--isl-space-4);
+    border: 1px solid var(--isl-color-border);
+    border-radius: var(--isl-radius-lg);
+    background: var(--isl-color-surface);
+    overflow-wrap: anywhere;
+}
+
+.event-discovery-identity__actions,
+.event-discovery-identity__confirmation {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--isl-space-2);
+    align-items: center;
+}
+
+.event-discovery-identity fieldset {
+    display: grid;
+    gap: var(--isl-space-3);
+    min-inline-size: 0;
+}
+
+.event-discovery-identity select {
+    max-inline-size: 100%;
+    min-block-size: 2.75rem;
+    color: var(--isl-color-text-primary);
+    background: var(--isl-color-surface);
+    border: 1px solid var(--isl-color-border);
+    border-radius: var(--isl-radius-sm);
+}
+
+.event-discovery-identity :is(a, select, input):focus-visible {
+    outline: 2px solid var(--isl-color-primary);
+    outline-offset: 2px;
+}

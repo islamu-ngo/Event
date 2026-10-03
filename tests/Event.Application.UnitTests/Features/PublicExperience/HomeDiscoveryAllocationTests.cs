@@ -21,6 +21,27 @@ namespace Explore.Application.UnitTests.Features.PublicExperience;
 public sealed class HomeDiscoveryAllocationTests
 {
     [Test]
+    public async Task ReviewedAliasesShareHomeOwnershipWithoutDisclosingThePrivatePrimaryKey()
+    {
+        Guid root = Guid.CreateVersion7();
+        var pool = Pool(3);
+        pool[0] = pool[0] with { DiscoveryIdentityId = root };
+        pool[1] = pool[1] with { DiscoveryIdentityId = root };
+        var allocator = new HomeDiscoveryAllocator(DateTimeOffset.UnixEpoch);
+        Task<PaginatedResult<EventDiscoveryItemDto>> Read(GetEventListRequest request, CancellationToken _) =>
+            Task.FromResult(new PaginatedResult<EventDiscoveryItemDto>(
+                pool, pool.Count, request.PageNumber, request.PageSize));
+        var first = await allocator.AllocateAsync(new(), 1, Read, CancellationToken.None);
+        var second = await allocator.AllocateAsync(new(), 1, Read, CancellationToken.None);
+        await Assert.That(first.Items[0].Event!.Id).IsEqualTo(pool[0].Event!.Id);
+        await Assert.That(second.Items[0].Event!.Id).IsEqualTo(pool[2].Event!.Id);
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(first.Items[0]));
+        await Assert.That(document.RootElement.TryGetProperty("DiscoveryIdentityId", out _)).IsFalse();
+        await Assert.That(document.RootElement.ToString().Contains(root.ToString("D"), StringComparison.Ordinal))
+            .IsFalse();
+    }
+
+    [Test]
     public async Task SectionsAndRefillPagesRetainOneTrustedOperationInstant()
     {
         var now = new DateTimeOffset(2030, 6, 1, 12, 30, 0, TimeSpan.Zero);

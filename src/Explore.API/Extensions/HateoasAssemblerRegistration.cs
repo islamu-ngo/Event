@@ -7,6 +7,7 @@ using Explore.API.Hateoas.Resources;
 using Explore.Application.Contracts.Hateoas;  // For ILinkPolicy, ICollectionLinkPolicy
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Application.Features.Events.Discovery;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.DTOs.Admissions;
@@ -87,6 +88,8 @@ public static class HateoasAssemblerRegistration
         services.AddHalResource<OrganizationTenantEvidenceDto, OrganizationTenantEvidenceDetailLinkPolicy, OrganizationTenantEvidenceCollectionLinkPolicy>();
 
         // Event
+        services.AddHalResource<EventDiscoveryIdentityDto, EventDiscoveryIdentityLinkPolicy, EventDiscoveryIdentityCollectionLinkPolicy>();
+        services.AddHalResource<EventDuplicateCandidatesDto, EventDuplicateCandidatesLinkPolicy, EventDuplicateCandidatesCollectionLinkPolicy>();
         services.AddHalResourceWithAssembler<EventDto, EventListDto, EventDetailLinkPolicy, EventCollectionLinkPolicy, EventResourceAssembler>();
         services.AddHalResource<EventTeamMemberDto, EventTeamMemberDetailLinkPolicy, EventTeamMemberCollectionLinkPolicy>();
         services.AddHalResource<EventResourceManagementDto, EventMaterialDetailLinkPolicy, EventMaterialCollectionLinkPolicy>();

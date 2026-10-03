@@ -1,7 +1,7 @@
 # Event Publication And Discovery
 
 Scope: public occurrence selection, governed regional matching, home allocation and card presentation.
-Implementation checkpoint: occurrence discovery and unique home allocation; identity correction and bounded traversal are subsequent slices.
+Implementation checkpoint: occurrence discovery, unique home allocation and identity correction surfaces; bounded traversal is a subsequent slice.
 
 ## Occurrence authority
 
@@ -46,6 +46,58 @@ Public home uses `PrivateNoStore`; current `public_experience.*` settings bypass
 `GetEventListRequestHandler` reads the current entity graph rather than a cached page of DTOs. `GetEventDetailsRequestHandler` builds a current projection, so a still-public program cannot replay fields removed by a committed redaction. Its fresh tenant and public-parent checks remain in place. Anonymous discovery and public details use `PrivateNoStore`, bypassing shared output-cache and conditional ETag shortcuts. Unavailable discovery returns `503` with `discovery_unavailable` and no-store headers.
 
 The OpenAPI schema is generated from API source, then the existing client generator produces immutable client records. Discovery cards, hero slides and timeline grouping consume the matching occurrence rather than treating the aggregate first date as the regional match. Known positive additional matches may be shown; unknown or zero counts do not become fabricated totals. Source and contributor attribution remains distinct from organizer ownership, with actions gated by HAL links.
+
+## Identity correction surfaces
+
+`EventDiscoveryIdentityController` exposes a no-store HAL status resource at
+`GET api/event/{eventId}/discovery-identity`. An optional `candidateEventId` selects
+a public review target; it is never an authority claim. The native
+`GetEventDiscoveryIdentityQueryHandler` independently checks public eligibility,
+current membership, management rights, explicit review/reversal grants and
+conflict-of-interest across the affected identity groups. Read-side affordances
+do not replace the command's commit-bound reauthorization.
+
+The status resource exposes `canonical` only for an independently public local
+primary. An unavailable primary supplies no ID, reason or relationship link,
+including on a source owner's request. `original-event` always names the source
+event. Revision and bounded decision reason are management-only; the revision
+is the tenant-wide identity epoch, not a per-record concurrency stamp.
+
+Candidates retain the flattened `eventId`, `expectedRevision`, `candidates` and
+`isBounded` fields inside HAL. Separate detail and collection policies are
+registered explicitly. Selecting a candidate reloads the status resource so
+`review` and `reverse` reflect that target, rather than inferring authority from
+a similarity match or local claims.
+
+`EventDiscoveryIdentityPanel` is shared by full event details and sidebar
+previews. Its service delegates to generated clients through the existing BFF
+boundary. Review, different-offering and reversal keep the original event route,
+selected target and tenant epoch. A `409` preserves input, disables submission,
+and requires an explicit refresh and fresh confirmation. The existing correction
+report dialog remains available through the original event's `suggest-correction`
+link. A saved decision is not represented as a delivered publisher notification;
+durable notification delivery is not implemented by this surface.
+
+### Durable publisher correction delivery
+
+`ReviewEventDiscoveryAliasCommandHandler` commits the relationship, tenant epoch,
+immutable audit entry and `EventDiscoveryIdentityCorrectionRequested` outbox
+message in one caller-owned serializable transaction. A different-offering
+decision records audit and delivery intent without changing the identity epoch;
+its initial revision may therefore be zero.
+
+`CompositeOutboxMessageDispatcher` routes the discriminator through
+`EventDiscoveryIdentityCorrectionDispatcher`, which binds and restores the
+payload tenant. The Application notification service resolves current effective
+owners and active membership before using the existing recipient materializer.
+Each recipient's in-app notification references only their own managed event.
+The existing notification graph and outbox retries/dead-letter handling own
+delivery; committing a decision does not imply that delivery completed.
+
+Deduplication uses the immutable outbox occurrence, tenant, recipient-owned event
+and recipient. Retrying one occurrence preserves its key; separate decisions at
+the same nonmutating identity revision retain separate notifications. The safe
+payload reference and notification contain no counterpart identity or title.
 
 ## Verification checkpoint
 

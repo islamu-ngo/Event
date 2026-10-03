@@ -7832,6 +7832,189 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.ToTable("ie_event_days", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.EventDiscoveryAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("MemberIdentityId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("member_identity_id");
+
+                    b.Property<Guid>("PrimaryIdentityId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("primary_identity_id");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<long>("RelationshipRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("relationship_revision");
+
+                    b.Property<DateTime>("ReviewedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("reviewed_at_utc");
+
+                    b.Property<Guid>("ReviewerId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("reviewer_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_discovery_aliases");
+
+                    b.HasIndex("TenantId", "MemberIdentityId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_discovery_aliases_tenant_id_member_identity_id");
+
+                    b.HasIndex("TenantId", "PrimaryIdentityId")
+                        .HasDatabaseName("ix_event_discovery_aliases_tenant_id_primary_identity_id");
+
+                    b.ToTable("ie_event_discovery_aliases", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_discovery_alias_not_self", "member_identity_id <> primary_identity_id");
+
+                            t.HasCheckConstraint("ck_discovery_alias_reason", "length(reason_code) BETWEEN 1 AND 80");
+
+                            t.HasCheckConstraint("ck_discovery_alias_revision", "relationship_revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoveryIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)")
+                        .HasColumnName("source_key");
+
+                    b.Property<string>("SourceKeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("source_key_hash");
+
+                    b.Property<int>("SourceKind")
+                        .HasColumnType("int")
+                        .HasColumnName("source_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_discovery_identities");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_event_discovery_identity_tenant_id_id");
+
+                    b.HasIndex("TenantId", "SourceKind", "SourceKeyHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_event_discovery_identities_tenant_id_source_kind__37832492");
+
+                    b.ToTable("ie_event_discovery_identities", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_discovery_identity_source_hash", "length(source_key_hash) = 64");
+
+                            t.HasCheckConstraint("ck_discovery_identity_source_key", "length(source_key) BETWEEN 1 AND 1024");
+
+                            t.HasCheckConstraint("ck_discovery_identity_source_kind", "source_kind IN (1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoveryRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<long>("DisclosureEpoch")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("disclosure_epoch");
+
+                    b.Property<long>("IdentityEpoch")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("identity_epoch");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_discovery_revisions");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_discovery_revisions_tenant_id");
+
+                    b.ToTable("ie_event_discovery_revisions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_discovery_revision_epochs", "identity_epoch >= 0 AND disclosure_epoch >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.EventFormat", b =>
                 {
                     b.Property<int>("Id")
@@ -39821,6 +40004,49 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Explore.Domain.EventDiscoveryAlias", b =>
+                {
+                    b.HasOne("Explore.Domain.EventDiscoveryIdentity", "Member")
+                        .WithOne("Alias")
+                        .HasForeignKey("Explore.Domain.EventDiscoveryAlias", "TenantId", "MemberIdentityId")
+                        .HasPrincipalKey("Explore.Domain.EventDiscoveryIdentity", "TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_event_discovery_aliases_ie_event_discovery_identi_5aad88fc");
+
+                    b.HasOne("Explore.Domain.EventDiscoveryIdentity", "Primary")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PrimaryIdentityId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_event_discovery_aliases_ie_event_discovery_identi_120bf9bd");
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Primary");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoveryIdentity", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_discovery_identities_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoveryRevision", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_discovery_revisions_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.EventIslamicAspect", b =>
                 {
                     b.HasOne("Explore.Domain.Event", "Event")
@@ -50193,6 +50419,11 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
             modelBuilder.Entity("Explore.Domain.EventCustomPropertyOption", b =>
                 {
                     b.Navigation("ChildOptions");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoveryIdentity", b =>
+                {
+                    b.Navigation("Alias");
                 });
 
             modelBuilder.Entity("Explore.Domain.EventParticipationConfiguration", b =>

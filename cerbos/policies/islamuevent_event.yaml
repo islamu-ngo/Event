@@ -12,6 +12,58 @@ resourcePolicy:
     resourceSchema:
       ref: cerbos:///islamuevent_event.json
   rules:
+    - actions: ["view-management"]
+      effect: EFFECT_ALLOW
+      roles:
+        - islamuevent_authenticated_user
+      condition:
+        match:
+          expr: >
+            has(request.principal.attr.userId) &&
+            has(request.resource.attr.discoveryReviewerUserId) &&
+            request.resource.attr.discoveryReviewerUserId == request.principal.attr.userId &&
+            request.resource.id == request.resource.attr.eventId &&
+            request.resource.attr.discoveryAction == "view-management" &&
+            request.resource.attr.discoveryActiveMembership == true &&
+            request.resource.attr.discoveryManagementAuthority == true &&
+            (!has(request.principal.attr.is_machine) || request.principal.attr.is_machine != true)
+
+    - actions: ["review-discovery-identity"]
+      effect: EFFECT_ALLOW
+      roles:
+        - islamuevent_authenticated_user
+      condition:
+        match:
+          expr: >
+            has(request.principal.attr.userId) &&
+            has(request.resource.attr.discoveryReviewerUserId) &&
+            request.resource.attr.discoveryReviewerUserId == request.principal.attr.userId &&
+            request.resource.id == request.resource.attr.eventId &&
+            request.resource.attr.discoveryAction == "review-discovery-identity" &&
+            request.resource.attr.discoveryActiveMembership == true &&
+            request.resource.attr.discoveryManagementAuthority == true &&
+            request.resource.attr.discoveryExplicitGrant == true &&
+            request.resource.attr.discoveryHasConflict == false &&
+            (!has(request.principal.attr.is_machine) || request.principal.attr.is_machine != true)
+
+    - actions: ["reverse-discovery-identity"]
+      effect: EFFECT_ALLOW
+      roles:
+        - islamuevent_authenticated_user
+      condition:
+        match:
+          expr: >
+            has(request.principal.attr.userId) &&
+            has(request.resource.attr.discoveryReviewerUserId) &&
+            request.resource.attr.discoveryReviewerUserId == request.principal.attr.userId &&
+            request.resource.id == request.resource.attr.eventId &&
+            request.resource.attr.discoveryAction == "reverse-discovery-identity" &&
+            request.resource.attr.discoveryActiveMembership == true &&
+            request.resource.attr.discoveryManagementAuthority == true &&
+            request.resource.attr.discoveryExplicitGrant == true &&
+            request.resource.attr.discoveryHasConflict == false &&
+            (!has(request.principal.attr.is_machine) || request.principal.attr.is_machine != true)
+
     - actions: ["approve-publish"]
       effect: EFFECT_ALLOW
       derivedRoles:

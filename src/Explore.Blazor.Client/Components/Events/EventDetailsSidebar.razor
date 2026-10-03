@@ -169,6 +169,11 @@
 
             <MudDivider Class="mb-4" />
 
+            @if (EventDetail?.HasHalLink("discovery-identity") == true)
+            {
+                <EventDiscoveryIdentityPanel Event="EventDetail" @key="EventDetail.Id" />
+            }
+
             @* ── Core Info ── *@
             <MudStack Spacing="3" Class="mb-4">
                 <div class="d-flex gap-3 align-center">

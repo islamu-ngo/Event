@@ -34,8 +34,44 @@ A community-reported listing identifies its contributor separately from its sour
 
 Available editing and publishing actions come from the server-provided capabilities. Follow the actions offered for the current event and session.
 
+## Listing corrections
+
+Related listings can share a discovery identity without merging their original
+records. Registration, tickets, sessions, payments and organizer obligations stay
+with the event where they were created. The event page never redirects those
+actions to another listing.
+
+When the related listing is independently public, the identity panel offers a
+link to it. Private or unavailable targets are not identified. Authorized
+organizers can inspect bounded public candidate suggestions and use the offered
+correction route. A matching title is not proof that two events are one offering.
+
+Reviewers with the required current authority can confirm the same offering,
+record a different offering, or reverse a relationship when the server offers
+that action. If another decision changes the revision, the form retains input
+but requires a reload and renewed confirmation. Recording a different offering
+does not penalize either listing.
+
+A saved decision confirms the correction result only. It does not mean a
+publisher notification was delivered.
+Current active publishers receive corrections through the durable in-app
+notification pipeline. Background retries may delay delivery; operators should
+use the existing outbox and notification status controls to investigate failed
+or dead-lettered delivery. Notifications identify only the publisher's own
+event, not a private counterpart.
+
+Review and reversal permissions are not automatically assigned to existing
+roles. Assign independent reviewers with management and explicit decision
+authority on every affected record. Ownership or contribution to either record
+does not grant an exemption from the conflict-of-interest check.
+
 ## API consumers
 
 Public discovery accepts `areaId` alongside local `dateFrom` and `dateTo` filters. Its card payload includes `matchingSession` and a nullable `additionalSessionCount`. Regional matching-session fields contain only the currently permitted public city and country.
+
+Identity status and candidate responses use HAL and `Cache-Control: no-store`.
+Follow the current resource's links; do not derive review authority from account
+roles or candidate IDs. Review submissions include the current tenant identity
+revision, and HTTP `409` requires reloading before another decision.
 
 An unavailable response uses HTTP `503` and the machine code `discovery_unavailable`. Retry the search when the service is available rather than presenting old cached results.

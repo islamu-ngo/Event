@@ -91,6 +91,8 @@ public static class AuthorizationActions
         public const string ClaimOrganizer = "claim-organizer";
         public const string WithdrawOrganizerClaim = "withdraw-organizer-claim";
         public const string ReviewOrganizerClaim = "review-organizer-claim";
+        public const string ReviewDiscoveryIdentity = "review-discovery-identity";
+        public const string ReverseDiscoveryIdentity = "reverse-discovery-identity";
         public const string ViewOrganizerClaims = "view-organizer-claims";
         public const string ManageRegistrations = "manage-registrations";
         public const string ManageTickets = "manage-tickets";

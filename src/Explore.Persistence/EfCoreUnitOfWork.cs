@@ -55,7 +55,20 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct = default)
     {
-        return await ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct);
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                return await ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct);
+            }
+            catch (Exception exception) when (attempt < 4 && IsSerializableRetryConflict(exception))
+            {
+                // ExecuteCore has rolled back and cleared operation writes. Transaction-start
+                // conflicts have no writes, but may still have tracked state from the caller.
+                _dbContext.ChangeTracker.Clear();
+            }
+        }
     }
 
     public Task<T> ExecuteBootstrapConvergenceAsync<T>(
@@ -220,6 +233,22 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             }
         }
 
+        return false;
+    }
+
+    private static bool IsSerializableRetryConflict(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SqliteException { SqliteErrorCode: 5 or 6 }
+                || current is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
+                }
+                || current is MySqlException { Number: 1205 or 1213 }
+                || current is SqlException { Number: 1205 })
+                return true;
+        }
         return false;
     }
 }

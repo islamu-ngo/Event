@@ -25,6 +25,7 @@ public sealed class CompositeOutboxMessageDispatcher(
     IEventPublishedNotificationFanoutService notificationFanoutService,
     IEventModerationNotificationFanoutService moderationNotificationFanoutService,
     IReportProviderSyncDispatcher reportProviderSyncDispatcher,
+    EventDiscoveryIdentityCorrectionDispatcher eventDiscoveryIdentityCorrectionDispatcher,
     LocationPrivacyCorrectionDispatcher locationPrivacyCorrectionDispatcher,
     PrivacyErasureCacheInvalidationDispatcher privacyErasureCacheInvalidationDispatcher,
     IAdmissionCredentialDeliveryOutboxHandler admissionCredentialDeliveryHandler,
@@ -69,6 +70,10 @@ public sealed class CompositeOutboxMessageDispatcher(
 
             case EventReportOutboxMessageFactory.EventReportProviderSyncRequestedEventType:
                 await reportProviderSyncDispatcher.DispatchAsync(message, ct);
+                return;
+
+            case EventDiscoveryIdentityCorrectionDispatcher.EventType:
+                await eventDiscoveryIdentityCorrectionDispatcher.DispatchAsync(message, ct);
                 return;
 
             case LocationPrivacyOutboxMessageFactory.LocationPiiErasedEventType:
@@ -299,6 +304,10 @@ public sealed class CompositeOutboxMessageDispatcher(
                 await reconcileManagedTenantProvisioningDeadLetterCommandHandler.ExecuteAsync(
                     new ReconcileManagedTenantProvisioningDeadLetterCommand(message.AggregateId, message.Id),
                     ct);
+                return;
+
+            case EventDiscoveryIdentityCorrectionDispatcher.EventType:
+                await eventDiscoveryIdentityCorrectionDispatcher.DispatchAsync(message, ct);
                 return;
 
             case LocationPrivacyOutboxMessageFactory.LocationPiiErasedEventType:

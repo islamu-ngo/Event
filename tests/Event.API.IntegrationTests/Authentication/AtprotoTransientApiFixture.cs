@@ -7,9 +7,11 @@ using System.Text.Json.Nodes;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Secrets;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain.Secrets;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
 using Explore.Domain;
@@ -45,7 +47,9 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
     private readonly ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private readonly ECDsa retiringKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private readonly PostgreSqlContainer container;
-    public ISecretResolver Secrets { get; } = Substitute.For<ISecretResolver>();
+    private readonly TestPrivacyIdentityFenceKeyProvider identityFenceKeys = new();
+    internal string AuthorityPath => identityFenceKeys.AuthorityPath;
+    public ISecretResolver Secrets { get; } = Substitute.For<ISecretResolver, IRetainedSecretResolver>();
     public PostgreSqlApiWebApplicationFactory Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
     public FrozenClock Clock { get; } = new();
@@ -94,13 +98,22 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
         {
             ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
             ["RateLimiting:DisableInTesting"] = "true",
+            ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
+            ["PrivacyErasureAuthorityEmbedded:Path"] = AuthorityPath,
             ["Deployment:Mode"] = "MultiTenant"
         }, ConfigureServices);
         Client = Factory.CreateClient(new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        await using var scope = Factory.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>().EnsureReadyAsync();
+        await using var authority = await scope.ServiceProvider
+            .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>().CreateDbContextAsync();
+        await authority.Database.MigrateAsync();
     }
 
     public void ConfigureServices(IServiceCollection services)
     {
+        services.RemoveAll<IPrivacyIdentityFenceKeyProvider>();
+        services.AddSingleton<IPrivacyIdentityFenceKeyProvider>(identityFenceKeys);
         services.RemoveAll<ISecretResolver>();
         services.AddSingleton(Secrets);
         services.RemoveAll<TimeProvider>();
@@ -224,6 +237,7 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
         Client?.Dispose();
         if (Factory is not null) await Factory.DisposeAsync();
         await container.DisposeAsync();
+        identityFenceKeys.Dispose();
         key.Dispose();
         retiringKey.Dispose();
     }

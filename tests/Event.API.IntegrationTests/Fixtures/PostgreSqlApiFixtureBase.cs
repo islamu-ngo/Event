@@ -1,10 +1,13 @@
 using System.Threading.Channels;
 using System.Security.Cryptography;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Seed;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 
@@ -18,6 +21,7 @@ namespace Event.Api.IntegrationTests.Fixtures;
 public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDisposable
 {
     private readonly PostgreSqlContainer _container;
+    private readonly TestPrivacyIdentityFenceKeyProvider _identityFenceKeys = new();
 
     public PostgreSqlApiWebApplicationFactory Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
@@ -45,10 +49,18 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
 
     private void RecreateHost()
     {
+        var configuration = GetAdditionalConfiguration();
+        configuration.TryAdd("PrivacyErasure:Authority:Topology", "EmbeddedSqlite");
+        configuration.TryAdd("PrivacyErasureAuthorityEmbedded:Path", _identityFenceKeys.AuthorityPath);
         Factory = new PostgreSqlApiWebApplicationFactory(
             _container.GetConnectionString(),
-            GetAdditionalConfiguration(),
-            ConfigureAdditionalTestServices);
+            configuration,
+            services =>
+            {
+                services.RemoveAll<IPrivacyIdentityFenceKeyProvider>();
+                services.AddSingleton<IPrivacyIdentityFenceKeyProvider>(_identityFenceKeys);
+                ConfigureAdditionalTestServices(services);
+            });
 
         Client = Factory.CreateClient();
     }
@@ -65,6 +77,15 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
         await LookupTableSeeder.SeedAsync(dbContext);
 
         RecreateHost();
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var storage = scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>();
+            await storage.EnsureReadyAsync();
+            var authorityFactory = scope.ServiceProvider
+                .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>();
+            await using var authority = await authorityFactory.CreateDbContextAsync();
+            await authority.Database.MigrateAsync();
+        }
         DatabaseReset = await TestDatabaseReset.CreateAsync(_container.GetConnectionString());
     }
 
@@ -152,6 +173,7 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
         }
 
         await _container.DisposeAsync();
+        _identityFenceKeys.Dispose();
         GC.SuppressFinalize(this);
     }
 

@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System.Text.Json;
 using System.Net.Http.Json;
 using System.Net;
@@ -14,6 +15,7 @@ using Explore.API.Authentication;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.TenantSettings;
@@ -23,6 +25,7 @@ using Explore.Domain.Enums;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Secrets.Database;
 using TUnit.Core;
 
@@ -409,6 +412,7 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(), $"onboarding-{Guid.NewGuid():N}.db");
     private readonly SqliteConnection _connection;
+    private readonly TestPrivacyIdentityFenceKeyProvider _identityFenceKeys = new();
 
     internal static string RequireSecret(string key) =>
         Environment.GetEnvironmentVariable(key) is { Length: > 0 } value
@@ -419,6 +423,8 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
     {
         AdditionalConfiguration["SETUP_SECRET"] = SetupSecret;
         AdditionalConfiguration["Authorization:Provider"] = "local";
+        AdditionalConfiguration["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite";
+        AdditionalConfiguration["PrivacyErasureAuthorityEmbedded:Path"] = _identityFenceKeys.AuthorityPath;
         ClientOptions.BaseAddress = new Uri("https://localhost");
         _connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
@@ -430,9 +436,13 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseSetting("PrivacyErasure:Authority:Topology", "EmbeddedSqlite");
+        builder.UseSetting("PrivacyErasureAuthorityEmbedded:Path", _identityFenceKeys.AuthorityPath);
         base.ConfigureWebHost(builder);
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IPrivacyIdentityFenceKeyProvider>();
+            services.AddSingleton<IPrivacyIdentityFenceKeyProvider>(_identityFenceKeys);
             services.RemoveExploreDbContextRegistrations();
             var options = new DbContextOptionsBuilder<ExploreDbContext>();
             ConfigureDatabase(options);
@@ -471,6 +481,18 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
         });
     }
 
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        using var scope = host.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>()
+            .EnsureReadyAsync().GetAwaiter().GetResult();
+        using var authority = scope.ServiceProvider
+            .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>().CreateDbContext();
+        authority.Database.Migrate();
+        return host;
+    }
+
     private void ConfigureDatabase(DbContextOptionsBuilder options)
     {
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
@@ -488,6 +510,7 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
         if (disposing)
         {
             _connection.Dispose();
+            _identityFenceKeys.Dispose();
             File.Delete(_databasePath);
         }
     }
@@ -496,6 +519,7 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
     {
         await base.DisposeAsync();
         await _connection.DisposeAsync();
+        _identityFenceKeys.Dispose();
         File.Delete(_databasePath);
     }
 }

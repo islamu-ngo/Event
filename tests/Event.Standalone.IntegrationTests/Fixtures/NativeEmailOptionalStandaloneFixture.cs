@@ -34,7 +34,8 @@ internal sealed class NativeEmailOptionalStandaloneFixture : IDisposable
         foreach (string prefix in new[] { "Database__", "DATABASE_", "IdentityDatabase__", "IDENTITY_DATABASE_",
                      "Keycloak__", "KEYCLOAK_", "Smtp__", "SMTP_", "MAIL_SMTP_", "Authentication__",
                      "AUTHENTICATION_", "Authorization__", "AUTHORIZATION_", "INSTANCE_BOOTSTRAP_",
-                     "SecretProvider__", "ConnectionStrings__", "CERBOS_", "Cerbos__" })
+                     "SecretProvider__", "ConnectionStrings__", "CERBOS_", "Cerbos__",
+                     "PRIVACY_ERASURE_IDENTITY_" })
         {
             foreach (string name in Environment.GetEnvironmentVariables().Keys.Cast<string>()
                          .Where(name => name.StartsWith(prefix, StringComparison.Ordinal)).ToArray())
@@ -50,6 +51,8 @@ internal sealed class NativeEmailOptionalStandaloneFixture : IDisposable
             ["AUTHENTICATION_PROVIDER"] = "local",
             ["AUTHORIZATION_PROVIDER"] = "local",
             ["AUTHENTICATION_LOCAL_JWT_KEY"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+            ["PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID"] = Guid.CreateVersion7().ToString("N"),
+            ["PRIVACY_ERASURE_IDENTITY_FENCE_KEY"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             ["INSTANCE_BOOTSTRAP_MODE"] = "ConfiguredAdministrator",
             ["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] = "local",
             ["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] = Subject.ToString("D"),

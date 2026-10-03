@@ -1475,6 +1475,15 @@ weighted votes, and no unresolved critical finding. Architecture evidence
 contracts validate structured fields, executable behavior, and sentinel values
 rather than source text, prose, or prompt wording.
 
+For multiple classes, place parenthesized alternatives inside the class segment:
+`/*/*/(EmailDeliveryGraphRevisionTests*)|(EventResourceStorageCleanupTests*)/*`.
+Do not join complete tree paths with `|`: that invalid expression executed
+unrelated classes in local acceptance runs. A minimum test count rejects empty
+selection, not an accidentally broad selection. Inspect the selected classes
+with `--list-tests json` before a combined run, or execute each class separately.
+The [official TUnit filter contract](https://tunit.dev/docs/execution/test-filters/)
+defines assembly, namespace, class and test segments and their operators.
+
 - `production` should require reviewer approval and restrict deployments to `main` and version tags.
 - `staging` should use environment-scoped secrets and can deploy automatically from `develop` unless the release process requires review.
 - Store Coolify webhook URLs and bearer tokens as environment secrets. Do not print webhook URLs or tokens in workflow logs.

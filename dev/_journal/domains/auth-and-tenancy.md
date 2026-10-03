@@ -135,3 +135,44 @@ browser execution, establish Keycloak/Cerbos parity, or make a general claim
 about provider behavior. The browser protocol still proves identity with a
 fresh context, ordinary antiforgery-protected BFF login, post-login status, HAL
 affordances, and direct-denial checks.
+
+---
+
+[2026-10-03 Europe/Brussels] - Canonical claim lookups must normalize before resolution
+
+**Context**: Native external-admission verification exercised two trusted,
+differently keyed provider subjects claiming the same address on PostgreSQL.
+The test subscribed to real save/authority transaction barriers before starting
+the requests and checked that the first graph remained uncommitted.
+
+**Symptom / Observation**: The winner committed, but the serialized follower
+returned an unsuccessful response at
+`LocalIdentitySynchronizationTests.Invariants.cs`. This resembled an admission
+race even though the retained authority gate already serialized the operations.
+
+**Root Cause**: `IdentityAccountResolver` passed uppercase principal evidence
+to `GetByNormalizedEmailAsync`, whose contract is an exact normalized lookup.
+The later handler normalized the same address, found the winner's claim and
+refused enrollment rather than converging. Database collation must not be
+treated as the canonicalization authority.
+
+**Resolution**: Trim and lowercase trusted evidence before the resolver lookup,
+matching claim creation/recheck. The native PostgreSQL race and the entire
+`LocalIdentitySynchronizationTests` cohort passed 47/47, exit 0, with zero skips.
+Trusted/untrusted formatting cases preserve issuer trust; the race proves one
+User/Actor/claim, two bindings and two active proofs. Verification:
+`rtk dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release -- --treenode-filter '/*/*/*LocalIdentitySynchronizationTests/*'`.
+
+**Why This Matters for Future Work**: Normalize at every normalized-key boundary
+before making an ownership decision. A later normalized collision check cannot
+repair an earlier raw lookup, and adding retries or changing serialization
+would obscure this mismatch rather than fix it.
+
+**References**:
+- `src/Explore.Application/Services/IdentityAccountResolver.cs`
+- `src/Explore.Persistence/Repositories/UserIdentityEmailRepository.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalIdentitySynchronizationTests.Invariants.cs`
+- `docs/internal/adr/ADR-036-verified-identity-correlation-authority.md`
+
+**Promotion Consideration**:
+- [x] Stays in domain journal as a verified admission debugging lesson.

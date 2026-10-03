@@ -130,6 +130,16 @@ releasing an email claim does not release an erased subject's fence. The
 machine inventory classifies the normalized address and proof linkage,
 observation and activity fields as hard-delete copies.
 
+### Managed Media Inventory
+
+The test-only `UserPiiInventory` classifies `StorageObject.SourceUri` as a
+subject-owned hard-delete copy through `StorageObject.ActorId -> Actor.UserId`.
+It is optional foreign-origin provenance, not a persisted delivery URL.
+`ActorPii.ExternalProfilePictureUri` and `ActorPii.ProfilePictureStorageObjectId`
+are likewise hard-delete copies through `Actor.UserId -> ActorPii.ActorId`.
+The inventory coverage gate resolves each named copy against EF metadata;
+renamed fields must replace the old entry rather than bypass that check.
+
 ### Configuration Portability Privacy Boundary
 
 Configuration-manifest and tenant-package exports are not subject-data export

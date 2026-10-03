@@ -85,6 +85,13 @@ writers cannot transfer ownership between its pre-read and graph mutation.
 Retained keyed account fingerprints also prevent an erased external identity
 from returning under a new User UUID. See [Privacy Erasure](PRIVACY_ERASURE.md).
 
+ATProtocol bootstrap acquires the ordered visitor-setting lock group before
+entering this enrollment gate, then performs bootstrap convergence inside the
+retained-authority transaction. `RelationalSettingMutationLock` rejects acquiring
+ordered groups after a caller-owned transaction has started. Keep the setting
+leases outside both the identity fence and convergence; do not bypass the fence
+or move the signup-capability recheck outside the convergence snapshot.
+
 ## Editable Profile Ownership
 
 Provider names initialize `UserPii.FirstName`, `UserPii.LastName` and the personal

@@ -1,18 +1,18 @@
 # I-VSD Planning Assessment: Pre-Release Contract Foundations
 
-Last Updated: 2026-09-30
+Last Updated: 2026-10-03
 
 ## Review Metadata
 
-- Mode: planning
+- Mode: implementation evidence review
 - Subject: Event identity/profile and storage foundations before optional Asset/Identity integration
 - Workstream: pre-release-contract-foundations
 - Report kind: implementation-planning-assessment
 - Report status: current
-- Disposition: plan-aligned
-- Report revision: 2026-09-30-r1
-- Evidence cutoff: 2026-09-30
-- Reviewed input: `59eafea41d7487409059f6bfe8562ca8e87dd17d` plus the shared evidence packet in `dev/active/pre-release-contract-foundations/pre-release-contract-foundations-context.md`
+- Disposition: architecture-aligned; final acceptance pending
+- Report revision: 2026-10-03-r4
+- Evidence cutoff: 2026-10-03
+- Reviewed input: committed runtime `80e8070b86ef42b09ce597b8b15e7f2cfe06fce7` and profile recovery `70a1719131bea7f8eb1d66267c8c0220de1d483e`, inspected native acceptance receipts and graduation documents. Corrected owning-case gates reconcile final API/Persistence coverage; actual Development browser acceptance is not inferred from those tests.
 - Supersedes: none; consumes the pre-release consultancy and the user's accepted correlation-policy correction
 
 ## Scope
@@ -25,7 +25,45 @@ The user also accepted preserving safe first-time signup under existing admissio
 
 ## Claim Boundary
 
-This is provider-responsibility reasoning and current-source traceability, not security certification, a legal opinion, a fatwa or implementation approval. No product build/test/runtime verification was performed. The triad is decision-complete and mapped below; plan-aligned describes the design, not implemented correctness or release approval.
+This is provider-responsibility reasoning and current-source traceability, not security certification, a legal opinion, a fatwa or release approval. Scoped native execution now exists; its exact limits are recorded below. The original findings retain their planning rationale, not a claim that their September source descriptions remain current.
+
+## Implementation Revalidation
+
+All nine finding/mitigation pairs were reconciled with source and executed
+scoped evidence. The durable [identity decision](../../docs/internal/adr/ADR-036-verified-identity-correlation-authority.md)
+and [managed-file decision](../../docs/internal/adr/ADR-037-managed-file-reference-and-retirement-authority.md)
+record the implemented contracts; task-local receipts remain working memory.
+The gate counts and remaining limits below separate execution from source coverage.
+
+| Pair | Implemented mitigation and scoped evidence | Remaining validation |
+|---|---|---|
+| F001/M001 | Exact binding precedes trusted-issuer canonical claims; Local-owned adoption remains denied. Shared-contact histories and proof transitions pass native assertions. Normalized claim lookup converges the actual PostgreSQL race with one graph and two active proofs; synchronization cohort 47/47, exit 0. | Real recovery/sign-in and final suites remain open. |
+| F002/M002 | Provider names initialize only new profiles. Later edits survive synchronization; free-address updates supersede only the corresponding binding proof and preserve independent proof. | Final edit/relogin and current-recipient browser boundary. |
+| F003/M003 | Immutable captured provider bindings/versions precede writes; UUID delivery and explicit external provenance remain distinct. Real generic/CSV/federation provider cohorts and five-engine migration/runtime gates executed. | Remaining API acceptance, release receipt reconciliation and real target/recovery browser flows. |
+| F004/M004 | All twelve mapped owner relations use physical-reference authority; shared CAS covers tracked, bulk and cascade changes. Native retirement transfers custody to the existing leased worker. Shared/held files survive conversion, reconciliation and moderation. | Final cross-engine concurrency, tenant HAL desktop/mobile actions and stale-link behavior. |
+| F005/M005 | Retained external-identity fences and source-less producer acknowledgements prevent resurrection. Real late-completion/privacy/storage cohorts and final Persistence coverage executed. | Browser startup requires the approved retained key authority and currently fails closed. No replacement key or bypass was introduced. |
+| F006/M006 | Standalone embedded identity and actual Local/S3 implementations remain selected; no remote adapter, fake health or fallback was added. Standalone 81/81 passed. ADRs and actionable integration/linking backlogs exist. | Actual Development browser readiness; remote activation remains separately scoped. |
+| F007/M007 | OpenAPI/tag clients were regenerated natively; internal/public storage semantics agree on pending202 and bounded409. Obsolete direct deletion documentation removed. | Final release receipts, generated checks, current-candidate tests and reviewed commits. |
+| F008/M008 | Separate discovery task ownership confirmed read-only in its actual worktree; durable consultation retained. No quotas/editorial policy adopted here. | Final preserved event/session lifecycle evidence. |
+| F009/M009 | SQLite profile/media change re-reads preserved purchaser contact, distinct guest participant, assignment, admission credential and purpose/subject/form/version-pinned consent. Organizer/user shared contacts retain separate history. | Final inherited order/consent/admission suites; this does not redesign commerce or force guest accounts. |
+
+The architecture remains aligned with the accepted ownership, standalone and
+shared-file safeguards. No finding is closed by source inspection alone.
+The final Release build passed 63 projects with 2,079 reported warnings; it is
+not a warning-free result. Architecture passed 679/679, Application 3,590/3,590,
+and all ten non-matrix Persistence cohorts are reconciled with the reserved
+provider cases. Corrected owning-class gates resolve earlier fixture failures;
+interrupted or failed full commands remain recorded as such. All 4,197 API
+cases are reconciled through exhaustive cohorts and corrected owning gates;
+the final combined-host owner passed 2/2 without bypassing startup replay.
+Infrastructure's 2,012 non-runtime cases passed and its isolated MinIO runtime
+case passed separately with generated test credentials. The documented recursive vault API
+inspected 147 secret metadata entries without requesting values and found no
+retained key/ID; neither the shared Development store nor current environment
+contains that pair. No replacement key or startup bypass was introduced.
+Stakeholder usability and operational browser acceptance, final release receipts
+and PR review remain outstanding. Future Asset/Identity activation is not
+implied by the graduation backlogs.
 
 ## Findings
 
@@ -114,8 +152,8 @@ IDs preserve correspondence with the foundational consultancy, but statuses and 
 - Lifecycle: accepted; severity: medium; claim type: ownership/sequence constraint.
 - Principles/domains: Ihsan, Adl; strategic/evaluation.
 - Stakeholders/control: organizers and maintainers; event identity, discovery and scope.
-- Evidence: `dev/active/event-publication-and-identity-discovery/` already owns the corresponding intake and source investigation.
-- Validation: repository planning evidence.
+- Evidence: the [publication and identity discovery consultation](../consultations/i-vsd-event-publication-and-identity-discovery-consultation.md) records the separate scope. Its task triad currently lives in `.worktrees/event-publication-and-identity-discovery/dev/active/event-publication-and-identity-discovery/`, not this worktree's `dev/active/`.
+- Validation: read-only inspection of the separate worktree's context on 2026-10-03 confirms active discovery implementation; publication quotas, admission and editorial review remain separately deferred. This is ownership evidence, not runtime acceptance of those policies.
 - Mitigation **IVSD-M008**: explicitly map event/discovery work to that separate workstream; preserve event/session/time/provenance invariants here. Do not silently absorb its pending publication-policy decision.
 - Owner/next validation: project steward and planners; final plan scope/mapping review.
 - Escalation: dependency only if shared contracts materially change.
@@ -169,7 +207,7 @@ No religious-legal ruling is requested. Security/privacy specialists review the 
 ## Evidence Reviewed
 
 - [Source consultancy](../consultations/i-vsd-pre-release-breaking-change-prevention-consultancy-report.md).
-- [Shared planning evidence packet](../../dev/active/pre-release-contract-foundations/pre-release-contract-foundations-context.md), including exact current implementation and test paths.
+- [Verified identity authority decision](../../docs/internal/adr/ADR-036-verified-identity-correlation-authority.md) and [managed-file retirement authority decision](../../docs/internal/adr/ADR-037-managed-file-reference-and-retirement-authority.md), including concrete implementation and test anchors.
 - [User synchronization](../../src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs).
 - [User repository](../../src/Explore.Persistence/Repositories/UserRepository.cs) and [PII mapping](../../src/Explore.Persistence/Configurations/Entities/UserPiiConfiguration.cs).
 - [External verification HTTP tests](../../tests/Event.API.IntegrationTests/Features/ExternalProviderEmailVerificationHttpTests.cs) and [Local synchronization tests](../../tests/Event.API.IntegrationTests/Features/LocalIdentitySynchronizationTests.cs).
@@ -179,16 +217,16 @@ No religious-legal ruling is requested. Security/privacy specialists review the 
 
 ## Missing Evidence
 
-Implementation/runtime evidence and stakeholder validation remain absent, as expected for a plan. Future remote service contracts are out of scope and assigned to explicit backlog graduation tasks rather than treated as hidden dependencies.
+Automated native project, exhaustive API/Persistence and five-engine migration/runtime evidence is reconciled in the implementation revalidation. Real browser acceptance and stakeholder validation remain missing because the selected Development authority lacks its retained key pair. Future remote contracts remain out of scope, assigned to the substantive graduation backlogs.
 
 ## Context Inventory
 
-Main repository on fresh `develop`; current consultancy; overlapping active/paused workstreams; source/test/docs evidence; two bounded read-only scouts. Knowledge graph was unavailable. No external product research or code ingestion; no product edits, branch/worktree creation or implementation execution.
+Original planning inventory: fresh `develop`, consultancy and two bounded scouts; graph unavailable. Current review adds the task-owned implementation worktree, native scoped runtime/test receipts, explicit owner inventory, separate discovery context and ADR/backlog graduation. No external product research or third-party code ingestion was used.
 
 ## Planning Handoff
 
 - Workstream: pre-release-contract-foundations.
-- Status: current / plan-aligned; revision `2026-09-30-r1`.
+- Status: current / architecture-aligned, real-surface acceptance pending; revision `2026-10-03-r4`.
 - Reviewed input: HEAD above and shared context evidence.
 - Findings/mitigations: IVSD-F001-F009 paired with IVSD-M001-M009.
 - Plan: `dev/active/pre-release-contract-foundations/pre-release-contract-foundations-plan.md`.
@@ -216,3 +254,4 @@ Main repository on fresh `develop`; current consultancy; overlapping active/paus
 | 2026-09-30 | none | draft | Implementation-plan request and explicit controlled-email-linking decision | Current repository evidence; material intake question pending |
 | 2026-09-30 | draft | draft | User accepted safe signup without unsafe account correlation | IVSD-M001 clarified; profile-mastering question now pending |
 | 2026-09-30 | draft | current | User instructed best-judgment completion after timeout; architecture defaults selected and full triad mapped | Revision `2026-09-30-r1`; plan-aligned, implementation not started |
+| 2026-10-03 | current | current | Native implementation and focused acceptance evidence reviewed across all nine pairs | Revision `2026-10-03-r2`; architecture aligned, final candidate and browser/provider gates remain open |

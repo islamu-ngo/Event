@@ -40,7 +40,6 @@ internal static class ActorMediaCutoverGuard
                     Schema = rename.Schema,
                     Sql = $"{column} IS NULL"
                 });
-            prepared.Add(operation);
             if (!sqlite)
                 prepared.Add(new DropCheckConstraintOperation
                 {
@@ -48,6 +47,9 @@ internal static class ActorMediaCutoverGuard
                     Table = rename.Table,
                     Schema = rename.Schema
                 });
+            // Validation must finish before rename: SQL Server rejects renaming
+            // columns referenced by an enforced check constraint.
+            prepared.Add(operation);
         }
         return prepared;
     }

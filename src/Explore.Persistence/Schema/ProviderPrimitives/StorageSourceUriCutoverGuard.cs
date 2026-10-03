@@ -53,17 +53,12 @@ internal static class StorageSourceUriCutoverGuard
                     Name = ConstraintName, Table = tableName, Schema = schema, Sql = condition
                 });
             // Drop cannot remove a column while its validating constraint still depends on it.
-            if (!sqlite && operation is DropColumnOperation)
+            if (!sqlite)
                 prepared.Add(new DropCheckConstraintOperation
                 {
                     Name = ConstraintName, Table = tableName, Schema = schema
                 });
             prepared.Add(operation);
-            if (!sqlite && operation is RenameColumnOperation)
-                prepared.Add(new DropCheckConstraintOperation
-                {
-                    Name = ConstraintName, Table = tableName, Schema = schema
-                });
         }
 
         // Run after the native nullable-column alteration/rebuild; an empty old locator is absence, not origin.

@@ -166,6 +166,7 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
+        operations = PrepareStorageBindingIndexReplacements(operations);
         var executableOperations = new List<MigrationOperation>(operations.Count);
         foreach (MigrationOperation operation in operations)
         {
@@ -200,6 +201,30 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             base.Generate(executableOperations, model, sqlOptions),
             executableOperations,
             Dependencies);
+    }
+
+    private static IReadOnlyList<MigrationOperation> PrepareStorageBindingIndexReplacements(
+        IReadOnlyList<MigrationOperation> operations)
+    {
+        var prepared = operations.ToList();
+        foreach (var drop in operations.OfType<DropIndexOperation>().Where(operation =>
+                     operation.Table is not null
+                     && (operation.Table.EndsWith("storage_objects", StringComparison.Ordinal)
+                         || operation.Table.EndsWith("storage_upload_sessions", StringComparison.Ordinal))
+                     && operation.Name.Contains("storage_provider_bind", StringComparison.Ordinal)))
+        {
+            var replacement = operations.OfType<CreateIndexOperation>().SingleOrDefault(operation =>
+                operation.Table == drop.Table && operation.Schema == drop.Schema
+                && operation.Columns[0] == "storage_provider_binding_id");
+            if (replacement is null || prepared.IndexOf(replacement) < prepared.IndexOf(drop))
+                continue;
+
+            // InnoDB must retain an index whose leading column supports the binding FK,
+            // including when downgrading the composite target index to its predecessor.
+            prepared.Remove(replacement);
+            prepared.Insert(prepared.IndexOf(drop), replacement);
+        }
+        return prepared;
     }
 }
 

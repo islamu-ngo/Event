@@ -31,6 +31,9 @@ public static class FailureCodes
     public const string StorageUploadContentTypeMismatch = "storage_upload_content_type_mismatch";
     public const string StorageUploadContentSignatureMismatch = "storage_upload_content_signature_mismatch";
     public const string StorageUploadWriteFailed = "storage_upload_write_failed";
+    public const string StorageObjectInUse = "storage_object_in_use";
+    public const string StorageObjectRetentionBlocked = "storage_object_retention_blocked";
+    public const string StorageObjectInvalidTarget = "storage_object_invalid_target";
     public const string AddressSelectionInvalid = "address_selection_invalid";
 
     /// <summary>

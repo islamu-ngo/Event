@@ -27,7 +27,8 @@ public sealed class StorageObjectReferenceRepositoryTests(EventResourceFileUploa
         var scope = await SeedAsync();
         await using var modelContext = database.CreateContext();
         var relations = modelContext.Model.FindEntityType(typeof(StorageObject))!.GetReferencingForeignKeys()
-            .Where(key => key.DeclaringEntityType.ClrType != typeof(StorageUploadSession))
+            .Where(key => key.DeclaringEntityType.ClrType != typeof(StorageUploadSession)
+                && key.DeclaringEntityType.ClrType != typeof(StorageProducerOperation))
             .ToArray();
         await Assert.That(relations.Length).IsGreaterThan(0);
         foreach (var relation in relations)

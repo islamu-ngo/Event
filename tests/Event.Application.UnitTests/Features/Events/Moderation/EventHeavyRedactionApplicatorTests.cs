@@ -8,7 +8,26 @@ namespace Event.Application.UnitTests.Features.Events.Moderation;
 public sealed class EventHeavyRedactionApplicatorTests
 {
     [Test]
-    public async Task Apply_RedactsEventOwnedGraphAndRequestsImageDeletion()
+    public async Task SharedImageDetachmentCannotChangeAnotherOwnersSourceAuthority()
+    {
+        var source = CreateStorageObject();
+        Guid survivingOwnerId = Guid.CreateVersion7();
+        source.OwningResourceKind = ResourceKinds.Event;
+        source.OwningResourceId = survivingOwnerId;
+        var parent = CreateEvent(source.Id);
+        var graph = new EventHeavyRedactionGraph(
+            parent, [], [], [], [], [], [], [], [], [], [source], [], []);
+
+        EventHeavyRedactionApplicator.Apply(graph, Guid.CreateVersion7(), DateTimeOffset.UtcNow);
+
+        await Assert.That(parent.FeaturedImageId).IsNull();
+        await Assert.That(source.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        await Assert.That(source.OwningResourceKind).IsEqualTo(ResourceKinds.Event);
+        await Assert.That(source.OwningResourceId).IsEqualTo(survivingOwnerId);
+    }
+
+    [Test]
+    public async Task Apply_RedactsEventOwnedGraphAndDetachesImages()
     {
         var moderatorUserId = Guid.NewGuid();
         var redactedAt = DateTimeOffset.UtcNow;
@@ -54,7 +73,7 @@ public sealed class EventHeavyRedactionApplicatorTests
 
         var result = EventHeavyRedactionApplicator.Apply(graph, moderatorUserId, redactedAt);
 
-        await Assert.That(result.DeleteRequestedImageObjectCount).IsEqualTo(1);
+        await Assert.That(result.DetachedImageObjectCount).IsEqualTo(1);
         await Assert.That(@event.EventStatusId).IsEqualTo((int)EventStatusEnum.Moderated);
         await Assert.That(@event.Title).IsEqualTo(EventRedactionSentinelPolicy.DisplayText);
         await Assert.That(@event.Slug).StartsWith("redacted-event-");
@@ -97,10 +116,10 @@ public sealed class EventHeavyRedactionApplicatorTests
         await Assert.That(sessionProjection.TextValue).IsEqualTo(EventRedactionSentinelPolicy.DisplayText);
         await Assert.That(sessionProjection.NormalizedValue).IsNull();
 
-        await Assert.That(image.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
-        await Assert.That(image.OwningResourceKind).IsEqualTo(ResourceKinds.Event);
-        await Assert.That(image.OwningResourceId).IsEqualTo(@event.Id);
-        await Assert.That(image.UpdatedBy).IsEqualTo(moderatorUserId);
+        await Assert.That(image.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        await Assert.That(image.OwningResourceKind).IsNull();
+        await Assert.That(image.OwningResourceId).IsNull();
+        await Assert.That(image.UpdatedBy).IsNull();
     }
 
     [Test]
@@ -118,8 +137,8 @@ public sealed class EventHeavyRedactionApplicatorTests
         await Assert.That(parent.FeaturedImageId).IsNull();
         await Assert.That(storage.OwningResourceKind).IsEqualTo(StorageOwningResourceKinds.EventResource);
         await Assert.That(storage.OwningResourceId).IsEqualTo(resourceId);
-        await Assert.That(storage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
-        await Assert.That(summary.DeleteRequestedImageObjectCount).IsEqualTo(0);
+        await Assert.That(storage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        await Assert.That(summary.DetachedImageObjectCount).IsEqualTo(0);
     }
 
     private static Explore.Domain.Event CreateEvent(Guid imageId) => new(EventStatusEnum.Published)

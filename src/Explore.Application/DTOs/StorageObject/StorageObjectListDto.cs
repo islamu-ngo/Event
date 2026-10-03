@@ -7,6 +7,9 @@ public sealed record StorageObjectListDto
     [JsonIgnore]
     public StorageObjectContentEligibilityDto ContentEligibility { get; init; } = StorageObjectContentEligibilityDto.Unrestricted;
 
+    [JsonIgnore]
+    public bool RetirementAllowed { get; init; }
+
     public StorageObjectListDto ForDisclosureAt(DateTime utcNow) => ContentEligibility.CanReadAt(utcNow)
         ? this
         : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = null };

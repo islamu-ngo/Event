@@ -1,4 +1,3 @@
-using Explore.Application.Authorization;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
@@ -26,7 +25,7 @@ public sealed class HeavyRedactEventCommandHandler(
     INotificationFanoutOccurrenceRepository fanoutOccurrenceRepository,
     NotificationFanoutOccurrenceCoordinator fanoutCoordinator,
     IEventLifecycleScheduler eventLifecycleScheduler,
-    IStorageObjectDeletionService storageObjectDeletionService,
+    IEventResourceStorageLifecycleRepository storageLifecycle,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
     HybridCache cache,
@@ -39,7 +38,6 @@ public sealed class HeavyRedactEventCommandHandler(
     IStorageObjectReferenceRepository storageReferences)
     : ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>>
 {
-    private const int ImmediateDeletionBatchSize = 100;
     private const string ActionKind = "heavy_redacted";
     private const string FanoutSourceType = "event_moderation_record";
 
@@ -146,6 +144,16 @@ public sealed class HeavyRedactEventCommandHandler(
                 foreach (var resourceIds in graph.Resources.Select(resource => resource.Id).Chunk(500))
                     await resourceStorageLifecycle.RetireAsync(@event.TenantId, resourceIds, [],
                         redactedAt.UtcDateTime, token);
+                foreach (var image in graph.ImageStorageObjects.Where(storage =>
+                    storage.Purpose != StorageObjectPurposes.EventResource
+                    && storage.OwningResourceKind != StorageOwningResourceKinds.EventResource
+                    && !graph.ResourceStorageObjects.Any(resourceObject => resourceObject.Id == storage.Id)))
+                {
+                    var admission = await storageLifecycle.TryQueueRetirementAsync(
+                        @event.TenantId, image.Id, redactedAt.UtcDateTime, token);
+                    if (admission is StorageRetirementAdmission.InvalidTarget or StorageRetirementAdmission.NotFound)
+                        throw new InvalidOperationException("Redaction requires exact retained storage custody.");
+                }
                 await atprotoPublicationPlanner.PlanEventAsync(
                     new AtprotoEventPublicationInput(
                         @event.TenantId,
@@ -206,47 +214,17 @@ public sealed class HeavyRedactEventCommandHandler(
             await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
         }
 
-        var deletionResult = await storageObjectDeletionService.DeleteRequestedForResourceAsync(
-            tenantId,
-            ResourceKinds.Event,
-            eventId,
-            moderatorUserId,
-            ImmediateDeletionBatchSize,
-            cancellationToken);
-
-        if (!deletionResult.CompletedWithoutFailures)
-        {
-            metrics.RecordEventModerationAction(tenantId.ToString(), ActionKind, "pending_storage_deletion", "storage_deletion_pending", irreversible: true);
-            logger.LogWarning(
-                "Heavy event moderation completed with pending image deletion for event {EventId} in tenant {TenantId}; scanned {ScannedCount}, deleted {DeletedCount}, missing-key deleted {MissingKeyDeletedCount}, failed {FailedCount}.",
-                eventId,
-                tenantId,
-                deletionResult.ScannedCount,
-                deletionResult.DeletedCount,
-                deletionResult.MissingKeyDeletedCount,
-                deletionResult.FailedCount);
-
-            return Failure(
-                eventId,
-                "Event heavy-redacted; image deletion is pending retry.",
-                ["One or more image objects could not be deleted immediately and remain queued for retry."],
-                HeavyRedactEventCommand.StorageDeletionPendingFailureCode);
-        }
-
         metrics.RecordEventModerationAction(
             tenantId.ToString(),
             ActionKind,
             wasIdempotent ? "idempotent" : "succeeded",
             irreversible: true);
         logger.LogInformation(
-            "Heavy event moderation {Outcome} for event {EventId} in tenant {TenantId}; moderation record {ModerationRecordId}, scanned {ScannedCount}, deleted {DeletedCount}, missing-key deleted {MissingKeyDeletedCount}.",
+            "Heavy event moderation {Outcome} for event {EventId} in tenant {TenantId}; moderation record {ModerationRecordId}. Detached eligible image cleanup is durably queued.",
             wasIdempotent ? "idempotent" : "succeeded",
             eventId,
             tenantId,
-            moderationRecordForLog?.Id,
-            deletionResult.ScannedCount,
-            deletionResult.DeletedCount,
-            deletionResult.MissingKeyDeletedCount);
+            moderationRecordForLog?.Id);
 
         return transactionResponse;
     }

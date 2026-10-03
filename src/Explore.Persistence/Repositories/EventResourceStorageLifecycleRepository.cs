@@ -22,9 +22,47 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
                 .SingleOrDefaultAsync(item => item.Id == storageObjectId && item.TenantId == tenantId, cancellationToken);
             if (source is null)
             {
-                if (existing is null) return StorageRetirementAdmission.NotFound;
                 var survivingSessions = await SessionsAsync(storageObjectId, cancellationToken);
                 var survivingOperation = await OperationAsync(storageObjectId, cancellationToken);
+                if (existing is null)
+                {
+                    if (survivingSessions.Length == 0 && survivingOperation is null)
+                        return StorageRetirementAdmission.NotFound;
+                    if (survivingSessions.Length != 1 || survivingOperation is not null)
+                        return StorageRetirementAdmission.InvalidTarget;
+                    var session = survivingSessions[0];
+                    if (session.TenantId != tenantId || (session.StorageObjectId ?? session.Id) != storageObjectId
+                        || session.StorageProviderBindingId is not { } bindingId || session.ObjectKey is not { } key)
+                        return StorageRetirementAdmission.InvalidTarget;
+                    StorageObjectDeletionTombstone target;
+                    try
+                    {
+                        target = StorageObjectDeletionTombstone.Create(storageObjectId, tenantId,
+                            session.Provider, bindingId, key, session.ProviderVersionId, session.ProducerSettled, utcNow);
+                    }
+                    catch (ArgumentException) { return StorageRetirementAdmission.InvalidTarget; }
+                    if (!await database.StorageProviderBindings.AsNoTracking().AnyAsync(binding =>
+                        binding.Id == bindingId && binding.Provider == session.Provider, cancellationToken))
+                        return StorageRetirementAdmission.InvalidTarget;
+                    Guid stamp = Guid.CreateVersion7();
+                    if (await database.StorageUploadSessions.IgnoreQueryFilters([QueryFilterNames.Tenant])
+                        .Where(item => item.Id == session.Id && item.TenantId == tenantId
+                            && item.ConcurrencyStamp == session.ConcurrencyStamp)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.ConcurrencyStamp, stamp),
+                            cancellationToken) != 1)
+                        throw SourceRemovalConflict();
+                    DetachSession(session.Id);
+                    if (await SourceAsync(tenantId, storageObjectId, cancellationToken) is not null)
+                        throw SourceRemovalConflict();
+                    session.ConcurrencyStamp = stamp;
+                    session.Fail("storage_retired", null, utcNow);
+                    database.StorageUploadSessions.Update(session);
+                    database.StorageObjectDeletionTombstones.Add(target);
+                    await database.SaveChangesAsync(cancellationToken);
+                    await RemoveTransferredSourcesCoreAsync(tenantId, [], [storageObjectId], utcNow, cancellationToken);
+                    await RecalculateAsync(tenantId, [session.Provider], utcNow, cancellationToken);
+                    return StorageRetirementAdmission.Pending;
+                }
                 if (survivingSessions.Any(session => session.TenantId != tenantId
                     || session.Provider != existing.Provider || session.StorageProviderBindingId != existing.ProviderBindingId
                     || session.ObjectKey != existing.ObjectKey
@@ -36,6 +74,25 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
                         || survivingOperation.ProviderVersionId is not null
                             && survivingOperation.ProviderVersionId != existing.ProviderObjectVersion))
                     return StorageRetirementAdmission.InvalidTarget;
+                if ((survivingSessions.Any(session => !session.ProducerSettled)
+                    || survivingOperation is { ProducerSettled: false })
+                    && existing.State != Explore.Domain.Enums.StorageObjectDeletionState.AwaitingProducer)
+                    return StorageRetirementAdmission.InvalidTarget;
+                foreach (var session in survivingSessions)
+                {
+                    if (session.Status is StorageUploadSessionStates.Reserved or StorageUploadSessionStates.Uploading
+                        or StorageUploadSessionStates.Finalized)
+                    {
+                        DetachSession(session.Id);
+                        session.Fail("storage_retired", null, utcNow);
+                        database.StorageUploadSessions.Update(session);
+                    }
+                }
+                await database.SaveChangesAsync(cancellationToken);
+                await RemoveTransferredSourcesCoreAsync(tenantId, [], [storageObjectId], utcNow, cancellationToken);
+                await RecalculateAsync(tenantId, survivingSessions.Select(session => session.Provider)
+                    .Concat(survivingOperation is null ? [] : [survivingOperation.Provider]),
+                    utcNow, cancellationToken);
                 return StorageRetirementAdmission.Pending;
             }
 
@@ -190,9 +247,7 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
             .Where(item => item.TenantId == tenantId && (objectIds.Contains(item.Id)
                 || item.Purpose == StorageObjectPurposes.EventResource
                     && item.OwningResourceKind == StorageOwningResourceKinds.EventResource
-                    && item.OwningResourceId.HasValue && resourceIds.Contains(item.OwningResourceId.Value)
-                    && !database.OrganizationTenantEvidence.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant })
-                        .Any(evidence => evidence.DocumentStorageObjectId == item.Id)))
+                    && item.OwningResourceId.HasValue && resourceIds.Contains(item.OwningResourceId.Value)))
             .OrderBy(item => item.Id).ToArrayAsync(cancellationToken);
         var references = new StorageObjectReferenceRepository(database);
         await references.FenceAsync(sources.Select(item => item.Id).ToArray(), cancellationToken);
@@ -202,10 +257,21 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
             .Where(item => item.TenantId == tenantId && (objectIds.Contains(item.Id)
                 || item.Purpose == StorageObjectPurposes.EventResource
                     && item.OwningResourceKind == StorageOwningResourceKinds.EventResource
-                    && item.OwningResourceId.HasValue && resourceIds.Contains(item.OwningResourceId.Value)
-                    && !database.OrganizationTenantEvidence.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant })
-                        .Any(evidence => evidence.DocumentStorageObjectId == item.Id)))
+                    && item.OwningResourceId.HasValue && resourceIds.Contains(item.OwningResourceId.Value)))
             .OrderBy(item => item.Id).ToArrayAsync(cancellationToken);
+        var preservedIds = new List<Guid>();
+        foreach (var source in sources)
+        {
+            if (!objectIds.Contains(source.Id)
+                && !await database.EventResources
+                    .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                    .AnyAsync(resource => resource.TenantId == tenantId && resourceIds.Contains(resource.Id)
+                        && resource.StorageObjectId == source.Id, cancellationToken)
+                && (await references.HasBlockingReferencesAsync(source.Id, cancellationToken)
+                    || await references.HasBlockingHoldsAsync(source.Id, utcNow, cancellationToken)))
+                preservedIds.Add(source.Id);
+        }
+        sources = sources.Where(source => !preservedIds.Contains(source.Id)).ToArray();
         var selectedIds = sources.Select(item => item.Id).Concat(objectIds).Distinct().ToArray();
         var sessions = await database.StorageUploadSessions.IgnoreQueryFilters([QueryFilterNames.Tenant]).AsNoTracking()
             .Where(item => selectedIds.Contains(item.Id)
@@ -213,8 +279,7 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
                 || item.TenantId == tenantId && item.Purpose == StorageObjectPurposes.EventResource
                     && item.OwningResourceKind == StorageOwningResourceKinds.EventResource
                     && item.OwningResourceId.HasValue && resourceIds.Contains(item.OwningResourceId.Value)
-                    && !database.OrganizationTenantEvidence.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant })
-                        .Any(evidence => evidence.DocumentStorageObjectId == (item.StorageObjectId ?? item.Id)))
+                    && !preservedIds.Contains(item.StorageObjectId ?? item.Id))
             .ToArrayAsync(cancellationToken);
         var ids = sources.Select(item => item.Id).Concat(sessions.Where(item => item.StorageObjectId.HasValue)
             .Select(item => item.StorageObjectId!.Value)).Concat(objectIds).Distinct().ToArray();
@@ -366,14 +431,28 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
         // removed those rows, the independent tombstone above is the entire acknowledgement.
         var session = await database.StorageUploadSessions.IgnoreQueryFilters([QueryFilterNames.Tenant]).AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == identity.SessionId && item.TenantId == identity.TenantId, cancellationToken);
+        if (session is null || session.Provider != identity.Provider
+            || session.StorageProviderBindingId != identity.BindingId || session.ObjectKey != identity.ObjectKey
+            || session.ProducerSettled) return;
         var source = await database.StorageObjects
             .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete]).AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == identity.ObjectId && item.TenantId == identity.TenantId, cancellationToken);
-        if (session is null || source is null || session.StorageObjectId != identity.ObjectId
-            || session.Provider != identity.Provider || session.StorageProviderBindingId != identity.BindingId
-            || session.ObjectKey != identity.ObjectKey || source.Provider != identity.Provider
+        if (source is null)
+        {
+            bool isGenericSourceLessSession = session.Id == identity.ObjectId && session.StorageObjectId is null
+                && session.Purpose != StorageObjectPurposes.EventResource
+                && session.OwningResourceKind != StorageOwningResourceKinds.EventResource
+                && session.ExpectedResourceVersion is null;
+            if (!isGenericSourceLessSession) return;
+            DetachSession(session.Id);
+            session.RecordProducerSettlement(identity.ObjectId, identity.BindingId, identity.ObjectKey, providerVersion);
+            database.StorageUploadSessions.Update(session);
+            await database.SaveChangesAsync(cancellationToken);
+            return;
+        }
+        if (session.StorageObjectId != identity.ObjectId || source.Provider != identity.Provider
             || source.StorageProviderBindingId != identity.BindingId || source.ObjectKey != identity.ObjectKey
-            || session.ProducerSettled) return;
+            ) return;
         await FenceAsync(source, cancellationToken);
         DetachSession(session.Id);
         session.RecordProducerSettlement(identity.ObjectId, identity.BindingId, identity.ObjectKey, providerVersion);

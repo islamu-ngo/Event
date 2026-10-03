@@ -97,7 +97,7 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
         FinalizedResourceVersion = version;
     }
 
-    /// <summary>Acknowledges an exact completed write without reopening a canceled or failed session.</summary>
+    /// <summary>Acknowledges a completed producer attempt without reopening a canceled or failed session.</summary>
     public void RecordProducerSettlement(Guid objectId, Guid bindingId, string objectKey, string? providerVersion)
     {
         var expectedObjectId = Purpose == StorageObjectPurposes.EventResource ? StorageObjectId : Id;

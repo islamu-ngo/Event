@@ -10,6 +10,9 @@ public sealed record StorageObjectDto
     [JsonIgnore]
     public bool SupportsPresignedDownload { get; init; }
 
+    [JsonIgnore]
+    public bool RetirementAllowed { get; init; }
+
     public StorageObjectDto ForDisclosureAt(DateTime utcNow) => ContentEligibility.CanReadAt(utcNow)
         ? this
         : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = null };

@@ -1,0 +1,28 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M3ZMYZ4VGZY4ESMBMM7R5V6M
+Title: "Preserve shared files during attachment and deletion races"
+Type: fix
+Scope: storage
+Summary: "Managed-file deletion refuses surviving references and retention holds; eligible requests transfer exact custody to durable cleanup and acknowledge pending work rather than immediate byte removal."
+Group: storage-retirement-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

@@ -59,6 +59,9 @@ public static class StoragePresentationUrlResolver
             ? $"{StorageObjectApiPathPrefix}{id}/public"
             : ExternalProfilePictureUri(pii);
 
+    public static string? ActorProfilePictureUri(Actor actor) =>
+        ActorProfilePictureUri(actor.Pii);
+
     public static string? PublicProfileImageUri(StorageObject? image, Guid tenantId) =>
         IsManagedProfileImage(image) && image!.TenantId == tenantId && tenantId != Guid.Empty
             ? $"{StorageObjectApiPathPrefix}{image.Id}/public"

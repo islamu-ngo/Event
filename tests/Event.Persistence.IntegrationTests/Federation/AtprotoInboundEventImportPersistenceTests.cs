@@ -539,6 +539,386 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
+    [Arguments("replacement", false)]
+    [Arguments("removal", false)]
+    [Arguments("tombstone", false)]
+    [Arguments("absence", false)]
+    [Arguments("rejected-snapshot", false)]
+    [Arguments("snapshot-replacement", false)]
+    [Arguments("snapshot-removal", false)]
+    [Arguments("replacement", true)]
+    [Arguments("removal", true)]
+    [Arguments("tombstone", true)]
+    [Arguments("absence", true)]
+    [Arguments("rejected-snapshot", true)]
+    [Arguments("snapshot-replacement", true)]
+    [Arguments("snapshot-removal", true)]
+    [Arguments("held-removal", false)]
+    [Arguments("held-tombstone", false)]
+    [Arguments("held-absence", false)]
+    public async Task ThumbnailDetachment_RetiresExactUnreferencedTargetButPreservesSharedSource(
+        string route, bool shared)
+    {
+        await fixture.ResetAsync();
+        ImportScope scope = await SeedScopeAsync("atproto-thumbnail-retirement");
+        await using ExploreDbContext context = fixture.CreateDbContext();
+        var repository = new AtprotoJetstreamRepository(context);
+        DateTime observedAt = CurrentUtc();
+        AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
+        AtprotoRecord first = Record(1, observedAt, "Retirement event", "https://events.example/retirement");
+        await Assert.That(await repository.TryApplyAndAdvanceAsync(WithStagedThumbnail(
+            ApplyRequest(claim, 0, 1, first, scope.TenantId, "Retirement event",
+                "https://events.example/retirement", observedAt),
+            StagedThumbnail("exact-retirement") with { ProviderVersionId = "saved-version" }))).IsTrue();
+        context.ChangeTracker.Clear();
+        StorageObject source = await context.StorageObjects.AsNoTracking().SingleAsync();
+        Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
+        bool held = route.StartsWith("held-", StringComparison.Ordinal);
+        if (held)
+        {
+            route = route["held-".Length..];
+            StorageObject retained = await context.StorageObjects.SingleAsync();
+            retained.OwningResourceKind = "registration_submission_sink";
+            retained.OwningResourceId = Guid.CreateVersion7();
+            retained.RegistrationContentRetentionUntilUtc = observedAt.AddDays(1);
+            await SaveFixtureAsync(context);
+            context.ChangeTracker.Clear();
+        }
+        Guid? survivorId = null;
+        if (shared)
+        {
+            var survivor = new Explore.Domain.Event(EventStatusEnum.Published)
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantId,
+                Tenant = null!,
+                ActorId = scope.ActorId,
+                Actor = null!,
+                Title = "Surviving thumbnail owner",
+                PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
+                FeaturedImageId = source.Id,
+                EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventTimeZoneId = "UTC",
+                Timezone = "UTC"
+            };
+            context.Events.Add(survivor);
+            await SaveFixtureAsync(context);
+            survivorId = survivor.Id;
+            context.ChangeTracker.Clear();
+        }
+
+        DateTime detachedAt = observedAt.AddSeconds(1);
+        AtprotoRecord next = Record(2, detachedAt, "Retirement event", "https://events.example/retirement");
+        AtprotoPersistenceApplyResult result;
+        StagedStorageWrite? replacement = null;
+        if (route is "snapshot-replacement" or "snapshot-removal")
+        {
+            AtprotoEventProjection projection = Projection(next, "Retirement event", UtcOffset(10),
+                UtcOffset(13), UtcOffset(14), "https://events.example/retirement", detachedAt);
+            AtprotoFederatedEventImportPlan import = ImportPlan(scope.TenantId, next, projection);
+            if (route == "snapshot-replacement")
+            {
+                replacement = PersistStagedThumbnail(scope.TenantId,
+                    StagedThumbnail("exact-replacement", checksum: ReplacementThumbnailChecksum));
+                import = import with
+                {
+                    Thumbnail = new AtprotoThumbnailBlobCandidate(Did, ReplacementThumbnailCid, "image/png", 8),
+                    StagedThumbnail = replacement
+                };
+            }
+            result = await repository.TryReconcileWithResultAsync(new AtprotoPdsSnapshotApplyRequest(
+                claim, [Did], [new AtprotoPdsSnapshot(Did, [new(Collection, RecordKey)], [new(next, projection)])],
+                [scope.TenantId], SnapshotVersion: 2, ObservedAt: detachedAt)
+                { EventImports = [import] }, CancellationToken.None);
+        }
+        else if (route is "absence" or "rejected-snapshot")
+        {
+            result = await repository.TryReconcileWithResultAsync(new AtprotoPdsSnapshotApplyRequest(
+                claim, [Did],
+                [new AtprotoPdsSnapshot(Did,
+                    route == "absence" ? [] : [new(Collection, RecordKey)], [])],
+                [scope.TenantId], SnapshotVersion: 2, ObservedAt: detachedAt), CancellationToken.None);
+        }
+        else
+        {
+            AtprotoJetstreamApplyRequest request = ApplyRequest(claim, 1, 2, next, scope.TenantId,
+                "Retirement event", "https://events.example/retirement", detachedAt);
+            if (route == "replacement")
+            {
+                request = WithStagedThumbnail(request,
+                    StagedThumbnail("exact-replacement", checksum: ReplacementThumbnailChecksum),
+                    ReplacementThumbnailCid);
+                replacement = request.EventImports.Single().StagedThumbnail;
+            }
+            else if (route == "tombstone")
+            {
+                next.TombstonedAt = detachedAt;
+                next.Cid = null;
+                next.RecordJson = null;
+                next.RecordHash = null;
+                request = request with { EventImports = [] };
+            }
+            result = await repository.TryApplyAndAdvanceWithResultAsync(request);
+        }
+
+        context.ChangeTracker.Clear();
+        await Assert.That(result.Applied).IsTrue();
+        await Assert.That(result.ConsumedStagedThumbnails)
+            .IsEquivalentTo(replacement is null ? [] : new[] { replacement });
+        Explore.Domain.Event detached = await context.Events.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(value => value.Id == imported.Id);
+        await Assert.That(detached.FeaturedImageId).IsEqualTo(replacement?.OperationId);
+        await Assert.That(await context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
+        StorageUsageCounter quota = await context.StorageUsageCounters.AsNoTracking().SingleAsync();
+        await Assert.That(quota.UsedBytes).IsEqualTo((shared || held ? 8L : 0L) + (replacement is null ? 0L : 8L));
+        await Assert.That(quota.ReservedBytes).IsEqualTo(0);
+        if (shared || held)
+        {
+            StorageObject retained = await context.StorageObjects.AsNoTracking()
+                .SingleAsync(value => value.Id == source.Id);
+            await Assert.That(retained.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+            await Assert.That(retained.StorageProviderBindingId).IsEqualTo(source.StorageProviderBindingId);
+            await Assert.That(retained.ProviderVersionId).IsEqualTo("saved-version");
+            await Assert.That(await context.StorageObjectDeletionTombstones.CountAsync()).IsEqualTo(0);
+            if (shared)
+                await Assert.That(await context.Events.Where(value => value.Id == survivorId)
+                    .Select(value => value.FeaturedImageId).SingleAsync()).IsEqualTo(source.Id);
+        }
+        else
+        {
+            await Assert.That(await context.StorageObjects.IgnoreQueryFilters()
+                .AnyAsync(value => value.Id == source.Id)).IsFalse();
+            StorageObjectDeletionTombstone custody = await context.StorageObjectDeletionTombstones
+                .AsNoTracking().SingleAsync();
+            await Assert.That(custody.Id).IsEqualTo(source.Id);
+            await Assert.That(custody.TenantId).IsEqualTo(scope.TenantId);
+            await Assert.That(custody.Provider).IsEqualTo(source.Provider);
+            await Assert.That(custody.ProviderBindingId).IsEqualTo(source.StorageProviderBindingId);
+            await Assert.That(custody.ObjectKey).IsEqualTo(source.ObjectKey);
+            await Assert.That(custody.ProviderObjectVersion).IsEqualTo("saved-version");
+            await Assert.That(custody.State).IsEqualTo(StorageObjectDeletionState.Ready);
+        }
+    }
+
+    [Test]
+    public async Task PdsSnapshotReplacement_FencesWholeTenantSetBeforeSavingOlderStagedTargets()
+    {
+        await fixture.ResetAsync();
+        ImportScope firstScope = await SeedScopeAsync("atproto-multi-retirement-a");
+        ImportScope secondScope = await SeedScopeAsync("atproto-multi-retirement-b", includeAtprotoIdentity: false);
+        await using ExploreDbContext context = fixture.CreateDbContext();
+        var repository = new AtprotoJetstreamRepository(context);
+        DateTime observedAt = CurrentUtc();
+        AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
+        AtprotoRecord first = Record(1, observedAt, "Multiple owners", "https://events.example/multiple");
+        AtprotoJetstreamApplyRequest initial = WithStagedThumbnail(
+            ApplyRequest(claim, 0, 1, first, firstScope.TenantId, "Multiple owners",
+                "https://events.example/multiple", observedAt), StagedThumbnail("multi-a"));
+        AtprotoFederatedEventImportPlan firstImport = initial.EventImports.Single();
+        initial = initial with
+        {
+            EventImports =
+            [
+                firstImport,
+                firstImport with
+                {
+                    TenantId = secondScope.TenantId,
+                    StagedThumbnail = PersistStagedThumbnail(secondScope.TenantId, StagedThumbnail("multi-b"))
+                }
+            ]
+        };
+        await Assert.That(await repository.TryApplyAndAdvanceAsync(initial)).IsTrue();
+        context.ChangeTracker.Clear();
+        StorageObject[] originals = await context.StorageObjects.AsNoTracking().ToArrayAsync();
+        DateTime updatedAt = observedAt.AddSeconds(1);
+        AtprotoRecord next = Record(2, updatedAt, "Multiple owners", "https://events.example/multiple");
+        AtprotoEventProjection projection = Projection(next, "Multiple owners", UtcOffset(10),
+            UtcOffset(13), UtcOffset(14), "https://events.example/multiple", updatedAt);
+        StagedStorageWrite[] stages =
+        [
+            PersistStagedThumbnail(firstScope.TenantId,
+                StagedThumbnail("multi-new-a", checksum: ReplacementThumbnailChecksum),
+                Guid.Parse("018e4e5c-7f00-7000-8000-000000000021")),
+            PersistStagedThumbnail(secondScope.TenantId,
+                StagedThumbnail("multi-new-b", checksum: ReplacementThumbnailChecksum),
+                Guid.Parse("018e4e5c-7f00-7000-8000-000000000022"))
+        ];
+        AtprotoPersistenceApplyResult result = await repository.TryReconcileWithResultAsync(
+            new AtprotoPdsSnapshotApplyRequest(claim, [Did],
+                [new AtprotoPdsSnapshot(Did, [new(Collection, RecordKey)], [new(next, projection)])],
+                [firstScope.TenantId, secondScope.TenantId], 2, updatedAt)
+            {
+                EventImports = stages.Select(stage => ImportPlan(stage.TenantId, next, projection) with
+                {
+                    Thumbnail = new AtprotoThumbnailBlobCandidate(Did, ReplacementThumbnailCid, "image/png", 8),
+                    StagedThumbnail = stage
+                }).ToArray()
+            }, CancellationToken.None);
+        context.ChangeTracker.Clear();
+        await Assert.That(result.Applied).IsTrue();
+        await Assert.That(result.ConsumedStagedThumbnails).IsEquivalentTo(stages);
+        await Assert.That(await context.StorageObjects.Select(value => value.Id).ToArrayAsync())
+            .IsEquivalentTo(stages.Select(value => value.OperationId));
+        await Assert.That(await context.Events.Select(value => value.FeaturedImageId!.Value).ToArrayAsync())
+            .IsEquivalentTo(stages.Select(value => value.OperationId));
+        StorageObjectDeletionTombstone[] custody = await context.StorageObjectDeletionTombstones.AsNoTracking().ToArrayAsync();
+        await Assert.That(custody.Select(value => value.Id)).IsEquivalentTo(originals.Select(value => value.Id));
+        foreach (StorageObject original in originals)
+        {
+            StorageObjectDeletionTombstone retired = custody.Single(value => value.Id == original.Id);
+            await Assert.That(retired.ProviderBindingId).IsEqualTo(original.StorageProviderBindingId);
+            await Assert.That(retired.ObjectKey).IsEqualTo(original.ObjectKey);
+            await Assert.That(retired.TenantId).IsEqualTo(original.TenantId);
+        }
+        await Assert.That(await context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
+        StorageUsageCounter[] quotas = await context.StorageUsageCounters.AsNoTracking().ToArrayAsync();
+        await Assert.That(quotas.Length).IsEqualTo(2);
+        foreach (StorageUsageCounter quota in quotas)
+        {
+            await Assert.That(quota.UsedBytes).IsEqualTo(8);
+            await Assert.That(quota.ReservedBytes).IsEqualTo(0);
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ThumbnailReplacement_CommitFenceLossRollsBackRetirementAndProducerQuota(bool snapshot)
+    {
+        await fixture.ResetAsync();
+        ImportScope scope = await SeedScopeAsync("atproto-retirement-fence");
+        DateTime observedAt = CurrentUtc();
+        AtprotoJetstreamClaim claim;
+        StorageObject source;
+        await using (ExploreDbContext context = fixture.CreateDbContext())
+        {
+            var repository = new AtprotoJetstreamRepository(context);
+            claim = await ClaimAsync(repository, observedAt);
+            AtprotoRecord first = Record(1, observedAt, "Fence event", "https://events.example/fence");
+            await repository.TryApplyAndAdvanceAsync(WithStagedThumbnail(
+                ApplyRequest(claim, 0, 1, first, scope.TenantId, "Fence event",
+                    "https://events.example/fence", observedAt), StagedThumbnail("fence-original")));
+            context.ChangeTracker.Clear();
+            source = await context.StorageObjects.AsNoTracking().SingleAsync();
+        }
+        StagedStorageWrite replacement = PersistStagedThumbnail(scope.TenantId,
+            StagedThumbnail("fence-replacement", checksum: ReplacementThumbnailChecksum));
+        var interceptor = new ExpireConsumerAfterSaveInterceptor(claim.ConsumerStateId);
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseNpgsql(fixture.ConnectionString).UseSnakeCaseNamingConvention()
+            .AddInterceptors(interceptor).Options;
+        await using (var context = new ExploreDbContext(options))
+        {
+            context.EnableTenantFilterBypass("Federation retirement commit-fence rollback test.");
+            var repository = new AtprotoJetstreamRepository(context);
+            DateTime updatedAt = observedAt.AddSeconds(1);
+            AtprotoRecord next = Record(2, updatedAt, "Fence updated", "https://events.example/fence");
+            AtprotoJetstreamApplyRequest request = ApplyRequest(claim, 1, 2, next, scope.TenantId,
+                "Fence updated", "https://events.example/fence", updatedAt);
+            AtprotoFederatedEventImportPlan import = request.EventImports.Single() with
+            {
+                Thumbnail = new AtprotoThumbnailBlobCandidate(Did, ReplacementThumbnailCid, "image/png", 8),
+                StagedThumbnail = replacement
+            };
+            AtprotoPersistenceApplyResult result = snapshot
+                ? await repository.TryReconcileWithResultAsync(new AtprotoPdsSnapshotApplyRequest(
+                    claim, [Did], [new AtprotoPdsSnapshot(Did, [new(Collection, RecordKey)],
+                        [new(next, request.EventProjection)])], [scope.TenantId], 2, updatedAt)
+                    { EventImports = [import] }, CancellationToken.None)
+                : await repository.TryApplyAndAdvanceWithResultAsync(request with { EventImports = [import] });
+            await Assert.That(result.Applied).IsFalse();
+            await Assert.That(result.ConsumedStagedThumbnails.Count).IsEqualTo(0);
+            await Assert.That(interceptor.FailuresInjected).IsEqualTo(1);
+        }
+        await using ExploreDbContext verify = fixture.CreateDbContext();
+        await Assert.That(await verify.StorageObjectDeletionTombstones.CountAsync()).IsEqualTo(0);
+        StorageObject retainedSource = await verify.StorageObjects.AsNoTracking().SingleAsync();
+        await Assert.That(retainedSource.Id).IsEqualTo(source.Id);
+        await Assert.That(retainedSource.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        await Assert.That(await verify.Events.Select(value => value.FeaturedImageId).SingleAsync()).IsEqualTo(source.Id);
+        await Assert.That(await verify.AtprotoRecords.Select(value => value.SourceVersion).SingleAsync()).IsEqualTo(1);
+        await Assert.That(await verify.AtprotoJetstreamConsumerStates.Select(value => value.Cursor).SingleAsync()).IsEqualTo(1);
+        StorageProducerOperation unconsumed = await verify.Set<StorageProducerOperation>().AsNoTracking().SingleAsync();
+        await Assert.That(unconsumed.Id).IsEqualTo(replacement.OperationId);
+        await Assert.That(unconsumed.ProducerSettled).IsTrue();
+        await Assert.That(unconsumed.ProviderBindingId).IsEqualTo(replacement.BindingId);
+        StorageUsageCounter quota = await verify.StorageUsageCounters.AsNoTracking().SingleAsync();
+        await Assert.That(quota.UsedBytes).IsEqualTo(8);
+        await Assert.That(quota.ReservedBytes).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments("tombstone")]
+    [Arguments("absence")]
+    [Arguments("rejected-snapshot")]
+    public async Task ThumbnailTombstone_OwnerKindOrphanTransfersUnsettledProducerWithoutGuessingAbsence(string route)
+    {
+        await fixture.ResetAsync();
+        ImportScope scope = await SeedScopeAsync("atproto-orphan-retirement");
+        await using ExploreDbContext context = fixture.CreateDbContext();
+        var repository = new AtprotoJetstreamRepository(context);
+        DateTime observedAt = CurrentUtc();
+        AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
+        AtprotoRecord first = Record(1, observedAt, "Orphan owner", "https://events.example/orphan");
+        await repository.TryApplyAndAdvanceAsync(ApplyRequest(claim, 0, 1, first, scope.TenantId,
+            "Orphan owner", "https://events.example/orphan", observedAt));
+        Guid eventId = await context.Events.Select(value => value.Id).SingleAsync();
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        var operation = StorageProducerOperation.Create(Guid.CreateVersion7(), scope.TenantId, binding,
+            "atproto/unsettled-orphan", observedAt);
+        var orphan = new StorageObject
+        {
+            Id = operation.Id, TenantId = scope.TenantId, Tenant = null!, ActorId = scope.ActorId,
+            FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
+            Provider = binding.Provider, StorageProviderBindingId = binding.Id, ObjectKey = operation.ObjectKey,
+            ProviderVersionId = "observed-before-settlement", FullName = "orphan.png", SafeDisplayName = "orphan.png",
+            Extension = ".png", ContentType = "image/png", Sha256Checksum = ThumbnailChecksum, Size = 8,
+            Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            OwningResourceKind = ResourceKinds.Event, OwningResourceId = eventId, CreatedAt = observedAt
+        };
+        context.AddRange(binding, operation, orphan);
+        await SaveFixtureAsync(context);
+        context.ChangeTracker.Clear();
+        DateTime deletedAt = observedAt.AddSeconds(1);
+        bool applied;
+        if (route == "tombstone")
+        {
+            AtprotoRecord deleted = Record(2, deletedAt, "Orphan owner", "https://events.example/orphan");
+            deleted.TombstonedAt = deletedAt;
+            deleted.Cid = null;
+            deleted.RecordJson = null;
+            applied = await repository.TryApplyAndAdvanceAsync(new(claim, 1, 2, deleted, [], null, deletedAt));
+        }
+        else
+        {
+            applied = await repository.TryReconcileAsync(new AtprotoPdsSnapshotApplyRequest(claim, [Did],
+                [new AtprotoPdsSnapshot(Did, route == "absence" ? [] : [new(Collection, RecordKey)], [])],
+                [scope.TenantId], 2, deletedAt), CancellationToken.None);
+        }
+        context.ChangeTracker.Clear();
+        await Assert.That(applied).IsTrue();
+        await Assert.That(await context.StorageObjects.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
+        StorageObjectDeletionTombstone custody = await context.StorageObjectDeletionTombstones.AsNoTracking().SingleAsync();
+        await Assert.That(custody.Id).IsEqualTo(orphan.Id);
+        await Assert.That(custody.ProviderBindingId).IsEqualTo(binding.Id);
+        await Assert.That(custody.ObjectKey).IsEqualTo(operation.ObjectKey);
+        await Assert.That(custody.ProviderObjectVersion).IsEqualTo("observed-before-settlement");
+        await Assert.That(custody.State).IsEqualTo(StorageObjectDeletionState.AwaitingProducer);
+        await Assert.That(await new StorageObjectDeletionTombstoneRepository(context)
+            .ListDueAsync(deletedAt, 100, CancellationToken.None)).IsEmpty();
+        StorageUsageCounter quota = await context.StorageUsageCounters.AsNoTracking().SingleAsync();
+        await Assert.That(quota.UsedBytes).IsEqualTo(0);
+        await Assert.That(quota.ReservedBytes).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task JetstreamApply_ReplaysAndReplacementPreserveIdsWithoutDuplicateOrOrphanedImages()
     {
         await fixture.ResetAsync();
@@ -562,7 +942,8 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         context.ChangeTracker.Clear();
         Guid eventId = await context.Events.Select(value => value.Id).SingleAsync();
         Guid sessionId = await context.EventSessions.Select(value => value.Id).SingleAsync();
-        Guid firstImageId = await context.StorageObjects.Select(value => value.Id).SingleAsync();
+        StorageObject firstImage = await context.StorageObjects.AsNoTracking().SingleAsync();
+        Guid firstImageId = firstImage.Id;
 
         AtprotoRecord equal = Record(2, observedAt.AddSeconds(1), "Ignored equal", "https://events.example/equal");
         await repository.TryApplyAndAdvanceAsync(WithStagedThumbnail(
@@ -613,11 +994,13 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await Assert.That(replaced).IsTrue();
         await Assert.That(imported.Id).IsEqualTo(eventId);
         await Assert.That(await context.EventSessions.Select(value => value.Id).SingleAsync()).IsEqualTo(sessionId);
-        await Assert.That(images.Length).IsEqualTo(2);
-        StorageObject original = images.Single(value => value.Id == firstImageId);
-        await Assert.That(original.SourceUri!.Contains(ThumbnailCid, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(original.LifecycleState)
-            .IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
+        await Assert.That(images.Length).IsEqualTo(1);
+        StorageObjectDeletionTombstone retired = await context.StorageObjectDeletionTombstones.AsNoTracking().SingleAsync();
+        await Assert.That(retired.Id).IsEqualTo(firstImageId);
+        await Assert.That(retired.ProviderBindingId).IsEqualTo(firstImage.StorageProviderBindingId);
+        await Assert.That(retired.ObjectKey).IsEqualTo(firstImage.ObjectKey);
+        await Assert.That(retired.ProviderObjectVersion).IsEqualTo(firstImage.ProviderVersionId);
+        await Assert.That(retired.State).IsEqualTo(StorageObjectDeletionState.Ready);
         StorageObject replacement = images.Single(value => value.ObjectKey == "atproto/thumbnail-b");
         await Assert.That(replacement.Id).IsNotEqualTo(firstImageId);
         await Assert.That(replacement.SourceUri!.Contains(ReplacementThumbnailCid, StringComparison.Ordinal)).IsTrue();
@@ -1425,16 +1808,15 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
             .AsNoTracking()
             .SingleAsync();
-        StorageObject image = await context.StorageObjects
-            .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
-            .AsNoTracking()
-            .SingleAsync();
+        StorageObjectDeletionTombstone image = await context.StorageObjectDeletionTombstones.AsNoTracking().SingleAsync();
         await Assert.That(deleted).IsTrue();
         await Assert.That(imported.IsDeleted).IsTrue();
         await Assert.That(imported.DeletedAt).IsEqualTo(observedAt.AddSeconds(1));
         await Assert.That(session.IsDeleted).IsTrue();
         await Assert.That(session.DeletedAt).IsEqualTo(observedAt.AddSeconds(1));
-        await Assert.That(image.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
+        await Assert.That(image.ObjectKey).IsEqualTo("atproto/thumbnail-tombstone");
+        await Assert.That(image.State).IsEqualTo(StorageObjectDeletionState.Ready);
+        await Assert.That(await context.StorageObjects.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
         await Assert.That(await context.Events.CountAsync()).IsEqualTo(0);
         await Assert.That(await context.EventSessions.CountAsync()).IsEqualTo(0);
         await Assert.That(await context.PdsSyncOutbox.CountAsync()).IsEqualTo(0);
@@ -1472,7 +1854,9 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await Assert.That(await context.EventSessions.CountAsync()).IsEqualTo(0);
         await Assert.That(await context.StorageObjects
             .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
-            .CountAsync()).IsEqualTo(1);
+            .CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.StorageObjectDeletionTombstones.Select(value => value.Id).SingleAsync())
+            .IsEqualTo(image.Id);
         await Assert.That(await context.PdsSyncOutbox.CountAsync()).IsEqualTo(0);
     }
 
@@ -2026,7 +2410,8 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 CancellationToken.None)).Single();
             byte[] initialBytes = RealPipelineImageBytes;
             await using var initialContent = new MemoryStream(initialBytes, writable: false);
-            var producer = CreateProducer(context, storageRoot).Producer;
+            var production = CreateProducer(context, storageRoot);
+            var producer = production.Producer;
             StagedStorageWrite initialStage = await producer.WriteAsync(StorageProviders.Local,
                 new FileStorageWriteInput(
                     scope.TenantId,
@@ -2170,7 +2555,8 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 .AsNoTracking()
                 .OrderBy(value => value.CreatedAt)
                 .ToArrayAsync();
-            StorageObject retiredImage = images.Single(value => value.Id == initialImageId);
+            StorageObjectDeletionTombstone retiredImage = await context.StorageObjectDeletionTombstones
+                .AsNoTracking().SingleAsync();
             StorageObject replacementImage = images.Single(value => value.Id != initialImageId);
             await Assert.That(replaced.Applied).IsTrue();
             await Assert.That(replaced.ConsumedStagedThumbnails).IsEquivalentTo([replacementStage]);
@@ -2186,11 +2572,13 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await Assert.That(session.Slug).IsEqualTo(sessionSlug);
             await Assert.That(session.LocalStartTime).IsEqualTo(new TimeOnly(17, 0));
             await Assert.That(session.LocalEndTime).IsEqualTo(new TimeOnly(18, 0));
-            await Assert.That(images.Length).IsEqualTo(2);
-            await Assert.That(retiredImage.SourceUri!.Contains(RealPipelineThumbnailCid, StringComparison.Ordinal)).IsTrue();
+            await Assert.That(images.Length).IsEqualTo(1);
+            await Assert.That(retiredImage.Id).IsEqualTo(initialImageId);
             await Assert.That(retiredImage.Provider).IsEqualTo(initialStage.Write.Provider);
+            await Assert.That(retiredImage.ProviderBindingId).IsEqualTo(initialStage.BindingId);
             await Assert.That(retiredImage.ObjectKey).IsEqualTo(initialStage.Write.ObjectKey);
-            await Assert.That(retiredImage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
+            await Assert.That(retiredImage.ProviderObjectVersion).IsEqualTo(initialStage.Write.ProviderVersionId);
+            await Assert.That(retiredImage.State).IsEqualTo(StorageObjectDeletionState.Ready);
             await Assert.That(replacementImage.Id).IsNotEqualTo(initialImageId);
             await Assert.That(replacementImage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
             await Assert.That(replacementImage.SourceUri!.Contains(ReplacementPipelineThumbnailCid, StringComparison.Ordinal))
@@ -2219,6 +2607,21 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 await Assert.That(storedBytes.ToArray()).IsEquivalentTo(replacementBytes);
             }
 
+            var worker = new EventResourceStorageCleanupService(
+                new StorageObjectDeletionTombstoneRepository(context), production.Bindings,
+                new RetirementClock(updatedAt), NullLogger<EventResourceStorageCleanupService>.Instance,
+                new EventResourceStorageLifecycleRepository(context), new EfCoreUnitOfWork(context));
+            StorageObjectDeletionResult cleaned = await worker.ProcessDueAsync(100, false, CancellationToken.None);
+            await Assert.That(cleaned.DeletedCount).IsEqualTo(1);
+            await Assert.That(cleaned.FailedCount).IsEqualTo(0);
+            await Assert.That(await storage.ExistsAsync(new(initialStage.Write.ObjectKey), CancellationToken.None)).IsFalse();
+            await Assert.That(await storage.ExistsAsync(new(replacementStage.Write.ObjectKey), CancellationToken.None)).IsTrue();
+            context.ChangeTracker.Clear();
+            await Assert.That(await context.StorageObjectDeletionTombstones.CountAsync()).IsEqualTo(0);
+            StorageUsageCounter quota = await context.StorageUsageCounters.AsNoTracking().SingleAsync();
+            await Assert.That(quota.UsedBytes).IsEqualTo(replacementBytes.Length);
+            await Assert.That(quota.ReservedBytes).IsEqualTo(0);
+            await Assert.That(await context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
             await Assert.That(await context.PdsSyncOutbox.CountAsync()).IsEqualTo(0);
         }
         finally
@@ -2300,7 +2703,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             Title = "Unrelated local event",
         };
         context.AddRange(localEvent, localSession);
-        await context.SaveChangesAsync();
+        await SaveFixtureAsync(context);
         context.ChangeTracker.Clear();
         Guid importedEventId = await context.Events
             .Where(value => value.AtprotoRecordId != null)
@@ -2330,10 +2733,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
             .AsNoTracking()
             .SingleAsync(value => value.Id == importedSessionId);
-        StorageObject importedImage = await context.StorageObjects
-            .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
-            .AsNoTracking()
-            .SingleAsync();
+        StorageObjectDeletionTombstone importedImage = await context.StorageObjectDeletionTombstones.AsNoTracking().SingleAsync();
         Explore.Domain.Event remaining = await context.Events.AsNoTracking().SingleAsync();
         EventSession remainingSession = await context.EventSessions.AsNoTracking().SingleAsync();
         await Assert.That(created).IsTrue();
@@ -2343,8 +2743,10 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await Assert.That(imported.DeletedAt).IsEqualTo(absenceObservedAt);
         await Assert.That(importedSession.IsDeleted).IsTrue();
         await Assert.That(importedSession.DeletedAt).IsEqualTo(absenceObservedAt);
-        await Assert.That(importedImage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
-        await Assert.That(importedImage.OwningResourceId).IsEqualTo(importedEventId);
+        await Assert.That(importedImage.State).IsEqualTo(StorageObjectDeletionState.Ready);
+        await Assert.That(importedImage.TenantId).IsEqualTo(importedScope.TenantId);
+        await Assert.That(importedImage.ObjectKey).IsEqualTo("atproto/thumbnail-pds-absence");
+        await Assert.That(await context.StorageObjects.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
         await Assert.That(remaining.Id).IsEqualTo(localEvent.Id);
         await Assert.That(remaining.TenantId).IsEqualTo(localScope.TenantId);
         await Assert.That(remainingSession.Id).IsEqualTo(localSession.Id);
@@ -2391,7 +2793,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         };
         DateTime beforeSave = DateTime.UtcNow;
         context.AddRange(actor, identity);
-        await context.SaveChangesAsync();
+        await SaveFixtureAsync(context);
         DateTime afterSave = DateTime.UtcNow;
 
         context.ChangeTracker.Clear();
@@ -2472,7 +2874,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         {
             context.Add(identity);
         }
-        await context.SaveChangesAsync();
+        await SaveFixtureAsync(context);
         return new(tenant.Id, actor.Id);
     }
 
@@ -2539,20 +2941,34 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             ]
         };
 
-    private StagedStorageWrite PersistStagedThumbnail(Guid tenantId, FileStorageWriteResult written)
+    private StagedStorageWrite PersistStagedThumbnail(
+        Guid tenantId, FileStorageWriteResult written, Guid? operationId = null)
     {
         using var context = fixture.CreateDbContext();
         var binding = StorageProviderBinding.Local(Path.GetTempPath());
-        var operation = StorageProducerOperation.Create(Guid.CreateVersion7(), tenantId, binding,
+        var operation = StorageProducerOperation.Create(operationId ?? Guid.CreateVersion7(), tenantId, binding,
             string.IsNullOrWhiteSpace(written.ObjectKey) ? $"invalid-result/{Guid.CreateVersion7():N}" : written.ObjectKey,
             DateTime.UtcNow);
         operation.Settle(binding.Id, binding.Provider, operation.ObjectKey, written.ProviderVersionId);
         context.AddRange(binding, operation);
-        context.SaveChanges();
+        context.Database.CreateExecutionStrategy().Execute(() =>
+        {
+            using var transaction = context.Database.BeginTransaction();
+            context.SaveChanges();
+            transaction.Commit();
+        });
         return new(operation.Id, tenantId, binding.Id, written);
     }
 
-    private static (ManagedStorageProducer Producer, IStoragePolicyResolver Policy) CreateProducer(
+    private static Task<int> SaveFixtureAsync(ExploreDbContext context) =>
+        new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(ct => context.SaveChangesAsync(ct));
+
+    private sealed class RetirementClock(DateTime utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(utcNow);
+    }
+
+    private static (ManagedStorageProducer Producer, IStoragePolicyResolver Policy, IStorageProviderBindingService Bindings) CreateProducer(
         ExploreDbContext context, string root)
     {
         Directory.CreateDirectory(root);
@@ -2564,7 +2980,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             Substitute.For<IRetainedSecretResolver>(), options, Substitute.For<IS3ClientFactory>(), NullLoggerFactory.Instance);
         var policy = new StoragePolicyResolver(settings, new FileStorageProviderResolver(
             [new LocalFileStorageProvider(options, NullLogger<LocalFileStorageProvider>.Instance)]));
-        return (new ManagedStorageProducer(bindings, new StorageObjectRepository(context), new EfCoreUnitOfWork(context)), policy);
+        return (new ManagedStorageProducer(bindings, new StorageObjectRepository(context), new EfCoreUnitOfWork(context)), policy, bindings);
     }
 
     private static FileStorageWriteResult StagedThumbnail(
@@ -2794,6 +3210,25 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         new(Utc(hour));
 
     private sealed record ImportScope(Guid TenantId, Guid ActorId);
+
+    private sealed class ExpireConsumerAfterSaveInterceptor(Guid consumerStateId) : SaveChangesInterceptor
+    {
+        public int FailuresInjected { get; private set; }
+
+        public override async ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
+        {
+            if (FailuresInjected == 0)
+            {
+                FailuresInjected++;
+                await ((ExploreDbContext)eventData.Context!).AtprotoJetstreamConsumerStates
+                    .Where(value => value.Id == consumerStateId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.LeaseExpiresAt, Utc(12)),
+                        cancellationToken);
+            }
+            return result;
+        }
+    }
 
     private sealed class CancelAfterSaveInterceptor : SaveChangesInterceptor
     {

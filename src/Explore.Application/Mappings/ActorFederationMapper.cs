@@ -126,6 +126,7 @@ public static partial class ActorFederationMapper
     [MapperIgnoreSource(nameof(StorageObject.DeletedBy))]
     [MapperIgnoreSource(nameof(StorageObject.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(StorageObjectDto.ContentEligibility))]
+    [MapperIgnoreTarget(nameof(StorageObjectDto.RetirementAllowed))]
     [MapProperty(nameof(StorageObject.FileType), nameof(StorageObjectDto.FileTypeFullName), Use = nameof(FileTypeName))]
     [MapProperty(nameof(StorageObject.FileType), nameof(StorageObjectDto.FileTypeMasterCode), Use = nameof(FileTypeCode))]
     [MapProperty(nameof(StorageObject.Tenant), nameof(StorageObjectDto.TenantFullName), Use = nameof(TenantName))]
@@ -162,6 +163,7 @@ public static partial class ActorFederationMapper
     [MapperIgnoreSource(nameof(StorageObject.DeletedBy))]
     [MapperIgnoreSource(nameof(StorageObject.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(StorageObjectListDto.ContentEligibility))]
+    [MapperIgnoreTarget(nameof(StorageObjectListDto.RetirementAllowed))]
     [MapProperty(nameof(StorageObject.FileType), nameof(StorageObjectListDto.FileTypeFullName), Use = nameof(FileTypeName))]
     public static partial StorageObjectListDto ToStorageListItem(StorageObject source);
 

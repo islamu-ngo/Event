@@ -221,13 +221,21 @@ public sealed partial class NativeStorageObjectHttpTests
         using (var canceled = await client.DeleteAsync($"{Root}/upload-sessions/{reserved.Id}"))
             await ProblemAsync(canceled, HttpStatusCode.Conflict, FailureCodes.StorageUploadSessionFinalized);
         using (var deleted = await client.DeleteAsync($"{Root}/{id}"))
-            await Assert.That(deleted.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
-        await Assert.That(factory.Objects).IsEmpty();
+        {
+            await Assert.That(deleted.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+            var acknowledgement = (await deleted.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>())!;
+            await Assert.That(acknowledgement.IsSuccess).IsTrue();
+            await Assert.That(acknowledgement.Id).IsEqualTo(id);
+        }
+        await Assert.That(factory.Objects.Values.Single()).IsEquivalentTo("hello"u8.ToArray());
         using (var scope = factory.Services.CreateScope())
         {
             var visible = await scope.ServiceProvider.GetRequiredService<IStorageObjectRepository>()
                 .GetForGenericAccessAsync(id, default);
             await Assert.That(visible).IsNull();
+            var work = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .Set<StorageObjectDeletionTombstone>().SingleAsync(row => row.Id == id);
+            await Assert.That(work.State).IsEqualTo(StorageObjectDeletionState.Ready);
         }
         using (var missing = await client.GetAsync($"{Root}/{id}/content"))
             await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.NotFound);

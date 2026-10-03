@@ -17,7 +17,9 @@ public sealed class StorageReconciliationService(
     IOptions<StorageReconciliationSettings> settings,
     BusinessMetrics metrics,
     ILogger<StorageReconciliationService> logger,
-    IEventResourceStorageCleanupService resourceCleanup) : IStorageReconciliationService
+    IEventResourceStorageCleanupService resourceCleanup,
+    IEventResourceStorageLifecycleRepository lifecycle,
+    IUnitOfWork unitOfWork) : IStorageReconciliationService
 {
     private const string MissingBackingObjectReason = "backing_object_missing";
     private const string MissingMetadataRecordReason = "metadata_record_missing";
@@ -159,19 +161,27 @@ public sealed class StorageReconciliationService(
 
             try
             {
-                var provider = await providerResolver.ResolveTargetAsync(
-                    storageObject.StorageProviderBindingId, storageObject.Provider, cancellationToken);
-                var deleted = await provider.DeleteAsync(
-                    new FileStorageDeleteInput(storageObject.ObjectKey, storageObject.ProviderVersionId),
+                // Each transaction declares one complete source set through admission's fence.
+                // Pending means durable custody transfer; only the tombstone worker deletes bytes.
+                var admission = await unitOfWork.ExecuteSerializableAsync(
+                    ct => lifecycle.TryQueueRetirementAsync(storageObject.TenantId, storageObject.Id, utcNow, ct),
                     cancellationToken);
-                if (deleted.Provider != storageObject.Provider || deleted.ObjectKey != storageObject.ObjectKey
-                    || deleted.DeleteMarkerCreated)
-                    throw new InvalidOperationException("storage_deletion_unconfirmed");
-
-                storageObject.MarkDeleted(null, utcNow);
-                await storageObjectRepository.Update(storageObject);
-                counts.DeletedMetadataCount++;
-                metrics.RecordStorageDelete(storageObject.Provider, "succeeded");
+                switch (admission)
+                {
+                    case StorageRetirementAdmission.Pending:
+                        counts.DeletedMetadataCount++;
+                        break;
+                    case StorageRetirementAdmission.NotFound:
+                    case StorageRetirementAdmission.InUse:
+                    case StorageRetirementAdmission.RetentionBlocked:
+                        counts.SkippedCount++;
+                        break;
+                    case StorageRetirementAdmission.InvalidTarget:
+                        counts.FailedCount++;
+                        break;
+                    default:
+                        throw new InvalidOperationException("Unknown storage retirement acknowledgement.");
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -182,7 +192,7 @@ public sealed class StorageReconciliationService(
                 counts.FailedCount++;
                 metrics.RecordStorageDelete(storageObject.Provider, "failed", CategorizeProviderFailure(ex));
                 logger.LogWarning(
-                    "Storage reconciliation failed while deleting quarantined metadata object for provider {Provider}.",
+                    "Storage reconciliation failed while admitting quarantined metadata retirement for provider {Provider}.",
                     NormalizeProviderForLog(storageObject.Provider));
             }
         }

@@ -37,6 +37,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
     private readonly IAudienceGenderRepository _audienceGenderRepository;
     private readonly IEventTypeRepository _eventTypeRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
+    private readonly IStorageObjectReferenceRepository _storageObjectReferenceRepository;
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly IEventSeriesRepository _eventSeriesRepository;
     private readonly IEventRegistrationPolicyRepository _eventRegistrationPolicyRepository;
@@ -92,6 +93,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         IAudienceGenderRepository audienceGenderRepository,
         IEventTypeRepository eventTypeRepository,
         IStorageObjectRepository storageObjectRepository,
+        IStorageObjectReferenceRepository storageObjectReferenceRepository,
         IEventTemplateRepository eventTemplateRepository,
         IEventSeriesRepository eventSeriesRepository,
         IEventRegistrationPolicyRepository eventRegistrationPolicyRepository,
@@ -146,6 +148,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         _audienceGenderRepository = audienceGenderRepository;
         _eventTypeRepository = eventTypeRepository;
         _storageObjectRepository = storageObjectRepository;
+        _storageObjectReferenceRepository = storageObjectReferenceRepository;
         _eventTemplateRepository = eventTemplateRepository;
         _eventSeriesRepository = eventSeriesRepository;
         _eventRegistrationPolicyRepository = eventRegistrationPolicyRepository;
@@ -321,6 +324,9 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                     eventEntity.Publish(occurredAt);
                 }
 
+                await _storageObjectReferenceRepository.FenceAsync(
+                    imageIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToArray(),
+                    ct);
                 eventEntity = await _eventRepository.Create(eventEntity);
                 await AssignFeaturedImageActorAsync(dto, actorResult.ActorId);
                 await CreateEventIslamicAspectAsync(dto, eventEntity, ct);

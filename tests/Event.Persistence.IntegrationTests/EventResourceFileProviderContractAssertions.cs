@@ -145,8 +145,14 @@ internal static class EventResourceFileProviderContractAssertions
         UploadSeed seed = await SeedUploadAsync(contextFactory);
         Guid firstSessionId;
         Guid secondSessionId;
+        long existingBytes;
+        long existingObjects;
         await using (ExploreDbContext reserve = contextFactory())
         {
+            var inventory = reserve.StorageObjects.AsNoTracking()
+                .Where(row => row.TenantId == seed.TenantId && row.Provider == StorageProviders.Local);
+            existingBytes = await inventory.SumAsync(row => row.Size);
+            existingObjects = await inventory.LongCountAsync();
             EventResourceFileUploadWorkflow workflow = UploadWorkflow(reserve, contextFactory, seed);
             var firstReservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
             if (firstReservation.Id is null)
@@ -205,8 +211,8 @@ internal static class EventResourceFileProviderContractAssertions
         StorageUsageCounter quota = await verify.StorageUsageCounters.AsNoTracking()
             .SingleAsync(row => row.TenantId == seed.TenantId, deadline.Token);
         await Assert.That(quota.ReservedBytes).IsEqualTo(0);
-        await Assert.That(quota.UsedBytes).IsEqualTo(Pdf.Length);
-        await Assert.That(quota.ObjectCount).IsEqualTo(1);
+        await Assert.That(quota.UsedBytes).IsEqualTo(existingBytes + Pdf.Length);
+        await Assert.That(quota.ObjectCount).IsEqualTo(existingObjects + 1);
         await Assert.That(await verify.StorageObjects.AsNoTracking().CountAsync(row =>
             row.OwningResourceId == seed.ResourceId && row.LifecycleState == StorageObjectLifecycleStates.Active,
             deadline.Token)).IsEqualTo(1);

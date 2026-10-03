@@ -234,6 +234,8 @@ public sealed class StorageAdminHateoasTests
             Visibility = StorageObjectVisibilities.PublicImage,
             Purpose = StorageObjectPurposes.EventImage,
             LifecycleState = StorageObjectLifecycleStates.Active,
+            SupportsPresignedDownload = true,
+            RetirementAllowed = true,
             TenantId = tenantId
         };
 

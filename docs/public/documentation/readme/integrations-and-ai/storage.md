@@ -75,6 +75,31 @@ file cleanup. A retained organization evidence document stays stored even when
 the resource is redacted. Pending producer work keeps its original target until
 that exact write is acknowledged; age alone cannot authorize deletion.
 
+`DELETE /api/storageobject/{id}` returns `202 Accepted` with the object UUID
+when cleanup custody has committed. It does not synchronously erase provider
+bytes. In-use, retention-blocked or invalid captured targets return `409` with
+a bounded problem code, without other owners' names. Missing eligible metadata
+returns `404`; a fresh request cannot authorize from the retained cleanup record.
+
+Use the metadata response's HAL `delete` link to offer retirement. An `edit`
+link alone does not permit deletion. A file can remain editable while another
+physical reference or retention hold prevents retirement. The link is a current
+hint, not a reservation: a new attachment can make a later request return `409`.
+Refresh the metadata rather than infer permission from a role or file name.
+
+After acceptance, the existing cleanup worker retries the captured target.
+An uncertain provider response retains durable retry custody. An unfinished
+upload remains pending until its exact producer acknowledges completion; a
+late acknowledgement cannot recreate erased metadata. Do not change provider
+keys or infer completion from elapsed time to clear pending work.
+
+Tenant storage administration includes a bounded file list. It checks the
+collection and fresh detail response's retirement links, asks for confirmation,
+and announces accepted cleanup as pending. A stale in-use, retention or invalid
+target response refreshes current metadata; it does not reveal the identity of
+another reference owner. Removing a profile or resource attachment is a separate
+action and does not itself prove that provider bytes have been erased.
+
 For API integrations, `PATCH /api/user/{id}` accepts a `profileImage` group with
 either `profilePictureId` or `externalProfilePictureUri`. Supply neither value
 in a present group to clear; omit the group to preserve the image. Supplying both

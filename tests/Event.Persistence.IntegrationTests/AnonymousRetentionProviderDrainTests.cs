@@ -374,6 +374,42 @@ public sealed class AnonymousRetentionProviderDrainTests
     private sealed record Graph(RegistrationOrder Order, RegistrationRequirement Requirement, RegistrationFormVersion Version,
         RegistrationFormSection Section, RegistrationProviderBinding Binding, RegistrationSubmission Submission);
 
+    [Test]
+    [Arguments("completed")]
+    [Arguments("dead-lettered")]
+    [Arguments("parked")]
+    [Arguments("retry")]
+    public async Task DeliverySettlementFencesCsvAndPreservesUnresolvedAuthority(string outcome)
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        var storage = await harness.SeedArtifactAsync(graph);
+        var repository = new RegistrationProviderSubmissionWriteEffectRepository(harness.Context);
+        var claim = (await repository.ClaimDueAsync("settlement", 1, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+        Guid before = await harness.Context.StorageObjects.AsNoTracking()
+            .Where(item => item.Id == storage.Id).Select(item => item.ConcurrencyStamp).SingleAsync();
+
+        bool settled = outcome switch
+        {
+            "completed" => await repository.CompleteAsync(claim, Now, CancellationToken.None),
+            "dead-lettered" => await repository.DeadLetterAsync(claim, "rejected", Now, CancellationToken.None),
+            "parked" => await repository.ParkAmbiguousAsync(claim, "uncertain", Now, CancellationToken.None),
+            _ => await repository.RetryAsync(claim, "unavailable", Now.AddMinutes(1), Now, CancellationToken.None)
+        };
+
+        await Assert.That(settled).IsTrue();
+        Guid after = await harness.Context.StorageObjects.AsNoTracking()
+            .Where(item => item.Id == storage.Id).Select(item => item.ConcurrencyStamp).SingleAsync();
+        await Assert.That(after).IsNotEqualTo(before);
+        await using var transaction = await harness.Context.Database.BeginTransactionAsync();
+        await Assert.That(await new StorageObjectReferenceRepository(harness.Context)
+            .HasBlockingHoldsAsync(storage.Id, Now.AddDays(2), CancellationToken.None))
+            .IsEqualTo(outcome is "parked" or "retry");
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+    }
+
     private sealed class Harness(EventVisitorCapabilitySqliteFixture fixture, Clock clock) : IAsyncDisposable
     {
         public Explore.Persistence.ExploreDbContext Context => fixture.Context;
@@ -471,6 +507,30 @@ public sealed class AnonymousRetentionProviderDrainTests
         }
 
         public void SetUtcNow(DateTime now) => clock.UtcNow = now;
+
+        public async Task<StorageObject> SeedArtifactAsync(Graph graph)
+        {
+            new Explore.Application.Services.Registration.FormSchemaArtifactPublicationService(
+                new Explore.Application.Services.Registration.FormSchemaArtifactGenerator()).Publish(graph.Version, Now);
+            var binding = await fixture.Services.GetRequiredService<IStorageProviderBindingService>()
+                .CaptureAsync(StorageProviders.Local, graph.Order.TenantId, CancellationToken.None);
+            var storage = new StorageObject
+            {
+                Id = Guid.CreateVersion7(), TenantId = graph.Order.TenantId, Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
+                Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
+                ObjectKey = $"retention-test/{Guid.CreateVersion7():N}.csv",
+                FullName = "answer.csv", SafeDisplayName = "answer.csv", Extension = ".csv",
+                ContentType = "text/csv", Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+                Purpose = StorageObjectPurposes.Document, LifecycleState = StorageObjectLifecycleStates.Active,
+                OwningResourceKind = "registration_submission_sink", OwningResourceId = graph.Submission.Id,
+                RegistrationContentRetentionUntilUtc = Now, ConcurrencyStamp = Guid.CreateVersion7()
+            };
+            Context.Add(storage);
+            await Context.SaveChangesAsync();
+            Context.ChangeTracker.Clear();
+            return storage;
+        }
 
         public async Task<int> DrainAsync(Func<Task>? afterHandoff = null)
         {

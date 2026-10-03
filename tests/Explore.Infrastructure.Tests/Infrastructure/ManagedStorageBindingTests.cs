@@ -55,9 +55,10 @@ public sealed class ManagedStorageBindingTests
         var saved = await env.Sessions.GetForAuthorizationAsync(reservation.Id!.Id, default);
         var original = saved!.StorageProviderBindingId!.Value;
         env.Options.RootPath = env.OtherRoot;
+        var lifecycle = new EventResourceStorageLifecycleRepository(env.Context);
         var finalizer = new FinalizeStorageUploadSessionCommandHandler(env.Bindings, env.Policy, env.Sessions,
-            env.Counters, env.Objects, new PrivacyErasureStateRepository(env.Context), env.Database, env.User,
-            env.Unit, env.Metrics);
+            env.Counters, env.Objects, new PrivacyErasureStateRepository(env.Context), lifecycle, env.Database,
+            env.User, env.Unit, env.Metrics);
         using var content = new MemoryStream(Png);
         var finalized = await finalizer.ExecuteAsync(new FinalizeStorageUploadSessionCommand
         {
@@ -84,9 +85,147 @@ public sealed class ManagedStorageBindingTests
         }
         // A later HTTP request has a fresh identity map.
         env.Context.ChangeTracker.Clear();
-        var deletion = new DeleteStorageObjectCommandHandler(env.Objects, env.Bindings, env.Metrics);
-        await Assert.That(await deletion.ExecuteAsync(new DeleteStorageObjectCommand { Id = metadata.Id }, default)).IsTrue();
+        var deletion = new DeleteStorageObjectCommandHandler(env.Objects, lifecycle, env.Unit, TimeProvider.System);
+        var admitted = await deletion.ExecuteAsync(new DeleteStorageObjectCommand { Id = metadata.Id }, default);
+        await Assert.That(admitted.IsSuccess).IsTrue();
+        await Assert.That(File.Exists(Path.Combine(env.Root, metadata.ObjectKey!))).IsTrue();
+        await Assert.That(await env.Context.StorageObjects.AnyAsync(row => row.Id == metadata.Id)).IsFalse();
+        var tombstones = new StorageObjectDeletionTombstoneRepository(env.Context);
+        var work = await env.Context.Set<StorageObjectDeletionTombstone>().SingleAsync(row => row.Id == metadata.Id);
+        await Assert.That(work.ProviderBindingId).IsEqualTo(original);
+        var cleanup = new EventResourceStorageCleanupService(tombstones, env.Bindings, TimeProvider.System,
+            NullLogger<EventResourceStorageCleanupService>.Instance, lifecycle, env.Unit);
+        var cleaned = await cleanup.ProcessDueAsync(20, false, default);
+        await Assert.That(cleaned.DeletedCount).IsEqualTo(1);
         await Assert.That(File.Exists(Path.Combine(env.Root, metadata.ObjectKey!))).IsFalse();
+    }
+
+    [Test]
+    public async Task RejectedSignatureAcknowledgesStoppedProducerWithoutWritingBytes()
+    {
+        await using var env = await StorageTestEnvironment.CreateAsync();
+        var reserve = new CreateStorageUploadSessionCommandHandler(env.Policy, env.Sessions, env.Counters,
+            new PrivacyErasureStateRepository(env.Context), env.Database, env.User, env.Unit, env.Metrics, env.Bindings);
+        var reservation = await reserve.ExecuteAsync(new CreateStorageUploadSessionCommand
+        {
+            UploadSessionDto = new CreateStorageUploadSessionDto
+            {
+                ContentType = "image/png", ExpectedSizeBytes = Png.Length, SafeDisplayName = "rejected.png",
+                Extension = "png", Purpose = StorageObjectPurposes.EventImage,
+                Visibility = StorageObjectVisibilities.PublicImage, IdempotencyKey = Guid.CreateVersion7().ToString("N")
+            }
+        }, default);
+        await Assert.That(reservation.IsSuccess).IsTrue();
+        var lifecycle = new EventResourceStorageLifecycleRepository(env.Context);
+        var finalizer = new FinalizeStorageUploadSessionCommandHandler(env.Bindings, env.Policy, env.Sessions,
+            env.Counters, env.Objects, new PrivacyErasureStateRepository(env.Context), lifecycle, env.Database,
+            env.User, env.Unit, env.Metrics);
+        using var rejected = new MemoryStream(new byte[Png.Length]);
+        var result = await finalizer.ExecuteAsync(new FinalizeStorageUploadSessionCommand
+        {
+            UploadSessionId = reservation.Id!.Id, Content = rejected,
+            ContentLength = Png.Length, ContentType = "image/png"
+        }, default);
+        await Assert.That(result.FailureCode).IsEqualTo(Explore.Application.Responses.FailureCodes.StorageUploadContentSignatureMismatch);
+        env.Context.ChangeTracker.Clear();
+        var custody = await env.Context.StorageObjectDeletionTombstones.SingleAsync(row => row.Id == reservation.Id.Id);
+        await Assert.That(custody.State).IsEqualTo(StorageObjectDeletionState.Ready);
+        await Assert.That(File.Exists(Path.Combine(env.Root, custody.ObjectKey))).IsFalse();
+        await Assert.That(await env.Context.StorageUploadSessions.AnyAsync(row => row.Id == custody.Id)).IsFalse();
+        await Assert.That(await env.Context.StorageObjects.AnyAsync(row => row.Id == custody.Id)).IsFalse();
+        var cleanup = new EventResourceStorageCleanupService(
+            new StorageObjectDeletionTombstoneRepository(env.Context), env.Bindings, TimeProvider.System,
+            NullLogger<EventResourceStorageCleanupService>.Instance, lifecycle, env.Unit);
+        await Assert.That((await cleanup.ProcessDueAsync(20, false, default)).DeletedCount).IsEqualTo(1);
+        await Assert.That(await env.Context.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == custody.Id)).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GenericProviderAcknowledgementAfterPrivacyErasureSettlesExactCleanupTarget(bool canceled)
+    {
+        await using var env = await StorageTestEnvironment.CreateAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var reserve = new CreateStorageUploadSessionCommandHandler(env.Policy, env.Sessions, env.Counters,
+            new PrivacyErasureStateRepository(env.Context), env.Database, env.User, env.Unit, env.Metrics, env.Bindings);
+        var reservation = await reserve.ExecuteAsync(new CreateStorageUploadSessionCommand
+        {
+            UploadSessionDto = new CreateStorageUploadSessionDto
+            {
+                ContentType = "image/png", ExpectedSizeBytes = Png.Length, SafeDisplayName = "image.png",
+                Extension = "png", Purpose = StorageObjectPurposes.EventImage,
+                Visibility = StorageObjectVisibilities.PublicImage, IdempotencyKey = Guid.CreateVersion7().ToString("N")
+            }
+        }, timeout.Token);
+        await Assert.That(reservation.IsSuccess).IsTrue();
+        var saved = await env.Sessions.GetForAuthorizationAsync(reservation.Id!.Id, timeout.Token);
+        var bindingId = saved!.StorageProviderBindingId!.Value;
+        var barrier = new ProviderCompletionBarrier(env.Bindings);
+        var lifecycle = new EventResourceStorageLifecycleRepository(env.Context);
+        var finalizer = new FinalizeStorageUploadSessionCommandHandler(barrier, env.Policy, env.Sessions,
+            env.Counters, env.Objects, new PrivacyErasureStateRepository(env.Context), lifecycle, env.Database,
+            env.User, env.Unit, env.Metrics);
+        using var content = new MemoryStream(Png);
+        var finalization = finalizer.ExecuteAsync(new FinalizeStorageUploadSessionCommand
+        {
+            UploadSessionId = reservation.Id!.Id,
+            Content = content,
+            ContentLength = Png.Length,
+            ContentType = "image/png"
+        }, timeout.Token);
+
+        await barrier.ProviderCompleted.WaitAsync(timeout.Token);
+        try
+        {
+            if (canceled)
+            {
+                var cancel = new CancelStorageUploadSessionCommandHandler(
+                    env.Policy, env.Sessions, env.Counters, lifecycle, env.Database, env.User, env.Unit, env.Metrics);
+                var response = await cancel.ExecuteAsync(new CancelStorageUploadSessionCommand
+                {
+                    UploadSessionId = reservation.Id.Id
+                }, timeout.Token);
+                await Assert.That(response.IsSuccess).IsTrue();
+                await Assert.That(response.Id!.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
+            }
+            else
+            {
+                await env.Unit.ExecuteSerializableAsync(async ct =>
+                {
+                    await new UserLocationPrivacyErasureRepository(env.Context)
+                        .EraseProviderBackedLocalUserMetadataAsync(env.Database.ActorId, ct);
+                    return true;
+                }, timeout.Token);
+            }
+        }
+        finally
+        {
+            barrier.ReleaseAcknowledgement();
+        }
+
+        var finalized = await finalization.WaitAsync(timeout.Token);
+        await Assert.That(finalized.IsSuccess).IsFalse();
+        env.Context.ChangeTracker.Clear();
+        var tombstone = await env.Context.StorageObjectDeletionTombstones.AsNoTracking()
+            .SingleAsync(row => row.Id == reservation.Id.Id, timeout.Token);
+        await Assert.That(tombstone.State).IsEqualTo(StorageObjectDeletionState.Ready);
+        await Assert.That(tombstone.ProviderBindingId).IsEqualTo(bindingId);
+        await Assert.That(tombstone.ProviderObjectVersion).IsNull();
+        await Assert.That(await env.Context.StorageUploadSessions.IgnoreQueryFilters()
+            .AnyAsync(row => row.Id == reservation.Id.Id, timeout.Token)).IsFalse();
+        await Assert.That(await env.Context.StorageObjects.IgnoreQueryFilters()
+            .AnyAsync(row => row.Id == reservation.Id.Id, timeout.Token)).IsFalse();
+        await Assert.That(File.Exists(Path.Combine(env.Root, tombstone.ObjectKey))).IsTrue();
+
+        var cleanup = new EventResourceStorageCleanupService(
+            new StorageObjectDeletionTombstoneRepository(env.Context), env.Bindings, TimeProvider.System,
+            NullLogger<EventResourceStorageCleanupService>.Instance, lifecycle, env.Unit);
+        var cleaned = await cleanup.ProcessDueAsync(20, false, timeout.Token);
+        await Assert.That(cleaned.DeletedCount).IsEqualTo(1);
+        await Assert.That(File.Exists(Path.Combine(env.Root, tombstone.ObjectKey))).IsFalse();
+        await Assert.That(await env.Context.StorageObjectDeletionTombstones.AsNoTracking()
+            .AnyAsync(row => row.Id == reservation.Id.Id, timeout.Token)).IsFalse();
     }
 
     [Test]
@@ -242,6 +381,66 @@ public sealed class ManagedStorageBindingTests
         {
             await inspect();
             return await base.ReadAsync(buffer, cancellationToken);
+        }
+    }
+
+    private sealed class ProviderCompletionBarrier(IStorageProviderBindingService inner)
+        : IStorageProviderBindingService
+    {
+        private readonly TaskCompletionSource _providerCompleted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _acknowledgementReleased =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task ProviderCompleted => _providerCompleted.Task;
+
+        public Task<StorageProviderBinding> CaptureAsync(
+            string provider,
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            inner.CaptureAsync(provider, tenantId, cancellationToken);
+
+        public async Task<IFileStorageProvider> ResolveAsync(
+            Guid bindingId,
+            CancellationToken cancellationToken) =>
+            new BarrierProvider(await inner.ResolveAsync(bindingId, cancellationToken), this);
+
+        public void ReleaseAcknowledgement() => _acknowledgementReleased.TrySetResult();
+
+        private sealed class BarrierProvider(IFileStorageProvider inner, ProviderCompletionBarrier barrier)
+            : IFileStorageProvider
+        {
+            public string Provider => inner.Provider;
+
+            public async Task<FileStorageWriteResult> WriteAsync(
+                FileStorageWriteInput input,
+                CancellationToken cancellationToken)
+            {
+                var result = await inner.WriteAsync(input, cancellationToken);
+                barrier._providerCompleted.TrySetResult();
+                await barrier._acknowledgementReleased.Task.WaitAsync(cancellationToken);
+                return result;
+            }
+
+            public Task<bool> ExistsAsync(
+                FileStorageExistsInput input,
+                CancellationToken cancellationToken) =>
+                inner.ExistsAsync(input, cancellationToken);
+
+            public Task<FileStorageReadResult> OpenReadAsync(
+                FileStorageReadInput input,
+                CancellationToken cancellationToken) =>
+                inner.OpenReadAsync(input, cancellationToken);
+
+            public Task<FileStorageDeleteResult> DeleteAsync(
+                FileStorageDeleteInput input,
+                CancellationToken cancellationToken) =>
+                inner.DeleteAsync(input, cancellationToken);
+
+            public Task<FileStorageProviderStatus> TestAsync(
+                CancellationToken cancellationToken,
+                bool testWritePermissions = false) =>
+                inner.TestAsync(cancellationToken, testWritePermissions);
         }
     }
 }

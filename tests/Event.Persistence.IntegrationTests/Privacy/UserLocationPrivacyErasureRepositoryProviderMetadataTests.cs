@@ -1,14 +1,17 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.PrivacyErasure;
+using Explore.Application.Configuration;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Secrets;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TUnit.Core;
 using TUnit.Core.Interfaces;
 
@@ -140,12 +143,33 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
             unrelatedIntegrationSyncSeed);
 
         var fileType = await seedContext.FileTypes.FirstAsync();
-        var ownerStorageA = CreateStorageObject(tenantA, ownerActor, fileType, null, "Owner A", "Owner A");
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        seedContext.Add(binding);
+        var ownerStorageA = CreateStorageObject(tenantA, ownerActor, fileType, "tenants/a/owner.png", "Owner A", "Owner A");
         var ownerStorageB = CreateStorageObject(tenantB, ownerActor, fileType, "tenants/b/owner.png", "Owner B", "Owner B");
+        ownerStorageA.Provider = ownerStorageB.Provider = StorageProviders.Local;
+        ownerStorageA.StorageProviderBindingId = ownerStorageB.StorageProviderBindingId = binding.Id;
         var unrelatedStorage = CreateStorageObject(tenantA, unrelatedActor, fileType, "tenants/a/unrelated.png", "Unrelated", "Unrelated");
+        var unrelatedBinding = StorageProviderBinding.S3("https://storage.example.invalid", "unrelated", "test", true,
+            RetainedSecretReference.Capture(SecretBinding.CreateEnvironmentVariable(
+                SecretDefinitionRegistry.Keys.Storage.AccessKeyId, SecretScope.Instance, null, "S3_ACCESS_KEY"), "Environment"),
+            RetainedSecretReference.Capture(SecretBinding.CreateEnvironmentVariable(
+                SecretDefinitionRegistry.Keys.Storage.SecretAccessKey, SecretScope.Instance, null, "S3_SECRET_KEY"), "Environment"));
+        seedContext.Add(unrelatedBinding);
+        unrelatedStorage.StorageProviderBindingId = unrelatedBinding.Id;
         seedContext.StorageObjects.AddRange(ownerStorageA, ownerStorageB, unrelatedStorage);
         var ownerUpload = CreateStorageUploadSession(tenantA, owner, "tenants/a/uploads/owner.txt");
+        ownerUpload.StorageProviderBindingId = binding.Id;
+        var uploadSource = CreateStorageObject(tenantA, ownerActor, fileType,
+            ownerUpload.ObjectKey, "Upload", "Upload");
+        uploadSource.Id = ownerUpload.Id;
+        uploadSource.Provider = StorageProviders.Local;
+        uploadSource.StorageProviderBindingId = binding.Id;
+        uploadSource.LifecycleState = StorageObjectLifecycleStates.DeleteRequested;
+        ownerUpload.StorageObjectId = uploadSource.Id;
+        seedContext.Add(uploadSource);
         var unrelatedUpload = CreateStorageUploadSession(tenantA, unrelated, "tenants/a/uploads/unrelated.txt");
+        unrelatedUpload.StorageProviderBindingId = binding.Id;
         seedContext.StorageUploadSessions.AddRange(ownerUpload, unrelatedUpload);
         var storageUsageCounter = new StorageUsageCounter
         {
@@ -186,11 +210,11 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
         await Assert.That(candidates.Any(candidate => candidate.ProviderKind == PrivacyErasureProviderKind.Keycloak)).IsTrue();
         await Assert.That(candidates.Any(candidate => candidate.ProviderKind == PrivacyErasureProviderKind.Smtp)).IsTrue();
         await Assert.That(candidates.Any(candidate => candidate.ProviderKind == PrivacyErasureProviderKind.WebPush)).IsTrue();
-        await Assert.That(candidates.Any(candidate => candidate.ProviderKind == PrivacyErasureProviderKind.ObjectStorage)).IsTrue();
+        await Assert.That(candidates.Any(candidate => candidate.ProviderKind == PrivacyErasureProviderKind.ObjectStorage)).IsFalse();
         await Assert.That(candidates.Any(candidate =>
             candidate.ProviderKind == PrivacyErasureProviderKind.ObjectStorage
             && candidate.TargetId == ownerUpload.Id
-            && candidate.Locator == "tenants/a/uploads/owner.txt")).IsTrue();
+            && candidate.Locator == "tenants/a/uploads/owner.txt")).IsFalse();
         await Assert.That(candidates.Any(candidate => candidate.ProviderKind == PrivacyErasureProviderKind.Webhook)).IsTrue();
         await Assert.That(candidates.Any(candidate => candidate.ProviderKind == PrivacyErasureProviderKind.Osprey || candidate.ProviderKind == PrivacyErasureProviderKind.Coop)).IsFalse();
         await repository.EraseProviderBackedLocalUserMetadataAsync(owner.Id, CancellationToken.None);
@@ -250,31 +274,25 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
         StorageObject unrelatedObject = await runtimeContext.StorageObjects
             .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure)
             .SingleAsync(row => row.Id == unrelatedStorage.Id);
-        await Assert.That(ownerObjects.Length).IsEqualTo(2);
-        await Assert.That(ownerObjects.All(row =>
-            row.ObjectKey is null
-            && row.LifecycleState == StorageObjectLifecycleStates.Deleted
-            && row.IsDeleted
-            && row.SourceUri == null
-            && row.FullName == string.Empty
-            && row.SafeDisplayName == string.Empty
-            && row.Provider == StorageProviders.Local)).IsTrue();
+        await Assert.That(ownerObjects.Length).IsEqualTo(0);
+        var objectWork = await runtimeContext.StorageObjectDeletionTombstones.AsNoTracking()
+            .Where(row => row.Id == ownerStorageA.Id || row.Id == ownerStorageB.Id || row.Id == uploadSource.Id)
+            .ToArrayAsync();
+        await Assert.That(objectWork.Length).IsEqualTo(3);
+        await Assert.That(objectWork.All(row => row.ProviderBindingId == binding.Id)).IsTrue();
+        await Assert.That(objectWork.Single(row => row.Id == ownerStorageA.Id).ObjectKey).IsEqualTo("tenants/a/owner.png");
+        await Assert.That(objectWork.Single(row => row.Id == ownerStorageB.Id).ObjectKey).IsEqualTo("tenants/b/owner.png");
+        await Assert.That(objectWork.Single(row => row.Id == uploadSource.Id).State).IsEqualTo(StorageObjectDeletionState.AwaitingProducer);
         await Assert.That(unrelatedObject.ObjectKey).IsEqualTo("tenants/a/unrelated.png");
         await Assert.That(unrelatedObject.Provider).IsEqualTo("s3_compatible");
 
-        StorageUploadSession ownerUploadRow = await runtimeContext.StorageUploadSessions
+        StorageUploadSession? ownerUploadRow = await runtimeContext.StorageUploadSessions
             .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure)
-            .SingleAsync(row => row.Id == ownerUpload.Id);
+            .SingleOrDefaultAsync(row => row.Id == ownerUpload.Id);
         StorageUploadSession unrelatedUploadRow = await runtimeContext.StorageUploadSessions
             .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure)
             .SingleAsync(row => row.Id == unrelatedUpload.Id);
-        await Assert.That(ownerUploadRow.UserId).IsNull();
-        await Assert.That(ownerUploadRow.ObjectKey).IsNull();
-        await Assert.That(ownerUploadRow.ReservedBytes).IsEqualTo(0);
-        await Assert.That(ownerUploadRow.SafeDisplayName).IsEmpty();
-        await Assert.That(ownerUploadRow.Status).IsEqualTo(StorageUploadSessionStates.Uploading);
-        await Assert.That(ownerUploadRow.CreatedBy).IsNull();
-        await Assert.That(ownerUploadRow.UpdatedBy).IsNull();
+        await Assert.That(ownerUploadRow).IsNull();
         await Assert.That(unrelatedUploadRow.UserId).IsEqualTo(unrelated.Id);
         await Assert.That(unrelatedUploadRow.ObjectKey).IsEqualTo("tenants/a/uploads/unrelated.txt");
         await Assert.That(unrelatedUploadRow.ReservedBytes).IsEqualTo(8);
@@ -319,6 +337,10 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
         await Assert.That(unrelatedEndpoint.Url).IsEqualTo("https://hooks.example.invalid/unrelated");
 
         await transaction.RollbackAsync();
+        await using var rolledBack = fixture.CreateDbContext();
+        await Assert.That(await rolledBack.StorageObjects.IgnoreQueryFilters()
+            .AnyAsync(row => row.Id == ownerStorageB.Id && row.ObjectKey == "tenants/b/owner.png")).IsTrue();
+        await Assert.That(await rolledBack.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == uploadSource.Id)).IsFalse();
     }
 
     [Test]
@@ -537,7 +559,9 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
                 .IsEqualTo("owner-coop-signal");
         }
 
-        var authority = new RecordingPrivacyErasureAuthority();
+        await using var authorityContext = fixture.CreateAuthorityDbContext();
+        var authority = new EfCorePrivacyErasureAuthorityRepository(
+            authorityContext, Options.Create(new PrivacyErasureOptions()));
         await using (var runtimeContext = fixture.CreateTenantFilteredDbContext())
         await using (GlobalLocationPrivacyErasureTests.ErasureRuntime runtime =
             GlobalLocationPrivacyErasureTests.CreateRuntime(
@@ -1184,51 +1208,6 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
     {
         public Guid? UserId => Id;
         public bool IsAuthenticated => true;
-    }
-
-    private sealed class RecordingPrivacyErasureAuthority : IPrivacyErasureAuthority
-    {
-        private PrivacyErasureIntent? _intent;
-
-        public Task<PrivacyErasureAuthorityState> GetStateAsync(
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            long highWater = _intent?.AuthoritySequence ?? 0;
-            return Task.FromResult(new PrivacyErasureAuthorityState(highWater, 0));
-        }
-
-        public Task<PrivacyErasureIntent> AppendAsync(
-            PrivacyErasureRequest intent,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            DateTime utcNow = DateTime.UtcNow;
-            utcNow = new DateTime(utcNow.Ticks - (utcNow.Ticks % 10), DateTimeKind.Utc);
-            _intent ??= PrivacyErasureIntent.Record(
-                intent.IntentId,
-                1,
-                intent.SubjectKind,
-                intent.SubjectId,
-                intent.ReasonCode,
-                intent.PolicyVersion,
-                utcNow,
-                utcNow);
-            return Task.FromResult(_intent);
-        }
-
-        public Task<IReadOnlyList<PrivacyErasureIntent>> ReadAfterAsync(
-            long authoritySequence,
-            int limit,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            IReadOnlyList<PrivacyErasureIntent> result =
-                _intent is not null && _intent.AuthoritySequence > authoritySequence && limit > 0
-                    ? [_intent]
-                    : [];
-            return Task.FromResult(result);
-        }
     }
 
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;

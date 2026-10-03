@@ -7,7 +7,7 @@ ABOUTME: Covers local-first runtime storage, optional S3-compatible mode, reconc
 > **Status:** Mixed
 > **Owner:** Platform/Ops
 > **Last Verified:** 2026-07-29
-> **Source Anchors:** `Explore.Infrastructure/Storage/`, `Explore.Infrastructure/StorageObjectDeletionService.cs`, `Explore.Infrastructure/Services/ObjectStorageService.cs`, `Explore.API/Controllers/StorageObjectController.cs`, `Explore.API/Controllers/TenantStorageSettingsController.cs`, `Explore.Blazor.Client/Services/ImageStorageService.cs`, `docs/CONFIGURATION.md`, `docs/SECRETS.md`
+> **Source Anchors:** `src/Explore.Infrastructure/Storage/`, `src/Explore.Application/Services/EventResourceStorageCleanupService.cs`, `src/Explore.Persistence/Repositories/EventResourceStorageLifecycleRepository.cs`, `src/Explore.Persistence/Repositories/StorageObjectReferenceRepository.cs`, `src/Explore.Infrastructure/Services/ObjectStorageService.cs`, `src/Explore.API/Controllers/StorageObjectController.cs`, `src/Explore.API/Controllers/TenantStorageSettingsController.cs`, `src/Explore.Blazor.Client/Services/ImageStorageService.cs`, `docs/internal/CONFIGURATION.md`, `docs/internal/SECRETS.md`
 
 Storage is moving to a local-first, provider-neutral model. New upload/read flows use metadata-backed `StorageObject` records and the selected `IFileStorageProvider`; S3-compatible storage remains optional for instances that select and configure it. S3-compatible presigned downloads are ID-bound and are not an upload path.
 
@@ -24,9 +24,12 @@ Storage is moving to a local-first, provider-neutral model. New upload/read flow
 | Blazor admin UI | Instance and tenant storage dashboards consume service models mapped from HAL settings resources. The tenant dashboard autosaves isolated `policy` and `s3` patches only when `_links.edit` is present. Action buttons are driven by `_links` and read-only state, not client-side role checks. |
 | Local self-hosting | Docker Compose mounts a durable `local_storage_data` volume for local-first storage by default. MinIO remains optional through the `storage` profile for instances that select S3-compatible storage. Its initializer creates or repairs the sample bucket with anonymous access disabled. |
 | Reconciliation | API hosts a dry-run-first reconciliation worker that checks metadata/object drift, reports missing backing objects and local orphan files, and performs quarantine/delete mutations only when explicit policy flags are enabled. |
-| Moderation image deletion | Heavy event redaction marks referenced event image metadata as `delete_requested` with the owning event resource id, commits the redaction, then deletes provider objects through `IFileStorageProvider`. Failures leave metadata retryable and do not log object keys, filenames, paths, endpoints, buckets, or raw provider errors. |
+| Moderation image deletion | Heavy event redaction fences and detaches references, then admits eligible exact targets in its transaction. Shared or held sources stay active; independent tombstones retain cleanup authority. Only the existing worker deletes provider bytes. Logs exclude private object locators and raw provider errors. |
 
-The API delete endpoint exists, but `Explore.Blazor.Client/Services/ImageStorageService.cs` still returns `false` from `DeleteImageAsync`. Do not document a completed Blazor client delete flow until that helper is implemented.
+Tenant storage administration exposes a bounded metadata list and retirement action
+through `TenantStoredFiles` and `TenantStorageSettingsAdminService`, not the image
+display helper. Collection and detail HAL independently gate the action. A 202
+response means cleanup is pending; stale 409 responses refresh current links.
 
 ## Origin provenance and derived delivery
 
@@ -132,10 +135,10 @@ The server first requires tenant-admin or instance-admin authority and rejects t
 | `StorageReconciliation:BatchSize` | `500` | Maximum metadata rows or local inventory objects processed per pass. |
 | `StorageReconciliation:MissingObjectQuarantineGraceHours` | `24` | Active metadata older than this grace window can be quarantined when its backing object is missing. |
 | `StorageReconciliation:OrphanFileQuarantineGraceHours` | `24` | Local files older than this grace window can be quarantined when no metadata row exists. |
-| `StorageReconciliation:DeleteGraceHours` | `720` | Quarantined/delete-requested metadata older than this window can be physically deleted and soft-deleted. |
+| `StorageReconciliation:DeleteGraceHours` | `720` | Selects aged quarantined/delete-requested candidates for fenced retirement admission; age alone is not deletion authority. |
 | `StorageReconciliation:QuarantineMissingObjects` | `false` | Allows metadata quarantine for missing backing objects, only when `DryRun=false`. |
 | `StorageReconciliation:QuarantineOrphanLocalFiles` | `false` | Allows local orphan files to be moved into provider quarantine, only when `DryRun=false`. |
-| `StorageReconciliation:DeleteQuarantinedObjects` | `false` | Allows idempotent provider delete plus metadata soft-delete for eligible rows, only when `DryRun=false`. |
+| `StorageReconciliation:DeleteQuarantinedObjects` | `false` | Allows native retirement admission for eligible candidates, only when `DryRun=false`; the leased worker owns provider deletion. |
 
 Destructive cleanup requires both `DryRun=false` and the specific mutation flag. This prevents a single configuration typo from turning reporting mode into data deletion.
 
@@ -219,12 +222,46 @@ Transferred-source removal checks every mapped owner and hold, closes session/
 operation custody under CAS and projects quota in the same transaction. Worker
 claims and absence confirmation reject any surviving source, session or producer.
 Heavy resource redaction declares its whole object set and persists detachment
-before retirement; retained organization evidence remains outside that removal
-batch, while attached ordinary sources still fail closed.
+before retirement. Indirectly selected shared or held sources stay intact;
+explicit object removals and still-attached resource sources fail closed.
 
-Explicit bulk/indirect-hold writer enrollment, generic API/HAL adoption and the
-complete runtime inventory remain separate work. The producer port is not the
-shared-reference admission API; no second deletion engine is introduced.
+Generic `DeleteStorageObjectCommand` returns `BaseCommandResponse<Guid>` and
+owns one serializable unit: re-read generic eligibility, admit exact retirement,
+commit, then return the Pending acknowledgement. It has no provider dependency.
+The same named DELETE route maps success to 202 and bounded failures through
+`CommandFailurePolicy` to 404/409. Tenant-only tombstone authority cannot authorize
+a fresh generic request; the existing cleanup worker alone confirms absence.
+
+`IStorageObjectRetirementEligibilityReader` projects a server-only bounded hint
+using the same physical reference, CSV hold and exact-target predicates. Detail
+and collection HAL advertise `delete` only when the hint and authorization
+allow it; `edit` is independent. The hint is not serialized and is not command
+authority. An earlier link can become stale; DELETE rescans transactionally.
+Content disclosure refreshes server time after asynchronous hint reads, so a
+retention deadline crossed during projection still redacts names and URLs.
+
+Registration authoring and provider-delivery mutations explicitly enroll their
+indirect CSV targets before save or bulk SQL. Retention cleanup declares the
+complete candidate union before removing answers/effects and admits expired
+CSV targets through the same lifecycle owner. Federation import fences existing
+thumbnail targets before mutation, saves producer consumption with new owner
+activation, admits detached targets and projects quota before its final consumer
+commit fence. Losing that fence rolls back the entire database transition.
+
+When registration authoring owns the transaction, its execution strategy saves
+with `acceptAllChangesOnSuccess: false` and accepts tracked changes only after
+commit succeeds or a persisted graph concurrency stamp verifies a lost commit
+acknowledgement. A rolled-back attempt restores fence stamps before retrying the
+still-pending graph. Joining a caller-owned transaction does not introduce a
+second transaction or an independent retry owner.
+
+Account erasure includes detached picture IDs as well as upload/audit ownership.
+A source-less uploading session transfers its saved target without manufacturing
+metadata. Retained unresolved work can receive a validated late producer ACK
+without restoring source authority; settlement does not synchronously delete
+bytes. Bulk Actor PII removal fences persisted picture IDs before ExecuteDelete.
+The producer port is not the shared-reference admission API; the obsolete
+direct-provider deletion service and its DI registration are removed.
 Never discard an unsettled operation merely because its creation time is old.
 The existing erasure owner may clear a deleted metadata row's key while retaining
 its captured binding. The model permits that terminal metadata shape, but not a
@@ -400,7 +437,9 @@ The reconciliation worker compares `StorageObject` metadata with provider backin
 
 - active metadata with missing backing objects is reported first, then optionally moved to `quarantined` lifecycle state;
 - local provider inventory reports files that are present on disk but absent from metadata, then optionally moves them under the provider quarantine area;
-- delete-eligible quarantined or delete-requested metadata can be physically deleted from the selected provider and then soft-deleted in metadata.
+- aged quarantined or delete-requested candidates pass shared reference/hold
+  admission; eligible exact targets transfer to independent tombstones, and the
+  existing leased worker later confirms provider absence.
 
 These generic loops exclude event-resource purpose, ownership, retained
 attachment references and deletion tombstones. The same job separately invokes
@@ -415,13 +454,25 @@ The local provider intentionally skips temporary files and existing quarantine f
 
 ## Heavy Moderation Image Deletion
 
-Resource files use the separate transactional retirement path, even when a
-malformed image reference aliases one. Image redaction must not rewrite their
-owner to `event` or send them to the unfenced image deletion service.
+Resource files and generic images use the same fenced retirement owner.
+Malformed image references do not authorize ownership reassignment or bypass
+resource custody. Indirect shared or held sources remain active.
 
-Heavy event moderation uses the same provider-neutral delete boundary as normal storage cleanup, but it does not wait for the dry-run-first reconciliation schedule. The event redaction transaction clears event/session/day image foreign keys and marks the affected `StorageObject` rows as `delete_requested` with `OwningResourceKind=event` and the redacted event id. After commit, `StorageObjectDeletionService` loads those rows for the tenant/event, calls the selected `IFileStorageProvider.DeleteAsync`, then soft-deletes the storage metadata when the provider delete succeeds or when metadata has no object key.
+Heavy event moderation declares the complete existing image target set before
+mutation and persists detached event/session/day and resource references within
+its transaction. Native admission scans remaining physical references and
+retention holds. Eligible sources transfer exact binding/key/version custody
+into independent tombstones before source/session removal and quota projection
+commit. The existing leased worker performs provider deletion after commit;
+failure retains retry custody rather than depending on deleted source metadata.
 
-If a local or S3-compatible delete fails, the redaction remains committed and public APIs cannot use the image metadata, but the command reports a pending retry failure instead of full success. The rows stay in `delete_requested` so a repeated heavy-redaction command or the reconciliation worker can retry idempotently. Local deletion is idempotent for already-missing files, and S3-compatible deletion issues the provider delete request through the AWS SDK adapter.
+Provider deletion is not part of the redaction command. After retirement commits,
+the independent tombstone retains exact cleanup authority even when source
+metadata has been removed. A local or S3-compatible failure schedules a leased
+worker retry; repeating heavy redaction is not the retry mechanism. Shared or
+held sources remain available to surviving authorized owners. The worker must
+confirm exact-target absence before recording completion; an S3 delete marker
+alone is insufficient.
 
 Operational evidence for this path must remain bounded. Logs and metrics may include provider name, tenant id, owning resource kind/id, storage object id, outcome, and failure category. They must not include object keys, filenames, filesystem paths, S3 endpoints, bucket names, credentials, raw provider response bodies, or raw exception text.
 
@@ -451,6 +502,8 @@ All storage metric dimensions are bounded to provider, operation, outcome, failu
 
 ## Related Documentation
 
+- [ADR-037](adr/ADR-037-managed-file-reference-and-retirement-authority.md) - physical reference, CAS and durable retirement authority.
+- [Future ISLAMU Asset integration](../../dev/backlog/islamu-asset-provider-integration.md) - deferred provider activation and migration contract.
 - [CONFIGURATION.md](CONFIGURATION.md) - runtime configuration keys.
 - [SECRETS.md](SECRETS.md) - secret-provider naming and sensitive value handling.
 - [SELF_HOSTING.md](SELF_HOSTING.md) - Compose local storage volume, optional `storage` profile, and MinIO ports.

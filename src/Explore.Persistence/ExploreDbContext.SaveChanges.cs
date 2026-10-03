@@ -16,11 +16,11 @@ public partial class ExploreDbContext
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        return SaveWithStorageReferences(() =>
+        return SaveWithStorageReferences(acceptChanges =>
         {
             PrepareTrackedEntities();
-            return base.SaveChanges(acceptAllChangesOnSuccess);
-        });
+            return base.SaveChanges(acceptChanges);
+        }, acceptAllChangesOnSuccess);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
@@ -30,18 +30,20 @@ public partial class ExploreDbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        return await SaveWithStorageReferencesAsync(async () =>
+        return await SaveWithStorageReferencesAsync(async acceptChanges =>
         {
             PrepareTrackedEntities();
-            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        }, cancellationToken);
+            return await base.SaveChangesAsync(acceptChanges, cancellationToken);
+        }, acceptAllChangesOnSuccess, cancellationToken);
     }
 
     internal async Task<int> SavePrivacyErasureChangesAsync(CancellationToken cancellationToken)
         => await SaveWithStorageReferencesAsync(
-            () => SavePrivacyErasureGraphAsync(cancellationToken), cancellationToken);
+            acceptChanges => SavePrivacyErasureGraphAsync(acceptChanges, cancellationToken),
+            acceptAllChangesOnSuccess: true, cancellationToken);
 
-    private async Task<int> SavePrivacyErasureGraphAsync(CancellationToken cancellationToken)
+    private async Task<int> SavePrivacyErasureGraphAsync(
+        bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
     {
         PrepareTrackedEntities();
         foreach (var entry in ChangeTracker.Entries()
@@ -65,7 +67,7 @@ public partial class ExploreDbContext
             }
         }
 
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     private void PrepareTrackedEntities()

@@ -1,0 +1,51 @@
+.tenant-stored-files {
+    display: flex;
+    flex-direction: column;
+    gap: var(--isl-space-3);
+    border-block-start: 1px solid var(--mud-palette-lines-default);
+    padding-block-start: var(--isl-space-4);
+}
+
+.tenant-stored-files__header,
+.tenant-stored-files__item,
+.tenant-stored-files__pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--isl-space-3);
+}
+
+.tenant-stored-files__header,
+.tenant-stored-files__item {
+    justify-content: space-between;
+}
+
+.tenant-stored-files__header > div,
+.tenant-stored-files__metadata {
+    flex: 1 1 14rem;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+.tenant-stored-files__list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tenant-stored-files__item {
+    padding-block: var(--isl-space-3);
+    border-block-end: 1px solid var(--mud-palette-lines-default);
+}
+
+.tenant-stored-files__confirmation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--isl-space-3);
+    padding: var(--isl-space-4);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--isl-radius-md);
+    overflow-wrap: anywhere;
+}

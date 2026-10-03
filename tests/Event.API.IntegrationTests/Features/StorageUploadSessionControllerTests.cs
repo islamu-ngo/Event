@@ -413,7 +413,7 @@ public sealed class StorageUploadSessionControllerTests
             _finalize,
             _cancel,
             Substitute.For<ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>>(),
-            Substitute.For<ICommandHandler<DeleteStorageObjectCommand, bool>>(),
+            Substitute.For<ICommandHandler<DeleteStorageObjectCommand, BaseCommandResponse<Guid>>>(),
             _tenantContext,
             Substitute.For<IResourceAssembler<StorageObjectDto, StorageObjectListDto>>())
         {

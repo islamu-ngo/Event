@@ -18,6 +18,70 @@ namespace Event.Persistence.IntegrationTests.Storage;
 public sealed class ManagedStorageRetirementTests(EventResourceFileUploadTests.Database database)
 {
     [Test]
+    public async Task TenantDeletionFencesUnloadedSeriesPictureWithoutRetiringSharedSource()
+    {
+        await using var fixture = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
+        var scope = await fixture.SeedScopeAsync();
+        Guid tenantId = Guid.CreateVersion7();
+        Guid seriesId = Guid.CreateVersion7();
+        Guid originalStamp;
+        await using (var seed = database.CreateContext())
+        {
+            seed.Tenants.Add(new Tenant
+            {
+                Id = tenantId, FullName = "Cascade owner", Slug = $"cascade-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            });
+            seed.EventSeries.Add(new EventSeries
+            {
+                Id = seriesId, TenantId = tenantId, Title = "Physical shared reference",
+                ActorId = scope.ActorId, FeaturedImageId = scope.StorageAId,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!
+            });
+            await seed.SaveChangesAsync();
+            originalStamp = await seed.StorageObjects.AsNoTracking().Where(row => row.Id == scope.StorageAId)
+                .Select(row => row.ConcurrencyStamp).SingleAsync();
+        }
+        await using (var removing = database.CreateContext())
+        {
+            ITenantRepository repository = new TenantRepository(removing);
+            var tenant = (await repository.GetById(tenantId))!;
+            await repository.Delete(tenant);
+        }
+        await using var verify = database.CreateContext();
+        await Assert.That(await verify.Tenants.AnyAsync(row => row.Id == tenantId)).IsFalse();
+        await Assert.That(await verify.EventSeries.IgnoreQueryFilters().AnyAsync(row => row.Id == seriesId)).IsFalse();
+        var source = await verify.StorageObjects.AsNoTracking().SingleAsync(row => row.Id == scope.StorageAId);
+        await Assert.That(source.ConcurrencyStamp).IsNotEqualTo(originalStamp);
+        await Assert.That(source.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == source.Id)).IsFalse();
+    }
+
+    [Test]
+    public async Task BulkActorPiiDetachmentFencesPictureWithoutDeletingItsBytes()
+    {
+        await using var fixture = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
+        var scope = await fixture.SeedScopeAsync();
+        Guid originalStamp;
+        await using (var seed = database.CreateContext())
+        {
+            var picture = await seed.ActorPii.SingleAsync(item => item.ActorId == scope.ActorId);
+            picture.SetProfilePicture(scope.StorageAId, null);
+            await seed.SaveChangesAsync();
+            originalStamp = await seed.StorageObjects.AsNoTracking().Where(item => item.Id == scope.StorageAId)
+                .Select(item => item.ConcurrencyStamp).SingleAsync();
+        }
+        await using (var context = database.CreateContext())
+            await Assert.That(await new ActorRepository(context).ForgetPiiAsync(scope.ActorId)).IsEqualTo(1);
+        await using var verify = database.CreateContext();
+        var source = await verify.StorageObjects.AsNoTracking().SingleAsync(item => item.Id == scope.StorageAId);
+        await Assert.That(source.ConcurrencyStamp).IsNotEqualTo(originalStamp);
+        await Assert.That(source.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        await Assert.That(await verify.ActorPii.AnyAsync(item => item.ActorId == scope.ActorId)).IsFalse();
+        await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(item => item.Id == scope.StorageAId)).IsFalse();
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task RetirementPreservesSurvivingUsageRegardlessOfHistoricalCharge(bool previouslyCharged)

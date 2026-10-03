@@ -9,6 +9,7 @@ public sealed class TenantStorageSettingsAdminServiceTests
     {
         _service = new TenantStorageSettingsAdminService(
             _api,
+            Substitute.For<IStorageObjectClient>(),
             Substitute.For<ILogger<TenantStorageSettingsAdminService>>());
     }
 

@@ -361,7 +361,6 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IFileStorageProviderResolver, FileStorageProviderResolver>();
         services.AddScoped<IStorageProviderBindingService, StorageProviderBindingService>();
         services.AddScoped<ManagedStorageProducer>();
-        services.AddScoped<IStorageObjectDeletionService, StorageObjectDeletionService>();
 
         // Identity services
         services.AddScoped<IUserContext, UserContext>();

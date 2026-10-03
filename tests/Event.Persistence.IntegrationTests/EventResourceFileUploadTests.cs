@@ -82,7 +82,8 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         var policy = Substitute.For<IStoragePolicyResolver>();
         var handler = new FinalizeStorageUploadSessionCommandHandler(Substitute.For<IStorageProviderBindingService>(), policy,
             sessions, new StorageUsageCounterRepository(context), new StorageObjectRepository(context),
-            new PrivacyErasureStateRepository(context), tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
+            new PrivacyErasureStateRepository(context), new EventResourceStorageLifecycleRepository(context),
+            tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
         var result = await handler.ExecuteAsync(command, default);
         await Assert.That(result.IsSuccess).IsTrue();
         await using var read = database.CreateContext();
@@ -94,7 +95,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             pending.Id.ToString("D"), new StorageObjectCollectionAuthorizationFacts(seed.TenantId), default);
         await Assert.That(bound.Facts is EventResourceUploadAuthorizationFacts).IsTrue();
         var cancel = new CancelStorageUploadSessionCommandHandler(policy, sessions, new StorageUsageCounterRepository(context),
-            tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
+            new EventResourceStorageLifecycleRepository(context), tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
         await Assert.That((await cancel.ExecuteAsync(cancelCommand, default)).Id!.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
     }
 
@@ -586,7 +587,9 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
     }
 
     [Test]
-    public async Task HeavyModerationRetainsEvidenceBytesWhileRetiringOrdinaryResourceBytes()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task HeavyModerationRetainsEvidenceBytesWhileRetiringOrdinaryResourceBytes(bool actorPicture)
     {
         var seed = await SeedAsync();
         EventResource retainedResource;
@@ -630,7 +633,14 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
                 ApprovalStatus = null!
             };
             var source = await evidenceContext.StorageObjects.SingleAsync(item => item.Id == retainedObjectId);
-            evidenceContext.Add(OrganizationTenantEvidence.CreatePending(participation, source));
+            if (actorPicture)
+            {
+                var picture = await evidenceContext.Set<ActorPii>()
+                    .SingleAsync(item => item.Actor != null && item.Actor.UserId == seed.UserId);
+                picture.SetProfilePicture(retainedObjectId, null);
+            }
+            else
+                evidenceContext.Add(OrganizationTenantEvidence.CreatePending(participation, source));
             await evidenceContext.SaveChangesAsync();
         }
         await using (var redacting = database.CreateContext())
@@ -652,8 +662,12 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         await using var verify = database.CreateContext();
         await Assert.That(await verify.StorageObjects.AnyAsync(item => item.Id == retainedObjectId)).IsTrue();
         await Assert.That(await verify.StorageObjects.AnyAsync(item => item.Id == ordinaryObjectId)).IsFalse();
-        await Assert.That(await verify.OrganizationTenantEvidence.AnyAsync(item =>
-            item.DocumentStorageObjectId == retainedObjectId)).IsTrue();
+        if (actorPicture)
+            await Assert.That(await verify.Set<ActorPii>().AnyAsync(item =>
+                item.ProfilePictureStorageObjectId == retainedObjectId)).IsTrue();
+        else
+            await Assert.That(await verify.OrganizationTenantEvidence.AnyAsync(item =>
+                item.DocumentStorageObjectId == retainedObjectId)).IsTrue();
         await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(item =>
             item.Id == retainedObjectId)).IsFalse();
         await Assert.That((await verify.StorageObjectDeletionTombstones.SingleAsync(item =>

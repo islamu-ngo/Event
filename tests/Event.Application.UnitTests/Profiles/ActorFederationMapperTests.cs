@@ -13,6 +13,7 @@ using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Mappings;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 
 namespace Event.Application.UnitTests.Profiles;
@@ -99,8 +100,9 @@ public sealed class ActorFederationMapperTests
         else source.RegistrationContentRetentionUntilUtc = null;
         var store = new StorageStore([source]);
         var clock = new FixedClock();
-        var detail = new GetStorageObjectDetailsRequestHandler(store, clock);
-        var list = new GetStorageObjectListRequestHandler(store, clock);
+        var retirement = new RetirementEligibilityReader();
+        var detail = new GetStorageObjectDetailsRequestHandler(store, retirement, clock);
+        var list = new GetStorageObjectListRequestHandler(store, retirement, clock);
         var expected = ExpectedStorage(false);
         var expectedList = ExpectedStorage(true);
         if (registrationOwned)
@@ -124,6 +126,48 @@ public sealed class ActorFederationMapperTests
         store.Items.Clear();
         source.FullName = "changed";
         await AssertContract(page.Items.Single(), expectedList);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task StorageConsumers_RecheckDisclosureAfterRetirementRead(bool paged)
+    {
+        var source = CreateStorage();
+        var deadline = ResolvedAt.AddMinutes(1);
+        source.RegistrationContentRetentionUntilUtc = deadline;
+        var store = new StorageStore([source])
+        {
+            ContentOrder = RegistrationOrder.Create(
+                TenantId, Stamp, null, null, BookingPartyTypeEnum.Household, OwnerId,
+                RegistrationParticipationSnapshot.Create(
+                    ActorId, (int)ParticipationHandlingModeEnum.PlatformManaged,
+                    (int)IdentityAccessModeEnum.GuestAllowed, 2,
+                    GuestRecoveryPolicyEnum.VerifiedEmailRequired),
+                null, CapabilityTokenHash.Create(Convert.ToBase64String(
+                    System.Security.Cryptography.SHA256.HashData("disclosure-fixture"u8))),
+                "EUR", ResolvedAt, null, deadline)
+        };
+        var clock = new FixedClock();
+        var retirement = new RetirementEligibilityReader(() => clock.UtcNow = deadline);
+        if (paged)
+        {
+            var handler = new GetStorageObjectListRequestHandler(store, retirement, clock);
+            var page = await handler.QueryAsync(new GetStorageObjectListRequest(), default);
+            await Assert.That(page.Items.Single().FullName).IsEqualTo(string.Empty);
+            await Assert.That(page.Items.Single().SafeDisplayName).IsEqualTo(string.Empty);
+            await Assert.That(page.Items.Single().Uri).IsNull();
+            await Assert.That(page.Items.Single().ContentEligibility.CanReadAt(deadline)).IsFalse();
+        }
+        else
+        {
+            var handler = new GetStorageObjectDetailsRequestHandler(store, retirement, clock);
+            var dto = await handler.QueryAsync(new GetStorageObjectDetailsRequest { Id = Stamp }, default);
+            await Assert.That(dto!.FullName).IsEqualTo(string.Empty);
+            await Assert.That(dto.SafeDisplayName).IsEqualTo(string.Empty);
+            await Assert.That(dto.Uri).IsNull();
+            await Assert.That(dto.ContentEligibility.CanReadAt(deadline)).IsFalse();
+        }
     }
 
     [Test]
@@ -604,7 +648,8 @@ public sealed class ActorFederationMapperTests
     private sealed record TenantContext(Guid TenantId) : ITenantContext;
     private sealed class FixedClock : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => new(ResolvedAt);
+        public DateTime UtcNow { get; set; } = ResolvedAt;
+        public override DateTimeOffset GetUtcNow() => new(UtcNow);
     }
 
     // Entity stores exercise the real handlers and projection/disclosure pipeline, not database filters.
@@ -652,6 +697,7 @@ public sealed class ActorFederationMapperTests
     private sealed class StorageStore(List<StorageObject> items) : Store<StorageObject, Guid>, IStorageObjectRepository
     {
         public List<StorageObject> Items { get; } = items;
+        public RegistrationOrder? ContentOrder { get; init; }
         public override Task<StorageObject?> GetById(Guid id) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
         public Task<StorageObject?> GetForGenericAccessAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(Items.FirstOrDefault(item => item.Id == id
@@ -661,7 +707,7 @@ public sealed class ActorFederationMapperTests
         public Task<(List<StorageObject> Items, int TotalCount)> GetFilesWithDetailsPaged(int pageNumber, int pageSize) =>
             Task.FromResult((Items.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList(), Items.Count));
         public Task<RegistrationAnswerFile?> GetRegistrationAnswerFileAsync(Guid storageObjectId, Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<RegistrationAnswerFile?>(null);
-        public Task<RegistrationOrder?> GetRegistrationContentOrderAsync(StorageObject storageObject, RegistrationAnswerFile? answerFile, CancellationToken cancellationToken) => Task.FromResult<RegistrationOrder?>(null);
+        public Task<RegistrationOrder?> GetRegistrationContentOrderAsync(StorageObject storageObject, RegistrationAnswerFile? answerFile, CancellationToken cancellationToken) => Task.FromResult(ContentOrder);
         public Task<StorageObject?> GetFileWithDetails(Guid id) => throw new NotSupportedException();
         public Task<StorageObject?> GetForAuthorizationAsync(Guid id, Guid tenantId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<List<StorageObject>> GetFilesWithDetails() => throw new NotSupportedException();
@@ -673,6 +719,18 @@ public sealed class ActorFederationMapperTests
         public Task<StorageObject?> GetEvidenceDocumentAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<bool> IsRetainedEvidenceAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<bool> IsRegistrationAnswerFileQuarantinedAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class RetirementEligibilityReader(Action? onRead = null) : IStorageObjectRetirementEligibilityReader
+    {
+        public Task<bool> CanRetireAsync(
+            StorageObject storageObject,
+            DateTime serverNowUtc,
+            CancellationToken cancellationToken)
+        {
+            onRead?.Invoke();
+            return Task.FromResult(true);
+        }
     }
 
     private sealed class ActorTypeStore : Store<ActorType, int>, IActorTypeRepository

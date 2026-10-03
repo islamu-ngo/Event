@@ -106,8 +106,23 @@ public sealed class AnonymousRetentionContactDeliveryTests
             await Assert.That(order.TryLinkGuestOrderToAccount(fixture.UserId, "queued@example.test")).IsTrue();
             await fixture.Context.SaveChangesAsync();
             await fixture.Context.RegistrationOrderPii.Where(value => value.RegistrationOrderId == order.Id).ExecuteDeleteAsync();
-            await fixture.Context.Users.Where(value => value.Id == fixture.UserId).ExecuteUpdateAsync(setters => setters.SetProperty(value => value.EmailVerified, true));
             await fixture.Context.UserPii.Where(value => value.UserId == fixture.UserId).ExecuteUpdateAsync(setters => setters.SetProperty(value => value.Email, "queued@example.test"));
+            var binding = new UserExternalLogin
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = fixture.UserId,
+                User = null!,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+                AuthenticationProvider = null!,
+                ProviderKey = Explore.Application.Authentication.PlatformIdentityPrincipalExtensions
+                    .CreateOidcAccountKey("https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
+                CreatedAt = Start
+            };
+            var claim = UserIdentityEmailClaim.Create(fixture.UserId, "queued@example.test");
+            fixture.Context.UserExternalLogins.Add(binding);
+            fixture.Context.UserIdentityEmailClaims.Add(claim);
+            fixture.Context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(fixture.UserId, claim.Id, binding.Id, Start));
+            await fixture.Context.SaveChangesAsync();
             fixture.Context.ChangeTracker.Clear();
         }
         DateTime includedDeadline = held ? Deadline.AddDays(1) : Deadline;
@@ -153,13 +168,25 @@ public sealed class AnonymousRetentionContactDeliveryTests
                 await fixture.Context.RegistrationOrders.Where(value => value.Id == seed.Request.RegistrationOrderId)
                     .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.AnonymousPiiRetentionUntilUtc, (DateTime?)null), timeout.Token);
             if (scenario == "account-erased")
+            {
+                await fixture.Context.UserIdentityEmailClaims.Where(value => value.UserId == fixture.UserId).ExecuteDeleteAsync(timeout.Token);
                 await fixture.Context.UserPii.Where(value => value.UserId == fixture.UserId).ExecuteDeleteAsync(timeout.Token);
+            }
             if (scenario == "account-deleted")
                 await fixture.Context.Users.Where(value => value.Id == fixture.UserId).ExecuteUpdateAsync(setters => setters.SetProperty(value => value.IsDeleted, true), timeout.Token);
             if (scenario == "account-unverified")
-                await fixture.Context.Users.Where(value => value.Id == fixture.UserId).ExecuteUpdateAsync(setters => setters.SetProperty(value => value.EmailVerified, false), timeout.Token);
+                await fixture.Context.UserIdentityEmailEvidence.Where(value => value.UserId == fixture.UserId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.IsActive, false), timeout.Token);
             if (scenario == "account-changed")
-                await fixture.Context.UserPii.Where(value => value.UserId == fixture.UserId).ExecuteUpdateAsync(setters => setters.SetProperty(value => value.Email, "changed@example.test"), timeout.Token);
+            {
+                var evidence = await fixture.Context.UserIdentityEmailEvidence.AsNoTracking().SingleAsync(value => value.UserId == fixture.UserId, timeout.Token);
+                await fixture.Context.UserIdentityEmailEvidence.Where(value => value.Id == evidence.Id).ExecuteDeleteAsync(timeout.Token);
+                var refreshedClaim = UserIdentityEmailClaim.Create(fixture.UserId, "changed@example.test");
+                fixture.Context.UserIdentityEmailClaims.Add(refreshedClaim);
+                fixture.Context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(
+                    fixture.UserId, refreshedClaim.Id, evidence.ExternalLoginId, clock.Now.UtcDateTime));
+                await fixture.Context.SaveChangesAsync(timeout.Token);
+            }
             if (scenario is "save-crossing" or "channel-crossing")
             {
                 save.Armed = true;

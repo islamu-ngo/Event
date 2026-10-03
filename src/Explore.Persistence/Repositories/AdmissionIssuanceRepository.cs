@@ -165,6 +165,8 @@ public sealed class AdmissionIssuanceRepository(
         if (canDisclose && string.IsNullOrWhiteSpace(deliveryAddress) && order.AccountUserId.HasValue)
         {
             User? account = await dbContext.Users.AsNoTracking().Include(value => value.Pii)
+                .Include(value => value.IdentityEmailClaims)
+                    .ThenInclude(claim => claim.Evidence)
                 .SingleOrDefaultAsync(value => value.Id == order.AccountUserId.Value, cancellationToken);
             deliveryAddress = RecipientEmailAddressResolver.Resolve(account, order.AccountUserId.Value).Email;
             if (!string.IsNullOrWhiteSpace(deliveryAddress)) deliveryAccountUserId = order.AccountUserId;

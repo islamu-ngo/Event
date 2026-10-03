@@ -28,8 +28,12 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         await EmailDispatchSqliteFixture.EnableInstanceEmailAsync(context);
         var tenant = await SeedTenantAsync(context, "eligibility-address");
         var dispatch = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
-        var user = await context.Users.Include(value => value.Pii).SingleAsync(value => value.Id == dispatch.RecipientUserId);
-        user.Email = "current-verified@example.test";
+        var previousEvidence = await context.UserIdentityEmailEvidence.AsNoTracking().SingleAsync(value => value.UserId == dispatch.RecipientUserId);
+        await context.UserIdentityEmailEvidence.Where(value => value.Id == previousEvidence.Id).ExecuteDeleteAsync();
+        var refreshedClaim = UserIdentityEmailClaim.Create(dispatch.RecipientUserId, "current-verified@example.test");
+        context.UserIdentityEmailClaims.Add(refreshedClaim);
+        context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(
+            refreshedClaim.UserId, refreshedClaim.Id, previousEvidence.ExternalLoginId, DateTime.UtcNow));
         await context.SaveChangesAsync();
         var repository = new EmailDispatchOutboxRepository(context);
         var leaseToken = Guid.CreateVersion7();
@@ -144,8 +148,8 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         await using var context = fixture.CreateDbContext();
         var tenant = await SeedTenantAsync(context, "eligibility-unverified");
         var dispatch = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
-        var user = await context.Users.SingleAsync(value => value.Id == dispatch.RecipientUserId);
-        user.EmailVerified = false;
+        var evidence = await context.UserIdentityEmailEvidence.SingleAsync(value => value.UserId == dispatch.RecipientUserId);
+        evidence.Invalidate();
         await context.SaveChangesAsync();
         var repository = new EmailDispatchOutboxRepository(context);
         var leaseToken = Guid.CreateVersion7();
@@ -171,7 +175,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
     }
 
     [Test]
-    public async Task EligibilitySkipsQueuedReportReceiptWhenRecipientPiiWasErasedBeforeProviderHandoff()
+    public async Task EligibilitySkipsQueuedReportReceiptWhenRecipientIdentityWasErasedBeforeProviderHandoff()
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
@@ -180,6 +184,9 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         var repository = new EmailDispatchOutboxRepository(context);
         var leaseToken = Guid.CreateVersion7();
         await Assert.That(await ClaimSpecificAsync(repository, dispatch, leaseToken, DateTime.UtcNow)).IsNotNull();
+        await context.UserIdentityEmailClaims
+            .Where(value => value.UserId == dispatch.RecipientUserId)
+            .ExecuteDeleteAsync();
         await context.UserPii
             .Where(value => value.UserId == dispatch.RecipientUserId)
             .ExecuteDeleteAsync();
@@ -191,7 +198,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
 
         await Assert.That(result.Outcome).IsEqualTo(EmailDispatchEligibilityOutcome.Skipped);
         await Assert.That(result.RecipientEmail).IsNull();
-        await Assert.That(result.SkipReason).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailMissing);
+        await Assert.That(result.SkipReason).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailUnverified);
         var persisted = await context.EmailDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
             .SingleAsync(value => value.Id == dispatch.Id);
         var delivery = await context.NotificationDeliveries.IgnoreQueryFilters().AsNoTracking()
@@ -201,11 +208,11 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         var receipt = await context.EmailDispatchReceipts.IgnoreQueryFilters().AsNoTracking()
             .SingleAsync(value => value.EmailDispatchOutboxId == dispatch.Id);
         await Assert.That(persisted.Status).IsEqualTo(EmailDispatchStatus.Skipped);
-        await Assert.That(persisted.LastFailureCategory).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailMissing);
+        await Assert.That(persisted.LastFailureCategory).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailUnverified);
         await Assert.That(delivery.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Skipped);
-        await Assert.That(delivery.FailureCategory).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailMissing);
+        await Assert.That(delivery.FailureCategory).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailUnverified);
         await Assert.That(attempt.Outcome).IsEqualTo(EmailDispatchAttemptOutcome.Skipped);
-        await Assert.That(attempt.FailureCategory).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailMissing);
+        await Assert.That(attempt.FailureCategory).IsEqualTo(RecipientEmailAddressResolver.RecipientEmailUnverified);
         await Assert.That(receipt.Status).IsEqualTo(EmailDispatchReceiptStatus.Skipped);
         await Assert.That(await context.EmailDispatchAttempts.IgnoreQueryFilters().AnyAsync(value =>
             value.EmailDispatchOutboxId == dispatch.Id && value.FailureCategory == "provider_handoff_started")).IsFalse();
@@ -1839,6 +1846,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         receipt.CreatedAt = processingStartedAt;
 
         context.Users.Add(user);
+        AddRecipientProof(context, user, processingStartedAt);
         context.TenantUsers.Add(tenantUser);
         context.NotificationIntents.Add(intent);
         context.EmailDispatchOutbox.Add(dispatch);
@@ -1990,6 +1998,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         intent.Deliveries.Add(delivery);
 
         context.Users.Add(user);
+        AddRecipientProof(context, user, now);
         context.TenantUsers.Add(tenantUser);
         if (operation is not null)
         {
@@ -2011,6 +2020,25 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         context.NotificationIntents.Add(intent);
         await context.SaveChangesAsync();
         return dispatch;
+    }
+
+    private static void AddRecipientProof(ExploreDbContext context, User user, DateTime observedAt)
+    {
+        var binding = new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+            AuthenticationProvider = null!,
+            ProviderKey = Explore.Application.Authentication.PlatformIdentityPrincipalExtensions
+                .CreateOidcAccountKey("https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
+            CreatedAt = observedAt
+        };
+        var claim = UserIdentityEmailClaim.Create(user.Id, user.Email!);
+        context.UserExternalLogins.Add(binding);
+        context.UserIdentityEmailClaims.Add(claim);
+        context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(user.Id, claim.Id, binding.Id, observedAt));
     }
 
     private static async Task<EmailDispatchOutbox> SeedReportReceiptDispatchAsync(

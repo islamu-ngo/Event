@@ -1428,6 +1428,9 @@ failed tests. A restore/build failure before test execution leaves coverage
 unavailable rather than adding a misleading missing-report failure. Artifact
 retention still runs after failures; attempted tests with missing or invalid
 reports still fail validation.
+The upload lane enumerates downloaded Cobertura files explicitly and disables
+Codecov discovery. Reports under gitignored `artifacts/` must not depend on
+source-tree search; an empty downloaded artifact still fails closed.
 The weekly/manual `Coverage Evidence` workflow requests all fast selections
 and the established runtime/provider lanes from that reusable workflow.
 

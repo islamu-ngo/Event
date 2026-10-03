@@ -1,7 +1,6 @@
 using System.Data;
-using System.Data.Common;
 using Explore.Domain;
-using Microsoft.Data.Sqlite;
+using Explore.Persistence.Privacy.ErasureAuthority.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -20,14 +19,7 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
         await EnsureStorageReadyAsync(cancellationToken);
         await using EmbeddedPrivacyErasureAuthorityDbContext db =
             await contextFactory.CreateDbContextAsync(cancellationToken);
-        bool colocated = applicationContext?.Database.IsSqlite() == true
-            && SameFile(applicationContext.Database.GetDbConnection(), db.Database.GetDbConnection());
-        if (colocated)
-        {
-            if (applicationContext!.Database.CurrentTransaction is not null)
-                throw new InvalidOperationException("The identity gate must precede the application transaction.");
-            db.Database.SetDbConnection(applicationContext.Database.GetDbConnection(), contextOwnsConnection: false);
-        }
+        bool colocated = EmbeddedIdentityFenceConnection.TryShareApplicationConnection(applicationContext, db);
         // Microsoft.Data.Sqlite starts a non-deferred write transaction here. Its
         // database lock, not WriterLock, orders writers in other processes.
         await using IDbContextTransaction transaction =
@@ -96,14 +88,6 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
                 fence.IdentityKind == fingerprint.IdentityKind && fence.KeyId == fingerprint.KeyId
                 && fence.Fingerprint == fingerprint.Fingerprint))
             .OrderBy(intent => intent.AuthoritySequence).FirstOrDefaultAsync(cancellationToken);
-    }
-
-    private static bool SameFile(DbConnection first, DbConnection second)
-    {
-        var left = new SqliteConnectionStringBuilder(first.ConnectionString);
-        var right = new SqliteConnectionStringBuilder(second.ConnectionString);
-        return !string.IsNullOrEmpty(left.DataSource) && left.DataSource != ":memory:"
-            && Path.GetFullPath(left.DataSource) == Path.GetFullPath(right.DataSource);
     }
 
     public Task<bool> IsSubjectFencedAsync(Guid userId, CancellationToken cancellationToken)

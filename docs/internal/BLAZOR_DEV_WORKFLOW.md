@@ -141,17 +141,17 @@ an `Authorization: Bearer` header.
 
 ### Authority checks
 
-The admin host is shell routing for the instance console, not an authority
+The admin host selects the instance-settings landing route, not an authority
 grant. Test the instance administrator at `admin.localhost`; test tenant,
 organization, event, and attendee behavior at `default.localhost`. Use
 `agent-negative.localhost` for the wrong-tenant negative control. Host choice
 does not replace API authorization. On the admin host, `/login` must remain
 the ordinary Local form after Blazor becomes interactive; authentication
-pages must not be replaced by the control-plane shell. Local credential
+pages remain on the shared application router. Local credential
 verification itself has no tenant context, while subsequent tenant-scoped API
 requests still require a resolved tenant. After a successful instance
 administrator login with the default return URL, the BFF selects
-`/admin/instance` on the admin host and
+`/settings/instance` on the admin host and
 `/settings/instance?section=getting-started` on a tenant host. Cookie
 validation reads the authenticated current user and persisted administrator
 authority without inventing a tenant for the admin host.

@@ -121,13 +121,17 @@ The three application composition roots use the same contract: AppHost defaults 
 
 `Explore.Blazor` may keep its render-policy-controlled public app behavior, including the existing configurable Interactive Server, WebAssembly, or Auto paths documented in [RENDER_POLICIES.md](RENDER_POLICIES.md).
 
-Configured admin hosts render `Explore.Blazor/Components/ControlPlane/EmbeddedControlPlaneRoutes.razor` inside the same BFF. The embedded shell uses the host-selected effective render mode and the generated client contracts in `Explore.Blazor.Client`; it does not introduce a separate host, project, or backend dependency.
+Every host renders the shared `Routes` component with its effective render mode.
+Configured administration hosts send root requests to `/settings/instance`.
+`AdminSettingsPage` composes `UnifiedAdminSettingsLayout` for instance and tenant
+settings; host classification selects navigation, never authority.
 
-Control-plane UI primitives live under `Explore.Blazor.Client/Components/ControlPlane/`. They follow the same MudBlazor, token, CSS-isolation, and HAL affordance conventions as the rest of the client.
+Instance-administration UI primitives follow the same MudBlazor, token,
+CSS-isolation, and HAL affordance conventions as the rest of the client.
 
 The embedded instance console owns the public tenant-plan workflows. `/admin/instance/plans` creates structured plan drafts and `/admin/instance/plans/{key}` creates or edits version drafts, validates drafts, previews setting diffs, publishes or archives versions with typed confirmation, and clones published versions. Version lifecycle relations live on each `versions[]` resource, never on the root plan. `/admin/instance/tenants/{tenantId}/configuration` switches published plan assignments and applies or rolls them back with typed confirmation; rollback uses the separately returned eligible previous assignment. Every mutation is exposed only from the matching server-emitted HAL relation and matches the resource identifier in the advertised link before rendering or dispatch.
 
-The existing control-plane overview provider grid also renders one server-derived
+The instance overview provider grid also renders one server-derived
 secret-authority card. Its contract is limited to provider name, bounded status,
 and remediation code; it never exposes values, binding identifiers, paths, keys,
 URLs, or provider diagnostics. No secret mutation control is rendered because the
@@ -172,7 +176,7 @@ BFF endpoints are split by concern in `Explore.Blazor/Extensions/` and wired thr
 | User/session view | `/bff/me` | `BffPreferenceEndpoints.cs` |
 | Preferences and appearance | `/bff/theme`, `/bff/language`, `/bff/direction`, `/bff/ui-themes`, `/bff/appearance/*` | `BffPreferenceEndpoints.cs` |
 | White-label manifest | `/manifest.webmanifest` | `BffManifestEndpoints.cs` |
-| Configuration manifest export | `/bff/control-plane/configuration-manifest/export` | `BffConfigurationManifestEndpoints.cs` |
+| Configuration manifest export | `/bff/admin/instance/configuration-manifest/export` | `BffConfigurationManifestEndpoints.cs` |
 | Setup secret | `GET/POST/DELETE /bff/setup-secret`, `/bff/setup-secret/sync` | `BffSetupSecretEndpoints.cs` |
 | Storage upload proxy | `/bff/storage/upload-session`, `/bff/storage/upload-proxy` | `BffStorageEndpoints.cs` |
 | Registration provider embed host | `/bff/registration-provider-embed/tenants/{tenantId}/events/{eventId}/workflows/{workflowId}/requirements/{requirementId}/channels/{channelId}/bindings/{bindingId}` | `BffRegistrationProviderEmbedEndpoints.cs` |
@@ -519,14 +523,14 @@ Keep component lifecycle async and cancellation-aware for long-running loads. UI
 
 ### Local identity administration facade contract
 
-Interface injection remains the default for application services. The approved concrete exception is exactly `Explore.Blazor.Client.Services.ControlPlane.LocalIdentityAdministrationService`, injected only by `InstanceAdminSettingsLayout` and `LocalAccountsSection` in `Explore.Blazor.Client.Pages.Admin.Instance.Components`. This is a generated-client facade, not a framework type, state container, or interop adapter. Other concrete services and additional consumers do not inherit this permission, even if they have the same short name or an identical dependency shape. No additional interface is required for this facade.
+Interface injection remains the default for application services. The approved concrete exception is exactly `Explore.Blazor.Client.Services.InstanceAdmin.LocalIdentityAdministrationService`, injected only by `UnifiedAdminSettingsLayout` in `Pages.Admin.Components` and `LocalAccountsSection` in `Pages.Admin.Instance.Components`. This is a generated-client facade, not a framework type, state container, or interop adapter. Other concrete services and additional consumers do not inherit this permission, even if they have the same short name or an identical dependency shape. No additional interface is required for this facade.
 
 - `AddSharedApplicationServices` registers the sealed facade directly once, unkeyed and scoped. Singleton, transient, factory, keyed, or duplicate registrations do not satisfy this contract.
-- Its only retained fields are private readonly references to `ILocalIdentityAdministrationClient` and `IControlPlaneOverviewService`. No other instance or static fields are allowed: credentials, response DTOs, tasks, delegates, collections, or other per-call state must not survive in the facade. It has no state-bearing base class or storage/cache dependency.
+- Its only retained fields are private readonly references to `ILocalIdentityAdministrationClient` and `IInstanceOverviewService`. No other instance or static fields are allowed: credentials, response DTOs, tasks, delegates, collections, or other per-call state must not survive in the facade. It has no state-bearing base class or storage/cache dependency.
 - Each operation uses native server HAL discovery and the generated client. Reset/reconcile require target-bound HAL and typed subject/operation IDs; links do not become arbitrary transport URLs. Results retain their generated shape, exact operation/subject checks, and Issued-versus-Replayed one-time credential rules. Cancellation is checked after awaited issuance before handing any result back to the component.
 - Only the active `LocalAccountsSection` owns transient form and one-time handover state. Dismissal, supersession, cancellation, and disposal clear or invalidate it; a late response cannot populate another interaction or component in the same DI scope. Neither the facade nor shared UI state caches the handover.
 
-`BlazorClientArchitectureTests` Rule 1.04 discovers compiled `[Inject]` properties, including private inherited injections, and recognizes the exact service/consumer types rather than source spellings. Companion tests check the exact two consumers, the real shared registration, and dependency-only field shape. Synthetic probes reject unrelated or same-name types, additional/inherited consumers, wrong lifetimes, hidden registrations, mutable dependencies, and instance/static credential or response retention. `LocalIdentityAdministrationServiceTests`, `LocalAccountsSectionTests`, and `InstanceAdminSettingsLayoutTests` exercise native generated transport, HAL gating, and one-time UI behavior; structural recognition does not replace those behavioral checks.
+`BlazorClientArchitectureTests` Rule 1.04 discovers compiled `[Inject]` properties, including private inherited injections, and recognizes the exact service/consumer types rather than source spellings. Companion tests check the exact two consumers, the real shared registration, and dependency-only field shape. Synthetic probes reject unrelated or same-name types, additional/inherited consumers, wrong lifetimes, hidden registrations, mutable dependencies, and instance/static credential or response retention. `LocalIdentityAdministrationServiceTests`, `LocalAccountsSectionTests`, and `UnifiedAdminSettingsLayoutTests` exercise native generated transport, HAL gating, and one-time UI behavior; structural recognition does not replace those behavioral checks.
 
 ### Guest registration model and interop ownership
 

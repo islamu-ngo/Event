@@ -594,7 +594,7 @@ the API pipeline authorizes it.
 
 AppHost publishes dynamic/non-guaranteed internal HTTP via `WithHttpEndpoint(name: "http")`; HTTPS remains `https://localhost:7180`. Direct `Event.Standalone` launch profiles reserve `http://localhost:5180` (and `https://localhost:7180` for the HTTPS profile).
 
-`CONTROL_PLANE_PUBLIC_ORIGIN` remains the public admin-host input in both
+`INSTANCE_ADMIN_PUBLIC_ORIGIN` is the public admin-host input in both
 topologies. AppHost forwards it to the API/combined host and sets
 `Bff__AdminHosts__0` on the selected BFF surface. Set it to the browser-facing
 admin origin when testing an explicit admin host; it is not inferred from an

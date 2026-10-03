@@ -3,6 +3,19 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-10-02
+
+- **Unified instance administration.** Internal administration routes move from
+  `/api/admin/control-plane/*` to `/api/admin/instance/*`, with instance-named
+  operation IDs and generated contracts. Update direct clients to the regenerated
+  contract or follow current HAL links; no old route aliases remain. Tenant
+  lifecycle, plan assignment, configuration, deployment-mode and operator
+  diagnostics retain their existing authority and concurrency boundaries.
+  `/api/management/*` remains the separate external fleet connector.
+  Whole-instance configuration export and import sessions share the new
+  `/api/admin/instance/configuration-*` boundary; browser downloads use
+  `/bff/admin/instance/configuration-manifest/export`.
+
 ## 2026-10-01
 
 - **Private administrator sessions.** Current-user and administrator-authority

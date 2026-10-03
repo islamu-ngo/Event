@@ -3674,7 +3674,7 @@
       }
     },
     {
-      "key": "CONTROL_PLANE_PUBLIC_ORIGIN",
+      "key": "INSTANCE_ADMIN_PUBLIC_ORIGIN",
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
@@ -3688,8 +3688,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.deployment.control_plane_public_origin",
-        "helpKey": "environment.help.control_plane_public_origin",
+        "localizationKey": "environment.deployment.instance_admin_public_origin",
+        "helpKey": "environment.help.instance_admin_public_origin",
         "anchor": "environment-deployment"
       },
       "activation": {
@@ -9366,7 +9366,7 @@
     "STORAGE_S3_ACCESS_KEY_ID",
     "STORAGE_S3_SECRET_ACCESS_KEY",
     "DEPLOYMENT_MODE",
-    "CONTROL_PLANE_PUBLIC_ORIGIN",
+    "INSTANCE_ADMIN_PUBLIC_ORIGIN",
     "SETUP_SECRET",
     "SETUP_SECRET_FILE",
     "SETUP_SECRET_REQUIRED",
@@ -9698,7 +9698,7 @@
     "MANAGED_CLIENT_EXTERNAL_PROVIDER",
     "PHYSICAL_TENANCY_MODE",
     "API_ENDPOINT",
-    "CONTROL_PLANE_PUBLIC_ORIGIN",
+    "INSTANCE_ADMIN_PUBLIC_ORIGIN",
     "INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER",
     "PAYMENTS_STRIPE_MODE",
     "PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE",

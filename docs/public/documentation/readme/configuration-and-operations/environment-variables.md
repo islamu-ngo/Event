@@ -527,7 +527,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `MANAGED_CLIENT_EXTERNAL_PROVIDER` | platform | public | None | optional | process |
 | `PHYSICAL_TENANCY_MODE` | platform | public | None | optional | process |
 | `API_ENDPOINT` | platform | public | None | optional | process |
-| `CONTROL_PLANE_PUBLIC_ORIGIN` | deployment | public | None | optional | deployment |
+| `INSTANCE_ADMIN_PUBLIC_ORIGIN` | deployment | public | None | optional | deployment |
 | `INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER` | identity | public | None | optional | process |
 | `PAYMENTS_STRIPE_MODE` | platform | public | None | optional | process |
 | `PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE` | platform | public | None | optional | process |

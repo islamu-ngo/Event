@@ -40,10 +40,8 @@ public class NavMenuAdminTests : IDisposable
         var cut = RenderNavMenu();
 
         // Assert
-        await Assert.That(cut.Markup).DoesNotContain("Instance Administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Settings");
-        await Assert.That(cut.Markup).DoesNotContain("Tenant Administration");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(0);
         await Assert.That(cut.Markup).DoesNotContain("Organization Settings");
     }
 
@@ -59,10 +57,8 @@ public class NavMenuAdminTests : IDisposable
         OpenDropdown(cut);
 
         // Assert
-        await Assert.That(cut.Markup).DoesNotContain("Instance Administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Settings");
-        await Assert.That(cut.Markup).DoesNotContain("Tenant Administration");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(0);
         await Assert.That(cut.Markup).DoesNotContain("Organization Settings");
     }
 
@@ -136,9 +132,8 @@ public class NavMenuAdminTests : IDisposable
         OpenDropdown(cut);
 
         // Assert -- serialized/browser claims are not treated as admin authority
-        await Assert.That(cut.Markup).DoesNotContain("Instance Administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
-        await Assert.That(cut.Markup).DoesNotContain("Tenant Administration");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(0);
     }
 
     [Test]
@@ -157,10 +152,8 @@ public class NavMenuAdminTests : IDisposable
         OpenDropdown(cut);
 
         // Assert -- serialized/browser claims are not treated as admin authority
-        await Assert.That(cut.Markup).DoesNotContain("Instance Administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
-        await Assert.That(cut.Markup).DoesNotContain("Tenant Administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Settings");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(0);
     }
 
     [Test]
@@ -181,10 +174,8 @@ public class NavMenuAdminTests : IDisposable
         // Assert -- serialized/browser claims are not treated as admin authority
         await Assert.That(cut.Markup).DoesNotContain("Organization Settings");
         await Assert.That(cut.Markup).DoesNotContain($"/settings/organization/{orgId}");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Settings");
-        await Assert.That(cut.Markup).DoesNotContain("Tenant Administration");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(0);
     }
 
     [Test]
@@ -226,9 +217,8 @@ public class NavMenuAdminTests : IDisposable
         OpenDropdown(cut);
 
         // Assert -- serialized/browser claims do not create admin links
-        await Assert.That(cut.Markup).DoesNotContain("Instance Administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
-        await Assert.That(cut.Markup).DoesNotContain("Tenant Administration");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(0);
         await Assert.That(cut.Markup).DoesNotContain($"/settings/organization/{orgId}");
     }
 
@@ -252,7 +242,7 @@ public class NavMenuAdminTests : IDisposable
     }
 
     [Test]
-    public async Task NavMenu_MultiTenantInstanceAdmin_ShowsEmbeddedInstanceConsole()
+    public async Task NavMenu_MultiTenantInstanceAdmin_ShowsUnifiedInstanceAdministration()
     {
         // Arrange
         _ctx.SetAuthenticatedUser(AuthenticationTestConstants.AdminUserId, "Instance Admin");
@@ -265,9 +255,8 @@ public class NavMenuAdminTests : IDisposable
         OpenDropdown(cut);
 
         // Assert
-        await Assert.That(cut.Markup).Contains("Instance Console");
-        await Assert.That(cut.Markup).Contains("href=\"/admin/instance\"");
-        await Assert.That(cut.Markup).Contains("href=\"/settings/instance\"");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(1);
+        await Assert.That(cut.Find("a[href='/settings/instance']").TextContent).Contains("Instance administration");
         await Assert.That(cut.Markup).DoesNotContain("href=\"/settings/admin\"");
     }
 
@@ -308,7 +297,6 @@ public class NavMenuAdminTests : IDisposable
         // Assert -- onboarding grants are visible even before the serialized auth claims rehydrate.
         await Assert.That(cut.Markup).Contains("Administration");
         await Assert.That(cut.Markup).Contains("href=\"/settings/instance\"");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
         await Assert.That(cut.Markup).DoesNotContain("href=\"/settings/admin\"");
         await Assert.That(cut.Markup).DoesNotContain("Custom Property Governance");
     }
@@ -396,11 +384,9 @@ public class NavMenuAdminTests : IDisposable
 
         // Assert
         await Assert.That(cut.Markup).Contains("href=\"/settings/instance\"");
-        await Assert.That(cut.Markup).Contains("href=\"/settings/admin\"");
-        await Assert.That(cut.Markup).Contains("Site administration");
-        await Assert.That(cut.Markup).DoesNotContain("Tenant administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance administration");
-        await Assert.That(cut.Markup).DoesNotContain("Instance Console");
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("a[href='/settings/instance']")
+            .Select(link => link.TextContent.Trim())).Contains("Administration");
     }
 
     [Test]
@@ -417,7 +403,7 @@ public class NavMenuAdminTests : IDisposable
     }
 
     [Test]
-    public async Task NavMenu_SingleTenantInstanceAdmin_ReplacesAllSettingsWithAdminSettings()
+    public async Task NavMenu_SingleTenantInstanceAdmin_KeepsOneAdministrationEntryAndSettingsHub()
     {
         _ctx.SetAuthenticatedUser(AuthenticationTestConstants.AdminUserId, "Instance Admin");
         SetupNavMenuServices(
@@ -428,14 +414,13 @@ public class NavMenuAdminTests : IDisposable
         var cut = RenderNavMenu();
         OpenDropdown(cut);
 
-        var adminSettings = cut.FindAll("a")
-            .Single(link => link.TextContent.Contains("Admin Settings", StringComparison.Ordinal));
-        await Assert.That(adminSettings.GetAttribute("href")).IsEqualTo("/settings/instance");
-        await Assert.That(cut.Markup).DoesNotContain("All Settings");
+        await Assert.That(cut.FindAll("a[href='/settings/instance']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("a[href='/settings']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("a[href='/settings/personal']").Count).IsEqualTo(1);
     }
 
     [Test]
-    public async Task NavMenu_SingleTenantTenantAdmin_ReplacesAllSettingsWithAdminSettings()
+    public async Task NavMenu_SingleTenantTenantAdmin_KeepsOneAdministrationEntryAndSettingsHub()
     {
         _ctx.SetAuthenticatedUser(AuthenticationTestConstants.AdminUserId, "Tenant Admin");
         SetupNavMenuServices(
@@ -445,10 +430,9 @@ public class NavMenuAdminTests : IDisposable
         var cut = RenderNavMenu();
         OpenDropdown(cut);
 
-        var adminSettings = cut.FindAll("a")
-            .Single(link => link.TextContent.Contains("Admin Settings", StringComparison.Ordinal));
-        await Assert.That(adminSettings.GetAttribute("href")).IsEqualTo("/settings/admin");
-        await Assert.That(cut.Markup).DoesNotContain("All Settings");
+        await Assert.That(cut.FindAll("a[href='/settings/admin']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("a[href='/settings']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("a[href='/settings/personal']").Count).IsEqualTo(1);
     }
 
     [Test]

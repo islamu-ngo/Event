@@ -227,7 +227,7 @@ siblings that **share the original route**, stated explicitly rather than via th
 | Registration order | `RegistrationOrderController`, `GuestRegistrationOrderController`, `AuthenticatedRegistrationOrderController` | `api/events/{eventId:guid}/registration-orders` |
 | Webhooks | `WebhooksController`, `WebhookEndpointsController`, `WebhookMessagesController` | `api/webhooks` |
 | Instance settings | `Instance{Governance,Presentation,Storage,Messaging,Authentication,Authorization}SettingsController` | `api/instance/settings` |
-| Control plane | `ControlPlaneController`, `ControlPlaneTenant{Plan,Configuration,Lifecycle}Controller` | `api/admin/control-plane` |
+| Instance admin | `InstanceAdminController`, `InstanceTenant{Plan,Configuration,Lifecycle}Controller`, `InstanceDeploymentModeController` | `api/admin/instance` |
 
 Rules for a partition:
 

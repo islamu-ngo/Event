@@ -1,0 +1,16 @@
+@using MudBlazor
+@using Microsoft.AspNetCore.Authorization
+@using Explore.Blazor.Client.Pages.Admin.Components
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+<PageTitle>Administration Settings</PageTitle>
+
+<UnifiedAdminSettingsLayout TenantScope="@IsTenantScope" />
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+
+    private bool IsTenantScope => Navigation.ToBaseRelativePath(Navigation.Uri)
+        .Split('?', '#')[0].TrimEnd('/').Equals("settings/admin", StringComparison.OrdinalIgnoreCase);
+}

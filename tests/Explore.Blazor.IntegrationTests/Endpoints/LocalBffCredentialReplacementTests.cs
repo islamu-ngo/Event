@@ -82,7 +82,7 @@ public sealed class LocalBffCredentialReplacementTests
     }
 
     [Test]
-    public async Task FreshAdministratorSignInOnAdminHostEntersControlPlane()
+    public async Task FreshAdministratorSignInOnAdminHostEntersUnifiedSettings()
     {
         await using var fixture = new Fixture();
         fixture.Transport.OrdinaryLogin = true;
@@ -93,9 +93,9 @@ public sealed class LocalBffCredentialReplacementTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         await Assert.That(body.RootElement.GetProperty("redirectUrl").GetString())
-            .IsEqualTo("/admin/instance");
+            .IsEqualTo("/settings/instance");
         await Assert.That(fixture.ReadCookieTicket(response).Properties.RedirectUri)
-            .IsEqualTo("/admin/instance");
+            .IsEqualTo("/settings/instance");
     }
 
     [Test]

@@ -3,8 +3,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application;
-using Explore.Application.Features.ControlPlane.Handlers.Commands;
-using Explore.Application.Features.ControlPlane.Requests.Commands;
+using Explore.Application.Features.InstanceAdmin.Handlers.Commands;
+using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Features.Settings.Handlers.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
@@ -28,8 +28,8 @@ public sealed class SettingMutationBoundaryArchitectureTests
         GuardedMutationOwnerDependencies = new Dictionary<Type, IReadOnlyCollection<Type>>
         {
             [typeof(TenantPolicySettingService)] = [typeof(IPublicationPolicyMutationBoundary)],
-            [typeof(SetControlPlaneTenantSettingCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
-            [typeof(ApplyControlPlaneTenantPlanAssignmentCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
+            [typeof(SetInstanceTenantSettingCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
+            [typeof(ApplyInstanceTenantPlanAssignmentCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
             [typeof(UpdateSettingCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
             [typeof(UpdateSettingBatchCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
             [typeof(ResetSettingCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
@@ -119,13 +119,13 @@ public sealed class SettingMutationBoundaryArchitectureTests
     }
 
     [Test]
-    public async Task DirectControlPlaneSettingHandlers_ShouldRequireTrustedCurrentUserContext()
+    public async Task DirectInstanceSettingHandlers_ShouldRequireTrustedCurrentUserContext()
     {
         Type[] handlerTypes =
         [
-            typeof(SetControlPlaneTenantSettingCommandHandler),
-            typeof(LockControlPlaneTenantSettingCommandHandler),
-            typeof(UnlockControlPlaneTenantSettingCommandHandler)
+            typeof(SetInstanceTenantSettingCommandHandler),
+            typeof(LockInstanceTenantSettingCommandHandler),
+            typeof(UnlockInstanceTenantSettingCommandHandler)
         ];
 
         string[] violations = handlerTypes
@@ -138,14 +138,14 @@ public sealed class SettingMutationBoundaryArchitectureTests
     }
 
     [Test]
-    public async Task ControlPlaneMutationHandlers_ShouldDeclarePostCommitSideEffectDependencies()
+    public async Task InstanceMutationHandlers_ShouldDeclarePostCommitSideEffectDependencies()
     {
         Type[] handlerTypes =
         [
-            typeof(SetControlPlaneTenantSettingCommandHandler),
-            typeof(LockControlPlaneTenantSettingCommandHandler),
-            typeof(UnlockControlPlaneTenantSettingCommandHandler),
-            typeof(ApplyControlPlaneTenantPlanAssignmentCommandHandler)
+            typeof(SetInstanceTenantSettingCommandHandler),
+            typeof(LockInstanceTenantSettingCommandHandler),
+            typeof(UnlockInstanceTenantSettingCommandHandler),
+            typeof(ApplyInstanceTenantPlanAssignmentCommandHandler)
         ];
 
         string[] violations = handlerTypes
@@ -176,7 +176,7 @@ public sealed class SettingMutationBoundaryArchitectureTests
     {
         Type[] mutationOwners =
         [
-            typeof(SetControlPlaneTenantSettingCommandHandler),
+            typeof(SetInstanceTenantSettingCommandHandler),
             typeof(UpdateSettingCommandHandler),
             typeof(UpdateSettingBatchCommandHandler)
         ];
@@ -207,18 +207,18 @@ public sealed class SettingMutationBoundaryArchitectureTests
     {
         Guid tenantId = Guid.CreateVersion7();
         var currentUser = new FixedCurrentUserService(Guid.CreateVersion7());
-        var lockHandler = new LockControlPlaneTenantSettingCommandHandler(
+        var lockHandler = new LockInstanceTenantSettingCommandHandler(
             null!, null!, null!, currentUser, null!, [], null!, null!, null!);
-        var unlockHandler = new UnlockControlPlaneTenantSettingCommandHandler(
+        var unlockHandler = new UnlockInstanceTenantSettingCommandHandler(
             null!, null!, null!, currentUser, null!, [], null!, null!, null!);
 
         foreach (string key in PublicationPolicySettingKeys.All)
         {
             BaseCommandResponse<Guid> lockResponse = await lockHandler.ExecuteAsync(
-                new LockControlPlaneTenantSettingCommand(tenantId, key),
+                new LockInstanceTenantSettingCommand(tenantId, key),
                 CancellationToken.None);
             BaseCommandResponse<Guid> unlockResponse = await unlockHandler.ExecuteAsync(
-                new UnlockControlPlaneTenantSettingCommand(tenantId, key),
+                new UnlockInstanceTenantSettingCommand(tenantId, key),
                 CancellationToken.None);
 
             await Assert.That(lockResponse.IsSuccess).IsFalse();

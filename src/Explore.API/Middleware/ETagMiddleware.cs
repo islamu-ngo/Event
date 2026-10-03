@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Security.Cryptography;
 using Explore.API.Filters;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IO;
 
 namespace Explore.API.Middleware;
@@ -31,7 +32,10 @@ public sealed class ETagMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        // An event stream never completes, so it must bypass body capture before execution.
         if (context.GetEndpoint()?.Metadata.GetMetadata<PrivateNoStoreAttribute>() is not null
+            || context.GetEndpoint()?.Metadata.GetMetadata<ProducesAttribute>()?.ContentTypes
+                .Contains("text/event-stream", StringComparer.OrdinalIgnoreCase) is true
             || !HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
         {
             await _next(context);

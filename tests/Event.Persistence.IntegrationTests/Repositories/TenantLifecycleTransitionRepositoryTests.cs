@@ -4,8 +4,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TenantSettingsDocuments;
 using Explore.Application.Exceptions;
-using Explore.Application.Features.ControlPlane.Handlers.Commands;
-using Explore.Application.Features.ControlPlane.Requests.Commands;
+using Explore.Application.Features.InstanceAdmin.Handlers.Commands;
+using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Features.Management;
 using Explore.Application.Features.TenantSettingsDocuments.Handlers.Commands;
 using Explore.Application.Features.TenantSettingsDocuments.Requests.Commands;
@@ -296,7 +296,7 @@ public sealed class TenantLifecycleTransitionRepositoryTests(PostgreSqlContainer
         return new(tenantContext, CurrentOperator(), documents, new TenantRepository(db), mutationLock, new TypedSettingsDocumentResolver(documents, cache));
     }
 
-    private static TransitionControlPlaneTenantLifecycleCommandHandler ActivationHandler(ExploreDbContext db, ISettingMutationLock mutationLock, TenantDirectoryOperatorReadinessEvaluator readiness) => new(
+    private static TransitionInstanceTenantLifecycleCommandHandler ActivationHandler(ExploreDbContext db, ISettingMutationLock mutationLock, TenantDirectoryOperatorReadinessEvaluator readiness) => new(
         new TenantRepository(db), new TenantLifecycleLogRepository(db), new EmailDispatchOutboxRepository(db), CurrentOperator(), mutationLock,
         new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(db), new TenantRepository(db), new ManagedTenantProvisioningOperationRepository(db), Options.Create(new ManagedControlPlaneOptions())), readiness);
 

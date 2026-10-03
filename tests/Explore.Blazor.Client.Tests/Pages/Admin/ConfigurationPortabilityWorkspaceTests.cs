@@ -1,11 +1,11 @@
 namespace Explore.Blazor.Client.Tests.Pages.Admin;
 
 using Explore.Blazor.Client.Clients;
-using Explore.Blazor.Client.Contracts.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
 using Explore.Blazor.Client.Contracts.Interop;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Pages.Admin.Components;
-using Explore.Blazor.Client.Services.ControlPlane;
+using Explore.Blazor.Client.Services.InstanceAdmin;
 using Microsoft.AspNetCore.Components;
 
 public sealed class ConfigurationManifestImportAdministrationTests : IDisposable
@@ -17,8 +17,8 @@ public sealed class ConfigurationManifestImportAdministrationTests : IDisposable
     [Test]
     public async Task InstanceImport_RendersOnlyWhenServerAdvertisesHalCapability()
     {
-        IControlPlaneClient api = ConfigurationManifestImportAdministrationTests.InstanceApi(
-            ControlPlaneLinkRelations.CreateConfigurationImportSession);
+        IInstanceAdminClient api = ConfigurationManifestImportAdministrationTests.InstanceApi(
+            InstanceAdminLinkRelations.CreateConfigurationImportSession);
         ConfigurationManifestImportAdministrationTests.Register(context, api);
 
         var cut = context.Render<ConfigurationPortabilityWorkspace>(parameters =>
@@ -44,11 +44,11 @@ public sealed class ConfigurationManifestImportAdministrationTests : IDisposable
             .Contains("server did not advertise configuration import authority");
     }
 
-    internal static IControlPlaneClient InstanceApi(params string[] relations)
+    internal static IInstanceAdminClient InstanceApi(params string[] relations)
     {
-        IControlPlaneClient api = Substitute.For<IControlPlaneClient>();
-        api.GetControlPlaneOverviewAsync(null, null, Arg.Any<CancellationToken>())
-            .Returns(new HalResourceOfControlPlaneOverviewDto
+        IInstanceAdminClient api = Substitute.For<IInstanceAdminClient>();
+        api.GetInstanceAdminOverviewAsync(null, null, Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfInstanceOverviewDto
             {
                 _links = Links(relations)
             });
@@ -57,10 +57,10 @@ public sealed class ConfigurationManifestImportAdministrationTests : IDisposable
 
     internal static void Register(
         BlazorTestContext context,
-        IControlPlaneClient? controlPlaneClient = null,
+        IInstanceAdminClient? controlPlaneClient = null,
         ITenantOnboardingClient? tenantOnboardingClient = null)
     {
-        var cpClient = controlPlaneClient ?? Substitute.For<IControlPlaneClient>();
+        var cpClient = controlPlaneClient ?? Substitute.For<IInstanceAdminClient>();
         var toClient = tenantOnboardingClient ?? Substitute.For<ITenantOnboardingClient>();
         context.Services.AddSingleton(cpClient);
         context.Services.AddSingleton(toClient);
@@ -68,7 +68,7 @@ public sealed class ConfigurationManifestImportAdministrationTests : IDisposable
             new ConfigurationPortabilityService(
                 cpClient,
                 toClient,
-                Substitute.For<IControl_Plane_ConfigurationClient>(),
+                Substitute.For<IInstance_ConfigurationClient>(),
                 Substitute.For<ITenant_ConfigurationClient>(),
                 Substitute.For<IConfigurationManifestExportService>(),
                 Substitute.For<IBrowserActionInterop>(),
@@ -98,12 +98,12 @@ public sealed class TenantConfigurationPortabilityAdministrationTests : IDisposa
             {
                 TenantId = tenantId,
                 _links = ConfigurationManifestImportAdministrationTests.Links(
-                    ControlPlaneLinkRelations.CreateConfigurationImportSession,
-                    ControlPlaneLinkRelations.ExportTenantConfigurationPackage)
+                    InstanceAdminLinkRelations.CreateConfigurationImportSession,
+                    InstanceAdminLinkRelations.ExportTenantConfigurationPackage)
             });
-        var cpClient = Substitute.For<IControlPlaneClient>();
-        cpClient.GetControlPlaneTenantsAsync(null, null, Arg.Any<CancellationToken>())
-            .Returns(new HalCollectionResourceOfControlPlaneTenantListItemDto
+        var cpClient = Substitute.For<IInstanceAdminClient>();
+        cpClient.GetInstanceAdminTenantsAsync(null, null, Arg.Any<CancellationToken>())
+            .Returns(new HalCollectionResourceOfInstanceTenantListItemDto
             {
                 _links = new Dictionary<string, HalLink>(StringComparer.Ordinal)
             });
@@ -131,7 +131,7 @@ public sealed class ConfigurationPortabilityAccessibilityTests : IDisposable
         ConfigurationManifestImportAdministrationTests.Register(
             context,
             ConfigurationManifestImportAdministrationTests.InstanceApi(
-                ControlPlaneLinkRelations.CreateConfigurationImportSession));
+                InstanceAdminLinkRelations.CreateConfigurationImportSession));
 
         var cut = context.Render<ConfigurationPortabilityWorkspace>(parameters =>
             parameters.Add(component => component.Scope, ConfigurationImportScope.Instance));

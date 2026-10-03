@@ -4,7 +4,7 @@ using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
-using Explore.Application.Features.ControlPlane.Requests.Queries;
+using Explore.Application.Features.InstanceAdmin.Requests.Queries;
 using Explore.Application.Hateoas;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
@@ -155,7 +155,7 @@ public sealed class OnboardingStatusLinkPolicyTests
         var links = policy.GetLinks(status, user: null).ToArray();
         var manageTenants = links.Single(link => link.Rel == "manage-tenants");
 
-        await AssertInstanceSettingsViewLink(manageTenants, RouteNames.GetControlPlaneTenants);
+        await AssertInstanceSettingsViewLink(manageTenants, RouteNames.GetInstanceAdminTenants);
     }
 
     [Test]
@@ -211,12 +211,12 @@ public sealed class OnboardingStatusLinkPolicyTests
         };
 
         var links = new TenantOnboardingStatusLinkPolicy().GetLinks(status, user: null).ToArray();
-        var manage = links.Single(link => link.Rel == "manage-control-plane");
+        var manage = links.Single(link => link.Rel == "manage-instance");
         var complete = links.Single(link => link.Rel == "complete");
 
         await AssertInstanceSettingLink(
             manage,
-            RouteNames.GetControlPlaneTenantById,
+            RouteNames.GetInstanceAdminTenantById,
             "GET",
             AuthorizationActions.InstanceSettings.View);
         await AssertInstanceSettingLink(
@@ -328,7 +328,7 @@ public sealed class OnboardingStatusLinkPolicyTests
         await Assert.That(link.PermissionResourceKind).IsEqualTo(ResourceKinds.InstanceSetting);
         await Assert.That(link.PermissionAction).IsEqualTo(action);
         await Assert.That(link.PermissionResourceId)
-            .IsEqualTo(GetControlPlaneTenantListQuery.SettingKey);
+            .IsEqualTo(GetInstanceTenantListQuery.SettingKey);
         await Assert.That(link.PermissionScope).IsNull();
     }
 }

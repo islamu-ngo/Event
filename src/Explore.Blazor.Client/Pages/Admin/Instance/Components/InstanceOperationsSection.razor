@@ -1,0 +1,336 @@
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Components.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.Services.InstanceAdmin
+@inject IInstanceOperationsService OperationsService
+
+<div class="control-plane-operations">
+    <InstanceAdminPageHeader Title="Operations" IsSection="true"
+                            Eyebrow="Instance console"
+                            Description="Review outbox, email, storage, and background operation status without exposing tenant payloads.">
+    </InstanceAdminPageHeader>
+
+    @if (_loading)
+    {
+        <InstanceAdminPanel Title="Loading deployment-mode runbook">
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        </InstanceAdminPanel>
+    }
+    else if (_runbook is null)
+    {
+        <InstanceAdminPanel Title="Deployment-mode runbook unavailable" Description="Mode transitions stay hidden until the host can reach the instance API.">
+            <p class="control-plane-operations__message" role="alert">@_runbookProblemMessage</p>
+        </InstanceAdminPanel>
+    }
+    else
+    {
+        <InstanceAdminPanel Title="Deployment mode runbook" Description="@RunbookGeneratedAtLabel">
+            <div class="control-plane-operations__runbook-summary" role="list" aria-label="Deployment mode summary">
+                <div role="listitem">
+                    <span class="control-plane-operations__kicker">Current mode</span>
+                    <strong>@Runbook.CurrentMode</strong>
+                </div>
+                @if (Runbook.CurrentMode == "MultiTenant")
+                {
+                <div role="listitem">
+                    <span class="control-plane-operations__kicker">Active tenants</span>
+                    <strong>@Runbook.ActiveTenantCount</strong>
+                </div>
+                }
+            </div>
+
+            @if (Runbook.Steps?.Count > 0)
+            {
+                <ol class="control-plane-operations__runbook-steps" aria-label="Deployment mode runbook steps">
+                    @foreach (var step in Runbook.Steps)
+                    {
+                        <li class="control-plane-operations__runbook-step control-plane-operations__runbook-step--@step.Severity" @key="step.Key">
+                            <strong>@step.Title</strong>
+                            <span>@step.Description</span>
+                        </li>
+                    }
+                </ol>
+            }
+
+            <div class="control-plane-operations__targets" role="list" aria-label="Deployment mode targets">
+                @foreach (var option in Runbook.TargetOptions ?? [])
+                {
+                    var hasTransitionLink = HasTransitionLink(option.TargetMode);
+                    <article class="control-plane-operations__target" role="listitem" @key="option.TargetMode">
+                        <div>
+                            <span class="control-plane-operations__kicker">@option.TargetMode</span>
+                            <h3>@option.Label</h3>
+                            <p>@option.Description</p>
+                        </div>
+
+                        @if (option.Allowed != true || !hasTransitionLink)
+                        {
+                            <p class="control-plane-operations__message" role="alert">
+                                @(option.BlockingReason ?? "This transition is not available from the current HAL affordances.")
+                            </p>
+                            @if (!string.IsNullOrWhiteSpace(option.Remediation))
+                            {
+                                <p class="control-plane-operations__remediation">@option.Remediation</p>
+                            }
+                        }
+                    </article>
+                }
+            </div>
+
+            @if (Runbook.TargetOptions?.Count > 0)
+            {
+                <div class="control-plane-operations__transition-form">
+                    <label for="deployment-mode-target">Target deployment mode</label>
+                    <select id="deployment-mode-target" @bind="_selectedTargetMode" disabled="@_transitioning">
+                        <option value="">Choose a target mode</option>
+                        @foreach (var option in Runbook.TargetOptions)
+                        {
+                            <option value="@option.TargetMode" disabled="@(option.Allowed != true || !HasTransitionLink(option.TargetMode))">@option.Label</option>
+                        }
+                    </select>
+
+                    <label for="deployment-mode-confirmation">Type @SelectedConfirmationText to confirm</label>
+                    <input id="deployment-mode-confirmation"
+                           type="text"
+                           autocomplete="off"
+                           @bind="_confirmationText"
+                           disabled="@_transitioning" />
+
+                    <label for="deployment-mode-reason">Operator reason</label>
+                    <textarea id="deployment-mode-reason"
+                              rows="3"
+                              @bind="_transitionReason"
+                              disabled="@_transitioning"></textarea>
+
+                    <InstanceAdminActionButton Color="Color.Warning"
+                                              Disabled="@(!CanSubmitTransition)"
+                                              OnClick="@RunDeploymentModeTransitionAsync"
+                                              AriaLabel="Run deployment mode transition runbook">
+                        Run deployment-mode runbook
+                    </InstanceAdminActionButton>
+
+                    @if (_transitioning)
+                    {
+                        <MudProgressLinear Color="Color.Warning" Indeterminate="true" />
+                    }
+                </div>
+            }
+
+            @if (_transitionResult is not null)
+            {
+                <div class="control-plane-operations__command-result" role="@(_transitionResult.Success == true ? "status" : "alert")">
+                    <strong>@(_transitionResult.Success == true ? "Runbook completed" : "Runbook blocked")</strong>
+                    <p>@_transitionResult.Message</p>
+                    @if (_transitionResult.Errors?.Count > 0)
+                    {
+                        <ul>
+                            @foreach (var error in _transitionResult.Errors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        </InstanceAdminPanel>
+    }
+
+    @if (_loading)
+    {
+        <InstanceAdminPanel Title="Loading operations">
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        </InstanceAdminPanel>
+    }
+    else if (_operations is null)
+    {
+        <InstanceAdminPanel Title="Instance API unavailable" Description="Operations data is hidden until the instance API is available.">
+            <p class="control-plane-operations__message" role="alert">@_operationsProblemMessage</p>
+        </InstanceAdminPanel>
+    }
+    else if (Operations.Statuses?.Count is not > 0)
+    {
+        <InstanceAdminPanel Title="No operations reported" Description="The instance API did not return operation status records.">
+            <p class="control-plane-operations__message">Warnings and metrics will appear only when the API reports them.</p>
+        </InstanceAdminPanel>
+    }
+    else
+    {
+        <InstanceAdminPanel Title="Operations status" Description="@GeneratedAtLabel">
+            @if (Operations.Warnings?.Count > 0)
+            {
+                <ul class="control-plane-operations__warnings" aria-label="Operations warnings">
+                    @foreach (var warning in Operations.Warnings)
+                    {
+                        <li class="control-plane-operations__warning control-plane-operations__warning--@warning.Severity">
+                            <strong>@warning.Code</strong>
+                            <span>@warning.Message</span>
+                            @if (!string.IsNullOrWhiteSpace(warning.Remediation))
+                            {
+                                <span class="control-plane-operations__remediation">@warning.Remediation</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
+            <div class="control-plane-operations__list" role="list">
+                @foreach (var status in Operations.Statuses)
+                {
+                    <article class="control-plane-operations__item control-plane-operations__item--@status.Severity" role="listitem" @key="status.Key">
+                        <div class="control-plane-operations__item-main">
+                            <span class="control-plane-operations__kicker">@status.Key</span>
+                            <h3>@status.DisplayName</h3>
+                            <p>@status.Status</p>
+                            @if (!string.IsNullOrWhiteSpace(status.Message))
+                            {
+                                <p class="control-plane-operations__message">@status.Message</p>
+                            }
+                        </div>
+
+                        @if (status.Metrics?.Count > 0)
+                        {
+                            <dl class="control-plane-operations__metrics">
+                                @foreach (var metric in status.Metrics)
+                                {
+                                    <div>
+                                        <dt>@metric.DisplayName</dt>
+                                        <dd>@metric.Value@if (metric.IsCapped == true) { <span> capped</span> }</dd>
+                                    </div>
+                                }
+                            </dl>
+                        }
+                    </article>
+                }
+            </div>
+        </InstanceAdminPanel>
+    }
+</div>
+
+@code {
+    private HalResourceOfInstanceOperationsDto? _operations;
+    private HalResourceOfInstanceDeploymentModeRunbookDto? _runbook;
+    private BaseCommandResponseOfInstanceDeploymentModeTransitionDto? _transitionResult;
+    private string? _selectedTargetMode;
+    private string? _confirmationText;
+    private string? _transitionReason;
+    private bool _transitioning;
+    private bool _loading = true;
+    private string _operationsProblemMessage = "Operations data is currently unavailable.";
+    private string _runbookProblemMessage = "The deployment-mode runbook is currently unavailable.";
+
+    private HalResourceOfInstanceOperationsDto Operations => _operations ?? new();
+
+    private HalResourceOfInstanceDeploymentModeRunbookDto Runbook => _runbook ?? new();
+
+    private string GeneratedAtLabel => Operations.GeneratedAtUtc == DateTimeOffset.MinValue
+        ? "Generated timestamp unavailable."
+        : $"Generated {Operations.GeneratedAtUtc:u}.";
+
+    private string RunbookGeneratedAtLabel => Runbook.GeneratedAtUtc == DateTimeOffset.MinValue
+        ? "Runbook timestamp unavailable."
+        : $"Generated {Runbook.GeneratedAtUtc:u}.";
+
+    private InstanceDeploymentModeTargetOptionDto? SelectedTargetOption =>
+        Runbook.TargetOptions?.FirstOrDefault(option => string.Equals(option.TargetMode, _selectedTargetMode, StringComparison.Ordinal));
+
+    private string SelectedConfirmationText => SelectedTargetOption?.ConfirmationText ?? "the target mode";
+
+    private bool CanSubmitTransition
+    {
+        get
+        {
+            var option = SelectedTargetOption;
+            return option is not null
+                && option.Allowed == true
+                && HasTransitionLink(option.TargetMode)
+                && string.Equals(_confirmationText?.Trim(), option.ConfirmationText, StringComparison.Ordinal)
+                && !_transitioning;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadResultsAsync();
+    }
+
+    private async Task LoadResultsAsync()
+    {
+        var operationsTask = OperationsService.GetOperationsAsync();
+        var runbookTask = OperationsService.GetDeploymentModeRunbookAsync();
+
+        try
+        {
+            _operations = await operationsTask;
+            _runbook = await runbookTask;
+            SelectDefaultTarget();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            _operationsProblemMessage = "Operations data is currently unavailable.";
+            _runbookProblemMessage = "The deployment-mode runbook is currently unavailable.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SelectDefaultTarget()
+    {
+        if (SelectedTargetOption is { Allowed: true } selected && HasTransitionLink(selected.TargetMode ?? string.Empty))
+        {
+            return;
+        }
+
+        _selectedTargetMode = Runbook.TargetOptions?
+            .FirstOrDefault(option => option.Allowed == true && HasTransitionLink(option.TargetMode ?? string.Empty))
+            ?.TargetMode;
+    }
+
+    private bool HasTransitionLink(string targetMode)
+    {
+        var relation = targetMode switch
+        {
+            "MultiTenant" => InstanceAdminLinkRelations.TransitionToMultiTenant,
+            "SingleTenant" => InstanceAdminLinkRelations.TransitionToSingleTenant,
+            _ => null
+        };
+
+        return relation is not null && InstanceAdminHal.HasLink(Runbook._links, relation);
+    }
+
+    private async Task RunDeploymentModeTransitionAsync()
+    {
+        var option = SelectedTargetOption;
+        if (option is null)
+        {
+            return;
+        }
+
+        _transitioning = true;
+        _transitionResult = null;
+
+        try
+        {
+            _transitionResult = await OperationsService.TransitionDeploymentModeAsync(
+                option.TargetMode ?? string.Empty,
+                _confirmationText ?? string.Empty,
+                _transitionReason);
+
+            if (_transitionResult.Success == true)
+            {
+                _confirmationText = string.Empty;
+                _transitionReason = string.Empty;
+                await LoadResultsAsync();
+            }
+        }
+        finally
+        {
+            _transitioning = false;
+        }
+    }
+}

@@ -1,0 +1,22 @@
+.control-plane-operations {
+    display: grid;
+    gap: var(--mud-spacing-4);
+    min-inline-size: 0;
+}
+
+.control-plane-operations__list,
+.control-plane-operations__targets,
+.control-plane-operations__transition-form {
+    display: grid;
+    gap: var(--mud-spacing-3);
+}
+
+.control-plane-operations__metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: var(--mud-spacing-3);
+}
+
+.control-plane-operations__metrics dd {
+    margin-inline-start: 0;
+}

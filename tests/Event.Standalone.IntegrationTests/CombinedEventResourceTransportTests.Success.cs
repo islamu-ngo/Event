@@ -309,7 +309,7 @@ public sealed partial class CombinedEventResourceTransportTests
         });
         saved.EnsureSuccessStatusCode();
         using var activated = await client.PostAsJsonAsync(
-            $"/api/admin/control-plane/tenants/{PlatformDefaults.DefaultTenantId}/activate", new { });
+            $"/api/admin/instance/tenants/{PlatformDefaults.DefaultTenantId}/activate", new { });
         activated.EnsureSuccessStatusCode();
     }
 }

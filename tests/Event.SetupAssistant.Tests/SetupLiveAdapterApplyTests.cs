@@ -25,12 +25,20 @@ public sealed class SetupLiveAdapterApplyTests
         scenario.Handler.Enqueue(() => Preview(BasePath + $"/{SessionId:D}/apply"));
         scenario.Handler.Enqueue(() => Json(new
         {
-            operationId = Guid.CreateVersion7(), sessionId = SessionId,
-            targetScope = "Tenant", targetTenantId = TenantId,
-            kind = "Apply", status = "Applied", selectedSectionKeys = new[] { "tenant.settings" },
-            snapshotAvailable = true, effectStatus = "Completed", effectRetryCount = 0,
-            fidelityVerified = true, fidelityDigest = new string('a', 64),
-            omittedSectionKeys = new[] { "excluded.secrets" }, completedAt = Now
+            operationId = Guid.CreateVersion7(),
+            sessionId = SessionId,
+            targetScope = "Tenant",
+            targetTenantId = TenantId,
+            kind = "Apply",
+            status = "Applied",
+            selectedSectionKeys = new[] { "tenant.settings" },
+            snapshotAvailable = true,
+            effectStatus = "Completed",
+            effectRetryCount = 0,
+            fidelityVerified = true,
+            fidelityDigest = new string('a', 64),
+            omittedSectionKeys = new[] { "excluded.secrets" },
+            completedAt = Now
         }));
         await scenario.Enroll();
         using var artifact = new MemoryStream("{\"artifact\":\"bounded\"}"u8.ToArray());
@@ -102,7 +110,9 @@ public sealed class SetupLiveAdapterApplyTests
         scenario.Handler.Enqueue(() => Preview(BasePath + $"/{SessionId:D}/apply"));
         scenario.Handler.Enqueue(() => Json(new
         {
-            status = 409, type = "/problems/conflict", title = "Conflict",
+            status = 409,
+            type = "/problems/conflict",
+            title = "Conflict",
             detail = scenario.ImportToken
         }, HttpStatusCode.Conflict));
         await scenario.Enroll();
@@ -200,8 +210,13 @@ public sealed class SetupLiveAdapterApplyTests
 
     private static HttpResponseMessage Stage(string token) => Json(new
     {
-        sessionId = SessionId, accessToken = token, targetScope = "Tenant", targetTenantId = TenantId,
-        state = "Uploaded", expiresAt = Now.AddMinutes(5), artifactByteLength = 2,
+        sessionId = SessionId,
+        accessToken = token,
+        targetScope = "Tenant",
+        targetTenantId = TenantId,
+        state = "Uploaded",
+        expiresAt = Now.AddMinutes(5),
+        artifactByteLength = 2,
         availableSectionKeys = new[] { "tenant.settings" },
         _links = new Dictionary<string, object>
         {
@@ -211,16 +226,30 @@ public sealed class SetupLiveAdapterApplyTests
 
     private static HttpResponseMessage Preview(string? applyHref, string method = "POST") => Json(new
     {
-        sessionId = SessionId, targetScope = "Tenant", targetTenantId = TenantId,
-        state = "PreviewReady", expiresAt = Now.AddMinutes(5), isApplyReady = true,
+        sessionId = SessionId,
+        targetScope = "Tenant",
+        targetTenantId = TenantId,
+        state = "PreviewReady",
+        expiresAt = Now.AddMinutes(5),
+        isApplyReady = true,
         items = new[]
         {
-            new { sectionKey = "tenant.settings", category = "Changed",
-                reasonCode = "configuration_import_section_changed", sourceMappingIdentity = (string?)null,
-                targetMappingIdentity = (string?)null },
-            new { sectionKey = "excluded.secrets", category = "Omitted",
-                reasonCode = "configuration_import_nonportable_section_omitted", sourceMappingIdentity = (string?)null,
-                targetMappingIdentity = (string?)null }
+            new
+            {
+                sectionKey = "tenant.settings",
+                category = "Changed",
+                reasonCode = "configuration_import_section_changed",
+                sourceMappingIdentity = (string?)null,
+                targetMappingIdentity = (string?)null
+            },
+            new
+            {
+                sectionKey = "excluded.secrets",
+                category = "Omitted",
+                reasonCode = "configuration_import_nonportable_section_omitted",
+                sourceMappingIdentity = (string?)null,
+                targetMappingIdentity = (string?)null
+            }
         },
         _links = applyHref is null ? new Dictionary<string, object>() : new Dictionary<string, object>
         {
@@ -250,8 +279,11 @@ public sealed class SetupLiveAdapterApplyTests
             {
                 var enrollment = Json(new
                 {
-                    enrollmentId = EnrollmentId, state = "active", generation = 1,
-                    expiresAt = Now.AddMinutes(10), issuance = "issued",
+                    enrollmentId = EnrollmentId,
+                    state = "active",
+                    generation = 1,
+                    expiresAt = Now.AddMinutes(10),
+                    issuance = "issued",
                     scopes = new[] { "target.read", "secret_binding.readiness", "secret_binding.write", "configuration.import" },
                     _links = new Dictionary<string, object>
                     {

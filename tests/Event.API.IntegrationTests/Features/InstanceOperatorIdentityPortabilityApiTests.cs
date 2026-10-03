@@ -163,11 +163,16 @@ public partial class InstanceOperatorIdentityControllerTests
         InstanceOperatorIdentityDocument current = await identity.GetCurrentAsync();
         await identity.SaveAsync(new InstanceOperatorIdentitySettings
         {
-            PublicName = "Independent Operator", LegalName = "Independent ASBL",
-            OperatorKindCode = "registered_organization", JurisdictionCountryCode = "BE",
-            RegistrationIdentifier = "BE0123456789", PublicContactEmail = "contact@example.test",
-            WebsiteUrl = "https://example.test", LegalNoticeUrl = "https://example.test/legal",
-            TermsUrl = "https://example.test/terms", PrivacyUrl = "https://example.test/privacy",
+            PublicName = "Independent Operator",
+            LegalName = "Independent ASBL",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            RegistrationIdentifier = "BE0123456789",
+            PublicContactEmail = "contact@example.test",
+            WebsiteUrl = "https://example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            TermsUrl = "https://example.test/terms",
+            PrivacyUrl = "https://example.test/privacy",
             OfficialOrigin = "https://example.test"
         }, current.Settings?.Revision);
     }

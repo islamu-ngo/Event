@@ -111,7 +111,7 @@ public sealed class AppHostTopologyArchitectureTests
         var requiredEnvironmentKeys = new[]
         {
             "HttpsRedirection__Enabled",
-            "CONTROL_PLANE_PUBLIC_ORIGIN",
+            "INSTANCE_ADMIN_PUBLIC_ORIGIN",
             "Cerbos__PolicyPackagePath",
             "Storage__Local__RootPath",
             "Storage__Local__CreateRootIfMissing",

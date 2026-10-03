@@ -1,10 +1,10 @@
 @using MudBlazor
 @using Explore.Blazor.Client.Clients
-@using Explore.Blazor.Client.Contracts.ControlPlane
-@using Explore.Blazor.Client.Contracts.Services.ControlPlane
+@using Explore.Blazor.Client.Contracts.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.Services.InstanceAdmin
 @using Explore.Blazor.Client.Contracts.Services.Federation
 @using Explore.Blazor.Client.Services
-@inject IControlPlaneOperationsService OperationsService
+@inject IInstanceOperationsService OperationsService
 @inject IAtprotoFederationSettingsService AtprotoFederationSettingsService
 @inject ILogger<InstanceGovernanceSection> Logger
 
@@ -777,8 +777,8 @@
         !SuppressAtprotoGovernance && (DisplayMode is "full" or "advanced");
     private bool ShowHomePage => DisplayMode is "full" or "general";
 
-    private HalResourceOfControlPlaneDeploymentModeRunbookDto? _runbook;
-    private BaseCommandResponseOfControlPlaneDeploymentModeTransitionDto? _transitionResult;
+    private HalResourceOfInstanceDeploymentModeRunbookDto? _runbook;
+    private BaseCommandResponseOfInstanceDeploymentModeTransitionDto? _transitionResult;
     private bool _runbookLoaded;
     private string? _confirmationText;
     private string? _transitionReason;
@@ -826,7 +826,7 @@
     private bool IsSingleTenant => string.Equals(DeploymentMode, "SingleTenant", StringComparison.OrdinalIgnoreCase)
                                    || string.IsNullOrWhiteSpace(DeploymentMode);
 
-    private HalResourceOfControlPlaneDeploymentModeRunbookDto Runbook => _runbook ?? new();
+    private HalResourceOfInstanceDeploymentModeRunbookDto Runbook => _runbook ?? new();
 
     private bool HasRunbookDetails =>
         !string.IsNullOrWhiteSpace(Runbook.CurrentMode) || Runbook.TargetOptions?.Count > 0 || Runbook.Steps?.Count > 0;
@@ -910,26 +910,26 @@
 
     private static string? TransitionRelation(string targetMode) => targetMode switch
     {
-        "MultiTenant" => ControlPlaneLinkRelations.TransitionToMultiTenant,
-        "SingleTenant" => ControlPlaneLinkRelations.TransitionToSingleTenant,
+        "MultiTenant" => InstanceAdminLinkRelations.TransitionToMultiTenant,
+        "SingleTenant" => InstanceAdminLinkRelations.TransitionToSingleTenant,
         _ => null
     };
 
     private bool HasTransitionLink(string targetMode)
     {
         var relation = TransitionRelation(targetMode);
-        return relation is not null && ControlPlaneHal.HasLink(Runbook._links, relation);
+        return relation is not null && InstanceAdminHal.HasLink(Runbook._links, relation);
     }
 
-    private bool CanTransitionTo(ControlPlaneDeploymentModeTargetOptionDto option) =>
+    private bool CanTransitionTo(InstanceDeploymentModeTargetOptionDto option) =>
         option.Allowed == true && HasTransitionLink(option.TargetMode ?? string.Empty);
 
-    private bool CanSubmitTransition(ControlPlaneDeploymentModeTargetOptionDto option) =>
+    private bool CanSubmitTransition(InstanceDeploymentModeTargetOptionDto option) =>
         CanTransitionTo(option)
         && string.Equals(_confirmationText?.Trim(), option.ConfirmationText, StringComparison.Ordinal)
         && !_transitioning;
 
-    private static string TransitionUnavailableMessage(ControlPlaneDeploymentModeTargetOptionDto option) =>
+    private static string TransitionUnavailableMessage(InstanceDeploymentModeTargetOptionDto option) =>
         option.Allowed == true
             ? "Transition requires a server-provided HAL affordance."
             : option.BlockingReason ?? "This transition is not available.";
@@ -948,7 +948,7 @@
         _transitionReason = args.Value?.ToString();
     }
 
-    private async Task RunDeploymentModeTransitionAsync(ControlPlaneDeploymentModeTargetOptionDto option)
+    private async Task RunDeploymentModeTransitionAsync(InstanceDeploymentModeTargetOptionDto option)
     {
         if (!CanSubmitTransition(option))
         {

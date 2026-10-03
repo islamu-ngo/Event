@@ -1,0 +1,145 @@
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Components.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.Services.InstanceAdmin
+@using Explore.Blazor.Client.Routing.InstanceAdmin
+@inject IInstanceOverviewService OverviewService
+@inject NavigationManager Navigation
+
+<section class="control-plane-overview" aria-label="Instance overview">
+    <InstanceAdminPageHeader Title="Instance overview" IsSection="true"
+                            Eyebrow="Instance console"
+                            Description="Instance operations for multi-tenant deployments.">
+        <ActionsContent>
+            @if (InstanceAdminHal.HasLink(_overview?._links, InstanceAdminLinkRelations.Tenants))
+            {
+                <InstanceAdminActionButton Href="@InstanceAdminRoutes.Tenants"
+                                          AriaLabel="Manage tenants">Tenants</InstanceAdminActionButton>
+            }
+            @if (InstanceAdminHal.HasLink(_overview?._links, InstanceAdminLinkRelations.Plans))
+            {
+                <InstanceAdminActionButton Variant="Variant.Outlined"
+                                          AriaLabel="View tenant plans"
+                                          OnClick="OpenPlans">Plans</InstanceAdminActionButton>
+            }
+        </ActionsContent>
+    </InstanceAdminPageHeader>
+
+    @if (_loading)
+    {
+        <InstanceAdminPanel Title="Loading"
+                           Description="Checking instance administration readiness."
+                           aria-live="polite">
+            <p class="control-plane-overview__muted">The instance administration API is being queried.</p>
+        </InstanceAdminPanel>
+    }
+    else if (_overview is { } overview)
+    {
+        <section class="control-plane-overview__summary" aria-label="Instance summary">
+            <div class="control-plane-overview__summary-item">
+                <span class="control-plane-overview__label">Deployment mode</span>
+                <strong class="control-plane-overview__value">@overview.DeploymentMode</strong>
+            </div>
+            <div class="control-plane-overview__summary-item">
+                <span class="control-plane-overview__label">Public host</span>
+                <strong class="control-plane-overview__value">@DisplayValue(overview.PublicOrigin)</strong>
+            </div>
+            <div class="control-plane-overview__summary-item">
+                <span class="control-plane-overview__label">Admin host</span>
+                <strong class="control-plane-overview__value">@DisplayValue(overview.AdminOrigin)</strong>
+            </div>
+            <div class="control-plane-overview__summary-item">
+                <span class="control-plane-overview__label">Version</span>
+                <strong class="control-plane-overview__value">@DisplayValue(overview.Version)</strong>
+            </div>
+        </section>
+
+        @if (overview.Warnings?.Count > 0)
+        {
+            <InstanceAdminPanel Title="Warnings"
+                               Description="Items that need instance-operator attention.">
+                <ul class="control-plane-overview__warning-list">
+                    @foreach (var warning in overview.Warnings)
+                    {
+                        <li class="control-plane-overview__warning control-plane-overview__warning--@warning.Severity">
+                            <strong>@warning.Code</strong>
+                            <span>@warning.Message</span>
+                            @if (!string.IsNullOrWhiteSpace(warning.Remediation))
+                            {
+                                <span class="control-plane-overview__muted">@warning.Remediation</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </InstanceAdminPanel>
+        }
+
+        <section class="control-plane-overview__grid" aria-label="Operational status">
+            @if (overview.DeploymentMode == "MultiTenant")
+            {
+            <article class="control-plane-overview__card">
+                <span class="control-plane-overview__kicker">total-tenants</span>
+                <h3 class="control-plane-overview__card-title">Total tenants</h3>
+                <p class="control-plane-overview__card-value">@(overview.TotalTenantCount ?? 0)</p>
+            </article>
+            <article class="control-plane-overview__card control-plane-overview__card--success">
+                <span class="control-plane-overview__kicker">active-tenants</span>
+                <h3 class="control-plane-overview__card-title">Active tenants</h3>
+                <p class="control-plane-overview__card-value">@(overview.ActiveTenantCount ?? 0)</p>
+            </article>
+            }
+            @foreach (var provider in overview.ProviderSummaries ?? [])
+            {
+                <article class="control-plane-overview__card control-plane-overview__card--@(provider.Configured == true ? "success" : "warning")">
+                    <span class="control-plane-overview__kicker">@provider.Key</span>
+                    <h3 class="control-plane-overview__card-title">@(provider.DisplayName ?? provider.Key)</h3>
+                    <p class="control-plane-overview__card-value">@(provider.Status ?? (provider.Configured == true ? "Configured" : "Missing"))</p>
+                    @if (!string.IsNullOrWhiteSpace(provider.Message))
+                    {
+                        <p class="control-plane-overview__muted">@provider.Message</p>
+                    }
+                </article>
+            }
+        </section>
+    }
+    else
+    {
+        <InstanceAdminPanel Title="Instance API unavailable"
+                           Description="@(_problemMessage ?? "The instance API is currently unavailable.")">
+            <p class="control-plane-overview__muted">
+                Instance data stays hidden when the host cannot reach the server-side administration API.
+            </p>
+        </InstanceAdminPanel>
+    }
+</section>
+
+@code {
+    private HalResourceOfInstanceOverviewDto? _overview;
+    private string? _problemMessage;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _overview = await OverviewService.GetOverviewAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            _problemMessage = "The instance API is currently unavailable.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not configured" : value;
+
+    private void OpenPlans() => Navigation.NavigateTo(InstanceAdminRoutes.Plans);
+}

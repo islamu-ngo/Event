@@ -12,9 +12,6 @@
     <WasmStripILAfterAOT>false</WasmStripILAfterAOT>
     <MudAllowedAttributePattern>HTMLAttributes</MudAllowedAttributePattern>
     <MudAllowedAttributeList>Elevation,Title,Id,DropdownWidth,Dense,Checked,T,PanelClass,Image,DisablePadding,AriaLabel,Icon,IsInitiallyExpanded,CheckedChanged,IsExpanded,IsExpandedChanged,OnClick,AccessibleName,AlignItems,LabelPosition,DisableToolbar,Clickable,id,dir,onclick,autocomplete,title,onkeydown,tabindex,rel</MudAllowedAttributeList>
-    <!-- Blazor WASM client runtime packages (Microsoft.NET.Sdk.WebAssembly.Pack) track host runtime patch versions,
-         making static lock files non-portable across dev and CI runners. -->
-    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <GeneratedApiClientFile>$(MSBuildProjectDirectory)\Clients\EventApiTagClients.g.cs</GeneratedApiClientFile>
     <GeneratedApiSchemaFile Condition="'$(GeneratedApiSchemaFile)' == ''">$(MSBuildProjectDirectory)/../../schemas/openapi_islamu-event.json</GeneratedApiSchemaFile>
     <GeneratedContractCaptureDirectory>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/generated-contracts', '$(MSBuildProjectDirectory)'))</GeneratedContractCaptureDirectory>

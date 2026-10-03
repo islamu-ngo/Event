@@ -7,7 +7,7 @@ ABOUTME: Maps implemented admin UI surfaces to roles, entry points, dangerous op
 > **Status:** Mixed
 > **Owner:** Product/Admin
 > **Last Verified:** 2026-07-29
-> **Source Anchors:** `Explore.Blazor.Client/Pages/Admin/`, `Explore.Blazor.Client/Pages/Admin/Instance/Components/InstanceMonetizationSection.razor`, `Explore.Blazor.Client/Pages/Admin/Instance/ControlPlane/`, `Explore.API/Controllers/ControlPlaneController.cs`, `Explore.API/Controllers/ControlPlaneTenantPlanController.cs`, `Explore.API/Controllers/ControlPlaneTenantConfigurationController.cs`, `Explore.API/Controllers/ControlPlaneTenantLifecycleController.cs`, `Explore.API/Controllers/PlatformMonetizationSettingsController.cs`, `docs/ADMIN_HIERARCHY.md`, `docs/AUTHORIZATION.md`, `docs/AUTHORIZATION_PATTERNS.md`
+> **Source Anchors:** `Explore.Blazor.Client/Pages/Admin/AdminSettingsPage.razor`, `Explore.Blazor.Client/Pages/Admin/Components/UnifiedAdminSettingsLayout.razor`, `Explore.API/Controllers/InstanceAdminController.cs`, `Explore.API/Controllers/InstanceTenantPlanController.cs`, `Explore.API/Controllers/InstanceTenantConfigurationController.cs`, `Explore.API/Controllers/InstanceTenantLifecycleController.cs`, `Explore.API/Controllers/PlatformMonetizationSettingsController.cs`, `ADMIN_HIERARCHY.md`, `AUTHORIZATION.md`, `AUTHORIZATION_PATTERNS.md`
 
 ## Scope
 
@@ -19,7 +19,7 @@ Each workflow below states the required role, the UI entry point, and the recove
 
 | Scope | Typical role | UI entry point | Boundary |
 |---|---|---|---|
-| Instance | Instance administrator | Multi-tenant: `/admin/instance`, `/admin/instance/tenants`, `/admin/instance/domains`; instance settings: `/settings/instance` | Platform-wide settings, tenant lifecycle, domain/admin-host guidance, platform API keys, global provider settings. |
+| Instance | Instance administrator | `/settings/instance` or `/admin/instance`; tenant lifecycle and plans are linked from the unified settings console | Platform-wide settings, tenant lifecycle, domain/admin-host guidance, platform API keys, global provider settings. |
 | Tenant | Tenant administrator | `/settings/admin` and tenant admin sub-pages | Tenant policies, public experience, lookup tables, tenant API keys, navigation, footer, templates, custom properties. |
 | Organization | Organization administrator | `/settings/organization/{OrganizationId}` | Organization profile, members, verification state, organization API keys. |
 | Group | Group administrator | `/settings/group/{GroupId}` | Group profile, branding, members, group API keys. |
@@ -30,7 +30,22 @@ Admin pages require authentication. Editability is still checked at runtime by r
 
 **Required role:** Instance administrator.
 
-**UI entry points:** `/settings/instance` for instance settings; `/admin/instance`, `/admin/instance/tenants`, and `/admin/instance/domains` for the multi-tenant Instance Console.
+**UI entry points:** `/settings/instance` and `/admin/instance` open `AdminSettingsPage`, composed by `UnifiedAdminSettingsLayout`.
+
+The shared router owns every host. A dedicated administration host lands on
+`/settings/instance` rather than selecting a second embedded shell. In
+SingleTenant mode, the **Administration** console combines instance infrastructure
+and the default directory's tenant settings. In MultiTenant mode, **Instance
+Administration** contains instance sections, while `/settings/admin` supplies
+**Tenant Administration** for the selected directory. Scope comes from current
+server authority and deployment state; navigation never grants mutation authority.
+Delegated tenant-only administrators retain tenant settings in SingleTenant
+mode without receiving instance controls.
+
+Tenant lifecycle and tenant-plan pages remain separate capabilities accessible
+from unified administration navigation. Consolidation retains the former
+overview's health/provider information, domain guidance, and operational warnings
+and actions in the shared console rather than deleting those capabilities.
 
 Instance settings are the platform-control surface for static/default policy. Use them for:
 
@@ -41,9 +56,18 @@ Instance settings are the platform-control surface for static/default policy. Us
 - Analytics and privacy settings.
 - Versioned platform fee and optional contribution settings. Both default disabled or zero and are available only to instance administrators.
 - Footer governance and platform API keys.
-- Tenant management in multi-tenant deployments now lives in the Instance Console. The console is suppressed in single-tenant mode and its API endpoints return `403 Multi-tenant required` through `[RequireMultiTenant]`.
+- Tenant management and tenant-plan administration are available from the unified
+  console in multi-tenant deployments. Their multi-tenant-only operations retain
+  `[RequireMultiTenant]`; default-directory preparation in SingleTenant mode
+  retains its narrowly authorized tenant-detail and activation capability.
 
-Configured admin hosts from `Bff:AdminHosts` can render the embedded Instance Console shell in the existing Blazor BFF, while public and tenant hosts keep the public shell. This host classification selects the shell only; instance-admin authorization and API/HAL checks still decide access and action availability.
+`INSTANCE_ADMIN_PUBLIC_ORIGIN` configures the browser-facing administration
+origin in Compose and AppHost; AppHost also forwards it to `Bff:AdminHosts`.
+Host classification selects the landing route, not a second renderer.
+Instance-admin authorization and HAL checks still decide access and action
+availability. Internal administration uses `/api/admin/instance/*`. The separate
+`/api/management/*` connector and managed registration protocol remain reserved
+for external Event Control Plane fleet software.
 
 ### Platform Monetization
 

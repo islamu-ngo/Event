@@ -1,4 +1,4 @@
-@using Explore.Blazor.Client.Routing.ControlPlane
+@using Explore.Blazor.Client.Routing.InstanceAdmin
 @*
     NavMenu Component - BEM Methodology
     Block: navbar / navbar--search-active
@@ -321,31 +321,11 @@
                                      <div class="navbar__dropdown-divider"></div>
                                      <div class="navbar__dropdown-section-label">Administration</div>
 
-                                     @if (_isCurrentUserInstanceAdmin && !_isSingleTenantMode)
-                                     {
-                                        <a href="@ControlPlaneRoutes.Overview" class="navbar__dropdown-item" @onclick="CloseDropdown">
-                                            <MudIcon Icon="@Icons.Material.Filled.Dns" Size="Size.Small" />
-                                            Instance Console
-                                        </a>
-                                    }
-
-                                     @if (_isSingleTenantMode && _isCurrentUserInstanceAdmin && _isCurrentUserTenantAdmin)
-                                     {
-                                         <div class="navbar__dropdown-section-label">Site administration</div>
-                                         <a href="/settings/admin" class="navbar__dropdown-item" @onclick="CloseDropdown">
-                                             <MudIcon Icon="@Icons.Material.Filled.Domain" Size="Size.Small" />
-                                             Tenant settings
-                                         </a>
-                                         <a href="/settings/instance" class="navbar__dropdown-item" @onclick="CloseDropdown">
-                                             <MudIcon Icon="@Icons.Material.Filled.Domain" Size="Size.Small" />
-                                             Instance settings
-                                         </a>
-                                     }
-                                     else if (_isCurrentUserInstanceAdmin)
+                                     @if (_isCurrentUserInstanceAdmin)
                                      {
                                          <a href="/settings/instance" class="navbar__dropdown-item" @onclick="CloseDropdown">
                                              <MudIcon Icon="@Icons.Material.Filled.Domain" Size="Size.Small" />
-                                             @(_isSingleTenantMode ? "Site administration" : "Instance administration")
+                                             @(_isSingleTenantMode ? "Administration" : "Instance administration")
                                          </a>
                                      }
                                      else if (_isCurrentUserTenantAdmin)
@@ -387,20 +367,10 @@
                                      <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" />
                                      Personal Settings
                                  </a>
-                                 @if (ProfileAdminSettingsHref is not null)
-                                 {
-                                     <a href="@ProfileAdminSettingsHref" class="navbar__dropdown-item" @onclick="CloseDropdown">
-                                         <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />
-                                         Admin Settings
-                                     </a>
-                                 }
-                                 else
-                                 {
-                                     <a href="/settings" class="navbar__dropdown-item" @onclick="CloseDropdown">
-                                         <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />
-                                         All Settings
-                                     </a>
-                                 }
+                                 <a href="/settings" class="navbar__dropdown-item" @onclick="CloseDropdown">
+                                     <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />
+                                     All Settings
+                                 </a>
                                 <a href="/logout" data-enhance-nav="false" class="navbar__dropdown-item navbar__dropdown-item--danger" @onclick="CloseDropdown">
                                     <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />
                                     Logout

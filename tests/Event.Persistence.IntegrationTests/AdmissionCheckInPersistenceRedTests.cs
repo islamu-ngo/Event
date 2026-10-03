@@ -650,6 +650,72 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         await Assert.That(result).IsNotNull();
         await Assert.That(counter.CredentialLookupQueries).IsEqualTo(1);
         await Assert.That(counter.TotalReaderQueries).IsEqualTo(1);
+        await Assert.That(candidates.All(candidate =>
+            counter.CredentialLookupParameterValues.Contains(candidate.KeyVersion) &&
+            counter.CredentialLookupParameterValues.Contains(candidate.Digest))).IsTrue();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(tenantId)).IsTrue();
+    }
+
+    [Test]
+    public async Task CachedCredentialLookupPreservesCandidatePairsAndCurrentTenantValues()
+    {
+        await fixture.ResetAsync();
+        Guid tenantA = Guid.CreateVersion7();
+        Guid tenantB = Guid.CreateVersion7();
+        string digestA = Phase21PersistenceSurface.Digest(0x34);
+        string digestB = Phase21PersistenceSurface.Digest(0x35);
+        string digestC = Phase21PersistenceSurface.Digest(0x36);
+        Guid ticketA = await SeedCredentialAsync(tenantA, digestA);
+        Guid ticketB = await SeedCredentialAsync(tenantB, digestB);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var counter = new CredentialLookupCommandCounter();
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseNpgsql(fixture.ConnectionString)
+            .UseSnakeCaseNamingConvention()
+            .UseMemoryCache(cache)
+            .AddInterceptors(counter);
+        await using var contextA = new ExploreDbContext(options.Options)
+        {
+            TenantContext = new TestTenantContext(tenantA)
+        };
+        var repositoryA = new AdmissionCheckInRepository(contextA);
+
+        AdmissionTicket? first = await repositoryA.ResolveCredentialAsync(
+            tenantA, [(7, digestA), (6, digestB)], CancellationToken.None);
+        AdmissionTicket? crossed = await repositoryA.ResolveCredentialAsync(
+            tenantA, [(7, digestB), (6, digestA)], CancellationToken.None);
+        AdmissionTicket? changed = await repositoryA.ResolveCredentialAsync(
+            tenantA, [(8, digestB), (9, digestC)], CancellationToken.None);
+
+        await Assert.That(first?.Id).IsEqualTo(ticketA);
+        await Assert.That(crossed).IsNull();
+        await Assert.That(changed).IsNull();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(digestA)).IsFalse();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(digestB)).IsTrue();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(digestC)).IsTrue();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(8)).IsTrue();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(9)).IsTrue();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(tenantA)).IsTrue();
+
+        AdmissionTicket? foreign = await repositoryA.ResolveCredentialAsync(
+            tenantB, [(7, digestB), (6, digestC)], CancellationToken.None);
+        await Assert.That(foreign).IsNull();
+
+        await using var contextB = new ExploreDbContext(options.Options)
+        {
+            TenantContext = new TestTenantContext(tenantB)
+        };
+        AdmissionTicket? second = await new AdmissionCheckInRepository(contextB)
+            .ResolveCredentialAsync(
+                tenantB, [(7, digestB), (6, digestC)], CancellationToken.None);
+
+        await Assert.That(second?.Id).IsEqualTo(ticketB);
+        await Assert.That(second?.TenantId).IsEqualTo(tenantB);
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(tenantB)).IsTrue();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(digestB)).IsTrue();
+        await Assert.That(counter.CredentialLookupParameterValues.Contains(digestC)).IsTrue();
+        await Assert.That(counter.CredentialLookupQueries).IsEqualTo(5);
+        await Assert.That(counter.TotalReaderQueries).IsEqualTo(5);
     }
 
     [Test]
@@ -1471,7 +1537,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         return orderedValues[Math.Clamp(nearestRankIndex, 0, orderedValues.Count - 1)];
     }
 
-    private async Task SeedCredentialAsync(Guid tenantId, string digest)
+    private async Task<Guid> SeedCredentialAsync(Guid tenantId, string digest)
     {
         await using ExploreDbContext context = TenantContext(tenantId);
         Phase21Entities entities = Phase21PersistenceSurface.RequireEntities(context.Model);
@@ -1494,6 +1560,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
                 ["LookupKeyVersion"] = 7,
                 ["LookupDigest"] = digest
             }));
+        return ticketId;
     }
 
     private async Task SeedPlatformManagedTargetAsync(
@@ -1961,6 +2028,7 @@ internal sealed class CredentialLookupCommandCounter : DbCommandInterceptor
     private int totalReaderQueries;
     internal int CredentialLookupQueries => Volatile.Read(ref credentialLookupQueries);
     internal int TotalReaderQueries => Volatile.Read(ref totalReaderQueries);
+    internal IReadOnlyList<object?> CredentialLookupParameterValues { get; private set; } = [];
 
     public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
         DbCommand command,
@@ -1973,7 +2041,13 @@ internal sealed class CredentialLookupCommandCounter : DbCommandInterceptor
             command.CommandText.Contains("lookup_key_version", StringComparison.OrdinalIgnoreCase) &&
             command.CommandText.Contains("lookup_digest", StringComparison.OrdinalIgnoreCase) &&
             command.CommandText.Contains("tenant_id", StringComparison.OrdinalIgnoreCase))
+        {
             Interlocked.Increment(ref credentialLookupQueries);
+            CredentialLookupParameterValues = command.Parameters
+                .Cast<DbParameter>()
+                .Select(parameter => parameter.Value)
+                .ToArray();
+        }
         return ValueTask.FromResult(result);
     }
 }

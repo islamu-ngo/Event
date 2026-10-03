@@ -30,7 +30,7 @@ builder.Services.AddMudServices(config =>
     config.SnackbarConfiguration.ShowTransitionDuration = 200;
 });
 builder.Services.AddBlazouter();
-builder.Services.AddEventControlPlaneClient();
+builder.Services.AddInstanceAdminClient();
 builder.Services.AddScoped<AuthenticatedRouteGuard>();
 builder.Services.AddScoped<MultiTenantOnboardingRouteGuard>();
 builder.Services.AddScoped<AdminRouteGuard>();

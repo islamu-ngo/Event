@@ -57,6 +57,22 @@ Interested in how we leverage autonomous AI agents with deterministic rigor? Rea
 
 ---
 
+## Dependency Graph Checks
+
+The repository-owned Dependency Submission workflow is intended to replace
+GitHub's managed automatic submission. Maintainers activate it only after its
+first snapshot is accepted, then turn off managed automatic submission in Code
+Security settings to avoid duplicate lanes. Dependabot alerts and security
+updates stay enabled. Forks do not submit to the upstream repository.
+
+Contributors should commit regenerated NuGet lockfiles with dependency changes
+and use the pinned SDK. Workflow Security checks the snapshot and release-impact
+rules on pull requests without submission privileges. Transient submission errors
+have bounded retries; authorization or invalid-input failures need a maintainer
+fix, not repeated reruns. Logs provide status and retry evidence without exposing
+tokens or snapshot contents. This graph covers tracked NuGet resolutions, not a
+complete container-image or distribution SBOM.
+
 ## Contributor License Agreement (CLA)
 
 Every non-bot contributor must sign the **ISLAMU Event Contributor License Agreement (CLA) v1.0**. When you open a pull request, the CLA Assistant bot will guide you to sign directly in a comment:

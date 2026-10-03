@@ -24,8 +24,8 @@ using Microsoft.AspNetCore.RateLimiting;
 [ApiVersion("0.1")]
 [Authorize]
 [EndpointClassification(EndpointClass.Admin)]
-[Route("api/control-plane/configuration-import/sessions")]
-[Tags("Control Plane Configuration")]
+[Route("api/admin/instance/configuration-import/sessions")]
+[Tags("Instance Configuration")]
 public sealed class InstanceConfigurationImportSessionsController(
     ICommandHandler<CreateInstanceConfigurationImportSessionCommand,
         ConfigurationImportSessionCreatedResult> createSession,

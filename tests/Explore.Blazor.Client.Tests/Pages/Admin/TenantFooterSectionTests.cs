@@ -377,7 +377,8 @@ public sealed class TenantFooterSectionTests : IDisposable
         _footerService.GetLinkGroupAsync(group.Id.Value, Arg.Any<CancellationToken>()).Returns(_ =>
             new FooterLinkGroupDetailsDto
             {
-                Id = group.Id, Title = group.Title,
+                Id = group.Id,
+                Title = group.Title,
                 Links = [persisted ? new FooterLinkItemDto { Id = link.Id, Label = "Changed link", Url = "/changed" } : link]
             });
         object payload = callback switch

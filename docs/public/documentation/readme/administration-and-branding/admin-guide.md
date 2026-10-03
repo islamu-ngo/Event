@@ -14,8 +14,7 @@ This guide walks administrators through the web consoles in the Blazor managemen
 
 | Administration Scope | Typical Role | UI Entry Points | Capabilities |
 |---|---|---|---|
-| **Instance Control Plane** | Instance Administrator | `/admin/instance`<br>`/admin/instance/tenants`<br>`/admin/instance/domains` | [Multi-Tenant Governance](../security-and-identity/multi-tenancy.md), provisioning tenants, domain approvals, global quotas, platform settings. |
-| **Instance Settings** | Instance Administrator | `/settings/instance` | Default system policies, storage configurations, SMTP defaults, [platform monetization policies](../events-and-ticketing/paid-events-and-payouts.md). |
+| **Instance Administration** | Instance Administrator | `/settings/instance` or `/admin/instance` | [Multi-Tenant Governance](../security-and-identity/multi-tenancy.md), tenant lifecycle and plans, domain guidance, global quotas, storage, SMTP and [platform monetization](../events-and-ticketing/paid-events-and-payouts.md). |
 | **Tenant Administration** | Tenant Administrator | `/settings/admin` | [Tenant Branding](white-labeling.md), lookups, navigation, custom footers, event templates, and [custom registration properties](../events-and-ticketing/custom-properties.md). |
 | **Organization Management**| Organization Admin | `/settings/organization/{id}` | Organization profile, membership approvals, verified organizer status, and API keys. |
 | **Group Management** | Group Admin | `/settings/group/{id}` | Group profile, public event listings, group branding, and members. |
@@ -24,8 +23,27 @@ This guide walks administrators through the web consoles in the Blazor managemen
 
 ## 2. Instance Administration
 
-In multi-tenant deployments, the **Instance Console** (`/admin/instance`) manages
-tenants and platform operations. Instance settings are available in both deployment modes.
+Use `/settings/instance` or `/admin/instance` to open the unified console.
+SingleTenant deployments show **Administration**, combining instance infrastructure
+and directory settings. MultiTenant deployments show **Instance Administration**;
+tenant-only controls remain under **Tenant Administration** at `/settings/admin`.
+Tenant management and tenant plans remain available from the console navigation.
+Health, provider status, domain guidance and operational warnings are retained.
+Delegated tenant-only administrators can manage tenant settings in SingleTenant
+mode; instance infrastructure remains restricted to instance administrators.
+
+For a dedicated administration host, configure `INSTANCE_ADMIN_PUBLIC_ORIGIN`
+with its exact browser-facing origin. Compose defaults to
+`http://admin.localhost:7002`; the isolated local-agent profile uses
+`http://admin.localhost:5200`. Visiting that host's root opens instance settings.
+The retired `CONTROL_PLANE_PUBLIC_ORIGIN` variable has no compatibility fallback.
+External Event Control Plane fleet management remains a separate integration,
+not a second embedded administration console.
+
+The authentication provider card names Local when Local Identity is selected,
+alongside any enabled external sign-in providers. An SMTP warning means the
+instance's saved host or sender settings are missing; running a development
+Mailpit service alone does not configure or enable platform email delivery.
 
 ### Getting Started After Setup
 
@@ -56,7 +74,7 @@ challenge from temporary-password sign-in, not the completed setup secret. The
 private administrator session does not grant public directory access.
 
 In SingleTenant mode, authenticated instance administrators can read the default
-directory through the existing control-plane tenant-detail API and follow its
+directory through the instance-administration tenant-detail API and follow its
 `activate` link when offered. Only the fixed default directory is accepted; this
 does not enable the multi-tenant fleet console. Document editing still requires
 that directory's tenant-admin grant, not merely a platform role.

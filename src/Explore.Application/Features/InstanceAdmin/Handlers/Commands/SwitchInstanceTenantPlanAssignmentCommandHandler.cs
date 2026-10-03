@@ -1,0 +1,75 @@
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.InstanceAdmin.Requests.Commands;
+using Explore.Application.Responses;
+using Explore.Domain;
+using Explore.Domain.Enums;
+using Explore.Application.Contracts.Operations;
+
+namespace Explore.Application.Features.InstanceAdmin.Handlers.Commands;
+
+public sealed class SwitchInstanceTenantPlanAssignmentCommandHandler(
+    ITenantPlanRepository tenantPlanRepository,
+    IUnitOfWork unitOfWork)
+    : ICommandHandler<SwitchInstanceTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
+{
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        SwitchInstanceTenantPlanAssignmentCommand request,
+        CancellationToken cancellationToken)
+    {
+        return await unitOfWork.ExecuteInTransactionAsync(ExecuteAsync, cancellationToken);
+
+        async Task<BaseCommandResponse<Guid>> ExecuteAsync(CancellationToken token)
+        {
+            TenantPlanVersion? targetVersion = await tenantPlanRepository.GetVersionAsync(
+                request.TenantPlanVersionId,
+                token);
+
+            if (targetVersion is null)
+            {
+                return Failure("Tenant plan version was not found.", ["tenant_plan_version_not_found"]);
+            }
+
+            if (targetVersion.TenantPlanStatusId != (int)TenantPlanStatusEnum.Published)
+            {
+                return Failure("Tenant plan version must be published before assignment.", ["tenant_plan_version_not_published"]);
+            }
+
+            TenantPlanAssignment? current = await tenantPlanRepository.GetActiveAssignmentForTenantAsync(
+                request.TenantId,
+                token);
+
+            if (current?.TenantPlanVersionId == targetVersion.Id)
+            {
+                return BaseCommandResponse.Success(
+                    current.Id,
+                    "Tenant is already assigned to this plan version.");
+            }
+
+            DateTime now = DateTime.UtcNow;
+            if (current is not null)
+            {
+                current.TenantPlanAssignmentStatusId = (int)TenantPlanAssignmentStatusEnum.Superseded;
+                current.EndedAt = now;
+                await tenantPlanRepository.UpdateAssignmentAsync(current, token);
+            }
+
+            var assignment = new TenantPlanAssignment
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = request.TenantId,
+                TenantPlanId = targetVersion.TenantPlanId,
+                TenantPlanVersionId = targetVersion.Id,
+                TenantPlanAssignmentStatusId = (int)TenantPlanAssignmentStatusEnum.Active,
+                AssignedByUserId = request.AssignedByUserId,
+                AssignedAt = now
+            };
+
+            TenantPlanAssignment created = await tenantPlanRepository.CreateAssignmentAsync(assignment, token);
+
+            return BaseCommandResponse.Success(created.Id, "Tenant plan assignment switched.");
+        }
+    }
+
+    private static BaseCommandResponse<Guid> Failure(string message, IEnumerable<string> errors) =>
+        BaseCommandResponse.Validation<Guid>(errors, message);
+}

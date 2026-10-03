@@ -17,6 +17,57 @@ Do not symlink `.github` to `.ci`. GitHub discovers workflows from `.github/work
 
 Workflow YAML defines what runs; repository settings define which checks are required, which environments require approval, and which organization security features are enabled.
 
+## Reproducible WebAssembly Restore
+
+`global.json` pins the SDK. `Directory.Build.props` additionally pins
+`RuntimeFrameworkVersion` for Blazor WebAssembly projects so their implicit runtime
+packs do not follow the runner's installed runtime or local workload manifest.
+Both browser projects participate in locked NuGet restore; neither may opt out.
+Update the WASM runtime pin, central WebAssembly package versions, and affected
+lock files together, then verify `dotnet restore --locked-mode` on a clean
+installation. Keep the isolated compiler-runtime policy in the fast build lane:
+it serves compiler dependency auditing and is not a substitute for the WASM pin.
+
+## Repository-Owned Dependency Submission
+
+`.github/workflows/dependency-submission.yml` defines the replacement for managed
+automatic submission. It runs only on this repository's trusted default branch,
+never PR heads or forks. Checkout credentials are not persisted. Only the
+submission job receives `contents: write`; its token is injected into the final
+submission step, not restore, build, or tests.
+
+The native tool under `eng/dependency-submission/` separates tracked-lock loading,
+immutable snapshot construction, and HTTP submission. Enum lookups encode
+relationships, scopes, lock kinds, retry classifications, and outcomes. Each
+framework has its own manifest; NuGet identifiers are normalized, central
+transitives are indirect, and Project entries are not external packages.
+Dependency declarations can outlive `PrivateAssets` exclusions or SDK pruning:
+only actually resolved entries within that framework form submitted edges.
+Never synthesize a version from a requested range or borrow another framework's
+resolution. Malformed documents, duplicate identities, and missing resolved
+versions fail validation.
+
+The transport allows three total attempts, 45 seconds per attempt, and four
+minutes overall. It retries selected transport failures, timeouts, HTTP
+500/502/503/504, HTTP 429, and HTTP 403 only with rate-limit evidence. Retry/reset
+headers cannot be shortened to fit the budget; an excessive delay stops the
+submission. Ordinary authorization and validation failures are terminal.
+Diagnostics allow only status, attempt, classification, delay, bounded request ID,
+and outcome, excluding tokens, raw bodies, responses, and exception details.
+
+Workflow Security runs both metadata and submission regression tests on relevant
+PR changes with read-only permissions. Local preparation uses
+`dotnet run --project eng/dependency-submission/src/ISLAMU.DependencySubmission -c Release -- validate .`;
+this validates tracked locks without submitting anything. Development/test/tool
+scope is path-based; lockfiles alone cannot reveal per-package build-only scope.
+
+**Activation gate:** land the projects, locks, and workflow together, verify an
+accepted owned snapshot for the current default-branch commit, then disable
+GitHub-managed automatic submission in repository Code Security settings. Keep
+Dependabot alerts and security updates enabled. Source implementation and local
+tests do not establish live acceptance or prove that managed submission has been
+disabled.
+
 ## Prospective Provider-Neutral Release Governance
 
 The current production release process remains the manual SemVer-tag and manually
@@ -305,6 +356,15 @@ The decision record in [CONTRIBUTION_GOVERNANCE.md](legal/CONTRIBUTION_GOVERNANC
 Release-impacting pull requests must document operator-visible risk before merge. `.github/workflows/release-impact.yml` runs as a metadata-only `pull_request_target` check, checks out the trusted base commit only, and runs repository-owned `.ci/scripts/validate-release-impact-pr.cs` against the pull request body and changed-file metadata. It uses read-only `contents` and `pull-requests` permissions and must not checkout, build, test, cache, or execute pull-request head code.
 
 The check requires the `## Release Impact` section in `.github/PULL_REQUEST_TEMPLATE.md` to match the changed files. Security/auth, migration/data/rollback, configuration/secrets/deployment, OpenAPI/client contract, and operator/self-hosting/release-note path changes must select the corresponding checkbox and provide non-empty `Details:`. `Not applicable` is only valid when the changed files do not imply one of those release-impact categories.
+
+Categories and GitHub file-change kinds are enums, with immutable lookup tables
+owning category labels, path rules, and wire decoding. Missing, duplicate, or
+incomplete file metadata cannot establish `Not applicable`; renamed files are
+classified using both paths. A verified `imgbot[bot]` Bot account receives an
+automatic no-impact disposition only for a complete, nonempty set of modified
+PNG/SVG files under `assets/` or `docs/internal/assets/diagrams/` with no classified
+impact. Mixed, renamed, added, or sensitive changes still require the ordinary
+checklist. This decision never changes the PR body or executes PR-head code.
 
 ### GitHub Actions Supply-Chain Pins
 

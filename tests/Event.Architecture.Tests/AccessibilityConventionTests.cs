@@ -61,7 +61,7 @@ public class AccessibilityConventionTests
         {
             "Settings.razor",
             "GroupAdminSettings.razor",
-            "InstanceAdminSettings.razor",
+            "AdminSettingsPage.razor",
             "InstanceSettings.razor",
             "OrganizationAdminSettings.razor",
             "Navigation.razor",

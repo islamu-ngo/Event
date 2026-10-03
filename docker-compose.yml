@@ -138,7 +138,7 @@ x-s3-env: &s3-env
 
 x-api-runtime-env: &api-runtime-env
   DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-}
-  CONTROL_PLANE_PUBLIC_ORIGIN: ${CONTROL_PLANE_PUBLIC_ORIGIN:-http://admin.localhost:7002}
+  INSTANCE_ADMIN_PUBLIC_ORIGIN: ${INSTANCE_ADMIN_PUBLIC_ORIGIN:-http://admin.localhost:7002}
   SETUP_SECRET: ${SETUP_SECRET:-}
   SETUP_SECRET_FILE: ${SETUP_SECRET_FILE:-/app/bootstrap/setup-secret}
   SETUP_SECRET_REQUIRED: ${SETUP_SECRET_REQUIRED:-true}
@@ -522,7 +522,7 @@ services:
       Keycloak__Realm: ${KEYCLOAK_REALM:-ISLAMU}
       Keycloak__ClientId: ${KEYCLOAK_BLAZOR_CLIENT_ID:-islamu-event-blazor}
       Keycloak__ClientSecret: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
-      Bff__AdminHosts__0: ${CONTROL_PLANE_PUBLIC_ORIGIN:-http://admin.localhost:7002}
+      Bff__AdminHosts__0: ${INSTANCE_ADMIN_PUBLIC_ORIGIN:-http://admin.localhost:7002}
       ConnectionStrings__cache: ${REDIS_CONNECTION_STRING:-redis:6379}
     ports:
       - "${UI_HTTP_PORT:-7002}:8080"

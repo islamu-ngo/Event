@@ -16,8 +16,8 @@ using Microsoft.AspNetCore.RateLimiting;
 [ApiVersion("0.1")]
 [Authorize]
 [EndpointClassification(EndpointClass.Admin)]
-[Route("api/control-plane/configuration-manifest/export")]
-[Tags("Control Plane Configuration")]
+[Route("api/admin/instance/configuration-manifest/export")]
+[Tags("Instance Configuration")]
 public sealed class ConfigurationManifestExportsController(
     IQueryHandler<ExportConfigurationManifestQuery, ConfigurationManifestExportResult> exporter)
     : ControllerBase

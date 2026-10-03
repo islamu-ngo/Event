@@ -5,11 +5,82 @@ using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.Http;
+using Explore.Blazor.Client.Services;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 
 namespace Explore.Blazor.IntegrationTests.Services;
 
 public class TenantCircuitHandlerTests
 {
+    [Test]
+    public async Task NotificationPoll_UsesCurrentInboundTenantInsteadOfCapturedAuthority()
+    {
+        var transport = new TenantObservationHandler();
+        var services = new ServiceCollection()
+            .AddSingleton<IHttpContextAccessor, HttpContextAccessor>()
+            .AddScoped<ITenantRouteContextAccessor, TenantRouteContextAccessor>()
+            .AddTransient<TenantHeaderForwardingHandler>();
+        services.AddHttpClient("notification-poll")
+            .ConfigurePrimaryHttpMessageHandler(() => transport)
+            .AddHttpMessageHandler<TenantHeaderForwardingHandler>();
+        using var provider = services.BuildServiceProvider();
+        using var circuit = provider.CreateScope();
+        var route = circuit.ServiceProvider.GetRequiredService<ITenantRouteContextAccessor>();
+        var navigation = new TestNavigationManager("https://event.test/", "https://event.test/acme/events");
+        var tenantHandler = new TenantCircuitHandler(
+            route, navigation, CreateConfigurationProvider(), new("https://event.test"));
+        await tenantHandler.OnCircuitOpenedAsync(null!, CancellationToken.None);
+        ExecutionContext captured;
+        using (route.BeginActivityScope())
+        {
+            captured = ExecutionContext.Capture()!;
+        }
+
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("notification-poll");
+        await using var refresh = new NotificationRefreshStreamClient(
+            Substitute.For<IJSRuntime>(), navigation, NullLogger<NotificationRefreshStreamClient>.Instance);
+        refresh.RefreshReceived += async hint =>
+        {
+            await Assert.That(hint.UnreadCount).IsEqualTo(-1);
+            await Assert.That(hint.Reason).IsEqualTo("poll");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.example.test/api/Notification/unread-count");
+            using var response = await client.SendAsync(request, CancellationToken.None);
+        };
+        // Invoke the public browser interop seam without depending on a running browser.
+        var poll = typeof(NotificationRefreshStreamClient).GetMethod("HandleNotificationPoll");
+        await Assert.That(poll).IsNotNull();
+        var inbound = tenantHandler.CreateInboundActivityHandler(_ => (Task)poll!.Invoke(refresh, null)!);
+
+        navigation.NavigateTo("/other/events");
+        Task current = Task.CompletedTask;
+        ExecutionContext.Run(captured.CreateCopy(), _ => current = inbound(null!), null);
+        await current.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(transport.Slugs).IsEquivalentTo(new string?[] { "other" });
+
+        navigation.NavigateTo("/admin");
+        Task cleared = Task.CompletedTask;
+        ExecutionContext.Run(captured.CreateCopy(), _ => cleared = inbound(null!), null);
+        await cleared.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(transport.Slugs).IsEquivalentTo(new string?[] { "other", null });
+
+        // A pooled handler outside any inbound activity must not retain circuit authority.
+        using var outside = new HttpRequestMessage(HttpMethod.Get, "https://api.example.test/api/Notification/unread-count");
+        using var outsideResponse = await client.SendAsync(outside, CancellationToken.None);
+        await Assert.That(transport.Slugs).IsEquivalentTo(new string?[] { "other", null, null });
+    }
+
+    private sealed class TenantObservationHandler : HttpMessageHandler
+    {
+        public List<string?> Slugs { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Slugs.Add(request.Headers.TryGetValues(EventBffHeaderNames.TenantSlug, out var values) ? values.Single() : null);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+    }
+
     [Test]
     public async Task CircuitNavigation_RetainsRequestOriginAfterHttpContextIsGone()
     {

@@ -1,9 +1,9 @@
-@using Explore.Blazor.Client.Contracts.ControlPlane
+@using Explore.Blazor.Client.Contracts.InstanceAdmin
 @using Explore.Blazor.Client.Clients
-@using Explore.Blazor.Client.Routing.ControlPlane
-@using Explore.Blazor.Client.Contracts.Services.ControlPlane
+@using Explore.Blazor.Client.Routing.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.Services.InstanceAdmin
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
-@inject IControlPlaneTenantService TenantService
+@inject IInstanceTenantService TenantService
 @inject IAccessibilityFocusService AccessibilityFocusService
 
 <section class="settings-section instance-tenants" aria-labelledby="instance-tenants-title">
@@ -58,37 +58,37 @@
                             @if (HasTenantAction(context))
                             {
                                 <div class="instance-tenants__actions">
-                                @if (ControlPlaneHal.HasLink(context._links, ControlPlaneLinkRelations.Configuration))
+                                @if (InstanceAdminHal.HasLink(context._links, InstanceAdminLinkRelations.Configuration))
                                 {
                                     <AppButton Size="Size.Small" Variant="Variant.Outlined"
                                                Href="@TenantConfigurationHref(TenantId(context))"
                                                aria-label="@($"Configure {TenantName(context)}")">Configure</AppButton>
                                 }
-                                @if (ControlPlaneHal.HasLink(context._links, ControlPlaneLinkRelations.Activate))
+                                @if (InstanceAdminHal.HasLink(context._links, InstanceAdminLinkRelations.Activate))
                                 {
                                     <AppButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@IsBusy"
                                                aria-label="@($"Activate {TenantName(context)}")"
-                                               OnClick="@(() => RunTenantCommandAsync(context, ControlPlaneLinkRelations.Activate))">Activate</AppButton>
+                                               OnClick="@(() => RunTenantCommandAsync(context, InstanceAdminLinkRelations.Activate))">Activate</AppButton>
                                 }
-                                @if (ControlPlaneHal.HasLink(context._links, ControlPlaneLinkRelations.Suspend))
+                                @if (InstanceAdminHal.HasLink(context._links, InstanceAdminLinkRelations.Suspend))
                                 {
                                     <AppButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@IsBusy"
                                                aria-label="@($"Suspend {TenantName(context)}")"
-                                               OnClick="@(() => StartReasonConfirmation(context, ControlPlaneLinkRelations.Suspend))">Suspend</AppButton>
+                                               OnClick="@(() => StartReasonConfirmation(context, InstanceAdminLinkRelations.Suspend))">Suspend</AppButton>
                                 }
-                                @if (ControlPlaneHal.HasLink(context._links, ControlPlaneLinkRelations.Archive))
+                                @if (InstanceAdminHal.HasLink(context._links, InstanceAdminLinkRelations.Archive))
                                 {
                                     <AppButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@IsBusy"
                                                aria-label="@($"Archive {TenantName(context)}")"
-                                               OnClick="@(() => StartReasonConfirmation(context, ControlPlaneLinkRelations.Archive))">Archive</AppButton>
+                                               OnClick="@(() => StartReasonConfirmation(context, InstanceAdminLinkRelations.Archive))">Archive</AppButton>
                                 }
-                                @if (ControlPlaneHal.HasLink(context._links, ControlPlaneLinkRelations.Reactivate))
+                                @if (InstanceAdminHal.HasLink(context._links, InstanceAdminLinkRelations.Reactivate))
                                 {
                                     <AppButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@IsBusy"
                                                aria-label="@($"Reactivate {TenantName(context)}")"
-                                               OnClick="@(() => RunTenantCommandAsync(context, ControlPlaneLinkRelations.Reactivate))">Reactivate</AppButton>
+                                               OnClick="@(() => RunTenantCommandAsync(context, InstanceAdminLinkRelations.Reactivate))">Reactivate</AppButton>
                                 }
-                                @if (ControlPlaneHal.HasLink(context._links, ControlPlaneLinkRelations.SchedulePurge))
+                                @if (InstanceAdminHal.HasLink(context._links, InstanceAdminLinkRelations.SchedulePurge))
                                 {
                                     <AppButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" Disabled="@IsBusy"
                                                aria-label="@($"Schedule purge for {TenantName(context)}")"
@@ -215,7 +215,7 @@
     [Parameter] public int TenantCount { get; set; }
     [Parameter] public EventCallback<int> TenantCountChanged { get; set; }
 
-    private HalCollectionResourceOfControlPlaneTenantListItemDto? _tenants;
+    private HalCollectionResourceOfInstanceTenantListItemDto? _tenants;
     private bool _loading = true;
     private Guid? _busyTenantId;
     private bool _isCreating;
@@ -223,18 +223,18 @@
     private string? _createName;
     private string? _createSlug;
     private bool _assignCurrentUserAsTenantAdmin;
-    private HalResourceOfControlPlaneTenantListItemDto? _reasonTenant;
+    private HalResourceOfInstanceTenantListItemDto? _reasonTenant;
     private string? _reasonRelation;
     private string? _lifecycleReason;
-    private HalResourceOfControlPlaneTenantListItemDto? _purgeTenant;
+    private HalResourceOfInstanceTenantListItemDto? _purgeTenant;
     private string? _purgeReason;
     private string? _purgeConfirmation;
     private string? _commandMessage;
     private string? _pendingFocusElementId;
     private bool _commandSucceeded;
 
-    private IReadOnlyList<HalResourceOfControlPlaneTenantListItemDto> TenantItems => _tenants?._embedded?.Items?.ToArray() ?? [];
-    private bool CanCreateTenant => ControlPlaneHal.HasLink(_tenants?._links, ControlPlaneLinkRelations.Create);
+    private IReadOnlyList<HalResourceOfInstanceTenantListItemDto> TenantItems => _tenants?._embedded?.Items?.ToArray() ?? [];
+    private bool CanCreateTenant => InstanceAdminHal.HasLink(_tenants?._links, InstanceAdminLinkRelations.Create);
     private bool IsBusy => _busyTenantId is not null || _isCreating;
     private bool CanSubmitCreate => IsValidName(_createName) && IsValidSlug(_createSlug);
     private bool CanConfirmReason => _reasonTenant is not null
@@ -244,7 +244,7 @@
         && !string.IsNullOrWhiteSpace(_purgeTenant.Slug)
         && !string.IsNullOrWhiteSpace(_purgeReason)
         && string.Equals(_purgeConfirmation, _purgeTenant.Slug, StringComparison.Ordinal);
-    private string ReasonActionLabel => _reasonRelation == ControlPlaneLinkRelations.Suspend ? "suspend" : "archive";
+    private string ReasonActionLabel => _reasonRelation == InstanceAdminLinkRelations.Suspend ? "suspend" : "archive";
     private const string ProblemMessage = "Tenant data is currently unavailable.";
     private int TotalTenantCount => _tenants?.TotalCount ?? TenantItems.Count;
     private string TenantCountLabel => TotalTenantCount == 1 ? "1 tenant total" : $"{TotalTenantCount} tenants total";
@@ -280,7 +280,7 @@
         }
     }
 
-    private async Task RunTenantCommandAsync(HalResourceOfControlPlaneTenantListItemDto tenant, string relation)
+    private async Task RunTenantCommandAsync(HalResourceOfInstanceTenantListItemDto tenant, string relation)
     {
         var tenantId = TenantId(tenant);
         var fallbackSelector = TenantActionTargetSelector(tenantId);
@@ -292,9 +292,9 @@
         {
             var result = relation switch
             {
-                ControlPlaneLinkRelations.Activate => await TenantService.ActivateTenantAsync(tenantId),
-                ControlPlaneLinkRelations.Reactivate => await TenantService.ReactivateTenantAsync(tenantId),
-                _ => new BaseCommandResponseOfControlPlaneTenantLifecycleTransitionDto
+                InstanceAdminLinkRelations.Activate => await TenantService.ActivateTenantAsync(tenantId),
+                InstanceAdminLinkRelations.Reactivate => await TenantService.ReactivateTenantAsync(tenantId),
+                _ => new BaseCommandResponseOfInstanceTenantLifecycleTransitionDto
                 {
                     Success = false,
                     Message = "This tenant action is not supported.",
@@ -388,7 +388,7 @@
         }
     }
 
-    private async Task StartReasonConfirmation(HalResourceOfControlPlaneTenantListItemDto tenant, string relation)
+    private async Task StartReasonConfirmation(HalResourceOfInstanceTenantListItemDto tenant, string relation)
     {
         await AccessibilityFocusService.SaveFocusAsync();
         ClearCreate();
@@ -432,9 +432,9 @@
             var reason = _lifecycleReason!.Trim();
             var result = _reasonRelation switch
             {
-                ControlPlaneLinkRelations.Suspend => await TenantService.SuspendTenantAsync(tenantId, reason),
-                ControlPlaneLinkRelations.Archive => await TenantService.ArchiveTenantAsync(tenantId, reason),
-                _ => new BaseCommandResponseOfControlPlaneTenantLifecycleTransitionDto
+                InstanceAdminLinkRelations.Suspend => await TenantService.SuspendTenantAsync(tenantId, reason),
+                InstanceAdminLinkRelations.Archive => await TenantService.ArchiveTenantAsync(tenantId, reason),
+                _ => new BaseCommandResponseOfInstanceTenantLifecycleTransitionDto
                 {
                     Success = false,
                     Message = "This tenant action is not supported.",
@@ -464,7 +464,7 @@
         }
     }
 
-    private async Task StartPurgeConfirmation(HalResourceOfControlPlaneTenantListItemDto tenant)
+    private async Task StartPurgeConfirmation(HalResourceOfInstanceTenantListItemDto tenant)
     {
         await AccessibilityFocusService.SaveFocusAsync();
         ClearCreate();
@@ -563,20 +563,20 @@
             && value.All(character => char.IsAsciiLetterLower(character) || char.IsAsciiDigit(character) || character == '-');
     }
 
-    private static bool HasTenantAction(HalResourceOfControlPlaneTenantListItemDto tenant) =>
-        ControlPlaneHal.HasLink(tenant._links, ControlPlaneLinkRelations.Configuration)
-        || ControlPlaneHal.HasLink(tenant._links, ControlPlaneLinkRelations.Activate)
-        || ControlPlaneHal.HasLink(tenant._links, ControlPlaneLinkRelations.Suspend)
-        || ControlPlaneHal.HasLink(tenant._links, ControlPlaneLinkRelations.Archive)
-        || ControlPlaneHal.HasLink(tenant._links, ControlPlaneLinkRelations.Reactivate)
-        || ControlPlaneHal.HasLink(tenant._links, ControlPlaneLinkRelations.SchedulePurge);
+    private static bool HasTenantAction(HalResourceOfInstanceTenantListItemDto tenant) =>
+        InstanceAdminHal.HasLink(tenant._links, InstanceAdminLinkRelations.Configuration)
+        || InstanceAdminHal.HasLink(tenant._links, InstanceAdminLinkRelations.Activate)
+        || InstanceAdminHal.HasLink(tenant._links, InstanceAdminLinkRelations.Suspend)
+        || InstanceAdminHal.HasLink(tenant._links, InstanceAdminLinkRelations.Archive)
+        || InstanceAdminHal.HasLink(tenant._links, InstanceAdminLinkRelations.Reactivate)
+        || InstanceAdminHal.HasLink(tenant._links, InstanceAdminLinkRelations.SchedulePurge);
 
-    private static Guid TenantId(HalResourceOfControlPlaneTenantListItemDto tenant) => tenant.Id ?? Guid.Empty;
+    private static Guid TenantId(HalResourceOfInstanceTenantListItemDto tenant) => tenant.Id ?? Guid.Empty;
 
-    private static string TenantName(HalResourceOfControlPlaneTenantListItemDto tenant) =>
+    private static string TenantName(HalResourceOfInstanceTenantListItemDto tenant) =>
         string.IsNullOrWhiteSpace(tenant.FullName) ? tenant.Slug ?? "Unnamed tenant" : tenant.FullName;
 
-    private static string TenantStatus(HalResourceOfControlPlaneTenantListItemDto tenant) =>
+    private static string TenantStatus(HalResourceOfInstanceTenantListItemDto tenant) =>
         tenant.StatusName ?? tenant.StatusCode ?? "Unknown";
 
     private static string TenantActionTargetId(Guid tenantId) => $"instance-tenants-actions-{tenantId:N}";
@@ -584,5 +584,5 @@
     private static string TenantActionTargetSelector(Guid tenantId) => $"#{TenantActionTargetId(tenantId)}";
 
     private static string TenantConfigurationHref(Guid tenantId) =>
-        ControlPlaneRoutes.TenantConfiguration.Replace("{TenantId}", tenantId.ToString(), StringComparison.Ordinal);
+        InstanceAdminRoutes.TenantConfiguration.Replace("{TenantId}", tenantId.ToString(), StringComparison.Ordinal);
 }

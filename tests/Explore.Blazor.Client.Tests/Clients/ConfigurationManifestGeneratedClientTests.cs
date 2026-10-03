@@ -7,8 +7,8 @@ public sealed class ConfigurationManifestGeneratedClientTests
     [Test]
     public async Task DeterministicExportPreservesTypedBinaryContract()
     {
-        MethodInfo method = typeof(IControl_Plane_ConfigurationClient).GetMethod(
-            nameof(IControl_Plane_ConfigurationClient.ExportConfigurationManifestAsync),
+        MethodInfo method = typeof(IInstance_ConfigurationClient).GetMethod(
+            nameof(IInstance_ConfigurationClient.ExportConfigurationManifestAsync),
             [
                 typeof(ConfigurationManifestExportView?),
                 typeof(string),
@@ -42,27 +42,10 @@ public sealed class ConfigurationManifestGeneratedClientTests
     }
 
     [Test]
-    public async Task TenantExportAliasesAreAbsent()
-    {
-        string[] methodNames = typeof(IControl_Plane_ConfigurationClient).GetMethods()
-            .Concat(typeof(ITenant_ConfigurationClient).GetMethods())
-            .Select(method => method.Name)
-            .ToArray();
-
-        await Assert.That(methodNames)
-            .DoesNotContain("ExportTenant" + "ConfigurationManifestAsync");
-        await Assert.That(methodNames)
-            .DoesNotContain("ExportControlPlaneTenant" + "ConfigurationManifestAsync");
-        await Assert.That(typeof(IControl_Plane_ConfigurationClient).Assembly.GetType(
-            "Explore.Blazor.Client.Clients.Tenant" + "ConfigurationManifestExportView"))
-            .IsNull();
-    }
-
-    [Test]
     public async Task ImportUploadsUseDeterministicBinaryStreams()
     {
         MethodInfo instance = RequireMethod(
-            nameof(IControl_Plane_ConfigurationClient.CreateInstanceConfigurationImportSessionAsync));
+            nameof(IInstance_ConfigurationClient.CreateInstanceConfigurationImportSessionAsync));
         MethodInfo tenant = RequireMethod(
             nameof(ITenant_ConfigurationClient.CreateTenantConfigurationImportSessionAsync));
 
@@ -82,9 +65,9 @@ public sealed class ConfigurationManifestGeneratedClientTests
     {
         string[] operations =
         [
-            nameof(IControl_Plane_ConfigurationClient.PreviewInstanceConfigurationImportSessionAsync),
-            nameof(IControl_Plane_ConfigurationClient.RefreshInstanceConfigurationImportSessionAsync),
-            nameof(IControl_Plane_ConfigurationClient.CancelInstanceConfigurationImportSessionAsync),
+            nameof(IInstance_ConfigurationClient.PreviewInstanceConfigurationImportSessionAsync),
+            nameof(IInstance_ConfigurationClient.RefreshInstanceConfigurationImportSessionAsync),
+            nameof(IInstance_ConfigurationClient.CancelInstanceConfigurationImportSessionAsync),
             nameof(ITenant_ConfigurationClient.PreviewTenantConfigurationImportSessionAsync),
             nameof(ITenant_ConfigurationClient.RefreshTenantConfigurationImportSessionAsync),
             nameof(ITenant_ConfigurationClient.CancelTenantConfigurationImportSessionAsync)
@@ -140,7 +123,7 @@ public sealed class ConfigurationManifestGeneratedClientTests
 
     private static MethodInfo RequireMethod(string name)
     {
-        MethodInfo[] methods = typeof(IControl_Plane_ConfigurationClient).GetMethods()
+        MethodInfo[] methods = typeof(IInstance_ConfigurationClient).GetMethods()
             .Concat(typeof(ITenant_ConfigurationClient).GetMethods())
             .Where(method => method.Name == name)
             .ToArray();

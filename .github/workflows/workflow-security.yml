@@ -63,7 +63,7 @@ jobs:
           relevant_files=""
           while IFS= read -r changed_file; do
             case "$changed_file" in
-              .github/workflows/*|.ci/*|.github/dependabot.yml|docs/CI_CD_GOVERNANCE.md|src/Explore.API/Dockerfile|src/Explore.Blazor/Dockerfile|src/Event.Standalone/Dockerfile)
+              .github/workflows/*|.ci/*|eng/dependency-submission/*|eng/release/*|.github/dependabot.yml|docs/internal/CI_CD_GOVERNANCE.md|src/Explore.API/Dockerfile|src/Explore.Blazor/Dockerfile|src/Event.Standalone/Dockerfile)
                 relevant_files="${relevant_files}${changed_file}"$'\n'
                 ;;
             esac
@@ -113,17 +113,40 @@ jobs:
           tar -xzf ".tools/${archive}" -C .tools/actionlint actionlint
           .tools/actionlint/actionlint -version | tee workflow-security-results/actionlint-version.txt
 
+      - name: Verify typed CI policy and submission invariants
+        if: ${{ steps.changes.outputs.run-scan == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          submission_project="eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj"
+          release_project="eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj"
+          dotnet restore "$submission_project" --locked-mode --verbosity quiet
+          dotnet restore "$release_project" --locked-mode --verbosity quiet
+          dotnet build "$submission_project" --configuration Release --no-restore --verbosity quiet
+          dotnet build "$release_project" --configuration Release --no-restore --verbosity quiet
+          dotnet run --project "$submission_project" --configuration Release --no-build --no-restore -- \
+            --minimum-expected-tests 48 --results-directory workflow-security-results/submission-tests
+          dotnet run --project "$release_project" --configuration Release --no-build --no-restore -- \
+            --treenode-filter "/*/*/*ReleaseImpactScriptTests/*" --minimum-expected-tests 18 \
+            --results-directory workflow-security-results/metadata-tests
+
       - name: Run actionlint
         if: ${{ steps.changes.outputs.run-scan == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          .tools/actionlint/actionlint -format '{{json .}}' .github/workflows/*.yml > workflow-security-results/actionlint.json
-          .tools/actionlint/actionlint .github/workflows/*.yml | tee workflow-security-results/actionlint.txt
+          json_exit=0
+          .tools/actionlint/actionlint -format '{{json .}}' .github/workflows/*.yml > workflow-security-results/actionlint.json || json_exit=$?
+          text_exit=0
+          .tools/actionlint/actionlint .github/workflows/*.yml | tee workflow-security-results/actionlint.txt || text_exit=$?
           {
             echo "## actionlint"
-            echo "Workflow syntax and GitHub Actions expression linting passed."
+            echo "JSON exit code: ${json_exit}; readable diagnostics exit code: ${text_exit}."
           } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$json_exit" -ne 0 || "$text_exit" -ne 0 ]]; then
+            exit 1
+          fi
+          echo "Workflow syntax and GitHub Actions expression linting passed." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install zizmor
         if: ${{ steps.changes.outputs.run-scan == 'true' }}

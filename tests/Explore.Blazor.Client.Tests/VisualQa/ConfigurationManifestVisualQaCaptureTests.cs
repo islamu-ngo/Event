@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Encodings.Web;
 using Explore.Blazor.Client.Clients;
-using Explore.Blazor.Client.Contracts.ControlPlane;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using Explore.Blazor.Client.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,13 +25,13 @@ public sealed class ConfigurationManifestVisualQaCaptureTests
         using var context = new BlazorTestContext();
         var service = Substitute.For<IConfigurationManifestExportService>();
         service.GetCapabilitiesAsync(Arg.Any<CancellationToken>())
-            .Returns(new HalResourceOfControlPlaneOverviewDto
+            .Returns(new HalResourceOfInstanceOverviewDto
             {
                 _links = new Dictionary<string, HalLink>
                 {
-                    [ControlPlaneLinkRelations.ExportConfigurationOverrides] =
+                    [InstanceAdminLinkRelations.ExportConfigurationOverrides] =
                         new HalLink { Href = "/ignored", Method = "GET" },
-                    [ControlPlaneLinkRelations.ExportConfigurationPortable] =
+                    [InstanceAdminLinkRelations.ExportConfigurationPortable] =
                         new HalLink { Href = "/ignored", Method = "GET" }
                 }
             });
@@ -71,8 +71,8 @@ public sealed class ConfigurationManifestVisualQaCaptureTests
             "src",
             "Explore.Blazor.Client",
             "Components",
-            "ControlPlane",
-            "ControlPlaneActionButton.razor.css"));
+            "InstanceAdmin",
+            "InstanceAdminActionButton.razor.css"));
         componentCss = string.Concat(
                 componentCss,
                 Environment.NewLine,

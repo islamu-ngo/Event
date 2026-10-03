@@ -240,20 +240,23 @@ public sealed class AdmissionCheckInRepository(
         Expression candidateMatch = Expression.Constant(false);
         foreach (AdmissionCheckInCredentialDigestCandidate candidate in candidates)
         {
+            Expression<Func<int>> keyVersion = () => candidate.KeyVersion;
+            Expression<Func<string>> lookupDigest = () => candidate.LookupDigest;
             Expression keyMatch = Expression.Equal(
                 Expression.Property(credential, nameof(AdmissionTicketCredential.LookupKeyVersion)),
-                Expression.Constant(candidate.KeyVersion));
+                keyVersion.Body);
             Expression digestMatch = Expression.Equal(
                 Expression.Property(credential, nameof(AdmissionTicketCredential.LookupDigest)),
-                Expression.Constant(candidate.LookupDigest));
+                lookupDigest.Body);
             candidateMatch = Expression.OrElse(
                 candidateMatch,
                 Expression.AndAlso(keyMatch, digestMatch));
         }
 
+        Expression<Func<Guid>> selectedTenant = () => tenantId;
         Expression tenantMatch = Expression.Equal(
             Expression.Property(credential, nameof(AdmissionTicketCredential.TenantId)),
-            Expression.Constant(tenantId));
+            selectedTenant.Body);
         Expression activeMatch = Expression.Equal(
             Expression.Property(
                 credential,

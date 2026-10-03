@@ -102,7 +102,7 @@ public static class BlazorHostServiceCollectionExtensions
         builder.Services.AddServerOnlyServices(builder.Configuration);
         builder.Services.AddScoped(services => OnboardingRequestOriginResolver.Resolve(
             services.GetRequiredService<IHttpContextAccessor>().HttpContext));
-        builder.Services.AddEventControlPlaneClient();
+        builder.Services.AddInstanceAdminClient();
         builder.Services.AddApiHttpClients(builder.Configuration, builder.Environment, profile);
         if (profile == BlazorHostProfile.Combined)
         {

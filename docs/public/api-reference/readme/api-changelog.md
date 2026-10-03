@@ -31,6 +31,18 @@ for the explicit pre-release provenance cutover procedure.
 
 ## Recent externally visible themes
 
+### Unified instance administration (2026-10-02)
+
+Internal administrator endpoints now use `/api/admin/instance/*` instead of
+`/api/admin/control-plane/*`. Regenerate direct clients for the instance-named
+operations and contracts, or consume the current HAL links. Old routes are not
+retained. Tenant lifecycle, plan management and deployment operations keep their
+existing authorization and concurrency rules. External fleet clients continue
+to use the unchanged `/api/management/*` connector.
+Whole-instance configuration export and import-session routes also live under
+`/api/admin/instance/configuration-*`; browser downloads use the same-origin
+`/bff/admin/instance/configuration-manifest/export` resource.
+
 ### Protected resource links and operator limits (2026-09-24)
 
 `PUT /api/eventresource/{id}/destination` writes a validated HTTPS

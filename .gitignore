@@ -575,12 +575,6 @@ dev/active/*
 
 inbox
 
-# Blazor.Client lock file: Microsoft.NET.Sdk.WebAssembly.Pack version tracks the
-# .NET RUNTIME patch (not the SDK), making the lock file non-portable across
-# environments with different runtime patches (local 10.0.8 vs CI 10.0.9).
-# Without a tracked lock file, --locked-mode restores normally for this project.
-src/Explore.Blazor.Client/packages.lock.json
-
 # Plane Compose ! reason is it shares too much information !
 # already sharing project management with the "Public" Roadmap ! wich only shows what it should be showing !
 # Thats a massive security vulnerability to share all work items as there may be security ones and more !
@@ -604,3 +598,4 @@ dev/pause/
 dev/report/
 privacy-erasure-authority-data/aspire-local/
 privacy-erasure-authority-data/aspire-agent/
+StrykerOutput/

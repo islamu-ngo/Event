@@ -6,7 +6,7 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
-using Explore.Application.Features.ControlPlane.Requests.Queries;
+using Explore.Application.Features.InstanceAdmin.Requests.Queries;
 using Explore.Application.Hateoas;
 
 public sealed class InstanceOnboardingStatusLinkPolicy(
@@ -90,8 +90,8 @@ public sealed class InstanceOnboardingStatusLinkPolicy(
         {
             yield return InstanceSettingLink(
                 "manage-tenants",
-                RouteNames.GetControlPlaneTenants,
-                GetControlPlaneTenantListQuery.SettingKey,
+                RouteNames.GetInstanceAdminTenants,
+                GetInstanceTenantListQuery.SettingKey,
                 "Manage tenants");
         }
     }

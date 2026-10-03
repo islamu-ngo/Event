@@ -224,6 +224,7 @@ jobs:
 
       - name: Setup Project Gates
         if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
+        id: test_setup
         shell: bash
         run: |
           set -euo pipefail
@@ -247,6 +248,7 @@ jobs:
                 test_filters=(--treenode-filter "/*/*/*/*[Category!=Architecture]")
               fi
             fi
+            echo "started=true" >> "$GITHUB_OUTPUT"
             dotnet test --project "$project" --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --minimum-expected-tests 1 --no-progress "${coverage_args[@]}" "${test_filters[@]}"
           done
           coverage_args=()
@@ -373,7 +375,18 @@ jobs:
 
       - name: Validate coverage reports
         id: coverage_reports
-        if: ${{ always() && inputs.run-fast-tests && inputs.collect-coverage }}
+        if: >-
+          ${{ always() && !cancelled() && inputs.run-fast-tests && inputs.collect-coverage &&
+            (steps.test_setup.outputs.started == 'true' ||
+             contains(fromJSON('["success","failure"]'), steps.test_application.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_domain.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_secrets.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_infrastructure.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_blazor_client.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_blazor_integration.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_wire_contracts.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_diagnostic.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_standalone.outcome)) }}
         shell: bash
         run: |
           mkdir -p artifacts/coverage
@@ -579,7 +592,12 @@ jobs:
 
       - name: Validate runtime coverage reports
         id: coverage_reports
-        if: ${{ always() && inputs.collect-coverage }}
+        if: >-
+          ${{ always() && !cancelled() && inputs.collect-coverage &&
+            (contains(fromJSON('["success","failure"]'), steps.test_persistence_integration.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_api_integration.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_infrastructure_email.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.test_infrastructure_rabbitmq.outcome)) }}
         shell: bash
         run: |
           mkdir -p artifacts/coverage

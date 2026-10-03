@@ -2,6 +2,7 @@
 #pragma warning disable CA1050 // File-based CI scripts intentionally keep helper policy types in the script file.
 
 using System.Net.Http.Headers;
+using System.Collections.Frozen;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -16,7 +17,14 @@ using var eventDocument = JsonDocument.Parse(File.ReadAllText(eventPath));
 var pullRequest = eventDocument.RootElement.GetProperty("pull_request");
 var body = pullRequest.TryGetProperty("body", out var bodyElement) ? bodyElement.GetString() ?? string.Empty : string.Empty;
 var author = pullRequest.GetProperty("user").GetProperty("login").GetString() ?? string.Empty;
-var filesUrl = pullRequest.TryGetProperty("url", out var urlElement) ? (urlElement.GetString() ?? string.Empty) + "/files" : string.Empty;
+var isBot = pullRequest.GetProperty("user").TryGetProperty("type", out var accountType)
+    && accountType.GetString() == "Bot";
+var expectedFileCount = pullRequest.TryGetProperty("changed_files", out var countElement)
+    ? countElement.GetInt32() : 0;
+Uri? filesUri = pullRequest.TryGetProperty("url", out var urlElement)
+    && Uri.TryCreate(urlElement.GetString(), UriKind.Absolute, out var pullRequestUri)
+    && pullRequestUri.Scheme == Uri.UriSchemeHttps && pullRequestUri.Host == "api.github.com"
+    ? new Uri(pullRequestUri.AbsoluteUri + "/files") : null;
 
 var trustedBots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {
@@ -24,14 +32,38 @@ var trustedBots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     "github-actions[bot]",
 };
 
-if (trustedBots.Contains(author))
+if (isBot && trustedBots.Contains(author))
 {
     Console.WriteLine("Release impact check skipped for trusted bot author " + author + ".");
     return 0;
 }
 
-var changedFiles = await GetChangedFilesAsync(filesUrl);
-var requiredCategories = ClassifyRequiredCategories(changedFiles);
+List<GitHubChangedFile>? changedFiles;
+try
+{
+    changedFiles = await GetChangedFilesAsync(filesUri);
+}
+catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException or JsonException)
+{
+    Console.WriteLine("Release impact validation failed: changed-file metadata is unavailable.");
+    return 1;
+}
+if (changedFiles is null || expectedFileCount <= 0 || changedFiles.Count != expectedFileCount
+    || changedFiles.Select(file => file.Path).Distinct(StringComparer.Ordinal).Count() != expectedFileCount)
+{
+    Console.WriteLine("Release impact validation failed: complete changed-file metadata is required.");
+    return 1;
+}
+
+var requiredCategories = ClassifyRequiredCategories(changedFiles.SelectMany(file =>
+    file.PreviousPath is { } previousPath ? new[] { file.Path, previousPath } : new[] { file.Path }));
+if (isBot && author == "imgbot[bot]" && requiredCategories.Count == 0
+    && changedFiles.All(file => file.Kind == GitHubFileChangeKind.Modified
+        && file.PreviousPath is null && IsReviewedImagePath(file.Path)))
+{
+    Console.WriteLine("Release impact validation passed: verified ImgBot modified only existing reviewed image assets.");
+    return 0;
+}
 var failures = new List<string>();
 
 var releaseImpactSection = ExtractSection(body, "Release Impact");
@@ -41,10 +73,10 @@ if (string.IsNullOrWhiteSpace(releaseImpactSection))
 }
 
 var notApplicableChecked = HasCheckedLine(releaseImpactSection, "Not applicable");
-var checkedCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-foreach (var category in ReleaseImpactPolicy.CategoryLabels.Keys)
+var checkedCategories = new HashSet<ReleaseImpactCategory>();
+foreach (var (category, rule) in ReleaseImpactPolicy.Rules)
 {
-    if (HasCheckedLine(releaseImpactSection, ReleaseImpactPolicy.CategoryLabels[category]))
+    if (HasCheckedLine(releaseImpactSection, rule.Label))
     {
         checkedCategories.Add(category);
     }
@@ -53,14 +85,15 @@ foreach (var category in ReleaseImpactPolicy.CategoryLabels.Keys)
 var details = ExtractDetails(releaseImpactSection);
 if (requiredCategories.Count > 0 && notApplicableChecked)
 {
-    failures.Add("Release Impact cannot be marked Not applicable because changed files require release-impact evidence: " + string.Join(", ", requiredCategories.Order(StringComparer.OrdinalIgnoreCase)) + ".");
+    failures.Add("Release Impact cannot be marked Not applicable because changed files require release-impact evidence: "
+        + string.Join(", ", requiredCategories.Order().Select(category => ReleaseImpactPolicy.Rules[category].Label)) + ".");
 }
 
-foreach (var category in requiredCategories.Order(StringComparer.OrdinalIgnoreCase))
+foreach (var category in requiredCategories.Order())
 {
     if (!checkedCategories.Contains(category))
     {
-        failures.Add("Missing checked Release Impact item: " + ReleaseImpactPolicy.CategoryLabels[category] + ".");
+        failures.Add("Missing checked Release Impact item: " + ReleaseImpactPolicy.Rules[category].Label + ".");
     }
 }
 
@@ -96,38 +129,37 @@ if (changedFiles.Count > 0)
 
 return 0;
 
-static async Task<List<string>> GetChangedFilesAsync(string filesUrl)
+static async Task<List<GitHubChangedFile>?> GetChangedFilesAsync(Uri? filesUri)
 {
-    var overrideFiles = Environment.GetEnvironmentVariable("RELEASE_IMPACT_CHANGED_FILES");
-    if (!string.IsNullOrWhiteSpace(overrideFiles))
+    var metadata = Environment.GetEnvironmentVariable("RELEASE_IMPACT_FILE_METADATA");
+    if (!string.IsNullOrWhiteSpace(metadata))
     {
-        return overrideFiles
-            .Split(ReleaseImpactPolicy.FileSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
+        using var document = JsonDocument.Parse(metadata);
+        return ReadChangedFiles(document.RootElement);
     }
 
     var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
-    if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(filesUrl))
+    if (string.IsNullOrWhiteSpace(token) || filesUri is null)
     {
-        Console.WriteLine("Warning: changed files unavailable; validating PR body checklist only.");
-        return new List<string>();
+        return null;
     }
 
     using var client = new HttpClient();
+    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("islamu-release-impact-validator");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
-    var files = new List<string>();
+    var files = new List<GitHubChangedFile>();
     var page = 1;
-    while (true)
+    while (page <= 30)
     {
-        var separator = filesUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?';
-        using var response = await client.GetAsync(filesUrl + separator + "per_page=100&page=" + page);
+        var pageUri = new UriBuilder(filesUri) { Query = $"per_page=100&page={page}" }.Uri;
+        using var response = await client.GetAsync(pageUri, deadline.Token);
         if (!response.IsSuccessStatusCode)
         {
-            Console.WriteLine("Warning: could not read PR files from GitHub API (" + (int)response.StatusCode + "). Validating PR body checklist only.");
-            return new List<string>();
+            Console.WriteLine("Changed-file metadata request failed with HTTP status " + (int)response.StatusCode + ".");
+            return null;
         }
 
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -137,17 +169,9 @@ static async Task<List<string>> GetChangedFilesAsync(string filesUrl)
             break;
         }
 
-        foreach (var file in pageFiles.EnumerateArray())
-        {
-            if (file.TryGetProperty("filename", out var filenameElement))
-            {
-                var filename = filenameElement.GetString();
-                if (!string.IsNullOrWhiteSpace(filename))
-                {
-                    files.Add(filename);
-                }
-            }
-        }
+        var parsedFiles = ReadChangedFiles(pageFiles);
+        if (parsedFiles is null) return null;
+        files.AddRange(parsedFiles);
 
         if (pageFiles.GetArrayLength() < 100)
         {
@@ -160,61 +184,42 @@ static async Task<List<string>> GetChangedFilesAsync(string filesUrl)
     return files;
 }
 
-static HashSet<string> ClassifyRequiredCategories(IEnumerable<string> changedFiles)
+static List<GitHubChangedFile>? ReadChangedFiles(JsonElement metadata)
 {
-    var categories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    if (metadata.ValueKind != JsonValueKind.Array) return null;
+    var files = new List<GitHubChangedFile>();
+    foreach (var file in metadata.EnumerateArray())
+    {
+        if (!file.TryGetProperty("filename", out var name) || name.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(name.GetString())
+            || !file.TryGetProperty("status", out var status) || status.ValueKind != JsonValueKind.String
+            || !ReleaseImpactPolicy.FileChangeKinds.TryGetValue(status.GetString() ?? string.Empty, out var kind))
+            return null;
+        string? previous = file.TryGetProperty("previous_filename", out var previousName)
+            ? previousName.GetString() : null;
+        if (kind == GitHubFileChangeKind.Renamed && string.IsNullOrWhiteSpace(previous)) return null;
+        files.Add(new(name.GetString()!, kind, previous));
+    }
+    return files;
+}
+
+static bool IsReviewedImagePath(string path) =>
+    !path.Contains('\\', StringComparison.Ordinal) && !path.Split('/').Any(segment => segment is "." or "..")
+    && (path.StartsWith("assets/", StringComparison.Ordinal)
+        || path.StartsWith("docs/internal/assets/diagrams/", StringComparison.Ordinal))
+    && (path.EndsWith(".png", StringComparison.Ordinal) || path.EndsWith(".svg", StringComparison.Ordinal));
+
+static HashSet<ReleaseImpactCategory> ClassifyRequiredCategories(IEnumerable<string> changedFiles)
+{
+    var categories = new HashSet<ReleaseImpactCategory>();
     foreach (var file in changedFiles)
     {
         var path = file.Replace('\\', '/').ToLowerInvariant();
-        if (path.Contains("security", StringComparison.Ordinal)
-            || path.Contains("authorization", StringComparison.Ordinal)
-            || path.Contains("auth", StringComparison.Ordinal)
-            || path.Contains("cerbos", StringComparison.Ordinal)
-            || path.Contains("keycloak", StringComparison.Ordinal)
-            || path.Contains("cla", StringComparison.Ordinal)
-            || path.Contains("secret", StringComparison.Ordinal))
+        foreach (var (category, rule) in ReleaseImpactPolicy.Rules)
         {
-            categories.Add("security");
-        }
-
-        if (path.Contains("/migrations/", StringComparison.Ordinal)
-            || path.Contains("migration", StringComparison.Ordinal)
-            || path.Contains("seed", StringComparison.Ordinal))
-        {
-            categories.Add("migration");
-        }
-
-        if (path.Contains("configuration", StringComparison.Ordinal)
-            || path.Contains("config", StringComparison.Ordinal)
-            || path.Contains("secrets", StringComparison.Ordinal)
-            || path.Contains("appsettings", StringComparison.Ordinal)
-            || path.EndsWith("dockerfile", StringComparison.Ordinal)
-            || path.Contains("docker-compose", StringComparison.Ordinal)
-            || path.Contains(".github/workflows/deploy", StringComparison.Ordinal)
-            || path.Contains(".ci/actions/deploy", StringComparison.Ordinal))
-        {
-            categories.Add("configuration");
-        }
-
-        if (path.Contains("schemas/openapi_islamu-event.json", StringComparison.Ordinal)
-            || path.Contains("api_changelog", StringComparison.Ordinal)
-            || path.Contains("api_contract", StringComparison.Ordinal)
-            || path.Contains("eventapiclient.g.cs", StringComparison.Ordinal)
-            || path.Contains("explore.api/controllers", StringComparison.Ordinal))
-        {
-            categories.Add("openapi");
-        }
-
-        if (path.Contains("self_hosting", StringComparison.Ordinal)
-            || path.Contains("backup_restore_upgrade", StringComparison.Ordinal)
-            || path.Contains("release_checklist", StringComparison.Ordinal)
-            || path.Contains("operations", StringComparison.Ordinal)
-            || path.Contains("deployment", StringComparison.Ordinal)
-            || path.Contains("deploy", StringComparison.Ordinal)
-            || path.EndsWith("dockerfile", StringComparison.Ordinal)
-            || path.Contains("docker-compose", StringComparison.Ordinal))
-        {
-            categories.Add("operator");
+            if (rule.Fragments.Any(fragment => path.Contains(fragment, StringComparison.Ordinal))
+                || rule.Suffixes.Any(suffix => path.EndsWith(suffix, StringComparison.Ordinal)))
+                categories.Add(category);
         }
     }
 
@@ -261,14 +266,37 @@ static string ExtractDetails(string section)
 
 static class ReleaseImpactPolicy
 {
-    public static readonly char[] FileSeparators = ['\n', '\r', ','];
-
-    public static readonly Dictionary<string, string> CategoryLabels = new(StringComparer.OrdinalIgnoreCase)
+    public static readonly FrozenDictionary<ReleaseImpactCategory, ReleaseImpactRule> Rules =
+        new Dictionary<ReleaseImpactCategory, ReleaseImpactRule>
     {
-        ["security"] = "Security/auth impact documented",
-        ["migration"] = "Migration/data/rollback impact documented",
-        ["configuration"] = "Configuration/secrets/deployment impact documented",
-        ["openapi"] = "OpenAPI/client contract impact documented",
-        ["operator"] = "Operator/self-hosting/release-note impact documented",
-    };
+        [ReleaseImpactCategory.Security] = new("Security/auth impact documented",
+            ["security", "authorization", "auth", "cerbos", "keycloak", "cla", "secret"], []),
+        [ReleaseImpactCategory.Migration] = new("Migration/data/rollback impact documented",
+            ["/migrations/", "migration", "seed"], []),
+        [ReleaseImpactCategory.Configuration] = new("Configuration/secrets/deployment impact documented",
+            ["configuration", "config", "secrets", "appsettings", "docker-compose", ".github/workflows/deploy", ".ci/actions/deploy"],
+            ["dockerfile"]),
+        [ReleaseImpactCategory.OpenApi] = new("OpenAPI/client contract impact documented",
+            ["schemas/openapi_islamu-event.json", "api_changelog", "api_contract", "eventapitagclients.g.cs", "explore.api/controllers"], []),
+        [ReleaseImpactCategory.Operator] = new("Operator/self-hosting/release-note impact documented",
+            ["self_hosting", "backup_restore_upgrade", "release_checklist", "operations", "deployment", "deploy", "docker-compose"],
+            ["dockerfile"]),
+    }.ToFrozenDictionary();
+
+    public static readonly FrozenDictionary<string, GitHubFileChangeKind> FileChangeKinds =
+        new Dictionary<string, GitHubFileChangeKind>(StringComparer.Ordinal)
+        {
+            ["added"] = GitHubFileChangeKind.Added,
+            ["modified"] = GitHubFileChangeKind.Modified,
+            ["removed"] = GitHubFileChangeKind.Removed,
+            ["renamed"] = GitHubFileChangeKind.Renamed,
+            ["copied"] = GitHubFileChangeKind.Copied,
+            ["changed"] = GitHubFileChangeKind.Changed,
+            ["unchanged"] = GitHubFileChangeKind.Unchanged
+        }.ToFrozenDictionary(StringComparer.Ordinal);
 }
+
+enum ReleaseImpactCategory { Security, Migration, Configuration, OpenApi, Operator }
+enum GitHubFileChangeKind { Unknown, Added, Modified, Removed, Renamed, Copied, Changed, Unchanged }
+sealed record GitHubChangedFile(string Path, GitHubFileChangeKind Kind, string? PreviousPath);
+sealed record ReleaseImpactRule(string Label, IReadOnlyList<string> Fragments, IReadOnlyList<string> Suffixes);

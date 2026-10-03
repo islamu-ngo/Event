@@ -10,7 +10,7 @@ using NSubstitute;
 public sealed class ConfigurationImportSessionHttpFlowTests
 {
     private const string Route =
-        "/api/control-plane/configuration-import/sessions";
+        "/api/admin/instance/configuration-import/sessions";
     private const string MediaType =
         "application/vnd.islamu.configuration-manifest.v1alpha2+json";
 

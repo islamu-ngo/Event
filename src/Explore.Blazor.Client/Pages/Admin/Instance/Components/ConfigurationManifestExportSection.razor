@@ -1,7 +1,7 @@
-@using Explore.Blazor.Client.Components.ControlPlane
-@using Explore.Blazor.Client.Contracts.ControlPlane
+@using Explore.Blazor.Client.Components.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.InstanceAdmin
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
-@using Explore.Blazor.Client.Contracts.Services.ControlPlane
+@using Explore.Blazor.Client.Contracts.Services.InstanceAdmin
 @implements IDisposable
 @inject IConfigurationManifestExportService ExportService
 @inject ITranslationService Translations
@@ -64,7 +64,7 @@
                  aria-label="@T("instance.configurationManifest.actionsLabel", "Configuration manifest downloads")">
                 @if (CanExportOverrides)
                 {
-                    <ControlPlaneActionButton AriaLabel="@T(
+                    <InstanceAdminActionButton AriaLabel="@T(
                                                   "instance.configurationManifest.overrides.ariaLabel",
                                                   "Download configuration overrides")"
                                               StartIcon="@Icons.Material.Filled.Download"
@@ -72,12 +72,12 @@
                                               dir="auto"
                                               OnClick="@(() => DownloadAsync(ConfigurationManifestExportView.Overrides))">
                         @T("instance.configurationManifest.overrides.label", "Download overrides")
-                    </ControlPlaneActionButton>
+                    </InstanceAdminActionButton>
                 }
 
                 @if (CanExportPortable)
                 {
-                    <ControlPlaneActionButton AriaLabel="@T(
+                    <InstanceAdminActionButton AriaLabel="@T(
                                                   "instance.configurationManifest.portable.ariaLabel",
                                                   "Download portable configuration")"
                                               Variant="Variant.Outlined"
@@ -86,7 +86,7 @@
                                               dir="auto"
                                               OnClick="@(() => DownloadAsync(ConfigurationManifestExportView.Portable))">
                         @T("instance.configurationManifest.portable.label", "Download portable")
-                    </ControlPlaneActionButton>
+                    </InstanceAdminActionButton>
                 }
             </div>
         }
@@ -114,21 +114,21 @@
 
 @code {
     private readonly CancellationTokenSource _disposal = new();
-    private HalResourceOfControlPlaneOverviewDto? _capabilities;
+    private HalResourceOfInstanceOverviewDto? _capabilities;
     private bool _loading = true;
     private bool _downloading;
     private bool _statusIsError;
     private string? _statusMessage;
 
     private bool CanExportOverrides =>
-        ControlPlaneHal.HasLink(
+        InstanceAdminHal.HasLink(
             _capabilities?._links,
-            ControlPlaneLinkRelations.ExportConfigurationOverrides);
+            InstanceAdminLinkRelations.ExportConfigurationOverrides);
 
     private bool CanExportPortable =>
-        ControlPlaneHal.HasLink(
+        InstanceAdminHal.HasLink(
             _capabilities?._links,
-            ControlPlaneLinkRelations.ExportConfigurationPortable);
+            InstanceAdminLinkRelations.ExportConfigurationPortable);
 
     private string T(string key, string fallback) =>
         Translations.T(key, fallback);

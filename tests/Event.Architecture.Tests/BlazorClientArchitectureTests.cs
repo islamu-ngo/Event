@@ -3,10 +3,11 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Explore.Blazor.Client.Clients;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Extensions;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
-using Explore.Blazor.Client.Services.ControlPlane;
+using Explore.Blazor.Client.Pages.Admin.Components;
+using Explore.Blazor.Client.Services.InstanceAdmin;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -298,10 +299,10 @@ public class BlazorClientArchitectureTests
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(consumers.SequenceEqual(new[]
+        await Assert.That(consumers).IsEquivalentTo(new[]
         {
-            typeof(InstanceAdminSettingsLayout), typeof(LocalAccountsSection)
-        })).IsTrue();
+            typeof(LocalAccountsSection), typeof(UnifiedAdminSettingsLayout)
+        });
     }
 
     [Test]
@@ -319,7 +320,7 @@ public class BlazorClientArchitectureTests
     public async Task Rule_1_04_ConcreteInjectionGuard_RejectsUnapprovedAndImpersonatedConsumersAndServices()
     {
         await Assert.That(IsAllowedComponentInjection(typeof(LocalAccountsSection), typeof(LocalIdentityAdministrationService))).IsTrue();
-        await Assert.That(IsAllowedComponentInjection(typeof(InstanceAdminSettingsLayout), typeof(LocalIdentityAdministrationService))).IsTrue();
+        await Assert.That(IsAllowedComponentInjection(typeof(UnifiedAdminSettingsLayout), typeof(LocalIdentityAdministrationService))).IsTrue();
         await Assert.That(IsAllowedComponentInjection(typeof(LocalAccountsSection), typeof(DependencyOnlyFacadeProbe))).IsFalse();
         await Assert.That(IsAllowedComponentInjection(typeof(LocalAccountsSection), typeof(Impostor.LocalIdentityAdministrationService))).IsFalse();
         await Assert.That(IsAllowedComponentInjection(typeof(Impostor.LocalAccountsSection), typeof(LocalIdentityAdministrationService))).IsFalse();
@@ -395,7 +396,7 @@ public class BlazorClientArchitectureTests
     private static bool IsAllowedComponentInjection(Type consumer, Type service)
     {
         if (service == typeof(LocalIdentityAdministrationService))
-            return (consumer == typeof(LocalAccountsSection) || consumer == typeof(InstanceAdminSettingsLayout))
+            return (consumer == typeof(LocalAccountsSection) || consumer == typeof(UnifiedAdminSettingsLayout))
                 && HasDependencyOnlyFacadeShape(service);
 
         if (service.IsInterface || FrameworkAllowedConcreteInjects.Contains(service)) return true;
@@ -422,7 +423,7 @@ public class BlazorClientArchitectureTests
             && fields.Length == 2
             && fields.All(field => field.IsPrivate && field.IsInitOnly && !field.IsStatic)
             && fields.Count(field => field.FieldType == typeof(ILocalIdentityAdministrationClient)) == 1
-            && fields.Count(field => field.FieldType == typeof(IControlPlaneOverviewService)) == 1;
+            && fields.Count(field => field.FieldType == typeof(IInstanceOverviewService)) == 1;
     }
 
     private class UnapprovedConsumer : ComponentBase
@@ -441,33 +442,33 @@ public class BlazorClientArchitectureTests
     private sealed class DependencyOnlyFacadeProbe
     {
         public ILocalIdentityAdministrationClient Client { get; } = null!;
-        public IControlPlaneOverviewService Overview { get; } = null!;
+        public IInstanceOverviewService Overview { get; } = null!;
     }
 
     private sealed class RetainingFacadeProbe<T>
     {
         public ILocalIdentityAdministrationClient Client { get; } = null!;
-        public IControlPlaneOverviewService Overview { get; } = null!;
+        public IInstanceOverviewService Overview { get; } = null!;
         public T? Retained { get; }
     }
 
     private sealed class StaticRetainingFacadeProbe<T>
     {
         public ILocalIdentityAdministrationClient Client { get; } = null!;
-        public IControlPlaneOverviewService Overview { get; } = null!;
+        public IInstanceOverviewService Overview { get; } = null!;
         public static T? Retained { get; set; }
     }
 
     private sealed class MutableDependencyFacadeProbe
     {
         public ILocalIdentityAdministrationClient Client { get; set; } = null!;
-        public IControlPlaneOverviewService Overview { get; } = null!;
+        public IInstanceOverviewService Overview { get; } = null!;
     }
 
     private sealed class InheritedFacadeProbe : UnapprovedConsumer
     {
         public ILocalIdentityAdministrationClient Client { get; } = null!;
-        public IControlPlaneOverviewService Overview { get; } = null!;
+        public IInstanceOverviewService Overview { get; } = null!;
     }
 
     // ============================================================================================

@@ -21,7 +21,7 @@
         "ERASURE_DATABASE_TOPOLOGY": "EmbeddedSqlite",
         "WEBHOOKS_PROVIDER": "Local",
         "DEPLOYMENT_MODE": "multi_tenant",
-        "CONTROL_PLANE_PUBLIC_ORIGIN": "http://admin.localhost:5200",
+        "INSTANCE_ADMIN_PUBLIC_ORIGIN": "http://admin.localhost:5200",
         "PUBLIC_BASE_URL": "http://default.localhost:5200",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21221",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22157"

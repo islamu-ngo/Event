@@ -688,9 +688,9 @@ After success:
 
 | Surface | Contract |
 |---|---|
-| API | `GET /api/control-plane/configuration-manifest/export?view=Overrides\|Portable` |
+| API | `GET /api/admin/instance/configuration-manifest/export?view=Overrides\|Portable` |
 | API operation ID | `ExportConfigurationManifest` |
-| Same-origin BFF | `GET /bff/control-plane/configuration-manifest/export?view=Overrides\|Portable` |
+| Same-origin BFF | `GET /bff/admin/instance/configuration-manifest/export?view=Overrides\|Portable` |
 | UI | Instance administration configuration-manifest section |
 
 The API has no caller-supplied instance or tenant ID. Trusted server context

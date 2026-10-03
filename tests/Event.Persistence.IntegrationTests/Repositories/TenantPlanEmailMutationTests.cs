@@ -3,9 +3,9 @@ using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings;
-using Explore.Application.Features.ControlPlane.Handlers.Commands;
-using Explore.Application.Features.ControlPlane.Plans;
-using Explore.Application.Features.ControlPlane.Requests.Commands;
+using Explore.Application.Features.InstanceAdmin.Handlers.Commands;
+using Explore.Application.Features.InstanceAdmin.Plans;
+using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -226,13 +226,13 @@ public sealed class TenantPlanEmailMutationTests
         finally { DeleteDatabase(databasePath); }
     }
 
-    private static ApplyControlPlaneTenantPlanAssignmentCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
+    private static ApplyInstanceTenantPlanAssignmentCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
         new(new TenantPlanRepository(fixture.Context), new TenantSettingRepository(fixture.Context, fixture.MutationLock), fixture.SystemSettings,
             new TenantPlanStorageQuotaCeilingPolicy(fixture.SystemSettings), fixture.UnitOfWork, fixture.MutationLock,
             fixture.PublicationPolicyBoundary, fixture.Settings, fixture.NotificationHandlers, fixture.EmailDeliverySettingsWriter,
             fixture.VisitorSettings);
 
-    private static ApplyControlPlaneTenantPlanAssignmentCommand Request(PlanScenario scenario) =>
+    private static ApplyInstanceTenantPlanAssignmentCommand Request(PlanScenario scenario) =>
         new(TenantId: scenario.TenantId, AssignmentId: scenario.AssignmentId, AppliedByUserId: scenario.ActorId);
 
     private static async Task AssertAppliedAsync(InstanceSettingsCommandFixture fixture, PlanScenario scenario, bool mixed)

@@ -1,0 +1,19 @@
+using Explore.Application.Authorization;
+using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
+
+namespace Explore.Application.Features.InstanceAdmin.Requests.Commands;
+
+[AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.Update)]
+public sealed record ApplyInstanceTenantPlanAssignmentCommand(
+    Guid TenantId,
+    Guid AssignmentId,
+    Guid AppliedByUserId) : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
+{
+    public const string SettingKey = "control-plane.tenant-plan-assignments";
+
+    public string ResourceId => SettingKey;
+
+    IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>
+        InstanceScopedAuthorizationFacts.Instance;
+}

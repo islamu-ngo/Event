@@ -4,7 +4,7 @@ using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Admissions;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Ai;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Contracts.Services.CustomProperties;
 using Explore.Blazor.Client.Contracts.Services.EventReporting;
 using Explore.Blazor.Client.Contracts.Services.Events;
@@ -26,7 +26,7 @@ using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Admissions;
 using Explore.Blazor.Client.Services.Accessibility;
 using Explore.Blazor.Client.Services.Ai;
-using Explore.Blazor.Client.Services.ControlPlane;
+using Explore.Blazor.Client.Services.InstanceAdmin;
 using Explore.Blazor.Client.Services.Docking;
 using Explore.Blazor.Client.Services.EventSessionTemplateSync;
 using Explore.Blazor.Client.Services.EventTemplateSync;
@@ -41,7 +41,6 @@ using Explore.Blazor.Client.Services.Waitlist;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using ExploreControlPlaneApiAdapter = Explore.Blazor.Client.Services.ControlPlane.ControlPlaneApiAdapter;
 
 namespace Explore.Blazor.Client.Extensions;
 
@@ -71,15 +70,7 @@ public static class ServiceCollectionExtensions
             configureBffRefitClient?.Invoke(provider, client))
             .AddHttpMessageHandler<AdmissionScannerCapabilityMessageHandler>();
         services.AddScoped<AdmissionScannerHttpClient>();
-        services.AddScoped<ExploreControlPlaneApiAdapter>();
-        services.AddScoped<IControlPlaneOverviewService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
-        services.AddScoped<IControlPlaneTenantService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
-        services.AddScoped<IControlPlaneDomainService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
-        services.AddScoped<IControlPlaneOperationsService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
-        services.AddScoped<IControlPlanePlanCatalogService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
-        services.AddScoped<IControlPlaneTenantConfigurationService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
-        services.AddScoped<IConfigurationManifestExportService, ConfigurationManifestExportService>();
-        services.AddScoped<LocalIdentityAdministrationService>();
+        services.AddInstanceAdminClient();
         services.AddScoped<IConfigurationPortabilityService, ConfigurationPortabilityService>();
         services.AddScoped<ISchedulerAdminService, SchedulerAdminApiAdapter>();
         services.AddScoped<IExternalApiKeyService, ExternalApiKeyService>();

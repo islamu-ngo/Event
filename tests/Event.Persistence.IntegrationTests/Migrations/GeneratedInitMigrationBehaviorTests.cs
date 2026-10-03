@@ -38,7 +38,8 @@ public sealed class GeneratedInitMigrationBehaviorTests(
             .HasSingleItem();
         await Assert.That(exploreMigrations[0]).EndsWith("_Init");
         await Assert.That(dataProtectionMigrations).HasSingleItem();
-        await Assert.That(authorityMigrations).HasSingleItem();
+        await Assert.That(authorityMigrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
         await Assert.That(dataProtectionMigrations[0]).EndsWith("_Init");
         await Assert.That(authorityMigrations[0]).EndsWith("_Init");
 
@@ -290,9 +291,19 @@ public sealed class GeneratedInitMigrationBehaviorTests(
                   AND routine_schema = 'privacy_erasure_authority'
                   AND privilege_type = 'EXECUTE'
                   AND routine_name IN (
-                      'append_erasure_intent_with_retention',
+                      'append_identity_fenced_erasure',
+                      'read_identity_fenced_intents_after',
                       'read_erasure_intents_after')
-                """)).IsEqualTo(2);
+                """)).IsEqualTo(3);
+            await Assert.That(await ScalarIntAsync(
+                """
+                SELECT count(*)::integer
+                FROM information_schema.role_routine_grants
+                WHERE grantee = 'privacy_erasure_authority_runtime'
+                  AND routine_schema = 'privacy_erasure_authority'
+                  AND privilege_type = 'EXECUTE'
+                  AND routine_name = 'append_erasure_intent_with_retention'
+                """)).IsEqualTo(0);
             await Assert.That(await ScalarIntAsync(
                 """
                 SELECT count(*)::integer

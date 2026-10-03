@@ -233,7 +233,7 @@ internal static class UserPiiInventory
         Local("WebhookProviderPublication.ProviderEventId", "Webhook consumer owner UserId", "Webhook provider publisher", UserPiiDisposition.BoundedRetain,
             "Provider reconciliation", "Webhook publication retention policy"),
         Local("IncomingWebhookMessage._payloadBytes", "Verified webhook principal resolves UserId", "Incoming webhook receiver", UserPiiDisposition.HardDelete),
-        Local("StorageObject.Uri", "StorageObject.ActorId -> Actor.UserId", "Storage upload finalizer", UserPiiDisposition.HardDelete),
+        Local("StorageObject.SourceUri", "StorageObject.ActorId -> Actor.UserId", "Storage upload finalizer", UserPiiDisposition.HardDelete),
         Local("StorageObject.ObjectKey", "StorageObject.ActorId -> Actor.UserId", "Storage upload finalizer", UserPiiDisposition.HardDelete),
         Local("StorageObject.FullName", "StorageObject.ActorId -> Actor.UserId", "Storage upload finalizer", UserPiiDisposition.HardDelete),
         Local("StorageUploadSession.OriginalFileName", "StorageUploadSession.UserId", "CreateStorageUploadSessionCommandHandler", UserPiiDisposition.HardDelete),

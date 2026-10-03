@@ -1423,6 +1423,11 @@ coverage belongs to the existing runtime lanes rather than making the full
 provider matrix an every-PR prerequisite. Explicit MTP coverage arguments in
 `_build-test.yml` produce uniquely named reports, validated before one Codecov
 upload per lane with the `fast` or `runtime` flag. No shell command is intercepted.
+Validation runs only after a coverage-producing test was attempted, including
+failed tests. A restore/build failure before test execution leaves coverage
+unavailable rather than adding a misleading missing-report failure. Artifact
+retention still runs after failures; attempted tests with missing or invalid
+reports still fail validation.
 The weekly/manual `Coverage Evidence` workflow requests all fast selections
 and the established runtime/provider lanes from that reusable workflow.
 

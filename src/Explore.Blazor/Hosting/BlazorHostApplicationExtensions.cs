@@ -5,6 +5,7 @@ using Event.Web.BffHosting.Security;
 using Explore.Blazor.Components;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
+using Explore.Blazor.Services;
 
 namespace Explore.Blazor.Hosting;
 
@@ -69,6 +70,7 @@ public static class BlazorHostApplicationExtensions
         }
 
         app.UseEventBffAdminHostAccessControl();
+        app.UseMiddleware<InstanceAdminHostLandingMiddleware>();
         if (profile == BlazorHostProfile.Split)
         {
             app.ConfigureGracefulShutdown(shutdownState);

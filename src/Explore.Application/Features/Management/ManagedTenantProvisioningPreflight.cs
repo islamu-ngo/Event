@@ -4,7 +4,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Management;
-using Explore.Application.Features.ControlPlane.Plans;
+using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;

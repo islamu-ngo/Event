@@ -1,14 +1,14 @@
 @page "/admin/instance/tenants/{TenantId:guid}/configuration"
 @using Explore.Blazor.Client.Clients
-@using Explore.Blazor.Client.Contracts.ControlPlane
-@using Explore.Blazor.Client.Routing.ControlPlane
-@using Explore.Blazor.Client.Contracts.Services.ControlPlane
+@using Explore.Blazor.Client.Contracts.InstanceAdmin
+@using Explore.Blazor.Client.Routing.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.Services.InstanceAdmin
 @using Explore.Blazor.Client.Components.Forms
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
-@inject IControlPlaneTenantConfigurationService ConfigurationService
-@inject IControlPlanePlanCatalogService PlanCatalog
+@inject IInstanceTenantConfigurationService ConfigurationService
+@inject IInstancePlanCatalogService PlanCatalog
 @inject IAccessibilityFocusService FocusService
 @inject IAccessibilityAnnouncerService Announcer
 
@@ -20,7 +20,7 @@
             <h1>Tenant configuration</h1>
             <p dir="auto">Effective settings and quota usage for tenant <code dir="ltr">@TenantId</code>.</p>
         </div>
-        <AppButton Variant="Variant.Outlined" Href="@ControlPlaneRoutes.Tenants" aria-label="Back to tenants">Back to tenants</AppButton>
+        <AppButton Variant="Variant.Outlined" Href="@InstanceAdminRoutes.Tenants" aria-label="Back to tenants">Back to tenants</AppButton>
     </header>
 
     @if (_loading)
@@ -199,23 +199,23 @@
                                         }
                                         else
                                         {
-                                            @if (ControlPlaneHal.HasLink(setting._links, ControlPlaneLinkRelations.Override))
+                                            @if (InstanceAdminHal.HasLink(setting._links, InstanceAdminLinkRelations.Override))
                                             {
                                                 <AppButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@IsBusy"
                                                            aria-label="@($"Override {setting.Key}")"
                                                            OnClick="@(() => StartEditAsync(setting))">Override</AppButton>
                                             }
-                                            @if (ControlPlaneHal.HasLink(setting._links, ControlPlaneLinkRelations.Lock))
+                                            @if (InstanceAdminHal.HasLink(setting._links, InstanceAdminLinkRelations.Lock))
                                             {
                                                 <AppButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" Disabled="@IsBusy"
                                                            aria-label="@($"Lock {setting.Key}")"
-                                                           OnClick="@(() => RunSettingCommandAsync(setting, ControlPlaneLinkRelations.Lock))">Lock</AppButton>
+                                                           OnClick="@(() => RunSettingCommandAsync(setting, InstanceAdminLinkRelations.Lock))">Lock</AppButton>
                                             }
-                                            @if (ControlPlaneHal.HasLink(setting._links, ControlPlaneLinkRelations.Unlock))
+                                            @if (InstanceAdminHal.HasLink(setting._links, InstanceAdminLinkRelations.Unlock))
                                             {
                                                 <AppButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@IsBusy"
                                                            aria-label="@($"Unlock {setting.Key}")"
-                                                           OnClick="@(() => RunSettingCommandAsync(setting, ControlPlaneLinkRelations.Unlock))">Unlock</AppButton>
+                                                           OnClick="@(() => RunSettingCommandAsync(setting, InstanceAdminLinkRelations.Unlock))">Unlock</AppButton>
                                             }
                                         }
                                     </div>
@@ -260,7 +260,7 @@
     [Parameter] public Guid TenantId { get; set; }
 
     private readonly FormSubmitState _submitState = new();
-    private HalResourceOfControlPlaneTenantEffectiveConfigurationDto? _configuration;
+    private HalResourceOfInstanceTenantEffectiveConfigurationDto? _configuration;
     private IReadOnlyList<PublishedPlanVersion> _publishedPlanVersions = [];
     private bool _loading = true;
     private bool _planCatalogUnavailable;
@@ -278,14 +278,14 @@
 
     private bool IsBusy => _submitState.IsSubmitting;
     private const string LoadError = "Tenant configuration is currently unavailable.";
-    private IReadOnlyList<ControlPlaneTenantEffectiveSettingDto> Settings => _configuration?.Settings?.ToArray() ?? [];
-    private IReadOnlyList<ControlPlaneTenantQuotaUsageDto> Quotas => _configuration?.Quotas?.ToArray() ?? [];
-    private ControlPlaneTenantPlanAssignmentDto? Assignment => _configuration?.PlanAssignment;
-    private ControlPlaneTenantPlanAssignmentDto? RollbackAssignment => _configuration?.RollbackAssignment;
-    private bool CanSwitchPlan => ControlPlaneHal.HasLink(_configuration?._links, ControlPlaneLinkRelations.SwitchPlan);
+    private IReadOnlyList<InstanceTenantEffectiveSettingDto> Settings => _configuration?.Settings?.ToArray() ?? [];
+    private IReadOnlyList<InstanceTenantQuotaUsageDto> Quotas => _configuration?.Quotas?.ToArray() ?? [];
+    private InstanceTenantPlanAssignmentDto? Assignment => _configuration?.PlanAssignment;
+    private InstanceTenantPlanAssignmentDto? RollbackAssignment => _configuration?.RollbackAssignment;
+    private bool CanSwitchPlan => InstanceAdminHal.HasLink(_configuration?._links, InstanceAdminLinkRelations.SwitchPlan);
     private bool CanConfirmAssignment => _assignmentConfirmation is not null
         && string.Equals(_assignmentConfirmationText.Trim(), _assignmentConfirmation.RequiredPhrase, StringComparison.Ordinal);
-    private IEnumerable<IGrouping<string, ControlPlaneTenantEffectiveSettingDto>> GroupedSettings =>
+    private IEnumerable<IGrouping<string, InstanceTenantEffectiveSettingDto>> GroupedSettings =>
         Settings.OrderBy(setting => setting.Category, StringComparer.OrdinalIgnoreCase)
             .ThenBy(setting => setting.Key, StringComparer.OrdinalIgnoreCase)
             .GroupBy(setting => string.IsNullOrWhiteSpace(setting.Category) ? "General" : setting.Category);
@@ -316,7 +316,7 @@
     {
         try
         {
-            HalResourceOfControlPlaneTenantEffectiveConfigurationDto configuration =
+            HalResourceOfInstanceTenantEffectiveConfigurationDto configuration =
                 await ConfigurationService.GetEffectiveConfigurationAsync(requestedTenantId);
             if (!IsTenantRequestCurrent(generation, requestedTenantId))
             {
@@ -371,7 +371,7 @@
     {
         try
         {
-            HalCollectionResourceOfControlPlaneTenantPlanListItemDto catalog = await PlanCatalog.GetPlansAsync();
+            HalCollectionResourceOfInstanceTenantPlanListItemDto catalog = await PlanCatalog.GetPlansAsync();
             if (!IsTenantRequestCurrent(generation, requestedTenantId))
             {
                 return;
@@ -379,10 +379,10 @@
 
             string[] keys = catalog._embedded?.Items?
                 .Where(plan => !string.IsNullOrWhiteSpace(plan.Key)
-                    && ControlPlaneHal.HasLink(plan._links, ControlPlaneLinkRelations.Self))
+                    && InstanceAdminHal.HasLink(plan._links, InstanceAdminLinkRelations.Self))
                 .Select(plan => NormalizePlanKey(plan.Key))
                 .ToArray() ?? [];
-            HalResourceOfControlPlaneTenantPlanDetailDto[] plans = await Task.WhenAll(
+            HalResourceOfInstanceTenantPlanDetailDto[] plans = await Task.WhenAll(
                 keys.Select(key => PlanCatalog.GetPlanAsync(key)));
             if (!IsTenantRequestCurrent(generation, requestedTenantId))
             {
@@ -427,7 +427,7 @@
         }
     }
 
-    private async Task StartEditAsync(ControlPlaneTenantEffectiveSettingDto setting)
+    private async Task StartEditAsync(InstanceTenantEffectiveSettingDto setting)
     {
         long generation = _loadGeneration;
         Guid requestedTenantId = _requestedTenantId;
@@ -462,7 +462,7 @@
         }
     }
 
-    private async Task SaveOverrideAsync(ControlPlaneTenantEffectiveSettingDto setting)
+    private async Task SaveOverrideAsync(InstanceTenantEffectiveSettingDto setting)
     {
         Guid requestedTenantId = _requestedTenantId;
         await RunCommandAsync(
@@ -471,12 +471,12 @@
             closeEditorOnSuccess: true);
     }
 
-    private Task RunSettingCommandAsync(ControlPlaneTenantEffectiveSettingDto setting, string relation)
+    private Task RunSettingCommandAsync(InstanceTenantEffectiveSettingDto setting, string relation)
     {
         Guid requestedTenantId = _requestedTenantId;
         return RunCommandAsync(
             setting,
-            relation == ControlPlaneLinkRelations.Lock
+            relation == InstanceAdminLinkRelations.Lock
                 ? () => ConfigurationService.LockSettingAsync(requestedTenantId, setting.Key)
                 : () => ConfigurationService.UnlockSettingAsync(requestedTenantId, setting.Key),
             closeEditorOnSuccess: false,
@@ -492,8 +492,8 @@
             return;
         }
 
-        ControlPlaneTenantPlanAssignmentDto? assignment = _configuration?.PlanAssignment;
-        ControlPlaneTenantPlanAssignmentDto? rollbackAssignment = _configuration?.RollbackAssignment;
+        InstanceTenantPlanAssignmentDto? assignment = _configuration?.PlanAssignment;
+        InstanceTenantPlanAssignmentDto? rollbackAssignment = _configuration?.RollbackAssignment;
         PublishedPlanVersion? target = operation == AssignmentOperation.Switch
             ? _publishedPlanVersions.FirstOrDefault(option => option.Id == _selectedPlanVersionId)
             : null;
@@ -622,7 +622,7 @@
     }
 
     private async Task RunCommandAsync(
-        ControlPlaneTenantEffectiveSettingDto setting,
+        InstanceTenantEffectiveSettingDto setting,
         Func<Task<BaseCommandResponseOfGuid>> command,
         bool closeEditorOnSuccess,
         bool saveFocus = false)
@@ -718,18 +718,18 @@
         }
     }
 
-    private static bool HasActions(ControlPlaneTenantEffectiveSettingDto setting) =>
-        setting.IsSensitive != true && (ControlPlaneHal.HasLink(setting._links, ControlPlaneLinkRelations.Override)
-            || ControlPlaneHal.HasLink(setting._links, ControlPlaneLinkRelations.Lock)
-            || ControlPlaneHal.HasLink(setting._links, ControlPlaneLinkRelations.Unlock));
+    private static bool HasActions(InstanceTenantEffectiveSettingDto setting) =>
+        setting.IsSensitive != true && (InstanceAdminHal.HasLink(setting._links, InstanceAdminLinkRelations.Override)
+            || InstanceAdminHal.HasLink(setting._links, InstanceAdminLinkRelations.Lock)
+            || InstanceAdminHal.HasLink(setting._links, InstanceAdminLinkRelations.Unlock));
 
-    private bool CanApplyAssignment(ControlPlaneTenantPlanAssignmentDto assignment) =>
+    private bool CanApplyAssignment(InstanceTenantPlanAssignmentDto assignment) =>
         assignment.Id is { } id
-        && ControlPlaneHal.HasLinkForResource(_configuration?._links, ControlPlaneLinkRelations.Apply, id);
+        && InstanceAdminHal.HasLinkForResource(_configuration?._links, InstanceAdminLinkRelations.Apply, id);
 
-    private bool CanRollbackAssignment(ControlPlaneTenantPlanAssignmentDto assignment) =>
+    private bool CanRollbackAssignment(InstanceTenantPlanAssignmentDto assignment) =>
         assignment.Id is { } id
-        && ControlPlaneHal.HasLinkForResource(_configuration?._links, ControlPlaneLinkRelations.Rollback, id);
+        && InstanceAdminHal.HasLinkForResource(_configuration?._links, InstanceAdminLinkRelations.Rollback, id);
 
     private bool IsCurrentAssignmentConfirmation(AssignmentConfirmation confirmation)
     {
@@ -827,8 +827,8 @@
         public static AssignmentConfirmation Create(
             AssignmentOperation operation,
             Guid tenantId,
-            ControlPlaneTenantPlanAssignmentDto? assignment,
-            ControlPlaneTenantPlanAssignmentDto? rollbackAssignment,
+            InstanceTenantPlanAssignmentDto? assignment,
+            InstanceTenantPlanAssignmentDto? rollbackAssignment,
             PublishedPlanVersion? target) =>
             operation == AssignmentOperation.Switch
                 ? new(operation, tenantId, null, target!.Id, target.Label)

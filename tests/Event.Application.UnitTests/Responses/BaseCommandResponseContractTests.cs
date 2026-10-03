@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.DTOs.ControlPlane;
+using Explore.Application.DTOs.InstanceAdmin;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.StorageObject;
@@ -55,7 +55,7 @@ public sealed class BaseCommandResponseContractTests
     private static readonly Type[] RegisteredResponseTypes =
     [
         typeof(BaseCommandResponse<Guid>),
-        typeof(BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>),
+        typeof(BaseCommandResponse<InstanceTenantLifecycleTransitionDto>),
         typeof(BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>),
         typeof(BaseCommandResponse<StorageUploadSessionDto>),
         .. WireDescendantTypes,

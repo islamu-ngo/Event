@@ -1,0 +1,45 @@
+<header class="control-plane-page-header">
+    <div class="control-plane-page-header__content">
+        @if (!string.IsNullOrWhiteSpace(Eyebrow))
+        {
+            <p class="control-plane-page-header__eyebrow">@Eyebrow</p>
+        }
+
+        @if (IsSection)
+        {
+            <h2 class="control-plane-page-header__title">@Title</h2>
+        }
+        else
+        {
+            <h1 class="control-plane-page-header__title">@Title</h1>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Description))
+        {
+            <p class="control-plane-page-header__description" dir="auto">@Description</p>
+        }
+
+        @if (MetaContent is not null)
+        {
+            <div class="control-plane-page-header__meta">
+                @MetaContent
+            </div>
+        }
+    </div>
+
+    @if (ActionsContent is not null)
+    {
+        <div class="control-plane-page-header__actions">
+            @ActionsContent
+        </div>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool IsSection { get; set; }
+    [Parameter] public string? Eyebrow { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? MetaContent { get; set; }
+    [Parameter] public RenderFragment? ActionsContent { get; set; }
+}

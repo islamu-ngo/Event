@@ -5,7 +5,7 @@ using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Models.Responses;
 using Explore.Blazor.Client.Pages.Onboarding;
-using Explore.Blazor.Client.Routing.ControlPlane;
+using Explore.Blazor.Client.Routing.InstanceAdmin;
 
 namespace Explore.Blazor.Client.Tests.Pages.Onboarding;
 
@@ -192,7 +192,7 @@ public sealed class TenantOnboardingTests : IDisposable
     }
 
     [Test]
-    public async Task PlatformAdministratorOnly_CanCompleteAndUsesControlPlaneHandoff()
+    public async Task PlatformAdministratorOnly_CanCompleteAndUsesInstanceHandoff()
     {
         Guid tenantId = Guid.NewGuid();
         _tenantOnboardingService.GetStatusAsync().Returns(
@@ -215,7 +215,7 @@ public sealed class TenantOnboardingTests : IDisposable
         {
             RequireContains(cut.Markup, "Tenant onboarding is complete");
             RequireContains(cut.Markup, "Open control plane");
-            RequireContains(cut.Markup, $"href=\"{ControlPlaneRoutes.Overview}\"");
+            RequireContains(cut.Markup, $"href=\"{InstanceAdminRoutes.Overview}\"");
             RequireContains(cut.Markup, "href=\"/events\"");
             RequireDoesNotContain(cut.Markup, "/settings/admin");
         });
@@ -268,7 +268,7 @@ public sealed class TenantOnboardingTests : IDisposable
             RequireAlertContains(cut, safeMessage);
             RequireDoesNotContain(cut.Markup, "Tenant onboarding is complete");
             RequireDoesNotContain(cut.Markup, "/settings/admin");
-            RequireDoesNotContain(cut.Markup, ControlPlaneRoutes.Overview);
+            RequireDoesNotContain(cut.Markup, InstanceAdminRoutes.Overview);
         });
 
         _ = _tenantOnboardingService.Received(2).GetStatusAsync();

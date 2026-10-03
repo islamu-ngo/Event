@@ -13,7 +13,7 @@ using Explore.Application.DTOs.Admissions;
 using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.Category;
-using Explore.Application.DTOs.ControlPlane;
+using Explore.Application.DTOs.InstanceAdmin;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.DTOs.CustomPropertyGovernance;
 using Explore.Application.DTOs.CustomPropertyProjection;
@@ -230,16 +230,16 @@ public static class HateoasAssemblerRegistration
         services.AddHalResource<SchedulerAdminOverviewDto, SchedulerAdminOverviewLinkPolicy, SchedulerAdminOverviewCollectionLinkPolicy>();
         services.AddHalResource<SchedulerAdminJobDto, SchedulerAdminJobLinkPolicy, SchedulerAdminJobCollectionLinkPolicy>();
 
-        services.AddHalResource<ControlPlaneOverviewDto, ControlPlaneOverviewLinkPolicy, ControlPlaneOverviewCollectionLinkPolicy>();
+        services.AddHalResource<InstanceOverviewDto, InstanceOverviewLinkPolicy, InstanceOverviewCollectionLinkPolicy>();
         services.AddHalResource<LocalIdentitySummary, LocalIdentityDetailLinkPolicy, LocalIdentityCollectionLinkPolicy>();
         services.AddHalResource<LocalCredentialOperationStatus, LocalCredentialOperationDetailLinkPolicy, LocalCredentialOperationCollectionLinkPolicy>();
         services.AddHalResource<LocalCredentialIssueDto, LocalCredentialIssueDetailLinkPolicy, LocalCredentialIssueCollectionLinkPolicy>();
-        services.AddHalResource<ControlPlaneDomainOverviewDto, ControlPlaneDomainLinkPolicy, ControlPlaneDomainCollectionLinkPolicy>();
-        services.AddHalResource<ControlPlaneOperationsDto, ControlPlaneOperationsLinkPolicy, ControlPlaneOperationsCollectionLinkPolicy>();
-        services.AddHalResource<ControlPlaneDeploymentModeRunbookDto, ControlPlaneDeploymentModeRunbookLinkPolicy, ControlPlaneDeploymentModeRunbookCollectionLinkPolicy>();
-        services.AddHalResource<ControlPlaneTenantDetailDto, ControlPlaneTenantListItemDto, ControlPlaneTenantDetailLinkPolicy, ControlPlaneTenantCollectionLinkPolicy>();
-        services.AddHalResourceWithAssembler<ControlPlaneTenantPlanDetailDto, ControlPlaneTenantPlanListItemDto, ControlPlaneTenantPlanDetailLinkPolicy, ControlPlaneTenantPlanCollectionLinkPolicy, ControlPlaneTenantPlanResourceAssembler>();
-        services.AddHalResourceWithAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationLinkPolicy, ControlPlaneTenantEffectiveConfigurationCollectionLinkPolicy, ControlPlaneTenantEffectiveConfigurationResourceAssembler>();
+        services.AddHalResource<InstanceDomainOverviewDto, InstanceDomainLinkPolicy, InstanceDomainCollectionLinkPolicy>();
+        services.AddHalResource<InstanceOperationsDto, InstanceOperationsLinkPolicy, InstanceOperationsCollectionLinkPolicy>();
+        services.AddHalResource<InstanceDeploymentModeRunbookDto, InstanceDeploymentModeRunbookLinkPolicy, InstanceDeploymentModeRunbookCollectionLinkPolicy>();
+        services.AddHalResource<InstanceTenantDetailDto, InstanceTenantListItemDto, InstanceTenantDetailLinkPolicy, InstanceTenantCollectionLinkPolicy>();
+        services.AddHalResourceWithAssembler<InstanceTenantPlanDetailDto, InstanceTenantPlanListItemDto, InstanceTenantPlanDetailLinkPolicy, InstanceTenantPlanCollectionLinkPolicy, InstanceTenantPlanResourceAssembler>();
+        services.AddHalResourceWithAssembler<InstanceTenantEffectiveConfigurationDto, InstanceTenantEffectiveConfigurationLinkPolicy, InstanceTenantEffectiveConfigurationCollectionLinkPolicy, InstanceTenantEffectiveConfigurationResourceAssembler>();
 
         services.AddHalResource<InstanceOnboardingStatusDto, InstanceOnboardingStatusLinkPolicy, InstanceOnboardingStatusCollectionLinkPolicy>();
         services.AddHalResource<InstanceOnboardingJourneyDto, InstanceOnboardingJourneyLinkPolicy, InstanceOnboardingJourneyCollectionLinkPolicy>();

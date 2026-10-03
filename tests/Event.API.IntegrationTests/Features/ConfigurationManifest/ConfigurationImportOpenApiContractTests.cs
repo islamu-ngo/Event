@@ -13,7 +13,7 @@ public sealed class ConfigurationImportOpenApiContractTests(
 {
     private const string OpenApiEndpoint = "/openapi/islamu-event.json";
     private const string InstancePath =
-        "/api/control-plane/configuration-import/sessions";
+        "/api/admin/instance/configuration-import/sessions";
     private const string TenantPath =
         "/api/tenants/{tenantId}/configuration-import/sessions";
 

@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using Explore.Blazor.Client.Clients;
-using Explore.Blazor.Client.Contracts.ControlPlane;
-using Explore.Blazor.Client.Routing.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
+using Explore.Blazor.Client.Routing.InstanceAdmin;
 using Explore.Blazor.Services.Preferences;
 
 namespace Explore.Blazor.Extensions;
@@ -55,7 +55,7 @@ public static class BffConfigurationManifestEndpoints
             if (status.TenantId != tenantId
                 || !HasGetCapability(
                     status._links,
-                    ControlPlaneLinkRelations.ExportTenantConfigurationPackage))
+                    InstanceAdminLinkRelations.ExportTenantConfigurationPackage))
             {
                 return Results.Problem(
                     title: "Tenant configuration export unavailable",
@@ -111,8 +111,8 @@ public static class BffConfigurationManifestEndpoints
     private static async Task<IResult> HandleDownloadAsync(
         ConfigurationManifestExportView? view,
         HttpContext context,
-        IControlPlaneClient controlPlaneClient,
-        IControl_Plane_ConfigurationClient controlPlaneConfigurationClient,
+        IInstanceAdminClient controlPlaneClient,
+        IInstance_ConfigurationClient controlPlaneConfigurationClient,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -127,14 +127,14 @@ public static class BffConfigurationManifestEndpoints
 
         try
         {
-            HalResourceOfControlPlaneOverviewDto overview =
-                await controlPlaneClient.GetControlPlaneOverviewAsync(
+            HalResourceOfInstanceOverviewDto overview =
+                await controlPlaneClient.GetInstanceAdminOverviewAsync(
                     cancellationToken: cancellationToken);
             if (!HasGetCapability(overview, relation))
             {
                 return Results.Problem(
                     title: "Configuration manifest export unavailable",
-                    detail: "The current control-plane capabilities do not permit this export.",
+                    detail: "The current instance administration capabilities do not permit this export.",
                     statusCode: StatusCodes.Status403Forbidden);
             }
 
@@ -191,7 +191,7 @@ public static class BffConfigurationManifestEndpoints
     }
 
     private static bool HasGetCapability(
-        HalResourceOfControlPlaneOverviewDto overview,
+        HalResourceOfInstanceOverviewDto overview,
         string relation) =>
         HasGetCapability(overview._links, relation);
 
@@ -205,9 +205,9 @@ public static class BffConfigurationManifestEndpoints
         view switch
         {
             ConfigurationManifestExportView.Overrides =>
-                ControlPlaneLinkRelations.ExportConfigurationOverrides,
+                InstanceAdminLinkRelations.ExportConfigurationOverrides,
             ConfigurationManifestExportView.Portable =>
-                ControlPlaneLinkRelations.ExportConfigurationPortable,
+                InstanceAdminLinkRelations.ExportConfigurationPortable,
             _ => throw new ArgumentOutOfRangeException(nameof(view), view, "Unsupported export view.")
         };
 

@@ -1,7 +1,7 @@
-using Explore.Blazor.Client.Contracts.ControlPlane;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
-using Explore.Blazor.Client.Routing.ControlPlane;
-using Explore.Blazor.Client.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
+using Explore.Blazor.Client.Routing.InstanceAdmin;
+using Explore.Blazor.Client.Services.InstanceAdmin;
 
 namespace Explore.Blazor.Client.Tests.Services;
 
@@ -10,10 +10,10 @@ public sealed class ConfigurationManifestExportServiceTests
     [Test]
     public async Task Download_WithHalCapabilityUsesFixedBffRouteAndIgnoresRawApiHref()
     {
-        var overviewService = Substitute.For<IControlPlaneOverviewService>();
+        var overviewService = Substitute.For<IInstanceOverviewService>();
         overviewService.GetOverviewAsync(Arg.Any<CancellationToken>())
             .Returns(Overview(
-                ControlPlaneLinkRelations.ExportConfigurationOverrides,
+                InstanceAdminLinkRelations.ExportConfigurationOverrides,
                 "https://attacker.example/export?access_token=raw-secret"));
         var browser = Substitute.For<IBrowserActionInterop>();
         browser.DownloadFileFromUrlAsync(
@@ -42,11 +42,11 @@ public sealed class ConfigurationManifestExportServiceTests
     [Test]
     public async Task Download_PreservesConfiguredApplicationPathBase()
     {
-        var overviewService = Substitute.For<IControlPlaneOverviewService>();
+        var overviewService = Substitute.For<IInstanceOverviewService>();
         overviewService.GetOverviewAsync(Arg.Any<CancellationToken>())
             .Returns(Overview(
-                ControlPlaneLinkRelations.ExportConfigurationPortable,
-                "/api/control-plane/configuration-manifest/export?view=Portable"));
+                InstanceAdminLinkRelations.ExportConfigurationPortable,
+                "/api/admin/instance/configuration-manifest/export?view=Portable"));
         var browser = Substitute.For<IBrowserActionInterop>();
         browser.DownloadFileFromUrlAsync(
                 Arg.Any<string>(),
@@ -69,7 +69,7 @@ public sealed class ConfigurationManifestExportServiceTests
     [Test]
     public async Task Download_WithoutMatchingHalCapabilityDoesNotInvokeBrowser()
     {
-        var overviewService = Substitute.For<IControlPlaneOverviewService>();
+        var overviewService = Substitute.For<IInstanceOverviewService>();
         overviewService.GetOverviewAsync(Arg.Any<CancellationToken>())
             .Returns(Overview());
         var browser = Substitute.For<IBrowserActionInterop>();
@@ -87,7 +87,7 @@ public sealed class ConfigurationManifestExportServiceTests
             Arg.Any<CancellationToken>());
     }
 
-    private static HalResourceOfControlPlaneOverviewDto Overview(
+    private static HalResourceOfInstanceOverviewDto Overview(
         string? relation = null,
         string? href = null) =>
         new()

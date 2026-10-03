@@ -26,7 +26,7 @@ namespace Event.Api.IntegrationTests.Features;
 [NotInParallel("ApiTestFixture")]
 public sealed class NativeConfigurationManifestHttpTests
 {
-    private const string InstanceExportPath = "/api/control-plane/configuration-manifest/export";
+    private const string InstanceExportPath = "/api/admin/instance/configuration-manifest/export";
     private static readonly Guid TenantId = PlatformDefaults.DefaultTenantId;
     private static readonly string ExportPath = $"/api/tenants/{TenantId:D}/configuration-package/export";
     private static readonly string SessionsPath = $"/api/tenants/{TenantId:D}/configuration-import/sessions";

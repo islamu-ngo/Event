@@ -1,6 +1,6 @@
-using Explore.Blazor.Client.Contracts.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Pages.Admin.Instance;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 
@@ -9,7 +9,7 @@ namespace Explore.Blazor.Client.Tests.Pages.Admin;
 public sealed class InstanceTenantsSectionTests : IDisposable
 {
     private readonly BlazorTestContext _ctx = new();
-    private readonly IControlPlaneTenantService _tenantService = Substitute.For<IControlPlaneTenantService>();
+    private readonly IInstanceTenantService _tenantService = Substitute.For<IInstanceTenantService>();
     private readonly IAccessibilityFocusService _focusService = Substitute.For<IAccessibilityFocusService>();
 
     public InstanceTenantsSectionTests()
@@ -48,13 +48,13 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task StateSpecificHalLinks_ShowAllSupportedLifecycleActions()
     {
-        var provisioningTenant = Tenant("Provisioning Mosque", "provisioning", "Provisioning", ControlPlaneLinkRelations.Activate);
+        var provisioningTenant = Tenant("Provisioning Mosque", "provisioning", "Provisioning", InstanceAdminLinkRelations.Activate);
         ReturnTenants(
             provisioningTenant,
-            Tenant("Active Mosque", "active", "Active", ControlPlaneLinkRelations.Suspend),
-            Tenant("Suspended Mosque", "suspended", "Suspended", ControlPlaneLinkRelations.Reactivate),
-            Tenant("Archivable Mosque", "archivable", "Active", ControlPlaneLinkRelations.Archive),
-            Tenant("Archived Mosque", "archived", "Archived", ControlPlaneLinkRelations.SchedulePurge));
+            Tenant("Active Mosque", "active", "Active", InstanceAdminLinkRelations.Suspend),
+            Tenant("Suspended Mosque", "suspended", "Suspended", InstanceAdminLinkRelations.Reactivate),
+            Tenant("Archivable Mosque", "archivable", "Active", InstanceAdminLinkRelations.Archive),
+            Tenant("Archived Mosque", "archived", "Archived", InstanceAdminLinkRelations.SchedulePurge));
 
         var cut = RenderSection();
 
@@ -75,7 +75,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task ConfigurationNavigation_RequiresItemHalLink()
     {
-        var configurable = Tenant("Configurable Mosque", "configurable", "Active", ControlPlaneLinkRelations.Configuration);
+        var configurable = Tenant("Configurable Mosque", "configurable", "Active", InstanceAdminLinkRelations.Configuration);
         var hidden = Tenant("Hidden Mosque", "hidden", "Active");
         ReturnTenants(configurable, hidden);
 
@@ -91,7 +91,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task LoadingResult_ThenEmptyResult_RenderMigrationStates()
     {
-        var pending = new TaskCompletionSource<HalCollectionResourceOfControlPlaneTenantListItemDto>();
+        var pending = new TaskCompletionSource<HalCollectionResourceOfInstanceTenantListItemDto>();
         _tenantService.GetTenantsAsync(Arg.Any<CancellationToken>()).Returns(pending.Task);
 
         var loading = RenderSection();
@@ -105,7 +105,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     public async Task ApiFailure_RendersSafeProblemMessage()
     {
         _tenantService.GetTenantsAsync(Arg.Any<CancellationToken>())
-            .Returns<Task<HalCollectionResourceOfControlPlaneTenantListItemDto>>(_ =>
+            .Returns<Task<HalCollectionResourceOfInstanceTenantListItemDto>>(_ =>
                 throw new ApiException("forbidden", 403, null, new Dictionary<string, IEnumerable<string>>(), null));
         var failed = RenderSection();
         failed.WaitForAssertion(() => failed.Find("[role='alert']"));
@@ -117,7 +117,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     public async Task ThrownLoad_RendersSafeProblemWithoutRawException()
     {
         _tenantService.GetTenantsAsync(Arg.Any<CancellationToken>())
-            .Returns<Task<HalCollectionResourceOfControlPlaneTenantListItemDto>>(_ => throw new InvalidOperationException("raw load secret"));
+            .Returns<Task<HalCollectionResourceOfInstanceTenantListItemDto>>(_ => throw new InvalidOperationException("raw load secret"));
         var thrown = RenderSection();
         thrown.WaitForAssertion(() => thrown.Find("[role='alert']"));
         await Assert.That(thrown.Markup).Contains("Tenant data is currently unavailable.");
@@ -128,7 +128,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     public async Task CreateAffordance_RequiresCollectionHalLink_ValidInputAndManagesFocus()
     {
         ReturnTenantsWithCollectionLinks([Tenant("Central Mosque", "central", "Active")],
-            ControlPlaneLinkRelations.Create);
+            InstanceAdminLinkRelations.Create);
         var cut = RenderSection();
         cut.WaitForAssertion(() => cut.Find("button[aria-label='Create tenant']"));
         await Assert.That(cut.Find("button[aria-label='Create tenant']").Id).IsEqualTo("instance-tenants-create-trigger");
@@ -160,7 +160,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task CreateSuccess_SubmitsTrimmedTypedRequestReloadsAndRestoresFocus()
     {
-        ReturnTenantsWithCollectionLinks([], ControlPlaneLinkRelations.Create);
+        ReturnTenantsWithCollectionLinks([], InstanceAdminLinkRelations.Create);
         _tenantService.CreateTenantAsync(
                 Arg.Is<CreateTenantDto>(request =>
                     request != null
@@ -196,7 +196,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task CreateFailure_ShowsSafeResultKeepsFormAndDoesNotReload()
     {
-        ReturnTenantsWithCollectionLinks([], ControlPlaneLinkRelations.Create);
+        ReturnTenantsWithCollectionLinks([], InstanceAdminLinkRelations.Create);
         var pending = new TaskCompletionSource<BaseCommandResponseOfGuid>(TaskCreationOptions.RunContinuationsAsynchronously);
         _tenantService.CreateTenantAsync(Arg.Any<CreateTenantDto>(), Arg.Any<CancellationToken>())
             .Returns(pending.Task);
@@ -238,7 +238,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task ActivateSuccess_CallsLifecycleServiceAndReloads()
     {
-        var tenant = Tenant("Provisioning Mosque", "provisioning", "Provisioning", ControlPlaneLinkRelations.Activate);
+        var tenant = Tenant("Provisioning Mosque", "provisioning", "Provisioning", InstanceAdminLinkRelations.Activate);
         ReturnTenants(tenant);
         _tenantService.ActivateTenantAsync(TenantId(tenant), null, Arg.Any<CancellationToken>())
             .Returns(LifecycleResult(true, "Tenant activated."));
@@ -258,7 +258,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task SuspendReasonFlow_RequiresReasonAndReloadsAfterTrimmedReasonSucceeds()
     {
-        var tenant = Tenant("Active Mosque", "active", "Active", ControlPlaneLinkRelations.Suspend);
+        var tenant = Tenant("Active Mosque", "active", "Active", InstanceAdminLinkRelations.Suspend);
         ReturnTenants(tenant);
         _tenantService.SuspendTenantAsync(TenantId(tenant), "maintenance window", Arg.Any<CancellationToken>())
             .Returns(LifecycleResult(true, "Tenant suspended."));
@@ -287,7 +287,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task ArchiveReasonFlow_FailureUsesTrimmedReasonAndDoesNotReload()
     {
-        var tenant = Tenant("Active Mosque", "active", "Active", ControlPlaneLinkRelations.Archive);
+        var tenant = Tenant("Active Mosque", "active", "Active", InstanceAdminLinkRelations.Archive);
         ReturnTenants(tenant);
         _tenantService.ArchiveTenantAsync(TenantId(tenant), "contract ended", Arg.Any<CancellationToken>())
             .Returns(LifecycleResult(false, "Tenant cannot be archived.", "control_plane_conflict"));
@@ -306,7 +306,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task PurgeRequiresNonblankReasonAndExactCaseSensitiveSlug()
     {
-        ReturnTenants(Tenant("Archived Mosque", "Archived-Mosque", "Archived", ControlPlaneLinkRelations.SchedulePurge));
+        ReturnTenants(Tenant("Archived Mosque", "Archived-Mosque", "Archived", InstanceAdminLinkRelations.SchedulePurge));
         var cut = RenderSection();
         cut.WaitForAssertion(() => cut.Find("button[aria-label='Schedule purge for Archived Mosque']"));
 
@@ -329,7 +329,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task PurgeWithEmptyTenantSlug_RemainsDisabled()
     {
-        ReturnTenants(Tenant("Malformed Tenant", string.Empty, "Archived", ControlPlaneLinkRelations.SchedulePurge));
+        ReturnTenants(Tenant("Malformed Tenant", string.Empty, "Archived", InstanceAdminLinkRelations.SchedulePurge));
         var cut = RenderSection();
         cut.WaitForAssertion(() => cut.Find("button[aria-label='Schedule purge for Malformed Tenant']"));
 
@@ -343,7 +343,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task ConfirmedPurge_CallsSchedulePurgeAndReloadsOnlyAfterSuccess()
     {
-        var tenant = Tenant("Archived Mosque", "archived-mosque", "Archived", ControlPlaneLinkRelations.SchedulePurge);
+        var tenant = Tenant("Archived Mosque", "archived-mosque", "Archived", InstanceAdminLinkRelations.SchedulePurge);
         ReturnTenants(tenant);
         _tenantService.ScheduleTenantPurgeAsync(
                 TenantId(tenant),
@@ -372,7 +372,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     [Test]
     public async Task LifecycleFailure_ShowsSafeErrorAndDoesNotReload()
     {
-        var tenant = Tenant("Suspended Mosque", "suspended", "Suspended", ControlPlaneLinkRelations.Reactivate);
+        var tenant = Tenant("Suspended Mosque", "suspended", "Suspended", InstanceAdminLinkRelations.Reactivate);
         ReturnTenants(tenant);
         _tenantService.ReactivateTenantAsync(TenantId(tenant), null, Arg.Any<CancellationToken>())
             .Returns(LifecycleResult(false, "Reactivation is currently blocked.", "control_plane_conflict"));
@@ -391,7 +391,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     {
         ReturnTenants(Tenant("Central Mosque", "central", "Active"));
 
-        var cut = _ctx.Render<InstanceTenants>();
+        var cut = _ctx.Render<InstanceTenantsPage>();
 
         cut.WaitForAssertion(() => cut.Find("h1").TextContent.Equals("Tenant Management", StringComparison.Ordinal));
         await Assert.That(cut.Markup).Contains("Central Mosque");
@@ -399,17 +399,17 @@ public sealed class InstanceTenantsSectionTests : IDisposable
 
     private IRenderedComponent<InstanceTenantsSection> RenderSection() => _ctx.RenderMudComponent<InstanceTenantsSection>();
 
-    private void ReturnTenants(params HalResourceOfControlPlaneTenantListItemDto[] tenants) =>
+    private void ReturnTenants(params HalResourceOfInstanceTenantListItemDto[] tenants) =>
         _tenantService.GetTenantsAsync(Arg.Any<CancellationToken>())
             .Returns(TenantCollection(tenants));
 
     private void ReturnTenantsWithCollectionLinks(
-        IReadOnlyList<HalResourceOfControlPlaneTenantListItemDto> tenants,
+        IReadOnlyList<HalResourceOfInstanceTenantListItemDto> tenants,
         params string[] relations) =>
         _tenantService.GetTenantsAsync(Arg.Any<CancellationToken>())
             .Returns(TenantCollection(tenants, Links(relations)));
 
-    private static HalResourceOfControlPlaneTenantListItemDto Tenant(
+    private static HalResourceOfInstanceTenantListItemDto Tenant(
         string name,
         string slug,
         string status,
@@ -423,16 +423,16 @@ public sealed class InstanceTenantsSectionTests : IDisposable
             _links = Links(relations)
         };
 
-    private static HalCollectionResourceOfControlPlaneTenantListItemDto TenantCollection(
-        IReadOnlyCollection<HalResourceOfControlPlaneTenantListItemDto> tenants,
+    private static HalCollectionResourceOfInstanceTenantListItemDto TenantCollection(
+        IReadOnlyCollection<HalResourceOfInstanceTenantListItemDto> tenants,
         IReadOnlyDictionary<string, HalLink>? links = null) => new()
         {
             TotalCount = tenants.Count,
-            _embedded = new HalCollectionEmbeddedOfControlPlaneTenantListItemDto { Items = tenants.ToArray() },
+            _embedded = new HalCollectionEmbeddedOfInstanceTenantListItemDto { Items = tenants.ToArray() },
             _links = links is null ? null : new Dictionary<string, HalLink>(links)
         };
 
-    private static Guid TenantId(HalResourceOfControlPlaneTenantListItemDto tenant) => tenant.Id.GetValueOrDefault();
+    private static Guid TenantId(HalResourceOfInstanceTenantListItemDto tenant) => tenant.Id.GetValueOrDefault();
 
     private static BaseCommandResponseOfGuid CreateResult(bool success, string message, string? failureCode = null) => new()
     {
@@ -441,7 +441,7 @@ public sealed class InstanceTenantsSectionTests : IDisposable
         FailureCode = failureCode
     };
 
-    private static BaseCommandResponseOfControlPlaneTenantLifecycleTransitionDto LifecycleResult(
+    private static BaseCommandResponseOfInstanceTenantLifecycleTransitionDto LifecycleResult(
         bool success,
         string message,
         string? failureCode = null) => new()
@@ -454,6 +454,6 @@ public sealed class InstanceTenantsSectionTests : IDisposable
     private static Dictionary<string, HalLink> Links(params string[] relations) =>
         relations.ToDictionary(
             relation => relation,
-            relation => new HalLink { Href = $"/api/admin/control-plane/tenants/{relation}", Method = "POST" },
+            relation => new HalLink { Href = $"/api/admin/instance/tenants/{relation}", Method = "POST" },
             StringComparer.OrdinalIgnoreCase);
 }

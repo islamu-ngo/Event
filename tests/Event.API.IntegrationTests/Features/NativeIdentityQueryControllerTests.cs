@@ -79,7 +79,7 @@ public sealed class NativeIdentityQueryControllerTests
         await Assert.That(await query.QueryAsync(request, CancellationToken.None)).IsEqualTo(LinkedUser);
 
         Type[] callers = [
-            typeof(AdminCacheDiagnosticsController), typeof(ControlPlaneTenantConfigurationController), typeof(GroupController),
+            typeof(AdminCacheDiagnosticsController), typeof(InstanceTenantConfigurationController), typeof(GroupController),
             typeof(InstanceAuthenticationSettingsController), typeof(InstanceAuthorizationSettingsController),
             typeof(InstanceGovernanceSettingsController), typeof(InstanceMessagingSettingsController),
             typeof(InstanceModerationReportingSettingsController), typeof(InstanceOnboardingController),

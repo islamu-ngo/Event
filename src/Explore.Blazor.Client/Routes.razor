@@ -1,8 +1,7 @@
 @using Blazouter.Models
 @using Blazouter.Enums
 @using Blazouter.Interfaces
-@using Explore.Blazor.Client.Pages.Admin.Instance.ControlPlane
-@using Explore.Blazor.Client.Routing.ControlPlane
+@using Explore.Blazor.Client.Routing.InstanceAdmin
 @using Explore.Blazor.Client.Routing
 @using Explore.Blazor.Client.Layout
 @using Explore.Blazor.Client.Pages
@@ -52,7 +51,7 @@
     private static List<Type> RequireAuthenticated() => [typeof(AuthenticatedRouteGuard)];
     private static List<Type> RequireMultiTenantOnboarding() => [typeof(MultiTenantOnboardingRouteGuard)];
     private static List<Type> RequireAdmin() => [typeof(AdminRouteGuard)];
-    private static List<Type> RequireMultiTenantAdmin() => [typeof(AdminRouteGuard), typeof(MultiTenantControlPlaneRouteGuard)];
+    private static List<Type> RequireMultiTenantAdmin() => [typeof(AdminRouteGuard), typeof(MultiTenantInstanceAdminRouteGuard)];
     private static List<Type> RequireTenantAdmin() => [typeof(TenantAdminRouteGuard)];
     private static List<Type> RequireOrgAdmin() => [typeof(OrgAdminRouteGuard)];
     private static List<Type> RequireGroupAdmin() => [typeof(GroupAdminRouteGuard)];
@@ -168,15 +167,13 @@
             new RouteConfig { Path = "/admin/organization/:organizationId", Component = typeof(AdminListDetails), Transition = RouteTransition.Fade, Guards = RequireAdmin() },
 
             // Admin settings routes
-            new RouteConfig { Path = ControlPlaneRoutes.Overview, Component = typeof(ControlPlaneOverviewPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
-            new RouteConfig { Path = ControlPlaneRoutes.Tenants, Component = typeof(InstanceTenants), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
-            new RouteConfig { Path = ControlPlaneRoutes.TenantConfiguration, Component = typeof(InstanceTenantConfiguration), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
-            new RouteConfig { Path = ControlPlaneRoutes.Plans, Component = typeof(InstancePlans), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
-            new RouteConfig { Path = "/admin/instance/plans/:Key", Component = typeof(InstancePlanDetail), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
-            new RouteConfig { Path = ControlPlaneRoutes.Domains, Component = typeof(ControlPlaneDomainsPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
-            new RouteConfig { Path = ControlPlaneRoutes.Operations, Component = typeof(ControlPlaneOperationsPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
-             new RouteConfig { Path = "/settings/instance", Component = typeof(InstanceAdminSettings), Transition = RouteTransition.Fade, Guards = RequireAdmin() },
-             new RouteConfig { Path = "/settings/admin", Component = typeof(TenantAdminSettings), Transition = RouteTransition.Fade, Guards = RequireTenantAdmin() },
+            new RouteConfig { Path = InstanceAdminRoutes.Root, Component = typeof(AdminSettingsPage), Transition = RouteTransition.Fade, Guards = RequireAdmin() },
+            new RouteConfig { Path = InstanceAdminRoutes.Tenants, Component = typeof(InstanceTenantsPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
+            new RouteConfig { Path = InstanceAdminRoutes.TenantConfiguration, Component = typeof(InstanceTenantConfiguration), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
+            new RouteConfig { Path = InstanceAdminRoutes.Plans, Component = typeof(InstanceTenantPlansPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
+            new RouteConfig { Path = "/admin/instance/plans/:Key", Component = typeof(InstanceTenantPlanDetailPage), Transition = RouteTransition.Fade, Guards = RequireMultiTenantAdmin() },
+             new RouteConfig { Path = "/settings/instance", Component = typeof(AdminSettingsPage), Transition = RouteTransition.Fade, Guards = RequireAdmin() },
+             new RouteConfig { Path = "/settings/admin", Component = typeof(AdminSettingsPage), Transition = RouteTransition.Fade, Guards = RequireTenantAdmin() },
              new RouteConfig { Path = "/settings/organization/:OrganizationId", Component = typeof(OrganizationAdminSettings), Transition = RouteTransition.Fade, Guards = RequireOrgAdmin() },
              new RouteConfig { Path = "/settings/group/:GroupId", Component = typeof(GroupAdminSettings), Transition = RouteTransition.Fade, Guards = RequireGroupAdmin() },
     };

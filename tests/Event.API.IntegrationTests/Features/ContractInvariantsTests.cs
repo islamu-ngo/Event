@@ -676,10 +676,25 @@ public class ContractInvariantsTests
     }
 
     [Test]
+    [Arguments("InstanceTenantListItemDto", "slug")]
+    [Arguments("InstanceTenantPlanListItemDto", "key")]
+    public async Task InstanceAdministrationCollections_ExposeTypedHalItems(string itemSchemaName, string identityField)
+    {
+        using var document = await GetOpenApiDocumentAsync();
+        var embedded = GetSchemaProperties(document, $"HalCollectionEmbeddedOf{itemSchemaName}");
+        await Assert.That(GetReference(embedded.GetProperty("items").GetProperty("items")))
+            .IsEqualTo($"#/components/schemas/HalResourceOf{itemSchemaName}");
+
+        var item = GetSchemaProperties(document, $"HalResourceOf{itemSchemaName}");
+        await Assert.That(item.GetProperty(identityField).GetProperty("type").GetString()).IsEqualTo("string");
+        await Assert.That(item.TryGetProperty("_links", out _)).IsTrue();
+    }
+
+    [Test]
     public async Task OpenApiDocument_TenantEffectiveSettingExposesNestedHalLinks()
     {
         using var document = await GetOpenApiDocumentAsync();
-        var links = GetSchemaProperties(document, "ControlPlaneTenantEffectiveSettingDto")
+        var links = GetSchemaProperties(document, "InstanceTenantEffectiveSettingDto")
             .GetProperty("_links");
 
         await Assert.That(GetReference(links.GetProperty("additionalProperties")))

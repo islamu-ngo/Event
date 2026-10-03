@@ -6,7 +6,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Settings;
-using Explore.Application.Features.ControlPlane.Requests.Commands;
+using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.Settings.Handlers.Commands;
 using Explore.Application.Features.Events;
@@ -190,7 +190,7 @@ public sealed class VisitorAccessSettingsWriterTests
             BaseCommandResponse<Guid> result = surface == "scalar"
                 ? await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
                 { Key = ModeKey, Value = "AnonymousOnly", Scope = SettingScope.Instance }, CancellationToken.None)
-                : await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>>()
+                : await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<SetInstanceTenantSettingCommand, BaseCommandResponse<Guid>>>()
                     .ExecuteAsync(new(fixture.TenantId, ModeKey, "AnonymousOnly"), CancellationToken.None);
             await Assert.That(result.FailureCode).IsEqualTo(Conflict);
         }
@@ -241,9 +241,9 @@ public sealed class VisitorAccessSettingsWriterTests
             "\"FullRegistrationAndAuth\"", !locking)], fixture.UserId)).EnsureAccepted();
         await fixture.SeedEventAsync(accountRequired: true);
         var result = locking
-            ? await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<LockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>>()
+            ? await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<LockInstanceTenantSettingCommand, BaseCommandResponse<Guid>>>()
                 .ExecuteAsync(new(fixture.TenantId, ModeKey), CancellationToken.None)
-            : await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>>()
+            : await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UnlockInstanceTenantSettingCommand, BaseCommandResponse<Guid>>>()
                 .ExecuteAsync(new(fixture.TenantId, ModeKey), CancellationToken.None);
         await Assert.That(result.IsSuccess).IsTrue().Because(result.FailureCode ?? "tenant lock");
         var stored = await fixture.Services.GetRequiredService<ITenantSettingRepository>().GetByTenantAndKey(fixture.TenantId, ModeKey);
@@ -413,7 +413,7 @@ public sealed class VisitorAccessSettingsWriterTests
             AssignedAt = now,
             CreatedAt = now
         });
-        var result = await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>>()
+        var result = await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<ApplyInstanceTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(new(fixture.TenantId, assignment.Id, fixture.UserId), CancellationToken.None);
         await Assert.That(result.FailureCode).IsEqualTo(Conflict);
         await Assert.That(await fixture.Services.GetRequiredService<ITenantSettingRepository>()

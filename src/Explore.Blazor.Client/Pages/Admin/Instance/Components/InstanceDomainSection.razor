@@ -26,7 +26,7 @@
                           OnBlur="@(EventCallback.Factory.Create<FocusEventArgs>(this, SaveAdminHostAsync))"
                           Disabled="_isSaving"
                           Placeholder="admin.example.org"
-                          HelperText="Optional operator host for the multi-tenant control plane." />
+                          HelperText="Optional operator host for multi-tenant instance administration." />
         }
 
         <MudSwitch T="bool"

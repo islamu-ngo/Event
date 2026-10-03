@@ -893,9 +893,9 @@ public static class BffAuthEndpoints
             && safeReturnUrl == "/")
         {
             safeReturnUrl = ctx.RequestServices
-                .GetRequiredService<AdminHostControlPlaneShellSelector>()
-                .ShouldUseControlPlaneShell(ctx, new PathString("/admin/instance"))
-                ? "/admin/instance"
+                .GetRequiredService<Event.Web.BffHosting.Abstractions.IEventBffHostClassifier>()
+                .IsAdminHost(ctx)
+                ? "/settings/instance"
                 : "/settings/instance?section=getting-started";
             properties.RedirectUri = safeReturnUrl;
         }

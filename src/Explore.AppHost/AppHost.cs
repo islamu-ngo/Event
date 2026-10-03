@@ -14,8 +14,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-const string DefaultControlPlaneHost = "admin.localhost";
-const int DefaultControlPlanePort = 7002;
+const string DefaultInstanceAdminHost = "admin.localhost";
+const int DefaultInstanceAdminPort = 7002;
 var repositoryRoot = FindRepositoryRoot(Directory.GetCurrentDirectory());
 var dotenvPath = Path.Combine(repositoryRoot, ".env");
 if (File.Exists(dotenvPath))
@@ -161,11 +161,11 @@ var admissionCheckInAlertRulesPath = Path.Combine(appHostConfigRoot, "admission-
 var grafanaDashboardPath = Path.Combine(appHostConfigRoot, "grafana-dashboard");
 var pgAdminServersPath = Path.Combine(appHostConfigRoot, "pgadmin", "servers.json");
 var pgAdminPassFilePath = Path.Combine(appHostConfigRoot, "pgadmin", "pgpass");
-var controlPlanePublicOrigin = agentBrowserProfile?.AdminOrigin
+var instanceAdminPublicOrigin = agentBrowserProfile?.AdminOrigin
     ?? ConfiguredValue(
         builder.Configuration,
-        "CONTROL_PLANE_PUBLIC_ORIGIN",
-        BuildDefaultHttpUri(DefaultControlPlaneHost, DefaultControlPlanePort));
+        "INSTANCE_ADMIN_PUBLIC_ORIGIN",
+        BuildDefaultHttpUri(DefaultInstanceAdminHost, DefaultInstanceAdminPort));
 var publicBaseUrl = agentBrowserProfile?.DefaultTenantOrigin
     ?? ConfiguredValue(builder.Configuration, "PUBLIC_BASE_URL", string.Empty);
 Directory.CreateDirectory(localStorageRootPath);
@@ -354,7 +354,7 @@ if (hostingTopology == HostingTopology.Split)
             builder.Configuration,
             allowAgentRuntimeSecrets: true)
         .WithEnvironment("HttpsRedirection__Enabled", "false")
-        .WithEnvironment("CONTROL_PLANE_PUBLIC_ORIGIN", controlPlanePublicOrigin)
+        .WithEnvironment("INSTANCE_ADMIN_PUBLIC_ORIGIN", instanceAdminPublicOrigin)
         .WithEnvironment("Cerbos__PolicyPackagePath", cerbosPolicyPackagePath)
         .WithEnvironment("Storage__Local__RootPath", localStorageRootPath)
         .WithEnvironment("Storage__Local__CreateRootIfMissing", "true")
@@ -481,7 +481,7 @@ if (hostingTopology == HostingTopology.Split)
             allowAgentRuntimeSecrets: false)
         .WithReference(exploreAPI)
         .WaitFor(exploreAPI)
-        .WithEnvironment("Bff__AdminHosts__0", controlPlanePublicOrigin)
+        .WithEnvironment("Bff__AdminHosts__0", instanceAdminPublicOrigin)
         .WithEnvironment("ForwardedHeadersTrust__ForwardLimit", ConfiguredValue(
             builder.Configuration,
             "BFF_FORWARDED_HEADERS_FORWARD_LIMIT",
@@ -541,10 +541,10 @@ else
             builder.Configuration,
             allowAgentRuntimeSecrets: false)
         .WithEnvironment("HttpsRedirection__Enabled", "false")
-        .WithEnvironment("CONTROL_PLANE_PUBLIC_ORIGIN", ConfiguredValue(
+        .WithEnvironment("INSTANCE_ADMIN_PUBLIC_ORIGIN", ConfiguredValue(
             builder.Configuration,
-            "CONTROL_PLANE_PUBLIC_ORIGIN",
-            BuildDefaultHttpUri(DefaultControlPlaneHost, DefaultControlPlanePort)))
+            "INSTANCE_ADMIN_PUBLIC_ORIGIN",
+            BuildDefaultHttpUri(DefaultInstanceAdminHost, DefaultInstanceAdminPort)))
         .WithEnvironment("Cerbos__PolicyPackagePath", cerbosPolicyPackagePath)
         .WithEnvironment("Storage__Local__RootPath", localStorageRootPath)
         .WithEnvironment("Storage__Local__CreateRootIfMissing", "true")
@@ -566,8 +566,8 @@ else
         .WithEnvironment("ForwardedHeadersTrust__KnownNetworks__0", ConfiguredValue(builder.Configuration, "API_FORWARDED_HEADERS_KNOWN_NETWORK", "::1/128"))
         .WithEnvironment("Bff__AdminHosts__0", ConfiguredValue(
             builder.Configuration,
-            "CONTROL_PLANE_PUBLIC_ORIGIN",
-            BuildDefaultHttpUri(DefaultControlPlaneHost, DefaultControlPlanePort)))
+            "INSTANCE_ADMIN_PUBLIC_ORIGIN",
+            BuildDefaultHttpUri(DefaultInstanceAdminHost, DefaultInstanceAdminPort)))
         .WaitFor(mailpit);
     eventStandalone = ConfigureConfigurationManifestOwner(
         eventStandalone,
@@ -1740,7 +1740,7 @@ static IResourceBuilder<ProjectResource> WithAgentBrowserEnvironment(
         .WithEnvironment("INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", profile.InstanceBootstrapAdminSubject)
         .WithEnvironment("INSTANCE_BOOTSTRAP_ADMIN_EMAIL", profile.InstanceBootstrapAdminEmail)
         .WithEnvironment("INSTANCE_BOOTSTRAP_BINDING_GENERATION", profile.InstanceBootstrapBindingGeneration)
-        .WithEnvironment("CONTROL_PLANE_PUBLIC_ORIGIN", profile.AdminOrigin)
+        .WithEnvironment("INSTANCE_ADMIN_PUBLIC_ORIGIN", profile.AdminOrigin)
         .WithEnvironment("PUBLIC_BASE_URL", profile.DefaultTenantOrigin)
         .WithEnvironment("Bff__AdminHosts__0", profile.AdminOrigin);
 

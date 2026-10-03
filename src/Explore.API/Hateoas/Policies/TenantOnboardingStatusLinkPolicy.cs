@@ -7,7 +7,7 @@ using Explore.Application.DTOs.Onboarding;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
-using Explore.Application.Features.ControlPlane.Requests.Queries;
+using Explore.Application.Features.InstanceAdmin.Requests.Queries;
 using Explore.Application.Hateoas;
 
 public sealed class TenantOnboardingStatusLinkPolicy : ILinkPolicy<TenantOnboardingStatusDto>
@@ -130,15 +130,15 @@ public sealed class TenantOnboardingStatusLinkPolicy : ILinkPolicy<TenantOnboard
         }
 
         yield return new LinkDefinition(
-            "manage-control-plane",
-            RouteNames.GetControlPlaneTenantById,
+            "manage-instance",
+            RouteNames.GetInstanceAdminTenantById,
             new { tenantId = dto.TenantId },
             HttpMethods.Get,
-            "Manage tenant from the control plane",
+            "Manage tenant from instance administration",
             RequiresAuth: true)
             .RequirePermission(AuthorizationActions.InstanceSettings.View,
                 ResourceKinds.InstanceSetting,
-                GetControlPlaneTenantListQuery.SettingKey,
+                GetInstanceTenantListQuery.SettingKey,
                 facts: InstanceScopedAuthorizationFacts.Instance);
 
         if (!dto.IsCompleted && !dto.IsCurrentUserTenantAdministrator)
@@ -151,7 +151,7 @@ public sealed class TenantOnboardingStatusLinkPolicy : ILinkPolicy<TenantOnboard
                 RequiresAuth: true)
                 .RequirePermission(AuthorizationActions.InstanceSettings.Update,
                     ResourceKinds.InstanceSetting,
-                    GetControlPlaneTenantListQuery.SettingKey,
+                    GetInstanceTenantListQuery.SettingKey,
                     facts: InstanceScopedAuthorizationFacts.Instance);
         }
     }

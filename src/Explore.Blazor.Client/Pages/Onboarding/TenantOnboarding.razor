@@ -6,7 +6,7 @@
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @using Explore.Blazor.Client.Helpers
 @using Explore.Blazor.Client.Pages.Onboarding.Components
-@using Explore.Blazor.Client.Routing.ControlPlane
+@using Explore.Blazor.Client.Routing.InstanceAdmin
 @layout SetupLayout
 @attribute [Authorize]
 @rendermode InteractiveServer
@@ -242,7 +242,7 @@
         _status?.HasHalLink("manage-tenant-settings") == true
             ? TenantSettingsRoute
             : _status?.HasHalLink("manage-control-plane") == true
-                ? ControlPlaneRoutes.Overview
+                ? InstanceAdminRoutes.Overview
                 : null;
 
     private string? ManagementActionLabel =>

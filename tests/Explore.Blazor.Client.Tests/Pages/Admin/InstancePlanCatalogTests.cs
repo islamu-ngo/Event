@@ -1,17 +1,17 @@
 using Blazouter.Enums;
 using Blazouter.Extensions;
 using Blazouter.Models;
-using Explore.Blazor.Client.Contracts.ControlPlane;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Pages.Admin.Instance;
-using Explore.Blazor.Client.Routing.ControlPlane;
+using Explore.Blazor.Client.Routing.InstanceAdmin;
 
 namespace Explore.Blazor.Client.Tests.Pages.Admin;
 
 public sealed class InstancePlanCatalogTests : IDisposable
 {
     private readonly BlazorTestContext _ctx = new();
-    private readonly IControlPlanePlanCatalogService _catalog = Substitute.For<IControlPlanePlanCatalogService>();
+    private readonly IInstancePlanCatalogService _catalog = Substitute.For<IInstancePlanCatalogService>();
 
     public InstancePlanCatalogTests()
     {
@@ -24,11 +24,11 @@ public sealed class InstancePlanCatalogTests : IDisposable
     [Test]
     public async Task Plans_LoadingThenEmpty_RendersAccessibleStates()
     {
-        var pending = new TaskCompletionSource<HalCollectionResourceOfControlPlaneTenantPlanListItemDto>(
+        var pending = new TaskCompletionSource<HalCollectionResourceOfInstanceTenantPlanListItemDto>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         _catalog.GetPlansAsync(Arg.Any<CancellationToken>()).Returns(pending.Task);
 
-        var cut = _ctx.RenderMudComponent<InstancePlans>();
+        var cut = _ctx.RenderMudComponent<InstanceTenantPlansPage>();
 
         await Assert.That(cut.Find("[role='status'][aria-live='polite']").TextContent).Contains("Loading plans");
         pending.SetResult(PlanCollection([]));
@@ -39,10 +39,10 @@ public sealed class InstancePlanCatalogTests : IDisposable
     public async Task Plans_ThrownLoad_RendersSafeFailureWithoutRawException()
     {
         _catalog.GetPlansAsync(Arg.Any<CancellationToken>())
-            .Returns<Task<HalCollectionResourceOfControlPlaneTenantPlanListItemDto>>(_ =>
+            .Returns<Task<HalCollectionResourceOfInstanceTenantPlanListItemDto>>(_ =>
                 throw new InvalidOperationException("raw catalog credential"));
 
-        var cut = _ctx.RenderMudComponent<InstancePlans>();
+        var cut = _ctx.RenderMudComponent<InstanceTenantPlansPage>();
 
         cut.WaitForAssertion(() => cut.Find("[role='alert']"));
         await Assert.That(cut.Markup).Contains("Tenant plans are currently unavailable.");
@@ -54,11 +54,11 @@ public sealed class InstancePlanCatalogTests : IDisposable
     {
         _catalog.GetPlansAsync(Arg.Any<CancellationToken>()).Returns(PlanCollection(
             [
-                Summary("enterprise", "Enterprise", Links(ControlPlaneLinkRelations.Self)),
+                Summary("enterprise", "Enterprise", Links(InstanceAdminLinkRelations.Self)),
                 Summary("community", "Community")
             ]));
 
-        var cut = _ctx.RenderMudComponent<InstancePlans>();
+        var cut = _ctx.RenderMudComponent<InstanceTenantPlansPage>();
         cut.WaitForAssertion(() => cut.Find("[data-plan-key='enterprise']"));
 
         await Assert.That(cut.FindAll("[aria-label^='View plan ']").Count).IsEqualTo(1);
@@ -80,7 +80,7 @@ public sealed class InstancePlanCatalogTests : IDisposable
         _catalog.GetPlanAsync("enterprise", Arg.Any<CancellationToken>())
             .Returns(DetailWithVersion());
 
-        var cut = _ctx.RenderMudComponent<InstancePlanDetail>(parameters => parameters.Add(p => p.Key, "enterprise"));
+        var cut = _ctx.RenderMudComponent<InstanceTenantPlanDetailPage>(parameters => parameters.Add(p => p.Key, "enterprise"));
         cut.WaitForAssertion(() => cut.Find("[data-plan-version='3']"));
 
         await Assert.That(cut.Find("h1").TextContent).IsEqualTo("Enterprise");
@@ -106,7 +106,7 @@ public sealed class InstancePlanCatalogTests : IDisposable
             new()
             {
                 Path = "/admin/instance/plans/:Key",
-                Component = typeof(InstancePlanDetail),
+                Component = typeof(InstanceTenantPlanDetailPage),
                 Transition = RouteTransition.None
             }
         };
@@ -123,7 +123,7 @@ public sealed class InstancePlanCatalogTests : IDisposable
     [Test]
     public async Task PlanDetail_WithoutVersions_RendersEmptyState()
     {
-        _catalog.GetPlanAsync("community", Arg.Any<CancellationToken>()).Returns(new HalResourceOfControlPlaneTenantPlanDetailDto
+        _catalog.GetPlanAsync("community", Arg.Any<CancellationToken>()).Returns(new HalResourceOfInstanceTenantPlanDetailDto
         {
             Id = Guid.NewGuid(),
             Key = "community",
@@ -131,7 +131,7 @@ public sealed class InstancePlanCatalogTests : IDisposable
             Versions = []
         });
 
-        var cut = _ctx.RenderMudComponent<InstancePlanDetail>(parameters => parameters.Add(p => p.Key, "community"));
+        var cut = _ctx.RenderMudComponent<InstanceTenantPlanDetailPage>(parameters => parameters.Add(p => p.Key, "community"));
 
         cut.WaitForAssertion(() => cut.Markup.Contains("No plan versions", StringComparison.Ordinal));
         await Assert.That(cut.Find("[role='status'] [dir='auto']").TextContent).Contains("No plan versions");
@@ -141,17 +141,17 @@ public sealed class InstancePlanCatalogTests : IDisposable
     public async Task PlanDetail_ThrownLoad_RendersSafeFailureWithoutRawException()
     {
         _catalog.GetPlanAsync("enterprise", Arg.Any<CancellationToken>())
-            .Returns<Task<HalResourceOfControlPlaneTenantPlanDetailDto>>(_ =>
+            .Returns<Task<HalResourceOfInstanceTenantPlanDetailDto>>(_ =>
                 throw new InvalidOperationException("raw plan database error"));
 
-        var cut = _ctx.RenderMudComponent<InstancePlanDetail>(parameters => parameters.Add(p => p.Key, "enterprise"));
+        var cut = _ctx.RenderMudComponent<InstanceTenantPlanDetailPage>(parameters => parameters.Add(p => p.Key, "enterprise"));
 
         cut.WaitForAssertion(() => cut.Find("[role='alert']"));
         await Assert.That(cut.Markup).Contains("Tenant plan details are currently unavailable.");
         await Assert.That(cut.Markup).DoesNotContain("raw plan database error");
     }
 
-    private static HalResourceOfControlPlaneTenantPlanListItemDto Summary(
+    private static HalResourceOfInstanceTenantPlanListItemDto Summary(
         string key,
         string name,
         IReadOnlyDictionary<string, HalLink>? links = null) => new()
@@ -169,7 +169,7 @@ public sealed class InstancePlanCatalogTests : IDisposable
             _links = links is null ? null : new Dictionary<string, HalLink>(links)
         };
 
-    private static HalResourceOfControlPlaneTenantPlanDetailDto DetailWithVersion() => new()
+    private static HalResourceOfInstanceTenantPlanDetailDto DetailWithVersion() => new()
     {
         Id = Guid.NewGuid(),
         Key = "enterprise",
@@ -177,7 +177,7 @@ public sealed class InstancePlanCatalogTests : IDisposable
         Description = "خطة مؤسسية متعددة المستأجرين.",
         Versions =
         [
-            new ControlPlaneTenantPlanVersionDto
+            new InstanceTenantPlanVersionDto
             {
                 Id = Guid.NewGuid(),
                 VersionNumber = 3,
@@ -187,17 +187,17 @@ public sealed class InstancePlanCatalogTests : IDisposable
                 CurrencyCode = "EUR",
                 BillingPeriod = "monthly",
                 IsActiveForProvisioning = true,
-                Settings = [new ControlPlaneTenantPlanSettingDto { Key = "ai.enabled", JsonValue = "true", IsLocked = true }],
-                Quotas = [new ControlPlaneTenantPlanQuotaDto { Key = "storage.bytes", Limit = 10_000 }]
+                Settings = [new InstanceTenantPlanSettingDto { Key = "ai.enabled", JsonValue = "true", IsLocked = true }],
+                Quotas = [new InstanceTenantPlanQuotaDto { Key = "storage.bytes", Limit = 10_000 }]
             }
         ]
     };
 
-    private static HalCollectionResourceOfControlPlaneTenantPlanListItemDto PlanCollection(
-        IReadOnlyCollection<HalResourceOfControlPlaneTenantPlanListItemDto> plans) => new()
+    private static HalCollectionResourceOfInstanceTenantPlanListItemDto PlanCollection(
+        IReadOnlyCollection<HalResourceOfInstanceTenantPlanListItemDto> plans) => new()
         {
             TotalCount = plans.Count,
-            _embedded = new HalCollectionEmbeddedOfControlPlaneTenantPlanListItemDto { Items = plans.ToArray() }
+            _embedded = new HalCollectionEmbeddedOfInstanceTenantPlanListItemDto { Items = plans.ToArray() }
         };
 
     private static Dictionary<string, HalLink> Links(params string[] relations) =>

@@ -125,7 +125,7 @@ public class MiddlewareOrderTests
         });
 
         using var client = app.CreateClient();
-        var response = await client.GetAsync("/api/admin/control-plane/tenants");
+        var response = await client.GetAsync("/api/admin/instance/tenants");
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
     }

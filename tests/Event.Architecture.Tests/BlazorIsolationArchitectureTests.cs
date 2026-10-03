@@ -155,7 +155,7 @@ public sealed class BlazorIsolationArchitectureTests
         string typeName,
         HashSet<string> generatedContractNames)
     {
-        if (relativePath.Contains("/Contracts/ControlPlane/", StringComparison.Ordinal))
+        if (relativePath.Contains("/Contracts/InstanceAdmin/", StringComparison.Ordinal))
         {
             return true;
         }

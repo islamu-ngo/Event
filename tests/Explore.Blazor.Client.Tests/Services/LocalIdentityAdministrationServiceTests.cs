@@ -3,7 +3,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
-using Explore.Blazor.Client.Services.ControlPlane;
+using Explore.Blazor.Client.Services.InstanceAdmin;
 using Explore.Blazor.Client.Serialization;
 
 namespace Explore.Blazor.Client.Tests.Services;
@@ -74,13 +74,13 @@ public sealed class LocalIdentityAdministrationServiceTests
     {
         using var handler = new DiscoveryBoundaryHandler();
         using var http = new HttpClient(handler) { BaseAddress = new Uri("https://bff.example.test/") };
-        var overview = new ControlPlaneApiAdapter(new ControlPlaneClient(http), new ControlPlaneDeploymentModeClient(http),
-            new ControlPlaneTenantConfigurationClient(http), new ControlPlaneTenantLifecycleClient(http), new ControlPlaneTenantPlanClient(http));
+        var overview = new InstanceAdminApiAdapter(new InstanceAdminClient(http), new InstanceDeploymentModeClient(http),
+            new InstanceTenantConfigurationClient(http), new InstanceTenantLifecycleClient(http), new InstanceTenantPlanClient(http));
         var service = new LocalIdentityAdministrationService(new LocalIdentityAdministrationClient(http), overview);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetIdentitiesAsync(cancellationToken: CancellationToken));
 
-        await Assert.That(handler.RequestedPaths.Contains("/api/admin/control-plane/overview")).IsTrue();
+        await Assert.That(handler.RequestedPaths.Contains("/api/admin/instance/overview")).IsTrue();
         await Assert.That(handler.RequestedPaths.Contains("/api/instance/local-identities")).IsFalse();
     }
 
@@ -204,6 +204,7 @@ internal sealed class LocalIdentityUiTransport : HttpMessageHandler
     internal LocalCredentialState StateA { get; set; } = LocalCredentialState.Ready;
     internal Guid StampB { get; } = Guid.CreateVersion7();
     internal bool Discoverable { get; set; } = true;
+    internal bool InstanceManagementLinks { get; set; }
     internal bool ActionLinks { get; set; } = true;
     internal int PageCount { get; set; } = 1;
     internal bool IncludeSubjectB { get; set; } = true;
@@ -211,9 +212,9 @@ internal sealed class LocalIdentityUiTransport : HttpMessageHandler
     internal Func<Request, CancellationToken, Task<HttpResponseMessage>>? Override { get; set; }
     internal Func<Request, CancellationToken, Task<HttpResponseMessage>>? ListOverride { get; set; }
     internal HttpClient CreateHttpClient() => new(this, disposeHandler: false) { BaseAddress = new Uri("https://bff.example.test/") };
-    internal ControlPlaneApiAdapter CreateOverview(HttpClient http) => new(new ControlPlaneClient(http),
-        new ControlPlaneDeploymentModeClient(http), new ControlPlaneTenantConfigurationClient(http),
-        new ControlPlaneTenantLifecycleClient(http), new ControlPlaneTenantPlanClient(http));
+    internal InstanceAdminApiAdapter CreateOverview(HttpClient http) => new(new InstanceAdminClient(http),
+        new InstanceDeploymentModeClient(http), new InstanceTenantConfigurationClient(http),
+        new InstanceTenantLifecycleClient(http), new InstanceTenantPlanClient(http));
     internal LocalIdentityAdministrationService CreateService(HttpClient http) => new(new LocalIdentityAdministrationClient(http), CreateOverview(http));
     internal string ResetPath(Guid subjectId) => $"{IdentitiesPath}/{subjectId:D}/temporary-credential";
     internal static string StatusPath(Guid operationId) => $"{OperationsPath}/{operationId:D}";
@@ -234,7 +235,7 @@ internal sealed class LocalIdentityUiTransport : HttpMessageHandler
         Requests.Add(captured);
         if (ListOverride is not null && captured.Method == HttpMethod.Get && captured.Uri.AbsolutePath == IdentitiesPath)
             return await ListOverride(captured, cancellationToken);
-        if (Override is not null && captured.Uri.AbsolutePath != "/api/admin/control-plane/overview"
+        if (Override is not null && captured.Uri.AbsolutePath != "/api/admin/instance/overview"
             && !(captured.Method == HttpMethod.Get && captured.Uri.AbsolutePath == IdentitiesPath))
             return await Override(captured, cancellationToken);
         return DefaultResponse(captured);
@@ -242,8 +243,16 @@ internal sealed class LocalIdentityUiTransport : HttpMessageHandler
 
     internal HttpResponseMessage DefaultResponse(Request request)
     {
-        if (request.Uri.AbsolutePath == "/api/admin/control-plane/overview")
-            return Json(new { _links = Discoverable ? Links("local-identities", IdentitiesPath) : new Dictionary<string, object>() });
+        if (request.Uri.AbsolutePath == "/api/admin/instance/overview")
+        {
+            var links = Discoverable ? Links("local-identities", IdentitiesPath) : new Dictionary<string, object>();
+            if (InstanceManagementLinks)
+            {
+                links["tenants"] = new { href = "/api/admin/instance/tenants", method = "GET" };
+                links["plans"] = new { href = "/api/admin/instance/plans", method = "GET" };
+            }
+            return Json(new { _links = links });
+        }
         if (request.Method == HttpMethod.Get && request.Uri.AbsolutePath == IdentitiesPath)
         {
             int page = int.Parse(Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(request.Uri.Query)["pageNumber"].ToString(),

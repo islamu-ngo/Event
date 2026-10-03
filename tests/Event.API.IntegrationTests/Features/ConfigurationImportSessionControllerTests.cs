@@ -15,7 +15,7 @@ using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.DTOs.ControlPlane;
+using Explore.Application.DTOs.InstanceAdmin;
 using Explore.Application.DTOs.Tenant;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Importing;
@@ -39,7 +39,7 @@ public sealed class ConfigurationImportSessionControllerTests
     {
         await AssertController(
             typeof(InstanceConfigurationImportSessionsController),
-            "api/control-plane/configuration-import/sessions",
+            "api/admin/instance/configuration-import/sessions",
             expectedTenantRoute: false);
         await AssertController(
             typeof(TenantConfigurationImportSessionsController),
@@ -189,8 +189,8 @@ public sealed class ConfigurationImportSessionControllerTests
     [Test]
     public async Task ParentHal_AdvertisesOnlyPermissionBoundUploadAffordances()
     {
-        LinkDefinition instance = new ControlPlaneOverviewLinkPolicy()
-            .GetLinks(new ControlPlaneOverviewDto(), user: null)
+        LinkDefinition instance = new InstanceOverviewLinkPolicy()
+            .GetLinks(new InstanceOverviewDto(), user: null)
             .Single(link =>
                 link.Rel ==
                 LinkRelations.CreateConfigurationImportSession);
@@ -442,7 +442,7 @@ public sealed class ConfigurationImportSessionControllerTests
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            "/api/control-plane/configuration-import/sessions");
+            "/api/admin/instance/configuration-import/sessions");
         if (authenticated)
         {
             request.Headers.Add(

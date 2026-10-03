@@ -45,13 +45,13 @@ public sealed class SetupLiveRequestBodyTransformer
                 {
                     [ISLAMU.Wire.Contracts.ConfigurationPortability
                         .TenantConfigurationPackageContractMetadata.MediaType] = new()
-                    {
-                        Schema = new OpenApiSchema
                         {
-                            Type = JsonSchemaType.String,
-                            Format = "binary"
+                            Schema = new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.String,
+                                Format = "binary"
+                            }
                         }
-                    }
                 }
             };
         }

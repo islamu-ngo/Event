@@ -1,0 +1,66 @@
+name: Dependency Submission
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-submission-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    if: >-
+      github.repository == 'islamu-ngo/Event' &&
+      github.event.repository.fork == false &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - name: Prepare native tool scratch directory
+        run: |
+          mkdir -p "$HOME/.cache/agent-tmp"
+          printf 'TMPDIR=%s/.cache/agent-tmp\n' "$HOME" >> "$GITHUB_ENV"
+      - name: Check out trusted commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up pinned .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Restore owned tool and deterministic tests
+        run: >-
+          dotnet restore
+          eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj
+          --locked-mode --verbosity quiet
+      - name: Build owned tool and deterministic tests
+        run: >-
+          dotnet build
+          eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj
+          --configuration Release --verbosity quiet --no-restore
+      - name: Verify submission invariants without network
+        run: >-
+          dotnet run
+          --project eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj
+          --configuration Release --no-build --no-restore
+          -- --minimum-expected-tests 48 --results-directory "$TMPDIR/dependency-submission-tests"
+      - name: Submit tracked NuGet lock graph
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          dotnet run
+          --project eng/dependency-submission/src/ISLAMU.DependencySubmission/ISLAMU.DependencySubmission.csproj
+          --configuration Release --no-build --no-restore
+          -- submit .

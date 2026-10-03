@@ -28,6 +28,18 @@ exit. Never use a machine-wide `stop-all-dotnet` command.
 
 ## 2. Local-Agent Browser Authentication
 
+When the fixed local-agent ports belong to another workstream, use
+`bash eng/scripts/run-local-agent.sh --isolated`. The same approved vault import
+is retained; Aspire assigns isolated resource ports and user-secrets state.
+Discover the endpoints for this worktree's AppHost and wait for its resources
+and manifest readiness. Do not terminate the other host or assume port 5200
+serves the current checkout. `--no-build` is optional and requires the matching
+startup build to be current; otherwise let Aspire build the selected host.
+Aspire isolation does not rename explicitly configured persistent volumes. Use
+a task-private container-provider storage namespace when another workstream
+owns the profile's named volumes; never reset those shared volumes to obtain a
+fresh database.
+
 Use this protocol only for the isolated Development `local-agent` profile. It
 is Split topology with real BFF-to-API forwarding, not a Keycloak/Cerbos or
 provider-parity proof.
@@ -47,6 +59,8 @@ persona initialization passwords. Never print their values.
 | `POSTGRESQL_USERNAME` | Username for the isolated PostgreSQL resource. |
 | `POSTGRESQL_PASSWORD` | Password for the isolated PostgreSQL resource. |
 | `AGENT_BROWSER_REDIS_PASSWORD` | Password for the isolated Redis resource. |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` | Retained external-identity fingerprint authority; Base64-encoded key material from the selected secret authority. |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` | Stable identifier paired with the retained fingerprint key; preserve both across restart and restore. |
 
 Do not put values for any of these names in commands, browser scripts, logs, or
 screenshots. The profile does not choose Environment, User Secrets, or
@@ -68,8 +82,8 @@ When the shared Development Infisical `/api` folder selects Keycloak, direct
 Infisical selection correctly rejects the Local-only agent API. The
 repository-native `bash eng/scripts/run-local-agent.sh --no-build` instead
 reads approved Development Universal Auth bootstrap values from the shared
-User Secrets store, imports only six allowlisted agent credentials from the
-selected `/api` and `/postgresql` vault folders into this process,
+User Secrets store, imports only allowlisted agent credentials from the
+selected `/api`, `/postgresql` and `/privacy` vault folders into this process,
 and selects Environment plus the agent's compiled Local topology. It does not
 rewrite the shared vault, the ignored `.env`, or any credential. The operator
 needs `curl`, `jq`, `base64`, and `dotnet`; omit `--no-build` after source edits
@@ -77,6 +91,9 @@ until a Release build has produced the intended binaries. The implement-tasks
 workflow copies any repository-root `.env` into a new or resumed worktree
 without overwriting a task-specific copy. An empty source `.env` does not
 supply missing secrets.
+The `/privacy` folder must contain the retained identity-fence key and its stable
+identifier. Missing authority blocks startup replay even on a new Local-only
+database; the agent must not invent replacement key material or bypass replay.
 
 The profile binds loopback-only HTTP endpoints. Register the AppHost
 resource-state observer before launch, then wait for the migration resource to

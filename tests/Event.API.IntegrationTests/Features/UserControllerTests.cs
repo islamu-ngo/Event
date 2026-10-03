@@ -8,6 +8,7 @@ using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.DTOs.User;
@@ -18,10 +19,17 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Secrets.Database;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -98,7 +106,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_WithOidcIssuerNormalization_PersistsAuthorityQualifiedProviderKey()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
+        await using var factory = new UserEnrollmentFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         string subject = Guid.NewGuid().ToString("D");
         ProviderAccountKey expected = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
@@ -123,7 +131,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_WhenOnlyRawSubjectLoginExists_DoesNotUseLegacyFallback()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
+        await using var factory = new UserEnrollmentFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         Guid legacyUserId = Guid.CreateVersion7();
         string subject = Guid.NewGuid().ToString("D");
@@ -134,9 +142,8 @@ public class UserControllerTests
             "https://auth.example.test/realms/ISLAMU",
             "primary@example.test");
         using HttpResponseMessage response = await client.SendAsync(request);
-        BaseCommandResponse<Guid>? body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
-
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        BaseCommandResponse<Guid>? body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
         await Assert.That(body).IsNotNull();
         await Assert.That(body!.Id).IsNotEqualTo(legacyUserId);
         using var scope = factory.Services.CreateScope();
@@ -154,7 +161,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_GuidSubjectFromDifferentIssuer_DoesNotSelectExistingInternalUser()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
+        await using var factory = new UserEnrollmentFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         Guid existingUserId = Guid.CreateVersion7();
         string subject = existingUserId.ToString("D");
@@ -173,9 +180,8 @@ public class UserControllerTests
             "https://issuer-b.example.test",
             "issuer-b@example.test");
         using HttpResponseMessage response = await client.SendAsync(request);
-        BaseCommandResponse<Guid>? body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
-
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        BaseCommandResponse<Guid>? body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
         await Assert.That(body).IsNotNull();
         await Assert.That(body!.Id).IsNotEqualTo(existingUserId);
         await Assert.That(body.Id.Version).IsEqualTo(7);
@@ -355,6 +361,78 @@ public class UserControllerTests
     }
 
     #endregion
+
+    private sealed class UserEnrollmentFactory : AuthenticatedWebApplicationFactory
+    {
+        private readonly TestPrivacyIdentityFenceKeyProvider _keys = new();
+        private readonly string _databasePath = Path.Join(
+            Path.GetTempPath(), $"user-enrollment-{Guid.CreateVersion7():N}.db");
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            AdditionalConfiguration["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite";
+            AdditionalConfiguration["PrivacyErasureAuthorityEmbedded:Path"] = _keys.AuthorityPath;
+            builder.UseSetting("PrivacyErasure:Authority:Topology", "EmbeddedSqlite");
+            builder.UseSetting("PrivacyErasureAuthorityEmbedded:Path", _keys.AuthorityPath);
+            base.ConfigureWebHost(builder);
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IPrivacyIdentityFenceKeyProvider>();
+                services.AddSingleton<IPrivacyIdentityFenceKeyProvider>(_keys);
+                services.RemoveExploreDbContextRegistrations();
+                var options = new DbContextOptionsBuilder<ExploreDbContext>();
+                ConfigureDatabase(options);
+                using (var context = new ExploreDbContext(options.Options))
+                    context.Database.EnsureCreated();
+                services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+                services.AddScoped(provider =>
+                {
+                    var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+                    context.TenantContext = provider.GetRequiredService<Explore.Application.Contracts.Infrastructure.ITenantContext>();
+                    context.CurrentUserService = provider.GetRequiredService<Explore.Application.Contracts.Infrastructure.ICurrentUserService>();
+                    context.ClearTenantFilterBypass();
+                    return context;
+                });
+            });
+        }
+
+        private void ConfigureDatabase(DbContextOptionsBuilder options)
+        {
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _databasePath
+            });
+            options.UseSnakeCaseNamingConvention();
+        }
+
+        protected override IHost CreateHost(IHostBuilder builder)
+        {
+            var host = base.CreateHost(builder);
+            using var scope = host.Services.CreateScope();
+            scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>()
+                .EnsureReadyAsync().GetAwaiter().GetResult();
+            using var authority = scope.ServiceProvider
+                .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>().CreateDbContext();
+            authority.Database.Migrate();
+            return host;
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await base.DisposeAsync();
+            _keys.Dispose();
+            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            ConfigureDatabase(options);
+            await using var context = new ExploreDbContext(options.Options);
+            Microsoft.Data.Sqlite.SqliteConnection.ClearPool(
+                (Microsoft.Data.Sqlite.SqliteConnection)context.Database.GetDbConnection());
+            File.Delete(_databasePath);
+            File.Delete(_databasePath + "-wal");
+            File.Delete(_databasePath + "-shm");
+        }
+    }
 
     private static async Task SeedLinkedAtprotoUserAsync(
         AuthenticatedWebApplicationFactory factory,

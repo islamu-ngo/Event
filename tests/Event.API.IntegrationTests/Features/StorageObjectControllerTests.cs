@@ -790,6 +790,12 @@ public class StorageObjectControllerTests
                 services.RemoveAll<IFileStorageProviderResolver>();
                 services.AddSingleton(resolver);
                 services.AddCapturedStorageProviders();
+                var eligibility = Substitute.For<IStorageObjectRetirementEligibilityReader>();
+                eligibility.CanRetireAsync(
+                    Arg.Any<StorageObject>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+                    .Returns(false);
+                services.RemoveAll<IStorageObjectRetirementEligibilityReader>();
+                services.AddSingleton(eligibility);
                 if (objectStorageService is not null)
                 {
                     services.RemoveAll<IObjectStorageService>();

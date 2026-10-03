@@ -69,8 +69,12 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
         ProviderAccountKey accountKey =
             PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(
                 verified.Did);
-        return await identityFence.ExecuteEnrollmentAsync(accountKey,
-            token => CompleteVerifiedAsync(request, verified, accountKey, tenantId, token), cancellationToken);
+        return await settingMutationLock.ExecuteOrderedGroupsAsync(
+            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+            leaseToken => identityFence.ExecuteEnrollmentAsync(accountKey,
+                token => CompleteVerifiedAsync(request, verified, accountKey, tenantId, token),
+                leaseToken),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<AtprotoSessionBootstrapResult> CompleteVerifiedAsync(
@@ -147,9 +151,7 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
             Guid.CreateVersion7(),
             Guid.CreateVersion7());
         BootstrapPersistenceOutcome persistence =
-            await settingMutationLock.ExecuteOrderedGroupsAsync(
-                [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
-                leaseToken => unitOfWork.ExecuteBootstrapConvergenceAsync(
+            await unitOfWork.ExecuteBootstrapConvergenceAsync(
                 async transactionToken =>
         {
             // Recheck after acquiring authority and starting the convergence snapshot.
@@ -218,7 +220,6 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                 onboarding.ActorId!.Value,
                 onboarding.ParticipationId);
         },
-                leaseToken),
                 cancellationToken).ConfigureAwait(false);
         if (!persistence.Success)
         {

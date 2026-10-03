@@ -34,7 +34,24 @@ public sealed class PrivacyErasureAuthorityModelTests
             ?? throw new InvalidOperationException("Retained intent is not mapped.");
 
         await Assert.That(model.GetEntityTypes().Select(entity => entity.ClrType))
-            .IsEquivalentTo([typeof(PrivacyErasureIntent), typeof(PrivacyErasureCounter)]);
+            .IsEquivalentTo([
+                typeof(PrivacyErasureIntent), typeof(PrivacyErasureCounter),
+                typeof(PrivacyErasureIdentityFence)
+            ]);
+        IEntityType fence = model.FindEntityType(typeof(PrivacyErasureIdentityFence))!;
+        await Assert.That(fence.GetProperties().Select(property => property.GetColumnName()))
+            .IsEquivalentTo([
+                "authority_sequence", "identity_kind", "key_id", "fingerprint",
+                "retention_expires_at_utc"
+            ]);
+        await Assert.That(fence.GetForeignKeys().Single().DeleteBehavior)
+            .IsEqualTo(DeleteBehavior.Cascade);
+        await Assert.That(fence.GetIndexes().Single().Properties.Select(property => property.Name))
+            .IsEquivalentTo([
+                nameof(PrivacyErasureIdentityFence.IdentityKind),
+                nameof(PrivacyErasureIdentityFence.KeyId),
+                nameof(PrivacyErasureIdentityFence.Fingerprint)
+            ]);
         await Assert.That(intent.GetSchema()).IsEqualTo("privacy_erasure_authority");
         await Assert.That(intent.GetProperties().Select(property => property.GetColumnName()))
             .IsEquivalentTo([
@@ -111,9 +128,13 @@ public sealed class PrivacyErasureAuthorityModelTests
 
         await Assert.That(services.Any(item =>
             item.ServiceType == typeof(PrivacyErasureAuthorityDbContext))).IsFalse();
-        await Assert.That(services.Any(item =>
-            item.ServiceType == typeof(IPrivacyErasureAuthority)
-            && item.ImplementationType == typeof(EmbeddedPrivacyErasureAuthorityRepository))).IsTrue();
+        await using ServiceProvider provider = services.BuildIsolatedServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true });
+        await Assert.That(provider.GetRequiredService<IPrivacyErasureAuthority>())
+            .IsTypeOf<EmbeddedPrivacyErasureAuthorityRepository>();
+        await Assert.That(services.Single(item =>
+            item.ServiceType == typeof(IPrivacyErasureAuthority)).Lifetime)
+            .IsEqualTo(ServiceLifetime.Singleton);
         await Assert.That(services.Any(item =>
             item.ServiceType == typeof(IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>))).IsTrue();
     }
@@ -121,8 +142,8 @@ public sealed class PrivacyErasureAuthorityModelTests
     [Test]
     public async Task DefaultComposition_PoisonAuthorityProviderIsNeverReadOrResolved()
     {
-        var provider = new PoisonAuthorityConfigurationProvider();
-        using var configuration = new ConfigurationRoot([provider]);
+        var configurationProvider = new PoisonAuthorityConfigurationProvider();
+        using var configuration = new ConfigurationRoot([configurationProvider]);
         var services = new ServiceCollection();
 
         services.ConfigurePersistenceServices(
@@ -131,12 +152,14 @@ public sealed class PrivacyErasureAuthorityModelTests
             skipLookupCacheInitializer: true);
         services.ConfigureInfrastructureServices(configuration);
 
-        await Assert.That(provider.AuthorityReadCount).IsEqualTo(0);
+        await Assert.That(configurationProvider.AuthorityReadCount).IsEqualTo(0);
         await Assert.That(services.Any(item =>
             item.ServiceType == typeof(PrivacyErasureAuthorityDbContext))).IsFalse();
-        await Assert.That(services.Any(item =>
-            item.ServiceType == typeof(IPrivacyErasureAuthority)
-            && item.ImplementationType == typeof(EmbeddedPrivacyErasureAuthorityRepository))).IsTrue();
+        await using ServiceProvider provider = services.BuildIsolatedServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true });
+        await Assert.That(provider.GetRequiredService<IPrivacyErasureAuthority>())
+            .IsTypeOf<EmbeddedPrivacyErasureAuthorityRepository>();
+        await Assert.That(configurationProvider.AuthorityReadCount).IsEqualTo(0);
         await Assert.That(services.Any(item =>
             item.ServiceType.FullName?.Contains(
                 "IPrivacyErasureReplayService",
@@ -194,7 +217,11 @@ public sealed class PrivacyErasureAuthorityModelTests
                 "ReadAfterAsync",
                 "GetStateAsync",
                 "EvaluateRetentionAsync",
-                "CompactExpiredIntentsAsync"
+                "CompactExpiredIntentsAsync",
+                "ExecuteSerializedAsync",
+                "ValidateKeyAsync",
+                "FindAsync",
+                "IsSubjectFencedAsync"
             ]);
     }
 

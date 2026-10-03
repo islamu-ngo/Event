@@ -143,7 +143,8 @@ public sealed class AtprotoTransientStoreControllerTests(AtprotoTransientApiFixt
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/event?pageSize=1");
         request.Headers.Accept.ParseAdd("application/hal+json");
         using var response = await fixture.Client.SendAsync(request);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(await response.Content.ReadAsStringAsync());
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         JsonElement links = document.RootElement.GetProperty("_links");
         var hrefs = links.EnumerateObject().SelectMany(link => link.Value.ValueKind == JsonValueKind.Array

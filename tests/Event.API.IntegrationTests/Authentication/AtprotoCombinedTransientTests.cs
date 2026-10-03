@@ -9,6 +9,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Authentication;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Domain.Secrets;
 using Explore.Persistence;
@@ -83,6 +84,7 @@ public sealed class AtprotoCombinedTransientTests(AtprotoRelationalLoginFixture 
         var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         string connection = database.Database.GetConnectionString()!;
         var secrets = scope.ServiceProvider.GetRequiredService<ISecretResolver>();
+        var identityFenceKeys = scope.ServiceProvider.GetRequiredService<IPrivacyIdentityFenceKeyProvider>();
         string ring = (await secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks, null)).Value!;
         var configuration = new Dictionary<string, string?>
         {
@@ -126,6 +128,8 @@ public sealed class AtprotoCombinedTransientTests(AtprotoRelationalLoginFixture 
                 services.AddPostgreSqlExploreDbContext(connection);
                 services.RemoveAll<ISecretResolver>();
                 services.AddSingleton(secrets);
+                services.RemoveAll<IPrivacyIdentityFenceKeyProvider>();
+                services.AddSingleton(identityFenceKeys);
                 services.PostConfigure<BffAuth.AtprotoClientKeyOptions>(options => options.OAuthClientPrivateJwks = ring);
                 services.RemoveAll<IDataProtectionProvider>();
                 services.AddSingleton<IDataProtectionProvider>(_ => fixture.CreateDataProtectionProvider());

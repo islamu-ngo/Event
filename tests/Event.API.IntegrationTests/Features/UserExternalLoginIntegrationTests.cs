@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
+using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
@@ -26,6 +27,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -44,8 +46,41 @@ public class UserExternalLoginIntegrationTests
     [Test]
     public async Task SyncUser_GoogleVerifiedEmail_ShouldAutoMatchExistingUserAndCreateGoogleLink()
     {
+        await using var runtime = new RealRuntimeApiFixture();
+        await runtime.InitializeAsync();
+        await runtime.ResetWithActiveDefaultTenantAsync();
         var existingUserId = Guid.NewGuid();
-        await EnsureUserExistsAsync(existingUserId, "shared@example.com");
+        string email = $"shared-{Guid.CreateVersion7():N}@example.test";
+        using (var seedScope = runtime.Factory.Services.CreateScope())
+        {
+            var seed = seedScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            seed.Users.Add(new User
+            {
+                Id = existingUserId,
+                Pii = new UserPii { Email = email, FirstName = "Shared", LastName = "User" },
+                CreatedAt = DateTime.UtcNow
+            });
+            var priorBinding = new UserExternalLogin
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = existingUserId,
+                User = null!,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+                AuthenticationProvider = null!,
+                ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+                    "https://identity.example.test/realms/previous", Guid.CreateVersion7().ToString("N")).Value,
+                CreatedAt = DateTime.UtcNow
+            };
+            var claim = UserIdentityEmailClaim.Create(existingUserId, email);
+            seed.UserExternalLogins.Add(priorBinding);
+            seed.UserIdentityEmailClaims.Add(claim);
+            seed.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(
+                existingUserId, claim.Id, priorBinding.Id, DateTime.UtcNow));
+            await seed.SaveChangesAsync();
+        }
+        var correlation = runtime.Factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value;
+        var originalIssuers = correlation.TrustedIssuers;
+        correlation.TrustedIssuers = ["https://accounts.google.com"];
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/user/sync");
         request.Headers.Add(TestAuthHandler.AuthHeaderName,
@@ -53,22 +88,31 @@ public class UserExternalLoginIntegrationTests
                 ("sub", "google-sub-123"),
                 ("iss", "https://accounts.google.com"),
                 ("name", "Shared User"),
-                ("email", "shared@example.com"),
+                ("email", email),
                 ("given_name", "Shared"),
                 ("family_name", "User"),
                 ("preferred_username", "shared.user"),
                 ("email_verified", "true"),
                 ("idp", "google")));
 
-        var response = await _fixture.Client.SendAsync(request);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        HttpResponseMessage response;
+        try
+        {
+            response = await runtime.Client.SendAsync(request);
+        }
+        finally
+        {
+            correlation.TrustedIssuers = originalIssuers;
+        }
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(await response.Content.ReadAsStringAsync());
 
         var body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
         await Assert.That(body).IsNotNull();
         await Assert.That(body!.IsSuccess).IsTrue();
         await Assert.That(body.Id).IsEqualTo(existingUserId);
 
-        using var scope = _fixture.Factory.Services.CreateScope();
+        using var scope = runtime.Factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         string providerKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
             "https://accounts.google.com",
@@ -79,6 +123,13 @@ public class UserExternalLoginIntegrationTests
                 && x.ProviderKey == providerKey);
         await Assert.That(googleLink).IsNotNull();
         await Assert.That(googleLink!.UserId).IsEqualTo(existingUserId);
+        var evidence = await dbContext.UserIdentityEmailEvidence
+            .SingleAsync(value => value.ExternalLoginId == googleLink.Id);
+        await Assert.That(evidence.IsActive).IsTrue();
+        await Assert.That(evidence.UserId).IsEqualTo(existingUserId);
+        await Assert.That(await dbContext.UserIdentityEmailClaims
+            .AnyAsync(value => value.Id == evidence.ClaimId
+                && value.UserId == existingUserId && value.NormalizedEmail == email)).IsTrue();
     }
 
     [Test]

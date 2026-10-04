@@ -76,6 +76,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     private EventDiscoveryTraversalResource? _traversal;
     private EventListFilterState? _traversalFilters;
     private string? _recoveryCode;
+    // Search-batch cancellation does not own previews, settings writes or explicit browser actions.
     private CancellationTokenSource? _discoveryCancellation;
     private string? _loadedUrlQuery;
 
@@ -574,7 +575,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         try
         {
             var detailTask = EventService.GetEventByIdAsync(evt.Id!.Value);
-            var sessionsTask = EventSessionService.GetSessionsByEventAsync(evt.Id!.Value);
+            var sessionsTask = EventSessionService.GetSessionsByEventAsync(evt.Id!.Value, cancellationToken: CancellationToken.None);
             await Task.WhenAll(detailTask, sessionsTask);
 
             _selectedEventDetail = await detailTask;
@@ -643,7 +644,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     {
         try
         {
-            var result = await UserSettingsService.GetSettingsAsync("event-list");
+            var result = await UserSettingsService.GetSettingsAsync("event-list", CancellationToken.None);
             if (result?.Settings != null)
             {
                 _userSettings = result.Settings;
@@ -793,7 +794,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
             _isSaving = true;
             await InvokeAsync(StateHasChanged);
 
-            var result = await UserSettingsService.UpdateSettingsBatchAsync("event-list", changesToSave);
+            var result = await UserSettingsService.UpdateSettingsBatchAsync("event-list", changesToSave, CancellationToken.None);
             UserSettingsService.InvalidateCache("event-list");
 
             await InvokeAsync(() =>
@@ -840,7 +841,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
             _autosaveTimer = null;
             lock (_pendingChangesLock) { _pendingChanges.Clear(); }
 
-            await UserSettingsService.ResetAllAsync("event-list");
+            await UserSettingsService.ResetAllAsync("event-list", CancellationToken.None);
             UserSettingsService.InvalidateCache("event-list");
             await LoadUserSettingsAsync();
             Snackbar.Add("Settings reset to defaults", Severity.Success);
@@ -887,7 +888,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         if (path is null) return;
 
         var url = AbsoluteUrlBuilder.Build(Navigation, path);
-        if (await BrowserActionInterop.CopyTextAsync(url))
+        if (await BrowserActionInterop.CopyTextAsync(url, CancellationToken.None))
         {
             Snackbar.Add("Link copied to clipboard", Severity.Success, options => options.VisibleStateDuration = 2000);
             return;
@@ -920,12 +921,12 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
         var url = AbsoluteUrlBuilder.Build(Navigation, path);
 
-        if (await BrowserActionInterop.ShareAsync(eventToShare.Title ?? "Event", url))
+        if (await BrowserActionInterop.ShareAsync(eventToShare.Title ?? "Event", url, CancellationToken.None))
         {
             return;
         }
 
-        if (await BrowserActionInterop.CopyTextAsync(url))
+        if (await BrowserActionInterop.CopyTextAsync(url, CancellationToken.None))
         {
             Snackbar.Add("Link copied to clipboard", Severity.Success,
                 options => options.VisibleStateDuration = 2000);
@@ -1396,7 +1397,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
             {
                 try
                 {
-                    await UserSettingsService.UpdateSettingsBatchAsync("event-list", finalChanges);
+                    await UserSettingsService.UpdateSettingsBatchAsync("event-list", finalChanges, CancellationToken.None);
                     UserSettingsService.InvalidateCache("event-list");
                 }
                 catch (Exception ex)

@@ -11,6 +11,7 @@ using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Federation;
 using Explore.Infrastructure.Tests.Infrastructure;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Federation;
@@ -60,15 +61,16 @@ public sealed class AtprotoAdapterDidBoundaryTests
     [Test]
     public async Task ThumbnailIngress_ExactCaseSensitiveScalarCrossesBothProviderBoundaries()
     {
+        await using var environment = await StorageTestEnvironment.CreateAsync();
         var transport = new RecordingTransport(CaseSensitiveDid);
-        var storage = new RecordingStorage();
         var gateway = new AtprotoThumbnailBlobGateway(
             transport.CreateHandler,
-            storage,
+            environment.Producer,
+            environment.Policy,
             maximumBytes: 64,
             requestTimeout: TimeSpan.FromSeconds(1));
 
-        FileStorageWriteResult? result = await gateway.FetchAndStageAsync(
+        StagedStorageWrite? result = await gateway.FetchAndStageAsync(
             new AtprotoThumbnailBlobCandidate(CaseSensitiveDid, ValidCid, "image/png", 8),
             Guid.CreateVersion7(),
             CancellationToken.None);
@@ -77,23 +79,25 @@ public sealed class AtprotoAdapterDidBoundaryTests
         await Assert.That(transport.Requests.Count).IsEqualTo(2);
         await Assert.That(transport.Requests[^1].AbsoluteUri).IsEqualTo(
             $"https://pds.example/xrpc/com.atproto.sync.getBlob?did={Uri.EscapeDataString(CaseSensitiveDid)}&cid={ValidCid}");
-        await Assert.That(storage.WriteObserved).IsFalse();
+        await Assert.That(await environment.Context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
+        await Assert.That(Directory.EnumerateFiles(environment.Root, "*", SearchOption.AllDirectories)).IsEmpty();
     }
 
     [Test]
     public async Task ThumbnailIngress_MalformedDidsFailBeforeHandlerNetworkOrStorage()
     {
+        await using var environment = await StorageTestEnvironment.CreateAsync();
         foreach (string malformedDid in MalformedDids())
         {
             var transport = new RecordingTransport(malformedDid);
-            var storage = new RecordingStorage();
             var gateway = new AtprotoThumbnailBlobGateway(
                 transport.CreateHandler,
-                storage,
+                environment.Producer,
+                environment.Policy,
                 maximumBytes: 64,
                 requestTimeout: TimeSpan.FromSeconds(1));
 
-            FileStorageWriteResult? result = await gateway.FetchAndStageAsync(
+            StagedStorageWrite? result = await gateway.FetchAndStageAsync(
                 new AtprotoThumbnailBlobCandidate(malformedDid, ValidCid, "image/png", 8),
                 Guid.CreateVersion7(),
                 CancellationToken.None);
@@ -101,7 +105,8 @@ public sealed class AtprotoAdapterDidBoundaryTests
             await Assert.That(result).IsNull();
             await Assert.That(transport.HandlerCreations).IsEqualTo(0);
             await Assert.That(transport.Requests).IsEmpty();
-            await Assert.That(storage.WriteObserved).IsFalse();
+            await Assert.That(await environment.Context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
+            await Assert.That(Directory.EnumerateFiles(environment.Root, "*", SearchOption.AllDirectories)).IsEmpty();
         }
     }
 

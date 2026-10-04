@@ -7,12 +7,13 @@ using Microsoft.Extensions.Options;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed class EmbeddedPrivacyErasureAuthorityRepository(
+public sealed partial class EmbeddedPrivacyErasureAuthorityRepository(
     IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext> contextFactory,
     TimeProvider timeProvider,
     IOptions<PrivacyErasureOptions> options,
-    EmbeddedPrivacyErasureAuthorityStorage? storage = null)
-    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance
+    EmbeddedPrivacyErasureAuthorityStorage? storage = null,
+    ExploreDbContext? applicationContext = null)
+    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority
 {
     public const int MaximumReadBatchSize = 500;
     private static readonly SemaphoreSlim WriterLock = new(1, 1);
@@ -30,42 +31,42 @@ public sealed class EmbeddedPrivacyErasureAuthorityRepository(
         PrivacyErasureCounter? counter = await db.AuthorityCounters
             .AsNoTracking()
             .SingleOrDefaultAsync(cancellationToken);
+        if (counter is null && await db.ErasureIntents.AnyAsync(cancellationToken))
+            throw new InvalidOperationException("privacy_identity_fence_authority_state_unavailable");
         return counter?.GetState() ?? new PrivacyErasureAuthorityState(0, 0);
     }
 
-    public async Task<PrivacyErasureIntent> AppendAsync(
+    public Task<PrivacyErasureIntent> AppendAsync(
         PrivacyErasureRequest intent,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(intent);
-        if (storage is not null)
+        return ExecuteSerializedAsync(async token =>
         {
-            await storage.EnsureReadyAsync(cancellationToken);
-        }
-        await WriterLock.WaitAsync(cancellationToken);
-        try
-        {
-            await using EmbeddedPrivacyErasureAuthorityDbContext db =
-                await contextFactory.CreateDbContextAsync(cancellationToken);
-            await using var transaction =
-                await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            EmbeddedPrivacyErasureAuthorityDbContext db = _identityGate.Value!;
+            if (intent.IdentityKeyId is not null)
+                await ValidateKeyAsync(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!, token);
 
             PrivacyErasureIntent? existing = await db.ErasureIntents
-                .SingleOrDefaultAsync(item => item.IntentId == intent.IntentId, cancellationToken);
+                .Include(item => item.IdentityFences)
+                .SingleOrDefaultAsync(item => item.IntentId == intent.IntentId, token);
             if (existing is not null)
             {
                 EnsureSamePayload(existing, intent);
-                await transaction.CommitAsync(cancellationToken);
                 return existing;
             }
 
             PrivacyErasureCounter? counter = await db.AuthorityCounters
-                .SingleOrDefaultAsync(cancellationToken);
+                .SingleOrDefaultAsync(token);
             if (counter is null)
             {
+                if (await db.ErasureIntents.AnyAsync(token))
+                    throw new InvalidOperationException("privacy_identity_fence_authority_state_unavailable");
                 counter = PrivacyErasureCounter.Start();
                 db.AuthorityCounters.Add(counter);
             }
+            if (intent.IdentityKeyId is not null)
+                counter.BindIdentityKey(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!);
             long sequence = counter.AllocateNext();
             DateTime recordedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
             var fact = PrivacyErasureIntent.Record(
@@ -77,17 +78,12 @@ public sealed class EmbeddedPrivacyErasureAuthorityRepository(
                 intent.PolicyVersion,
                 recordedAtUtc,
                 recordedAtUtc,
-                recordedAtUtc + options.Value.AuthorityRetention);
+                recordedAtUtc + options.Value.AuthorityRetention,
+                intent.IdentityFences);
             db.ErasureIntents.Add(fact);
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            storage?.HardenCompanionFiles();
+            await db.SaveChangesAsync(token);
             return fact;
-        }
-        finally
-        {
-            WriterLock.Release();
-        }
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<PrivacyErasureIntent>> ReadAfterAsync(
@@ -117,6 +113,7 @@ public sealed class EmbeddedPrivacyErasureAuthorityRepository(
 
         return await db.ErasureIntents
             .AsNoTracking()
+            .Include(item => item.IdentityFences)
             .Where(item => item.AuthoritySequence > authoritySequence)
             .OrderBy(item => item.AuthoritySequence)
             .Take(limit)
@@ -352,7 +349,8 @@ public sealed class EmbeddedPrivacyErasureAuthorityRepository(
         if (existing.SubjectKind != requested.SubjectKind
             || existing.SubjectId != requested.SubjectId
             || existing.ReasonCode != requested.ReasonCode
-            || existing.PolicyVersion != requested.PolicyVersion)
+            || existing.PolicyVersion != requested.PolicyVersion
+            || !existing.HasSameIdentityFences(requested.IdentityFences))
         {
             throw new InvalidOperationException(
                 "The erasure authority rejected the append payload for this IntentId.");

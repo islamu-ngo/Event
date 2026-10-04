@@ -25,6 +25,7 @@ public sealed class PrivacyErasureIntentConfiguration
         });
 
         builder.HasKey(item => item.AuthoritySequence);
+        builder.HasIndex(item => new { item.SubjectKind, item.SubjectId });
         builder.Property(item => item.AuthoritySequence).ValueGeneratedNever();
         builder.HasIndex(item => new { item.IntentId, item.SubjectKind, item.PolicyVersion })
             .IsUnique();

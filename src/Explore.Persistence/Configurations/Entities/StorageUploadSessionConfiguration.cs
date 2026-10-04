@@ -56,9 +56,9 @@ public class StorageUploadSessionConfiguration : IEntityTypeConfiguration<Storag
             .HasFilter("idempotency_key IS NOT NULL")
             .HasDatabaseName("ux_storage_upload_sessions_tenant_idempotency_key");
 
-        builder.HasIndex(e => new { e.Provider, e.ObjectKey })
+        builder.HasIndex(e => new { e.StorageProviderBindingId, e.ObjectKey })
             .HasFilter("object_key IS NOT NULL")
-            .HasDatabaseName("ix_storage_upload_sessions_provider_object_key");
+            .HasDatabaseName("ix_storage_upload_sessions_binding_object_key");
 
         builder.HasIndex(e => new { e.TenantId, e.OwningResourceKind, e.OwningResourceId })
             .HasFilter("owning_resource_kind IS NOT NULL AND owning_resource_id IS NOT NULL")
@@ -69,7 +69,9 @@ public class StorageUploadSessionConfiguration : IEntityTypeConfiguration<Storag
             t.HasCheckConstraint("ck_storage_upload_sessions_expected_size_nonnegative", "expected_size_bytes >= 0");
             t.HasCheckConstraint("ck_storage_upload_sessions_reserved_bytes_nonnegative", "reserved_bytes >= 0");
             t.HasCheckConstraint("ck_storage_upload_sessions_policy_max_upload_bytes_nonnegative", "policy_max_upload_bytes >= 0");
-            t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
+            t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible')");
+            t.HasCheckConstraint("ck_storage_upload_sessions_bound_target",
+                "storage_provider_binding_id IS NOT NULL AND storage_provider_binding_id <> '00000000-0000-0000-0000-000000000000'");
             t.HasCheckConstraint("ck_storage_upload_sessions_route_key", "route_key IN ('images', 'documents', 'general')");
             t.HasCheckConstraint("ck_storage_upload_sessions_visibility", "visibility IN ('public_image', 'authenticated_tenant', 'private_owner')");
             t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");

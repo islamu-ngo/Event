@@ -110,7 +110,7 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
         await using (var migrator = new CoLocatedPrivacyErasureAuthorityDbContext(
             CreateAuthorityOptions(PrimaryDatabaseRole.Migrator, schema)))
         {
-            string migration = migrator.Database.GetMigrations().Single();
+            string migration = migrator.Database.GetMigrations().Last();
             IMigrator migrationRunner = migrator.GetService<IMigrator>();
             await migrationRunner.MigrateAsync(migration);
             await migrationRunner.MigrateAsync(Migration.InitialDatabase);
@@ -284,7 +284,7 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
                 .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>();
             await using EmbeddedPrivacyErasureAuthorityDbContext context =
                 await factory.CreateDbContextAsync();
-            string migration = context.Database.GetMigrations().Single();
+            string migration = context.Database.GetMigrations().Last();
             IMigrator migrationRunner = context.GetService<IMigrator>();
             await migrationRunner.MigrateAsync(migration);
             await migrationRunner.MigrateAsync(Migration.InitialDatabase);
@@ -304,7 +304,7 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             await Assert.That(authority).IsTypeOf<EmbeddedPrivacyErasureAuthorityRepository>();
             await Assert.That(services.Single(descriptor =>
                 descriptor.ServiceType == typeof(IPrivacyErasureAuthority)).Lifetime)
-                .IsEqualTo(ServiceLifetime.Singleton);
+                .IsEqualTo(ServiceLifetime.Scoped);
             await Assert.That(Path.GetFullPath(dataSource)).IsEqualTo(Path.GetFullPath(primaryPath));
             await Assert.That(context.Model.FindEntityType(typeof(PrivacyErasureIntent))!
                 .GetTableName()).IsEqualTo("ie_erasure_intents");
@@ -459,9 +459,16 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             descriptor.ServiceType == typeof(IPrivacyErasureAuthority))).IsEqualTo(1);
         await Assert.That(coLocatedSqlite.Count(descriptor =>
             descriptor.ServiceType == typeof(IPrivacyErasureAuthority))).IsEqualTo(1);
-        await Assert.That(embedded.Single(descriptor =>
-            descriptor.ServiceType == typeof(IPrivacyErasureAuthority)).ImplementationType)
-            .IsEqualTo(typeof(EmbeddedPrivacyErasureAuthorityRepository));
+        ServiceDescriptor embeddedAuthority = embedded.Single(descriptor =>
+            descriptor.ServiceType == typeof(IPrivacyErasureAuthority));
+        await Assert.That(embeddedAuthority.Lifetime).IsEqualTo(ServiceLifetime.Singleton);
+        await Assert.That(embeddedAuthority.ImplementationFactory).IsNotNull();
+        await using (ServiceProvider provider = embedded.BuildIsolatedServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true }))
+        {
+            await Assert.That(provider.GetRequiredService<IPrivacyErasureAuthority>())
+                .IsTypeOf<EmbeddedPrivacyErasureAuthorityRepository>();
+        }
         await Assert.That(external.Single(descriptor =>
             descriptor.ServiceType == typeof(IPrivacyErasureAuthority)).ImplementationType)
             .IsEqualTo(typeof(EfCorePrivacyErasureAuthorityRepository));

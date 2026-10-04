@@ -1,0 +1,28 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M40A08RCWWF3P389963B4BHJ
+Title: "Load canonical verified email evidence for recipient delivery"
+Type: fix
+Scope: access
+Summary: "Admission issuance and reliable email delivery load the canonical identity claims and supporting binding evidence before recipient resolution; editable profile fields cannot substitute for verified proof."
+Group: verified-identity-recipient-delivery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

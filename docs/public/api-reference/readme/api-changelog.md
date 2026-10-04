@@ -8,6 +8,18 @@ The draft HTTP API version is `0.1`. In pre-release development before v1, break
 
 ## Current mainline contract
 
+### Storage origin and delivery (2026-10-02)
+
+Storage `uri` is a nullable policy-derived route, not a persisted provider or
+origin address. Eligible managed public images use `/api/storageobject/{id}/public`;
+private and tenant content use authenticated `/api/storageobject/{id}/content`.
+Resource files retain their separately authorized resource content route.
+External references never acquire managed delivery automatically.
+Ordinary storage detail/list and upload-session responses no longer expose
+backend provider identity. Source, bucket, key, binding, and version stay private.
+Continue to gate actions by HAL links. See [storage operations](../../documentation/readme/integrations-and-ai/storage.md)
+for the explicit pre-release provenance cutover procedure.
+
 * HAL representations are default where available; clients use `_links` for resource actions.
 * API version negotiation uses media type, query, or `X-Api-Version`; URL-segment versions are not supported.
 * Failures use RFC 7807 ProblemDetails rather than failed success-shaped command bodies.

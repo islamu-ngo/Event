@@ -405,14 +405,23 @@ public sealed class LocalBootstrapConvergenceTests
             var setup = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
             var deployment = scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>();
             var systemSettings = new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork));
+            var identityEmails = new UserIdentityEmailRepository(application);
+            var privacyState = new PrivacyErasureStateRepository(application);
             var completion = new InstanceOnboardingCompletionOperation(bootstrap, platformRoles, tenantRoles,
                 new TenantUserRepository(application), new RoleRepository(application), new UserRepository(application),
-                new ActorRepository(application), logins, tenants, new TenantCreationService(tenants, documents),
+                new ActorRepository(application), logins, identityEmails, privacyState,
+                new IdentityAccountResolver(new UserRepository(application), logins, identityEmails,
+                    privacyState, Options.Create(new IdentityCorrelationOptions())),
+                new IdentityEmailSynchronizationOperation(identityEmails),
+                tenants, new TenantCreationService(tenants, documents),
                 systemSettings,
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
                 deployment, new RuntimeMetadataRefresh(),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
-                GenerationReader(scope), Configuration, OperatorOptions);
+                GenerationReader(scope), Configuration,
+                new PrivacyIdentityFenceOperation(
+                    Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()),
+                OperatorOptions);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,
                 new RuntimeAuthenticationProviderDispatcher(

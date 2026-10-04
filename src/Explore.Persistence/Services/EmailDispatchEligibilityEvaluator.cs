@@ -278,6 +278,8 @@ public sealed class EmailDispatchEligibilityEvaluator(
         var user = await dbContext.Users
             .AsNoTracking()
             .Include(value => value.Pii)
+            .Include(value => value.IdentityEmailClaims)
+                .ThenInclude(claim => claim.Evidence)
             .SingleOrDefaultAsync(value => value.Id == dispatch.RecipientUserId, cancellationToken);
         if (user is null || user.IsDeleted)
         {

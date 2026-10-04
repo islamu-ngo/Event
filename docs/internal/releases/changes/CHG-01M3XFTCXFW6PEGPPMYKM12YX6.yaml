@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3XFTCXFW6PEGPPMYKM12YX6
+Title: "Enforce verified account email ownership"
+Type: feat
+Scope: access
+Summary: "Canonical verified addresses belong to one account; editable contacts cannot drive correlation or delivery, and erased external identities cannot silently reenroll."
+Group: identity-correlation-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented

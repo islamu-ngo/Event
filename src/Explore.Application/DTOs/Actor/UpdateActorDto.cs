@@ -19,4 +19,5 @@ public sealed record UpdateActorProfileDto
 public sealed record UpdateActorProfileImageDto
 {
     public OptionalUpdate<Guid?> ProfilePictureId { get; init; } = OptionalUpdate<Guid?>.Unspecified();
+    public OptionalUpdate<string?> ExternalProfilePictureUri { get; init; } = OptionalUpdate<string?>.Unspecified();
 }

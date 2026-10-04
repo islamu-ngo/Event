@@ -90,3 +90,28 @@
 - [x] Stays in journal as diagnostic evidence; the host-fixture contract is recorded in TESTING.md.
 
 ---
+
+[2026-10-03 Europe/Brussels] — Validate class-segment OR before bounded TUnit acceptance
+
+**Context**: Exhaustive API and Persistence acceptance required separate processes to bound accumulated integration-host memory without omitting cases.
+
+**Symptom / Observation**: Joining complete tree paths with `|` executed unrelated classes rather than the intended two-class slice. Native managed-stack inspection identified unrelated test executors. A leading class wildcard also selected both `PrimaryDatabaseProviderBehaviorContractTests` and `ContainerizedPrimaryDatabaseProviderBehaviorContractTests`.
+
+**Root Cause**: TUnit tree filters express alternatives within a path segment, not as independently joined complete paths. A wildcard before a class name deliberately permits additional prefixes. Successful execution alone cannot prove the requested class set.
+
+**Resolution**: Use exact, parenthesized class alternatives in one segment: `--treenode-filter '/*/*/(EmailDeliveryGraphRevisionTests)|(EventResourceStorageCleanupTests)/*'`. Before executing a new cohort, run the native project executable with `--list-tests json`, inspect `.tests[].type.typeName`, and verify the exact selected classes and case count. The corrected two-class inventory selected exactly 27 cases; separate exact-class executions passed 15/15 and 12/12. Validate exhaustive cohorts as a non-overlapping partition and give each run a unique TRX filename. `dotnet test` wrapper output that says zero tests ran while listing is not execution evidence.
+
+**Why This Matters for Future Work**: A malformed slice can silently become a broad run, producing misleading provider coverage and defeating the memory bound. Inventory validation establishes selection; exit status and unique TRX counters establish execution. Neither substitutes for the other.
+
+**References**:
+
+- `docs/internal/OPERATIONS.md#verification-policy`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryGraphRevisionTests.cs`
+- `tests/Event.Persistence.IntegrationTests/EventResourceStorageCleanupTests.cs`
+- https://tunit.dev/docs/execution/test-filters/
+
+**Promotion Consideration**:
+
+- [x] Operator guidance is recorded in `docs/internal/OPERATIONS.md`; this entry retains the observed diagnostic evidence.
+
+---

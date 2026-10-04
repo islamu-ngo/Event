@@ -298,6 +298,9 @@ public sealed class StorageProviderIdentityTests
         }
         public Task<StorageProviderBinding?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(_bindings.GetValueOrDefault(id));
+        public Task<IReadOnlyList<StorageProviderBinding>> ListLocalAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<StorageProviderBinding>>(
+                _bindings.Values.Where(binding => binding.Provider == StorageProviders.Local).ToArray());
     }
 
     private static S3FileStorageProvider CreateS3(IAmazonS3 client, bool boundTarget = false)

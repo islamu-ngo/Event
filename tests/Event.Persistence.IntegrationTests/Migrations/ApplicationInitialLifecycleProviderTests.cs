@@ -46,21 +46,23 @@ public sealed class SqliteApplicationInitialLifecycleTests
         await using var context = new ExploreDbContext(options.Options);
         IMigrator migrator = context.GetService<IMigrator>();
         string[] migrations = context.Database.GetMigrations().ToArray();
-        await Assert.That(migrations).HasSingleItem();
-        string initialMigration = migrations[0];
-        await Assert.That(initialMigration).EndsWith("_Init");
+        string initialMigration = migrations.Single(id => id.EndsWith("_Init", StringComparison.Ordinal));
+        await Assert.That(migrations[0]).IsEqualTo(initialMigration);
 
         await migrator.MigrateAsync(initialMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
             .IsEquivalentTo([initialMigration], TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(await context.Database.CanConnectAsync()).IsTrue();
+        await migrator.MigrateAsync();
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
 
         await migrator.MigrateAsync(Migration.InitialDatabase);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
 
-        await migrator.MigrateAsync(initialMigration);
+        await migrator.MigrateAsync();
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo([initialMigration], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+            .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(await context.Database.CanConnectAsync()).IsTrue();
     }
 

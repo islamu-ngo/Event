@@ -104,30 +104,42 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
     [Test]
     public async Task PrivacyErasure_QueuesProviderDeletionAndFencesStorageBeforeRemovingMetadata()
     {
-        Guid tenantId = Guid.CreateVersion7();
-        Guid subjectId = Guid.CreateVersion7();
-        await using ExploreDbContext context = CreateContext(tenantId);
-        RegistrationFileScope scope = CreateRegistrationFileScope(tenantId, subjectId);
+        await using var database = new EventResourceFileUploadTests.Database();
+        await database.InitializeAsync();
+        await using var seeds = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
+        var owner = await seeds.SeedScopeAsync();
+        await using ExploreDbContext context = database.CreateContext();
+        Guid subjectId = (await context.Actors.Where(actor => actor.Id == owner.ActorId)
+            .Select(actor => actor.UserId).SingleAsync())!.Value;
+        RegistrationFileScope scope = CreateRegistrationFileScope(owner.TenantAId, subjectId, owner.EventAId);
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        scope.StorageObject.StorageProviderBindingId = binding.Id;
+        context.Add(binding);
+        context.AddRange(scope.Parents);
         context.AddRange(scope.Order, scope.Submission, scope.StorageObject, scope.File);
         await context.SaveChangesAsync();
         var erasure = new UserLocationPrivacyErasureRepository(context);
 
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         IReadOnlyList<Explore.Application.Contracts.Persistence.PrivacyErasureProviderCandidate> candidates =
             await erasure.GetProviderCandidatesAsync(subjectId, CancellationToken.None);
         await erasure.EraseRegistrationAnswerFilesAsync(subjectId, CancellationToken.None);
+        await transaction.CommitAsync();
 
         await Assert.That(candidates.Any(candidate =>
             candidate.ProviderKind == Explore.Domain.PrivacyErasureProviderKind.ObjectStorage &&
             candidate.Action == Explore.Domain.PrivacyErasureProviderAction.DeleteOwnedObject &&
             candidate.TargetId == scope.StorageObject.Id &&
-            candidate.Locator == scope.ObjectKey)).IsTrue();
+            candidate.Locator == scope.ObjectKey)).IsFalse();
         await Assert.That(await context.RegistrationAnswerFiles
             .IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
-        StorageObject erasedStorage = await context.StorageObjects
-            .IgnoreQueryFilters().SingleAsync(item => item.Id == scope.StorageObject.Id);
-        await Assert.That(erasedStorage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Deleted);
-        await Assert.That(erasedStorage.IsDeleted).IsTrue();
-        await Assert.That(erasedStorage.ObjectKey).IsNull();
+        await Assert.That(await context.StorageObjects.IgnoreQueryFilters()
+            .AnyAsync(item => item.Id == scope.StorageObject.Id)).IsFalse();
+        var retained = await context.StorageObjectDeletionTombstones
+            .SingleAsync(item => item.Id == scope.StorageObject.Id);
+        await Assert.That(retained.ProviderBindingId).IsEqualTo(binding.Id);
+        await Assert.That(retained.ObjectKey).IsEqualTo(scope.ObjectKey);
+        await Assert.That(retained.State).IsEqualTo(StorageObjectDeletionState.Ready);
         context.ChangeTracker.Clear();
         var storageRepository = new StorageObjectRepository(context);
         await Assert.That(await storageRepository.GetById(scope.StorageObject.Id)).IsNull();
@@ -166,7 +178,6 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
         FileTypeId = 1,
         FileType = null!,
         Tenant = null!,
-        Uri = "/api/storageobject/file/content",
         ObjectKey = $"tenants/{tenantId:N}/{Guid.NewGuid():N}.pdf",
         Provider = StorageProviders.Local,
         FullName = "document.pdf",
@@ -181,10 +192,10 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
         ConcurrencyStamp = Guid.CreateVersion7()
     };
 
-    private static RegistrationFileScope CreateRegistrationFileScope(Guid tenantId, Guid subjectId)
+    private static RegistrationFileScope CreateRegistrationFileScope(Guid tenantId, Guid subjectId, Guid? parentEventId = null)
     {
         DateTime now = new(2026, 8, 2, 22, 0, 0, DateTimeKind.Utc);
-        Guid eventId = Guid.CreateVersion7();
+        Guid eventId = parentEventId ?? Guid.CreateVersion7();
         RegistrationWorkflow workflow = RegistrationWorkflow.Create(tenantId, eventId, "FILES", now);
         RegistrationRequirement requirement = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
@@ -204,9 +215,10 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
             RegistrationFieldTypeEnum.File, 1,
             RegistrationOrganizerVisibilityEnum.AuthorizedOrganizers,
             false, false, now);
+        EventTicketCatalogVersion catalog = EventTicketCatalogVersion.Create(tenantId, eventId, "EUR", 2);
         RegistrationOrder order = RegistrationOrder.Create(
             tenantId, eventId, subjectId, null, BookingPartyTypeEnum.Individual,
-            Guid.CreateVersion7(),
+            catalog.Id,
             RegistrationParticipationSnapshot.Create(
                 Guid.CreateVersion7(), 4, 3, 2, GuestRecoveryPolicyEnum.VerifiedEmailRequired),
             workflow.Id, null, "EUR", now, now.AddHours(1));
@@ -221,7 +233,8 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
         string objectKey = storageObject.ObjectKey!;
         RegistrationAnswerFile file = RegistrationAnswerFile.Create(
             tenantId, submission.Id, field, storageObject, now.AddMinutes(2));
-        return new RegistrationFileScope(order, submission, storageObject, file, objectKey);
+        return new RegistrationFileScope(order, submission, storageObject, file, objectKey,
+            [workflow, requirement, channel, form, version, section, field, attempt, catalog]);
     }
 
     private sealed record RegistrationFileScope(
@@ -229,7 +242,8 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
         RegistrationSubmission Submission,
         StorageObject StorageObject,
         RegistrationAnswerFile File,
-        string ObjectKey);
+        string ObjectKey,
+        object[] Parents);
 
     private sealed record TestTenantContext(Guid TenantId)
         : Explore.Application.Contracts.Infrastructure.ITenantContext;

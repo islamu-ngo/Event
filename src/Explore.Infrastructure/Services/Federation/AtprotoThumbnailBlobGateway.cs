@@ -8,6 +8,8 @@ using Explore.Application.Models.Storage;
 using Explore.Application.Services;
 using Explore.Atproto.Transport;
 using Explore.Domain.ValueObjects;
+using Explore.Domain;
+using Explore.Infrastructure.Storage;
 
 namespace Explore.Infrastructure.Services.Federation;
 
@@ -15,14 +17,16 @@ public sealed class AtprotoThumbnailBlobGateway : IAtprotoThumbnailBlobGateway
 {
     private const int MaximumIdentityResponseBytes = 1024 * 1024;
     private readonly Func<AtprotoOutboundPolicy, HttpMessageHandler> _primaryHandlerFactory;
-    private readonly IFileStorageProvider _storage;
+    private readonly ManagedStorageProducer _storage;
+    private readonly IStoragePolicyResolver _policy;
     private readonly int _maximumBytes;
     private readonly TimeSpan _requestTimeout;
 
-    public AtprotoThumbnailBlobGateway(IFileStorageProvider storage)
+    public AtprotoThumbnailBlobGateway(ManagedStorageProducer storage, IStoragePolicyResolver policy)
         : this(
             policy => AtprotoHardenedHttpClient.CreatePrimaryHandler(policy, TimeSpan.FromSeconds(5)),
             storage,
+            policy,
             maximumBytes: AtprotoPdsSnapshotGateway.MaximumTargetRecordBytes,
             requestTimeout: AtprotoPdsSnapshotGateway.RequestTimeout)
     {
@@ -30,7 +34,8 @@ public sealed class AtprotoThumbnailBlobGateway : IAtprotoThumbnailBlobGateway
 
     internal AtprotoThumbnailBlobGateway(
         Func<AtprotoOutboundPolicy, HttpMessageHandler> primaryHandlerFactory,
-        IFileStorageProvider storage,
+        ManagedStorageProducer storage,
+        IStoragePolicyResolver policy,
         int maximumBytes,
         TimeSpan requestTimeout)
     {
@@ -41,11 +46,12 @@ public sealed class AtprotoThumbnailBlobGateway : IAtprotoThumbnailBlobGateway
 
         _primaryHandlerFactory = primaryHandlerFactory;
         _storage = storage;
+        _policy = policy;
         _maximumBytes = maximumBytes;
         _requestTimeout = requestTimeout;
     }
 
-    public async Task<FileStorageWriteResult?> FetchAndStageAsync(
+    public async Task<StagedStorageWrite?> FetchAndStageAsync(
         AtprotoThumbnailBlobCandidate? candidate,
         Guid tenantId,
         CancellationToken cancellationToken)
@@ -56,7 +62,7 @@ public sealed class AtprotoThumbnailBlobGateway : IAtprotoThumbnailBlobGateway
         }
 
         var policy = new AtprotoOutboundPolicy(allowsDevelopmentLoopback: false);
-        FileStorageWriteResult? staged = null;
+        StagedStorageWrite? staged = null;
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -75,7 +81,10 @@ public sealed class AtprotoThumbnailBlobGateway : IAtprotoThumbnailBlobGateway
                 timeout.Token).ConfigureAwait(false);
 
             using var content = new MemoryStream(bytes, writable: false);
-            staged = await _storage.WriteAsync(
+            var storagePolicy = await _policy.ResolveAsync(tenantId,
+                new StoragePolicyIntent(StorageObjectPurposes.EventImage, StorageObjectVisibilities.PublicImage,
+                    mimeType!, null, null, candidate!.Size), timeout.Token);
+            staged = await _storage.WriteAsync(storagePolicy.Provider,
                 new FileStorageWriteInput(
                     tenantId,
                     content,
@@ -111,12 +120,12 @@ public sealed class AtprotoThumbnailBlobGateway : IAtprotoThumbnailBlobGateway
     }
 
     public async Task CleanupAsync(
-        FileStorageWriteResult staged,
+        StagedStorageWrite staged,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(staged);
-        await _storage.DeleteAsync(
-            new FileStorageDeleteInput(staged.ObjectKey),
+        await _storage.RetireAsync(
+            staged.OperationId, staged.TenantId,
             cancellationToken).ConfigureAwait(false);
     }
 

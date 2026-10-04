@@ -57,7 +57,8 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
                 "Public image content");
         }
 
-        if (CanReadContent(dto) && dto.ContentEligibility.PresignedDownloadAllowed)
+        if (CanReadContent(dto) && dto.ContentEligibility.PresignedDownloadAllowed
+            && dto.SupportsPresignedDownload)
         {
             yield return new LinkDefinition(
                 "presigned-download",
@@ -78,7 +79,10 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
                 "PATCH",
                 RequiresAuth: true)
                 .RequirePermission(AuthorizationActions.Update, ResourceDescriptors.StorageObject, dto);
+        }
 
+        if (CanRetire(dto))
+        {
             yield return LinkDefinition.Delete(
                 RouteNames.DeleteStorageObject,
                 new { id = dto.Id })
@@ -89,6 +93,7 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
     private static bool CanReadContent(StorageObjectDto dto) =>
         string.Equals(dto.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal)
         && !dto.IsDeleted
+        && !string.IsNullOrEmpty(dto.Uri)
         && dto.ContentEligibility.ContentAllowed;
 
     private static bool CanReadPublicImage(StorageObjectDto dto) =>
@@ -100,6 +105,9 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
         && dto.DeletedAt is null
         && dto.LifecycleState is not StorageObjectLifecycleStates.Deleted
             and not StorageObjectLifecycleStates.DeleteRequested;
+
+    private static bool CanRetire(StorageObjectDto dto) =>
+        CanMutate(dto) && dto.RetirementAllowed;
 }
 
 /// <summary>
@@ -159,7 +167,10 @@ public sealed class StorageObjectCollectionLinkPolicy : ICollectionLinkPolicy<St
                     dto.Id.ToString(),
                     new AuthorizationScope(TenantId: dto.TenantId.ToString()),
                     StorageObjectFacts(dto));
+        }
 
+        if (CanRetire(dto))
+        {
             yield return LinkDefinition.Delete(
                 RouteNames.DeleteStorageObject,
                 new { id = dto.Id })
@@ -193,6 +204,7 @@ public sealed class StorageObjectCollectionLinkPolicy : ICollectionLinkPolicy<St
 
     private static bool CanReadContent(StorageObjectListDto dto) =>
         string.Equals(dto.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal)
+        && !string.IsNullOrEmpty(dto.Uri)
         && dto.ContentEligibility.ContentAllowed;
 
     private static bool CanReadPublicImage(StorageObjectListDto dto) =>
@@ -202,6 +214,9 @@ public sealed class StorageObjectCollectionLinkPolicy : ICollectionLinkPolicy<St
     private static bool CanMutate(StorageObjectListDto dto) =>
         dto.LifecycleState is not StorageObjectLifecycleStates.Deleted
             and not StorageObjectLifecycleStates.DeleteRequested;
+
+    private static bool CanRetire(StorageObjectListDto dto) =>
+        CanMutate(dto) && dto.RetirementAllowed;
 
     private static IAuthorizationFacts StorageObjectFacts(StorageObjectListDto dto) =>
         new PersistedStorageObjectAuthorizationFacts(

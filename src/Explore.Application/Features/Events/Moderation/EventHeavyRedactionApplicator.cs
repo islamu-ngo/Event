@@ -1,4 +1,3 @@
-using Explore.Application.Authorization;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
@@ -34,11 +33,6 @@ public static class EventHeavyRedactionApplicator
         RedactRootEvent(graph.Event, moderatorUserId, utcNow);
         foreach (var resource in graph.Resources)
             resource.ApplyParentModeration(EventRedactionSentinelPolicy.DisplayText, moderatorUserId, utcNow);
-        foreach (var storageObject in graph.ResourceStorageObjects)
-        {
-            storageObject.RequestDelete();
-            Touch(storageObject, moderatorUserId, utcNow);
-        }
 
         foreach (var session in graph.Sessions)
         {
@@ -99,15 +93,6 @@ public static class EventHeavyRedactionApplicator
 
         RedactEventCustomProperties(graph.EventCustomPropertyDefinitions, graph.EventCustomPropertyProjections, moderatorUserId, utcNow);
         RedactSessionCustomProperties(graph.SessionCustomPropertyDefinitions, graph.SessionCustomPropertyProjections, moderatorUserId, utcNow);
-
-        foreach (var storageObject in imageStorageObjects)
-        {
-            storageObject.RequestDelete();
-            storageObject.OwningResourceKind = ResourceKinds.Event;
-            storageObject.OwningResourceId = graph.Event.Id;
-            storageObject.UpdatedAt = utcNow;
-            storageObject.UpdatedBy = moderatorUserId;
-        }
 
         return new EventHeavyRedactionSummary(redactedImageObjectIds.Length);
     }
@@ -296,4 +281,4 @@ public static class EventHeavyRedactionApplicator
         EventRedactionSentinelPolicy.BuildMachineKeySentinel(id, scope, MachineValueMaxLength);
 }
 
-public sealed record EventHeavyRedactionSummary(int DeleteRequestedImageObjectCount);
+public sealed record EventHeavyRedactionSummary(int DetachedImageObjectCount);

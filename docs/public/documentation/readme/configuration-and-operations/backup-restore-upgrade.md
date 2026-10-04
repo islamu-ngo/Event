@@ -17,6 +17,20 @@ successful file copy alone is not evidence of crash safety or recovery.
 
 Inventory the stores your selected topology actually uses:
 
+For media, inventory all captured storage targets, including old roots/buckets
+still used by existing files or pending cleanup. The current default alone is
+not a complete backup inventory. Preserve the database's upload sessions,
+producer records and cleanup records with their target metadata and required
+credential references. Restore bound local files at the captured absolute mount
+path; selecting a new root does not relocate them.
+
+Before a storage-target schema upgrade, identify unbound development objects.
+Accept historical mappings only with verified original-target and byte evidence,
+or re-upload from a trusted source. Recreating a disposable environment requires
+explicit approval. Keep unresolved data and pending producer records intact;
+neither timeouts nor missing current bytes justify guessing a target or declaring
+cleanup complete. See [storage target recovery](../integrations-and-ai/storage.md#existing-files-keep-their-original-target).
+
 | Asset | Storage Location | Why It Matters |
 |---|---|---|
 | Primary database | Split `postgres_data`; Standalone `/app/data/islamu_event.db` | Application state, persisted email settings, outbox, colocated Local Identity and API/Standalone Data Protection keys; include migration histories and operational schemas |

@@ -208,6 +208,8 @@ public sealed partial class NativeStorageObjectHttpTests
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var binding = CapturedStorageProviders.LocalBinding();
+            db.Add(binding);
             db.StorageObjects.Add(new StorageObject
             {
                 Id = id,
@@ -218,9 +220,9 @@ public sealed partial class NativeStorageObjectHttpTests
                 FileType = null!,
                 FullName = "stored",
                 SafeDisplayName = image ? "image.png" : "document.pdf",
-                Uri = string.Empty,
                 ObjectKey = key,
                 Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
                 Purpose = purpose,
                 Size = bytes.Length,
                 ContentType = image ? "image/png" : "application/pdf",

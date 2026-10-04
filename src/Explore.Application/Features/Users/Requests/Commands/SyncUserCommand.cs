@@ -10,6 +10,7 @@ public sealed record SyncUserCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public required ProviderAccountKey AccountKey { get; init; }
     public required UserDto UserDto { get; init; }
+    public IdentityAuthorityEvidence? AuthorityEvidence { get; init; }
 
     // Trusted lifecycle callback only: the selected Identity store already owns the serializable
     // mirror transaction and current native credential row lock. Never populated by public JSON.

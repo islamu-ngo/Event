@@ -238,7 +238,7 @@ public sealed class ActorSubscriptionMapperTests
         var user = new User { Id = UserId, Pii = new UserPii { Email = "private@example.test", FirstName = "Private", LastName = "Subscriber" } };
         var membership = new TenantUser { Id = MembershipId, TenantId = TenantId, UserId = UserId, User = user, Tenant = null!, ModerationNote = "private moderation" };
         var type = new ActorType { Id = 7, MasterCode = "PRIVATE_TYPE_CODE", FullName = "Community", Description = "private type metadata" };
-        var actor = new Actor { Id = ActorId, ActorTypeId = 7, ActorType = type, User = user, Pii = new ActorPii { DisplayName = "Public display", ProfilePictureUri = "https://private.example.test/avatar" } };
+        var actor = new Actor { Id = ActorId, ActorTypeId = 7, ActorType = type, User = user, Pii = new ActorPii { DisplayName = "Public display", ExternalProfilePictureUri = "https://private.example.test/avatar" } };
         actor.Pii.Actor = actor;
         user.Actor = actor;
         return new ActorSubscription

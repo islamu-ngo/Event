@@ -164,7 +164,7 @@ public sealed class OrganizationMapperTests
         {
             Id = ActorId,
             ActorType = null!,
-            Pii = new ActorPii { DisplayName = "Public actor", ProfilePictureUri = "https://images.example.test/public.png" },
+            Pii = new ActorPii { DisplayName = "Public actor", ExternalProfilePictureUri = "https://images.example.test/public.png" },
             BackgroundColor = "blue",
             BackgroundEffect = "glow",
             BannerColor = "green",

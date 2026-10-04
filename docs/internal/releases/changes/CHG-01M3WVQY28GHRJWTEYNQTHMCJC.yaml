@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3WVQY28GHRJWTEYNQTHMCJC
+Title: "Constrain automatic account linking to trusted issuers"
+Type: feat
+Scope: access
+Summary: "Automatic verified-email adoption requires explicit deployment-owned issuer trust; exact account bindings and permitted safe signup remain available."
+Group: identity-correlation-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented

@@ -56,11 +56,6 @@ public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto?>
 
                 var dto = UserMapper.ToDetail(user);
 
-                if (!string.IsNullOrEmpty(user.Actor?.ProfilePictureUri))
-                {
-                    dto.ProfileImageUri = user.Actor.ProfilePictureUri;
-                }
-
                 return dto;
             },
             new HybridCacheEntryOptions
@@ -76,17 +71,22 @@ public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto?>
             return null;
         }
 
-        if (userDto != null && !string.IsNullOrEmpty(userDto.ProfileImageUri))
+        if (userDto is not null)
         {
-            userDto.ProfileImageUri = await ResolveImageUrl(userDto.ProfileImageUri);
+            // The account cache is global; managed media is tenant-filtered and can be revoked independently.
+            // Re-project media from the current entity graph rather than caching image publication authority.
+            var currentUser = await _userRepository.GetUserWithDetails(request.UserId, cancellationToken);
+            if (currentUser is null)
+                return null;
+            userDto = userDto with
+            {
+                ProfilePictureStorageObjectId = StoragePresentationUrlResolver.ManagedProfilePictureId(currentUser.Actor?.Pii),
+                ExternalProfilePictureUri = StoragePresentationUrlResolver.ExternalProfilePictureUri(currentUser.Actor?.Pii),
+                ProfileImageUri = StoragePresentationUrlResolver.ActorProfilePictureUri(currentUser.Actor?.Pii)
+            };
         }
 
         return userDto;
     }
 
-    private Task<string?> ResolveImageUrl(string? objectKeyOrUri)
-        => StoragePresentationUrlResolver.ResolveImageUrlAsync(
-            objectKeyOrUri,
-            _logger,
-            "user profile image");
 }

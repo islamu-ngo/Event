@@ -50,9 +50,10 @@ internal static partial class PortableRelationalModelPolicy
             {
                 ConfigureMySqlExternalBindingUniqueness(entityType);
             }
-            else if (providerName == MySqlProvider && entityType.ClrType == typeof(StorageObject))
+            else if (providerName == MySqlProvider &&
+                     (entityType.ClrType == typeof(StorageObject) || entityType.ClrType == typeof(StorageProducerOperation)))
             {
-                ConfigureMySqlStorageObjectUniqueness(entityType);
+                ConfigureMySqlStorageTargetUniqueness(entityType);
             }
             else if (providerName == MySqlProvider && entityType.ClrType == typeof(UserExternalLogin))
             {
@@ -494,21 +495,27 @@ internal static partial class PortableRelationalModelPolicy
         index.SetDatabaseName(indexName);
     }
 
-    private static void ConfigureMySqlStorageObjectUniqueness(IMutableEntityType entityType)
+    private static void ConfigureMySqlStorageTargetUniqueness(IMutableEntityType entityType)
     {
-        var providerObjectKeyIndex = entityType.GetIndexes().Single(index =>
-            index.GetDatabaseName() == "ux_storage_objects_provider_object_key");
-        entityType.RemoveIndex(providerObjectKeyIndex);
+        bool storageObject = entityType.ClrType == typeof(StorageObject);
+        string bindingProperty = storageObject
+            ? nameof(StorageObject.StorageProviderBindingId)
+            : nameof(StorageProducerOperation.ProviderBindingId);
+        var bindingObjectKeyIndex = entityType.GetIndexes().Single(index =>
+            index.Properties.Select(property => property.Name).SequenceEqual([bindingProperty, nameof(StorageObject.ObjectKey)]));
+        entityType.RemoveIndex(bindingObjectKeyIndex);
 
-        var property = entityType.AddProperty("ProviderObjectKeyUniquenessHash", typeof(byte[]));
-        property.IsNullable = true;
-        property.SetColumnName("provider_object_key_uniqueness_hash");
+        var property = entityType.AddProperty("BindingObjectKeyUniquenessHash", typeof(byte[]));
+        property.IsNullable = storageObject;
+        property.SetColumnName("binding_object_key_uniqueness_hash");
         property.SetColumnType("binary(32)");
         property.ValueGenerated = ValueGenerated.Never;
 
         var index = entityType.AddIndex(property);
         index.IsUnique = true;
-        index.SetDatabaseName("ux_storage_objects_provider_object_key_hash");
+        index.SetDatabaseName(storageObject
+            ? "ux_storage_objects_binding_object_key_hash"
+            : "ux_storage_producer_operations_binding_object_key_hash");
     }
 
     private static void ConfigureMySqlUserExternalLoginUniqueness(IMutableEntityType entityType)

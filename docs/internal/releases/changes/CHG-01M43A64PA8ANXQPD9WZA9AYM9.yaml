@@ -1,0 +1,28 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M43A64PA8ANXQPD9WZA9AYM9
+Title: "Permit fresh signup after ordinary account erasure"
+Type: fix
+Scope: privacy
+Summary: "External sign-in can create a clean new account after ordinary erasure without requiring reserved moderation fingerprint secrets."
+Group: identity-erasure-enrollment
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/privacy-erasure.md
+    Disposition: documented

@@ -184,10 +184,17 @@ public sealed class AiContextDisclosureRegistry
                 Phase4Gated: false),
             new(
                 EntityName: nameof(ActorPii),
-                FieldName: nameof(ActorPii.ProfilePictureUri),
+                FieldName: nameof(ActorPii.ExternalProfilePictureUri),
                 Sensitivity: AiContextSensitivityEnum.Public,
                 LocalModelRule: AiContextDisclosureRuleEnum.Allow,
-                Rationale: "Public CDN URL.",
+                Rationale: "Explicit external profile image URL; no managed storage authority.",
+                Phase4Gated: false),
+            new(
+                EntityName: nameof(ActorPii),
+                FieldName: nameof(ActorPii.ProfilePictureStorageObjectId),
+                Sensitivity: AiContextSensitivityEnum.Internal,
+                LocalModelRule: AiContextDisclosureRuleEnum.Allow,
+                Rationale: "Opaque managed profile reference; presentation requires public image policy.",
                 Phase4Gated: false),
 
             // ───────────── LocationPii (7 persisted public properties; 1 nav skipped) ─────────────

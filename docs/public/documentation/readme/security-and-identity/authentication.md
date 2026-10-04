@@ -23,6 +23,60 @@ for the five supported states.
 
 ---
 
+## Account Matching and Recovery
+
+Accepting a sign-in provider does not automatically trust it to attach a new
+identity to an existing Event account by email. Automatic matching is disabled
+by default. A deployment operator may explicitly allow exact OIDC issuer
+addresses with `IdentityCorrelation:TrustedIssuers`; see the
+[environment reference](../configuration-and-operations/environment-variables.md#3-authentication-providers-and-local-identity).
+Only that issuer's verified email can match one eligible account. Local-owned
+accounts are never automatically adopted this way.
+
+An already linked issuer and subject always resolve the same Event account,
+even if the email changes or the operator removes the issuer from matching
+trust. Removing trust stops new email-based matches; it does not unlink users.
+Ordinary permitted first signup remains available without matching trust,
+including unverified or absent email, but a verified address already owned by
+another account cannot be used to bypass ownership through separate signup.
+AT Protocol continues to support
+email-free signup through a verified DID. Mail settings do not manufacture or
+erase a provider's verification statement.
+
+An ambiguous or conflicting identity is not silently merged or used to select
+another account. Recover access through the original sign-in provider or
+contact the instance operator. Event does not currently offer a general
+self-service account-merge or explicit-linking screen.
+
+Account matching uses verified identity-address claims, not the editable contact
+email displayed in a profile. Supported identity addresses are unique across
+the instance; contact addresses may be shared. Verified-address matching ignores
+letter case and surrounding whitespace without trusting additional issuers.
+A provider changing its verified
+address to one already claimed by another account does not move its linked Event
+account. Event discards that provider's obsolete address proof while preserving
+proof supplied independently by another linked identity. Mail recipient
+selection uses supported identity-address claims.
+
+After ordinary account erasure, authenticating again with the same external
+provider identity or released email may automatically create a fresh Event
+account. It does not recover the old account ID, profile, permissions, private
+history or consent. Existing matching and address-conflict rules still apply.
+Old-account replay protection remains intact; fingerprint keys are not required
+for ordinary signup, erasure or startup. See [Privacy Erasure](privacy-erasure.md).
+
+## Profile Names
+
+Your sign-in provider can supply initial first, last and display names when an
+Event account is created. After creation, signing in again preserves the names
+you edited in Event instead of replacing them with the provider's current
+profile. This also applies when an eligible existing account gains another
+external sign-in identity.
+
+Changing names does not verify an address or change the identity claims used
+for mail delivery. Previous registration contact details and recorded consent
+retain their captured values.
+
 ## Browser Authentication Flow
 
 The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of the selected provider:

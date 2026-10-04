@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3XHN9D64HQQYYBE0PQQ542X
+Title: "Preserve user profile edits across sign-ins"
+Type: fix
+Scope: privacy
+Summary: "Sign-in providers initialize names only when creating an account; later sign-ins preserve edited first, last and Actor display names while identity proofs continue to synchronize."
+Group: identity-correlation-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented

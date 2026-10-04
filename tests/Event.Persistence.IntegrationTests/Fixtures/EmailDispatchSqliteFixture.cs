@@ -226,6 +226,22 @@ internal static class EmailDispatchSqliteFixture
         context.Users.Add(user);
         context.TenantUsers.Add(tenantUser);
         context.NotificationIntents.Add(intent);
+        var recipientBinding = new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+            AuthenticationProvider = null!,
+            ProviderKey = Explore.Application.Authentication.PlatformIdentityPrincipalExtensions
+                .CreateOidcAccountKey("https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
+            CreatedAt = now
+        };
+        var recipientClaim = UserIdentityEmailClaim.Create(user.Id, user.Email!);
+        context.UserExternalLogins.Add(recipientBinding);
+        context.UserIdentityEmailClaims.Add(recipientClaim);
+        context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(
+            user.Id, recipientClaim.Id, recipientBinding.Id, now));
         await context.SaveChangesAsync();
         return new SeededDispatch(tenant.Id, dispatch.Id, leaseToken);
     }

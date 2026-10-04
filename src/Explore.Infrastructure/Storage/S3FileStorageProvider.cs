@@ -241,10 +241,14 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         return true;
     }
 
-    private async Task RequireAddressableVersionAsync(
+    private Task RequireAddressableVersionAsync(
+        IAmazonS3 client, string bucket, string? versionId, CancellationToken cancellationToken) =>
+        _boundTarget ? RequireCapturedVersionAsync(client, bucket, versionId, cancellationToken) : Task.CompletedTask;
+
+    internal static async Task RequireCapturedVersionAsync(
         IAmazonS3 client, string bucket, string? versionId, CancellationToken cancellationToken)
     {
-        if (!_boundTarget || versionId is not null)
+        if (versionId is not null)
             return;
         var versioning = await client.GetBucketVersioningAsync(
             new GetBucketVersioningRequest { BucketName = bucket }, cancellationToken);

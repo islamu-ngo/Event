@@ -67,9 +67,14 @@ public sealed class EnvironmentCatalogue
     public EnvironmentVariableDefinition? Lookup(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
-        return _byKey.TryGetValue(key, out EnvironmentVariableDefinition? definition)
-            ? definition
-            : null;
+        if (_byKey.TryGetValue(key, out EnvironmentVariableDefinition? definition))
+            return definition;
+        if (!IdentityCorrelationEnvironment.IsIssuerKey(key)
+            || !_byKey.TryGetValue(IdentityCorrelationEnvironment.FirstKey, out EnvironmentVariableDefinition? template))
+            return null;
+        return new EnvironmentVariableDefinition(key, template.Category, template.Sensitivity,
+            template.Requirement, template.SafeDefault, template.Order, template.Activation,
+            template.ValidatorId, template.Generation, template.RestartBehavior, template.Documentation);
     }
 
     public IReadOnlyList<EnvironmentVariableDefinition> Relevant(EnvironmentActivationContext context)

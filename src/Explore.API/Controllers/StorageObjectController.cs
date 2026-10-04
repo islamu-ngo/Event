@@ -41,6 +41,13 @@ public class StorageObjectController : ControllerBase
         "Storage object not found",
         "Storage object not found.");
 
+    private static readonly CommandFailurePolicy RetirementFailurePolicy = CommandFailurePolicy.ValidatedBy(
+        new ApiValidationProblemDescriptor("storageObject", "Storage retirement failed", "Storage retirement failed."))
+        .NotFound(StorageObjectNotFoundProblem, FailureCodes.NotFound)
+        .Conflict("Storage retirement blocked", "Storage cleanup cannot be admitted.",
+            FailureCodes.StorageObjectInUse, FailureCodes.StorageObjectRetentionBlocked,
+            FailureCodes.StorageObjectInvalidTarget, FailureCodes.ConcurrencyConflict);
+
     private readonly IQueryHandler<GetStorageObjectListRequest, PaginatedResult<StorageObjectListDto>> _list;
     private readonly IQueryHandler<GetStorageObjectDetailsRequest, StorageObjectDto?> _details;
     private readonly IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> _content;
@@ -50,7 +57,7 @@ public class StorageObjectController : ControllerBase
     private readonly ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _finalizeUpload;
     private readonly ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _cancelUpload;
     private readonly ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>> _update;
-    private readonly ICommandHandler<DeleteStorageObjectCommand, bool> _delete;
+    private readonly ICommandHandler<DeleteStorageObjectCommand, BaseCommandResponse<Guid>> _delete;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<StorageObjectDto, StorageObjectListDto> _resourceAssembler;
 
@@ -64,7 +71,7 @@ public class StorageObjectController : ControllerBase
         ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload,
         ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> cancelUpload,
         ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>> update,
-        ICommandHandler<DeleteStorageObjectCommand, bool> delete,
+        ICommandHandler<DeleteStorageObjectCommand, BaseCommandResponse<Guid>> delete,
         ITenantContext tenantContext,
         IResourceAssembler<StorageObjectDto, StorageObjectListDto> resourceAssembler)
     {
@@ -351,17 +358,19 @@ public class StorageObjectController : ControllerBase
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpDelete("{id:guid}", Name = RouteNames.DeleteStorageObject)]
-    [EndpointSummary("Delete Storage Object")]
-    [EndpointDescription("Delete a storage object")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [EndpointSummary("Retire Storage Object")]
+    [EndpointDescription("Admit durable cleanup of an unreferenced storage object. Acceptance does not confirm provider absence.")]
+    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteStorageObjectCommand { Id = id };
-        await _delete.ExecuteAsync(command, cancellationToken);
-
-        return NoContent();
+        var response = await _delete.ExecuteAsync(command, cancellationToken);
+        return RetirementFailurePolicy.Map(this, response, () => Accepted(response));
     }
 
     private FileStreamResult ToFileResult(StorageObjectContentResult result)

@@ -54,7 +54,7 @@ public sealed class ActorLifecycleTests
         await Assert.That(identity.ActorId).IsEqualTo(actorId);
         await Assert.That(ReferenceEquals(actor.Pii, pii)).IsTrue();
         await Assert.That(actor.DisplayName).IsEqualTo("External organizer");
-        await Assert.That(actor.ProfilePictureUri).IsEqualTo("https://cdn.example/avatar.png");
+        await Assert.That(actor.Pii.ExternalProfilePictureUri).IsEqualTo("https://cdn.example/avatar.png");
         await Assert.That(actor.ExternalActorSubjectId).IsNull();
         await Assert.That(actor.ExternalActorSubject).IsNull();
         await Assert.That(actor.OrganizationId).IsEqualTo(organization.Id);
@@ -405,7 +405,7 @@ public sealed class ActorLifecycleTests
             {
                 ActorId = actorId,
                 DisplayName = "External organizer",
-                ProfilePictureUri = "https://cdn.example/avatar.png"
+                ExternalProfilePictureUri = "https://cdn.example/avatar.png"
             },
             ConcurrencyStamp = Guid.CreateVersion7()
         };

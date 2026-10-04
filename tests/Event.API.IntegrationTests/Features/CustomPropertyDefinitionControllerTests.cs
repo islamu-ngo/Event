@@ -252,7 +252,6 @@ public sealed class AdminRoleEndpointParityTests
             TenantId = tenantId,
             Tenant = new TenantBuilder().WithId(tenantId).Build(),
             FileType = new FileType { MasterCode = "pdf", FullName = "PDF" },
-            Uri = "answer.pdf",
             Provider = "test",
             FullName = "answer.pdf",
             Visibility = StorageObjectVisibilities.AuthenticatedTenant,

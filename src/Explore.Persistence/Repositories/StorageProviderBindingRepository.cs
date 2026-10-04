@@ -12,4 +12,9 @@ public sealed class StorageProviderBindingRepository(ExploreDbContext dbContext)
 
     public async Task AddAsync(StorageProviderBinding binding, CancellationToken cancellationToken) =>
         await dbContext.Set<StorageProviderBinding>().AddAsync(binding, cancellationToken);
+
+    public async Task<IReadOnlyList<StorageProviderBinding>> ListLocalAsync(CancellationToken cancellationToken) =>
+        await dbContext.Set<StorageProviderBinding>().AsNoTracking()
+            .Where(binding => binding.Provider == StorageProviders.Local)
+            .OrderBy(binding => binding.Id).ToArrayAsync(cancellationToken);
 }

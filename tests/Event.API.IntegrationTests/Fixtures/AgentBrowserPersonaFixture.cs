@@ -383,7 +383,7 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         }
     }
 
-    private sealed class TestSecrets : ISecretResolver
+    private sealed class TestSecrets : ISecretResolver, IRetainedSecretResolver
     {
         internal Dictionary<string, string> Values { get; } = new()
         {
@@ -398,5 +398,12 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         public Task<SecretResolutionResult> ResolveQualifiedAsync(string settingKey, SecretScope scope, Guid? scopeId, string qualifier, CancellationToken cancellationToken = default) => ResolveAsync(settingKey, scopeId, cancellationToken);
         public Task<SecretResolutionResult> ResolveTenantBindingAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken = default) => Task.FromResult(SecretResolutionResult.Unconfigured);
         public Task InvalidateAsync(string settingKey, SecretScope scope, Guid? scopeId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        // This fixture provisions local storage only, with no external storage credential binding.
+        public Task<RetainedSecretReference> CaptureAsync(string settingKey, Guid tenantId, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("storage_secret_unavailable");
+
+        public Task<SecretResolutionResult> ResolveAsync(RetainedSecretReference reference, CancellationToken cancellationToken) =>
+            Task.FromResult(SecretResolutionResult.Unconfigured);
     }
 }

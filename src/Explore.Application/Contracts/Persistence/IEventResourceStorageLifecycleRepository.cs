@@ -5,6 +5,14 @@ namespace Explore.Application.Contracts.Persistence;
 /// <summary>All operations require the caller's transaction; no provider I/O is permitted.</summary>
 public interface IEventResourceStorageLifecycleRepository
 {
+    /// <summary>
+    /// Admits an already-authorized exact target, acquiring its reference fence before flushing and scanning.
+    /// Multi-save callers must fence their complete affected object set before their first save.
+    /// Pending acknowledges durable custody transfer, not provider absence.
+    /// </summary>
+    Task<StorageRetirementAdmission> TryQueueRetirementAsync(
+        Guid tenantId, Guid storageObjectId, DateTime utcNow, CancellationToken cancellationToken);
+
     Task<int> RetireExpiredUploadsAsync(DateTime utcNow, int limit, CancellationToken cancellationToken);
 
     Task RetireAsync(Guid tenantId, IReadOnlyCollection<Guid> resourceIds,

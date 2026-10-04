@@ -101,12 +101,11 @@ public sealed class UserMappingHandlerTests
 
     [Test]
     [Arguments("https://images.example.invalid/profile.png", "https://images.example.invalid/profile.png")]
-    [Arguments("private/raw-object-key", null)]
     [Arguments(null, null)]
     public async Task Read_ProfileImageStillUsesPresentationBoundary(string? source, string? expected)
     {
         var user = UserMapperTests.CreateUser();
-        user.Actor!.ProfilePictureUri = source;
+        user.Actor!.Pii.ExternalProfilePictureUri = source;
         var repository = UserRepository(user);
         var handler = new GetUserRequestHandler(repository, Substitute.For<IObjectStorageService>(),
             NullLogger<GetUserRequestHandler>.Instance, new InlineCache(), Substitute.For<IPrivacyErasureStateRepository>());
@@ -115,6 +114,22 @@ public sealed class UserMappingHandlerTests
         await Assert.That(result?.Email).IsEqualTo("private@example.invalid");
         await Assert.That(result?.ActorHandle).IsEqualTo("first.example.invalid");
         await Assert.That(result?.ProfileImageUri).IsEqualTo(expected);
+        await Assert.That(result?.ExternalProfilePictureUri).IsEqualTo(expected);
+        await Assert.That(result?.ProfilePictureStorageObjectId).IsNull();
+    }
+
+    [Test]
+    public async Task Read_RawProviderKeyCannotBecomeAnExternalProfileImage()
+    {
+        var user = UserMapperTests.CreateUser();
+        await Assert.That(() => user.Actor!.Pii.ExternalProfilePictureUri = "private/raw-object-key")
+            .Throws<ArgumentException>();
+        var result = await new GetUserRequestHandler(
+            UserRepository(user), Substitute.For<IObjectStorageService>(),
+            NullLogger<GetUserRequestHandler>.Instance, new InlineCache(),
+            Substitute.For<IPrivacyErasureStateRepository>())
+            .QueryAsync(new GetUserRequest(user.Id), CancellationToken.None);
+        await Assert.That(result!.ProfileImageUri).IsEqualTo("https://images.example.invalid/profile.png");
     }
 
     [Test]

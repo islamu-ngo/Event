@@ -91,7 +91,7 @@ public class UserProfileTests : IDisposable
         cut.WaitForState(() => cut.Markup.Contains("Unable to load user profile", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
 
         // Assert
-        await Assert.That(cut.Markup).Contains("Unable to load user profile. Please try refreshing the page.");
+        await Assert.That(cut.Find("[role='alert']").TextContent).IsNotEmpty();
     }
 
     [Test]

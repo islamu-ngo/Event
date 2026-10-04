@@ -97162,8 +97162,8 @@
         "tags": [
           "StorageObject"
         ],
-        "summary": "Delete Storage Object",
-        "description": "Delete a storage object",
+        "summary": "Retire Storage Object",
+        "description": "Admit durable cleanup of an unreferenced storage object. Acceptance does not confirm provider absence.",
         "operationId": "DeleteStorageObject",
         "parameters": [
           {
@@ -97191,9 +97191,36 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "No Content",
+          "202": {
+            "description": "Accepted",
             "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
               "application/json": { },
               "application/hal+json": { }
             }
@@ -97215,8 +97242,42 @@
               "application/hal+json": { }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json; v=0.1": {
                 "schema": {
@@ -112648,6 +112709,19 @@
           "displayName": {
             "type": "string"
           },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "profilePictureCid": {
             "type": [
               "null",
@@ -112806,6 +112880,19 @@
             ]
           },
           "didCustodyTypeFullName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"
@@ -136320,6 +136407,19 @@
           "displayName": {
             "type": "string"
           },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "profilePictureCid": {
             "type": [
               "null",
@@ -136492,6 +136592,19 @@
             ]
           },
           "didCustodyTypeFullName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"
@@ -154948,8 +155061,6 @@
       },
       "HalResourceOfStorageObjectDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -154984,10 +155095,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -155104,8 +155215,6 @@
       },
       "HalResourceOfStorageObjectListDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -155134,10 +155243,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -156732,7 +156841,14 @@
             "type": "string",
             "format": "uuid"
           },
-          "profileImageKey": {
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"
@@ -178371,8 +178487,6 @@
       },
       "StorageObjectDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -178407,10 +178521,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -178513,8 +178627,6 @@
       },
       "StorageObjectListDto": {
         "required": [
-          "uri",
-          "provider",
           "fullName",
           "safeDisplayName",
           "extension",
@@ -178543,10 +178655,10 @@
             ]
           },
           "uri": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "fullName": {
             "type": "string"
@@ -178658,7 +178770,6 @@
       },
       "StorageUploadSessionDto": {
         "required": [
-          "provider",
           "contentType",
           "safeDisplayName",
           "purpose",
@@ -178681,9 +178792,6 @@
               "string"
             ],
             "format": "uuid"
-          },
-          "provider": {
-            "type": "string"
           },
           "routeKey": {
             "type": "string"
@@ -185401,8 +185509,17 @@
         "type": "object",
         "properties": {
           "profilePictureId": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
+          },
+          "externalProfilePictureUri": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -185877,7 +185994,14 @@
             "type": "string",
             "format": "uuid"
           },
-          "profileImageKey": {
+          "profilePictureStorageObjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "externalProfilePictureUri": {
             "type": [
               "null",
               "string"

@@ -20,12 +20,18 @@ public static class RecipientEmailAddressResolver
             return new(null, RecipientDeletedOrMissing);
         }
 
-        if (user.EmailVerified != true)
-        {
+        string contactAddress = user.Pii?.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+        UserIdentityEmailClaim? supported = user.IdentityEmailClaims
+            .Where(claim => claim.UserId == recipientUserId
+                && claim.Evidence.Any(evidence => evidence.UserId == recipientUserId
+                    && evidence.ClaimId == claim.Id && evidence.IsActive))
+            .OrderByDescending(claim => string.Equals(claim.NormalizedEmail, contactAddress, StringComparison.Ordinal))
+            .ThenBy(claim => claim.Id)
+            .FirstOrDefault();
+        if (supported is null)
             return new(null, RecipientEmailUnverified);
-        }
 
-        string email = user.Pii?.Email?.Trim() ?? string.Empty;
+        string email = supported.NormalizedEmail;
         return string.IsNullOrWhiteSpace(email)
             ? new(null, RecipientEmailMissing)
             : new(email, null);

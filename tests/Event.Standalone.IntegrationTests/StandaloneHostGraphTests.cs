@@ -289,6 +289,7 @@ public sealed class StandaloneHostGraphTests
     {
         await using var factory = new StandaloneWebApplicationFactory();
         using var publicClient = factory.CreateClient();
+        await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
         var clientFactory = factory.Services.GetRequiredService<IHttpClientFactory>();
         using var admin = clientFactory.CreateClient("AdminAuthority");
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "invalid-token");

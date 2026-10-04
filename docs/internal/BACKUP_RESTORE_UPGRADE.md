@@ -139,10 +139,20 @@ Do not treat Docker image tags alone as a backup. Database schema and secret-pro
    Record the authority watermark, application watermark, backup timestamp, dump SHA-256, and restore drill identifier in the release manifest. Never record the DSN or opaque owner/location/intent IDs.
 
 5. Back up object storage:
+   - inventory every captured `StorageProviderBinding`, not only the current
+     provider settings; preserve its original root/bucket and required object versions;
+   - include upload sessions, producer operations and deletion tombstones in the
+     coordinated application database backup, with their retained secret references;
    - for local-first Compose, copy the API `local_storage_data` named volume or the deployment-managed `Storage:Local:RootPath`;
    - for Aspire/local-dev state that must be preserved, copy `storage-data/aspire-local`;
    - for local MinIO/S3-compatible mode, copy the `minio_data` volume or use an S3-compatible sync tool;
    - for external S3, use provider-native versioning or bucket replication.
+   A changed default does not move existing bytes. Restore bound local files at
+   their captured absolute mount path. Before applying the generated storage-target
+   migration, resolve unbound development rows through verified historical mapping
+   or trusted re-upload; use disposable recreation only with explicit approval.
+   Do not infer an old target from today's configuration or delete unresolved
+   producer/tombstone records to make a restore appear healthy.
 6. Export secret-provider configuration or capture the exact secret paths and key names used by the release.
 7. Store backups outside the host running Docker Compose. Keep the authority
    artifact independent from primary backup retention and for at least as long

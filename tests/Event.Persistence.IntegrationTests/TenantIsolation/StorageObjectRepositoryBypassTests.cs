@@ -25,25 +25,29 @@ public class StorageObjectRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         await seedContext.SaveChangesAsync();
 
         var resourceId = Guid.CreateVersion7();
-        var matching = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested);
-        var matchingWithoutObjectKey = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested);
-        matchingWithoutObjectKey.ObjectKey = null;
-        var active = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.Active);
-        var otherResource = CreateStorageObject(tenantA.Id, Guid.CreateVersion7(), StorageObjectLifecycleStates.DeleteRequested);
-        var unsupportedProvider = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested);
-        unsupportedProvider.Provider = StorageProviders.LegacyExternal;
-        var deleted = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested);
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        seedContext.Add(binding);
+        var matching = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested, binding);
+        var matchingWithoutObjectKey = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested, binding, missingKey: true);
+        var active = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.Active, binding);
+        var otherResource = CreateStorageObject(tenantA.Id, Guid.CreateVersion7(), StorageObjectLifecycleStates.DeleteRequested, binding);
+        var unsupportedProvider = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested, null);
+        var deleted = CreateStorageObject(tenantA.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested, binding);
         deleted.MarkDeleted(null, new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc));
-        var ambientTenantMatch = CreateStorageObject(tenantB.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested);
+        var ambientTenantMatch = CreateStorageObject(tenantB.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested, binding);
         seedContext.StorageObjects.AddRange(
             matching,
-            matchingWithoutObjectKey,
             active,
             otherResource,
             unsupportedProvider,
             deleted,
             ambientTenantMatch);
         await seedContext.SaveChangesAsync();
+        await using (var invalidContext = fixture.CreateDbContext())
+        {
+            invalidContext.Add(matchingWithoutObjectKey);
+            await Assert.ThrowsAsync<DbUpdateException>(() => invalidContext.SaveChangesAsync());
+        }
 
         await using var tenantBContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.Id));
         var visibleWithoutBypass = await tenantBContext.StorageObjects
@@ -61,9 +65,9 @@ public class StorageObjectRepositoryBypassTests(PostgreSqlContainerFixture fixtu
 
         await Assert.That(visibleWithoutBypass).IsEquivalentTo([ambientTenantMatch.Id]);
         await Assert.That(deleteRequestedForTenantA.Select(storageObject => storageObject.Id))
-            .IsEquivalentTo([matching.Id, matchingWithoutObjectKey.Id]);
+            .IsEquivalentTo([matching.Id]);
         await Assert.That(deleteRequestedForTenantA.Select(storageObject => storageObject.TenantId))
-            .IsEquivalentTo([tenantA.Id, tenantA.Id]);
+            .IsEquivalentTo([tenantA.Id]);
     }
 
     [Test]
@@ -77,8 +81,10 @@ public class StorageObjectRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         await seedContext.SaveChangesAsync();
 
         var resourceId = Guid.CreateVersion7();
-        var active = CreateStorageObject(tenant.Id, resourceId, StorageObjectLifecycleStates.Active);
-        var deleteEligible = CreateStorageObject(tenant.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested);
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        seedContext.Add(binding);
+        var active = CreateStorageObject(tenant.Id, resourceId, StorageObjectLifecycleStates.Active, binding);
+        var deleteEligible = CreateStorageObject(tenant.Id, resourceId, StorageObjectLifecycleStates.DeleteRequested, binding);
         deleteEligible.UpdatedAt = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
         seedContext.StorageObjects.AddRange(active, deleteEligible);
         await seedContext.SaveChangesAsync();
@@ -94,18 +100,18 @@ public class StorageObjectRepositoryBypassTests(PostgreSqlContainerFixture fixtu
             new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc),
             limit: -1,
             CancellationToken.None);
-        var knownKeysWithBlankProvider = await repository.ListKnownObjectKeysAsync(
-            " ",
+        var knownKeysWithoutBindings = await repository.ListKnownObjectKeysAsync(
+            [],
             [active.ObjectKey!],
             CancellationToken.None);
         var knownKeysWithEmptyKeySet = await repository.ListKnownObjectKeysAsync(
-            StorageProviders.Local,
+            [binding.Id],
             [],
             CancellationToken.None);
 
         await Assert.That(activeWithZeroLimit).IsEmpty();
         await Assert.That(deleteEligibleWithNegativeLimit).IsEmpty();
-        await Assert.That(knownKeysWithBlankProvider).IsEmpty();
+        await Assert.That(knownKeysWithoutBindings).IsEmpty();
         await Assert.That(knownKeysWithEmptyKeySet).IsEmpty();
     }
 
@@ -121,7 +127,8 @@ public class StorageObjectRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         };
     }
 
-    private static StorageObject CreateStorageObject(Guid tenantId, Guid resourceId, string lifecycleState)
+    private static StorageObject CreateStorageObject(Guid tenantId, Guid resourceId, string lifecycleState,
+        StorageProviderBinding? binding, bool missingKey = false)
     {
         var objectId = Guid.CreateVersion7();
         return new StorageObject
@@ -131,9 +138,9 @@ public class StorageObjectRepositoryBypassTests(PostgreSqlContainerFixture fixtu
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
-            Provider = StorageProviders.Local,
-            ObjectKey = $"tenants/{tenantId:N}/{objectId:N}.png",
-            Uri = $"/storage/{objectId:N}.png",
+            Provider = binding?.Provider ?? StorageProviders.LegacyExternal,
+            StorageProviderBindingId = binding?.Id,
+            ObjectKey = binding is null || missingKey ? null : $"tenants/{tenantId:N}/{objectId:N}.png",
             FullName = "storage-bypass.png",
             SafeDisplayName = "storage-bypass.png",
             Extension = ".png",

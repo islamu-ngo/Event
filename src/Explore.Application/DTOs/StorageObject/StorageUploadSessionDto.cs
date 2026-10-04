@@ -5,7 +5,8 @@ public sealed record StorageUploadSessionDto
     public Guid Id { get; init; }
     public Guid TenantId { get; init; }
     public Guid? UserId { get; init; }
-    public required string Provider { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? Provider { get; init; }
     public string RouteKey { get; init; } = "general";
     public long PolicyMaxUploadBytes { get; init; }
     public string? PolicyVersion { get; init; }

@@ -1,5 +1,6 @@
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.StorageObject;
+using Explore.Application.Services;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
 
@@ -11,7 +12,6 @@ public static partial class ActorFederationMapper
     // Public profile scalars only. Repository queries own identity visibility and tenant fences.
     // Pii selectors avoid proxy getters after hard erasure; no owner, audit or moderation graph is copied.
     [MapperIgnoreSource(nameof(Actor.DisplayName))]
-    [MapperIgnoreSource(nameof(Actor.ProfilePictureUri))]
     [MapperIgnoreSource(nameof(Actor.User))]
     [MapperIgnoreSource(nameof(Actor.Organization))]
     [MapperIgnoreSource(nameof(Actor.Group))]
@@ -39,7 +39,6 @@ public static partial class ActorFederationMapper
     [MapperIgnoreTarget(nameof(ActorDto.DidCustodyTypeId))]
     [MapperIgnoreTarget(nameof(ActorDto.DidCustodyTypeMasterCode))]
     [MapperIgnoreTarget(nameof(ActorDto.DidCustodyTypeFullName))]
-    [MapperIgnoreTarget(nameof(ActorDto.ProfilePictureId))]
     [MapperIgnoreTarget(nameof(ActorDto.BannerPictureId))]
     [MapperIgnoreTarget(nameof(ActorDto.BannerPictureUri))]
     [MapperIgnoreTarget(nameof(ActorDto.BackgroundImageId))]
@@ -48,6 +47,8 @@ public static partial class ActorFederationMapper
     [MapProperty(nameof(Actor.ActorType), nameof(ActorDto.ActorTypeFullName), Use = nameof(ActorTypeName))]
     [MapProperty(nameof(Actor.Pii), nameof(ActorDto.DisplayName), Use = nameof(DisplayName))]
     [MapProperty(nameof(Actor.Pii), nameof(ActorDto.ProfilePictureUri), Use = nameof(ProfilePictureUri))]
+    [MapProperty(nameof(Actor.Pii), nameof(ActorDto.ProfilePictureStorageObjectId), Use = nameof(ProfilePictureStorageObjectId))]
+    [MapProperty(nameof(Actor.Pii), nameof(ActorDto.ExternalProfilePictureUri), Use = nameof(ExternalProfilePictureUri))]
     [MapProperty(nameof(Actor.AtprotoIdentities), nameof(ActorDto.Did), Use = nameof(FirstDid))]
     [MapProperty(nameof(Actor.AtprotoIdentities), nameof(ActorDto.Handle), Use = nameof(FirstHandle))]
     [MapProperty(nameof(Actor.AtprotoIdentities), nameof(ActorDto.PdsHost), Use = nameof(FirstPdsHost))]
@@ -61,7 +62,6 @@ public static partial class ActorFederationMapper
     [MapperIgnoreSource(nameof(Actor.ProfilePictureCid))]
     [MapperIgnoreSource(nameof(Actor.Description))]
     [MapperIgnoreSource(nameof(Actor.DisplayName))]
-    [MapperIgnoreSource(nameof(Actor.ProfilePictureUri))]
     [MapperIgnoreSource(nameof(Actor.User))]
     [MapperIgnoreSource(nameof(Actor.Organization))]
     [MapperIgnoreSource(nameof(Actor.Group))]
@@ -88,7 +88,6 @@ public static partial class ActorFederationMapper
     [MapperIgnoreTarget(nameof(ActorListDto.DidCustodyTypeId))]
     [MapperIgnoreTarget(nameof(ActorListDto.DidCustodyTypeMasterCode))]
     [MapperIgnoreTarget(nameof(ActorListDto.DidCustodyTypeFullName))]
-    [MapperIgnoreTarget(nameof(ActorListDto.ProfilePictureId))]
     [MapperIgnoreTarget(nameof(ActorListDto.BannerPictureId))]
     [MapperIgnoreTarget(nameof(ActorListDto.BannerPictureUri))]
     [MapperIgnoreTarget(nameof(ActorListDto.BackgroundImageId))]
@@ -97,6 +96,8 @@ public static partial class ActorFederationMapper
     [MapProperty(nameof(Actor.ActorType), nameof(ActorListDto.ActorTypeFullName), Use = nameof(ActorTypeName))]
     [MapProperty(nameof(Actor.Pii), nameof(ActorListDto.DisplayName), Use = nameof(DisplayName))]
     [MapProperty(nameof(Actor.Pii), nameof(ActorListDto.ProfilePictureUri), Use = nameof(ProfilePictureUri))]
+    [MapProperty(nameof(Actor.Pii), nameof(ActorListDto.ProfilePictureStorageObjectId), Use = nameof(ProfilePictureStorageObjectId))]
+    [MapProperty(nameof(Actor.Pii), nameof(ActorListDto.ExternalProfilePictureUri), Use = nameof(ExternalProfilePictureUri))]
     [MapProperty(nameof(Actor.AtprotoIdentities), nameof(ActorListDto.Did), Use = nameof(FirstDid))]
     [MapProperty(nameof(Actor.AtprotoIdentities), nameof(ActorListDto.Handle), Use = nameof(FirstHandle))]
     [MapProperty(nameof(Actor.AtprotoIdentities), nameof(ActorListDto.PdsHost), Use = nameof(FirstPdsHost))]
@@ -105,6 +106,10 @@ public static partial class ActorFederationMapper
 
     // Operational detail exposes lifecycle and quarantine reason, never provider keys or audit authors.
     // Content eligibility is resolved by the consuming handler, not by the mapper.
+    [MapperIgnoreSource(nameof(StorageObject.SourceUri))]
+    [MapperIgnoreSource(nameof(StorageObject.Provider))]
+    [MapPropertyFromSource(nameof(StorageObjectDto.Uri), Use = nameof(StorageDeliveryUri))]
+    [MapPropertyFromSource(nameof(StorageObjectDto.SupportsPresignedDownload), Use = nameof(SupportsPresignedDownload))]
     [MapperIgnoreSource(nameof(StorageObject.StorageProviderBindingId))]
     [MapperIgnoreSource(nameof(StorageObject.ProviderVersionId))]
     [MapperIgnoreSource(nameof(StorageObject.ObjectKey))]
@@ -121,6 +126,7 @@ public static partial class ActorFederationMapper
     [MapperIgnoreSource(nameof(StorageObject.DeletedBy))]
     [MapperIgnoreSource(nameof(StorageObject.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(StorageObjectDto.ContentEligibility))]
+    [MapperIgnoreTarget(nameof(StorageObjectDto.RetirementAllowed))]
     [MapProperty(nameof(StorageObject.FileType), nameof(StorageObjectDto.FileTypeFullName), Use = nameof(FileTypeName))]
     [MapProperty(nameof(StorageObject.FileType), nameof(StorageObjectDto.FileTypeMasterCode), Use = nameof(FileTypeCode))]
     [MapProperty(nameof(StorageObject.Tenant), nameof(StorageObjectDto.TenantFullName), Use = nameof(TenantName))]
@@ -128,6 +134,9 @@ public static partial class ActorFederationMapper
     public static partial StorageObjectDto ToStorageDetail(StorageObject source);
 
     // Storage lists omit ownership graphs, checksum, quarantine detail and deletion/audit metadata.
+    [MapperIgnoreSource(nameof(StorageObject.SourceUri))]
+    [MapperIgnoreSource(nameof(StorageObject.Provider))]
+    [MapPropertyFromSource(nameof(StorageObjectListDto.Uri), Use = nameof(StorageDeliveryUri))]
     [MapperIgnoreSource(nameof(StorageObject.StorageProviderBindingId))]
     [MapperIgnoreSource(nameof(StorageObject.ProviderVersionId))]
     [MapperIgnoreSource(nameof(StorageObject.ObjectKey))]
@@ -154,6 +163,7 @@ public static partial class ActorFederationMapper
     [MapperIgnoreSource(nameof(StorageObject.DeletedBy))]
     [MapperIgnoreSource(nameof(StorageObject.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(StorageObjectListDto.ContentEligibility))]
+    [MapperIgnoreTarget(nameof(StorageObjectListDto.RetirementAllowed))]
     [MapProperty(nameof(StorageObject.FileType), nameof(StorageObjectListDto.FileTypeFullName), Use = nameof(FileTypeName))]
     public static partial StorageObjectListDto ToStorageListItem(StorageObject source);
 
@@ -161,7 +171,9 @@ public static partial class ActorFederationMapper
     private static string? ActorTypeName(ActorType? type) => type?.FullName;
     // An erased profile has the DTO's empty display default. Loaded values pass through unchanged.
     private static string DisplayName(ActorPii? pii) => pii is null ? string.Empty : pii.DisplayName;
-    private static string? ProfilePictureUri(ActorPii? pii) => pii?.ProfilePictureUri;
+    private static string? ProfilePictureUri(ActorPii? pii) => StoragePresentationUrlResolver.ActorProfilePictureUri(pii);
+    private static Guid? ProfilePictureStorageObjectId(ActorPii? pii) => StoragePresentationUrlResolver.ManagedProfilePictureId(pii);
+    private static string? ExternalProfilePictureUri(ActorPii? pii) => StoragePresentationUrlResolver.ExternalProfilePictureUri(pii);
     // Do not sort, filter or skip null handles here: repository-selected enumeration order is authoritative.
     private static string? FirstDid(ICollection<AtprotoIdentity>? identities) => identities?.FirstOrDefault()?.Did;
     private static string? FirstHandle(ICollection<AtprotoIdentity>? identities) => identities?.FirstOrDefault()?.Handle;
@@ -171,4 +183,7 @@ public static partial class ActorFederationMapper
     private static string? FileTypeCode(FileType? type) => type?.MasterCode;
     private static string? TenantName(Tenant? tenant) => tenant?.FullName;
     private static string? StorageActorName(Actor? actor) => actor?.Pii?.DisplayName;
+    private static string? StorageDeliveryUri(StorageObject source) => StoragePresentationUrlResolver.DeliveryUri(source);
+    private static bool SupportsPresignedDownload(StorageObject source) =>
+        StoragePresentationUrlResolver.HasManagedBytes(source) && source.Provider == StorageProviders.S3Compatible;
 }

@@ -137,10 +137,14 @@ public sealed partial class ProvisioningTenantAccessHttpTests
                 imageStream.Position = 0;
                 return new FileStorageReadResult(imageStream, "image/png", fixture.ImageBytes.Length, null);
             });
+        var bindings = Substitute.For<IStorageProviderBindingService>();
+        bindings.ResolveAsync(fixture.BindingId, Arg.Any<CancellationToken>()).Returns(provider);
         await using var host = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IFileStorageProvider>();
             services.AddSingleton(provider);
+            services.RemoveAll<IStorageProviderBindingService>();
+            services.AddSingleton(bindings);
         }));
         // Keep the same handler scope and real HybridCache across the persisted lifecycle change.
         await using var scope = host.Services.CreateAsyncScope();
@@ -200,7 +204,7 @@ public sealed partial class ProvisioningTenantAccessHttpTests
     private static Task<TResult> QueryAsync<TQuery, TResult>(IServiceProvider services, TQuery query)
         where TQuery : IQuery<TResult> => services.GetRequiredService<IQueryHandler<TQuery, TResult>>().QueryAsync(query, Token);
 
-    private static async Task<(Guid EventId, Guid ImageId, string ObjectKey, byte[] ImageBytes)> SeedPublicContentAsync(LocalAdmissionWebApplicationFactory factory, bool enableFederation)
+    private static async Task<(Guid EventId, Guid ImageId, string ObjectKey, byte[] ImageBytes, Guid BindingId)> SeedPublicContentAsync(LocalAdmissionWebApplicationFactory factory, bool enableFederation)
     {
         await using var db = factory.CreateDatabase();
         var user = await db.Users.SingleAsync(Token);
@@ -269,6 +273,8 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             Url = "/events",
             CreatedAt = DateTime.UtcNow
         });
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        db.StorageProviderBindings.Add(binding);
         var image = new StorageObject
         {
             Id = Guid.CreateVersion7(),
@@ -276,9 +282,9 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
-            Uri = "lifecycle.png",
             ObjectKey = $"tenants/{TenantId:N}/lifecycle.png",
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             FullName = "lifecycle.png",
             SafeDisplayName = "lifecycle.png",
             Extension = ".png",
@@ -360,6 +366,6 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         (await db.SystemSettings.SingleAsync(
             setting => setting.SettingKey == GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Token)).Value = enableFederation ? "true" : "false";
         await db.SaveChangesAsync(Token);
-        return (entity.Id, image.Id, image.ObjectKey, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0ioAAAAASUVORK5CYII="));
+        return (entity.Id, image.Id, image.ObjectKey, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0ioAAAAASUVORK5CYII="), binding.Id);
     }
 }

@@ -1,0 +1,271 @@
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@inject ITenantStorageSettingsAdminService Storage
+@inject ITranslationService Translation
+@inject IAccessibilityFocusService Focus
+@implements IDisposable
+
+<section class="tenant-stored-files" aria-labelledby="@TitleId" aria-busy="@(_busy ? "true" : "false")">
+    <div class="tenant-stored-files__header">
+        <div>
+            <MudText Typo="Typo.h6" HtmlTag="h3" id="@TitleId">
+                @Text("title", "Stored files")
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                @Text("description", "Review this tenant's file metadata. Retirement requests durable cleanup; it does not confirm that stored bytes are already absent.")
+            </MudText>
+        </div>
+        <MudButton id="@RefreshId" Variant="Variant.Outlined" Disabled="@(_busy || TenantId is null)"
+                   OnClick="@(() => LoadAsync(CurrentPageLink))" data-action="refresh">
+            @Text("refresh", "Refresh files")
+        </MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <MudText>@Text("loading", "Loading file metadata...")</MudText>
+    }
+    else if (_page?._embedded?.Items is { Count: > 0 } items)
+    {
+        <ul class="tenant-stored-files__list">
+            @foreach (var file in items)
+            {
+                <li @key="file.Id" class="tenant-stored-files__item">
+                    <div class="tenant-stored-files__metadata">
+                        <MudText Typo="Typo.subtitle2">@file.SafeDisplayName</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @file.ContentType
+                            @if (file.Size is long size)
+                            {
+                                <span> · @size.ToString("N0") @Text("bytes", "bytes")</span>
+                            }
+                        </MudText>
+                    </div>
+                    @if (file._links?.ContainsKey("delete") == true)
+                    {
+                        <MudButton id="@($"{_id}-retire-{file.Id:N}")" Variant="Variant.Outlined" Color="Color.Error" Disabled="@_busy"
+                                   aria-label="@($"{Text("retire", "Retire file")}: {file.SafeDisplayName}")"
+                                   data-action="retire" OnClick="@(() => PrepareAsync(file))">
+                            @Text("retire", "Retire file")
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" data-state="unavailable">
+                            @Text("unavailable", "Retirement unavailable")
+                        </MudText>
+                    }
+                </li>
+            }
+        </ul>
+    }
+    else if (_page is not null)
+    {
+        <MudText data-state="empty">@Text("empty", "No file metadata on this page.")</MudText>
+    }
+
+    @if (_pending is not null)
+    {
+        <div class="tenant-stored-files__confirmation" role="group" aria-labelledby="@ConfirmId">
+            <MudText id="@ConfirmId" Typo="Typo.subtitle2">
+                @Text("confirm_title", "Request cleanup for this file?") @_pending.SafeDisplayName
+            </MudText>
+            <MudText Typo="Typo.body2">
+                @Text("confirm_description", "Accepted retirement removes the metadata from active use. Provider cleanup continues asynchronously.")
+            </MudText>
+            <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+                <MudButton id="@CancelId" Disabled="@_busy" Variant="Variant.Outlined"
+                           data-action="cancel" OnClick="CancelAsync">@Text("cancel", "Cancel")</MudButton>
+                <MudButton Disabled="@_busy" Variant="Variant.Filled" Color="Color.Error"
+                           data-action="confirm" OnClick="RetireAsync">@Text("confirm", "Request cleanup")</MudButton>
+            </MudStack>
+        </div>
+    }
+
+    <div class="tenant-stored-files__pagination">
+        @if (_page?._links?.TryGetValue("prev", out var previous) == true)
+        {
+            <MudButton Disabled="@_busy" Variant="Variant.Outlined" data-action="previous"
+                       OnClick="@(() => LoadAsync(previous))">@Text("previous", "Previous page")</MudButton>
+        }
+        @if (_page is not null)
+        {
+            <MudText Typo="Typo.caption">@Text("page", "Page") @_page.PageNumber</MudText>
+        }
+        @if (_page?._links?.TryGetValue("next", out var next) == true)
+        {
+            <MudButton Disabled="@_busy" Variant="Variant.Outlined" data-action="next"
+                       OnClick="@(() => LoadAsync(next))">@Text("next", "Next page")</MudButton>
+        }
+    </div>
+    <div role="status" aria-live="polite" aria-atomic="true" data-outcome="@_outcome">@_message @_loadError</div>
+</section>
+
+@code {
+    [Parameter] public Guid? TenantId { get; set; }
+
+    private readonly string _id = $"stored-files-{Guid.NewGuid():N}";
+    private CancellationTokenSource _scope = new();
+    private Guid? _tenant;
+    private HalCollectionResourceOfStorageObjectListDto? _page;
+    private HalResourceOfStorageObjectDto? _pending;
+    private bool _loading;
+    private bool _busy;
+    private bool _disposed;
+    private string? _message;
+    private string? _loadError;
+    private string? _outcome;
+    private string? _focusId;
+    private string? _returnFocusId;
+    private string TitleId => $"{_id}-title";
+    private string RefreshId => $"{_id}-refresh";
+    private string ConfirmId => $"{_id}-confirmation";
+    private string CancelId => $"{_id}-cancel";
+    private HalLink? CurrentPageLink => _page?._links is { } links && links.TryGetValue("self", out var link) ? link : null;
+    private string Text(string key, string fallback) => Translation.T($"tenant.storage.files.{key}", fallback);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_tenant == TenantId) return;
+        _scope.Cancel();
+        _scope.Dispose();
+        _scope = new();
+        _tenant = TenantId;
+        _page = null;
+        _pending = null;
+        _message = null;
+        _loadError = null;
+        _outcome = null;
+        _focusId = null;
+        _returnFocusId = null;
+        _busy = false;
+        _loading = false;
+        if (TenantId is not null) await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusId is not { } id) return;
+        _focusId = null;
+        await Focus.FocusByIdAsync(id, preventScroll: true);
+    }
+
+    private async Task LoadAsync(HalLink? link = null)
+    {
+        var scope = _scope;
+        _busy = true;
+        _loading = true;
+        _loadError = null;
+        _pending = null;
+        try
+        {
+            var page = await Storage.GetFilesAsync(link, scope.Token);
+            if (!IsCurrent(scope)) return;
+            _page = page;
+        }
+        catch (OperationCanceledException) when (scope.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            if (!IsCurrent(scope)) return;
+            _page = null;
+            _loadError = Text("load_failed", "File metadata could not be loaded. Refresh to try again.");
+        }
+        finally
+        {
+            if (IsCurrent(scope)) { _busy = false; _loading = false; }
+        }
+    }
+
+    private async Task PrepareAsync(HalResourceOfStorageObjectListDto file)
+    {
+        if (_busy || file._links?.ContainsKey("delete") != true) return;
+        var scope = _scope;
+        _busy = true;
+        _message = null;
+        _outcome = null;
+        _returnFocusId = $"{_id}-retire-{file.Id:N}";
+        try
+        {
+            var detail = await Storage.GetFileAsync(file, scope.Token);
+            if (!IsCurrent(scope)) return;
+            if (detail._links?.ContainsKey("delete") != true)
+            {
+                SetOutcome("unavailable", Text("unavailable", "Retirement unavailable"));
+                await LoadAsync(CurrentPageLink);
+                if (IsCurrent(scope)) _focusId = RefreshId;
+                return;
+            }
+            _pending = detail;
+            _focusId = CancelId;
+        }
+        catch (OperationCanceledException) when (scope.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            if (IsCurrent(scope))
+                SetOutcome("failed", Text("failed", "Cleanup could not be requested. Refresh file metadata before trying again."));
+        }
+        finally { if (IsCurrent(scope)) _busy = false; }
+    }
+
+    private Task CancelAsync()
+    {
+        if (_busy) return Task.CompletedTask;
+        _pending = null;
+        _focusId = _returnFocusId;
+        return Task.CompletedTask;
+    }
+
+    private async Task RetireAsync()
+    {
+        if (_busy || _pending?._links?.ContainsKey("delete") != true) return;
+        var scope = _scope;
+        var pending = _pending;
+        _busy = true;
+        try
+        {
+            var response = await Storage.RetireFileAsync(pending, scope.Token);
+            if (!IsCurrent(scope)) return;
+            if (response.Success == true)
+            {
+                SetOutcome("pending", Text("pending", "Cleanup accepted and pending. Stored bytes may remain until provider cleanup completes."));
+                if (_page?._embedded?.Items is { } items)
+                {
+                    var retired = items.FirstOrDefault(file => file.Id == pending.Id);
+                    if (retired is not null) items.Remove(retired);
+                }
+            }
+            else
+            {
+                var (code, message) = response.FailureCode switch
+                {
+                    "storage_object_in_use" => ("in-use", Text("in_use", "This file is in use and cannot be retired.")),
+                    "storage_object_retention_blocked" => ("retention", Text("retention", "Retention requirements currently prevent cleanup.")),
+                    "storage_object_invalid_target" => ("invalid-target", Text("invalid_target", "This file is not a valid cleanup target.")),
+                    _ => ("failed", Text("failed", "Cleanup could not be requested. Refresh file metadata before trying again."))
+                };
+                SetOutcome(code, message);
+            }
+            await LoadAsync(CurrentPageLink);
+            if (IsCurrent(scope)) _focusId = RefreshId;
+        }
+        catch (OperationCanceledException) when (scope.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            if (!IsCurrent(scope)) return;
+            _pending = null;
+            SetOutcome("failed", Text("failed", "Cleanup could not be requested. Refresh file metadata before trying again."));
+            await LoadAsync(CurrentPageLink);
+            if (IsCurrent(scope)) _focusId = RefreshId;
+        }
+        finally { if (IsCurrent(scope)) _busy = false; }
+    }
+
+    private bool IsCurrent(CancellationTokenSource scope) => !_disposed && ReferenceEquals(scope, _scope);
+    private void SetOutcome(string code, string message) { _outcome = code; _message = message; }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _scope.Cancel();
+        _scope.Dispose();
+    }
+}

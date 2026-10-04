@@ -2,6 +2,8 @@ namespace Explore.Domain;
 
 public sealed class PrivacyErasureIntent
 {
+    private readonly List<PrivacyErasureIdentityFence> _identityFences = [];
+
     private PrivacyErasureIntent()
     {
     }
@@ -16,6 +18,10 @@ public sealed class PrivacyErasureIntent
     public DateTime RecordedAtUtc { get; private set; }
     public DateTime RetentionExpiresAtUtc { get; private set; }
     public bool IsLegalHoldPseudonymized { get; private set; }
+    public IReadOnlyCollection<PrivacyErasureIdentityFence> IdentityFences => _identityFences.AsReadOnly();
+
+    public bool HasSameIdentityFences(IEnumerable<PrivacyIdentityFingerprint> fingerprints) =>
+        _identityFences.Select(fence => fence.GetFingerprint()).ToHashSet().SetEquals(fingerprints);
 
     public static PrivacyErasureIntent Record(
         Guid intentId,
@@ -26,9 +32,11 @@ public sealed class PrivacyErasureIntent
         int policyVersion,
         DateTime requestedAtUtc,
         DateTime recordedAtUtc,
-        DateTime? retentionExpiresAtUtc = null)
+        DateTime? retentionExpiresAtUtc = null,
+        IEnumerable<PrivacyIdentityFingerprint>? identityFences = null,
+        bool isLegalHoldPseudonymized = false)
     {
-        if (!IsUuidVersion7(intentId))
+        if (intentId == Guid.Empty || (!isLegalHoldPseudonymized && !IsUuidVersion7(intentId)))
         {
             throw new ArgumentException(
                 "Erasure intent idempotency keys must be non-empty RFC 4122 UUIDv7 values.",
@@ -77,7 +85,7 @@ public sealed class PrivacyErasureIntent
                 nameof(retentionExpiresAtUtc));
         }
 
-        return new PrivacyErasureIntent
+        var intent = new PrivacyErasureIntent
         {
             IntentId = intentId,
             AuthoritySequence = authoritySequence,
@@ -87,8 +95,12 @@ public sealed class PrivacyErasureIntent
             PolicyVersion = policyVersion,
             RequestedAtUtc = requestedAtUtc,
             RecordedAtUtc = recordedAtUtc,
-            RetentionExpiresAtUtc = retentionExpiry
+            RetentionExpiresAtUtc = retentionExpiry,
+            IsLegalHoldPseudonymized = isLegalHoldPseudonymized
         };
+        intent._identityFences.AddRange((identityFences ?? []).Distinct()
+            .Select(fingerprint => PrivacyErasureIdentityFence.Capture(authoritySequence, fingerprint, retentionExpiry)));
+        return intent;
     }
 
     public void PseudonymizeForLegalHold(Guid intentAuditToken, Guid subjectAuditToken)

@@ -213,6 +213,22 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
         context.Users.Add(user);
         context.TenantUsers.Add(tenantUser);
         context.NotificationIntents.Add(intent);
+        var recipientBinding = new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+            AuthenticationProvider = null!,
+            ProviderKey = Explore.Application.Authentication.PlatformIdentityPrincipalExtensions
+                .CreateOidcAccountKey("https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
+            CreatedAt = now
+        };
+        var recipientClaim = UserIdentityEmailClaim.Create(user.Id, email);
+        context.UserExternalLogins.Add(recipientBinding);
+        context.UserIdentityEmailClaims.Add(recipientClaim);
+        context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(
+            user.Id, recipientClaim.Id, recipientBinding.Id, now));
         await context.SaveChangesAsync();
 
         var dispatch = new EmailDispatchOutbox
@@ -264,6 +280,13 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
         context.EmailDispatchOutbox.Add(dispatch);
         context.NotificationDeliveries.Add(delivery);
         await context.SaveChangesAsync();
+        User verifiedRecipient = await context.Users.AsNoTracking()
+            .Include(value => value.Pii)
+            .Include(value => value.IdentityEmailClaims).ThenInclude(value => value.Evidence)
+            .SingleAsync(value => value.Id == user.Id);
+        RecipientEmailAddressResolution recipient = RecipientEmailAddressResolver.Resolve(verifiedRecipient, user.Id);
+        await Assert.That(recipient.HasVerifiedEmail).IsTrue();
+        await Assert.That(recipient.Email).IsEqualTo(email);
 
         return new DispatchIdentity(
             tenant.Id,

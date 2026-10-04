@@ -23,9 +23,10 @@ public sealed class StorageObjectDeletionTombstoneRepository(ExploreDbContext da
         return await database.StorageObjectDeletionTombstones.AsNoTracking()
             .Where(item => database.StorageObjects
                     .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
-                    .Any(source => source.Id == item.Id && source.TenantId == item.TenantId)
+                    .Any(source => source.Id == item.Id)
                 || database.StorageUploadSessions.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant })
-                    .Any(session => session.StorageObjectId == item.Id && session.TenantId == item.TenantId))
+                    .Any(session => (session.StorageObjectId == item.Id || session.Id == item.Id))
+                || database.Set<StorageProducerOperation>().Any(operation => operation.Id == item.Id))
             .OrderBy(item => item.Id).Take(limit).ToArrayAsync(cancellationToken);
     }
 
@@ -50,9 +51,10 @@ public sealed class StorageObjectDeletionTombstoneRepository(ExploreDbContext da
             .Where(item => item.Id == objectId && item.ConcurrencyStamp == expectedStamp
                 && !database.StorageObjects
                     .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
-                    .Any(source => source.Id == item.Id && source.TenantId == item.TenantId)
+                    .Any(source => source.Id == item.Id)
                 && !database.StorageUploadSessions.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant })
-                    .Any(session => session.StorageObjectId == item.Id && session.TenantId == item.TenantId))
+                    .Any(session => session.StorageObjectId == item.Id || session.Id == item.Id)
+                && !database.Set<StorageProducerOperation>().Any(operation => operation.Id == item.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(item => item.State, work.State)
                 .SetProperty(item => item.ConcurrencyStamp, work.ConcurrencyStamp)
@@ -66,7 +68,8 @@ public sealed class StorageObjectDeletionTombstoneRepository(ExploreDbContext da
     {
         var work = await GetByIdAsync(objectId, cancellationToken);
         if (work is null || work.ProviderBindingId != bindingId
-            || !string.Equals(work.ObjectKey, objectKey, StringComparison.Ordinal))
+            || !string.Equals(work.ObjectKey, objectKey, StringComparison.Ordinal)
+            || work.ProviderObjectVersion is not null && work.ProviderObjectVersion != providerVersion)
             return false;
         Guid expectedStamp = work.ConcurrencyStamp;
         if (!work.TrySettleProducer(providerVersion, utcNow)) return false;
@@ -91,9 +94,10 @@ public sealed class StorageObjectDeletionTombstoneRepository(ExploreDbContext da
                 && item.ConcurrencyStamp == claimStamp && item.LeaseExpiresAtUtc > utcNow
                 && !database.StorageObjects
                     .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
-                    .Any(source => source.Id == item.Id && source.TenantId == item.TenantId)
+                    .Any(source => source.Id == item.Id)
                 && !database.StorageUploadSessions.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant })
-                    .Any(session => session.StorageObjectId == item.Id && session.TenantId == item.TenantId))
+                    .Any(session => session.StorageObjectId == item.Id || session.Id == item.Id)
+                && !database.Set<StorageProducerOperation>().Any(operation => operation.Id == item.Id))
             .ExecuteDeleteAsync(cancellationToken) == 1;
     }
 

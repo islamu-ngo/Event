@@ -116,7 +116,6 @@ public sealed partial class EventResourceContentTests
                 Tenant = null!,
                 FileTypeId = (int)FileTypeEnum.Document,
                 FileType = null!,
-                Uri = $"/api/eventresource/{resourceId}/content",
                 ObjectKey = objectKey,
                 Provider = StorageProviders.Local,
                 StorageProviderBindingId = binding.Id,

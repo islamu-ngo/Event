@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Data.Common;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Authorization;
@@ -10,8 +11,12 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
@@ -39,7 +44,7 @@ public sealed class StorageRetentionHateoasTests
         string scenario, bool contentAllowed, bool presignedAllowed)
     {
         var clock = new Clock { Now = Deadline.AddTicks(-1) };
-        await using var factory = new StorageFactory(clock);
+        await using var factory = await StorageFactory.CreateAsync(clock);
         using var client = factory.CreateClient();
         var (id, userId) = await SeedAsync(factory, scenario);
         if (scenario.StartsWith("expired-", StringComparison.Ordinal)) clock.Now = Deadline;
@@ -52,8 +57,9 @@ public sealed class StorageRetentionHateoasTests
         using var listJson = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
         JsonElement item = listJson.RootElement.GetProperty("_embedded").GetProperty("items")
             .EnumerateArray().Single(value => value.GetProperty("id").GetGuid() == id);
-        await AssertLinksAsync(detailJson.RootElement, contentAllowed, presignedAllowed);
-        await AssertLinksAsync(item, contentAllowed, false);
+        bool deleteAllowed = scenario == "ordinary";
+        await AssertLinksAsync(detailJson.RootElement, contentAllowed, presignedAllowed, deleteAllowed);
+        await AssertLinksAsync(item, contentAllowed, false, deleteAllowed);
         await AssertNamesAsync(detailJson.RootElement, contentAllowed);
         await AssertNamesAsync(item, contentAllowed);
         await Assert.That(detailJson.RootElement.EnumerateObject().Select(value => value.Name)
@@ -79,7 +85,8 @@ public sealed class StorageRetentionHateoasTests
     {
         var clock = new Clock { Now = Deadline.AddTicks(-1) };
         var authorization = new AuthorizationBarrier();
-        await using var factory = new StorageFactory(clock) { AuthorizationProviderOverride = authorization };
+        await using var factory = await StorageFactory.CreateAsync(clock);
+        factory.AuthorizationProviderOverride = authorization;
         using var client = factory.CreateClient();
         var (id, userId) = await SeedAsync(factory, "live-csv");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -97,7 +104,7 @@ public sealed class StorageRetentionHateoasTests
                 ? json.RootElement.GetProperty("_embedded").GetProperty("items").EnumerateArray()
                     .Single(value => value.GetProperty("id").GetGuid() == id)
                 : json.RootElement;
-            await AssertLinksAsync(resource, false, false);
+            await AssertLinksAsync(resource, false, false, deleteAllowed: false);
             await AssertNamesAsync(resource, false);
         }
         finally { authorization.Release.TrySetResult(); }
@@ -109,7 +116,7 @@ public sealed class StorageRetentionHateoasTests
     public async Task ExpiredMetadataMinimalResponseStillRedactsFilenames(bool collection)
     {
         var clock = new Clock { Now = Deadline };
-        await using var factory = new StorageFactory(clock);
+        await using var factory = await StorageFactory.CreateAsync(clock);
         using var client = factory.CreateClient();
         var (id, userId) = await SeedAsync(factory, "expired-csv");
         using var response = await GetAsync(client, collection ? BaseUrl : $"{BaseUrl}/{id}", userId, minimal: true);
@@ -128,19 +135,21 @@ public sealed class StorageRetentionHateoasTests
         await Assert.That(resource.GetProperty("safeDisplayName").GetString()).IsEqualTo(allowed ? "retained.csv" : string.Empty);
         if (!allowed)
         {
-            await Assert.That(resource.GetProperty("uri").GetString()).IsEqualTo(string.Empty);
+            if (resource.TryGetProperty("uri", out JsonElement uri))
+                await Assert.That(uri.GetString()).IsNull();
             await Assert.That(resource.GetRawText()).DoesNotContain("retained.csv");
         }
     }
 
-    private static async Task AssertLinksAsync(JsonElement resource, bool content, bool presigned)
+    private static async Task AssertLinksAsync(
+        JsonElement resource, bool content, bool presigned, bool deleteAllowed)
     {
         JsonElement links = resource.GetProperty("_links");
         await Assert.That(links.TryGetProperty("content", out _)).IsEqualTo(content);
         await Assert.That(links.TryGetProperty("presigned-download", out _)).IsEqualTo(presigned);
         await Assert.That(links.TryGetProperty("self", out _)).IsTrue();
         await Assert.That(links.TryGetProperty("edit", out _)).IsTrue();
-        await Assert.That(links.TryGetProperty("delete", out _)).IsTrue();
+        await Assert.That(links.TryGetProperty("delete", out _)).IsEqualTo(deleteAllowed);
     }
 
     private static async Task<(Guid Id, Guid UserId)> SeedAsync(StorageFactory factory, string scenario)
@@ -172,6 +181,8 @@ public sealed class StorageRetentionHateoasTests
             submission.TenantId = other.TenantId;
         }
         Guid id = Guid.CreateVersion7();
+        var storageBinding = CapturedStorageProviders.S3Binding();
+        db.Add(storageBinding);
         var storage = new StorageObject
         {
             Id = id,
@@ -179,9 +190,9 @@ public sealed class StorageRetentionHateoasTests
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
-            Uri = $"{BaseUrl}/{id}/content",
             ObjectKey = $"tenants/{tenant.TenantId:N}/{id:N}.csv",
-            Provider = StorageProviders.Local,
+            Provider = StorageProviders.S3Compatible,
+            StorageProviderBindingId = storageBinding.Id,
             FullName = "retained.csv",
             SafeDisplayName = "retained.csv",
             Extension = "csv",
@@ -239,30 +250,112 @@ public sealed class StorageRetentionHateoasTests
         public override DateTimeOffset GetUtcNow() => new(Now);
     }
 
-    private sealed class StorageFactory(Clock clock) : AuthenticatedWebApplicationFactory
+    private sealed class StorageFactory : AuthenticatedWebApplicationFactory
     {
+        private readonly Clock _clock;
+        private readonly string _database =
+            Path.Combine(Path.GetTempPath(), $"storage-retention-hateoas-{Guid.CreateVersion7():N}.db");
+
+        public StorageFactory(Clock clock)
+        {
+            _clock = clock;
+        }
+
+        public static async Task<StorageFactory> CreateAsync(Clock clock)
+        {
+            var factory = new StorageFactory(clock);
+            try
+            {
+                var options = new DbContextOptionsBuilder<ExploreDbContext>();
+                factory.ConfigureDatabase(options);
+                await using var db = new ExploreDbContext(options.Options);
+                await db.Database.EnsureCreatedAsync();
+                await SqliteDatabaseInitializer.InitializeAsync(db, default);
+                return factory;
+            }
+            catch
+            {
+                await factory.DisposeAsync();
+                throw;
+            }
+        }
+
+        private void ConfigureDatabase(DbContextOptionsBuilder options)
+        {
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _database
+            });
+            options.UseSnakeCaseNamingConvention();
+            options.AddInterceptors(SqliteForeignKeysOffInterceptor.Instance);
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             AuthorizationProviderOverride ??= new StubAuthorizationProvider();
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {
+                services.RemoveExploreDbContextRegistrations();
+                services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+                services.AddScoped(provider =>
+                {
+                    var db = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+                    db.TenantContext = provider.GetRequiredService<ITenantContext>();
+                    db.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
+                    return db;
+                });
                 services.RemoveAll<TimeProvider>();
-                services.AddSingleton<TimeProvider>(clock);
+                services.AddSingleton<TimeProvider>(_clock);
                 var provider = Substitute.For<IFileStorageProvider>();
+                provider.Provider.Returns(StorageProviders.S3Compatible);
                 provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
                     .Returns(_ => new FileStorageReadResult(new MemoryStream("retained content"u8.ToArray()),
                         "text/csv", 16, new DateTimeOffset(Deadline.AddDays(-1))));
                 var resolver = Substitute.For<IFileStorageProviderResolver>();
-                resolver.GetRequired(StorageProviders.Local).Returns(provider);
+                resolver.GetRequired(StorageProviders.S3Compatible).Returns(provider);
                 services.RemoveAll<IFileStorageProviderResolver>();
                 services.AddSingleton(resolver);
+                services.AddCapturedStorageProviders();
                 var storage = Substitute.For<IObjectStorageService>();
-                storage.GeneratePresignedDownloadUrl(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>())
+                storage.GeneratePresignedDownloadUrl(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(),
+                    Arg.Any<int>(), Arg.Any<string?>())
                     .Returns("https://storage.example.test/download");
                 services.RemoveAll<IObjectStorageService>();
                 services.AddSingleton(storage);
             });
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await base.DisposeAsync();
+            File.Delete(_database);
+            File.Delete(_database + "-wal");
+            File.Delete(_database + "-shm");
+        }
+    }
+
+    private sealed class SqliteForeignKeysOffInterceptor : DbConnectionInterceptor
+    {
+        public static SqliteForeignKeysOffInterceptor Instance { get; } = new();
+
+        public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA foreign_keys = OFF";
+            command.ExecuteNonQuery();
+        }
+
+        public override async Task ConnectionOpenedAsync(
+            DbConnection connection,
+            ConnectionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA foreign_keys = OFF";
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 

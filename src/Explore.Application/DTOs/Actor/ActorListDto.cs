@@ -35,8 +35,8 @@ public sealed record ActorListDto
     public string? DidCustodyTypeFullName { get; init; } // Fallback default
 
     // ProfilePicture
-    [JsonIgnore]
-    public Guid? ProfilePictureId { get; init; }
+    public Guid? ProfilePictureStorageObjectId { get; set; }
+    public string? ExternalProfilePictureUri { get; set; }
     public string? ProfilePictureUri { get; set; }
 
     // Appearance

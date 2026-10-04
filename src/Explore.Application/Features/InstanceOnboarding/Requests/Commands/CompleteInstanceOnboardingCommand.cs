@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Authentication;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Responses;
 
@@ -16,4 +17,5 @@ public sealed record CompleteInstanceOnboardingCommand : ICommand<BaseCommandRes
     public string? AuthProvider { get; init; }
     public string? AuthProviderId { get; init; }
     public bool? EmailVerified { get; init; }
+    public IdentityAuthorityEvidence? AuthorityEvidence { get; init; }
 }

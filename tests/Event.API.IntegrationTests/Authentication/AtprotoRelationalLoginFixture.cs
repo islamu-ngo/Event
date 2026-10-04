@@ -102,7 +102,7 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                 keys = new[] { new { kid = "session-envelope", status = "active", k = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32)) } }
             })
         };
-        var secrets = Substitute.For<ISecretResolver>();
+        var secrets = Substitute.For<ISecretResolver, IRetainedSecretResolver>();
         secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(async call =>
         {
             string name = call.ArgAt<string>(0);
@@ -120,6 +120,8 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
         {
             ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
             ["RateLimiting:DisableInTesting"] = DisableRateLimiting.ToString(),
+            ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
+            ["PrivacyErasureAuthorityEmbedded:Path"] = database.AuthorityPath,
             ["Deployment:Mode"] = "SingleTenant",
             ["Deployment:DefaultTenantId"] = TenantId.ToString("D"),
             ["Authentication:Provider"] = "atproto",

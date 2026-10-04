@@ -31,6 +31,10 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
             operations,
             Dependencies.SqlGenerationHelper,
             sqlite: false);
+        operations = ActorMediaCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = StorageSourceUriCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -55,6 +59,10 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
             operations,
             Dependencies.SqlGenerationHelper,
             sqlite: false);
+        operations = ActorMediaCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = StorageSourceUriCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "DATALENGTH");
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -80,6 +88,10 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             executableOperations,
             Dependencies.SqlGenerationHelper,
             sqlite: true);
+        executableOperations = ActorMediaCutoverGuard.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, sqlite: true);
+        executableOperations = StorageSourceUriCutoverGuard.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, sqlite: true, byteLengthFunction: "LENGTH");
         executableOperations =
             ConfigurableSchemaMigrationOperations.RemoveRedundantForeignKeyDrops(executableOperations);
         if (executableOperations.Any(operation => operation is RenameIndexOperation))
@@ -150,10 +162,69 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             operations,
             Dependencies.SqlGenerationHelper,
             sqlite: false);
+        operations = ActorMediaCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false);
+        operations = StorageSourceUriCutoverGuard.Prepare(
+            operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
+        operations = PrepareStorageBindingIndexReplacements(operations);
+        var executableOperations = new List<MigrationOperation>(operations.Count);
+        foreach (MigrationOperation operation in operations)
+        {
+            executableOperations.Add(operation);
+            if (operation is not RenameColumnOperation rename ||
+                !((rename.Name == "provider_object_key_uniqueness_hash" &&
+                   rename.NewName == "binding_object_key_uniqueness_hash") ||
+                  (rename.Name == "binding_object_key_uniqueness_hash" &&
+                   rename.NewName == "provider_object_key_uniqueness_hash")))
+                continue;
+
+            var sql = Dependencies.SqlGenerationHelper;
+            string identity = sql.DelimitIdentifier(rename.NewName == "binding_object_key_uniqueness_hash"
+                ? "storage_provider_binding_id" : "provider");
+            string key = sql.DelimitIdentifier("object_key");
+            string identityBytes = $"CAST(CONVERT(LOWER({identity}) USING utf8mb4) AS BINARY)";
+            string keyBytes = $"CAST(CONVERT({key} USING utf8mb4) AS BINARY)";
+            executableOperations.Add(new SqlOperation
+            {
+                Sql = $"""
+                    UPDATE {sql.DelimitIdentifier(rename.Table, rename.Schema)}
+                    SET {sql.DelimitIdentifier(rename.NewName)} = CASE
+                        WHEN {identity} IS NULL OR {key} IS NULL THEN NULL
+                        ELSE UNHEX(SHA2(CONCAT(
+                            UNHEX(LPAD(HEX(OCTET_LENGTH({identityBytes})), 8, '0')), {identityBytes},
+                            UNHEX(LPAD(HEX(OCTET_LENGTH({keyBytes})), 8, '0')), {keyBytes}), 256))
+                    END;
+                    """
+            });
+        }
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
-            base.Generate(operations, model, sqlOptions),
-            operations,
+            base.Generate(executableOperations, model, sqlOptions),
+            executableOperations,
             Dependencies);
+    }
+
+    private static IReadOnlyList<MigrationOperation> PrepareStorageBindingIndexReplacements(
+        IReadOnlyList<MigrationOperation> operations)
+    {
+        var prepared = operations.ToList();
+        foreach (var drop in operations.OfType<DropIndexOperation>().Where(operation =>
+                     operation.Table is not null
+                     && (operation.Table.EndsWith("storage_objects", StringComparison.Ordinal)
+                         || operation.Table.EndsWith("storage_upload_sessions", StringComparison.Ordinal))
+                     && operation.Name.Contains("storage_provider_bind", StringComparison.Ordinal)))
+        {
+            var replacement = operations.OfType<CreateIndexOperation>().SingleOrDefault(operation =>
+                operation.Table == drop.Table && operation.Schema == drop.Schema
+                && operation.Columns[0] == "storage_provider_binding_id");
+            if (replacement is null || prepared.IndexOf(replacement) < prepared.IndexOf(drop))
+                continue;
+
+            // InnoDB must retain an index whose leading column supports the binding FK,
+            // including when downgrading the composite target index to its predecessor.
+            prepared.Remove(replacement);
+            prepared.Insert(prepared.IndexOf(drop), replacement);
+        }
+        return prepared;
     }
 }
 

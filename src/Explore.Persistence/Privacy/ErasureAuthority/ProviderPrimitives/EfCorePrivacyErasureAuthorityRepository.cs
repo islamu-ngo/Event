@@ -9,10 +9,10 @@ using NpgsqlTypes;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed class EfCorePrivacyErasureAuthorityRepository(
+public sealed partial class EfCorePrivacyErasureAuthorityRepository(
     PrivacyErasureAuthorityDbContext dbContext,
     IOptions<PrivacyErasureOptions> options)
-    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance
+    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority
 {
     public const int MaximumReadBatchSize = 500;
 
@@ -23,11 +23,13 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
         try
         {
             await using NpgsqlCommand command = CreateCommand(
-                $"SELECT high_water_sequence, retained_floor_sequence FROM {PrivacyErasureAuthorityDatabaseContract.GetStateFunctionSql}()");
+                $"SELECT high_water_sequence, retained_floor_sequence, identity_key_id, identity_key_verification_tag FROM {PrivacyErasureAuthorityDatabaseContract.GetStateFunctionSql}() CROSS JOIN privacy_erasure_authority.read_identity_key_state()");
             await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
-                return new PrivacyErasureAuthorityState(reader.GetInt64(0), reader.GetInt64(1));
+                return new PrivacyErasureAuthorityState(reader.GetInt64(0), reader.GetInt64(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetString(3));
             }
 
             throw new InvalidOperationException("The erasure-authority state query returned no state.");
@@ -38,28 +40,37 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
         }
     }
 
-    public async Task<PrivacyErasureIntent> AppendAsync(
+    public Task<PrivacyErasureIntent> AppendAsync(
         PrivacyErasureRequest intent,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(intent);
-        await dbContext.Database.OpenConnectionAsync(cancellationToken);
-        try
+        return ExecuteSerializedAsync(async token =>
         {
             await using NpgsqlCommand command = CreateCommand(
-                $"SELECT authority_sequence, intent_id, subject_kind, subject_id, reason_code, policy_version, requested_at_utc, recorded_at_utc, retention_expires_at_utc FROM {PrivacyErasureAuthorityDatabaseContract.AppendFunctionSql}(@intent_id, @subject_kind, @subject_id, @reason_code, @policy_version, @authority_retention)");
+                $"SELECT {FactColumns} FROM privacy_erasure_authority.append_identity_fenced_erasure(@intent_id, @subject_kind, @subject_id, @reason_code, @policy_version, @authority_retention, @key_id, @verification_tag, @fences)");
             command.Parameters.AddWithValue("intent_id", NpgsqlDbType.Uuid, intent.IntentId);
             command.Parameters.AddWithValue("subject_kind", NpgsqlDbType.Smallint, (short)intent.SubjectKind);
             command.Parameters.AddWithValue("subject_id", NpgsqlDbType.Uuid, intent.SubjectId);
             command.Parameters.AddWithValue("reason_code", NpgsqlDbType.Smallint, (short)intent.ReasonCode);
             command.Parameters.AddWithValue("policy_version", NpgsqlDbType.Integer, intent.PolicyVersion);
             command.Parameters.AddWithValue("authority_retention", NpgsqlDbType.Interval, options.Value.AuthorityRetention);
+            command.Parameters.AddWithValue("key_id", NpgsqlDbType.Text, (object?)intent.IdentityKeyId ?? DBNull.Value);
+            command.Parameters.AddWithValue("verification_tag", NpgsqlDbType.Text, (object?)intent.IdentityKeyVerificationTag ?? DBNull.Value);
+            command.Parameters.AddWithValue("fences", NpgsqlDbType.Jsonb,
+                System.Text.Json.JsonSerializer.Serialize(intent.IdentityFences.Select(fence => new
+                {
+                    kind = (int)fence.IdentityKind,
+                    key_id = fence.KeyId,
+                    fingerprint = fence.Fingerprint
+                })));
+            PrivacyErasureIntent? fact = null;
             try
             {
-                await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-                if (await reader.ReadAsync(cancellationToken))
+                await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(token);
+                if (await reader.ReadAsync(token))
                 {
-                    return ReadFact(reader);
+                    fact = ReadFact(reader);
                 }
             }
             catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.InvalidParameterValue)
@@ -67,12 +78,10 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
                 throw new InvalidOperationException("The erasure authority rejected the append payload for this IntentId.");
             }
 
-            throw new InvalidOperationException("The erasure-authority append did not return a retained fact.");
-        }
-        finally
-        {
-            await dbContext.Database.CloseConnectionAsync();
-        }
+            return fact is null
+                ? throw new InvalidOperationException("The erasure-authority append did not return a retained fact.")
+                : await LoadFencesAsync(fact, token);
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<PrivacyErasureIntent>> ReadAfterAsync(
@@ -90,7 +99,7 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
         try
         {
             await using NpgsqlCommand command = CreateCommand(
-                $"SELECT authority_sequence, intent_id, subject_kind, subject_id, reason_code, policy_version, requested_at_utc, recorded_at_utc, retention_expires_at_utc FROM {PrivacyErasureAuthorityDatabaseContract.ReadFunctionSql}(@authority_sequence, @limit)");
+                $"SELECT {FactColumns} FROM privacy_erasure_authority.read_identity_fenced_intents_after(@authority_sequence, @limit)");
             command.Parameters.AddWithValue("authority_sequence", NpgsqlDbType.Bigint, authoritySequence);
             command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
             var facts = new List<PrivacyErasureIntent>(limit);
@@ -108,7 +117,10 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
                 throw new Explore.Application.Exceptions.StaleRestoreBelowRetainedFloorException();
             }
 
-            return facts;
+            var retained = new List<PrivacyErasureIntent>(facts.Count);
+            foreach (PrivacyErasureIntent fact in facts)
+                retained.Add(await LoadFencesAsync(fact, cancellationToken));
+            return retained;
         }
         finally
         {
@@ -164,7 +176,7 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
         try
         {
             await using NpgsqlCommand command = CreateCommand(
-                $"SELECT deleted_count, pseudonymized_count, high_water_sequence, retained_floor_sequence FROM {PrivacyErasureAuthorityDatabaseContract.CompactRetentionFunctionSql}(@as_of_utc, @batch_size, @held_authority_sequences)");
+                $"SELECT deleted_count, pseudonymized_count, high_water_sequence, retained_floor_sequence, identity_key_id, identity_key_verification_tag FROM {PrivacyErasureAuthorityDatabaseContract.CompactRetentionFunctionSql}(@as_of_utc, @batch_size, @held_authority_sequences) CROSS JOIN privacy_erasure_authority.read_identity_key_state()");
             AddMaintenanceParameters(command, request);
             NpgsqlDataReader reader;
             try
@@ -182,7 +194,9 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
                     return new PrivacyErasureCompactionResult(
                         reader.GetInt32(0),
                         reader.GetInt32(1),
-                        new PrivacyErasureAuthorityState(reader.GetInt64(2), reader.GetInt64(3)));
+                        new PrivacyErasureAuthorityState(reader.GetInt64(2), reader.GetInt64(3),
+                            reader.IsDBNull(4) ? null : reader.GetString(4),
+                            reader.IsDBNull(5) ? null : reader.GetString(5)));
                 }
 
             throw new InvalidOperationException("The erasure-authority compaction returned no result.");
@@ -223,5 +237,6 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
             reader.GetInt32(5),
             DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc),
             DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc),
-            DateTime.SpecifyKind(reader.GetDateTime(8), DateTimeKind.Utc));
+            DateTime.SpecifyKind(reader.GetDateTime(8), DateTimeKind.Utc),
+            isLegalHoldPseudonymized: reader.GetBoolean(9));
 }

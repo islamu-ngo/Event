@@ -72,7 +72,6 @@ public class StorageObjectTests
     {
         return new StorageObject
         {
-            Uri = "/storage/local/test-file.png",
             ObjectKey = "tenants/default/test-file.png",
             Provider = StorageProviders.Local,
             FullName = "test-file.png",

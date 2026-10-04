@@ -16,8 +16,11 @@ public partial class ExploreDbContext
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        PrepareTrackedEntities();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
+        return SaveWithStorageReferences(acceptChanges =>
+        {
+            PrepareTrackedEntities();
+            return base.SaveChanges(acceptChanges);
+        }, acceptAllChangesOnSuccess);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
@@ -27,11 +30,20 @@ public partial class ExploreDbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        PrepareTrackedEntities();
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        return await SaveWithStorageReferencesAsync(async acceptChanges =>
+        {
+            PrepareTrackedEntities();
+            return await base.SaveChangesAsync(acceptChanges, cancellationToken);
+        }, acceptAllChangesOnSuccess, cancellationToken);
     }
 
     internal async Task<int> SavePrivacyErasureChangesAsync(CancellationToken cancellationToken)
+        => await SaveWithStorageReferencesAsync(
+            acceptChanges => SavePrivacyErasureGraphAsync(acceptChanges, cancellationToken),
+            acceptAllChangesOnSuccess: true, cancellationToken);
+
+    private async Task<int> SavePrivacyErasureGraphAsync(
+        bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
     {
         PrepareTrackedEntities();
         foreach (var entry in ChangeTracker.Entries()
@@ -55,7 +67,7 @@ public partial class ExploreDbContext
             }
         }
 
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     private void PrepareTrackedEntities()
@@ -354,9 +366,14 @@ public partial class ExploreDbContext
                         : null;
                     break;
                 case StorageObject storageObject:
-                    entry.Property("ProviderObjectKeyUniquenessHash").CurrentValue = storageObject.ObjectKey is { } objectKey
-                        ? ComputeMySqlUniquenessHash(storageObject.Provider, objectKey)
+                    entry.Property("BindingObjectKeyUniquenessHash").CurrentValue =
+                        storageObject.ObjectKey is { } objectKey && storageObject.StorageProviderBindingId is { } bindingId
+                        ? ComputeMySqlUniquenessHash(bindingId.ToString("D"), objectKey)
                         : null;
+                    break;
+                case StorageProducerOperation producer:
+                    entry.Property("BindingObjectKeyUniquenessHash").CurrentValue =
+                        ComputeMySqlUniquenessHash(producer.ProviderBindingId.ToString("D"), producer.ObjectKey);
                     break;
                 case WebPushSubscription webPushSubscription:
                     var active = webPushSubscription.IsActive && !webPushSubscription.IsDeleted;

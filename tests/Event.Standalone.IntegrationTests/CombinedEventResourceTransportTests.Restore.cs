@@ -131,7 +131,6 @@ public sealed partial class CombinedEventResourceTransportTests
                 Tenant = null!,
                 FileTypeId = (int)FileTypeEnum.Document,
                 FileType = null!,
-                Uri = $"/api/eventresource/{fileId}/content",
                 ObjectKey = stored.ObjectKey,
                 Provider = StorageProviders.Local,
                 StorageProviderBindingId = binding.Id,

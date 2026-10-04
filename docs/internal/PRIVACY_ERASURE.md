@@ -47,6 +47,97 @@ erasure request -> append authority fact (committed first)
 5. **Startup & Restore Replay**: At application startup, the startup gate replays all authority facts missing from the local checkpoint before serving traffic.
 6. **Bounded Retention**: The authority publishes a PII-free high-water/floor state. Compaction deletes only an expired contiguous prefix, preserves and pseudonymizes held evidence, and advances the floor in the same transaction.
 
+### Serialized Enrollment And Erased-Subject Fencing
+
+`PrivacyIdentityFenceOperation` serializes external enrollment through
+`IPrivacyIdentityFenceAuthority` before binding resolution and holds the
+authority gate through the application commit. This gate is keyless. Ordinary
+erasure appends its old internal-subject fact through `IPrivacyErasureAuthority`
+before primary deletion; it does not capture reusable provider fingerprints. Sync,
+instance/configured onboarding, DID bootstrap and managed external administrator
+provisioning all use this gate. Native Local identity continues to use its
+credential-operation receipts and User UUID fences.
+
+Before linking to an existing user, each external writer also checks the indexed
+retained subject fact under that gate. This closes the interval between retained
+append and saving the primary saga: a different external key cannot join the
+erased user while its primary UUID fence is not yet visible.
+
+Dedicated SQLite holds a real write transaction. CoLocated SQLite enlists the
+application context in that same connection/transaction; `EfCoreUnitOfWork`
+recognizes only this explicit enlistment, while ordinary nested transactions
+remain rejected. CoLocated PostgreSQL locks the authority counter row in its
+transaction. External PostgreSQL retains function-only runtime privileges through
+`PrivacyIdentityFenceDatabaseContract`; it does not grant raw table access.
+No fingerprint secret is resolved or validated by ordinary enrollment, erasure
+or startup replay.
+
+Replay validates retained floor, high-water, sequence continuity and checkpoint
+identity before purging old-subject records. It does not scan reusable provider
+identities and append erasure facts for a different fresh User UUID. After normal
+erasure removes bindings and identity-email ownership, otherwise admissible
+external authentication may automatically create a fresh account with the same
+provider identity or released address. It never restores the old internal ID,
+profile, permissions, private history or consent. Trusted correlation and
+verified-address conflicts still apply.
+
+Preserve the supported authority backup and compaction contract, including
+`MaximumBackupHorizon + AuthorityRetentionSafetyMargin`. An unavailable authority
+or invalid restore sequence still fails closed; permitting a fresh account is not
+permission to bypass replay or restore erased old-subject data.
+
+### Reserved Moderation Recognition Configuration
+
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` remain optional reserved configuration for
+future moderation recognition, not mandatory ordinary-erasure startup inputs.
+Their approved Infisical location is `/api`. If the explicit key provider is
+invoked, it requires stable Base64-encoded key material and its matching nonsecret
+ID; no ephemeral key, source-code credential or silent fallback is supplied.
+Live rotation remains unsupported.
+
+The existing fingerprint payload/index contracts and key commitments are not
+overwritten by keyless enrollment. They do not constitute an implemented ban
+ledger, and an erasure fingerprint must not be interpreted as a sanction. Future
+moderation needs its own purpose, retention and expiry contract. The accepted
+future policy permits restricted authenticated sessions for existing banned
+accounts, but rejects provisioning of an identity deleted during an active ban.
+No banning or strike-history enforcement is activated by this correction.
+
+### Verified Identity Email Ownership
+
+`UserIdentityEmailClaim` and `UserIdentityEmailEvidence` are subject-owned PII,
+not retained audit evidence. `PrivacyErasureApplier` invokes
+`IUserPrivacyErasureRepository.EraseIdentityEmailOwnershipAsync` after protected
+provider work has been materialized and before deleting external account
+bindings or `UserPii`. `UserLocationPrivacyErasureRepository` explicitly deletes
+all proofs by `UserId`, including invalidated proofs, then deletes the subject's
+claims. Owner-qualified foreign keys make this subject predicate cover the
+claim/binding graph without enumerating another account's evidence. The
+binding-to-proof foreign key is restrictive to avoid SQL Server multiple
+cascade paths; binding deletion must not precede proof disposal.
+
+These deletes share the existing serializable settlement transaction, retained
+authority fence, policy coverage and replay checkpoint. A failed settlement
+rolls back claims/proofs with the other local PII while the committed authority
+fact remains available for replay. Restoring a primary backup restores neither
+authority nor permission to recreate PII: startup replay removes restored
+claims/proofs before admitting traffic. Identity synchronization and proof
+writers must honor the existing subject fence in their serialized mutation;
+releasing an email claim does not release an erased subject's fence. The
+machine inventory classifies the normalized address and proof linkage,
+observation and activity fields as hard-delete copies.
+
+### Managed Media Inventory
+
+The test-only `UserPiiInventory` classifies `StorageObject.SourceUri` as a
+subject-owned hard-delete copy through `StorageObject.ActorId -> Actor.UserId`.
+It is optional foreign-origin provenance, not a persisted delivery URL.
+`ActorPii.ExternalProfilePictureUri` and `ActorPii.ProfilePictureStorageObjectId`
+are likewise hard-delete copies through `Actor.UserId -> ActorPii.ActorId`.
+The inventory coverage gate resolves each named copy against EF metadata;
+renamed fields must replace the old entry rather than bypass that check.
+
 ### Configuration Portability Privacy Boundary
 
 Configuration-manifest and tenant-package exports are not subject-data export

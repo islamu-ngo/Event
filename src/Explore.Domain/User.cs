@@ -35,6 +35,7 @@ public class User : IAuditableEntity, ISoftDeletable, IConcurrencyAware
     }
 
     public Actor? Actor { get; set; }
+    public ICollection<UserIdentityEmailClaim> IdentityEmailClaims { get; set; } = [];
 
     public bool? EmailVerified { get; set; }
     public Guid ConcurrencyStamp { get; set; }

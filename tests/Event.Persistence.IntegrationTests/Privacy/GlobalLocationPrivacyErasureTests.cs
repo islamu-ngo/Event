@@ -315,6 +315,10 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
                 .CountAsync(login => login.UserId == graph.OwnerUserId)).IsEqualTo(2);
             await Assert.That(await rollbackContext.UserExternalLogins
                 .CountAsync(login => login.UserId == graph.UnrelatedUserId)).IsEqualTo(1);
+            await Assert.That(await rollbackContext.UserIdentityEmailClaims
+                .CountAsync(claim => claim.UserId == graph.OwnerUserId)).IsEqualTo(1);
+            await Assert.That(await rollbackContext.UserIdentityEmailEvidence
+                .CountAsync(evidence => evidence.UserId == graph.OwnerUserId)).IsEqualTo(2);
             await Assert.That(await rollbackContext.AtprotoIdentities
                 .AnyAsync(identity => identity.ActorId == graph.OwnerActorId && !identity.IsDeleted)).IsTrue();
             await Assert.That(await rollbackContext.AtprotoIdentities
@@ -499,7 +503,8 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             await Assert.That(ownerIdentity.Handle).IsNull();
             await Assert.That(ownerIdentity.PdsHost).IsEqualTo(string.Empty);
             await Assert.That(ownerIdentity.IsDeleted).IsTrue();
-            await Assert.That(ownerActorPii.ProfilePictureUri).IsNull();
+            await Assert.That(ownerActorPii.ExternalProfilePictureUri).IsNull();
+            await Assert.That(ownerActorPii.ProfilePictureStorageObjectId).IsNull();
             await Assert.That(await committedContext.AtprotoIdentities
                 .AnyAsync(identity => identity.ActorId == graph.UnrelatedActorId
                     && identity.Did == "did:plc:unrelated"
@@ -682,7 +687,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             Pii = new ActorPii
             {
                 DisplayName = "ACTOR-NAME-CANARY",
-                ProfilePictureUri = "https://example.com/actor-canary.jpg",
+                ExternalProfilePictureUri = "https://example.com/actor-canary.jpg",
             },
             ConcurrencyStamp = Guid.CreateVersion7(),
         };
@@ -756,6 +761,29 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             CreatePreference(tenantA, owner.Id, "owner-a"),
             CreatePreference(tenantB, owner.Id, "owner-b"),
             CreatePreference(tenantA, unrelated.Id, "unrelated"));
+        await context.SaveChangesAsync();
+
+        UserIdentityEmailClaim ownerClaim = UserIdentityEmailClaim.Create(
+            owner.Id, $"erasure-owner{identitySuffix}@example.test");
+        UserIdentityEmailClaim unrelatedClaim = UserIdentityEmailClaim.Create(
+            unrelated.Id, $"erasure-unrelated{identitySuffix}@example.test");
+        context.UserIdentityEmailClaims.AddRange(ownerClaim, unrelatedClaim);
+        await context.SaveChangesAsync();
+        UserExternalLogin[] identityBindings = await context.UserExternalLogins
+            .IgnoreQueryFilters()
+            .Where(login => login.UserId == owner.Id || login.UserId == unrelated.Id)
+            .ToArrayAsync();
+        foreach (UserExternalLogin binding in identityBindings)
+        {
+            UserIdentityEmailEvidence evidence = UserIdentityEmailEvidence.Create(
+                binding.UserId,
+                binding.UserId == owner.Id ? ownerClaim.Id : unrelatedClaim.Id,
+                binding.Id,
+                new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc));
+            if (binding.UserId == owner.Id && binding.ProviderKey == $"owner-b{identitySuffix}")
+                evidence.Invalidate();
+            context.UserIdentityEmailEvidence.Add(evidence);
+        }
         await context.SaveChangesAsync();
 
         Location homeA = CreatePrivateHome(tenantA.Id, owner.Id, "HOME-A-NAME-CANARY");
@@ -1141,61 +1169,57 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
     public async Task MigratorMaintenance_IsAtomicAndHoldAware()
     {
         await using PrivacyErasureAuthorityDbContext context = fixture.CreateAuthorityAdminDbContext();
-        await context.Database.OpenConnectionAsync();
+        var repository = new EfCorePrivacyErasureAuthorityRepository(
+            context,
+            Options.Create(new PrivacyErasureOptions()));
+        IPrivacyErasureAuthorityMaintenance maintenance = repository;
+        PrivacyErasureIntent[] facts = new PrivacyErasureIntent[3];
+        for (var index = 0; index < facts.Length; index++)
+        {
+            facts[index] = await repository.AppendAsync(new PrivacyErasureRequest(
+                Guid.CreateVersion7(),
+                PrivacyErasureSubjectKind.User,
+                Guid.CreateVersion7(),
+                PrivacyErasureReasonCode.AccountDeletion,
+                1));
+        }
+
+        // Each test owns its authority database. Seed committed facts before the
+        // rollback sandbox because append owns the serialization transaction.
         await using var transaction = await context.Database.BeginTransactionAsync();
-        try
-        {
-            DateTime databaseNow = await PrepareRetentionScenarioAsync(context);
-            var repository = new EfCorePrivacyErasureAuthorityRepository(
-                context,
-                Options.Create(new PrivacyErasureOptions()));
-            IPrivacyErasureAuthorityMaintenance maintenance = repository;
-            PrivacyErasureIntent[] facts = new PrivacyErasureIntent[3];
-            for (var index = 0; index < facts.Length; index++)
-            {
-                facts[index] = await repository.AppendAsync(new PrivacyErasureRequest(
-                    Guid.CreateVersion7(),
-                    PrivacyErasureSubjectKind.User,
-                    Guid.CreateVersion7(),
-                    PrivacyErasureReasonCode.AccountDeletion,
-                    1));
-            }
-            await context.Database.ExecuteSqlRawAsync(
-                "SELECT set_config('privacy_erasure_authority.maintenance', 'on', true); "
-                + "UPDATE privacy_erasure_authority.erasure_intents "
-                + "SET requested_at_utc = {0}, recorded_at_utc = {0}, retention_expires_at_utc = {1} "
-                + "WHERE authority_sequence >= {2} AND authority_sequence <= {3};",
-                databaseNow.AddDays(-2),
-                databaseNow.AddDays(-1),
-                facts[0].AuthoritySequence,
-                facts[^1].AuthoritySequence);
+        DateTime databaseNow = await context.Database.SqlQueryRaw<DateTime>(
+            "SELECT statement_timestamp() AS \"Value\"").SingleAsync();
+        await context.Database.ExecuteSqlRawAsync(
+            "SELECT set_config('privacy_erasure_authority.maintenance', 'on', true); "
+            + "UPDATE privacy_erasure_authority.erasure_intents "
+            + "SET requested_at_utc = {0}, recorded_at_utc = {0}, retention_expires_at_utc = {1} "
+            + "WHERE authority_sequence >= {2} AND authority_sequence <= {3};",
+            databaseNow.AddDays(-2),
+            databaseNow.AddDays(-1),
+            facts[0].AuthoritySequence,
+            facts[^1].AuthoritySequence);
 
-            var request = new PrivacyErasureRetentionRequest(
-                databaseNow,
-                100,
-                [facts[1].AuthoritySequence]);
-            PrivacyErasureRetentionEvaluation dryRun =
-                await maintenance.EvaluateRetentionAsync(request);
-            PrivacyErasureCompactionResult compacted =
-                await maintenance.CompactExpiredIntentsAsync(request);
+        var request = new PrivacyErasureRetentionRequest(
+            databaseNow,
+            100,
+            [facts[1].AuthoritySequence]);
+        PrivacyErasureRetentionEvaluation dryRun =
+            await maintenance.EvaluateRetentionAsync(request);
+        PrivacyErasureCompactionResult compacted =
+            await maintenance.CompactExpiredIntentsAsync(request);
 
-            await Assert.That(dryRun.EligibleCount).IsEqualTo(1);
-            await Assert.That(dryRun.HeldCount).IsEqualTo(1);
-            await Assert.That(compacted.DeletedCount).IsEqualTo(1);
-            await Assert.That(compacted.PseudonymizedCount).IsEqualTo(1);
-            await Assert.That(compacted.State.RetainedFloorSequence)
-                .IsEqualTo(facts[1].AuthoritySequence);
-            IReadOnlyList<PrivacyErasureIntent> replayable = await repository.ReadAfterAsync(
-                compacted.State.RetainedFloorSequence,
-                100);
-            await Assert.That(replayable.Select(fact => fact.AuthoritySequence))
-                .IsEquivalentTo([facts[2].AuthoritySequence]);
-        }
-        finally
-        {
-            await transaction.RollbackAsync();
-            await context.Database.CloseConnectionAsync();
-        }
+        await Assert.That(dryRun.EligibleCount).IsEqualTo(1);
+        await Assert.That(dryRun.HeldCount).IsEqualTo(1);
+        await Assert.That(compacted.DeletedCount).IsEqualTo(1);
+        await Assert.That(compacted.PseudonymizedCount).IsEqualTo(1);
+        await Assert.That(compacted.State.RetainedFloorSequence)
+            .IsEqualTo(facts[1].AuthoritySequence);
+        IReadOnlyList<PrivacyErasureIntent> replayable = await repository.ReadAfterAsync(
+            compacted.State.RetainedFloorSequence,
+            100);
+        await Assert.That(replayable.Select(fact => fact.AuthoritySequence))
+            .IsEquivalentTo([facts[2].AuthoritySequence]);
+        await transaction.RollbackAsync();
     }
 
     [Test]
@@ -1203,66 +1227,47 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
     public async Task MigratorMaintenance_TailGapRollsBackWithoutAdvancingFloor()
     {
         await using PrivacyErasureAuthorityDbContext context = fixture.CreateAuthorityAdminDbContext();
-        await context.Database.OpenConnectionAsync();
+        var repository = new EfCorePrivacyErasureAuthorityRepository(
+            context,
+            Options.Create(new PrivacyErasureOptions()));
+        PrivacyErasureIntent[] facts = new PrivacyErasureIntent[3];
+        for (var index = 0; index < facts.Length; index++)
+        {
+            facts[index] = await repository.AppendAsync(new PrivacyErasureRequest(
+                Guid.CreateVersion7(),
+                PrivacyErasureSubjectKind.User,
+                Guid.CreateVersion7(),
+                PrivacyErasureReasonCode.AccountDeletion,
+                1));
+        }
+
         await using var transaction = await context.Database.BeginTransactionAsync();
-        try
-        {
-            DateTime databaseNow = await PrepareRetentionScenarioAsync(context);
-            var repository = new EfCorePrivacyErasureAuthorityRepository(
-                context,
-                Options.Create(new PrivacyErasureOptions()));
-            PrivacyErasureIntent[] facts = new PrivacyErasureIntent[3];
-            for (var index = 0; index < 3; index++)
-            {
-                facts[index] = await repository.AppendAsync(new PrivacyErasureRequest(
-                    Guid.CreateVersion7(),
-                    PrivacyErasureSubjectKind.User,
-                    Guid.CreateVersion7(),
-                    PrivacyErasureReasonCode.AccountDeletion,
-                    1));
-            }
-            await context.Database.ExecuteSqlRawAsync(
-                "SELECT set_config('privacy_erasure_authority.maintenance', 'on', true); "
-                + "UPDATE privacy_erasure_authority.erasure_intents "
-                + "SET requested_at_utc = {0}, recorded_at_utc = {0}, retention_expires_at_utc = {1}; "
-                + "DELETE FROM privacy_erasure_authority.erasure_intents WHERE authority_sequence = {2};",
-                databaseNow.AddDays(-2),
-                databaseNow.AddDays(-1),
-                facts[^1].AuthoritySequence);
-            var request = new PrivacyErasureRetentionRequest(databaseNow, 100, []);
-
-            await transaction.CreateSavepointAsync("before_evaluation");
-            await Assert.ThrowsAsync<Explore.Application.Exceptions.PrivacyErasureSequenceGapException>(
-                () => repository.EvaluateRetentionAsync(request));
-            await transaction.RollbackToSavepointAsync("before_evaluation");
-            await transaction.CreateSavepointAsync("before_compaction");
-            await Assert.ThrowsAsync<Explore.Application.Exceptions.PrivacyErasureSequenceGapException>(
-                () => repository.CompactExpiredIntentsAsync(request));
-            await transaction.RollbackToSavepointAsync("before_compaction");
-            await Assert.That(await repository.GetStateAsync())
-                .IsEqualTo(new PrivacyErasureAuthorityState(facts[^1].AuthoritySequence, 0));
-            IReadOnlyList<PrivacyErasureIntent> retained = await repository.ReadAfterAsync(0, 100);
-            await Assert.That(retained.Select(fact => fact.AuthoritySequence))
-                .IsEquivalentTo(facts[..^1].Select(fact => fact.AuthoritySequence));
-        }
-        finally
-        {
-            await transaction.RollbackAsync();
-            await context.Database.CloseConnectionAsync();
-        }
-    }
-
-    private static async Task<DateTime> PrepareRetentionScenarioAsync(
-        PrivacyErasureAuthorityDbContext context)
-    {
-        // The caller's rollback restores other tests' authority facts and sequence state.
+        DateTime databaseNow = await context.Database.SqlQueryRaw<DateTime>(
+            "SELECT statement_timestamp() AS \"Value\"").SingleAsync();
         await context.Database.ExecuteSqlRawAsync(
             "SELECT set_config('privacy_erasure_authority.maintenance', 'on', true); "
-            + "DELETE FROM privacy_erasure_authority.erasure_intents; "
-            + "UPDATE privacy_erasure_authority.authority_counter "
-            + "SET last_sequence = 0, retained_floor_sequence = 0 WHERE singleton;");
-        return await context.Database.SqlQueryRaw<DateTime>(
-            "SELECT statement_timestamp() AS \"Value\"").SingleAsync();
+            + "UPDATE privacy_erasure_authority.erasure_intents "
+            + "SET requested_at_utc = {0}, recorded_at_utc = {0}, retention_expires_at_utc = {1}; "
+            + "DELETE FROM privacy_erasure_authority.erasure_intents WHERE authority_sequence = {2};",
+            databaseNow.AddDays(-2),
+            databaseNow.AddDays(-1),
+            facts[^1].AuthoritySequence);
+        var request = new PrivacyErasureRetentionRequest(databaseNow, 100, []);
+
+        await transaction.CreateSavepointAsync("before_evaluation");
+        await Assert.ThrowsAsync<Explore.Application.Exceptions.PrivacyErasureSequenceGapException>(
+            () => repository.EvaluateRetentionAsync(request));
+        await transaction.RollbackToSavepointAsync("before_evaluation");
+        await transaction.CreateSavepointAsync("before_compaction");
+        await Assert.ThrowsAsync<Explore.Application.Exceptions.PrivacyErasureSequenceGapException>(
+            () => repository.CompactExpiredIntentsAsync(request));
+        await transaction.RollbackToSavepointAsync("before_compaction");
+        await Assert.That(await repository.GetStateAsync())
+            .IsEqualTo(new PrivacyErasureAuthorityState(facts[^1].AuthoritySequence, 0));
+        IReadOnlyList<PrivacyErasureIntent> retained = await repository.ReadAfterAsync(0, 100);
+        await Assert.That(retained.Select(fact => fact.AuthoritySequence))
+            .IsEquivalentTo(facts[..^1].Select(fact => fact.AuthoritySequence));
+        await transaction.RollbackAsync();
     }
 
     [Test]
@@ -1388,7 +1393,9 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
                 1);
             var connection = (NpgsqlConnection)context.Database.GetDbConnection();
             await using var command = new NpgsqlCommand(
-                $"SELECT * FROM {PrivacyErasureAuthorityDatabaseContract.AppendFunctionSql}(@intent_id, @subject_kind, @subject_id, @reason_code, @policy_version, @authority_retention)",
+                "SELECT * FROM privacy_erasure_authority.append_identity_fenced_erasure("
+                + "@intent_id, @subject_kind, @subject_id, @reason_code, @policy_version, "
+                + "@authority_retention, NULL::text, NULL::text, '[]'::jsonb)",
                 connection);
             command.Parameters.AddWithValue("intent_id", NpgsqlTypes.NpgsqlDbType.Uuid, request.IntentId);
             command.Parameters.AddWithValue("subject_kind", NpgsqlTypes.NpgsqlDbType.Smallint, (short)request.SubjectKind);

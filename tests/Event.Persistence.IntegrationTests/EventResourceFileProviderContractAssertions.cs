@@ -145,8 +145,14 @@ internal static class EventResourceFileProviderContractAssertions
         UploadSeed seed = await SeedUploadAsync(contextFactory);
         Guid firstSessionId;
         Guid secondSessionId;
+        long existingBytes;
+        long existingObjects;
         await using (ExploreDbContext reserve = contextFactory())
         {
+            var inventory = reserve.StorageObjects.AsNoTracking()
+                .Where(row => row.TenantId == seed.TenantId && row.Provider == StorageProviders.Local);
+            existingBytes = await inventory.SumAsync(row => row.Size);
+            existingObjects = await inventory.LongCountAsync();
             EventResourceFileUploadWorkflow workflow = UploadWorkflow(reserve, contextFactory, seed);
             var firstReservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
             if (firstReservation.Id is null)
@@ -205,8 +211,8 @@ internal static class EventResourceFileProviderContractAssertions
         StorageUsageCounter quota = await verify.StorageUsageCounters.AsNoTracking()
             .SingleAsync(row => row.TenantId == seed.TenantId, deadline.Token);
         await Assert.That(quota.ReservedBytes).IsEqualTo(0);
-        await Assert.That(quota.UsedBytes).IsEqualTo(Pdf.Length);
-        await Assert.That(quota.ObjectCount).IsEqualTo(1);
+        await Assert.That(quota.UsedBytes).IsEqualTo(existingBytes + Pdf.Length);
+        await Assert.That(quota.ObjectCount).IsEqualTo(existingObjects + 1);
         await Assert.That(await verify.StorageObjects.AsNoTracking().CountAsync(row =>
             row.OwningResourceId == seed.ResourceId && row.LifecycleState == StorageObjectLifecycleStates.Active,
             deadline.Token)).IsEqualTo(1);
@@ -372,7 +378,6 @@ internal static class EventResourceFileProviderContractAssertions
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
-            Uri = $"/api/storageobject/{storageId}/content",
             Provider = StorageProviders.Local,
             ObjectKey = $"provider-contract/{storageId:N}.pdf",
             FullName = "provider-contract.pdf",
@@ -459,6 +464,7 @@ internal static class EventResourceFileProviderContractAssertions
                 1_000_000, false, true, SettingSource.SystemDefault, SettingSource.SystemDefault,
                 SettingSource.SystemDefault));
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
         {
             if (beforeWrite is not null) await beforeWrite(call.ArgAt<CancellationToken>(1));
@@ -491,6 +497,7 @@ internal static class EventResourceFileProviderContractAssertions
         Func<FileStorageReadInput, CancellationToken, Task<FileStorageReadResult>>? versionedOpen = null)
     {
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
             .Returns(call => versionedOpen is null ? open(call.ArgAt<CancellationToken>(1))
                 : versionedOpen(call.ArgAt<FileStorageReadInput>(0), call.ArgAt<CancellationToken>(1)));

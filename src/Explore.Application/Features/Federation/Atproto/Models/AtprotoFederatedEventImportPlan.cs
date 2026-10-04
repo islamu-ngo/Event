@@ -21,5 +21,5 @@ public sealed record AtprotoFederatedEventImportPlan(
     public string TimeZoneId { get; init; } = "UTC";
     public required ConfigureEventParticipationDto ParticipationConfiguration { get; init; }
     public AtprotoThumbnailBlobCandidate? Thumbnail { get; init; }
-    public FileStorageWriteResult? StagedThumbnail { get; init; }
+    public StagedStorageWrite? StagedThumbnail { get; init; }
 }

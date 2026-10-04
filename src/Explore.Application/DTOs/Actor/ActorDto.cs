@@ -39,9 +39,10 @@ public sealed record ActorDto
     public string DisplayName { get; set; } = string.Empty;
 
     // ProfilePicture relationship (optional)
-    [JsonIgnore]
-    public Guid? ProfilePictureId { get; init; }
+    public Guid? ProfilePictureStorageObjectId { get; set; }
+    public string? ExternalProfilePictureUri { get; set; }
     public string? ProfilePictureCid { get; init; }
+    /// <summary>Policy-filtered display URL, never a provider locator or ownership identifier.</summary>
     public string? ProfilePictureUri { get; set; }
 
     // Federation identifiers (ATProto/ActivityPub)

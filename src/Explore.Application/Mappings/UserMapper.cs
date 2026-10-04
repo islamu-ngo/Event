@@ -1,5 +1,6 @@
 using Explore.Application.DTOs.User;
 using Explore.Application.DTOs.UserAuthenticationToken;
+using Explore.Application.Services;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
 
@@ -11,6 +12,7 @@ public static partial class UserMapper
     // The current-user response discloses identity scalars, not PII/navigation graphs,
     // tenant history or audit/deletion state. Authorization and erasure fencing stay in callers.
     [MapperIgnoreSource(nameof(User.Pii))]
+    [MapperIgnoreSource(nameof(User.IdentityEmailClaims))]
     [MapperIgnoreSource(nameof(User.LastActiveTenantId))]
     [MapperIgnoreSource(nameof(User.CreatedAt))]
     [MapperIgnoreSource(nameof(User.CreatedBy))]
@@ -22,9 +24,10 @@ public static partial class UserMapper
     // Provider bindings are resolved by the identity operation, never inferred by this projection.
     [MapperIgnoreTarget(nameof(UserDto.AuthProvider))]
     [MapperIgnoreTarget(nameof(UserDto.AuthProviderId))]
-    // Image presentation is handler-owned; these fields were not populated by the old map.
-    [MapperIgnoreTarget(nameof(UserDto.ProfileImageKey))]
-    [MapperIgnoreTarget(nameof(UserDto.ProfileImageUri))]
+    // Profile media exposes only eligible stable references and explicitly external sources.
+    [MapProperty(nameof(User.Actor), nameof(UserDto.ProfilePictureStorageObjectId), Use = nameof(ProfilePictureStorageObjectId))]
+    [MapProperty(nameof(User.Actor), nameof(UserDto.ExternalProfilePictureUri), Use = nameof(ExternalProfilePictureUri))]
+    [MapProperty(nameof(User.Actor), nameof(UserDto.ProfileImageUri), Use = nameof(ProfileImageUri))]
     [MapperIgnoreTarget(nameof(UserDto.ActorBannerPictureId))]
     [MapperIgnoreTarget(nameof(UserDto.ActorBannerPictureUri))]
     [MapperIgnoreTarget(nameof(UserDto.ActorBackgroundImageId))]
@@ -94,4 +97,7 @@ public static partial class UserMapper
     private static string? ActorBackgroundColor(Actor? actor) => actor?.BackgroundColor;
     private static string? ActorBackgroundEffect(Actor? actor) => actor?.BackgroundEffect;
     private static string? ActorBannerColor(Actor? actor) => actor?.BannerColor;
+    private static Guid? ProfilePictureStorageObjectId(Actor? actor) => StoragePresentationUrlResolver.ManagedProfilePictureId(actor?.Pii);
+    private static string? ExternalProfilePictureUri(Actor? actor) => StoragePresentationUrlResolver.ExternalProfilePictureUri(actor?.Pii);
+    private static string? ProfileImageUri(Actor? actor) => StoragePresentationUrlResolver.ActorProfilePictureUri(actor?.Pii);
 }

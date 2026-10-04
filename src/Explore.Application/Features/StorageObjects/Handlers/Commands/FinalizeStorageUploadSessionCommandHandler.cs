@@ -18,12 +18,13 @@ public class FinalizeStorageUploadSessionCommandHandler
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
 
-    private readonly IFileStorageProviderResolver _providerResolver;
+    private readonly IStorageProviderBindingService _providerResolver;
     private readonly IStoragePolicyResolver _storagePolicyResolver;
     private readonly IStorageUploadSessionRepository _uploadSessionRepository;
     private readonly IStorageUsageCounterRepository _usageCounterRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
+    private readonly IEventResourceStorageLifecycleRepository _storageLifecycleRepository;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
@@ -31,12 +32,13 @@ public class FinalizeStorageUploadSessionCommandHandler
     private readonly EventResourceFileUploadWorkflow? _resourceUploads;
 
     public FinalizeStorageUploadSessionCommandHandler(
-        IFileStorageProviderResolver providerResolver,
+        IStorageProviderBindingService providerResolver,
         IStoragePolicyResolver storagePolicyResolver,
         IStorageUploadSessionRepository uploadSessionRepository,
         IStorageUsageCounterRepository usageCounterRepository,
         IStorageObjectRepository storageObjectRepository,
         IPrivacyErasureStateRepository privacyErasureStateRepository,
+        IEventResourceStorageLifecycleRepository storageLifecycleRepository,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork,
@@ -49,6 +51,7 @@ public class FinalizeStorageUploadSessionCommandHandler
         _usageCounterRepository = usageCounterRepository;
         _storageObjectRepository = storageObjectRepository;
         _privacyErasureStateRepository = privacyErasureStateRepository;
+        _storageLifecycleRepository = storageLifecycleRepository;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
@@ -115,6 +118,9 @@ public class FinalizeStorageUploadSessionCommandHandler
             return failure;
         }
 
+        var producer = new EventResourceProducerIdentity(
+            tenantId, session.Id, session.Id, session.Provider,
+            session.StorageProviderBindingId!.Value, session.ObjectKey!);
         Stream? contentForProvider = null;
         try
         {
@@ -129,13 +135,19 @@ public class FinalizeStorageUploadSessionCommandHandler
             if (!contentInspection.Success)
             {
                 var failure = await _unitOfWork.ExecuteInTransactionAsync(
-                    async ct => await FailSessionAsync(
-                        session.Id,
-                        tenantId,
-                        FailureCodes.StorageUploadContentSignatureMismatch,
-                        "Upload content did not match the reserved content policy.",
-                        contentInspection.Errors,
-                        ct),
+                    async ct =>
+                    {
+                        // This attempt has stopped before provider I/O, not merely timed out.
+                        await _storageLifecycleRepository.RecordProducerSettlementAsync(
+                            producer, null, DateTime.UtcNow, ct);
+                        return await FailSessionAsync(
+                            session.Id,
+                            tenantId,
+                            FailureCodes.StorageUploadContentSignatureMismatch,
+                            "Upload content did not match the reserved content policy.",
+                            contentInspection.Errors,
+                            ct);
+                    },
                     cancellationToken);
 
                 _metrics.RecordStorageUploadSession(session.Provider, "finalize", "failed", failure.FailureCode);
@@ -152,7 +164,8 @@ public class FinalizeStorageUploadSessionCommandHandler
                 return FencedFailure();
             }
 
-            var provider = _providerResolver.GetRequired(session.Provider);
+            var provider = await _providerResolver.ResolveTargetAsync(
+                session.StorageProviderBindingId, session.Provider, cancellationToken);
             var writeResult = await provider.WriteAsync(
                 new FileStorageWriteInput(
                     tenantId,
@@ -164,12 +177,6 @@ public class FinalizeStorageUploadSessionCommandHandler
                     session.ExpectedSizeBytes,
                     session.ObjectKey),
                 cancellationToken);
-
-            if (await IsFencedAsync(session.UserId, cancellationToken))
-            {
-                await FailFencedSessionAsync(session.Id, tenantId, cancellationToken);
-                return FencedFailure();
-            }
 
             var writeResultErrors = ValidateWriteResult(session, tenantId, writeResult);
             if (writeResultErrors.Count > 0)
@@ -190,6 +197,18 @@ public class FinalizeStorageUploadSessionCommandHandler
                 _metrics.RecordStorageQuotaBytes(session.ReservedBytes, session.Provider, "release", "succeeded");
 
                 return failure;
+            }
+
+            await _unitOfWork.ExecuteInTransactionAsync(async ct =>
+            {
+                await _storageLifecycleRepository.RecordProducerSettlementAsync(
+                    producer, writeResult.ProviderVersionId, DateTime.UtcNow, ct);
+            }, CancellationToken.None);
+
+            if (await IsFencedAsync(session.UserId, cancellationToken))
+            {
+                await FailFencedSessionAsync(session.Id, tenantId, cancellationToken);
+                return FencedFailure();
             }
 
             var response = await _unitOfWork.ExecuteInTransactionAsync(
@@ -357,12 +376,13 @@ public class FinalizeStorageUploadSessionCommandHandler
 
         var storageObject = new StorageObject
         {
-            Id = Guid.CreateVersion7(),
+            Id = session.Id,
             FileTypeId = ResolveFileTypeId(session.ContentType, session.Extension),
             FileType = null!,
-            Uri = $"/api/storageobject/{session.Id}/content",
             ObjectKey = writeResult.ObjectKey,
             Provider = session.Provider,
+            StorageProviderBindingId = session.StorageProviderBindingId,
+            ProviderVersionId = session.ProviderVersionId,
             FullName = session.SafeDisplayName,
             SafeDisplayName = session.SafeDisplayName,
             Extension = ResolveRequiredExtension(session.Extension, session.SafeDisplayName),
@@ -378,15 +398,13 @@ public class FinalizeStorageUploadSessionCommandHandler
             Tenant = null!,
             ActorId = null
         };
-        storageObject.Uri = $"/api/storageobject/{storageObject.Id}/content";
-
         storageObject = await _storageObjectRepository.Create(storageObject);
-        counter.FinalizeReservation(writeResult.SizeBytes);
-        await _usageCounterRepository.Update(counter);
-
-        session.Finalize(storageObject.Id, writeResult.ObjectKey, writeResult.Sha256Checksum!, DateTime.UtcNow);
+        var utcNow = DateTime.UtcNow;
+        session.Finalize(storageObject.Id, writeResult.ObjectKey, writeResult.Sha256Checksum!, utcNow);
         session.StorageObject = storageObject;
         await _uploadSessionRepository.Update(session);
+        counter = await _usageCounterRepository.RecalculateScopeAsync(tenantId, session.Provider, utcNow, cancellationToken);
+        await _usageCounterRepository.Update(counter);
 
         return Success(session, counter, "Upload session finalized successfully.");
     }
@@ -410,7 +428,7 @@ public class FinalizeStorageUploadSessionCommandHandler
             session.Provider,
             cancellationToken);
 
-        if (session.Status != StorageUploadSessionStates.Finalized)
+        if (session.Status is StorageUploadSessionStates.Reserved or StorageUploadSessionStates.Uploading)
         {
             if (counter is not null)
             {
@@ -422,11 +440,19 @@ public class FinalizeStorageUploadSessionCommandHandler
             await _uploadSessionRepository.Update(session);
         }
 
-        return BaseCommandResponse.Failure(
+        var response = BaseCommandResponse.Failure(
             failureCode,
             failureMessage,
             errors is { Count: > 0 } ? errors : [failureMessage],
             CreateStorageUploadSessionCommandHandler.Map(session, CreatePolicyFromSession(session), counter));
+        if (session.Status != StorageUploadSessionStates.Finalized && session.ObjectKey is not null)
+        {
+            var admitted = await _storageLifecycleRepository.TryQueueRetirementAsync(
+                tenantId, session.Id, DateTime.UtcNow, cancellationToken);
+            if (admitted != StorageRetirementAdmission.Pending)
+                throw new InvalidOperationException("Failed upload requires exact retained cleanup custody.");
+        }
+        return response;
     }
 
     private static IReadOnlyList<string> ValidateWriteResult(

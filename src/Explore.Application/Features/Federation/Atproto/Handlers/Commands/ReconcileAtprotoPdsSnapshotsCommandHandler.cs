@@ -183,7 +183,7 @@ public sealed class ReconcileAtprotoPdsSnapshotsCommandHandler(
         {
             foreach (AtprotoFederatedEventImportPlan plan in plans)
             {
-                FileStorageWriteResult? staged = await thumbnailGateway.FetchAndStageAsync(
+                StagedStorageWrite? staged = await thumbnailGateway.FetchAndStageAsync(
                     plan.Thumbnail,
                     plan.TenantId,
                     cancellationToken);
@@ -201,11 +201,11 @@ public sealed class ReconcileAtprotoPdsSnapshotsCommandHandler(
 
     private async Task CleanupUnconsumedAsync(
         IEnumerable<AtprotoFederatedEventImportPlan> plans,
-        IReadOnlyList<FileStorageWriteResult> consumed)
+        IReadOnlyList<StagedStorageWrite> consumed)
     {
-        foreach (FileStorageWriteResult staged in plans
+        foreach (StagedStorageWrite staged in plans
                      .Select(plan => plan.StagedThumbnail)
-                     .OfType<FileStorageWriteResult>()
+                     .OfType<StagedStorageWrite>()
                      .Where(staged => !consumed.Contains(staged)))
         {
             await thumbnailGateway.CleanupAsync(staged, CancellationToken.None);

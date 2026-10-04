@@ -10,6 +10,7 @@ public class UserExternalLoginConfiguration : IEntityTypeConfiguration<UserExter
     public void Configure(EntityTypeBuilder<UserExternalLogin> builder)
     {
         builder.Property(e => e.Id).HasValueGenerator<GuidVersion7ValueGenerator>();
+        builder.HasAlternateKey(e => new { e.Id, e.UserId });
 
         builder.Property(e => e.ProviderKey).HasMaxLength(2_048).IsRequired();
         builder.Property(e => e.ProviderDisplayName).HasMaxLength(500);

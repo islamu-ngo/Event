@@ -296,7 +296,9 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 new TenantBrandingSettingsDocumentProvisioningService(tenants, documents, typed), typed, hierarchy, Preflight(scope),
                 new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(app), tenants,
                     new ManagedTenantProvisioningOperationRepository(app), _managedOptions), _managedOptions,
-                mutation, unit, NullLogger<EnsureManagedProviderClientProvisionedCommandHandler>.Instance);
+                mutation, unit, NullLogger<EnsureManagedProviderClientProvisionedCommandHandler>.Instance,
+                new PrivacyIdentityFenceOperation(
+                    NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()));
         }
 
         internal async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> EnsureAsync()

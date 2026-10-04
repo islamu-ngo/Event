@@ -20,7 +20,7 @@ public static partial class EventMapper
     [MapperIgnoreSource(nameof(EventSeries.DeletedAt))]
     [MapperIgnoreSource(nameof(EventSeries.DeletedBy))]
     [MapProperty(nameof(EventSeries.Actor), nameof(EventSeriesDto.ActorDisplayName), Use = nameof(EventActorName))]
-    [MapProperty(nameof(EventSeries.FeaturedImage), nameof(EventSeriesDto.FeaturedImageUri), Use = nameof(EventImageUri))]
+    [MapPropertyFromSource(nameof(EventSeriesDto.FeaturedImageUri), Use = nameof(SeriesImageUri))]
     [MapProperty(nameof(EventSeries.Events), nameof(EventSeriesDto.Events), Use = nameof(SeriesEvents))]
     public static partial EventSeriesDto ToDetail(EventSeries source);
 
@@ -39,10 +39,11 @@ public static partial class EventMapper
     [MapperIgnoreSource(nameof(EventSeries.DeletedAt))]
     [MapperIgnoreSource(nameof(EventSeries.DeletedBy))]
     [MapProperty(nameof(EventSeries.Actor), nameof(EventSeriesListDto.ActorDisplayName), Use = nameof(EventActorName))]
-    [MapProperty(nameof(EventSeries.FeaturedImage), nameof(EventSeriesListDto.FeaturedImageUri), Use = nameof(EventImageUri))]
+    [MapPropertyFromSource(nameof(EventSeriesListDto.FeaturedImageUri), Use = nameof(SeriesImageUri))]
     [MapProperty(nameof(EventSeries.Events), nameof(EventSeriesListDto.EventCount), Use = nameof(SeriesEventCount))]
     public static partial EventSeriesListDto ToListItem(EventSeries source);
 
     private static IReadOnlyList<EventListDto> SeriesEvents(IReadOnlyList<Event> source) => source.Select(ToListItem).ToList();
     private static int SeriesEventCount(IReadOnlyList<Event> source) => source.Count;
+    private static string? SeriesImageUri(EventSeries source) => Explore.Application.Services.StoragePresentationUrlResolver.PublicImageUri(source.FeaturedImage, source.TenantId);
 }

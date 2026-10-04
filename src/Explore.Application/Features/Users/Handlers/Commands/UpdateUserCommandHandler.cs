@@ -83,11 +83,17 @@ public class UpdateUserCommandHandler : ICommandHandler<UpdateUserCommand, BaseC
             // Update profile picture and link the storage object when provided.
             if (request.UpdateUserDto.ProfileImage is not null)
             {
-                var actor = await _actorRepository.GetActorByUserId(user.Id);
+                var actor = await _actorRepository.GetTrackedActorByUserId(user.Id, token);
                 if (actor != null)
                 {
-                    var storageObject = await _storageObjectRepository.GetById(request.UpdateUserDto.ProfileImage.ProfilePictureId);
-                    if (!SafeRasterContentPolicy.IsEligibleImageReference(storageObject, _tenantContext.TenantId))
+                    var image = request.UpdateUserDto.ProfileImage;
+                    var storageObject = image.ProfilePictureId is { } imageId
+                        ? await _storageObjectRepository.GetById(imageId)
+                        : null;
+                    if (image.ProfilePictureId is not null
+                        && (!SafeRasterContentPolicy.IsEligibleImageReference(storageObject, _tenantContext.TenantId)
+                            || !StoragePresentationUrlResolver.IsManagedProfileImage(storageObject)
+                            || storageObject!.ActorId is { } ownerId && ownerId != actor.Id))
                     {
                         return BaseCommandResponse.Validation<Guid>(
                             ["Profile image must be an active public safe-raster object in the current tenant."],
@@ -97,8 +103,9 @@ public class UpdateUserCommandHandler : ICommandHandler<UpdateUserCommand, BaseC
                     if (storageObject != null)
                     {
                         storageObject.ActorId = actor.Id;
-                        actor.ProfilePictureUri = storageObject.Uri;
                     }
+                    actor.Pii.SetProfilePicture(image.ProfilePictureId, image.ExternalProfilePictureUri);
+                    actor.Pii.ProfilePicture = storageObject;
                 }
             }
 

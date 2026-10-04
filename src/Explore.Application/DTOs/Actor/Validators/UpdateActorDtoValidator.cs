@@ -62,8 +62,10 @@ public class UpdateActorProfileImageDtoValidator : AbstractValidator<UpdateActor
     public UpdateActorProfileImageDtoValidator(IStorageObjectRepository storageObjectRepository)
     {
         RuleFor(dto => dto)
-            .Must(dto => dto.ProfilePictureId.HasValue)
-            .WithMessage("ProfileImage group must include ProfilePictureId.");
+            .Must(dto => dto.ProfilePictureId.HasValue != dto.ExternalProfilePictureUri.HasValue
+                && Explore.Domain.ActorPii.IsValidProfilePicture(
+                    dto.ProfilePictureId.Value, dto.ExternalProfilePictureUri.Value))
+            .WithMessage("ProfileImage must specify exactly one managed ID or external HTTP(S) URI operation.");
 
         RuleFor(dto => dto.ProfilePictureId.Value!.Value)
             .MustAsync(async (profilePictureId, cancellation) => await storageObjectRepository.Exists(profilePictureId))

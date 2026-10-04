@@ -559,15 +559,25 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("display_name");
 
-                    b.Property<string>("ProfilePictureUri")
+                    b.Property<string>("ExternalProfilePictureUri")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT")
-                        .HasColumnName("profile_picture_uri");
+                        .HasColumnName("external_profile_picture_uri");
+
+                    b.Property<Guid?>("ProfilePictureStorageObjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_picture_storage_object_id");
 
                     b.HasKey("ActorId")
                         .HasName("pk_ie_actor_pii");
 
-                    b.ToTable("ie_actor_pii", (string)null);
+                    b.HasIndex("ProfilePictureStorageObjectId")
+                        .HasDatabaseName("ix_actor_pii_profile_picture_storage_object_id");
+
+                    b.ToTable("ie_actor_pii", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_actor_pii_profile_picture_shape", "(profile_picture_storage_object_id IS NULL OR (profile_picture_storage_object_id <> '00000000-0000-0000-0000-000000000000' AND external_profile_picture_uri IS NULL)) AND (external_profile_picture_uri IS NULL OR (LOWER(external_profile_picture_uri) LIKE 'https://_%' OR LOWER(external_profile_picture_uri) LIKE 'http://_%'))");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.ActorSubscription", b =>
@@ -30158,6 +30168,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("size");
 
+                    b.Property<string>("SourceUri")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_uri");
+
                     b.Property<Guid?>("StorageProviderBindingId")
                         .HasColumnType("TEXT")
                         .HasColumnName("storage_provider_binding_id");
@@ -30173,12 +30188,6 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("TEXT")
                         .HasColumnName("updated_by");
-
-                    b.Property<string>("Uri")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("uri");
 
                     b.Property<string>("Visibility")
                         .IsRequired()
@@ -30198,12 +30207,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasIndex("FileTypeId")
                         .HasDatabaseName("ix_storage_objects_file_type_id");
 
-                    b.HasIndex("StorageProviderBindingId")
-                        .HasDatabaseName("ix_storage_objects_storage_provider_binding_id");
-
-                    b.HasIndex("Provider", "ObjectKey")
+                    b.HasIndex("StorageProviderBindingId", "ObjectKey")
                         .IsUnique()
-                        .HasDatabaseName("ix_storage_objects_provider_object_key")
+                        .HasDatabaseName("ix_storage_objects_storage_provider_binding_id_object_key")
                         .HasFilter("object_key IS NOT NULL");
 
                     b.HasIndex("TenantId", "OwningResourceKind", "OwningResourceId")
@@ -30223,6 +30229,8 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                             t.HasCheckConstraint("ck_storage_objects_inspection_binding", "document_safety_state <> 'unscanned' OR (purpose = 'event_resource' AND inspected_object_id IS NOT NULL AND inspected_object_id = id AND inspected_sha256_checksum IS NOT NULL AND sha256_checksum IS NOT NULL AND inspected_sha256_checksum = sha256_checksum)");
 
                             t.HasCheckConstraint("ck_storage_objects_lifecycle_state", "lifecycle_state IN ('pending', 'active', 'quarantined', 'delete_requested', 'deleted')");
+
+                            t.HasCheckConstraint("ck_storage_objects_managed_target", "(provider = 'legacy_external' AND storage_provider_binding_id IS NULL AND object_key IS NULL) OR (provider IN ('local', 's3_compatible') AND storage_provider_binding_id IS NOT NULL AND storage_provider_binding_id <> '00000000-0000-0000-0000-000000000000' AND ((object_key IS NOT NULL AND object_key <> '') OR (lifecycle_state = 'deleted' AND object_key IS NULL)))");
 
                             t.HasCheckConstraint("ck_storage_objects_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
 
@@ -30304,6 +30312,63 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_storage_deletion_state", "(state = 1 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL) OR (state = 2 AND next_attempt_at_utc IS NOT NULL AND lease_expires_at_utc IS NULL) OR (state = 3 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NOT NULL) OR (state = 4 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL)");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageProducerOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("object_key");
+
+                    b.Property<bool>("ProducerSettled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("producer_settled");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("ProviderBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_binding_id");
+
+                    b.Property<string>("ProviderVersionId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_version_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_storage_producer_operations");
+
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_storage_producer_operations_created_at_utc");
+
+                    b.HasIndex("ProviderBindingId", "ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_storage_producer_operations_provider_binding_id_object_key");
+
+                    b.ToTable("ie_storage_producer_operations", (string)null);
                 });
 
             modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>
@@ -30535,14 +30600,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_storage_upload_sessions");
 
-                    b.HasIndex("StorageProviderBindingId")
-                        .HasDatabaseName("ix_storage_upload_sessions_storage_provider_binding_id");
-
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_storage_upload_sessions_user_id");
 
-                    b.HasIndex("Provider", "ObjectKey")
-                        .HasDatabaseName("ix_storage_upload_sessions_provider_object_key")
+                    b.HasIndex("StorageProviderBindingId", "ObjectKey")
+                        .HasDatabaseName("ix_storage_upload_sessions_storage_provider_binding_id_object_key")
                         .HasFilter("object_key IS NOT NULL");
 
                     b.HasIndex("TenantId", "IdempotencyKey")
@@ -30562,11 +30624,13 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_storage_upload_sessions", null, t =>
                         {
+                            t.HasCheckConstraint("ck_storage_upload_sessions_bound_target", "storage_provider_binding_id IS NOT NULL AND storage_provider_binding_id <> '00000000-0000-0000-0000-000000000000'");
+
                             t.HasCheckConstraint("ck_storage_upload_sessions_expected_size_nonnegative", "expected_size_bytes >= 0");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_policy_max_upload_bytes_nonnegative", "policy_max_upload_bytes >= 0");
 
-                            t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
+                            t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible')");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
 
@@ -33792,6 +33856,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_user_external_logins");
 
+                    b.HasAlternateKey("Id", "UserId")
+                        .HasName("ak_user_external_logins_id_user_id");
+
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_user_external_logins_user_id");
 
@@ -33800,6 +33867,80 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasDatabaseName("ix_user_external_logins_authentication_provider_id_provider_key");
 
                     b.ToTable("ie_user_external_logins", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("normalized_email");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_user_identity_email_claims");
+
+                    b.HasAlternateKey("Id", "UserId")
+                        .HasName("ak_user_identity_email_claims_id_user_id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_identity_email_claims_normalized_email");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_identity_email_claims_user_id");
+
+                    b.ToTable("ie_user_identity_email_claims", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("claim_id");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime>("ObservedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_user_identity_email_evidence");
+
+                    b.HasIndex("ExternalLoginId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_identity_email_evidence_external_login_id");
+
+                    b.HasIndex("ClaimId", "UserId")
+                        .HasDatabaseName("ix_user_identity_email_evidence_claim_id_user_id");
+
+                    b.HasIndex("ExternalLoginId", "UserId")
+                        .HasDatabaseName("ix_user_identity_email_evidence_external_login_id_user_id");
+
+                    b.ToTable("ie_user_identity_email_evidence", (string)null);
                 });
 
             modelBuilder.Entity("Explore.Domain.UserNotificationPreference", b =>
@@ -37993,7 +38134,15 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_actor_pii_actors_actor_id");
 
+                    b.HasOne("Explore.Domain.StorageObject", "ProfilePicture")
+                        .WithMany()
+                        .HasForeignKey("ProfilePictureStorageObjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_actor_pii_storage_objects_profile_picture_storage_object_id");
+
                     b.Navigation("Actor");
+
+                    b.Navigation("ProfilePicture");
                 });
 
             modelBuilder.Entity("Explore.Domain.ActorSubscription", b =>
@@ -47454,6 +47603,16 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasConstraintName("fk_storage_object_deletion_tombstones_storage_provider_bindings_provider_binding_id");
                 });
 
+            modelBuilder.Entity("Explore.Domain.StorageProducerOperation", b =>
+                {
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("ProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_storage_producer_operations_storage_provider_bindings_provider_binding_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>
                 {
                     b.OwnsOne("Explore.Domain.Secrets.RetainedSecretReference", "AccessKeyReference", b1 =>
@@ -49142,6 +49301,35 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailClaim", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany("IdentityEmailClaims")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identity_email_claims_users_user_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailEvidence", b =>
+                {
+                    b.HasOne("Explore.Domain.UserIdentityEmailClaim", null)
+                        .WithMany("Evidence")
+                        .HasForeignKey("ClaimId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identity_email_evidence_user_identity_email_claims_claim_id_user_id");
+
+                    b.HasOne("Explore.Domain.UserExternalLogin", null)
+                        .WithMany()
+                        .HasForeignKey("ExternalLoginId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identity_email_evidence_user_external_logins_external_login_id_user_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.UserNotificationPreference", b =>
                 {
                     b.HasOne("Explore.Domain.Tenant", "Tenant")
@@ -50427,8 +50615,15 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                 {
                     b.Navigation("Actor");
 
+                    b.Navigation("IdentityEmailClaims");
+
                     b.Navigation("Pii")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Explore.Domain.UserIdentityEmailClaim", b =>
+                {
+                    b.Navigation("Evidence");
                 });
 
             modelBuilder.Entity("Explore.Domain.WebhookConsumer", b =>

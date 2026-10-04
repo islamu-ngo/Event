@@ -71,29 +71,27 @@ public class GetActorDetailsRequestHandler : IQueryHandler<GetActorDetailsReques
         dto.Description = organization?.DescriptionOverride
             ?? group?.DescriptionOverride
             ?? dto.Description;
-        dto.ProfilePictureUri = PublicProfileImageUri(organization?.ProfilePicture)
-            ?? PublicProfileImageUri(group?.ProfilePicture)
-            ?? dto.ProfilePictureUri;
-        dto.BannerPictureUri = PublicProfileImageUri(organization?.BannerPicture)
-            ?? PublicProfileImageUri(group?.BannerPicture)
+        var profilePicture = StoragePresentationUrlResolver.PublicProfileImageUri(organization?.ProfilePicture, tenantId) is not null
+            ? organization!.ProfilePicture
+            : StoragePresentationUrlResolver.PublicProfileImageUri(group?.ProfilePicture, tenantId) is not null
+                ? group!.ProfilePicture
+                : null;
+        if (profilePicture is not null)
+        {
+            dto.ProfilePictureStorageObjectId = profilePicture.Id;
+            dto.ExternalProfilePictureUri = null;
+            dto.ProfilePictureUri = StoragePresentationUrlResolver.PublicProfileImageUri(profilePicture, tenantId);
+        }
+        dto.BannerPictureUri = StoragePresentationUrlResolver.PublicProfileImageUri(organization?.BannerPicture, tenantId)
+            ?? StoragePresentationUrlResolver.PublicProfileImageUri(group?.BannerPicture, tenantId)
             ?? dto.BannerPictureUri;
-        dto.BackgroundImageUri = PublicProfileImageUri(organization?.BackgroundImage)
-            ?? PublicProfileImageUri(group?.BackgroundImage)
+        dto.BackgroundImageUri = StoragePresentationUrlResolver.PublicProfileImageUri(organization?.BackgroundImage, tenantId)
+            ?? StoragePresentationUrlResolver.PublicProfileImageUri(group?.BackgroundImage, tenantId)
             ?? dto.BackgroundImageUri;
         dto.BackgroundColor = organization?.BackgroundColor ?? group?.BackgroundColor ?? dto.BackgroundColor;
         dto.BackgroundEffect = organization?.BackgroundEffect ?? group?.BackgroundEffect ?? dto.BackgroundEffect;
         dto.BannerColor = organization?.BannerColor ?? group?.BannerColor ?? dto.BannerColor;
     }
-
-    private static string? PublicProfileImageUri(StorageObject? storageObject) =>
-        storageObject is
-        {
-            IsDeleted: false,
-            Visibility: StorageObjectVisibilities.PublicImage,
-            LifecycleState: StorageObjectLifecycleStates.Active
-        }
-            ? storageObject.Uri
-            : null;
 
     private Task<string?> ResolveImageUrl(string? objectKeyOrUri)
         => StoragePresentationUrlResolver.ResolveImageUrlAsync(

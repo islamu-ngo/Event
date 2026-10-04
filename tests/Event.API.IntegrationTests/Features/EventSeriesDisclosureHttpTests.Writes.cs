@@ -222,7 +222,6 @@ public sealed partial class EventSeriesDisclosureHttpTests
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
-            Uri = "https://images.example.test/series.png",
             Provider = "legacy_external",
             FullName = "series.png",
             SafeDisplayName = "series.png",

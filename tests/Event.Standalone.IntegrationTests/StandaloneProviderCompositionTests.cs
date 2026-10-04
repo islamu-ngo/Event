@@ -2,10 +2,12 @@ using Event.Standalone.Hosting;
 using Event.Standalone.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Npgsql;
 
@@ -30,8 +32,11 @@ public sealed class StandaloneProviderCompositionTests
                 ["Database:Runtime:Password"] = null,
                 ["Hosting:ReplicaCount"] = "2",
             });
+            await using var guardedFactory = factory.WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services => services.AddSingleton<IHostLifetime>(_ =>
+                    throw new InvalidOperationException("Invalid replica configuration reached host construction."))));
 
-            InvalidOperationException? exception = await Assert.That(() => factory.CreateClient())
+            InvalidOperationException? exception = await Assert.That(() => guardedFactory.CreateClient())
                 .Throws<InvalidOperationException>();
 
             await Assert.That(exception!.Message).Contains("Hosting:ReplicaCount");

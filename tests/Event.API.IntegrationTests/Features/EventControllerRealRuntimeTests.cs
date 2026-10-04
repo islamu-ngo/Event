@@ -143,6 +143,118 @@ public class EventControllerRealRuntimeTests(RealRuntimeApiFixture fixture)
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Create_WithDescendingGraphImageIds_PersistsAllReferencesOrRejectsRetiredImage(bool retiredSessionImage)
+    {
+        await _fixture.ResetDatabaseAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        Guid rootImageId = Guid.Parse("40000000-0000-7000-8000-000000000001");
+        Guid backgroundImageId = Guid.Parse("30000000-0000-7000-8000-000000000001");
+        Guid dayImageId = Guid.Parse("20000000-0000-7000-8000-000000000001");
+        Guid sessionImageId = Guid.Parse("10000000-0000-7000-8000-000000000001");
+        TenantScenarioSeed.TenantScenarioResult tenantResult;
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            tenantResult = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+            var binding = StorageProviderBinding.Local(Path.GetTempPath());
+            context.StorageProviderBindings.Add(binding);
+            foreach (Guid imageId in new[] { rootImageId, backgroundImageId, dayImageId, sessionImageId })
+            {
+                context.StorageObjects.Add(new StorageObject
+                {
+                    Id = imageId,
+                    TenantId = tenantResult.TenantId,
+                    Tenant = null!,
+                    FileTypeId = (int)FileTypeEnum.Image,
+                    FileType = null!,
+                    Provider = binding.Provider,
+                    StorageProviderBindingId = binding.Id,
+                    ObjectKey = $"fixtures/{imageId:N}.png",
+                    FullName = "event.png",
+                    SafeDisplayName = "event.png",
+                    Extension = "png",
+                    ContentType = "image/png",
+                    Visibility = StorageObjectVisibilities.PublicImage,
+                    Purpose = StorageObjectPurposes.EventImage,
+                    LifecycleState = retiredSessionImage && imageId == sessionImageId
+                        ? StorageObjectLifecycleStates.DeleteRequested
+                        : StorageObjectLifecycleStates.Active
+                });
+            }
+            await context.SaveChangesAsync(timeout.Token);
+        }
+
+        const string title = "Descending image graph creation";
+        var start = new DateTimeOffset(2027, 3, 1, 10, 0, 0, TimeSpan.Zero);
+        var createRequest = new CreateEventDraftRequestDto
+        {
+            Title = title,
+            EventTypeId = 1,
+            AudienceGenderId = 1,
+            AudienceAgeId = 1,
+            ParticipationConfiguration = CreateParticipationConfiguration(),
+            VisibilityTypeId = 1,
+            EventFormatId = 1,
+            Timezone = "UTC",
+            FeaturedImageId = rootImageId,
+            BackgroundImageId = backgroundImageId,
+            Days =
+            [
+                new CreateEventGraphDayDto
+                {
+                    TempKey = "day",
+                    LocalDate = new DateOnly(2027, 3, 1),
+                    Label = title,
+                    BannerImageId = dayImageId
+                }
+            ],
+            Sessions =
+            [
+                new CreateEventGraphSessionDto
+                {
+                    DayTempKey = "day",
+                    Title = title,
+                    StartTime = start,
+                    EndTime = start.AddHours(1),
+                    FeaturedImageId = sessionImageId
+                }
+            ]
+        };
+        using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/event", tenantResult.UserId);
+        request.Content = JsonContent.Create(createRequest);
+        using var response = await _fixture.Client.SendAsync(request, timeout.Token);
+        await Assert.That(response.StatusCode).IsEqualTo(
+            retiredSessionImage ? HttpStatusCode.BadRequest : HttpStatusCode.Created);
+
+        using var verifyScope = _fixture.Factory.Services.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        if (retiredSessionImage)
+        {
+            await Assert.That(await verifyContext.Events.IgnoreQueryFilters().CountAsync(
+                item => item.Title == title, timeout.Token)).IsEqualTo(0);
+            await Assert.That(await verifyContext.EventDays.IgnoreQueryFilters().CountAsync(timeout.Token)).IsEqualTo(0);
+            await Assert.That(await verifyContext.EventSessions.IgnoreQueryFilters().CountAsync(timeout.Token)).IsEqualTo(0);
+            await Assert.That(await verifyContext.EventRoleAssignments.IgnoreQueryFilters().CountAsync(timeout.Token)).IsEqualTo(0);
+            await Assert.That(await verifyContext.Set<EventParticipationConfiguration>().IgnoreQueryFilters()
+                .CountAsync(timeout.Token)).IsEqualTo(0);
+            return;
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>(timeout.Token);
+        await Assert.That(body!.IsSuccess).IsTrue();
+        var created = await verifyContext.Events.IgnoreQueryFilters().SingleAsync(item => item.Id == body.Id, timeout.Token);
+        var day = await verifyContext.EventDays.IgnoreQueryFilters().SingleAsync(item => item.EventId == body.Id, timeout.Token);
+        var session = await verifyContext.EventSessions.IgnoreQueryFilters().SingleAsync(item => item.EventId == body.Id, timeout.Token);
+        await Assert.That(created.FeaturedImageId).IsEqualTo(rootImageId);
+        await Assert.That(created.BackgroundImageId).IsEqualTo(backgroundImageId);
+        await Assert.That(day.BannerImageId).IsEqualTo(dayImageId);
+        await Assert.That(session.FeaturedImageId).IsEqualTo(sessionImageId);
+        await Assert.That(session.EventDayId).IsEqualTo(day.Id);
+    }
+
+    [Test]
     public async Task Create_WithDraftWithoutSessions_ReturnsCreatedAndPersistsEmptyProgramDraft()
     {
         await _fixture.ResetDatabaseAsync();

@@ -116,6 +116,7 @@ public class UserController : EventControllerBase
         var command = new SyncUserCommand
         {
             AccountKey = providerIdentity.AccountKey,
+            AuthorityEvidence = providerIdentity.AuthorityEvidence,
             UserDto = userDto
         };
         var response = await _syncUserCommandHandler.ExecuteAsync(command, cancellationToken);

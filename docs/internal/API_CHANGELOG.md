@@ -3,7 +3,41 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-10-04
+
+- **Fresh registration after ordinary erasure.** External authentication retains
+  the combined sign-in/JIT-signup flow. An erased provider identity or released
+  verified email may create a fresh User/Actor graph without restoring old
+  profile data, roles, memberships or consent. Retained old-subject fencing,
+  atomic disposal and sequence-validated startup replay remain effective.
+  Replay no longer erases a different fresh UUID by matching external identity.
+  Ordinary signup, erasure and startup do not require reserved fingerprint
+  secrets. The optional key and key-ID definitions resolve from `/api`;
+  moderation enforcement remains a future feature. Routes and payload shapes
+  are unchanged.
+
 ## 2026-10-02
+
+- **Breaking: storage provenance versus delivery.** Persisted `StorageObject.Uri`
+  is replaced by nullable `SourceUri` foreign-origin provenance. Ordinary storage
+  `uri` is now nullable and derived only from eligible captured managed IDs:
+  public safe-raster `/public`, authenticated `/content`, with resource files
+  retaining their resource-only content route. `legacy_external` records do not
+  acquire managed delivery. Detail/list and upload-session responses omit backend
+  provider identity; source, binding, bucket, key and version are not disclosed.
+  HAL remains the action authority. API schema, inventory, NSwag client and
+  generated records are refreshed through their native generators.
+
+- **Breaking: explicit Actor profile-media ownership.** Actor/User responses
+  distinguish `profilePictureStorageObjectId` from `externalProfilePictureUri`.
+  Display URLs are derived independently; User `profileImageKey` is removed.
+  The user `profileImage` PATCH group selects a managed `profilePictureId` or
+  explicit external source, rejects both together, and clears with an empty
+  group. Omission preserves the image. Managed selection retains tenant/public
+  safe-raster checks and rejects resource-only or differently Actor-owned bytes.
+  External URLs never authorize ownership or deletion. Existing participation
+  background/banner delivery is ID-derived. API and client artifacts are
+  generator-owned; the database upgrade must accompany deployment.
 
 - **Unified instance administration.** Internal administration routes move from
   `/api/admin/control-plane/*` to `/api/admin/instance/*`, with instance-named

@@ -34,6 +34,16 @@ the authority-owned transaction flushes application disclosure after the complet
 enrollment callback and before its shared commit; a failed identity or storage
 operation rolls back both application writes and discovery epochs.
 
+Bulk actor PII detachment captures enrolled tenant/source fences before acquiring
+picture storage fences. Physical tenant deletion acquires the snapshot reservation
+before tenant/source and storage fences, then removes its aliases, identities,
+snapshot items, snapshots, revision and reservation in FK order. Tracked discovery
+rows are detached before the physical delete. The mutation scope removes that
+tenant from pending finalization and rejects subsequent writes or reservation
+resurrection; other tenants still finalize at the true transaction owner.
+Cleanup and deletion roll back together, including storage concurrency stamps.
+Shared storage objects and their provider bindings are not retired by this cleanup.
+
 The API assembles the complete HAL resource before
 `EventDiscoveryResponseAuthority` performs its fresh native release check.
 Continuations use purpose-isolated ASP.NET Core Data Protection and bind tenant,

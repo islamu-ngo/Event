@@ -256,6 +256,7 @@ public class ActorRepository : GenericRepository<Actor, Guid>, IActorRepository
         return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
         {
             await _dbContext.DisclosureMutations.EnlistActorsAsync([actorId], token);
+            await _dbContext.DisclosureMutations.CaptureAsync(token);
             Guid[] pictureIds = await _dbContext.ActorPii.AsNoTracking()
                 .Where(p => p.ActorId == actorId && p.ProfilePictureStorageObjectId.HasValue)
                 .Select(p => p.ProfilePictureStorageObjectId!.Value)

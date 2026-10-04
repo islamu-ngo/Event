@@ -23,6 +23,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         ["TenantId", "ActorId", "OrganizerActorId", "SubmittedByUserId", "AtprotoRecordId"];
     private readonly HashSet<Guid> _tenants = [];
     private readonly HashSet<Guid> _tenantParents = [];
+    private readonly HashSet<Guid> _deletedTenants = [];
     private readonly Dictionary<Guid, (long? Expected, long Advancement)> _identityRevisions = [];
     private readonly HashSet<Guid> _actors = [];
     private readonly HashSet<Guid> _users = [];
@@ -72,6 +73,8 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         {
             if (tenantId == Guid.Empty)
                 throw new InvalidOperationException("Disclosure mutations require an exact tenant.");
+            if (_deletedTenants.Contains(tenantId))
+                throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
             _tenants.Add(tenantId);
             if (_tenants.Union(_identityRevisions.Keys).Count() > MaximumAffectedTenants)
                 throw new InvalidOperationException("discovery_disclosure_fanout_exceeded");
@@ -83,6 +86,8 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         Enlist([]);
         if (tenantId == Guid.Empty)
             throw new InvalidOperationException("Discovery identity requires an exact tenant.");
+        if (_deletedTenants.Contains(tenantId))
+            throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
         _identityRevisions.TryGetValue(tenantId, out var pending);
         if (expected is { } revision && pending.Expected is { } previous
             && revision != checked(previous + pending.Advancement))
@@ -99,6 +104,16 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         Enlist([]);
         Guid[] ids = await tenantIds.Distinct().Take(MaximumAffectedTenants + 1).ToArrayAsync(cancellationToken);
         Enlist(ids);
+    }
+
+    internal void RecordTenantDeletion(Guid tenantId)
+    {
+        EnsureTransaction();
+        // The repository records only a successful physical delete, within the
+        // owning transaction. Its late flush must never recreate this Tenant FK.
+        _deletedTenants.Add(tenantId);
+        _tenants.Remove(tenantId);
+        _identityRevisions.Remove(tenantId);
     }
 
     internal async Task EnlistAllTenantsAsync(CancellationToken cancellationToken)
@@ -198,6 +213,9 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _storedSources.Clear();
         EntityEntry[] pending = context.ChangeTracker.Entries()
             .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted).ToArray();
+        if (pending.Any(entry => entry.Entity is ITenantEntity owned && _deletedTenants.Contains(owned.TenantId)
+                || entry.Entity is Tenant tenant && _deletedTenants.Contains(tenant.Id)))
+            throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
         if (_terminal && pending.Any(entry =>
                 entry.Entity is not EventDiscoverySnapshot and not EventDiscoverySnapshotItem))
             throw new InvalidOperationException("Source, audit and outbox writes cannot follow the terminal discovery fence.");
@@ -446,10 +464,17 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         EnsureTransaction();
         if (_finalizationFailed)
             throw new InvalidOperationException("A failed disclosure finalization requires transaction rollback.");
-        if (_flushed || _tenants.Count == 0 && _identityRevisions.Count == 0)
-            return;
         try
         {
+            // Reservation bootstrap uses native SQL and has no Tenant FK. Even a
+            // late bootstrap without a tracked snapshot must not resurrect it.
+            foreach (Guid tenantId in _deletedTenants)
+                if (await EventDiscoveryDisclosureRepository.InTenantAsync(context, tenantId,
+                        () => context.Set<EventDiscoverySnapshotReservation>().IgnoreAllFilters(Reason)
+                            .AnyAsync(row => row.TenantId == tenantId, cancellationToken), cancellationToken))
+                    throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
+            if (_flushed || _tenants.Count == 0 && _identityRevisions.Count == 0 && _deletedTenants.Count == 0)
+                return;
             await new EventDiscoveryDisclosureRepository(context)
                 .FinalizeAsync(_tenants.ToArray(), _identityRevisions, cancellationToken);
             _flushed = true;
@@ -473,6 +498,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _transactionId = null;
         _tenants.Clear();
         _tenantParents.Clear();
+        _deletedTenants.Clear();
         _identityRevisions.Clear();
         _actors.Clear();
         _users.Clear();

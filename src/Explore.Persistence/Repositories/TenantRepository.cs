@@ -1,5 +1,8 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Domain.Interfaces;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +21,16 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
     {
         await new EfCoreUnitOfWork(_dbContext).ExecuteSerializableAsync(async cancellationToken =>
         {
+            // Captures and retention take reservation before source/epoch locks.
+            // Hold it before Tenant so neither can race retirement or invert that order.
+            await EventDiscoveryDisclosureRepository.InTenantAsync(_dbContext, entity.Id, async () =>
+            {
+                await EventDiscoverySnapshotProviderOperations.BootstrapReservationAsync(
+                    _dbContext, entity.Id, cancellationToken);
+                await RelationalEntityRowFence.AcquireGlobalAsync<EventDiscoverySnapshotReservation>(
+                    _dbContext, entity.Id, cancellationToken);
+                return true;
+            }, cancellationToken);
             _dbContext.DisclosureMutations.Enlist([entity.Id]);
             await _dbContext.DisclosureMutations.CaptureAsync(cancellationToken);
             // Unloaded series are physically removed by the database cascade, not tracked saves.
@@ -27,8 +40,33 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
                 .Select(series => series.FeaturedImageId!.Value).Distinct()
                 .ToArrayAsync(cancellationToken);
             await new StorageObjectReferenceRepository(_dbContext).FenceAsync(pictureIds, cancellationToken);
+            await EventDiscoveryDisclosureRepository.InTenantAsync(_dbContext, entity.Id, async () =>
+            {
+                // Tenant fences identity/epoch writers; reservation fences capture and
+                // retention. These are owned ephemeral rows, not their shared sources.
+                // Do not acquire an early terminal epoch: the true transaction owner
+                // may still have source writes and other tenants to finalize.
+                await DeleteDiscoveryAsync<EventDiscoveryAlias>();
+                await DeleteDiscoveryAsync<EventDiscoveryIdentity>();
+                await DeleteDiscoveryAsync<EventDiscoverySnapshotItem>();
+                await DeleteDiscoveryAsync<EventDiscoverySnapshot>();
+                await DeleteDiscoveryAsync<EventDiscoveryRevision>();
+                await DeleteDiscoveryAsync<EventDiscoverySnapshotReservation>();
+                return true;
+            }, cancellationToken);
+            foreach (var entry in _dbContext.ChangeTracker.Entries()
+                         .Where(entry => entry.Entity is ITenantEntity owned && owned.TenantId == entity.Id
+                             && entry.Entity is EventDiscoveryAlias or EventDiscoveryIdentity or EventDiscoveryRevision
+                                 or EventDiscoverySnapshotItem or EventDiscoverySnapshot or EventDiscoverySnapshotReservation)
+                         .ToArray())
+                entry.State = EntityState.Detached;
             await base.Delete(entity);
+            _dbContext.DisclosureMutations.RecordTenantDeletion(entity.Id);
             return true;
+
+            Task<int> DeleteDiscoveryAsync<TEntity>() where TEntity : class, ITenantEntity =>
+                _dbContext.Set<TEntity>().IgnoreAllFilters(TenantFilterBypassReasons.DiscoveryDisclosureMutation)
+                    .Where(row => row.TenantId == entity.Id).ExecuteDeleteAsync(cancellationToken);
         }, CancellationToken.None);
     }
 

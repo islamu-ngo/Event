@@ -142,6 +142,11 @@ The tenant governance settings under `event_discovery.*` offer finite downward
 tuning of membership, lifetime, live snapshots, physical rows, examined rows and
 source seeks. They introduce no new environment variable or deployment service.
 
+Physical tenant deletion removes that tenant's reviewed discovery relationships
+and captured searches in the same transaction as the directory deletion.
+A failed commit restores both; cleanup does not delete another tenant's searches
+or shared picture storage. No separate manual discovery-table cleanup is required.
+
 For PostgreSQL, use the normal application migration bootstrap, not only
 `dotnet ef database update`: it also installs the bounded retention function.
 The runtime login needs `event_discovery_maintenance_runtime` membership with

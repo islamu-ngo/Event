@@ -634,7 +634,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             result = await repository.TryReconcileWithResultAsync(new AtprotoPdsSnapshotApplyRequest(
                 claim, [Did], [new AtprotoPdsSnapshot(Did, [new(Collection, RecordKey)], [new(next, projection)])],
                 [scope.TenantId], SnapshotVersion: 2, ObservedAt: detachedAt)
-                { EventImports = [import] }, CancellationToken.None);
+            { EventImports = [import] }, CancellationToken.None);
         }
         else if (route is "absence" or "rejected-snapshot")
         {
@@ -829,7 +829,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 ? await repository.TryReconcileWithResultAsync(new AtprotoPdsSnapshotApplyRequest(
                     claim, [Did], [new AtprotoPdsSnapshot(Did, [new(Collection, RecordKey)],
                         [new(next, request.EventProjection)])], [scope.TenantId], 2, updatedAt)
-                    { EventImports = [import] }, CancellationToken.None)
+                { EventImports = [import] }, CancellationToken.None)
                 : await repository.TryApplyAndAdvanceWithResultAsync(request with { EventImports = [import] });
             await Assert.That(result.Applied).IsFalse();
             await Assert.That(result.ConsumedStagedThumbnails.Count).IsEqualTo(0);
@@ -873,14 +873,28 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             "atproto/unsettled-orphan", observedAt);
         var orphan = new StorageObject
         {
-            Id = operation.Id, TenantId = scope.TenantId, Tenant = null!, ActorId = scope.ActorId,
-            FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-            Provider = binding.Provider, StorageProviderBindingId = binding.Id, ObjectKey = operation.ObjectKey,
-            ProviderVersionId = "observed-before-settlement", FullName = "orphan.png", SafeDisplayName = "orphan.png",
-            Extension = ".png", ContentType = "image/png", Sha256Checksum = ThumbnailChecksum, Size = 8,
-            Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage,
+            Id = operation.Id,
+            TenantId = scope.TenantId,
+            Tenant = null!,
+            ActorId = scope.ActorId,
+            FileTypeId = (int)FileTypeEnum.Image,
+            FileType = null!,
+            Provider = binding.Provider,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = operation.ObjectKey,
+            ProviderVersionId = "observed-before-settlement",
+            FullName = "orphan.png",
+            SafeDisplayName = "orphan.png",
+            Extension = ".png",
+            ContentType = "image/png",
+            Sha256Checksum = ThumbnailChecksum,
+            Size = 8,
+            Visibility = StorageObjectVisibilities.PublicImage,
+            Purpose = StorageObjectPurposes.EventImage,
             LifecycleState = StorageObjectLifecycleStates.Active,
-            OwningResourceKind = ResourceKinds.Event, OwningResourceId = eventId, CreatedAt = observedAt
+            OwningResourceKind = ResourceKinds.Event,
+            OwningResourceId = eventId,
+            CreatedAt = observedAt
         };
         context.AddRange(binding, operation, orphan);
         await SaveFixtureAsync(context);

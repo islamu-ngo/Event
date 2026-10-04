@@ -46,9 +46,13 @@ public sealed class ManagedStorageBindingTests
         {
             UploadSessionDto = new CreateStorageUploadSessionDto
             {
-                ContentType = "image/png", ExpectedSizeBytes = Png.Length, SafeDisplayName = "image.png",
-                Extension = "png", Purpose = StorageObjectPurposes.EventImage,
-                Visibility = StorageObjectVisibilities.PublicImage, IdempotencyKey = Guid.CreateVersion7().ToString("N")
+                ContentType = "image/png",
+                ExpectedSizeBytes = Png.Length,
+                SafeDisplayName = "image.png",
+                Extension = "png",
+                Purpose = StorageObjectPurposes.EventImage,
+                Visibility = StorageObjectVisibilities.PublicImage,
+                IdempotencyKey = Guid.CreateVersion7().ToString("N")
             }
         }, default);
         await Assert.That(reservation.IsSuccess).IsTrue();
@@ -62,7 +66,10 @@ public sealed class ManagedStorageBindingTests
         using var content = new MemoryStream(Png);
         var finalized = await finalizer.ExecuteAsync(new FinalizeStorageUploadSessionCommand
         {
-            UploadSessionId = saved.Id, Content = content, ContentLength = Png.Length, ContentType = "image/png"
+            UploadSessionId = saved.Id,
+            Content = content,
+            ContentLength = Png.Length,
+            ContentType = "image/png"
         }, default);
         await Assert.That(finalized.IsSuccess).IsTrue();
         var metadata = (await env.Objects.GetForGenericAccessAsync(finalized.Id!.StorageObjectId!.Value, default))!;
@@ -110,9 +117,13 @@ public sealed class ManagedStorageBindingTests
         {
             UploadSessionDto = new CreateStorageUploadSessionDto
             {
-                ContentType = "image/png", ExpectedSizeBytes = Png.Length, SafeDisplayName = "rejected.png",
-                Extension = "png", Purpose = StorageObjectPurposes.EventImage,
-                Visibility = StorageObjectVisibilities.PublicImage, IdempotencyKey = Guid.CreateVersion7().ToString("N")
+                ContentType = "image/png",
+                ExpectedSizeBytes = Png.Length,
+                SafeDisplayName = "rejected.png",
+                Extension = "png",
+                Purpose = StorageObjectPurposes.EventImage,
+                Visibility = StorageObjectVisibilities.PublicImage,
+                IdempotencyKey = Guid.CreateVersion7().ToString("N")
             }
         }, default);
         await Assert.That(reservation.IsSuccess).IsTrue();
@@ -123,8 +134,10 @@ public sealed class ManagedStorageBindingTests
         using var rejected = new MemoryStream(new byte[Png.Length]);
         var result = await finalizer.ExecuteAsync(new FinalizeStorageUploadSessionCommand
         {
-            UploadSessionId = reservation.Id!.Id, Content = rejected,
-            ContentLength = Png.Length, ContentType = "image/png"
+            UploadSessionId = reservation.Id!.Id,
+            Content = rejected,
+            ContentLength = Png.Length,
+            ContentType = "image/png"
         }, default);
         await Assert.That(result.FailureCode).IsEqualTo(Explore.Application.Responses.FailureCodes.StorageUploadContentSignatureMismatch);
         env.Context.ChangeTracker.Clear();
@@ -153,9 +166,13 @@ public sealed class ManagedStorageBindingTests
         {
             UploadSessionDto = new CreateStorageUploadSessionDto
             {
-                ContentType = "image/png", ExpectedSizeBytes = Png.Length, SafeDisplayName = "image.png",
-                Extension = "png", Purpose = StorageObjectPurposes.EventImage,
-                Visibility = StorageObjectVisibilities.PublicImage, IdempotencyKey = Guid.CreateVersion7().ToString("N")
+                ContentType = "image/png",
+                ExpectedSizeBytes = Png.Length,
+                SafeDisplayName = "image.png",
+                Extension = "png",
+                Purpose = StorageObjectPurposes.EventImage,
+                Visibility = StorageObjectVisibilities.PublicImage,
+                IdempotencyKey = Guid.CreateVersion7().ToString("N")
             }
         }, timeout.Token);
         await Assert.That(reservation.IsSuccess).IsTrue();
@@ -327,11 +344,19 @@ public sealed class ManagedStorageBindingTests
         env.Context.Add(binding);
         var stored = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = env.Database.TenantId, Tenant = null!,
-            FileTypeId = (int)FileTypeEnum.Document, FileType = null!, Provider = binding.Provider,
-            StorageProviderBindingId = binding.Id, ObjectKey = "objects/retired.pdf",
-            FullName = "file.pdf", SafeDisplayName = "file.pdf", Extension = "pdf",
-            Purpose = StorageObjectPurposes.Document, Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+            Id = Guid.CreateVersion7(),
+            TenantId = env.Database.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Provider = binding.Provider,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = "objects/retired.pdf",
+            FullName = "file.pdf",
+            SafeDisplayName = "file.pdf",
+            Extension = "pdf",
+            Purpose = StorageObjectPurposes.Document,
+            Visibility = StorageObjectVisibilities.AuthenticatedTenant,
             LifecycleState = StorageObjectLifecycleStates.Active
         };
         await env.Objects.Create(stored);

@@ -29,14 +29,21 @@ public sealed class ManagedStorageRetirementTests(EventResourceFileUploadTests.D
         {
             seed.Tenants.Add(new Tenant
             {
-                Id = tenantId, FullName = "Cascade owner", Slug = $"cascade-{tenantId:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = tenantId,
+                FullName = "Cascade owner",
+                Slug = $"cascade-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             seed.EventSeries.Add(new EventSeries
             {
-                Id = seriesId, TenantId = tenantId, Title = "Physical shared reference",
-                ActorId = scope.ActorId, FeaturedImageId = scope.StorageAId,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!
+                Id = seriesId,
+                TenantId = tenantId,
+                Title = "Physical shared reference",
+                ActorId = scope.ActorId,
+                FeaturedImageId = scope.StorageAId,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!
             });
             await seed.SaveChangesAsync();
             originalStamp = await seed.StorageObjects.AsNoTracking().Where(row => row.Id == scope.StorageAId)
@@ -97,17 +104,27 @@ public sealed class ManagedStorageRetirementTests(EventResourceFileUploadTests.D
             source.OwningResourceId = Guid.CreateVersion7();
             seed.Add(new StorageObject
             {
-                Id = survivingId, TenantId = scope.TenantAId, Tenant = null!,
-                FileTypeId = source.FileTypeId, FileType = null!,
+                Id = survivingId,
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                FileTypeId = source.FileTypeId,
+                FileType = null!,
                 StorageProviderBindingId = source.StorageProviderBindingId,
-                Provider = source.Provider, ObjectKey = $"fixtures/{survivingId:N}.pdf",
-                FullName = "surviving.pdf", SafeDisplayName = "surviving.pdf", Extension = ".pdf",
-                ContentType = "application/pdf", Size = 500, Purpose = StorageObjectPurposes.Document,
-                Visibility = StorageObjectVisibilities.PrivateOwner, LifecycleState = StorageObjectLifecycleStates.Active
+                Provider = source.Provider,
+                ObjectKey = $"fixtures/{survivingId:N}.pdf",
+                FullName = "surviving.pdf",
+                SafeDisplayName = "surviving.pdf",
+                Extension = ".pdf",
+                ContentType = "application/pdf",
+                Size = 500,
+                Purpose = StorageObjectPurposes.Document,
+                Visibility = StorageObjectVisibilities.PrivateOwner,
+                LifecycleState = StorageObjectLifecycleStates.Active
             });
             seed.Add(new StorageUsageCounter
             {
-                TenantId = scope.TenantAId, Provider = source.Provider,
+                TenantId = scope.TenantAId,
+                Provider = source.Provider,
                 UsedBytes = 500 + (previouslyCharged ? source.Size : 0),
                 ObjectCount = previouslyCharged ? 2 : 1
             });

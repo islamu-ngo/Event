@@ -255,13 +255,23 @@ public sealed class StorageReconciliationServiceTests
             _resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
             Object = new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-                StorageProviderBindingId = Binding.Id, Provider = StorageProviders.Local,
-                ObjectKey = "objects/target.png", FullName = "target.png", SafeDisplayName = "target.png",
-                Extension = "png", ContentType = "image/png", Size = 3,
-                Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage,
-                LifecycleState = StorageObjectLifecycleStates.Active, CreatedAt = Now.AddDays(-40)
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Image,
+                FileType = null!,
+                StorageProviderBindingId = Binding.Id,
+                Provider = StorageProviders.Local,
+                ObjectKey = "objects/target.png",
+                FullName = "target.png",
+                SafeDisplayName = "target.png",
+                Extension = "png",
+                ContentType = "image/png",
+                Size = 3,
+                Visibility = StorageObjectVisibilities.PublicImage,
+                Purpose = StorageObjectPurposes.EventImage,
+                LifecycleState = StorageObjectLifecycleStates.Active,
+                CreatedAt = Now.AddDays(-40)
             };
         }
 
@@ -282,13 +292,23 @@ public sealed class StorageReconciliationServiceTests
                 new FileType { Id = (int)FileTypeEnum.Image, MasterCode = "Image", FullName = "Image" });
             context.Add(new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = fixture.Database.TenantId, Tenant = null!,
-                FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-                StorageProviderBindingId = fixture.Binding.Id, Provider = StorageProviders.Local,
-                ObjectKey = "objects/neighbor.png", FullName = "neighbor.png", SafeDisplayName = "neighbor.png",
-                Extension = "png", ContentType = "image/png", Size = 3,
-                Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage,
-                LifecycleState = StorageObjectLifecycleStates.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.Database.TenantId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Image,
+                FileType = null!,
+                StorageProviderBindingId = fixture.Binding.Id,
+                Provider = StorageProviders.Local,
+                ObjectKey = "objects/neighbor.png",
+                FullName = "neighbor.png",
+                SafeDisplayName = "neighbor.png",
+                Extension = "png",
+                ContentType = "image/png",
+                Size = 3,
+                Visibility = StorageObjectVisibilities.PublicImage,
+                Purpose = StorageObjectPurposes.EventImage,
+                LifecycleState = StorageObjectLifecycleStates.Active,
+                CreatedAt = Now
             });
             await context.SaveChangesAsync();
             if (scenario == "shared")
@@ -296,7 +316,9 @@ public sealed class StorageReconciliationServiceTests
                 var group = new Group { Id = Guid.CreateVersion7(), FullName = "Surviving owner" };
                 var actor = new Actor
                 {
-                    Id = Guid.CreateVersion7(), Group = group, GroupId = group.Id,
+                    Id = Guid.CreateVersion7(),
+                    Group = group,
+                    GroupId = group.Id,
                     ActorTypeId = (int)ActorTypeEnum.Group,
                     ActorType = new ActorType { Id = (int)ActorTypeEnum.Group, MasterCode = "Group", FullName = "Group" },
                     Pii = new ActorPii { DisplayName = "Surviving owner" }
@@ -340,7 +362,9 @@ public sealed class StorageReconciliationServiceTests
                 new StorageProviderBindingRepository(Database.Context), repository,
                 Options.Create(new StorageReconciliationSettings
                 {
-                    DryRun = dryRun, DeleteQuarantinedObjects = true, QuarantineOrphanLocalFiles = true
+                    DryRun = dryRun,
+                    DeleteQuarantinedObjects = true,
+                    QuarantineOrphanLocalFiles = true
                 }),
                 new BusinessMetrics(_metrics.GetRequiredService<IMeterFactory>()),
                 NullLogger<StorageReconciliationService>.Instance, cleanup, lifecycle, unit);

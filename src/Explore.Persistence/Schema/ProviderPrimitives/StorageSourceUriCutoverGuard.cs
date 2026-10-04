@@ -50,13 +50,18 @@ internal static class StorageSourceUriCutoverGuard
                 }
                 : new AddCheckConstraintOperation
                 {
-                    Name = ConstraintName, Table = tableName, Schema = schema, Sql = condition
+                    Name = ConstraintName,
+                    Table = tableName,
+                    Schema = schema,
+                    Sql = condition
                 });
             // Drop cannot remove a column while its validating constraint still depends on it.
             if (!sqlite)
                 prepared.Add(new DropCheckConstraintOperation
                 {
-                    Name = ConstraintName, Table = tableName, Schema = schema
+                    Name = ConstraintName,
+                    Table = tableName,
+                    Schema = schema
                 });
             prepared.Add(operation);
         }

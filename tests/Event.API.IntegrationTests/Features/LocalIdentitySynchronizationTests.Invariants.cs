@@ -88,7 +88,9 @@ public sealed partial class LocalIdentitySynchronizationTests
         await Assert.That(initial.ActorId).IsNotNull();
         await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(before with
         {
-            Users = before.Users + 1, Actors = before.Actors + 1, Logins = before.Logins + 1
+            Users = before.Users + 1,
+            Actors = before.Actors + 1,
+            Logins = before.Logins + 1
         });
         await using (ExploreDbContext edit = factory.CreateDatabase())
         {
@@ -105,8 +107,10 @@ public sealed partial class LocalIdentitySynchronizationTests
         {
             UserDto = new UserDto
             {
-                Email = address, EmailVerified = true,
-                FirstName = "Provider Changed", LastName = "Provider Family"
+                Email = address,
+                EmailVerified = true,
+                FirstName = "Provider Changed",
+                LastName = "Provider Family"
             }
         };
 
@@ -122,7 +126,9 @@ public sealed partial class LocalIdentitySynchronizationTests
         await Assert.That(stored.ActorStamp).IsEqualTo(edited.ActorStamp);
         await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(before with
         {
-            Users = before.Users + 1, Actors = before.Actors + 1, Logins = before.Logins + 1
+            Users = before.Users + 1,
+            Actors = before.Actors + 1,
+            Logins = before.Logins + 1
         });
     }
 
@@ -261,7 +267,9 @@ public sealed partial class LocalIdentitySynchronizationTests
         await Assert.That(follower.Id).IsEqualTo(winner.Id);
         await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(before with
         {
-            Users = before.Users + 1, Actors = before.Actors + 1, Logins = before.Logins + 2
+            Users = before.Users + 1,
+            Actors = before.Actors + 1,
+            Logins = before.Logins + 2
         });
         await using ExploreDbContext stored = factory.CreateDatabase();
         var registry = new UserIdentityEmailRepository(stored);

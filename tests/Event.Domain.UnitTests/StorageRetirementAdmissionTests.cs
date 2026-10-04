@@ -46,12 +46,18 @@ public sealed class StorageRetirementAdmissionTests
         var source = Source(binding.Id);
         var session = new StorageUploadSession
         {
-            Id = source.Id, TenantId = source.TenantId, StorageObjectId = source.Id,
-            Provider = source.Provider, StorageProviderBindingId = mismatch == "binding" ? Guid.CreateVersion7() : binding.Id,
+            Id = source.Id,
+            TenantId = source.TenantId,
+            StorageObjectId = source.Id,
+            Provider = source.Provider,
+            StorageProviderBindingId = mismatch == "binding" ? Guid.CreateVersion7() : binding.Id,
             ObjectKey = mismatch == "key" ? "images/another.png" : source.ObjectKey,
             ProviderVersionId = mismatch == "version" ? "different-version" : null,
-            Purpose = source.Purpose, Visibility = source.Visibility, ContentType = "image/png",
-            SafeDisplayName = "image.png", Status = StorageUploadSessionStates.Uploading
+            Purpose = source.Purpose,
+            Visibility = source.Visibility,
+            ContentType = "image/png",
+            SafeDisplayName = "image.png",
+            Status = StorageUploadSessionStates.Uploading
         };
         if (mismatch == "tenant") session.TenantId = Guid.CreateVersion7();
         if (mismatch == "provider") session.Provider = StorageProviders.S3Compatible;
@@ -66,10 +72,18 @@ public sealed class StorageRetirementAdmissionTests
 
     private static StorageObject Source(Guid bindingId) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!, FileType = null!,
-        Provider = StorageProviders.Local, StorageProviderBindingId = bindingId, ObjectKey = "images/image.png",
-        FullName = "image.png", SafeDisplayName = "image.png", Extension = "png",
-        Purpose = StorageObjectPurposes.ProfileImage, Visibility = StorageObjectVisibilities.PublicImage,
+        Id = Guid.CreateVersion7(),
+        TenantId = Guid.CreateVersion7(),
+        Tenant = null!,
+        FileType = null!,
+        Provider = StorageProviders.Local,
+        StorageProviderBindingId = bindingId,
+        ObjectKey = "images/image.png",
+        FullName = "image.png",
+        SafeDisplayName = "image.png",
+        Extension = "png",
+        Purpose = StorageObjectPurposes.ProfileImage,
+        Visibility = StorageObjectVisibilities.PublicImage,
         LifecycleState = StorageObjectLifecycleStates.Active
     };
 }

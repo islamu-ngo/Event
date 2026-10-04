@@ -233,9 +233,13 @@ public sealed class StorageObjectPhysicalReferencePostgresTests(PostgreSqlContai
 
     private static EventSeries NewSeries(EventResourcePersistenceTests.ResourceScope scope) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, ActorId = scope.ActorId,
-        Title = "Owned save reference", FeaturedImageId = scope.StorageAId,
-        VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!
+        Id = Guid.CreateVersion7(),
+        TenantId = scope.TenantAId,
+        ActorId = scope.ActorId,
+        Title = "Owned save reference",
+        FeaturedImageId = scope.StorageAId,
+        VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+        VisibilityType = null!
     };
 
     private sealed class AuthoringCommitFault(bool loseAcknowledgement) : DbTransactionInterceptor

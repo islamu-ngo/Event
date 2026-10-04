@@ -914,12 +914,22 @@ public class StorageObjectControllerTests
             session.RecordProducerSettlement(session.Id, binding.Id, session.ObjectKey!, null);
             context.StorageObjects.Add(new StorageObject
             {
-                Id = session.Id, TenantId = session.TenantId, Tenant = null!,
-                FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-                Provider = session.Provider, StorageProviderBindingId = binding.Id, ObjectKey = session.ObjectKey,
-                FullName = session.SafeDisplayName, SafeDisplayName = session.SafeDisplayName,
-                Extension = "txt", ContentType = session.ContentType, Size = session.ExpectedSizeBytes,
-                Purpose = session.Purpose, Visibility = session.Visibility, LifecycleState = StorageObjectLifecycleStates.Active
+                Id = session.Id,
+                TenantId = session.TenantId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Document,
+                FileType = null!,
+                Provider = session.Provider,
+                StorageProviderBindingId = binding.Id,
+                ObjectKey = session.ObjectKey,
+                FullName = session.SafeDisplayName,
+                SafeDisplayName = session.SafeDisplayName,
+                Extension = "txt",
+                ContentType = session.ContentType,
+                Size = session.ExpectedSizeBytes,
+                Purpose = session.Purpose,
+                Visibility = session.Visibility,
+                LifecycleState = StorageObjectLifecycleStates.Active
             });
             session.Finalize(
                 session.Id,

@@ -1413,7 +1413,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         var events = _dbContext.Events.IgnoreAllFilters(filterBypassReason).AsNoTracking()
             .Where(value => value.AtprotoRecordId != null && recordIds.Contains(value.AtprotoRecordId.Value));
         var eventReferences = await events.Select(value => new
-            { value.FeaturedImageId, value.BackgroundImageId }).ToArrayAsync(cancellationToken);
+        { value.FeaturedImageId, value.BackgroundImageId }).ToArrayAsync(cancellationToken);
         Guid?[] sessionImages = await _dbContext.EventSessions.IgnoreAllFilters(filterBypassReason).AsNoTracking()
             .Where(value => events.Any(owner => owner.Id == value.EventId && owner.TenantId == value.TenantId))
             .Select(value => value.FeaturedImageId).ToArrayAsync(cancellationToken);

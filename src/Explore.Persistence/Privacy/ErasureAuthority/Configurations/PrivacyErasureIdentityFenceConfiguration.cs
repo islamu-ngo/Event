@@ -18,7 +18,10 @@ public sealed class PrivacyErasureIdentityFenceConfiguration(bool embedded)
         });
         builder.HasKey(fence => new
         {
-            fence.AuthoritySequence, fence.IdentityKind, fence.KeyId, fence.Fingerprint
+            fence.AuthoritySequence,
+            fence.IdentityKind,
+            fence.KeyId,
+            fence.Fingerprint
         });
         builder.Property(fence => fence.IdentityKind).HasConversion<int>();
         builder.Property(fence => fence.KeyId).HasMaxLength(64);

@@ -326,24 +326,39 @@ public class UserControllerTests
             user.LastActiveTenantId = PlatformDefaults.DefaultTenantId;
             database.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = erasedUserId, User = user,
-                RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                UserId = erasedUserId,
+                User = user,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = DateTime.UtcNow
             });
             database.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = erasedUserId, User = user, ActorId = erasedActorId,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow, CreatedBy = erasedUserId
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = erasedUserId,
+                User = user,
+                ActorId = erasedActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = erasedUserId
             });
             database.AiConsentGrants.Add(new AiConsentGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId,
-                SubjectUserId = erasedUserId, SubjectUser = user,
-                EntityName = nameof(UserPii), FieldName = nameof(UserPii.Email),
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                SubjectUserId = erasedUserId,
+                SubjectUser = user,
+                EntityName = nameof(UserPii),
+                FieldName = nameof(UserPii.Email),
                 ProviderTrustTierId = (int)AiProviderTrustTierEnum.LocalInProcessOrSameNetworkModel,
                 StatusId = (int)AiConsentGrantStatusEnum.Granted,
-                GrantedAtUtc = DateTimeOffset.UtcNow, CreatedAt = DateTime.UtcNow, CreatedBy = erasedUserId
+                GrantedAtUtc = DateTimeOffset.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = erasedUserId
             });
             await database.SaveChangesAsync();
             await Assert.That(await database.UserIdentityEmailClaims.AnyAsync(x =>

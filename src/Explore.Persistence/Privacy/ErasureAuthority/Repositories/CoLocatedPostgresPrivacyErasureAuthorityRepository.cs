@@ -34,42 +34,42 @@ public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
         ArgumentNullException.ThrowIfNull(intent);
         return ExecuteSerializedAsync(async token =>
         {
-        if (intent.IdentityKeyId is not null)
-            await ValidateKeyAsync(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!, token);
-        PrivacyErasureCounter? counter = await dbContext.AuthorityCounters
-            .SingleOrDefaultAsync(token);
-        if (counter is null)
-        {
-            counter = PrivacyErasureCounter.Start();
-            dbContext.AuthorityCounters.Add(counter);
-        }
-        PrivacyErasureIntent? existing = await dbContext.ErasureIntents
-            .Include(item => item.IdentityFences)
-            .SingleOrDefaultAsync(item => item.IntentId == intent.IntentId, token);
-        if (existing is not null)
-        {
-            EnsureSamePayload(existing, intent);
-            return existing;
-        }
+            if (intent.IdentityKeyId is not null)
+                await ValidateKeyAsync(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!, token);
+            PrivacyErasureCounter? counter = await dbContext.AuthorityCounters
+                .SingleOrDefaultAsync(token);
+            if (counter is null)
+            {
+                counter = PrivacyErasureCounter.Start();
+                dbContext.AuthorityCounters.Add(counter);
+            }
+            PrivacyErasureIntent? existing = await dbContext.ErasureIntents
+                .Include(item => item.IdentityFences)
+                .SingleOrDefaultAsync(item => item.IntentId == intent.IntentId, token);
+            if (existing is not null)
+            {
+                EnsureSamePayload(existing, intent);
+                return existing;
+            }
 
-        if (intent.IdentityKeyId is not null)
-            counter.BindIdentityKey(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!);
-        long sequence = counter.AllocateNext();
-        DateTime recordedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
-        var fact = PrivacyErasureIntent.Record(
-            intent.IntentId,
-            sequence,
-            intent.SubjectKind,
-            intent.SubjectId,
-            intent.ReasonCode,
-            intent.PolicyVersion,
-            recordedAtUtc,
-            recordedAtUtc,
-            recordedAtUtc + options.Value.AuthorityRetention,
-            intent.IdentityFences);
-        dbContext.ErasureIntents.Add(fact);
-        await dbContext.SaveChangesAsync(token);
-        return fact;
+            if (intent.IdentityKeyId is not null)
+                counter.BindIdentityKey(intent.IdentityKeyId, intent.IdentityKeyVerificationTag!);
+            long sequence = counter.AllocateNext();
+            DateTime recordedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
+            var fact = PrivacyErasureIntent.Record(
+                intent.IntentId,
+                sequence,
+                intent.SubjectKind,
+                intent.SubjectId,
+                intent.ReasonCode,
+                intent.PolicyVersion,
+                recordedAtUtc,
+                recordedAtUtc,
+                recordedAtUtc + options.Value.AuthorityRetention,
+                intent.IdentityFences);
+            dbContext.ErasureIntents.Add(fact);
+            await dbContext.SaveChangesAsync(token);
+            return fact;
         }, cancellationToken);
     }
 

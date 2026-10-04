@@ -27,8 +27,11 @@ public sealed class StorageRetirementAdmissionTests(EventResourceFileUploadTests
             var group = new Group { Id = Guid.CreateVersion7(), FullName = "Competing owner" };
             seed.Add(new Actor
             {
-                Id = actorId, Group = group, GroupId = group.Id,
-                ActorTypeId = (int)ActorTypeEnum.Group, ActorType = null!,
+                Id = actorId,
+                Group = group,
+                GroupId = group.Id,
+                ActorTypeId = (int)ActorTypeEnum.Group,
+                ActorType = null!,
                 Pii = new ActorPii { DisplayName = "Competing owner" }
             });
             await seed.SaveChangesAsync();
@@ -158,8 +161,11 @@ public sealed class StorageRetirementAdmissionTests(EventResourceFileUploadTests
             var group = new Group { Id = Guid.CreateVersion7(), FullName = "Private owner" };
             var actor = new Actor
             {
-                Id = Guid.CreateVersion7(), Group = group, GroupId = group.Id,
-                ActorTypeId = (int)ActorTypeEnum.Group, ActorType = null!,
+                Id = Guid.CreateVersion7(),
+                Group = group,
+                GroupId = group.Id,
+                ActorTypeId = (int)ActorTypeEnum.Group,
+                ActorType = null!,
                 Pii = new ActorPii { DisplayName = "Private owner" }
             };
             actor.Pii.SetProfilePicture(source.Id, null);
@@ -206,8 +212,11 @@ public sealed class StorageRetirementAdmissionTests(EventResourceFileUploadTests
         var group = new Group { Id = Guid.CreateVersion7(), FullName = "Later owner" };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), Group = group, GroupId = group.Id,
-            ActorTypeId = (int)ActorTypeEnum.Group, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            Group = group,
+            GroupId = group.Id,
+            ActorTypeId = (int)ActorTypeEnum.Group,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Later owner" }
         };
         actor.Pii.SetProfilePicture(source.Id, null);
@@ -225,8 +234,11 @@ public sealed class StorageRetirementAdmissionTests(EventResourceFileUploadTests
             var group = new Group { Id = Guid.CreateVersion7(), FullName = "Detaching owner" };
             var actor = new Actor
             {
-                Id = actorId, Group = group, GroupId = group.Id,
-                ActorTypeId = (int)ActorTypeEnum.Group, ActorType = null!,
+                Id = actorId,
+                Group = group,
+                GroupId = group.Id,
+                ActorTypeId = (int)ActorTypeEnum.Group,
+                ActorType = null!,
                 Pii = new ActorPii { DisplayName = "Detaching owner" }
             };
             actor.Pii.SetProfilePicture(source.Id, null);
@@ -475,11 +487,21 @@ public sealed class StorageRetirementAdmissionTests(EventResourceFileUploadTests
 
     private static StorageUploadSession Session(StorageObject source) => new()
     {
-        Id = source.Id, TenantId = source.TenantId, Provider = source.Provider,
-        StorageProviderBindingId = source.StorageProviderBindingId, ObjectKey = source.ObjectKey,
-        StorageObjectId = source.Id, Purpose = source.Purpose, Visibility = source.Visibility,
-        ContentType = "image/png", SafeDisplayName = "image.png", Status = StorageUploadSessionStates.Uploading,
-        UploadStartedAt = Now, ExpiresAt = Now.AddMinutes(5), ReservedBytes = 1000, ExpectedSizeBytes = 32
+        Id = source.Id,
+        TenantId = source.TenantId,
+        Provider = source.Provider,
+        StorageProviderBindingId = source.StorageProviderBindingId,
+        ObjectKey = source.ObjectKey,
+        StorageObjectId = source.Id,
+        Purpose = source.Purpose,
+        Visibility = source.Visibility,
+        ContentType = "image/png",
+        SafeDisplayName = "image.png",
+        Status = StorageUploadSessionStates.Uploading,
+        UploadStartedAt = Now,
+        ExpiresAt = Now.AddMinutes(5),
+        ReservedBytes = 1000,
+        ExpectedSizeBytes = 32
     };
 
     private async Task<StorageObject> SeedAsync(string? owningKind = null)
@@ -487,8 +509,11 @@ public sealed class StorageRetirementAdmissionTests(EventResourceFileUploadTests
         await using var db = database.CreateContext();
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Admission", Slug = $"admission-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Admission",
+            Slug = $"admission-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var binding = StorageProviderBinding.Local(Path.GetTempPath());
         var source = NewSource(tenant.Id, binding.Id);
@@ -500,10 +525,21 @@ public sealed class StorageRetirementAdmissionTests(EventResourceFileUploadTests
 
     private static StorageObject NewSource(Guid tenantId, Guid bindingId) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Image,
-        FileType = null!, Provider = StorageProviders.Local, StorageProviderBindingId = bindingId,
-        ObjectKey = $"images/{Guid.CreateVersion7():N}.png", FullName = "image.png", SafeDisplayName = "image.png",
-        Extension = "png", Size = 32, ContentType = "image/png", Purpose = StorageObjectPurposes.ProfileImage,
-        Visibility = StorageObjectVisibilities.PublicImage, LifecycleState = StorageObjectLifecycleStates.Active
+        Id = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        Tenant = null!,
+        FileTypeId = (int)FileTypeEnum.Image,
+        FileType = null!,
+        Provider = StorageProviders.Local,
+        StorageProviderBindingId = bindingId,
+        ObjectKey = $"images/{Guid.CreateVersion7():N}.png",
+        FullName = "image.png",
+        SafeDisplayName = "image.png",
+        Extension = "png",
+        Size = 32,
+        ContentType = "image/png",
+        Purpose = StorageObjectPurposes.ProfileImage,
+        Visibility = StorageObjectVisibilities.PublicImage,
+        LifecycleState = StorageObjectLifecycleStates.Active
     };
 }

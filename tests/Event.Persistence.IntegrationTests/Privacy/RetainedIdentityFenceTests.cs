@@ -237,8 +237,11 @@ public sealed class RetainedIdentityFenceTests
             await fixture.Operation.EnsureSubjectMayEnrollAsync(userId, token);
             await new UserExternalLoginRepository(fixture.Primary).Create(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = userId, User = null!,
-                AuthenticationProviderId = (int)newIdentity.ProviderKind, AuthenticationProvider = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = null!,
+                AuthenticationProviderId = (int)newIdentity.ProviderKind,
+                AuthenticationProvider = null!,
                 ProviderKey = newIdentity.Value
             });
             return true;
@@ -349,7 +352,9 @@ public sealed class RetainedIdentityFenceTests
             var builder = TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>()
                 .UseSqlite(new SqliteConnectionStringBuilder
                 {
-                    DataSource = AuthorityPath, Pooling = false, DefaultTimeout = 10
+                    DataSource = AuthorityPath,
+                    Pooling = false,
+                    DefaultTimeout = 10
                 }.ToString()).UseSnakeCaseNamingConvention();
             if (interceptor is not null) builder.AddInterceptors(interceptor);
             return new(builder.Options);
@@ -392,12 +397,16 @@ public sealed class RetainedIdentityFenceTests
         {
             var user = await new UserRepository(context).Create(new User
             {
-                Id = id, Pii = new UserPii { Email = "", FirstName = "Fence", LastName = "Test" }
+                Id = id,
+                Pii = new UserPii { Email = "", FirstName = "Fence", LastName = "Test" }
             });
             await new UserExternalLoginRepository(context).Create(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = id, User = user,
-                AuthenticationProviderId = (int)account.ProviderKind, AuthenticationProvider = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = id,
+                User = user,
+                AuthenticationProviderId = (int)account.ProviderKind,
+                AuthenticationProvider = null!,
                 ProviderKey = account.Value
             });
         }

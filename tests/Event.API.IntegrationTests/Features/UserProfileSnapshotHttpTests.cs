@@ -154,12 +154,21 @@ public sealed partial class UserProfileSnapshotHttpTests
             db.StorageProviderBindings.Add(binding);
             var image = new StorageObject
             {
-                Id = imageId, TenantId = owner.TenantId, Tenant = null!,
-                ActorId = owner.ActorId, FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-                StorageProviderBindingId = binding.Id, Provider = binding.Provider,
-                ObjectKey = $"profile-history/{imageId:N}.png", FullName = "profile.png",
-                SafeDisplayName = "profile.png", Extension = "png", ContentType = "image/png",
-                Size = 10, Purpose = StorageObjectPurposes.ProfileImage,
+                Id = imageId,
+                TenantId = owner.TenantId,
+                Tenant = null!,
+                ActorId = owner.ActorId,
+                FileTypeId = (int)FileTypeEnum.Image,
+                FileType = null!,
+                StorageProviderBindingId = binding.Id,
+                Provider = binding.Provider,
+                ObjectKey = $"profile-history/{imageId:N}.png",
+                FullName = "profile.png",
+                SafeDisplayName = "profile.png",
+                Extension = "png",
+                ContentType = "image/png",
+                Size = 10,
+                Purpose = StorageObjectPurposes.ProfileImage,
                 Visibility = StorageObjectVisibilities.PublicImage,
                 LifecycleState = StorageObjectLifecycleStates.Active
             };

@@ -25,13 +25,16 @@ public sealed partial class EventResourceManagementPersistenceTests
             {
                 var participation = new OrganizationTenant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = scope.TenantAId,
+                    Tenant = null!,
                     Organization = new Organization
                     {
                         Id = Guid.CreateVersion7(),
                         Pii = new OrganizationPii { FullName = "Retained document owner" }
                     },
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                    ApprovalStatus = null!
                 };
                 var document = await seed.StorageObjects.SingleAsync(row => row.Id == scope.StorageAId);
                 seed.OrganizationTenantEvidence.Add(

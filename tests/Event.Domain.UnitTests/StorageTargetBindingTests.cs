@@ -116,10 +116,18 @@ public sealed class StorageTargetBindingTests
         var binding = Binding();
         var stored = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!, FileType = null!,
-            Provider = binding.Provider, StorageProviderBindingId = binding.Id, ObjectKey = "objects/original.pdf",
-            FullName = "file.pdf", SafeDisplayName = "file.pdf", Extension = "pdf",
-            Purpose = StorageObjectPurposes.Document, Visibility = StorageObjectVisibilities.PrivateOwner,
+            Id = Guid.CreateVersion7(),
+            TenantId = Guid.CreateVersion7(),
+            Tenant = null!,
+            FileType = null!,
+            Provider = binding.Provider,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = "objects/original.pdf",
+            FullName = "file.pdf",
+            SafeDisplayName = "file.pdf",
+            Extension = "pdf",
+            Purpose = StorageObjectPurposes.Document,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
             LifecycleState = StorageObjectLifecycleStates.Active
         };
         // The existing erasure owner clears content metadata before marking its retained row deleted.

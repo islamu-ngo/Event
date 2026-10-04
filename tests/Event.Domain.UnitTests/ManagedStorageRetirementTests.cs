@@ -10,11 +10,19 @@ public sealed class ManagedStorageRetirementTests
     {
         var source = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!, FileType = null!,
-            Provider = StorageProviders.Local, StorageProviderBindingId = Guid.CreateVersion7(),
-            ObjectKey = "images/shared.png", ProviderVersionId = "captured-version",
-            FullName = "shared.png", SafeDisplayName = "shared.png", Extension = "png",
-            Purpose = StorageObjectPurposes.ProfileImage, Visibility = StorageObjectVisibilities.PublicImage,
+            Id = Guid.CreateVersion7(),
+            TenantId = Guid.CreateVersion7(),
+            Tenant = null!,
+            FileType = null!,
+            Provider = StorageProviders.Local,
+            StorageProviderBindingId = Guid.CreateVersion7(),
+            ObjectKey = "images/shared.png",
+            ProviderVersionId = "captured-version",
+            FullName = "shared.png",
+            SafeDisplayName = "shared.png",
+            Extension = "png",
+            Purpose = StorageObjectPurposes.ProfileImage,
+            Visibility = StorageObjectVisibilities.PublicImage,
             LifecycleState = StorageObjectLifecycleStates.Active
         };
         var first = new ActorPii { DisplayName = "First owner" };

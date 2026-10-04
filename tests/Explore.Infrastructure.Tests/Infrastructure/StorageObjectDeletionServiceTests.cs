@@ -111,12 +111,21 @@ public sealed class StorageObjectDeletionServiceTests
                 bindings, Clock, NullLogger<EventResourceStorageCleanupService>.Instance, lifecycle, unit);
             Object = new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-                Provider = Binding.Provider, StorageProviderBindingId = Binding.Id,
-                ObjectKey = missingKey ? " " : "objects/target.png", FullName = "target.png", SafeDisplayName = "target.png",
-                Extension = "png", Size = 1, Purpose = StorageObjectPurposes.EventImage,
-                Visibility = StorageObjectVisibilities.PublicImage, LifecycleState = StorageObjectLifecycleStates.Active,
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Image,
+                FileType = null!,
+                Provider = Binding.Provider,
+                StorageProviderBindingId = Binding.Id,
+                ObjectKey = missingKey ? " " : "objects/target.png",
+                FullName = "target.png",
+                SafeDisplayName = "target.png",
+                Extension = "png",
+                Size = 1,
+                Purpose = StorageObjectPurposes.EventImage,
+                Visibility = StorageObjectVisibilities.PublicImage,
+                LifecycleState = StorageObjectLifecycleStates.Active,
                 CreatedAt = Clock.Now.UtcDateTime
             };
         }

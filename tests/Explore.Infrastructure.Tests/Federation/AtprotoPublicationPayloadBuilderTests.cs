@@ -33,8 +33,12 @@ public sealed class AtprotoPublicationPayloadBuilderTests
         };
         var eventEntity = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            Title = "Public image event", ActorId = actor.Id, Actor = actor,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            Title = "Public image event",
+            ActorId = actor.Id,
+            Actor = actor,
             VisibilityTypeId = (int)VisibilityTypeEnum.Public,
             VisibilityType = new VisibilityType { MasterCode = "PUBLIC", FullName = "Public" },
             EventStatus = new EventStatus { MasterCode = "DRAFT", FullName = "Draft" },
@@ -43,13 +47,20 @@ public sealed class AtprotoPublicationPayloadBuilderTests
             CreatedAt = new DateTime(2026, 7, 18, 10, 0, 0, DateTimeKind.Utc),
             FeaturedImage = new StorageObject
             {
-                Id = imageId, TenantId = tenantId, Tenant = null!, FileType = null!,
-                FileTypeId = (int)FileTypeEnum.Image, Provider = StorageProviders.Local,
+                Id = imageId,
+                TenantId = tenantId,
+                Tenant = null!,
+                FileType = null!,
+                FileTypeId = (int)FileTypeEnum.Image,
+                Provider = StorageProviders.Local,
                 StorageProviderBindingId = Guid.CreateVersion7(),
                 ObjectKey = $"images/{imageId:N}.png",
                 SourceUri = "https://provider.example.test/provenance-canary",
-                FullName = "image.png", SafeDisplayName = "image.png", Extension = "png",
-                ContentType = "image/png", Purpose = StorageObjectPurposes.EventImage,
+                FullName = "image.png",
+                SafeDisplayName = "image.png",
+                Extension = "png",
+                ContentType = "image/png",
+                Purpose = StorageObjectPurposes.EventImage,
                 Visibility = StorageObjectVisibilities.PublicImage,
                 LifecycleState = StorageObjectLifecycleStates.Active
             }

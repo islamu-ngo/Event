@@ -516,15 +516,25 @@ public sealed class AnonymousRetentionProviderDrainTests
                 .CaptureAsync(StorageProviders.Local, graph.Order.TenantId, CancellationToken.None);
             var storage = new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = graph.Order.TenantId, Tenant = null!,
-                FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-                Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
+                Id = Guid.CreateVersion7(),
+                TenantId = graph.Order.TenantId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Document,
+                FileType = null!,
+                Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
                 ObjectKey = $"retention-test/{Guid.CreateVersion7():N}.csv",
-                FullName = "answer.csv", SafeDisplayName = "answer.csv", Extension = ".csv",
-                ContentType = "text/csv", Visibility = StorageObjectVisibilities.AuthenticatedTenant,
-                Purpose = StorageObjectPurposes.Document, LifecycleState = StorageObjectLifecycleStates.Active,
-                OwningResourceKind = "registration_submission_sink", OwningResourceId = graph.Submission.Id,
-                RegistrationContentRetentionUntilUtc = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                FullName = "answer.csv",
+                SafeDisplayName = "answer.csv",
+                Extension = ".csv",
+                ContentType = "text/csv",
+                Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+                Purpose = StorageObjectPurposes.Document,
+                LifecycleState = StorageObjectLifecycleStates.Active,
+                OwningResourceKind = "registration_submission_sink",
+                OwningResourceId = graph.Submission.Id,
+                RegistrationContentRetentionUntilUtc = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             Context.Add(storage);
             await Context.SaveChangesAsync();

@@ -60,7 +60,9 @@ public sealed partial class EfCorePrivacyErasureAuthorityRepository(
             command.Parameters.AddWithValue("fences", NpgsqlDbType.Jsonb,
                 System.Text.Json.JsonSerializer.Serialize(intent.IdentityFences.Select(fence => new
                 {
-                    kind = (int)fence.IdentityKind, key_id = fence.KeyId, fingerprint = fence.Fingerprint
+                    kind = (int)fence.IdentityKind,
+                    key_id = fence.KeyId,
+                    fingerprint = fence.Fingerprint
                 })));
             PrivacyErasureIntent? fact = null;
             try

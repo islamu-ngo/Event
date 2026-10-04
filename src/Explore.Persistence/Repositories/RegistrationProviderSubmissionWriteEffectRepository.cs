@@ -200,13 +200,13 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
         // submission ID. Settlements release or preserve indirect CSV holds.
         Guid[] storageIds = await (from effect in dbContext.RegistrationProviderSubmissionWriteEffects.AsNoTracking()
                 .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
-            join storage in dbContext.StorageObjects.AsNoTracking()
-                .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-                on new { effect.TenantId, Id = (Guid?)effect.RegistrationSubmissionId }
-                equals new { storage.TenantId, Id = storage.OwningResourceId }
-            where effectIds.Contains(effect.Id) && (tenantId == null || effect.TenantId == tenantId)
-                && storage.OwningResourceKind == "registration_submission_sink"
-            select storage.Id).Distinct().ToArrayAsync(cancellationToken);
+                                   join storage in dbContext.StorageObjects.AsNoTracking()
+                                       .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                                       on new { effect.TenantId, Id = (Guid?)effect.RegistrationSubmissionId }
+                                       equals new { storage.TenantId, Id = storage.OwningResourceId }
+                                   where effectIds.Contains(effect.Id) && (tenantId == null || effect.TenantId == tenantId)
+                                       && storage.OwningResourceKind == "registration_submission_sink"
+                                   select storage.Id).Distinct().ToArrayAsync(cancellationToken);
         await new StorageObjectReferenceRepository(dbContext).FenceAsync(storageIds, cancellationToken);
     }
 

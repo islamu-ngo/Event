@@ -105,11 +105,17 @@ public sealed class StorageObjectReferenceRepositoryTests(EventResourceFileUploa
         var binding = await context.Set<StorageProviderBinding>().SingleAsync(row => row.Id == source.StorageProviderBindingId);
         var session = new StorageUploadSession
         {
-            Id = source.Id, TenantId = source.TenantId, Provider = source.Provider,
-            StorageProviderBindingId = binding.Id, ObjectKey = source.ObjectKey,
-            StorageObjectId = source.Id, ContentType = source.ContentType!,
-            SafeDisplayName = source.SafeDisplayName, Purpose = source.Purpose,
-            Visibility = source.Visibility, Status = StorageUploadSessionStates.Reserved,
+            Id = source.Id,
+            TenantId = source.TenantId,
+            Provider = source.Provider,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = source.ObjectKey,
+            StorageObjectId = source.Id,
+            ContentType = source.ContentType!,
+            SafeDisplayName = source.SafeDisplayName,
+            Purpose = source.Purpose,
+            Visibility = source.Visibility,
+            Status = StorageUploadSessionStates.Reserved,
             ExpiresAt = Now.AddHours(1)
         };
         session.MarkUploading(Now);
@@ -179,8 +185,11 @@ public sealed class StorageObjectReferenceRepositoryTests(EventResourceFileUploa
             case "unbounded_policy":
                 var policy = new RegistrationRetentionPolicy
                 {
-                    Id = 9000, MasterCode = "UNBOUNDED", FullName = "Unbounded retention",
-                    DurationDays = null, IsLegalHold = false
+                    Id = 9000,
+                    MasterCode = "UNBOUNDED",
+                    FullName = "Unbounded retention",
+                    DurationDays = null,
+                    IsLegalHold = false
                 };
                 context.Add(policy);
                 context.Entry(graph.Field).Property(row => row.RetentionPolicyId).CurrentValue = policy.Id;
@@ -356,23 +365,35 @@ public sealed class StorageObjectReferenceRepositoryTests(EventResourceFileUploa
         if (ownerType == typeof(EventSeries))
             owner = new EventSeries
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, ActorId = scope.ActorId,
-                Title = "Unpublished series", VisibilityTypeId = (int)VisibilityTypeEnum.Private, VisibilityType = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                ActorId = scope.ActorId,
+                Title = "Unpublished series",
+                VisibilityTypeId = (int)VisibilityTypeEnum.Private,
+                VisibilityType = null!
             };
         else if (ownerType == typeof(GroupTenant))
             owner = new GroupTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
                 Group = new Group { Id = Guid.CreateVersion7(), FullName = "Hidden group" },
-                ApprovalStatusId = (int)ApprovalStatusEnum.Rejected, ApprovalStatus = null!, IsVisible = false
+                ApprovalStatusId = (int)ApprovalStatusEnum.Rejected,
+                ApprovalStatus = null!,
+                IsVisible = false
             };
         else if (ownerType == typeof(OrganizationTenant) || ownerType == typeof(OrganizationTenantEvidence))
         {
             var organization = new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
                 Organization = new Organization { Id = Guid.CreateVersion7(), Pii = new OrganizationPii { FullName = "Hidden organization" } },
-                ApprovalStatusId = (int)ApprovalStatusEnum.Rejected, ApprovalStatus = null!, IsVisible = false
+                ApprovalStatusId = (int)ApprovalStatusEnum.Rejected,
+                ApprovalStatus = null!,
+                IsVisible = false
             };
             if (ownerType == typeof(OrganizationTenantEvidence))
             {

@@ -584,30 +584,57 @@ public sealed class ExploreDbContextModelProviderTests
         const string objectKey = "objects/shared-key.png";
         var first = new Explore.Domain.StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            ActorId = Guid.CreateVersion7(), Actor = null!,
-            Provider = "local", StorageProviderBindingId = firstTarget.Id, ObjectKey = objectKey,
-            FileType = null!, FullName = "shared-key.png",
-            SafeDisplayName = "shared-key.png", Extension = "png",
-            Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            ActorId = Guid.CreateVersion7(),
+            Actor = null!,
+            Provider = "local",
+            StorageProviderBindingId = firstTarget.Id,
+            ObjectKey = objectKey,
+            FileType = null!,
+            FullName = "shared-key.png",
+            SafeDisplayName = "shared-key.png",
+            Extension = "png",
+            Visibility = "public_image",
+            Purpose = "event_image",
+            LifecycleState = "active"
         };
         var duplicate = new Explore.Domain.StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            ActorId = Guid.CreateVersion7(), Actor = null!,
-            Provider = "local", StorageProviderBindingId = firstTarget.Id, ObjectKey = objectKey,
-            FileType = null!, FullName = "shared-key.png",
-            SafeDisplayName = "shared-key.png", Extension = "png",
-            Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            ActorId = Guid.CreateVersion7(),
+            Actor = null!,
+            Provider = "local",
+            StorageProviderBindingId = firstTarget.Id,
+            ObjectKey = objectKey,
+            FileType = null!,
+            FullName = "shared-key.png",
+            SafeDisplayName = "shared-key.png",
+            Extension = "png",
+            Visibility = "public_image",
+            Purpose = "event_image",
+            LifecycleState = "active"
         };
         var otherTarget = new Explore.Domain.StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            ActorId = Guid.CreateVersion7(), Actor = null!,
-            Provider = "local", StorageProviderBindingId = secondTarget.Id, ObjectKey = objectKey,
-            FileType = null!, FullName = "shared-key.png",
-            SafeDisplayName = "shared-key.png", Extension = "png",
-            Visibility = "public_image", Purpose = "event_image", LifecycleState = "active"
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            ActorId = Guid.CreateVersion7(),
+            Actor = null!,
+            Provider = "local",
+            StorageProviderBindingId = secondTarget.Id,
+            ObjectKey = objectKey,
+            FileType = null!,
+            FullName = "shared-key.png",
+            SafeDisplayName = "shared-key.png",
+            Extension = "png",
+            Visibility = "public_image",
+            Purpose = "event_image",
+            LifecycleState = "active"
         };
         var producer = Explore.Domain.StorageProducerOperation.Create(
             Guid.CreateVersion7(), tenantId, firstTarget, objectKey,

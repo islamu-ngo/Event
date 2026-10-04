@@ -269,13 +269,13 @@ public sealed class RegistrationFormAuthoringRepository(ExploreDbContext dbConte
 
         Guid[] storageIds = await (from storage in dbContext.StorageObjects.AsNoTracking()
                 .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-            join submission in dbContext.RegistrationSubmissions.AsNoTracking()
-                .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-                on new { storage.TenantId, Id = storage.OwningResourceId }
-                equals new { submission.TenantId, Id = (Guid?)submission.Id }
-            where storage.OwningResourceKind == "registration_submission_sink"
-                && (formIds.Contains(submission.RegistrationFormId) || versionIds.Contains(submission.RegistrationFormVersionId))
-            select storage.Id).ToArrayAsync(cancellationToken);
+                                   join submission in dbContext.RegistrationSubmissions.AsNoTracking()
+                                       .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                                       on new { storage.TenantId, Id = storage.OwningResourceId }
+                                       equals new { submission.TenantId, Id = (Guid?)submission.Id }
+                                   where storage.OwningResourceKind == "registration_submission_sink"
+                                       && (formIds.Contains(submission.RegistrationFormId) || versionIds.Contains(submission.RegistrationFormVersionId))
+                                   select storage.Id).ToArrayAsync(cancellationToken);
         // Schema publication, field retention and physical removal all change
         // indirect CSV authority even though none carries a StorageObject FK.
         await new StorageObjectReferenceRepository(dbContext).FenceAsync(storageIds, cancellationToken);

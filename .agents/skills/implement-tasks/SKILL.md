@@ -4,10 +4,6 @@ description: "Load when executing or resuming an approved plan from `dev/active/
 type: workflow
 enforcement: suggest
 priority: high
----
-<!-- ABOUTME: Workflow skill for executing or resuming approved implementation tasks from dev/active/<task>/ or .worktrees/<task>. -->
-<!-- ABOUTME: Guides isolated worktree execution, develop in-tree resume, plan mv, semantic phase commits, pre-PR rebase, and parked worktree lifecycle. -->
-
 ## Must-Read Docs
 - [../../../AGENTS.md](../../../AGENTS.md)
 - [../../../.agents/CONTEXT_ENGINEERING.md](../../../.agents/CONTEXT_ENGINEERING.md)

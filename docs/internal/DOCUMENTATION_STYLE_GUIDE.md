@@ -1,21 +1,27 @@
-ABOUTME: Defines the writing and formatting conventions for repository documentation.
-ABOUTME: Optimized for concise, implementation-accurate docs that are easy for juniors to use.
-
 # Documentation Style Guide
 
 > **Audience:** Contributors | AI agents
 > **Status:** Implemented
 > **Owner:** Contributor Experience
-> **Last Verified:** 2026-05-06
-> **Source Anchors:** `docs/DOCUMENTATION_ARCHITECTURE.md`, `docs/index.md`
+> **Last Verified:** 2026-10-04
+> **Source Anchors:** `docs/internal/DOCUMENTATION_ARCHITECTURE.md`, `docs/internal/GOVERNANCE.md`, `.agents/skills/conventional-commit/resources/reader-first-writing.md`
 
 ## Writing Principles
 
+- **Meaning Before Mechanism**: Start with the concrete problem, who is affected, and what changes. Then explain how the technical mechanism produces that result. Follow [Reader-First Technical Communication](GOVERNANCE.md#reader-first-technical-communication) and the [shared writing guide](../../.agents/skills/conventional-commit/resources/reader-first-writing.md).
+- **Expand Explanation, Preserve Substance**: Improve readability by adding explanations, context, and scenarios, never by deleting technical depth, exact identifiers, architecture constraints, or evidence.
 - Write for action: what to do, where to look, what is enforced.
 - Prefer factual language over promotional wording.
-- Prefer short sections over long narratives.
 - Prioritize non-inferable facts (exact keys, fallback order, defaults, constraints).
 - If a statement can drift, link it to a concrete source file.
+
+## Reader-First Review Checklist
+
+Before finalizing any documentation, architectural ADR, PR description, or I-VSD report, verify against these four questions:
+1. **Practical consequence**: Does the document explain who is affected and what changes before detailing internal mechanics?
+2. **Mechanism explanation**: Does it explain why the technical mechanism or data flow produces that outcome?
+3. **Substance preservation**: Are exact identifiers, endpoints, configuration keys, constraints, and alternatives preserved?
+4. **Truthfulness & claim boundaries**: Can the reader distinguish proposed design from verified production behavior?
 
 ## Voice and Tone
 

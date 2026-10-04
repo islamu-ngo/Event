@@ -18,6 +18,14 @@ Last Updated: 2026-10-01
 
 The triad is now `publication-discovery-r3`: four active discovery PRs, with original publication phases 5-9 preserved in [the publication follow-up](../../dev/backlog/event-publication-trust-and-capacity.md). S49-S56 clarify reviewer scope, attendee alias continuity, non-endorsement, cached disclosure races, bounded scans, disclosure at notice dispatch, editorial-review UX and mistaken-moderation remedies. Scope and provider-controlled correction/task mappings changed. The r2 assessment below remains historical evidence, not current approval. Planning-mode revalidation of both deliveries is required before implementation approval; no fresh I-VSD, scholarly/legal or user approval is fabricated.
 
+## Executive Summary
+
+This assessment evaluates how ISLAMU Event balances accessible, welcoming event publication for grassroots organizers against the need to protect attendees from misleading listings, duplicated event cards, and platform abuse. In an open community platform, attendees can be misled if the same event appears under multiple titles or if a search for Saturday in London returns an event that is actually happening in Paris on Sunday. Conversely, volunteer organizers and informal halaqat can be excluded if publishing requires corporate identity verification, commercial paid tiers, or invasive personal dossiers.
+
+The recommended architecture establishes fair publisher capacity through explainable, finite quotas and transparent review pathways rather than opaque algorithmic scoring. On the technical side, publication is governed by tenant-qualified capacity admission, session-first matching, atomic ledger updates, and transactional outbox dispatch. Discovery searches capture a stable snapshot of event identifiers to prevent pagination jumps, while access controls and event details are freshly verified upon display. When reviewers identify duplicate events, they create reversible discovery aliases; the platform strictly forbids automatically transferring attendee registrations, ticket payments, or host ownership.
+
+**Historical Status & Claim Boundary**: This assessment preserves its recorded status as **stale** with disposition **changes-required** under the 2026-10-01 CTO rewrite refresh gate. It records the evaluation of planning revision `publication-discovery-r2`. The subsequent `r3` split separated discovery into active workstreams while deferring publication trust and quotas to the backlog. Making this document human-readable clarifies the moral and technical reasoning of the recorded review; it does not represent fresh approval or production operational readiness.
+
 ## Scope
 
 Translate the [publication consultation](../consultations/i-vsd-event-publication-and-identity-discovery-consultation.md) into an executable plan for publisher budgets, capacity review, session-first modeling, identity-safe discovery, and reversible duplicate correction. This assessment reuses the planner's repository investigation rather than treating the consultation's September 24 observations as current implementation proof.
@@ -39,6 +47,57 @@ IDs intentionally preserve the consultation's finding/mitigation correspondence.
 | IVSD-F005 | Open; high; privacy and ownership risk | Rights of people, avoiding spying, non-harm; design/technical; hosts, contributors and attendees; evidence access and duplicate correction | E01/E04: occurrence disclosure and source authority must survive matching. IVSD-M005: authorize before suggestion, use reversible discovery aliases, never automatically move registrations, payments or organizer ownership. | Privacy/moderation owners; prove inaccessible candidates remain hidden and reversal restores discovery; legal escalation for retention purposes. |
 | IVSD-F006 | Open; medium; design concern | Excellence and truthfulness; design/evaluation; volunteer organizers and attendees; session-first workflow and regional relevance | E01/E03: existing event/session structure and home composition should be extended, not rebuilt. IVSD-M006: same-session region/date eligibility, relevant-session cards, accessible session-first actions and data-preserving guidance. | Product/design maintainer; deterministic component/API assertions and organizer evaluation before enforcement. |
 | IVSD-F007 | Open; medium; governance risk | Justice, trust, avoiding spying; strategy/governance; small communities and operators; capacity versus visibility | E01: capacity must not buy ranking or endorsement. IVSD-M007: versioned finite operator policy, constrained grants, no fingerprinting or popularity-based trust, minimal retained evidence and bounded telemetry. | Product steward/operator; review concentration and incorrect denials without inventing fairness percentages. |
+
+### Detailed Findings & Technical Mechanisms
+
+#### IVSD-F001: Discovery Identity Allocation and Duplicate Card Clutter
+- **Concrete Scenario**: An event featured in multiple homepage categories (e.g., "Trending Community", "This Weekend", and "Near You") can render multiple identical cards on the screen, crowding out other volunteer initiatives. When browsing federated sources or advancing through paginated search results, an attendee may encounter duplicate entries across page boundaries as underlying timestamps update.
+- **Provider-Controlled Choice**: The platform operator controls the discovery snapshot mechanism and display deduplication logic. The operator must decide whether deduplication destroys independent publisher records or operates strictly at the presentation layer.
+- **Technical Mechanism**: The discovery engine assigns a single authoritative identity to each event before card allocation. Paged browsing captures a server-held query snapshot and returns continuation tokens (fenced with ASP.NET Core Data Protection) rather than relying on unstable offset pagination. When semantic duplicates are detected across publishers, reviewers link them via a reversible alias mapping rather than destructively merging event records.
+- **Ethical Reasoning**: Guided by *Adl* (fairness in visibility) and *Sidq* (truthfulness in discovery). Attendees must receive an accurate picture of available community gatherings, and no single publisher should monopolize visual space through multiple uncoordinated submissions.
+- **Mitigation & Limits**: Implemented via `IVSD-M001`. Does not automatically infer real-world organizational mergers, which remain subject to explicit human confirmation.
+
+#### IVSD-F002: Explainable Publisher Tiers vs. Age-Only Trust Scores
+- **Concrete Scenario**: A newly formed local student halaqah or volunteer charity seeks to announce their first gathering, while a dormant account registered months ago attempts bulk event submission. If the platform bases posting privileges strictly on account age or social graph density, legitimate grassroots initiatives are silenced while abandoned accounts can be weaponized.
+- **Provider-Controlled Choice**: Determining publication eligibility, starter allowances, and the criteria for capacity increases.
+- **Technical Mechanism**: The system implements explicit, transparent publisher tiers (e.g., a starter tier permitting one active published event with finite capacity) and an equal, documented administrative path to request increased allowance. Opaque algorithmic reputation scores, age-only trust heuristics, and pay-to-publish schemes are strictly prohibited.
+- **Ethical Reasoning**: Guided by *Adl* and *Huquq al-Ibad* (rights of individuals). Community members must be treated equitably regardless of corporate backing or historical platform tenure.
+- **Mitigation & Limits**: Implemented via `IVSD-M002`. Starter quotas remain pilot hypotheses and require operator review before finalization.
+
+#### IVSD-F003: Public-Exposure Accounting, Atomic Ledger & Outbox Dispatch
+- **Concrete Scenario**: An organizer publishes an event at the exact millisecond their monthly quota reaches its limit, or an event is published simultaneously via "Publish on Create" and an explicit "Publish Event" action. If capacity checks and status updates execute across separate database transactions, a race condition can double-allocate capacity, or publish an event while failing to update the tenant's accounting ledger.
+- **Provider-Controlled Choice**: The transaction boundary governing event lifecycle transitions and capacity deduction.
+- **Technical Mechanism**: The publication pipeline enforces tenant-qualified admission within a single serializable database transaction that atomically mutates event status, decrements available capacity in the tenant ledger, and enqueues the publication event into the transactional outbox (`EventPublicationExecutor.cs`). Replay protection using idempotency keys prevents duplicated quota deductions during network retries.
+- **Ethical Reasoning**: Rooted in *Amanah* (faithful stewardship) and *La Darar* (prevention of harm). Inconsistent data states betray user trust and create administrative chaos.
+- **Mitigation & Limits**: Implemented via `IVSD-M003`. High-concurrency race barriers must be validated under PostgreSQL and SQLite contention tests before production deployment.
+
+#### IVSD-F004: Review Obligations, Operational Staffing & Appeal Routes
+- **Concrete Scenario**: An applicant submits a request for increased publishing allowance before an urgent Ramadan charity drive. The application indicates a "24-hour response time," but the volunteer operator team is unstaffed, stranding the request without recourse.
+- **Provider-Controlled Choice**: What commitments, service levels, and escalation mechanisms are presented in the user interface.
+- **Technical Mechanism**: In-app request workflows record structured applicant justifications and durable timestamps. The system prohibits advertising fixed turnaround deadlines unless administrative staffing is verified. When an application is rejected or quota is withheld, the operator must record a reasoned explanation, and the applicant receives an explicit in-app appeal affordance.
+- **Ethical Reasoning**: Grounded in *Wafa bi al-Ahd* (honoring covenants and promises). Making promises without the organizational capacity to fulfill them violates Islamic contractual ethics.
+- **Mitigation & Limits**: Implemented via `IVSD-M004`. The software coordinates the process, but operational availability depends on the deploying organization.
+
+#### IVSD-F005: Privacy, Occurrence Disclosure & Reversible Aliases
+- **Concrete Scenario**: Two distinct event submissions for the same conference are identified by a moderator as duplicates. If the system automatically merges their attendee lists, registrations, and payment entries, private attendee data is exposed to unauthorized co-organizers, and refund accounting is hopelessly corrupted.
+- **Provider-Controlled Choice**: How duplicate resolution operates across security, privacy, and financial boundaries.
+- **Technical Mechanism**: Deduplication operates strictly as a discovery-layer alias (`EventDiscoveryAlias`). The underlying event aggregates, registration records, ticket balances, and host permissions remain completely isolated. If a reviewer mistakenly marks two events as duplicates, the alias is reversed instantly without data loss. Private venue addresses (such as private residential halaqat) remain shielded until attendee registration is confirmed.
+- **Ethical Reasoning**: Guided by *La Darar wa la Dirar* (neither harming nor reciprocating harm), prohibition of *Tajassus* (spying/unauthorized exposure), and preservation of property (*Hifz al-Mal*).
+- **Mitigation & Limits**: Implemented via `IVSD-M005`. Reversal must be tested against active cache layers.
+
+#### IVSD-F006: Session-First Workflow & Regional Relevance
+- **Concrete Scenario**: An educational seminar is held in London on Saturday and Birmingham on Sunday. A user searching for "London events this weekend" is shown a card advertising "Birmingham Session" because the search engine matched the London location from Saturday and the Birmingham date from Sunday across the multi-session parent event.
+- **Provider-Controlled Choice**: The indexing and querying model for multi-session and touring events.
+- **Technical Mechanism**: Discovery operates on a session-first indexing model where date, time, and geographic proximity filters must match the exact same session instance (`EventDirectoryTemporalQuery.cs`). The rendered event card displays the specific matching session details rather than an arbitrary first session of the parent aggregate.
+- **Ethical Reasoning**: *Sidq* (truthfulness) and *Ihsan* (craft excellence). Misleading attendees regarding time or venue causes lost travel time and frustration.
+- **Mitigation & Limits**: Implemented via `IVSD-M006`. Validated via unit and projection tests.
+
+#### IVSD-F007: Prohibiting Purchased Ranking & Limiting Telemetry
+- **Concrete Scenario**: A commercial entity offers to pay the platform operator for "top search placement" or "sponsored recommendations," or an analytics plugin tracks attendee browsing histories across events to construct marketing profiles.
+- **Provider-Controlled Choice**: Monetization models, search ranking algorithms, and user telemetry policies.
+- **Technical Mechanism**: Search result ordering is strictly deterministic (relevance, proximity, chronological date) and completely decoupled from publisher financial contributions or platform donations. Telemetry is constrained to operational aggregate counts without recording attendee browsing histories, IP fingerprinting, or cross-event profiling.
+- **Ethical Reasoning**: *Adl* (justice) and protection against *Ghabn* (deceptive exploitation). Sacred gatherings and community learning must never be commodified into pay-to-win advertising arenas.
+- **Mitigation & Limits**: Implemented via `IVSD-M007`. Versioned operator configuration locks ensure self-hosted instances adhere to transparent defaults.
 
 ## Recommendations
 

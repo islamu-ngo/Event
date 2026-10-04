@@ -1,6 +1,3 @@
-<!-- ABOUTME: Repository context-budget and retrieval policy for repository agents and subagents. -->
-<!-- ABOUTME: Prevents duplicate reads, preserves the main agent's working set, and routes broad discovery to economical scouts. -->
-
 # Context Engineering Contract
 
 ## 0. Repository Lifecycle & Greenfield Development Mandate
@@ -14,6 +11,13 @@
 >    - **DO Test**: Rich domain state transitions, pure business invariants, concurrency race conditions, multi-tenant isolation boundaries, and fail-closed security perimeters.
 >    - **DO NOT Test**: Mock-mirroring boilerplate (`Received(1)` on internal repositories/caches), framework mechanics (e.g. EF Core cancellation tokens), raw C# or CSS source-text scraping, or ephemeral mutation test project sprawl.
 >    - **Stryker Mutation Gating**: Stryker threshold gating (>85%) is disabled during active greenfield development to preserve agent speed and prevent low-value micro-test churn.
+
+## 0.1 Human Readability vs. Agent Context Efficiency
+
+A foundational architectural distinction governs documentation and agent context:
+- **Human Readability Requires Expanded Explanation**: Documentation, architectural ADRs, I-VSD reports, commit bodies, and decision briefs must explain concrete meaning, scenarios, and causal relationships before describing technical mechanics. Never shorten human-facing explanations to meet an artificial brevity target.
+- **Agent Context Efficiency Requires Targeted Retrieval**: Comprehensive human documents must not bloat cold-start agent prompts. Skill entrypoints (`SKILL.md`) remain lightweight routers specifying essential triggers, core invariants, and just-in-time resource links. Deep templates, checklists, and reference guides live under `resources/` and are retrieved on demand only when the corresponding task executes.
+- **Principle**: *Never delete technical information to optimize tokens; instead, structure documents for bounded, symbol-level and heading-level retrieval.*
 
 ## Objective
 

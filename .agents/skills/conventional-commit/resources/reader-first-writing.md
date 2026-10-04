@@ -86,8 +86,13 @@ Details:
 
 ### Evidence Without An Execution Diary
 
-- Summarize checks by the behavior they protect and the environment actually tested. Use a compact table when provider coverage or partial results matter.
-- Keep feature-branch, merged-branch, local, browser, and CI results distinct when they differ. Never add overlapping test counts or turn pending CI into a pass.
+- **Explain What the Check Proves**: Lead by explaining the business invariant, failure mode, or safety boundary the test guards, before listing commands and numbers:
+  > *Example*: "The concurrency integration test exercises simultaneous publication requests on the last remaining capacity slot to prove that concurrent writers receive HTTP 409 conflict and the tenant quota cannot be overdrawn."
+- **Partition Verification Layers Truthfully**:
+  - *Ring 1 (In-Memory Sliced Tests)*: State the targeted domain state machines and business logic verified in <2 seconds.
+  - *Ring 2 (Persistence & Provider Integration)*: State the concrete provider tested (e.g. SQLite in-memory or PostgreSQL testcontainer), transaction rollback semantics, and concurrency locks proven.
+  - *Architecture & Guardrail Gates*: State schema integrity, HAL affordance gates, and intent contracts validated.
+  - *Pending Checks & CI Pipelines*: Explicitly separate local verification from browser acceptance and pending asynchronous CI workflows. Never turn pending CI or untested providers into an inferred pass.
 - Put final evidence in the main account. Failed filter attempts, superseded runs, and command-budget adjustments belong in execution records unless they leave a limitation affecting confidence.
 - Link tracked documentation, test commands, CI runs, or published evidence for detail. Gitignored plans and parked-worktree paths are not accessible PR evidence.
 - Keep screenshots' publication status truthful. A local capture is not an uploaded image.

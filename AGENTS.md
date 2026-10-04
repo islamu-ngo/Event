@@ -1,10 +1,7 @@
-<!-- ABOUTME: Repository AI-agent contract for the ISLAMU Event platform. -->
-<!-- ABOUTME: Defines the Contribution Contract, critical rules, and routing logic. -->
-
 # AGENTS.md — Agent Contribution Contract
 
 > **This is the required entrypoint for every AI tool contributing to this repository.**
-> Last Updated: 2026-08-12
+> Last Updated: 2026-10-04
 
 ---
 
@@ -125,7 +122,7 @@ When a task touches a topic covered by docs, skills, or rules, retrieve the **sm
 
 ## 8. Verification Baseline
 
-Before the first product edit, ensure local tracking is fresh against upstream (`git checkout develop && git pull --ff-only`), then establish the green baseline once for code changes. Do not rerun an unchanged baseline; every PR touching product code must still leave the build and minimum tests green.
+Before the first product edit, ensure local tracking is fresh against upstream. In the root workspace on `develop`, fast-forward cleanly: `git fetch origin develop && git pull --ff-only origin develop`. To prevent index contamination, never switch branches via `git checkout` inside the main repository root when task worktrees or uncommitted edits exist; feature execution belongs in isolated worktrees (`.worktrees/<task>`), keeping the root checkout clean on `develop`. Then establish the green baseline once for code changes. Do not rerun an unchanged baseline; every PR touching product code must still leave the build and minimum tests green.
 
 **The 3-Ring Progressive Verification Hierarchy:**
 1. **Ring 1 (Inner Loop — Subtask Level, < 2s)**:

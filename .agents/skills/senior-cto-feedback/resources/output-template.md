@@ -1,5 +1,3 @@
-<!-- ABOUTME: Chat response structure for Senior CTO feedback and direct triad updates. -->
-<!-- ABOUTME: Outlines the crisp, high-signal reporting format for chat without generating review markdown files. -->
 # Output Template — Chat Response Structure
 
 Senior CTO feedback **never** writes or generates any `*-cto-review.md` or feedback files in `dev/active/<task>/`. Zero review files on disk.
@@ -10,7 +8,7 @@ Instead:
    - `dev/active/<task>/<task>-context.md`
    - `dev/active/<task>/<task>-tasks.md`
 2. **Autonomous Execution Without Approval**: The CTO skill does not pause to request user approval before applying these edits; it applies them directly.
-3. **Crisp Chat Reporting**: All findings, decisions, and applied modifications are reported back to the user in a crisp, high-signal chat response.
+3. **Reader-First Chat Reporting**: All findings, decisions, and applied modifications are reported back to the user in a crisp, high-signal chat response following [reader-first writing](../../conventional-commit/resources/reader-first-writing.md#progress-and-completion-reports). Lead with the executive verdict and practical engineering consequence before detailing technical mechanisms.
 
 ## Required Chat Response Structure
 
@@ -21,7 +19,7 @@ The finishing chat response must follow this structure:
 
 ### Executive Verdict & Direction
 **Verdict:** [Approved as Refined | Split Applied | Scope Pruned & Aligned]
-[A direct, punchy 2-3 sentence executive statement explaining the architectural assessment, why the triad was updated, and the overall readiness of the workstream.]
+[A direct, benefit-led 2-3 sentence executive statement explaining the architectural problem, what changes for the workstream, why the triad was updated, and the overall readiness.]
 
 ---
 

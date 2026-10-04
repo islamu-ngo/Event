@@ -4,10 +4,6 @@ description: "Load for Senior CTO critique, architectural audit, risk review, se
 type: workflow
 enforcement: suggest
 priority: high
----
-<!-- ABOUTME: Senior CTO review skill for repository-grounded implementation plans and active dev-doc workstreams. -->
-<!-- ABOUTME: Directly updates plan.md, context.md, and tasks.md with actionable architectural refinements and reports findings to chat without writing review files. -->
-
 ## Resources
 - [../../../AGENTS.md](../../../AGENTS.md)
 - [resources/output-template.md](resources/output-template.md) — load for the chat reporting template and high-signal summary structure.
@@ -25,7 +21,7 @@ priority: high
 Review depth is defined in [output-template.md](resources/output-template.md).
 
 2. **Autonomous Execution Without Approval**: Do NOT pause or block to ask the user for approval before editing the triad. Directly apply the architectural, sequencing, testing, and commit contract improvements.
-3. **Crisp, High-Signal Chat Reporting**: When finishing, report back to the user with a concise, high-signal summary in the chat response following [resources/output-template.md](resources/output-template.md) (decisions made, changes applied to the triad, top risks resolved, and execution readiness). Do not duplicate full files in chat; deliver a clear summary that is not too long, but does not omit essential details.
+3. **Reader-First Chat Reporting**: When finishing, report back to the user with a crisp, high-signal summary following [resources/output-template.md](resources/output-template.md) and [reader-first writing](../conventional-commit/resources/reader-first-writing.md#progress-and-completion-reports). Lead with the executive verdict, concrete architectural decisions made, and modifications applied across the triad, explaining technical reasons before mechanisms. Preserve exact identifiers, boundaries, and trade-offs without making the user open the plan files.
 4. **Follow I-VSD Integration**: Bind updates to exact plan/tasks and I-VSD revisions. If architectural refinements change provider authority, affected stakeholders, or `IVSD-*` mappings, mark the I-VSD report `stale` in the triad metadata and record the revalidation need; do not fabricate approval.
 5. **Codebase Reality Over Aspiration**: Distinguish verified codebase reality from plan aspiration. Verify claims against real repository files using `code-review-graph` before codifying them in the triad.
 6. **Socratic Stress-Testing & "Worst Break" Catastrophic Scenario**: Identify the single most catastrophic production failure mode. Mandate that Phase Red in `tasks.md` contains dedicated failing invariant tests proving it is prevented before handler implementation.

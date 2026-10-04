@@ -1,6 +1,3 @@
-<!-- ABOUTME: Authoritative I-VSD report for email-optional self-hosting, community directories, and administrative provisioning. -->
-<!-- ABOUTME: Consolidates consultancy evidence, planning analysis, and user decisions with explicit correction and review history. -->
-
 # Email-Optional Self-Hosting - I-VSD Consultancy And Planning Report
 
 Last Updated: 2026-09-09
@@ -17,6 +14,17 @@ Last Updated: 2026-09-09
 - Reviewed input revision: the integrated working tree of feature parent `9966068b9affe5b72df1503291011acc22367747` and upstream `425e4b48343690094637dda860304f3bfb04a5cd`, with natively consolidated application migrations and recorded fixture/contract corrections. Earlier exact planning/graduation SHA-256 snapshots and phase IDs remain historical provenance, not hashes of this integration.
 - Supersedes: the two separate subject reports identified in Evidence Reviewed; this file remains their single authoritative successor, not a new consultation or report identity.
 - Review boundary: targeted integration verification is current, including 12 five-engine lifecycle cases, 1,181 Domain and 2,161 Application tests, and successful native zero-email/restart and relational ATProto flows. The unfiltered Persistence run ended without finalized results; browser/assistive-technology, latency and empirical outcome limits remain. This factual evidence update is not a new ethical assessment, an all-green release gate, or outcome certification.
+
+## Executive Summary
+
+This report assesses the architectural and ethical requirements for running ISLAMU Event in self-hosted, offline, or low-connectivity environments where outbound SMTP delivery is absent, disabled, or unconfigured. Mainstream event and community platforms treat outbound email as an unconditional operational dependency, requiring domain registration, complex DNS management (SPF, DKIM, DMARC), and commercial delivery subscriptions. For grassroots masajid, independent halaqat, and humanitarian volunteer coalitions operating on minimal budgets, mandatory email infrastructure creates an exclusionary barrier to entry.
+
+The recommended design establishes a fully functional email-optional operating model across three core areas:
+1. **Directory & Native Participation**: Browsing event directories, publishing community gatherings, and registering for events function reliably without outbound email servers. For permitted anonymous registrations, attendees receive durable confirmation tokens, calendar exports, and cancellation affordances directly within the browser interface.
+2. **Identity & Authentication Architecture**: Local identity accounts retain email-shaped identifiers to preserve an extensible multi-provider model, but verification behavior adapts transparently to SMTP availability: when outbound delivery is unavailable, administrators provision accounts through supervised out-of-band credential handovers with enforced first-use password rotation. Federated identity providers (Keycloak, ATProtocol) maintain their own authentication workflows without artificial coupling to Event's local mail configuration.
+3. **Operational Transparency & Non-Harm (*La Darar*)**: The platform strictly avoids false communication promises. When SMTP is absent or failing, the interface explicitly warns organizers and attendees that automated notifications cannot be delivered, halts infinite background retry loops, and prevents bootstrap deadlocks during initial instance setup.
+
+**Historical Status & Claim Boundary**: This report records a consolidated consultancy and planning assessment with historical status **stale** and disposition **changes-required** (evidence cutoff: 2026-09-09). The recorded evidence verifies targeted integration, 12 multi-engine lifecycle cases, and zero-email startup flows under local test fixtures, but does not represent full persistence suites, production certification, or external stakeholder usability studies.
 
 ## Scope
 

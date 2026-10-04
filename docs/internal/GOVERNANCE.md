@@ -552,6 +552,14 @@ For detailed code patterns and examples, see:
 
 Every change — human or agent — routes through the Contribution Contract before editing. The contract answers **eight** deterministic questions (intent, rules, must-read files, may-change paths, must-run tests, docs-to-update, PR checklist, forbidden-without-approval). See [`AGENTS.md`](../../AGENTS.md) §1 and [`.agents/contract/README.md`](../../.agents/contract/README.md).
 
+### Reader-First Technical Communication
+
+Commit messages, PR descriptions, planning summaries, progress/completion reports, and feedback or decision requests must lead with concrete meaning: who is affected, what changes, and why it matters. Then explain the mechanism, naming the important components, contracts, constraints, and evidence. Internal engineering work should state its engineering benefit rather than inventing an end-user benefit.
+
+Explain technical terms in context; do not make the developer translate internal vocabulary or open a plan to understand the outcome or choice. Improve readability by adding explanations, not by deleting terminology, mechanisms, rationale, constraints, or evidence. Prefer a longer complete account over a shorter account that loses information. Preserve exact API fields, commands, deployment/rollback requirements, security/privacy consequences, and unverified work. Organize final verification rather than copying an execution diary; length follows the substance, not an arbitrary brevity target.
+
+Use the shared [reader-first writing guide](../../.agents/skills/conventional-commit/resources/reader-first-writing.md) for commit examples, PR structure, reporting, decision briefs, and the meaning/technical-detail review. This applies to human-facing communication even when no writing skill is loaded.
+
 ### Intent Classification (Decision Table)
 
 | Signal You Observe | Primary Intent | Must-Read Starts With |

@@ -48,6 +48,8 @@ For committed repository audits, reference the Git commit object. For active imp
 
 ## Finding Contract
 
+Use [reader-first-reports.md](reader-first-reports.md) for explanatory prose. Each material finding needs a descriptive title and paragraphs explaining the affected person, concrete failure or benefit, provider responsibility, mechanism, and evidence limits. A dense traceability-table row is not a substitute for this explanation; retain the table as an index and preserve every field below.
+
 Every material finding uses a stable `IVSD-Fnnn` ID and records:
 
 - lifecycle: `open`, `accepted`, `resolved`, `superseded`, or `not-reviewed`;
@@ -70,6 +72,7 @@ Every new or materially updated report includes:
 Last Updated: YYYY-MM-DD
 
 ## Review Metadata
+## Executive Summary
 ## Scope
 ## Claim Boundary
 ## Findings
@@ -85,6 +88,8 @@ Last Updated: YYYY-MM-DD
 ```
 
 Feature reports additionally include `## Common Overlooked Failures And Outcomes`. Planning and plan-review reports include `## Planning Handoff` from [integration-contract.md](integration-contract.md). Put rejected alternatives under `## Recommendations`; use `None considered` when no real alternative existed.
+
+`Executive Summary` explains the practical recommendation, who is affected, important technical/ethical reasoning, unresolved decisions, and evidence limits. Explain what the report's status/disposition permits; `plan-aligned` is not implementation or operational proof. The summary introduces the complete analysis, never replaces it or justifies removing detail.
 
 ## Review Lifecycle
 

@@ -14,6 +14,7 @@ priority: high
 
 - [Integration contract](resources/integration-contract.md) — load to select standalone, planning, or plan-review mode and enforce handoff freshness.
 - [Report contract](resources/report-contract.md) — load before creating or materially updating any report.
+- [Readable reports](resources/reader-first-reports.md) — load when composing findings, recommendations, explanations, or decision requests; retain full technical and ethical detail.
 - [Action routing](resources/action-routing.md) — load for standalone action selection, menu behavior, and domain lenses.
 - [Grill-Me alignment](../grill-me/SKILL.md) — load after standalone action/context routing to resolve material user decisions before substantive analysis.
 - [Resource index](resources/index.md) — load only the workflow, evidence, or domain resource selected by the current mode/action.
@@ -40,7 +41,9 @@ Follow [integration-contract.md](resources/integration-contract.md). Load only t
 
 Follow [report-contract.md](resources/report-contract.md) for identity, metadata, stable finding/mitigation IDs, lifecycle, evidence levels, and required headings. Planning and plan-review reports also include its `Planning Handoff`.
 
-The chat response names the written file and summarizes the recommendation and unresolved evidence; it does not duplicate the report.
+Reports and chat explain practical meaning before the technical/ethical reasoning, following [readable reports](resources/reader-first-reports.md). Add explanations rather than shorten away terminology, mechanisms, evidence, or uncertainty.
+
+The chat response names the report and gives a self-contained recommendation, rationale, material limits, and any decision needed. The report retains the complete analysis and traceability; its path is not a substitute for an understandable answer.
 
 ## Verification
 
@@ -49,5 +52,6 @@ The chat response names the written file and summarizes the recommendation and u
 - Confirm the workflow can stop for material context in every mode.
 - For substantive output, confirm a Markdown report was created or updated at the mapped path; for a routing response, confirm no report was written.
 - Check report identity, status, disposition, evidence revision, stable finding IDs, and every authority boundary.
+- Check that summaries and finding explanations are understandable without decoding tables, while the complete technical, ethical, and evidence fields remain intact.
 - For planning/review, confirm every material `IVSD-*` ID maps to a scenario/task, explicit non-applicability, or escalation gate and the reviewed revision is current.
 - Run host-repository link, schema, and whitespace checks when this skill or its resources change.

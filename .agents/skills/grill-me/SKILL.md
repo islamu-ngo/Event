@@ -4,20 +4,31 @@ description: "Load when the user asks to be grilled or stress-tested on a plan, 
 type: workflow
 enforcement: suggest
 priority: medium
----
-<!-- ABOUTME: Decision-tree interview workflow for stress-testing a plan, design, or high-criticality work intake. -->
-<!-- ABOUTME: Resolves codebase facts directly and asks the user one decision question at a time. -->
-
 # Grill-Me & Proactive Criticality Intake
 
 ## Rules
 
-- Ask exactly one question per response and wait for the answer.
-- Give a recommended answer with a concise rationale before each question.
+- Ask exactly one decision question per response and wait for the user's answer.
+- **Reader-First Decision Briefs**: Follow [reader-first writing](../conventional-commit/resources/reader-first-writing.md#feedback-and-decision-briefs). Questions must be completely self-contained; never reference bare task IDs, phase codes, or internal file paths without explaining their functional context inline. The developer must be able to evaluate the choice without opening an implementation plan.
+- **Structure Each Request**:
+  1. *Context & Problem*: What decision is required, who is affected, and why it matters now.
+  2. *Practical Alternatives*: Explain the concrete consequences of each option for users, operators, and data integrity.
+  3. *Technical Mechanisms & Trade-offs*: Name the relevant components, data flows, and architectural constraints.
+  4. *Recommended Answer*: State the recommended option and its rationale clearly before asking.
+  5. *Immediate Next Action*: State what the agent will execute the moment the choice is made.
 - Resolve upstream decisions before asking about choices that depend on them.
-- When repository evidence can answer a question, inspect the codebase and treat the finding as resolved instead of asking the user.
-- **Self-Contained Questions**: Questions must be fully understandable on their own. Never reference bare task IDs, phase numbers, or internal doc sections without explaining their functional context inline. The user must not need to open any implementation plan or task file to answer.
-- Continue until every relevant branch is resolved and both sides share the same understanding.
+- When repository evidence can answer a question, inspect the codebase directly and treat the item as resolved instead of questioning the user.
+- Continue until every relevant architectural branch is resolved and both sides share the same understanding.
+
+### Balanced Decision Request Example
+
+> **Decision Needed**: How should expired search snapshots handle subsequent pagination requests?
+>
+> **Context & Consequence**: When an attendee browses event listings, the search engine captures a stable snapshot of matching IDs. If they leave the tab open and click "Next Page" after the snapshot expires, the application must decide how to respond.
+> - **Option A (Automatic Refresh)**: Silently capture a fresh snapshot and return the next batch. This saves the user a click, but if events were added or removed in the interim, listings can shift unexpectedly, causing duplicate or skipped cards.
+> - **Option B (Recommended — Explicit Restart)**: Return HTTP 410 Gone and present a clear button: "Search results updated — Show new results". This keeps changes visible and prevents disorienting attendees mid-browse. Technically, both approaches create a new snapshot; the difference is whether the user is aware of the shift.
+>
+> **Immediate Next Action**: Implement the selected error handling in `GetPublicEventDiscoveryRequestHandler.cs`.
 
 ## High-Criticality Intake Decision Trees
 

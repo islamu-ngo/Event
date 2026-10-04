@@ -9,7 +9,7 @@ using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Docking;
 using Explore.Blazor.Client.Shared;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web.Virtualization;
+using System.Web;
 using Microsoft.JSInterop;
 using MudBlazor;
 using Timer = System.Threading.Timer;
@@ -34,6 +34,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     [Inject] protected IBrowserActionInterop BrowserActionInterop { get; set; } = null!;
     [Inject] private IAccessibilityFocusService AccessibilityFocusService { get; set; } = default!;
     [Inject] private IAccessibilityAnnouncerService AnnouncerService { get; set; } = default!;
+    [Inject] private ITranslationService Translation { get; set; } = default!;
     [Inject] private IUserSettingsService UserSettingsService { get; set; } = default!;
     [Inject] private FeatureStateContainer FeatureState { get; set; } = default!;
     [Inject] private DockLayoutState DockLayoutState { get; set; } = default!;
@@ -66,19 +67,17 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     private bool isLoading = true;
     private bool _eventsLoaded = false;
     private bool _dataLoaded = false;
-    private bool _usePersistedEvents = false;
-    private bool _virtualizeRefreshed = false;
-    private bool _useInitialBatch = false;
-    private PaginatedResult<EventListDto>? _initialBatch;
     private PublicExperienceShellDto? _publicExperienceShell;
 
-    // Pagination / Browse mode state
-    private BrowseMode _browseMode = BrowseMode.InfiniteScroll;
-    private int _currentPage = 1;
     private int _pageSize = 20;
     private List<EventListDto> _pagedEvents = new();
     private bool _isLoadingPage;
     private bool _isInitialized;
+    private EventDiscoveryTraversalResource? _traversal;
+    private EventListFilterState? _traversalFilters;
+    private string? _recoveryCode;
+    private CancellationTokenSource? _discoveryCancellation;
+    private string? _loadedUrlQuery;
 
     // Customization drawer state
     private bool _customizationDrawerOpen;
@@ -94,8 +93,6 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     private readonly EventListSelectionController _selectionController = new();
     private EventListDockingController? _dockingController;
 
-    private Virtualize<EventListDto>? _virtualize;
-    private int _totalCount;
     private IJSObjectReference? _imagePreloaderModule;
 
     // API Data
@@ -125,18 +122,24 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         : _publicExperienceShell.EventCatalog.Label.Trim();
 
     private string EmptyStateTitle => HasActiveFilters()
-        ? "No matching events found"
-        : "No events found";
+        ? T("ui.discovery.empty.filtered_title", "No matching events found")
+        : T("ui.discovery.empty.title", "No events found");
 
     private string EmptyStateMessage => HasActiveFilters()
-        ? "Try adjusting your filters or search query."
-        : $"No {EventCatalogLabel.ToLowerInvariant()} are published yet. Check back soon.";
+        ? T("ui.discovery.empty.filtered_body", "Try adjusting your filters or search query.")
+        : T("ui.discovery.empty.body", "No events match this search yet. Check back soon.");
 
-    private string ListResultAnnouncement => _totalCount switch
+    private string T(string key, string fallback) => Translation.T(key, fallback);
+    private bool CanContinue => _recoveryCode is null && _traversal?.HasMore == true &&
+        _traversal._links.TryGetValue("next", out var next) && !string.IsNullOrWhiteSpace(next.Href);
+    private string RecoveryMessage => _recoveryCode switch
     {
-        > 0 when HasActiveFilters() => $"{_totalCount} matching {EventCatalogLabel.ToLowerInvariant()} found",
-        > 0 => $"{_totalCount} {EventCatalogLabel.ToLowerInvariant()} found",
-        _ => EmptyStateTitle
+        "discovery_cursor_invalid" => T("ui.discovery.recovery.invalid", "This continuation cannot be used. Your filters are kept. Start a new search."),
+        "discovery_cursor_expired" => T("ui.discovery.recovery.expired", "This search has expired. Results may have changed. Your filters are kept."),
+        "discovery_restart_required" => T("ui.discovery.recovery.changed", "Results have changed. Your filters are kept. Start a new search to see current events."),
+        _ => _pagedEvents.Count > 0
+            ? T("ui.discovery.recovery.partial", "Only the events already loaded are shown. More results are temporarily unavailable.")
+            : T("ui.discovery.recovery.unavailable", "Events are temporarily unavailable. Your filters are kept. Try a new search when ready.")
     };
 
     private static string ResolvePresetIcon(string? icon)
@@ -211,29 +214,20 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     [SupplyParameterFromQuery(Name = "groupId")]
     public Guid? GroupIdQuery { get; set; }
 
-    [SupplyParameterFromQuery(Name = "page")]
-    public int? PageParam { get; set; }
-
     [SupplyParameterFromQuery(Name = "pageSize")]
     public int? PageSizeParam { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        Translation.OnLanguageChanged += HandleLanguageChanged;
+        _loadedUrlQuery = new Uri(Navigation.Uri).Query;
         Logger.LogDebug("OnInitializedAsync starting");
         _dockingController = new EventListDockingController(DockLayoutState, DockLayoutPersistence, Logger);
         _dockingController.RegisterPanels(RenderCustomizeViewPanel, RenderEventPreviewPanel);
         DockLayoutState.Changed += OnDockLayoutChanged;
 
-        // URL params trigger pagination mode
-        if (PageParam is > 0)
+        if (PageSizeParam is > 0 and <= 100)
         {
-            _browseMode = BrowseMode.Pagination;
-            _currentPage = PageParam.Value;
-        }
-
-        if (PageSizeParam is > 0 and <= 50)
-        {
-            _browseMode = BrowseMode.Pagination;
             _pageSize = PageSizeParam.Value;
         }
 
@@ -244,6 +238,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
         if (TryRestoreState())
         {
+            await PreloadInitialEventsAsync();
             _isInitialized = true;
             return;
         }
@@ -270,33 +265,22 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
     protected override async Task OnParametersSetAsync()
     {
-        if (!_isInitialized || _browseMode != BrowseMode.Pagination) return;
-
-        // Handle browser back/forward changing URL params
-        if (PageParam is > 0 && PageParam.Value != _currentPage)
+        var query = new Uri(Navigation.Uri).Query;
+        if (_isInitialized && query != _loadedUrlQuery)
         {
-            _currentPage = PageParam.Value;
-            await LoadPagedEventsAsync(_currentPage);
+            _loadedUrlQuery = query;
+            if (_filterBar is not null) _filterBar.SearchTerm = SearchQuery;
+            await RefreshList();
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Logger.LogWarning("OnAfterRenderAsync: firstRender={First}, _dataLoaded={Data}, _virtualize={Virt}, _virtualizeRefreshed={Refreshed}, _eventsLoaded={Events}",
-            firstRender, _dataLoaded, _virtualize != null, _virtualizeRefreshed, _eventsLoaded);
-
         if (firstRender)
         {
             await RequireDockingController().HydrateWorkspaceDockLayoutAsync();
         }
 
-        // Virtualize's IntersectionObserver may not fire when it first appears
-        // in a conditional render block inside MudGrid. Force the initial load.
-        if (_browseMode == BrowseMode.InfiniteScroll && _dataLoaded && _virtualize != null && !_virtualizeRefreshed)
-        {
-            _virtualizeRefreshed = true;
-            await _virtualize.RefreshDataAsync();
-        }
     }
 
     private bool TryRestoreState()
@@ -324,22 +308,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
         BuildLookupMaps();
         _dataLoaded = true;
-        _totalCount = PersistedState.TotalCount;
-        _eventsLoaded = true;
-        isLoading = false;
-
-        // Restore pagination state
-        if (PersistedState.BrowseMode == BrowseMode.Pagination)
-        {
-            _browseMode = PersistedState.BrowseMode;
-            _currentPage = PersistedState.CurrentPage;
-            _pageSize = PersistedState.PageSize;
-            _pagedEvents = PersistedState.InitialItems;
-        }
-        else
-        {
-            _usePersistedEvents = true;
-        }
+        _pageSize = PersistedState.PageSize;
 
         return true;
     }
@@ -418,37 +387,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
     private async Task PreloadInitialEventsAsync()
     {
         if (!_dataLoaded) return;
-
-        // In pagination mode, use the paged loading path instead
-        if (_browseMode == BrowseMode.Pagination)
-        {
-            await LoadPagedEventsAsync(_currentPage);
-            return;
-        }
-
-        try
-        {
-            _initialBatch = await FetchEventsPagedAsync(1, 20, CancellationToken.None);
-
-            _totalCount = _initialBatch.TotalCount;
-            _useInitialBatch = true;
-
-            // Preload images into the browser cache so cards appear with images ready
-            await PreloadImagesAsync(_initialBatch.Items);
-
-            _eventsLoaded = true;
-            isLoading = false;
-
-            await AnnouncerService.AnnouncePoliteAsync(ListResultAnnouncement);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "PreloadInitialEventsAsync error");
-            // Still flip to loaded state so the page isn't stuck on skeleton
-            _eventsLoaded = true;
-            isLoading = false;
-            await AnnouncerService.AnnounceAssertiveAsync("Failed to load events. Please try again.");
-        }
+        await LoadTraversalAsync();
     }
 
     private async Task PreloadImagesAsync(IEnumerable<EventListDto> events)
@@ -472,109 +411,116 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         }
     }
 
-    private Task<PaginatedResult<EventListDto>> FetchEventsPagedAsync(int pageNumber, int pageSize, CancellationToken cancellationToken)
+    private async Task LoadTraversalAsync(bool append = false)
     {
-        var filterState = EventListFilterState.From(
-            _filterBar,
-            SearchQuery,
-            ActorIdQuery,
-            OrganizationIdQuery,
-            GroupIdQuery);
+        if (append && (_isLoadingPage || !CanContinue)) return;
 
-        return filterState.FetchPageAsync(EventService, pageNumber, pageSize, cancellationToken);
-    }
-
-    private async ValueTask<ItemsProviderResult<EventListDto>> LoadEventsAsync(ItemsProviderRequest request)
-    {
-        Logger.LogWarning("LoadEventsAsync called: StartIndex={Start}, Count={Count}, _usePersistedEvents={Persisted}, _useInitialBatch={Batch}",
-            request.StartIndex, request.Count, _usePersistedEvents, _useInitialBatch);
-
-        if (_usePersistedEvents && PersistedState != null && request.StartIndex == PersistedState.InitialStartIndex)
+        var recovering = !append && _recoveryCode is not null;
+        _discoveryCancellation?.Cancel();
+        _discoveryCancellation?.Dispose();
+        _discoveryCancellation = new CancellationTokenSource();
+        var cancellationToken = _discoveryCancellation.Token;
+        string? cursor = null;
+        var requestedPageSize = _pageSize;
+        if (append)
         {
-            _usePersistedEvents = false;
-            return new ItemsProviderResult<EventListDto>(PersistedState.InitialItems, PersistedState.TotalCount);
+            var next = _traversal!._links["next"].Href!;
+            var query = HttpUtility.ParseQueryString(new Uri(new Uri(Navigation.BaseUri), next).Query);
+            var value = query["cursor"];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                _recoveryCode = "discovery_cursor_invalid";
+                _traversal = null;
+                await AnnouncerService.AnnouncePoliteAsync(RecoveryMessage);
+                return;
+            }
+            cursor = value;
+            if (int.TryParse(query["pageSize"], out var parsedSize))
+                requestedPageSize = parsedSize;
+        }
+        else
+        {
+            _traversalFilters = EventListFilterState.From(
+                _filterBar, SearchQuery, ActorIdQuery, OrganizationIdQuery, GroupIdQuery);
+            _traversal = null;
+            _recoveryCode = null;
+            _pagedEvents.Clear();
+            _selectionController.ClearLoadedEvents();
+            await CloseDetailDrawer();
         }
 
-        // Reuse the initial batch that was already fetched and image-preloaded
-        if (_useInitialBatch && _initialBatch != null && request.StartIndex == 0)
-        {
-            _useInitialBatch = false;
-            var batch = _initialBatch;
-            _initialBatch = null;
-            return new ItemsProviderResult<EventListDto>(batch.Items, batch.TotalCount);
-        }
-
-        var pageSize = Math.Max(request.Count, 20);
-        var pageNumber = (request.StartIndex / pageSize) + 1;
-
-        var result = await FetchEventsPagedAsync(pageNumber, pageSize, request.CancellationToken);
-
-        _totalCount = result.TotalCount;
-        _eventsLoaded = true;
-        if (isLoading) isLoading = false;
-
-        _selectionController.TrackLoadedEvents(result.Items);
-
-        StateHasChanged();
-
-        if (PersistedState == null && request.StartIndex == 0)
-        {
-            PersistState(result.Items.ToList(), result.TotalCount, request.StartIndex);
-        }
-
-        return new ItemsProviderResult<EventListDto>(result.Items, result.TotalCount);
-    }
-
-    private async Task LoadPagedEventsAsync(int page)
-    {
+        if (cancellationToken.IsCancellationRequested) return;
         _isLoadingPage = true;
         StateHasChanged();
 
         try
         {
-            var result = await FetchEventsPagedAsync(page, _pageSize, CancellationToken.None);
-            _pagedEvents = result.Items.ToList();
-            _totalCount = result.TotalCount;
-            _currentPage = page;
+            var result = await _traversalFilters!.FetchTraversalAsync(
+                EventService, cursor, requestedPageSize, cancellationToken);
+            if (cancellationToken.IsCancellationRequested) return;
+            var items = result.GetItems();
+            _pagedEvents.AddRange(items);
+            _traversal = result;
             _eventsLoaded = true;
             isLoading = false;
 
-            _selectionController.TrackLoadedEvents(result.Items);
-
-            // Preload images for the new page
-            await PreloadImagesAsync(result.Items);
-
-            // Persist state for SSR handoff
-            PersistState(result.Items.ToList(), result.TotalCount, 0);
-
-            // Accessibility announcement
-            var startItem = ((page - 1) * _pageSize) + 1;
-            var endItem = Math.Min(page * _pageSize, _totalCount);
-            await AnnouncerService.AnnouncePoliteAsync($"Showing events {startItem} to {endItem} of {_totalCount}");
+            _selectionController.TrackLoadedEvents(items);
+            await PreloadImagesAsync(items);
+            if (cancellationToken.IsCancellationRequested) return;
+            PersistState();
+            if (recovering)
+                await AccessibilityFocusService.FocusByIdAsync("event-discovery-results", preventScroll: true);
+            else
+                await AnnouncerService.AnnouncePoliteAsync(
+                    append
+                        ? T("ui.discovery.loaded_more", "More events loaded")
+                        : T("ui.discovery.loaded", "Current search results loaded"));
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            Logger.LogError(ex, "LoadPagedEventsAsync error for page {Page}", page);
-            _eventsLoaded = true;
-            isLoading = false;
-            await AnnouncerService.AnnounceAssertiveAsync("Failed to load events. Please try again.");
+        }
+        catch (ApiException ex)
+        {
+            if (cancellationToken.IsCancellationRequested) return;
+            var code = ex is ApiException<ProblemDetails> problem &&
+                problem.Result?.AdditionalProperties.TryGetValue("code", out var value) == true
+                ? value?.ToString()
+                : null;
+            _recoveryCode = code switch
+            {
+                "discovery_cursor_invalid" or "discovery_cursor_expired" or "discovery_restart_required" => code,
+                _ => "discovery_unavailable"
+            };
+            await ShowTraversalFailureAsync();
+        }
+        catch (Exception)
+        {
+            if (cancellationToken.IsCancellationRequested) return;
+            _recoveryCode = "discovery_unavailable";
+            await ShowTraversalFailureAsync();
         }
         finally
         {
-            _isLoadingPage = false;
-            StateHasChanged();
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                _isLoadingPage = false;
+                StateHasChanged();
+            }
         }
     }
 
-    private void PersistState(List<EventListDto> items, int totalCount, int startIndex)
+    private async Task ShowTraversalFailureAsync()
+    {
+        _traversal = null;
+        _eventsLoaded = true;
+        isLoading = false;
+        await AnnouncerService.AnnouncePoliteAsync(RecoveryMessage);
+    }
+
+    private void PersistState()
     {
         PersistedState = new EventListState
         {
-            InitialItems = items,
-            TotalCount = totalCount,
-            InitialStartIndex = startIndex,
-            BrowseMode = _browseMode,
-            CurrentPage = _currentPage,
             PageSize = _pageSize,
             IsIslamicModuleEnabled = _isIslamicModuleEnabled,
             IsTechModuleEnabled = _isTechModuleEnabled,
@@ -595,52 +541,16 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
     private async Task RefreshList()
     {
-        if (_browseMode == BrowseMode.Pagination)
-        {
-            _currentPage = 1;
-            await LoadPagedEventsAsync(1);
-            UpdateUrl();
-            return;
-        }
-
-        if (_virtualize != null)
-        {
-            _selectionController.ClearLoadedEvents();
-            await _virtualize.RefreshDataAsync();
-        }
+        await LoadTraversalAsync();
     }
 
-    private async Task OnPageChanged(int page)
-    {
-        _currentPage = page;
-        UpdateUrl();
-        await LoadPagedEventsAsync(page);
-    }
+    private Task LoadMoreAsync() => LoadTraversalAsync(append: true);
+    private Task RefineFiltersAsync() => AccessibilityFocusService.FocusAsync(".filter-bar__search-field input");
 
     private async Task OnPageSizeChanged(int size)
     {
         _pageSize = size;
-        _currentPage = 1;
-        UpdateUrl();
-        await LoadPagedEventsAsync(1);
-    }
-
-    private void UpdateUrl()
-    {
-        if (_browseMode != BrowseMode.Pagination) return;
-
-        var queryParams = new Dictionary<string, object?>
-        {
-            ["page"] = _currentPage > 1 ? _currentPage : null,
-            ["pageSize"] = _pageSize != 20 ? _pageSize : null,
-            ["q"] = !string.IsNullOrEmpty(SearchQuery) ? SearchQuery : null,
-            ["actorId"] = ActorIdQuery,
-            ["organizationId"] = OrganizationIdQuery,
-            ["groupId"] = GroupIdQuery
-        };
-
-        var uri = Navigation.GetUriWithQueryParameters(queryParams);
-        Navigation.NavigateTo(uri, new NavigationOptions { ReplaceHistoryEntry = true });
+        await RefreshList();
     }
 
     private async Task SelectEvent(EventListDto evt)
@@ -752,18 +662,10 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
         var lookup = _userSettings.ToDictionary(s => s.Key, s => s);
 
-        // Apply browse mode (only if not overridden by URL params)
-        if (PageParam is null && lookup.TryGetValue("event_list.browse_mode", out var bm) && !string.IsNullOrEmpty(bm.Value))
-        {
-            _browseMode = string.Equals(bm.Value, "infinite_scroll", StringComparison.OrdinalIgnoreCase)
-                ? BrowseMode.InfiniteScroll
-                : BrowseMode.Pagination;
-        }
-
         // Apply page size (only if not overridden by URL params)
         if (PageSizeParam is null && lookup.TryGetValue("event_list.page_size", out var ps) && int.TryParse(ps.Value, out var pageSize) && pageSize > 0)
         {
-            _pageSize = pageSize;
+            _pageSize = Math.Clamp(pageSize, 1, 100);
         }
 
         // Apply layout
@@ -1111,7 +1013,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         await AccessibilityFocusService.RestoreFocusAsync();
         if (result != null && !result.Canceled)
         {
-            await _virtualize?.RefreshDataAsync()!;
+            await RefreshList();
         }
     }
 
@@ -1459,8 +1361,13 @@ public partial class EventList : ComponentBase, IAsyncDisposable
         }
     }
 
+    private void HandleLanguageChanged(string languageCode) => _ = InvokeAsync(StateHasChanged);
+
     public async ValueTask DisposeAsync()
     {
+        Translation.OnLanguageChanged -= HandleLanguageChanged;
+        _discoveryCancellation?.Cancel();
+        _discoveryCancellation?.Dispose();
         DockLayoutState.Changed -= OnDockLayoutChanged;
         if (_dockingController is not null)
         {
@@ -1514,11 +1421,6 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
     public sealed class EventListState
     {
-        public List<EventListDto> InitialItems { get; init; } = new();
-        public int TotalCount { get; init; }
-        public int InitialStartIndex { get; init; }
-        public BrowseMode BrowseMode { get; init; } = BrowseMode.InfiniteScroll;
-        public int CurrentPage { get; init; } = 1;
         public int PageSize { get; init; } = 20;
         public bool IsIslamicModuleEnabled { get; init; }
         public bool IsTechModuleEnabled { get; init; }

@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -106,6 +107,42 @@ public sealed class EventDiscoveryIdentityAuthorityTests
         var result = await fixture.Handler.ExecuteAsync(fixture.Command(revision: 1), CancellationToken.None);
         await Assert.That(result.IsSuccess).IsFalse();
         await fixture.AssertUnchanged();
+    }
+
+    [Test]
+    [Arguments("same-offering")]
+    [Arguments("different-offering")]
+    public async Task CommitRevisionConflictRollsBackAlreadyWrittenDecisionEvidence(string decision)
+    {
+        using var fixture = new Fixture();
+        bool reachedCommit = false;
+        fixture.BeforeCommit = async () =>
+        {
+            reachedCommit = true;
+            await Assert.That(fixture.Revision.IdentityEpoch).IsEqualTo(0);
+            await Assert.That(fixture.Audit.Items.Count).IsEqualTo(1);
+            await Assert.That(fixture.Outbox.Count).IsEqualTo(1);
+        };
+        var result = await fixture.Handler.ExecuteAsync(
+            fixture.Command(decision, revision: 1), CancellationToken.None);
+        await Assert.That(reachedCommit).IsTrue();
+        await Assert.That(result.IsSuccess).IsFalse();
+        await fixture.AssertUnchanged();
+    }
+
+    [Test]
+    public async Task IdentityRevisionRemainsUnchangedUntilDecisionEvidenceIsWritten()
+    {
+        using var fixture = new Fixture();
+        fixture.BeforeCommit = async () =>
+        {
+            await Assert.That(fixture.Revision.IdentityEpoch).IsEqualTo(0);
+            await Assert.That(fixture.Audit.Items.Count).IsEqualTo(1);
+            await Assert.That(fixture.Outbox.Count).IsEqualTo(1);
+        };
+        var result = await fixture.Handler.ExecuteAsync(fixture.Command(), CancellationToken.None);
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(fixture.Revision.IdentityEpoch).IsEqualTo(1);
     }
 
     [Test]
@@ -352,7 +389,10 @@ public sealed class EventDiscoveryIdentityAuthorityTests
         public Dictionary<Guid, EventAuthorityForUser> Grants { get; } = [];
         public List<AuthorizationRequest> ProviderRequests { get; } = [];
         public Func<Task>? BeforeFence { get; set; }
+        public Func<Task>? BeforeCommit { get; set; }
         private bool _transaction;
+        private long? _expectedRevision;
+        private EventDiscoveryRevision? _proposedRevision;
         private readonly SemaphoreSlim _transactionGate = new(1, 1);
         public void Dispose() => _transactionGate.Dispose();
         public ReviewEventDiscoveryAliasCommandHandler Handler { get; }
@@ -399,6 +439,19 @@ public sealed class EventDiscoveryIdentityAuthorityTests
             if (!_transaction || tenantId != TenantId) throw new InvalidOperationException("Missing transaction.");
             if (BeforeFence is not null) await BeforeFence();
         }
+        public void ExpectRevisionAtCommit(Guid tenantId, long expectedRevision)
+        {
+            if (!_transaction || tenantId != TenantId)
+                throw new InvalidOperationException("Missing transaction.");
+            if (expectedRevision < 0 || _expectedRevision is { } previous && previous != expectedRevision)
+                throw new InvalidOperationException("discovery_revision_conflict");
+            _expectedRevision = expectedRevision;
+            _proposedRevision ??= new EventDiscoveryRevision
+            {
+                Id = Revision.Id, TenantId = TenantId, IdentityEpoch = expectedRevision,
+                DisclosureEpoch = Revision.DisclosureEpoch
+            };
+        }
         public Task<EventDiscoveryIdentity?> FindAsync(Guid tenantId, EventDiscoverySourceKind kind, string key, CancellationToken ct) =>
             Task.FromResult(Identities.SingleOrDefault(item => item.TenantId == tenantId && item.SourceKind == kind && item.SourceKey == key));
         public Task<IReadOnlyList<EventDiscoveryIdentity>> GetBindingsAsync(
@@ -425,14 +478,16 @@ public sealed class EventDiscoveryIdentityAuthorityTests
         public Task<EventDiscoveryRevision> ReviewAsync(Guid tenant, Guid member, Guid primary, long expected,
             Guid reviewer, string reason, DateTime at, CancellationToken ct)
         {
-            EventDiscoveryIdentityRules.Review(Revision, expected, Identities, member, primary, reviewer, reason, at);
-            return Task.FromResult(Revision);
+            ExpectRevisionAtCommit(tenant, expected);
+            EventDiscoveryIdentityRules.Review(_proposedRevision!, expected, Identities, member, primary, reviewer, reason, at);
+            return Task.FromResult(_proposedRevision!);
         }
         public Task<EventDiscoveryRevision> ReverseAsync(Guid tenant, Guid member, Guid primary, long expected,
             Guid reviewer, string reason, DateTime at, CancellationToken ct)
         {
-            EventDiscoveryIdentityRules.Reverse(Revision, expected, Identities, member, primary, reviewer, reason, at);
-            return Task.FromResult(Revision);
+            ExpectRevisionAtCommit(tenant, expected);
+            EventDiscoveryIdentityRules.Reverse(_proposedRevision!, expected, Identities, member, primary, reviewer, reason, at);
+            return Task.FromResult(_proposedRevision!);
         }
         public Task<EventDiscoveryRevision> AdvanceDisclosureAsync(Guid tenant, CancellationToken ct) => throw new NotSupportedException();
         public Task<EventAuthoritySnapshot> GetCommitBoundForUserAndEventsAsync(
@@ -473,22 +528,39 @@ public sealed class EventDiscoveryIdentityAuthorityTests
                 Audit.Items.RemoveRange(audit, Audit.Items.Count - audit);
                 Outbox.RemoveRange(outbox, Outbox.Count - outbox);
                 Revision.IdentityEpoch = revision;
+                _expectedRevision = null;
+                _proposedRevision = null;
             }
             try
             {
                 T result = await operation(ct);
-                if (BeforeReplay is not { } replay) return result;
-                BeforeReplay = null;
-                Rollback();
-                replay();
-                return await operation(ct);
+                if (BeforeReplay is { } replay)
+                {
+                    BeforeReplay = null;
+                    Rollback();
+                    replay();
+                    result = await operation(ct);
+                }
+                if (BeforeCommit is not null)
+                    await BeforeCommit();
+                if (_expectedRevision is { } expected && Revision.IdentityEpoch != expected)
+                    throw new InvalidOperationException("discovery_revision_conflict");
+                if (_proposedRevision is not null)
+                    Revision.IdentityEpoch = _proposedRevision.IdentityEpoch;
+                return result;
             }
             catch
             {
                 Rollback();
                 throw;
             }
-            finally { _transaction = false; _transactionGate.Release(); }
+            finally
+            {
+                _expectedRevision = null;
+                _proposedRevision = null;
+                _transaction = false;
+                _transactionGate.Release();
+            }
         }
         public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
             throw new NotSupportedException("Review must select serializable isolation.");
@@ -555,6 +627,12 @@ public sealed class EventDiscoveryIdentityAuthorityTests
 
     private sealed class EventStore(Guid tenantId) : Store<Event>, IEventRepository
     {
+        public Task<IReadOnlyList<Event>> SeekPublicDiscoveryAsync(
+            EventQuerySpecification specification, EventDiscoverySourceCursor? after, int take,
+            CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Event>> GetPublicDiscoveryMembersAsync(
+            EventQuerySpecification specification, IReadOnlyDictionary<Guid, Guid> matchingSessions,
+            CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<Event>> GetAuthorizationTargetsByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<Event>>(Items.Where(item => item.TenantId == tenantId && ids.Contains(item.Id)).ToArray());
         public Task<(List<Event> Items, int TotalCount)> GetEventsWithDetailsPaged(int page, int size,

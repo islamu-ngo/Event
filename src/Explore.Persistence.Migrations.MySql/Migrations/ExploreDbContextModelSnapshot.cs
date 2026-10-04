@@ -5745,6 +5745,28 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("varchar(150)")
                         .HasColumnName("description");
 
+                    b.Property<string>("DiscoverySourceSortKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("discovery_source_sort_key")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("DiscoverySourceSortKey"), "ascii");
+
+                    b.Property<string>("DiscoveryTitleSortKey")
+                        .IsRequired()
+                        .HasMaxLength(800)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(800)")
+                        .HasColumnName("discovery_title_sort_key")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("DiscoveryTitleSortKey"), "ascii");
+
                     b.Property<int>("EventFormatId")
                         .HasColumnType("int")
                         .HasColumnName("event_format_id");
@@ -5927,6 +5949,9 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.HasIndex("BackgroundImageId")
                         .HasDatabaseName("ix_events_background_image_id");
 
+                    b.HasIndex("DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_events_discovery_source_sort_key");
+
                     b.HasIndex("EventFormatId")
                         .HasDatabaseName("ix_events_event_format_id");
 
@@ -5974,11 +5999,21 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .IsDescending(false, false, true)
                         .HasDatabaseName("ix_events_tenant_id_actor_id_created_at");
 
+                    b.HasIndex("TenantId", "CreatedAt", "DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_events_tenant_id_created_at_discovery_source_sort_key");
+
+                    b.HasIndex("TenantId", "DiscoveryTitleSortKey", "DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_ie_events_tenant_id_discovery_title_sort_key_discove_13363d56")
+                        .HasAnnotation("MySql:IndexPrefixLength", new[] { 0, 512, 0 });
+
                     b.HasIndex("TenantId", "FirstSessionDate", "LastSessionDate")
                         .HasDatabaseName("ix_events_tenant_id_first_session_date_last_session_date");
 
                     b.HasIndex("TenantId", "IsDeleted", "EventStatusId")
                         .HasDatabaseName("ix_events_tenant_id_is_deleted_event_status_id");
+
+                    b.HasIndex("TenantId", "TotalViews", "DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_events_tenant_id_total_views_discovery_source_sort_key");
 
                     b.ToTable("ie_events", null, t =>
                         {
@@ -8013,6 +8048,141 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         {
                             t.HasCheckConstraint("ck_discovery_revision_epochs", "identity_epoch >= 0 AND disclosure_epoch >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoverySnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CriteriaHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("criteria_hash");
+
+                    b.Property<long>("DisclosureEpoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("disclosure_epoch");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<long>("IdentityEpoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("identity_epoch");
+
+                    b.Property<int>("ItemCount")
+                        .HasColumnType("int")
+                        .HasColumnName("item_count");
+
+                    b.Property<bool>("LocalSourceComplete")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("local_source_complete");
+
+                    b.Property<bool>("RemoteSourceComplete")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("remote_source_complete");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("Truncated")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("truncated");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_discovery_snapshots");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_event_discovery_snapshots_tenant_id_id");
+
+                    b.HasIndex("TenantId", "ExpiresAtUtc", "Id")
+                        .HasDatabaseName("ix_event_discovery_snapshots_tenant_id_expires_at_utc_id");
+
+                    b.HasIndex("TenantId", "CriteriaHash", "IdentityEpoch", "DisclosureEpoch", "ExpiresAtUtc")
+                        .HasDatabaseName("ix_ie_event_discovery_snapshots_tenant_id_criteria_hash_6ee94b63");
+
+                    b.ToTable("ie_event_discovery_snapshots", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_discovery_snapshot_count", "item_count BETWEEN 0 AND 1000");
+
+                            t.HasCheckConstraint("ck_discovery_snapshot_epochs", "identity_epoch >= 0 AND disclosure_epoch >= 0");
+
+                            t.HasCheckConstraint("ck_discovery_snapshot_expiry", "expires_at_utc > created_at_utc");
+
+                            t.HasCheckConstraint("ck_discovery_snapshot_hash", "length(criteria_hash) = 64");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoverySnapshotItem", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("SnapshotId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("snapshot_id");
+
+                    b.Property<long>("Ordinal")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid>("CanonicalId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("canonical_id");
+
+                    b.Property<int>("CanonicalKind")
+                        .HasColumnType("int")
+                        .HasColumnName("canonical_kind");
+
+                    b.Property<Guid?>("MatchingSessionId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("matching_session_id");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("SourceKind")
+                        .HasColumnType("int")
+                        .HasColumnName("source_kind");
+
+                    b.HasKey("TenantId", "SnapshotId", "Ordinal")
+                        .HasName("pk_ie_event_discovery_snapshot_items_tenant_id_snapshot_89bf56b6");
+
+                    b.HasIndex("TenantId", "SnapshotId", "CanonicalKind", "CanonicalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_event_discovery_snapshot_items_tenant_id_snapshot_1698ad69");
+
+                    b.ToTable("ie_event_discovery_snapshot_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_discovery_snapshot_item_canonical", "canonical_kind IN (1, 2, 3)");
+
+                            t.HasCheckConstraint("ck_discovery_snapshot_item_ordinal", "ordinal BETWEEN 0 AND 999");
+
+                            t.HasCheckConstraint("ck_discovery_snapshot_item_source", "source_kind IN (1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoverySnapshotReservation", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_ie_event_discovery_snapshot_reservations");
+
+                    b.ToTable("ie_event_discovery_snapshot_reservations", (string)null);
                 });
 
             modelBuilder.Entity("Explore.Domain.EventFormat", b =>
@@ -14433,6 +14603,28 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("varchar(4000)")
                         .HasColumnName("description");
 
+                    b.Property<string>("DiscoverySourceSortKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("discovery_source_sort_key")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("DiscoverySourceSortKey"), "ascii");
+
+                    b.Property<string>("DiscoveryTitleSortKey")
+                        .IsRequired()
+                        .HasMaxLength(960)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(960)")
+                        .HasColumnName("discovery_title_sort_key")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("DiscoveryTitleSortKey"), "ascii");
+
                     b.Property<DateTimeOffset?>("EndsAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("ends_at");
@@ -14482,14 +14674,18 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.HasKey("AtprotoRecordId")
                         .HasName("pk_ie_atproto_event_projections");
 
-                    b.HasIndex("CreatedAt", "AtprotoRecordId")
-                        .HasDatabaseName("ix_atproto_event_projections_created_at_atproto_record_id");
+                    b.HasIndex("DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_atproto_event_projections_discovery_source_sort_key");
 
-                    b.HasIndex("Name", "AtprotoRecordId")
-                        .HasDatabaseName("ix_atproto_event_projections_name_atproto_record_id");
+                    b.HasIndex("CreatedAt", "DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_ie_atproto_event_projections_created_at_discovery_so_8483aff5");
 
-                    b.HasIndex("StartsAt", "AtprotoRecordId")
-                        .HasDatabaseName("ix_atproto_event_projections_starts_at_atproto_record_id");
+                    b.HasIndex("DiscoveryTitleSortKey", "DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_ie_atproto_event_projections_discovery_title_sort_ke_9fa0b9db")
+                        .HasAnnotation("MySql:IndexPrefixLength", new[] { 512, 0 });
+
+                    b.HasIndex("StartsAt", "DiscoverySourceSortKey")
+                        .HasDatabaseName("ix_ie_atproto_event_projections_starts_at_discovery_sou_e9a41e4a");
 
                     b.ToTable("ie_atproto_event_projections", null, t =>
                         {
@@ -40047,6 +40243,27 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasConstraintName("fk_event_discovery_revisions_tenants_tenant_id");
                 });
 
+            modelBuilder.Entity("Explore.Domain.EventDiscoverySnapshot", b =>
+                {
+                    b.HasOne("Explore.Domain.EventDiscoverySnapshotReservation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_event_discovery_snapshots_ie_event_discovery_snap_21aba2f1");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoverySnapshotItem", b =>
+                {
+                    b.HasOne("Explore.Domain.EventDiscoverySnapshot", null)
+                        .WithMany("Items")
+                        .HasForeignKey("TenantId", "SnapshotId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_event_discovery_snapshot_items_ie_event_discovery_f029775e");
+                });
+
             modelBuilder.Entity("Explore.Domain.EventIslamicAspect", b =>
                 {
                     b.HasOne("Explore.Domain.Event", "Event")
@@ -50424,6 +50641,11 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
             modelBuilder.Entity("Explore.Domain.EventDiscoveryIdentity", b =>
                 {
                     b.Navigation("Alias");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventDiscoverySnapshot", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Explore.Domain.EventParticipationConfiguration", b =>

@@ -2,6 +2,7 @@
 @using Explore.Blazor.Client.Components.EventReporting
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @inject IEventDiscoveryIdentityService IdentityService
+@inject IEventService EventService
 @inject ITranslationService Translation
 @inject IDialogService DialogService
 @inject IAccessibilityFocusService FocusService
@@ -11,9 +12,9 @@
     <section class="event-discovery-identity" aria-labelledby="@HeadingId" aria-busy="@_busy.ToString().ToLowerInvariant()">
         <h2 id="@HeadingId">@Text("heading", "Listing identity")</h2>
         <p>@Text("commitments", "Your registration, tickets, sessions and payments stay with this original event. A discovery correction does not move them.")</p>
-        @if (Has("canonical") && _identity?.PublicPrimaryEventId is { } primaryId)
+        @if (Has("canonical") && _canonicalPath is not null)
         {
-            <a data-identity-canonical href="@($"/events/{primaryId:D}")">
+            <a data-identity-canonical href="@_canonicalPath">
                 @Text("canonical", "View the related public listing")
             </a>
         }
@@ -105,11 +106,12 @@
     private Guid? _selectedCandidate;
     private string _reasonCode = "duplicate_listing";
     private string? _message;
+    private string? _canonicalPath;
     private bool _confirmed;
     private bool _busy;
     private bool _mustReload;
     private string HeadingId => $"discovery-identity-{Event.Id:N}";
-    private string Text(string key, string fallback) => Translation.T($"event.discovery_identity.{key}", fallback);
+    private string Text(string key, string fallback) => Translation.T($"ui.discovery.identity.{key}", fallback);
     private bool Has(string relation) => _identity?._links?.ContainsKey(relation) == true;
 
     protected override async Task OnParametersSetAsync()
@@ -121,6 +123,7 @@
         _lifetime = new();
         _loadedEvent = Event;
         _identity = null;
+        _canonicalPath = null;
         _candidates = null;
         _selectedCandidate = null;
         _message = null;
@@ -137,6 +140,7 @@
         var token = _lifetime.Token;
         _busy = true;
         _confirmed = false;
+        _canonicalPath = null;
         try
         {
             var result = await IdentityService.GetAsync(eventId, _selectedCandidate, token);
@@ -145,6 +149,13 @@
             _identity = result;
             _mustReload = false;
             _message = null;
+            if (Has("canonical") && result.PublicPrimaryEventId is { } primaryId)
+            {
+                var primary = await EventService.GetPublicEventByIdAsync(primaryId, token);
+                if (token.IsCancellationRequested)
+                    return;
+                _canonicalPath = EventUrlHelper.BuildPublicPath(primary?.Slug, primary?.PublicCode);
+            }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception)

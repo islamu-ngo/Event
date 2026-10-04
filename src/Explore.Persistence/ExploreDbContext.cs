@@ -50,8 +50,16 @@ public partial class ExploreDbContext : DbContext
     /// </summary>
     public ICurrentUserService? CurrentUserService { get; set; }
 
-    public ExploreDbContext(DbContextOptions<ExploreDbContext> options) : base(options)
+    public ExploreDbContext(DbContextOptions<ExploreDbContext> options) : base(WithDisclosureInterceptor(options))
     {
+    }
+
+    private static DbContextOptions<ExploreDbContext> WithDisclosureInterceptor(DbContextOptions<ExploreDbContext> options)
+    {
+        var interceptor = Explore.Persistence.Database.EventDiscoveryDisclosureTransactionInterceptor.Instance;
+        return options.FindExtension<CoreOptionsExtension>()?.Interceptors?.Contains(interceptor) == true
+            ? options
+            : new DbContextOptionsBuilder<ExploreDbContext>(options).AddInterceptors(interceptor).Options;
     }
 
     public void EnableTenantFilterBypass(string reason)

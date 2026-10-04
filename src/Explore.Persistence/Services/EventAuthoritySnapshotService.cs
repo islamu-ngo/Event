@@ -3,6 +3,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
@@ -20,20 +21,25 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
         Guid tenantId, Guid userId, IReadOnlyCollection<Guid> eventIds,
         DateTime evaluationTimeUtc, CancellationToken cancellationToken)
     {
-        var ids = eventIds.Distinct().ToArray();
-        var parents = await _dbContext.Events.AsNoTracking()
-            .Where(parent => parent.TenantId == tenantId && ids.Contains(parent.Id))
-            .Select(parent => new { parent.Id, parent.ActorId, parent.OrganizerActorId })
-            .ToListAsync(cancellationToken);
+        var ids = eventIds.Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
+        var parents = await EventAuthorityProviderOperations.ReadOwnershipPlanAsync(
+            _dbContext, tenantId, ids, cancellationToken);
         var actors = parents.Select(parent => parent.ActorId)
             .Concat(parents.Where(parent => parent.OrganizerActorId.HasValue)
                 .Select(parent => parent.OrganizerActorId!.Value))
             .Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal);
         foreach (var actorId in actors)
             await RelationalEntityRowFence.AcquireGlobalAsync<Actor>(_dbContext, actorId, cancellationToken);
-        foreach (var parent in parents.OrderBy(parent => parent.Id.ToString("N"), StringComparer.Ordinal))
+        foreach (var id in ids)
             await RelationalEntityRowFence.AcquireAsync<Explore.Domain.Event>(
-                _dbContext, tenantId, row => row.Id, parent.Id, cancellationToken);
+                _dbContext, tenantId, row => row.Id, id, cancellationToken);
+        var heldParents = await EventAuthorityProviderOperations.ReadOwnershipAsync(
+            _dbContext, tenantId, ids, cancellationToken);
+        // Never add a newly discovered Actor behind an Event fence. Dirty, missing
+        // or changed ownership invalidates this entire attempt before authority is
+        // read; a new attempt must plan and acquire its complete sorted set again.
+        if (!parents.OrderBy(parent => parent.Id).SequenceEqual(heldParents.OrderBy(parent => parent.Id)))
+            throw new DbUpdateConcurrencyException("Event authority ownership changed before its source fence.");
         var assignments = await _dbContext.EventRoleAssignments.AsNoTracking()
             .Where(assignment => assignment.TenantId == tenantId && assignment.UserId == userId
                 && ids.Contains(assignment.EventId))

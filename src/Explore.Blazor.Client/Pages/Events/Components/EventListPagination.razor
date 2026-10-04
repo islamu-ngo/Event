@@ -1,39 +1,36 @@
-<div class="event-list-pagination" role="navigation" aria-label="Event list pagination">
+@inject Explore.Blazor.Client.Contracts.Services.ITranslationService Translation
+
+<div class="event-list-pagination" aria-busy="@IsLoading.ToString().ToLowerInvariant()">
     <div class="event-list-pagination__summary">
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            @if (TotalCount > 0)
-            {
-                <text>Showing @StartItem–@EndItem of @TotalCount events</text>
-            }
+            @string.Format(System.Globalization.CultureInfo.CurrentCulture, T("ui.discovery.membership", "{0} events loaded from {1} stored search results"), LoadedCount, SnapshotCount)
         </MudText>
     </div>
 
     <div class="event-list-pagination__controls">
-        <MudPagination Count="@TotalPages"
-                       Selected="@CurrentPage"
-                       SelectedChanged="HandlePageChanged"
-                       Variant="Variant.Outlined"
-                       Size="Size.Small"
-                       BoundaryCount="1"
-                       MiddleCount="3"
-                       ShowFirstButton="true"
-                       ShowLastButton="true"
-                       Disabled="@IsLoading"
-                       Class="event-list-pagination__pager"
-                       aria-label="Page navigation" />
+        @if (HasMore)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@IsLoading" OnClick="HandleNextRequested">
+                @T("ui.discovery.load_more", "Load more events")
+            </MudButton>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2">@T("ui.discovery.end", "End of this search")</MudText>
+        }
     </div>
 
     <div class="event-list-pagination__page-size">
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mr-2">Per page:</MudText>
         <MudSelect T="int"
+                   Label="@T("ui.discovery.batch_size", "Events per batch")"
                    Value="@PageSize"
                    ValueChanged="HandlePageSizeChanged"
                    Variant="Variant.Outlined"
                    Dense="true"
                    Margin="Margin.Dense"
                    Class="event-list-pagination__size-select"
-                   Disabled="@IsLoading"
-                   aria-label="Events per page">
+                   Disabled="@IsLoading">
             @foreach (var size in PageSizeOptions)
             {
                 <MudSelectItem T="int" Value="@size">@size</MudSelectItem>

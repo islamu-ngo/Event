@@ -125,6 +125,8 @@ public static class ExploreDatabaseMigrator
         ArgumentNullException.ThrowIfNull(configuration);
 
         await db.Database.MigrateAsync(cancellationToken);
+        await PostgresDiscoverySnapshotMaintenanceContract.ApplyAsync(db, cancellationToken);
+        await EventDiscoveryRankBackfill.ApplyAsync(db, cancellationToken);
     }
 
     private static async Task MigratePrivacyErasureAuthorityAsync(

@@ -1,9 +1,33 @@
+using Explore.Domain.Services.Discovery;
+
 namespace Explore.Domain.Federation;
 
 public sealed class AtprotoEventProjection
 {
-    public Guid AtprotoRecordId { get; set; }
-    public required string Name { get; set; }
+    private Guid _atprotoRecordId;
+    private string _name = string.Empty;
+
+    public Guid AtprotoRecordId
+    {
+        get => _atprotoRecordId;
+        set
+        {
+            _atprotoRecordId = value;
+            DiscoverySourceSortKey = EventDiscoveryRank.SourceKey(value);
+        }
+    }
+    public required string Name
+    {
+        get => _name;
+        set
+        {
+            string rank = EventDiscoveryRank.TitleKey(value);
+            _name = value;
+            DiscoveryTitleSortKey = rank;
+        }
+    }
+    public string DiscoveryTitleSortKey { get; private set; } = string.Empty;
+    public string DiscoverySourceSortKey { get; private set; } = EventDiscoveryRank.SourceKey(Guid.Empty);
     public string? Description { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartsAt { get; set; }

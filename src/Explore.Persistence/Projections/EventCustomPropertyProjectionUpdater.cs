@@ -38,6 +38,9 @@ public class EventCustomPropertyProjectionUpdater : IEventCustomPropertyProjecti
     }
 
     public async Task UpdateForValueAsync(Guid valueId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => UpdateValueCoreAsync(valueId, token), cancellationToken);
+
+    private async Task UpdateValueCoreAsync(Guid valueId, CancellationToken cancellationToken)
     {
         var value = await _dbContext.EventCustomPropertyValues
             .Include(v => v.Definition)
@@ -67,6 +70,9 @@ public class EventCustomPropertyProjectionUpdater : IEventCustomPropertyProjecti
     }
 
     public async Task UpdateForDefinitionAsync(Guid definitionId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => UpdateDefinitionCoreAsync(definitionId, token), cancellationToken);
+
+    private async Task UpdateDefinitionCoreAsync(Guid definitionId, CancellationToken cancellationToken)
     {
         var definition = await _dbContext.EventCustomPropertyDefinitions
             .FirstOrDefaultAsync(d => d.Id == definitionId, cancellationToken);
@@ -103,14 +109,26 @@ public class EventCustomPropertyProjectionUpdater : IEventCustomPropertyProjecti
     }
 
     public async Task RemoveForDefinitionAsync(Guid definitionId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => RemoveDefinitionCoreAsync(definitionId, token), cancellationToken);
+
+    private async Task RemoveDefinitionCoreAsync(Guid definitionId, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventCustomPropertyProjections.Where(value => value.EventCustomPropertyDefinitionId == definitionId)
+                .Select(value => value.TenantId), cancellationToken);
         await _dbContext.EventCustomPropertyProjections
             .Where(p => p.EventCustomPropertyDefinitionId == definitionId)
             .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task RefreshForEventAsync(Guid eventId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => RefreshEventCoreAsync(eventId, token), cancellationToken);
+
+    private async Task RefreshEventCoreAsync(Guid eventId, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventCustomPropertyProjections.Where(value => value.EventId == eventId)
+                .Select(value => value.TenantId), cancellationToken);
         await _dbContext.EventCustomPropertyProjections
             .Where(p => p.EventId == eventId)
             .ExecuteDeleteAsync(cancellationToken);
@@ -200,6 +218,7 @@ public class EventCustomPropertyProjectionUpdater : IEventCustomPropertyProjecti
                 LastErrorMessage = null,
             }, cancellationToken);
 
+            await _dbContext.FlushDisclosureAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             return new ProjectionRebuildResult(true, rowsProcessed, rowsFailed, drained);
@@ -225,6 +244,7 @@ public class EventCustomPropertyProjectionUpdater : IEventCustomPropertyProjecti
             }
 
             var drained = await DrainPendingScopesAsync(tenantId, batchSize, cancellationToken);
+            await _dbContext.FlushDisclosureAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return drained;
         });
@@ -296,6 +316,9 @@ public class EventCustomPropertyProjectionUpdater : IEventCustomPropertyProjecti
 
     private async Task RemoveProjectionForValueAsync(Guid valueId, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventCustomPropertyProjections.Where(value => value.EventCustomPropertyValueId == valueId)
+                .Select(value => value.TenantId), cancellationToken);
         await _dbContext.EventCustomPropertyProjections
             .Where(p => p.EventCustomPropertyValueId == valueId)
             .ExecuteDeleteAsync(cancellationToken);

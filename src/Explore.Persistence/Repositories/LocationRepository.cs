@@ -157,8 +157,17 @@ public class LocationRepository : GenericRepository<Location, Guid>, ILocationRe
 
     public async Task<int> ForgetPiiAsync(Guid locationId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.LocationPii
-            .Where(p => p.LocationId == locationId)
-            .ExecuteDeleteAsync(cancellationToken);
+        return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            var owners = _dbContext.Locations.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+                .Where(value => value.Id == locationId);
+            await _dbContext.DisclosureMutations.EnlistQueryAsync(
+                owners.Select(value => value.TenantId), token);
+            // Gate deletion with the same owner visibility used for enrollment:
+            // native RLS must not hide the tenant while permitting a PII-row delete.
+            return await _dbContext.LocationPii.Where(p => p.LocationId == locationId
+                    && owners.Any(location => location.Id == p.LocationId))
+                .ExecuteDeleteAsync(token);
+        }, cancellationToken);
     }
 }

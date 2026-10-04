@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq.Expressions;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
 using Explore.Domain.Services.Discovery;
@@ -52,19 +53,64 @@ internal static class EventDirectoryTemporalQuery
             Expression<Func<Event, string>> key = entity => EF.Functions.Collate(
                 ordered.Where(session => session.EventId == entity.Id && session.TenantId == entity.TenantId)
                     .Select(session => (string)(object)session.StartTime!).First(), InstantCollation);
-            return (descending ? query.OrderByDescending(key) : query.OrderBy(key)).ThenBy(entity => entity.Id);
+            return (descending ? query.OrderByDescending(key) : query.OrderBy(key)).ThenBy(entity => entity.DiscoverySourceSortKey);
         }
 
         Expression<Func<Event, DateTimeOffset?>> instant = entity =>
             ordered.Where(session => session.EventId == entity.Id && session.TenantId == entity.TenantId)
                 .Select(session => session.StartTime).First();
-        return (descending ? query.OrderByDescending(instant) : query.OrderBy(instant)).ThenBy(entity => entity.Id);
+        return (descending ? query.OrderByDescending(instant) : query.OrderBy(instant)).ThenBy(entity => entity.DiscoverySourceSortKey);
+    }
+
+    internal static IQueryable<Event> SeekEventsByOccurrence(
+        ExploreDbContext dbContext, IQueryable<Event> query,
+        IOrderedQueryable<EventSession> ordered, EventDiscoverySourceCursor after,
+        string? sourceKey, bool descending)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            var instant = after.StartsAt!.Value.ToString("O", CultureInfo.InvariantCulture);
+            return query.Where(entity => (descending
+                ? EF.Functions.Collate((string)(object)ordered.Where(session => session.EventId == entity.Id)
+                    .Select(session => session.StartTime).First()!, InstantCollation).CompareTo(instant) < 0
+                : EF.Functions.Collate((string)(object)ordered.Where(session => session.EventId == entity.Id)
+                    .Select(session => session.StartTime).First()!, InstantCollation).CompareTo(instant) > 0)
+                || EF.Functions.Collate((string)(object)ordered.Where(session => session.EventId == entity.Id)
+                    .Select(session => session.StartTime).First()!, InstantCollation) == instant
+                    && entity.DiscoverySourceSortKey.CompareTo(sourceKey) > 0);
+        }
+        return query.Where(entity => (descending
+            ? ordered.Where(session => session.EventId == entity.Id).Select(session => session.StartTime).First() < after.StartsAt
+            : ordered.Where(session => session.EventId == entity.Id).Select(session => session.StartTime).First() > after.StartsAt)
+            || ordered.Where(session => session.EventId == entity.Id).Select(session => session.StartTime).First() == after.StartsAt
+                && entity.DiscoverySourceSortKey.CompareTo(sourceKey) > 0);
     }
 
     private static void RegisterInstantCollation(ExploreDbContext dbContext) =>
         ((SqliteConnection)dbContext.Database.GetDbConnection()).CreateCollation(InstantCollation,
             static (left, right) => DateTimeOffset.Parse(left, CultureInfo.InvariantCulture)
                 .CompareTo(DateTimeOffset.Parse(right, CultureInfo.InvariantCulture)));
+
+    internal static Func<IQueryable<DateTimeOffset?>, Task<DateTimeOffset?>> CreateNextInstantReader(
+        ExploreDbContext dbContext, DateTimeOffset observedAtUtc, CancellationToken cancellationToken)
+    {
+        bool sqlite = dbContext.Database.IsSqlite();
+        if (sqlite)
+            RegisterInstantCollation(dbContext);
+        return NextInstantAsync;
+
+        Task<DateTimeOffset?> NextInstantAsync(IQueryable<DateTimeOffset?> values)
+        {
+            if (!sqlite)
+                return values.Where(value => value > observedAtUtc)
+                    .OrderBy(value => value).FirstOrDefaultAsync(cancellationToken);
+            string instant = observedAtUtc.ToString("O", CultureInfo.InvariantCulture);
+            return values.Where(value => value != null &&
+                    EF.Functions.Collate((string)(object)value, InstantCollation).CompareTo(instant) > 0)
+                .OrderBy(value => EF.Functions.Collate((string)(object)value!, InstantCollation))
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+    }
 
     /// <summary>
     /// Keeps Domain interval rules authoritative while translating instant comparisons

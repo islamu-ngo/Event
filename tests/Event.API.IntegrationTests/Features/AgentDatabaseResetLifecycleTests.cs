@@ -114,7 +114,7 @@ public sealed class AgentDatabaseResetLifecycleTests
         await Assert.That(await fixture.DatabasePreservationFingerprintAsync()).IsEqualTo(before);
         await using (var database = fixture.CreateDatabase())
         {
-            await Assert.That(await database.Events.CountAsync()).IsEqualTo(2);
+            await Assert.That(await database.Events.CountAsync()).IsEqualTo(4);
             await Assert.That(await database.Users.CountAsync()).IsEqualTo(6);
             await Assert.That(await database.TenantUserRoleGrants.AnyAsync(row => row.RevokedAt != null)).IsFalse();
             await database.Database.ExecuteSqlRawAsync("""

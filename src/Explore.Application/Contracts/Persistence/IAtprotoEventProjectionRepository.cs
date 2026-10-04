@@ -32,6 +32,13 @@ public sealed record AtprotoEventProjectionQuery(
 
 public interface IAtprotoEventProjectionRepository
 {
+    /// <summary>Requires caller-owned Serializable; persisted authorized projections only, with no source count.</summary>
+    Task<IReadOnlyList<AtprotoEventProjection>> SeekPublicDiscoveryAsync(
+        AtprotoEventProjectionQuery query, EventDiscoverySourceCursor? after, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AtprotoEventProjection>> GetPublicDiscoveryMembersAsync(
+        AtprotoEventProjectionQuery query, IReadOnlyCollection<Guid> recordIds, CancellationToken cancellationToken);
+
     Task<(IReadOnlyList<AtprotoEventProjection> Items, int TotalCount)> GetPublicWindowAsync(
         AtprotoEventProjectionQuery query,
         CancellationToken cancellationToken);

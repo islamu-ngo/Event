@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Application.Notifications;
 using Explore.Domain;
 

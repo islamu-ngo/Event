@@ -97,13 +97,19 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
         Guid updatedBy,
         CancellationToken cancellationToken = default)
     {
-        var affectedRows = await _dbContext.Tenants
-            .Where(tenant => tenant.Id == id && tenant.TenantStatusId == expectedStatusId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(tenant => tenant.TenantStatusId, newStatusId)
-                .SetProperty(tenant => tenant.UpdatedAt, updatedAt)
-                .SetProperty(tenant => tenant.UpdatedBy, updatedBy), cancellationToken);
+        return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            _dbContext.DisclosureMutations.Enlist([]);
+            var affectedRows = await _dbContext.Tenants
+                .Where(tenant => tenant.Id == id && tenant.TenantStatusId == expectedStatusId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(tenant => tenant.TenantStatusId, newStatusId)
+                    .SetProperty(tenant => tenant.UpdatedAt, updatedAt)
+                    .SetProperty(tenant => tenant.UpdatedBy, updatedBy), token);
 
-        return affectedRows == 1;
+            if (affectedRows == 1)
+                _dbContext.DisclosureMutations.Enlist([id]);
+            return affectedRows == 1;
+        }, cancellationToken);
     }
 }

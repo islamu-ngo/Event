@@ -76,57 +76,18 @@ public sealed class EventListFilterStateTests
     }
 
     [Test]
-    public async Task FetchPageAsync_ForwardsSnapshotToEventService()
+    public async Task FetchTraversalAsync_SendsOriginalCriteriaThroughGeneratedHttpClient()
     {
         var actorId = Guid.NewGuid();
-        var eventService = Substitute.For<IEventService>();
-        eventService.GetEventsPagedAsync(
-                Arg.Any<int>(),
-                Arg.Any<int>(),
-                searchTerm: Arg.Any<string?>(),
-                categoryId: Arg.Any<Guid?>(),
-                includedCategoryIds: Arg.Any<List<Guid>?>(),
-                excludedCategoryIds: Arg.Any<List<Guid>?>(),
-                categoryInclusionMode: Arg.Any<string?>(),
-                categoryExclusionMode: Arg.Any<string?>(),
-                includedTagIds: Arg.Any<List<Guid>?>(),
-                excludedTagIds: Arg.Any<List<Guid>?>(),
-                inclusionMode: Arg.Any<string?>(),
-                exclusionMode: Arg.Any<string?>(),
-                formatIds: Arg.Any<List<int>?>(),
-                madhabIds: Arg.Any<List<int>?>(),
-                registrationModeIds: Arg.Any<List<int>?>(),
-                languageIds: Arg.Any<List<int>?>(),
-                dateFrom: Arg.Any<DateTimeOffset?>(),
-                dateTo: Arg.Any<DateTimeOffset?>(),
-                sortBy: Arg.Any<string?>(),
-                sortDescending: Arg.Any<bool?>(),
-                eventTypeIds: Arg.Any<List<int>?>(),
-                audienceGenderIds: Arg.Any<List<int>?>(),
-                audienceAgeIds: Arg.Any<List<int>?>(),
-                eventStatusIds: Arg.Any<List<int>?>(),
-                genderModeIds: Arg.Any<List<int>?>(),
-                includesQuranRecitation: Arg.Any<bool?>(),
-                referencePrayerIds: Arg.Any<List<int>?>(),
-                islamicPrimaryLanguageIds: Arg.Any<List<int>?>(),
-                hasIslamicAspect: Arg.Any<bool?>(),
-                skillLevelId: Arg.Any<int?>(),
-                isCodingCompetition: Arg.Any<bool?>(),
-                isHackathon: Arg.Any<bool?>(),
-                requiresLaptop: Arg.Any<bool?>(),
-                techStackTag: Arg.Any<string?>(),
-                hasTechAspect: Arg.Any<bool?>(),
-                actorId: Arg.Any<Guid?>(),
-                organizationId: Arg.Any<Guid?>(),
-                groupId: Arg.Any<Guid?>(),
-                cancellationToken: Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResult<EventListDto>
-            {
-                Items = [],
-                PageNumber = 3,
-                PageSize = 25,
-                TotalCount = 0
-            });
+        using var handler = new DiscoveryHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var eventService = new EventService(
+            new EventClient(http),
+            Substitute.For<IEventLifecycleClient>(),
+            Substitute.For<IEventManagementReadClient>(),
+            Substitute.For<IEventParticipationClient>(),
+            Substitute.For<IEventPublicActionClient>(),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<EventService>>());
         var includedCategoryId = Guid.NewGuid();
         var excludedCategoryId = Guid.NewGuid();
         var includedTagId = Guid.NewGuid();
@@ -160,33 +121,40 @@ public sealed class EventListFilterStateTests
             OrganizationId: null,
             GroupId: null);
 
-        await state.FetchPageAsync(eventService, 3, 25, CancellationToken.None);
+        var result = await state.FetchTraversalAsync(eventService, "opaque+cursor", 25, CancellationToken.None);
+        var query = System.Web.HttpUtility.ParseQueryString(handler.RequestUri!.Query);
+        await Assert.That(query["cursor"]).IsEqualTo("opaque+cursor");
+        await Assert.That(query["pageSize"]).IsEqualTo("25");
+        await Assert.That(query["pageNumber"]).IsNull();
+        await Assert.That(query["searchTerm"]).IsEqualTo("community");
+        await Assert.That(query["actorId"]).IsEqualTo(actorId.ToString());
+        await Assert.That(query["includedCategoryIds"]).IsEqualTo(includedCategoryId.ToString());
+        await Assert.That(query["excludedCategoryIds"]).IsEqualTo(excludedCategoryId.ToString());
+        await Assert.That(query["categoryInclusionMode"]).IsEqualTo("any");
+        await Assert.That(query["categoryExclusionMode"]).IsEqualTo("all");
+        await Assert.That(query["includedTagIds"]).IsEqualTo(includedTagId.ToString());
+        await Assert.That(query["excludedTagIds"]).IsEqualTo(excludedTagId.ToString());
+        await Assert.That(query["inclusionMode"]).IsEqualTo("all");
+        await Assert.That(query["exclusionMode"]).IsEqualTo("any");
+        await Assert.That(query["techStackTag"]).IsEqualTo("dotnet");
+        await Assert.That(query["sortBy"]).IsEqualTo("date");
+        await Assert.That(query["sortDescending"]).IsEqualTo("true");
+        await Assert.That(result.SnapshotCount).IsEqualTo(43);
+        await Assert.That(result.Truncated).IsTrue();
+    }
 
-        await eventService.Received(1).GetEventsPagedAsync(
-            pageNumber: 3,
-            pageSize: 25,
-            searchTerm: "community",
-            categoryId: null,
-            includedCategoryIds: Arg.Is<List<Guid>?>(ids => ids != null && ids.SequenceEqual(new[] { includedCategoryId })),
-            excludedCategoryIds: Arg.Is<List<Guid>?>(ids => ids != null && ids.SequenceEqual(new[] { excludedCategoryId })),
-            categoryInclusionMode: "any",
-            categoryExclusionMode: "all",
-            includedTagIds: Arg.Is<List<Guid>?>(ids => ids != null && ids.SequenceEqual(new[] { includedTagId })),
-            excludedTagIds: Arg.Is<List<Guid>?>(ids => ids != null && ids.SequenceEqual(new[] { excludedTagId })),
-            inclusionMode: "all",
-            exclusionMode: "any",
-            includesQuranRecitation: null,
-            eventStatusIds: null,
-            islamicPrimaryLanguageIds: null,
-            hasIslamicAspect: null,
-            isCodingCompetition: null,
-            isHackathon: null,
-            requiresLaptop: null,
-            techStackTag: "dotnet",
-            hasTechAspect: null,
-            actorId: actorId,
-            sortBy: "date",
-            sortDescending: true,
-            cancellationToken: CancellationToken.None);
+    private sealed class DiscoveryHandler : HttpMessageHandler
+    {
+        public Uri? RequestUri { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestUri = request.RequestUri;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                    {"snapshotCount":43,"truncated":true,"expiresAt":"2026-10-03T12:15:00Z","hasMore":false,"_links":{},"_embedded":{"items":[]}}
+                    """, System.Text.Encoding.UTF8, "application/hal+json")
+            });
+        }
     }
 }

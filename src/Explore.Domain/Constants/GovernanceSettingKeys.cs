@@ -2,6 +2,16 @@ namespace Explore.Domain.Constants;
 
 public static class GovernanceSettingKeys
 {
+    public static class EventDiscovery
+    {
+        public const string MaxIdentities = "event_discovery.max_identities";
+        public const string LifetimeMinutes = "event_discovery.lifetime_minutes";
+        public const string MaxLiveSnapshots = "event_discovery.max_live_snapshots";
+        public const string MaxPhysicalItems = "event_discovery.max_physical_items";
+        public const string MaxExaminedRows = "event_discovery.max_examined_rows";
+        public const string MaxSourceSeeks = "event_discovery.max_source_seeks";
+    }
+
     public static class Deployment
     {
         public const string Mode = "deployment.mode";

@@ -4,6 +4,7 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.API.Hateoas.Assemblers;
 using Explore.API.Models;
 using Explore.API.Services.Calendar;
 using Explore.Application.DTOs.Event;
@@ -12,6 +13,7 @@ using Explore.Application.DTOs.EventSession;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.EventPrograms.Requests.Queries;
 using Explore.Application.Features.Events.Moderation;
+using Explore.Application.Features.Events.Discovery;
 using Explore.Application.Features.Events.OpenGraph;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Queries;
@@ -53,7 +55,9 @@ public class EventController : EventControllerBase
     private readonly IQueryHandler<GetEventDetailsRequest, EventDto?> _getEventDetails;
     private readonly IQueryHandler<GetPublicEventDetailsRequest, EventDto?> _getPublicEventDetails;
     private readonly IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?> _getOpenGraphImage;
-    private readonly IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> _getPublicEventDiscovery;
+    private readonly IQueryHandler<GetEventDiscoveryTraversalQuery, EventDiscoveryTraversalDto> _getPublicEventDiscovery;
+    private readonly EventDiscoveryResponseAuthority _discoveryResponseAuthority;
+    private readonly EventDiscoveryTraversalResourceAssembler _traversalAssembler;
     private readonly IQueryHandler<GetAtprotoEventSourceQuery, string?> _getAtprotoEventSource;
     private readonly IResourceAssembler<EventDto, EventListDto> _resourceAssembler;
     private readonly IResourceAssembler<EventDiscoveryItemDto> _eventDiscoveryResourceAssembler;
@@ -63,16 +67,20 @@ public class EventController : EventControllerBase
         IQueryHandler<GetEventDetailsRequest, EventDto?> getEventDetails,
         IQueryHandler<GetPublicEventDetailsRequest, EventDto?> getPublicEventDetails,
         IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?> getOpenGraphImage,
-        IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> getPublicEventDiscovery,
+        IQueryHandler<GetEventDiscoveryTraversalQuery, EventDiscoveryTraversalDto> getPublicEventDiscovery,
         IQueryHandler<GetAtprotoEventSourceQuery, string?> getAtprotoEventSource,
         IResourceAssembler<EventDto, EventListDto> resourceAssembler,
-        IResourceAssembler<EventDiscoveryItemDto> eventDiscoveryResourceAssembler)
+        IResourceAssembler<EventDiscoveryItemDto> eventDiscoveryResourceAssembler,
+        EventDiscoveryTraversalResourceAssembler traversalAssembler,
+        EventDiscoveryResponseAuthority discoveryResponseAuthority)
     {
         _getMyEvents = getMyEvents;
         _getEventDetails = getEventDetails;
         _getPublicEventDetails = getPublicEventDetails;
         _getOpenGraphImage = getOpenGraphImage;
         _getPublicEventDiscovery = getPublicEventDiscovery;
+        _traversalAssembler = traversalAssembler;
+        _discoveryResponseAuthority = discoveryResponseAuthority;
         _getAtprotoEventSource = getAtprotoEventSource;
         _resourceAssembler = resourceAssembler;
         _eventDiscoveryResourceAssembler = eventDiscoveryResourceAssembler;
@@ -85,8 +93,8 @@ public class EventController : EventControllerBase
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet(Name = RouteNames.GetEvents)]
     [EndpointSummary("Get all Events")]
-    [EndpointDescription("Get a paginated, filterable list of all Events (Conference, Webinar, Workshop...). " +
-        "Default page size is 20, max is 100. " +
+    [EndpointDescription("Browse a bounded, filterable snapshot of Events (Conference, Webinar, Workshop...). " +
+        "Default batch size is 20, max is 100. Continue with the opaque cursor in the next HAL link. " +
         "Supports filtering by category, tag, format, madhab, language, date range, and free-text search. " +
         "Supports module-conditional aspect filters: Islamic (genderMode, quranRecitation, referencePrayer, islamicLanguage) " +
         "and Tech (skillLevel, codingCompetition, hackathon, requiresLaptop, techStack). " +
@@ -95,28 +103,33 @@ public class EventController : EventControllerBase
         "'custom_properties.projection_discovery_enabled' — silently ignored when disabled. " +
         "Supports sorting by date, title, views, or createdAt. " +
         "When tenant governance enables ATProto Events, the result also includes tenant-visible community events " +
-        "within a bounded 1,000-item merge window, de-duplicated against locally-owned ATProto records. " +
-        "Response includes HATEOAS navigation links (first, prev, next, last) and safe source affordances. " +
+        "within a bounded 1,000-item snapshot, de-duplicated against locally-owned ATProto records. " +
+        "Each batch rechecks current disclosure and identity authority. Expired cursors return 410; " +
+        "authority changes return 409 and require a new search. " +
+        "Response includes forward HATEOAS navigation and safe source affordances, not offset pages or global totals. " +
         "Send 'Prefer: return=minimal' header to strip links.")]
-    [ProducesResponseType(typeof(HalCollectionResource<EventDiscoveryItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(EventDiscoveryTraversalResource), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
     [PrivateNoStore]
-    public async Task<ActionResult<HalCollectionResource<EventDiscoveryItemDto>>> GetAll(
+    public async Task<ActionResult<EventDiscoveryTraversalResource>> GetAll(
         [FromQuery] EventFilterRequest filter,
         CancellationToken cancellationToken = default)
     {
         if (Request.Query.Keys.Any(static key =>
-                string.Equals(key, "locationIds", StringComparison.OrdinalIgnoreCase)))
+                string.Equals(key, "locationIds", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(key, "pageNumber", StringComparison.OrdinalIgnoreCase)))
         {
             return this.ToValidationProblem(
                 FilterValidationProblem,
-                "The locationIds filter is not available on public event discovery.");
+                "Public event discovery does not accept locationIds or pageNumber.");
         }
 
-        var result = await _getPublicEventDiscovery.QueryAsync(new GetPublicEventDiscoveryRequest(new GetEventListRequest
+        var result = await _getPublicEventDiscovery.QueryAsync(new GetEventDiscoveryTraversalQuery(new GetEventListRequest
         {
-            PageNumber = filter.PageNumber,
+            PageNumber = 1,
             PageSize = filter.PageSize,
             SearchTerm = filter.SearchTerm,
             AreaId = filter.AreaId,
@@ -158,19 +171,10 @@ public class EventController : EventControllerBase
             View = ParseTemporalView(filter.View),
             CustomPropertyFilters = filter.CustomPropertyFilters,
             CustomPropertySearchTerm = filter.CustomPropertySearchTerm
-        }), cancellationToken);
+        }, filter.Cursor), cancellationToken);
 
-        var halResource = await _eventDiscoveryResourceAssembler.ToCollectionResource(
-            result,
-            RouteNames.GetEvents,
-            additionalRouteValues: new
-            {
-                filter.ActorId,
-                filter.OrganizationId,
-                filter.GroupId
-            },
-            HttpContext);
-
+        var halResource = await _traversalAssembler.ToResource(result, HttpContext);
+        await _discoveryResponseAuthority.ValidateAsync(result.Authority, cancellationToken);
         return Ok(halResource);
     }
 
@@ -182,16 +186,20 @@ public class EventController : EventControllerBase
     [EndpointDescription("Redirects to the current tenant-visible HTTPS source for a federated event after rechecking ATProto Events governance.")]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [PrivateNoStore]
     public async Task<IActionResult> GetAtprotoEventSource(
         Guid atprotoRecordId,
         CancellationToken cancellationToken = default)
     {
+        var authority = await _discoveryResponseAuthority.CaptureAsync(cancellationToken);
         string? sourceUrl = await _getAtprotoEventSource.QueryAsync(
             new GetAtprotoEventSourceQuery(atprotoRecordId),
             cancellationToken);
-        return sourceUrl is null
-            ? this.ToNotFoundProblem(EventNotFoundProblem)
-            : Redirect(sourceUrl);
+        if (sourceUrl is null)
+            return this.ToNotFoundProblem(EventNotFoundProblem);
+        var result = Redirect(sourceUrl);
+        await _discoveryResponseAuthority.ValidateAsync(authority, cancellationToken);
+        return result;
     }
 
     /// <summary>
@@ -252,11 +260,13 @@ public class EventController : EventControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<HalResource<EventDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
+        var authority = await _discoveryResponseAuthority.CaptureAsync(cancellationToken);
         var @event = await _getEventDetails.QueryAsync(new GetEventDetailsRequest { Id = id }, cancellationToken);
         if (@event == null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 
         var halResource = await _resourceAssembler.ToResource(@event, HttpContext);
+        await _discoveryResponseAuthority.ValidateAsync(authority, cancellationToken);
         return Ok(halResource);
     }
 
@@ -273,11 +283,13 @@ public class EventController : EventControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<HalResource<EventDto>>> GetByPublicCode(string slugCode, CancellationToken cancellationToken = default)
     {
+        var authority = await _discoveryResponseAuthority.CaptureAsync(cancellationToken);
         var @event = await _getPublicEventDetails.QueryAsync(new GetPublicEventDetailsRequest { SlugCode = slugCode }, cancellationToken);
         if (@event == null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 
         var halResource = await _resourceAssembler.ToResource(@event, HttpContext);
+        await _discoveryResponseAuthority.ValidateAsync(authority, cancellationToken);
         return Ok(halResource);
     }
 
@@ -298,6 +310,7 @@ public class EventController : EventControllerBase
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<IActionResult> GetOpenGraphImage(string slugCode, CancellationToken cancellationToken = default)
     {
+        var authority = await _discoveryResponseAuthority.CaptureAsync(cancellationToken);
         var result = await _getOpenGraphImage.QueryAsync(
             new GetPublicEventOpenGraphImageRequest { SlugCode = slugCode },
             cancellationToken);
@@ -305,11 +318,11 @@ public class EventController : EventControllerBase
             return this.ToNotFoundProblem(EventNotFoundProblem);
 
         var entityTag = EntityTagHeaderValue.Parse(result.ETag);
-        Response.Headers.CacheControl = "public, max-age=0, must-revalidate";
-        Response.Headers.Vary = "Host, X-Tenant-Slug";
-
         var fileResult = File(result.PngBytes.ToArray(), "image/png");
         fileResult.EntityTag = entityTag;
+        await _discoveryResponseAuthority.ValidateAsync(authority, cancellationToken);
+        Response.Headers.CacheControl = "public, max-age=0, must-revalidate";
+        Response.Headers.Vary = "Host, X-Tenant-Slug";
         return fileResult;
     }
 

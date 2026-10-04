@@ -10,7 +10,7 @@ using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Domain.Constants;
 
-namespace Explore.Application.Features.Events.Discovery;
+namespace Explore.Application.Features.Events.Discovery.Commands;
 
 public sealed class ReviewEventDiscoveryAliasCommandHandler(
     IEventDiscoveryIdentityRepository identities,
@@ -66,7 +66,8 @@ public sealed class ReviewEventDiscoveryAliasCommandHandler(
                     .Concat(new[] { request.EventId, request.Review.PrimaryEventId }).Distinct().ToArray();
                 if (authorityIds.Length > IEventRepository.MaximumAuthorizationTargetBatchSize)
                     throw new Rejected(BaseCommandResponse.Failure<Guid>("discovery_identity_bounded"));
-                // Authority rows precede discovery identities and the terminal tenant epoch.
+                // Authority rows precede identities. Epoch comparison is deferred
+                // until the graph, audit and outbox writes have all completed.
                 bool active = await memberships.FenceActiveTenantUserAsync(tenant, reviewer, token);
                 if (!active)
                     throw new Rejected(BaseCommandResponse.Authorization<Guid>());
@@ -77,7 +78,7 @@ public sealed class ReviewEventDiscoveryAliasCommandHandler(
                         new[] { member?.Id ?? request.EventId, primary?.Id ?? request.Review.PrimaryEventId })
                         .Distinct().ToArray(), token);
 
-                var revision = await identities.GetRevisionAsync(tenant, token);
+                identities.ExpectRevisionAtCommit(tenant, request.Review.ExpectedRevision);
 
                 member = await identities.FindAsync(tenant, EventDiscoverySourceKind.LocalEvent,
                     request.EventId.ToString("D"), token);
@@ -136,11 +137,10 @@ public sealed class ReviewEventDiscoveryAliasCommandHandler(
                         || !(grant.IsManager || grant.IsOwner || grant.PermissionCodes.Contains(PermissionCodes.EventUpdate))))
                     throw new Rejected(BaseCommandResponse.Authorization<Guid>());
 
-                if ((revision?.IdentityEpoch ?? 0) != request.Review.ExpectedRevision
-                    || graph.Any(identity => !before.Any(previous => previous.Id == identity.Id)))
+                if (graph.Any(identity => !before.Any(previous => previous.Id == identity.Id)))
                     throw new Rejected(BaseCommandResponse.Conflict(request.EventId, "discovery_revision_conflict"));
 
-                long decidedRevision = revision?.IdentityEpoch ?? 0;
+                long decidedRevision = request.Review.ExpectedRevision;
                 if (request.Review.Decision != "different-offering")
                 {
                     if (request.Review.Decision == "reverse" && (member is null || primary is null))

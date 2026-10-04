@@ -1289,11 +1289,13 @@ public partial class CreateEvent : IDisposable
                 Description = createDto.Description,
                 StartTime = startTimeUtc,
                 EndTime = endTimeUtc,
+                EndTimeType = SessionEndTimeType.Fixed,
                 LocationId = _inlineSessionLocationId,
                 SortOrder = 1,
                 MaxAudienceAttendees = _inlineSessionCapacity is > 0 ? _inlineSessionCapacity : null,
                 RegistrationModeId = registrationModes?.FirstOrDefault()?.Id,
-                LanguageIds = new List<int>()
+                LanguageIds = new List<int>(),
+                SpeakerActorIds = new List<Guid>()
             }
         };
 

@@ -5,6 +5,14 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-02
 
+- **Breaking public discovery traversal.** `GetEvents` accepts opaque `cursor`
+  and `pageSize` instead of public `pageNumber`. The HAL resource exposes
+  `snapshotCount`, `truncated`, `expiresAt`, `hasMore` and forward `next`, without
+  total pages or a global match count. Continuations retain criteria and captured
+  rank but recheck current authority. Invalid, expired and changed traversals
+  return metadata-free no-store `400`, `410` and `409` ProblemDetails; unavailable
+  authority or capacity returns `503`. Private management pagination is separate.
+
 - **Reversible discovery identity surfaces.** Event identity status and bounded
   duplicate candidates are no-store HAL resources. The status route accepts an
   optional public candidate and advertises current group-authorized review and

@@ -401,14 +401,23 @@ public class TenantSettingRepository : ITenantSettingRepository
     private Task<bool> ExecuteEmailPolicyMutationAsync(Guid tenantId, IEnumerable<string> keys,
         Func<CancellationToken, Task<bool>> operation, CancellationToken cancellationToken, Guid? actorId = null)
     {
-        string[] smtpKeys = keys
+        string[] mutationKeys = keys.ToArray();
+        bool disclosure = mutationKeys.Any(Services.EventDiscoveryDisclosureMutationScope.IsDisclosureSetting);
+        string[] smtpKeys = mutationKeys
             .Where(key => RelationalSettingMutationLock.RequiresEmailDeliveryFence([key]))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         return smtpKeys.Length == 0
-            ? operation(cancellationToken)
+            ? _dbContext.ExecuteDisclosureMutationAsync(async token =>
+            {
+                if (disclosure)
+                    _dbContext.DisclosureMutations.Enlist([tenantId]);
+                return await operation(token);
+            }, cancellationToken)
             : _mutationLock.ExecuteManyAsync(smtpKeys, async token =>
             {
+                if (disclosure)
+                    _dbContext.DisclosureMutations.Enlist([tenantId]);
                 var before = await EmailDeliveryPolicyReader.ReadAsync(_dbContext, tenantId, token);
                 bool changed = await operation(token);
                 if (changed)

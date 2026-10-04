@@ -9,6 +9,9 @@ namespace Explore.Persistence.Repositories;
 public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbContext)
     : IUserLocationPrivacyErasureRepository, IUserPrivacyErasureRepository
 {
+    public Task FenceSubjectAsync(Guid subjectId, CancellationToken cancellationToken) =>
+        dbContext.DisclosureMutations.EnlistUserAsync(subjectId, cancellationToken);
+
     public async Task<IReadOnlyList<PrivacyErasureProviderCandidate>> GetProviderCandidatesAsync(
         Guid subjectId,
         CancellationToken cancellationToken)
@@ -153,6 +156,13 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
     public async Task EraseProviderBackedLocalUserMetadataAsync(
         Guid subjectId,
         CancellationToken cancellationToken)
+        => await dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            await FenceSubjectAsync(subjectId, token);
+            await EraseProviderMetadataCoreAsync(subjectId, token);
+        }, cancellationToken);
+
+    private async Task EraseProviderMetadataCoreAsync(Guid subjectId, CancellationToken cancellationToken)
     {
         RequireId(subjectId, nameof(subjectId));
         string reason = TenantFilterBypassReasons.UserPrivacyErasure;
@@ -378,6 +388,13 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
     public async Task AnonymizeRetainedAuditEvidenceAsync(
         Guid subjectId,
         CancellationToken cancellationToken)
+        => await dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            await FenceSubjectAsync(subjectId, token);
+            await AnonymizeEvidenceCoreAsync(subjectId, token);
+        }, cancellationToken);
+
+    private async Task AnonymizeEvidenceCoreAsync(Guid subjectId, CancellationToken cancellationToken)
     {
         RequireId(subjectId, nameof(subjectId));
         string reason = TenantFilterBypassReasons.UserPrivacyErasure;
@@ -547,6 +564,13 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
     public async Task EraseRegistrationAndLocalNotificationsAsync(
         Guid subjectId,
         CancellationToken cancellationToken)
+        => await dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            await FenceSubjectAsync(subjectId, token);
+            await EraseRegistrationCoreAsync(subjectId, token);
+        }, cancellationToken);
+
+    private async Task EraseRegistrationCoreAsync(Guid subjectId, CancellationToken cancellationToken)
     {
         RequireId(subjectId, nameof(subjectId));
         string reason = TenantFilterBypassReasons.UserPrivacyErasure;
@@ -712,6 +736,13 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
     public async Task EraseMembershipsAndPreferencesAsync(
         Guid subjectId,
         CancellationToken cancellationToken)
+        => await dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            await FenceSubjectAsync(subjectId, token);
+            await EraseMembershipsCoreAsync(subjectId, token);
+        }, cancellationToken);
+
+    private async Task EraseMembershipsCoreAsync(Guid subjectId, CancellationToken cancellationToken)
     {
         RequireId(subjectId, nameof(subjectId));
         string reason = TenantFilterBypassReasons.UserPrivacyErasure;
@@ -854,8 +885,11 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(audits);
-        dbContext.EventLocationDisclosureAudits.AddRange(audits);
-        await dbContext.SavePrivacyErasureChangesAsync(cancellationToken);
+        await dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            dbContext.EventLocationDisclosureAudits.AddRange(audits);
+            await dbContext.SavePrivacyErasureChangesAsync(token);
+        }, cancellationToken);
     }
 
     private static void RequireId(Guid id, string parameterName)

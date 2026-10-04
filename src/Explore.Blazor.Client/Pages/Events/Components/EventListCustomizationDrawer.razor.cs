@@ -5,8 +5,16 @@ using MudBlazor;
 
 namespace Explore.Blazor.Client.Pages.Events.Components;
 
-public partial class EventListCustomizationDrawer : ComponentBase
+public partial class EventListCustomizationDrawer : ComponentBase, IDisposable
 {
+    [Inject] private Explore.Blazor.Client.Contracts.Services.ITranslationService Translation { get; set; } = default!;
+
+    protected override void OnInitialized() => Translation.OnLanguageChanged += HandleLanguageChanged;
+
+    private void HandleLanguageChanged(string languageCode) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Translation.OnLanguageChanged -= HandleLanguageChanged;
+
     /// <summary>Current user's effective settings for the event-list category.</summary>
     [Parameter] public ICollection<EffectiveSettingDto>? Settings { get; set; }
 
@@ -23,7 +31,6 @@ public partial class EventListCustomizationDrawer : ComponentBase
     [Parameter] public bool IsSaving { get; set; }
 
     // ── Setting Keys (matches GovernanceSettingKeys.EventList) ──
-    private const string KeyBrowseMode = "event_list.browse_mode";
     private const string KeyPageSize = "event_list.page_size";
     private const string KeyDefaultLayout = "event_list.default_layout";
     private const string KeyShowDate = "event_list.card.show_date";
@@ -55,8 +62,6 @@ public partial class EventListCustomizationDrawer : ComponentBase
 
     // ── Computed Values ──
 
-    private string BrowseModeValue => GetStringValue(KeyBrowseMode, "pagination");
-    private bool IsPaginationMode => string.Equals(BrowseModeValue, "pagination", StringComparison.OrdinalIgnoreCase);
     private int PageSizeValue => int.TryParse(GetStringValue(KeyPageSize, "20"), out var ps) ? ps : 20;
     private string LayoutValue => GetStringValue(KeyDefaultLayout, "DetailedList");
 
@@ -95,12 +100,6 @@ public partial class EventListCustomizationDrawer : ComponentBase
 
     private Task HandleClose()
         => OnCloseRequested.InvokeAsync();
-
-    private Task HandleBrowseModeChanged(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return Task.CompletedTask;
-        return EmitChange(KeyBrowseMode, value);
-    }
 
     private Task HandlePageSizeChanged(int value)
         => EmitChange(KeyPageSize, value.ToString());

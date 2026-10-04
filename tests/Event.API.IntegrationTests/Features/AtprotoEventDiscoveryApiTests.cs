@@ -1,4 +1,10 @@
 using Explore.API.Controllers;
+using System.Net;
+using System.Text.Json;
+using Event.Api.IntegrationTests.Fixtures;
+using Explore.API.Hateoas.Assemblers;
+using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Contracts.Persistence;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.API.Models;
@@ -33,36 +39,17 @@ public sealed class AtprotoEventDiscoveryApiTests
     [Test]
     public async Task EventListUsesSourceAwareDiscoveryContract()
     {
-        var discoveryHandler = Substitute.For<IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>>();
-        var assembler = Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>();
-        var page = PaginatedResult<EventDiscoveryItemDto>.Create(
-            [new EventDiscoveryItemDto { Source = "atproto", FederatedEvent = Federated() }],
-            1,
-            1,
-            20);
-        var hal = new HalCollectionResource<EventDiscoveryItemDto>();
-        discoveryHandler.QueryAsync(Arg.Any<GetPublicEventDiscoveryRequest>(), Arg.Any<CancellationToken>()).Returns(page);
-        assembler.ToCollectionResource(
-                page,
-                RouteNames.GetEvents,
-                Arg.Any<object?>(),
-                Arg.Any<HttpContext>())
-            .Returns(hal);
-        EventController controller = Controller(discoveryHandler: discoveryHandler, discoveryAssembler: assembler);
-
-        ActionResult<HalCollectionResource<EventDiscoveryItemDto>> result = await controller.GetAll(
-            new EventFilterRequest(),
-            CancellationToken.None);
-
-        var ok = result.Result as OkObjectResult;
-        await Assert.That(ok).IsNotNull();
-        await Assert.That(ok!.Value).IsSameReferenceAs(hal);
-        await discoveryHandler.Received(1).QueryAsync(
-            Arg.Is<GetPublicEventDiscoveryRequest>(request =>
-                request != null
-                && request.Criteria.PageNumber == 1
-                && request.Criteria.PageSize == 20),
-            Arg.Any<CancellationToken>());
+        await using var factory = new NativeEventTagsFactory(relational: true);
+        using var client = factory.CreateClient();
+        var seed = await EventDiscoveryTraversalTests.SeedAsync(factory);
+        using var response = await client.GetAsync(
+            $"/api/Event?searchTerm={Uri.EscapeDataString(seed.Title)}&pageSize=2");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(json.RootElement.GetProperty("snapshotCount").GetInt32()).IsEqualTo(6);
+        var item = json.RootElement.GetProperty("_embedded").GetProperty("items")[0];
+        await Assert.That(item.GetProperty("source").GetString()).IsEqualTo("local");
+        await Assert.That(item.GetProperty("event").GetProperty("id").GetGuid()).IsNotEqualTo(Guid.Empty);
     }
 
     [Test]
@@ -257,31 +244,55 @@ public sealed class AtprotoEventDiscoveryApiTests
     }
 
     [Test]
-    public async Task EventListUsesDedicatedDiscoveryCachePolicy()
+    public async Task EventListCannotReusePublicCachedDiscoveryMembership()
     {
-        var attribute = typeof(EventController)
-            .GetMethod(nameof(EventController.GetAll))!
-            .GetCustomAttributes(typeof(OutputCacheAttribute), true)
-            .Cast<OutputCacheAttribute>()
-            .Single();
-
-        await Assert.That(attribute.PolicyName).IsEqualTo("EventDiscovery");
+        await using var factory = new NativeEventTagsFactory(relational: true);
+        using var client = factory.CreateClient();
+        var seed = await EventDiscoveryTraversalTests.SeedAsync(factory);
+        using var response = await client.GetAsync(
+            "/api/Event?searchTerm=" + Uri.EscapeDataString(seed.Title));
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        await Assert.That(response.Headers.CacheControl?.Public == true).IsFalse();
     }
 
     private static EventController Controller(
-        IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>? discoveryHandler = null,
+        IQueryHandler<GetEventDiscoveryTraversalQuery, EventDiscoveryTraversalDto>? discoveryHandler = null,
         IQueryHandler<GetAtprotoEventSourceQuery, string?>? sourceHandler = null,
-        IResourceAssembler<EventDiscoveryItemDto>? discoveryAssembler = null)
+        IResourceAssembler<EventDiscoveryItemDto>? discoveryAssembler = null,
+        EventDiscoveryResponseAuthority? authority = null)
     {
+        var tenantId = Guid.CreateVersion7();
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(tenantId);
+        var revision = new Explore.Domain.EventDiscoveryRevision { Id = Guid.CreateVersion7(), TenantId = tenantId };
+        var identities = Substitute.For<IEventDiscoveryIdentityRepository>();
+        identities.GetRevisionAsync(tenantId, Arg.Any<CancellationToken>()).Returns(revision);
+        var disclosure = Substitute.For<IEventDiscoveryDisclosureRepository>();
+        disclosure.AcquireCurrentAsync(tenantId, Arg.Any<CancellationToken>()).Returns(revision);
+        var unit = Substitute.For<IUnitOfWork>();
+        unit.ExecuteReadCommittedAsync(Arg.Any<Func<CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var operation = call.Arg<Func<CancellationToken, Task<bool>>>();
+                ArgumentNullException.ThrowIfNull(operation);
+                return operation(call.Arg<CancellationToken>());
+            });
         var controller = new EventController(
             Substitute.For<IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>>(),
             Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>(),
             Substitute.For<IQueryHandler<GetPublicEventDetailsRequest, EventDto?>>(),
             Substitute.For<IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>>(),
-            discoveryHandler ?? Substitute.For<IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>>(),
+            discoveryHandler ?? Substitute.For<IQueryHandler<GetEventDiscoveryTraversalQuery, EventDiscoveryTraversalDto>>(),
             sourceHandler ?? Substitute.For<IQueryHandler<GetAtprotoEventSourceQuery, string?>>(),
             Substitute.For<IResourceAssembler<EventDto, EventListDto>>(),
-            discoveryAssembler ?? Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>())
+            discoveryAssembler ?? Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>(),
+            new EventDiscoveryTraversalResourceAssembler(
+                Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>(),
+                Substitute.For<IHateoasLinkGenerator>()),
+            authority ?? new EventDiscoveryResponseAuthority(
+                unit, disclosure, identities, tenant, TimeProvider.System,
+                Substitute.For<IEventDiscoveryResponseBoundaryRepository>()))
         {
             ControllerContext = new ControllerContext
             {

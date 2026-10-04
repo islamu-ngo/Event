@@ -163,7 +163,7 @@ public sealed class EventTeamManagerTests : IDisposable
             RoleId = roleId,
             RoleName = "Manager",
             RoleMasterCode = "event.manager",
-            Status = 2,
+            Status = EventRoleAssignmentStatus.Active,
             StartsAtUtc = TestTime.UtcNow,
             IsEffective = isEffective,
             CreatedAt = TestTime.UtcNow,

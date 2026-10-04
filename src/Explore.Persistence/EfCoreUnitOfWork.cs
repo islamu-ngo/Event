@@ -48,6 +48,11 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
 
     public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default)
     {
+        // MySQL's default RepeatableRead uses a historical snapshot for ordinary
+        // dependency queries even after a current-read row fence. Serializable
+        // gives source fanout current locking reads and whole-attempt replay.
+        if (_dbContext.Database.ProviderName == Database.RelationalNamedLock.MySqlProvider)
+            return await ExecuteSerializableAsync(operation, ct);
         return await ExecuteCoreAsync(operation, isolationLevel: null, ct);
     }
 
@@ -134,6 +139,7 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             try
             {
                 var result = await operation(ct);
+                await _dbContext.FlushDisclosureAsync(ct);
                 await transaction.CommitAsync(ct);
                 return result;
             }
@@ -170,6 +176,7 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         finally
         {
             _dbContext.ChangeTracker.Clear();
+            _dbContext.ResetDisclosureMutations();
         }
     }
 

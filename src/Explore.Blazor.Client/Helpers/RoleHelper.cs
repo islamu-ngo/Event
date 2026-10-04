@@ -22,6 +22,7 @@ public static class RoleHelper
     public const int EventManager = 42;
     public const int RegistrationManager = 43;
     public const int CheckInStaff = 44;
+    public const int EventDiscoveryReviewer = 45;
 
     // Group-scope role IDs matching RoleEnum
     public const int GroupCreator = 30;
@@ -150,6 +151,7 @@ public static class RoleHelper
         EventManager => "Manager",
         RegistrationManager => "Registration Manager",
         CheckInStaff => "Check-in Staff",
+        EventDiscoveryReviewer => "Discovery Reviewer",
         _ => "Unknown"
     };
 
@@ -159,6 +161,7 @@ public static class RoleHelper
         EventManager => Color.Info,
         RegistrationManager => Color.Success,
         CheckInStaff => Color.Warning,
+        EventDiscoveryReviewer => Color.Secondary,
         _ => Color.Default
     };
 
@@ -167,7 +170,8 @@ public static class RoleHelper
         (EventOwner, "Owner"),
         (EventManager, "Manager"),
         (RegistrationManager, "Registration Manager"),
-        (CheckInStaff, "Check-in Staff")
+        (CheckInStaff, "Check-in Staff"),
+        (EventDiscoveryReviewer, "Discovery Reviewer")
     ];
 
     public static RoleEnum? ToRoleEnum(int? roleId) => roleId switch
@@ -199,6 +203,7 @@ public static class RoleHelper
         RoleEnum.EventManager => 42,
         RoleEnum.RegistrationManager => 43,
         RoleEnum.CheckInStaff => 44,
+        RoleEnum.EventDiscoveryReviewer => EventDiscoveryReviewer,
         _ => null
     };
 }

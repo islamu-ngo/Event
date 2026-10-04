@@ -1,0 +1,48 @@
+Change-Id: CHG-01M3RRK3CVTGVE5MDKVGB09W68
+Title: Keep event browsing unique while rankings change
+Type: feat
+Scope: discovery
+Summary: >-
+  Replace public offset browsing with bounded canonical membership, protected
+  forward continuation and current-authority reprojection.
+Group: event-publication-and-identity-discovery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Public event discovery uses opaque continuation and snapshot metadata
+      instead of page numbers and total pages. Consumers follow HAL next.
+  Security:
+    Reference: docs/internal/adr/ADR-event-discovery-authority.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Continuations bind tenant, criteria, expiry and current epochs.
+      Source reprojection and post-HAL native validation fail closed.
+  Migration:
+    Reference: docs/internal/EVENT_PUBLICATION_AND_DISCOVERY.md
+    Disposition: documented
+    Detail: >-
+      EventDiscoveryTraversal adds bounded membership, dedicated reservations
+      and portable source ordering keys. Bounded bootstrap backfill precedes
+      readiness without rewriting original attendee commitments.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: >-
+      Six tenant governance settings offer finite downward bounds. Existing
+      shared Data Protection authority is reused; no environment keys are added.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Generated traversal resources and clients replace public offset totals
+      with snapshotCount, truncated, expiresAt, hasMore and protected next.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/publication-and-sessions.md
+    Disposition: documented
+    Detail: >-
+      Keep bounded snapshot purge and shared replica keys available. Recovery
+      explicitly replaces an old traversal while retaining attendee filters.

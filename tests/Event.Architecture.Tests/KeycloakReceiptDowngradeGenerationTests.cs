@@ -22,7 +22,8 @@ public sealed class KeycloakReceiptDowngradeGenerationTests
         await using ExploreDbContext context = CreateContext(provider);
         IMigrationsAssembly migrations =
             context.GetService<IMigrationsAssembly>();
-        string initialMigration = migrations.Migrations.Keys.Single();
+        string initialMigration = migrations.Migrations.Keys.Single(
+            id => id.EndsWith("_Init", StringComparison.Ordinal));
         IMigrator migrator = context.GetService<IMigrator>();
 
         string first = migrator.GenerateScript(
@@ -58,7 +59,8 @@ public sealed class KeycloakReceiptDowngradeGenerationTests
         await using ExploreDbContext context = CreateContext(provider);
         IMigrationsAssembly migrations =
             context.GetService<IMigrationsAssembly>();
-        string initialMigration = migrations.Migrations.Keys.Single();
+        string initialMigration = migrations.Migrations.Keys.Single(
+            id => id.EndsWith("_Init", StringComparison.Ordinal));
 
         string script = context.GetService<IMigrator>()
             .GenerateScript(Migration.InitialDatabase, initialMigration);

@@ -89,6 +89,7 @@ public class LocationRoomRepository : GenericRepository<LocationRoom, Guid>, ILo
         }
 
         var originalLocationId = room.LocationId;
+        _dbContext.DisclosureMutations.Enlist([room.TenantId, location.TenantId]);
         _dbContext.Entry(room).State = EntityState.Detached;
         int affectedRows;
         try

@@ -1,4 +1,4 @@
-using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Events.Discovery.Commands;
 
 namespace Explore.Application.Contracts.Services;
 

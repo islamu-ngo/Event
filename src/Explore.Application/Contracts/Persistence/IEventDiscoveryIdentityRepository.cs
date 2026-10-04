@@ -6,11 +6,15 @@ public interface IEventDiscoveryIdentityRepository
 {
     /// <summary>
     /// Requires a caller-owned serializable unit of work. Acquire domain/authority locks first,
-    /// then this sorted identity fence and terminal tenant epoch fence. Acquire no domain locks afterward.
+    /// then this sorted identity fence. The native epoch fence runs at transaction finalization,
+    /// after graph, audit and outbox writes; no further writes may follow finalization.
     /// Reload both groups and reauthorize current roots under this fence before deciding.
     /// The complete operation, including authority, audit and outbox, belongs inside the execution strategy.
     /// </summary>
     Task AcquireFenceAsync(Guid tenantId, IReadOnlyCollection<Guid> identityIds, CancellationToken cancellationToken);
+
+    /// <summary>Requires the identity fence; a stale expected epoch rolls back the complete transaction at commit.</summary>
+    void ExpectRevisionAtCommit(Guid tenantId, long expectedRevision);
 
     Task<EventDiscoveryIdentity?> FindAsync(
         Guid tenantId, EventDiscoverySourceKind sourceKind, string sourceKey, CancellationToken cancellationToken);
@@ -38,6 +42,6 @@ public interface IEventDiscoveryIdentityRepository
         Guid tenantId, Guid memberId, Guid primaryId, long expectedRevision,
         Guid reviewerId, string reasonCode, DateTime reviewedAtUtc, CancellationToken cancellationToken);
 
-    /// <summary>Requires the terminal fence and persists the epoch in the caller's transaction.</summary>
+    /// <summary>Requires the identity fence and enlists disclosure advancement at transaction finalization.</summary>
     Task<EventDiscoveryRevision> AdvanceDisclosureAsync(Guid tenantId, CancellationToken cancellationToken);
 }

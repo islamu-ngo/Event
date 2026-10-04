@@ -179,7 +179,8 @@ public sealed class EventRoleAuthorityCeilingService : IEventRoleAuthorityCeilin
             (int)RoleEnum.EventOwner or
             (int)RoleEnum.EventManager or
             (int)RoleEnum.RegistrationManager or
-            (int)RoleEnum.CheckInStaff;
+            (int)RoleEnum.CheckInStaff or
+            (int)RoleEnum.EventDiscoveryReviewer;
     }
 }
 

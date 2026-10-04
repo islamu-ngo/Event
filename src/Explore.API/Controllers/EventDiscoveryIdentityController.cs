@@ -5,6 +5,7 @@ using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;

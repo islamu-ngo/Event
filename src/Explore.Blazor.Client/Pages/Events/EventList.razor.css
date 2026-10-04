@@ -64,12 +64,18 @@
     flex-wrap: wrap !important;
 }
 
-/* Virtualize spacer divs collapse to 0×0 inside flex containers,
-   preventing IntersectionObserver from triggering item loading.
-   Give them full width so the observer can detect them. */
-::deep .event-grid > div[aria-hidden="true"] {
-    width: 100%;
-    flex-basis: 100%;
+.event-list__recovery {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--isl-space-3);
+    padding-block: var(--isl-space-4);
+    overflow-wrap: anywhere;
+}
+
+.event-list__truncated {
+    padding-block: var(--isl-space-3);
+    overflow-wrap: anywhere;
 }
 
 ::deep .event-grid > .mud-grid-item {

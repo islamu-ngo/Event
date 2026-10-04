@@ -7,7 +7,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Application.Features.Events.Handlers.Commands;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Features.Management.Handlers.Commands;

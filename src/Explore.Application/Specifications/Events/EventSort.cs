@@ -16,22 +16,22 @@ public sealed class EventSort : ISortSpecification<Event>
     /// <summary>
     /// Sort by first session date.
     /// </summary>
-    public static EventSort Date => new(e => e.FirstSessionDate!);
+    public static EventSort Date { get; } = new(e => e.FirstSessionDate!);
 
     /// <summary>
     /// Sort by event title.
     /// </summary>
-    public static EventSort Title => new(e => e.Title);
+    public static EventSort Title { get; } = new(e => e.DiscoveryTitleSortKey);
 
     /// <summary>
     /// Sort by total views (popularity).
     /// </summary>
-    public static EventSort Views => new(e => e.TotalViews);
+    public static EventSort Views { get; } = new(e => e.TotalViews);
 
     /// <summary>
     /// Sort by creation date.
     /// </summary>
-    public static EventSort CreatedAt => new(e => e.CreatedAt);
+    public static EventSort CreatedAt { get; } = new(e => e.CreatedAt);
 
     /// <summary>
     /// Temporal sort sentinel — not-past events first, then past.

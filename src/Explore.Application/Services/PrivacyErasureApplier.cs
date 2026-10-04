@@ -58,6 +58,7 @@ public sealed class PrivacyErasureApplier(
         PreparedErasure prepared,
         CancellationToken cancellationToken)
     {
+        await erasureRepository.FenceSubjectAsync(intent.SubjectId, cancellationToken);
         PrivacyErasureReplayCheckpoint? current =
             await checkpointRepository.GetLatestAsync(cancellationToken);
         if (current?.Matches(intent) == true

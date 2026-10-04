@@ -17,31 +17,12 @@
     @* ── Body ── *@
     <div class="customization-drawer__body">
 
-        @* ── Browse Mode Section ── *@
+        @* Traversal batch size ── *@
         <div class="customization-drawer__section">
-            <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="customization-drawer__section-title">Browse Mode</MudText>
-            <div class="customization-drawer__toggle-wrapper">
-                <MudToggleGroup T="string" Value="@BrowseModeValue" ValueChanged="HandleBrowseModeChanged"
-                                Color="Color.Primary" Size="Size.Small"
-                                Disabled="@IsLocked(KeyBrowseMode)"
-                                Class="customization-drawer__toggle-group">
-                    <MudToggleItem Value="@("pagination")" Text="Pages" />
-                    <MudToggleItem Value="@("infinite_scroll")" Text="Scroll" />
-                </MudToggleGroup>
-                @if (IsLocked(KeyBrowseMode))
-                {
-                    <MudTooltip Text="@GetLockReason(KeyBrowseMode)">
-                        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning" />
-                    </MudTooltip>
-                }
-            </div>
-
-            @if (IsPaginationMode)
-            {
                 <div class="customization-drawer__page-size">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Items per page</MudText>
                     <div class="customization-drawer__select-wrapper">
                         <MudSelect T="int" Value="@PageSizeValue" ValueChanged="HandlePageSizeChanged"
+                                   Label="@Translation.T("ui.discovery.batch_size", "Events per batch")"
                                    Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
                                    Disabled="@IsLocked(KeyPageSize)"
                                    Class="customization-drawer__page-size-select">
@@ -58,7 +39,6 @@
                         }
                     </div>
                 </div>
-            }
         </div>
 
         <MudDivider Class="my-2" />

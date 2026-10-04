@@ -1,5 +1,5 @@
 using Explore.Application.Contracts.Notifications;
-using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Notifications;

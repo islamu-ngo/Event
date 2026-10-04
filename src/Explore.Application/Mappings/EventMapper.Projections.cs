@@ -143,6 +143,8 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.IslamicAspect), nameof(EventDto.IslamicAspect), Use = nameof(MapIslamicAspect))]
     [MapProperty(nameof(Event.TechAspect), nameof(EventDto.TechAspect), Use = nameof(MapTechAspect))]
     [MapperIgnoreSource(nameof(Event.DiscoveryAdditionalSessionCount))]
+    [MapperIgnoreSource(nameof(Event.DiscoveryTitleSortKey))]
+    [MapperIgnoreSource(nameof(Event.DiscoverySourceSortKey))]
     private static partial EventDto MapEventDetail(Event source);
 
     // List is a scalar summary. It never traverses series children or aspect/session/action graphs.
@@ -229,6 +231,8 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.ParticipationConfiguration), nameof(EventListDto.ParticipationConfiguration), Use = nameof(Participation))]
     [MapProperty(nameof(Event.CreatedAt), nameof(EventListDto.CreatedAtUtc), Use = nameof(CreatedAtUtc))]
     [MapperIgnoreSource(nameof(Event.DiscoveryAdditionalSessionCount))]
+    [MapperIgnoreSource(nameof(Event.DiscoveryTitleSortKey))]
+    [MapperIgnoreSource(nameof(Event.DiscoverySourceSortKey))]
     private static partial EventListDto MapEventList(Event source);
 
     public static EventPublicActionDto ToDetail(EventPublicAction source) => MapPublicAction(source) with

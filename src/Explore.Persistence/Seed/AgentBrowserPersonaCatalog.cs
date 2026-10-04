@@ -19,6 +19,10 @@ public static class AgentBrowserPersonaCatalog
     public static readonly Guid NegativeOrganizationActorId = Id(307);
     public static readonly Guid OrganizationTenantId = Id(308);
     public static readonly Guid NegativeOrganizationTenantId = Id(309);
+    public static readonly Guid DiscoverySourceId = Id(340);
+    public static readonly Guid DuplicateDiscoverySourceId = Id(341);
+    public static readonly DateTimeOffset DiscoveryOccurrence = new(2030, 10, 10, 10, 0, 0, TimeSpan.Zero);
+    public const string DiscoverySourceTitle = "Agent discovery duplicate workshop";
     public static readonly AgentBrowserPersona Administrator = new(Id(101), null, "admin@agent.example.test", "Administrator", RoleEnum.TenantMember);
     public static readonly AgentBrowserPersona TenantAdministrator = new(Id(102), Id(202), "tenant-admin@agent.example.test", "Tenant administrator", RoleEnum.TenantAdmin);
     public static readonly AgentBrowserPersona Organizer = new(Id(103), Id(203), "organizer@agent.example.test", "Organizer", RoleEnum.TenantMember);

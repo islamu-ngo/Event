@@ -5,7 +5,7 @@ namespace Explore.API.Models;
 
 public sealed class EventFilterRequest : IValidatableObject
 {
-    public int PageNumber { get; set; } = 1;
+    public string? Cursor { get; set; }
     public int PageSize { get; set; } = 20;
 
     public string? SearchTerm { get; set; }
@@ -61,7 +61,9 @@ public sealed class EventFilterRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        foreach (var result in QueryValidationRules.ValidatePagination(PageNumber, PageSize))
+        foreach (var result in QueryValidationRules.ValidatePagination(1, PageSize))
+            yield return result;
+        foreach (var result in QueryValidationRules.ValidateBoundedText(Cursor, nameof(Cursor), 4096))
             yield return result;
 
         foreach (var result in QueryValidationRules.ValidateBoundedText(

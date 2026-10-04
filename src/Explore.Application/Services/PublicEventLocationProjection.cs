@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Location;
+using Explore.Application.Exceptions;
+using Explore.Domain;
 
 namespace Explore.Application.Services;
 
@@ -13,6 +15,14 @@ internal readonly record struct PublicEventLocationPlacement(
 
 internal static class PublicEventLocationProjection
 {
+    public static DateTimeOffset ResolveRevealBoundary(EventLocation location, TimeSpan defaultRevealOffset)
+    {
+        if (!EventLocationDisclosureEvaluator.TryResolveEffectiveRevealTime(
+                location, defaultRevealOffset, out var reveal))
+            throw new EventDiscoveryUnavailableException();
+        return new DateTimeOffset(reveal);
+    }
+
     public static async Task<IReadOnlyDictionary<Guid, EventLocationPublicDto>> ResolveAsync(
         IEventLocationDisclosureService disclosureService,
         IEnumerable<PublicEventLocationPlacement> placements,

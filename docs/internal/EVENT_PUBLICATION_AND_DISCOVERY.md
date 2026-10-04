@@ -1,7 +1,87 @@
 # Event Publication And Discovery
 
 Scope: public occurrence selection, governed regional matching, home allocation and card presentation.
-Implementation checkpoint: occurrence discovery, unique home allocation and identity correction surfaces; bounded traversal is a subsequent slice.
+Implementation checkpoint: occurrence discovery, unique home allocation, identity correction and bounded traversal. Runtime verification remains recorded separately from implementation.
+
+## Bounded public traversal
+
+`GetEventDiscoveryTraversalQuery` replaces the public offset contract. Its handler
+captures ordered canonical membership, not historical cards: source kind/ID,
+canonical kind/ID and the exact matching session. Every batch reprojects those
+references against current tenant, source, criteria and disclosure authority.
+Views can change without changing captured order; a source or authority change
+invalidates continuation rather than releasing old fields or counts.
+
+The default bounds are 1000 identities, 15 minutes, 200 live snapshots per tenant,
+400000 physical member rows, 10000 examined source rows and 32 combined source
+seeks. Expired rows still consume physical capacity. Empty snapshots consume
+independently bounded headers. Source exhaustion is distinct from stopping at a
+budget; `truncated` is not an exhaustive total.
+
+`EventDiscoveryTraversal` reads initial epochs before its Serializable boundary,
+then takes the dedicated native reservation fence before source reads. This
+reservation has no foreign key to a public source row. It compares current
+identity/disclosure epochs at the terminal fence before inserting snapshot-owned
+rows. Mutation writers accumulate affected tenants across saves and advance their
+sorted epochs only after source, audit and outbox writes, at transaction commit.
+Snapshot and pure view-count writes do not advance disclosure epochs.
+
+The API assembles the complete HAL resource before
+`EventDiscoveryResponseAuthority` performs its fresh native release check.
+Continuations use purpose-isolated ASP.NET Core Data Protection and bind tenant,
+snapshot, canonical criteria digest, ordinal, expiry and both epochs. The existing
+configured key ring is shared by replicas; there is no plaintext or stale-cache
+fallback. Logical expiry is independent of the purge job.
+
+Ordinary public detail reads also cross this final authority boundary. The client
+preserves `409`, `410` and `503` instead of converting them to a missing event.
+`EventDetail` conceals the rejected payload, renders localized recovery and only
+reloads on an explicit action. A concealed or missing `404` remains not-found.
+Recovery uses the page's captured public slug, not subsequently changed ambient
+router parameters. Valid public route changes reload the detail and replace its
+source action IDs; unrelated routes are ignored and the subscription is disposed.
+Each load owns a generation, invalidated by a replacement route or disposal.
+After every asynchronous detail, location, session, aspect and agenda read, only
+the current generation may publish data, errors, loading flags or persisted state.
+Returning to the same slug does not revive an earlier load of that slug.
+Post-edit refreshes, agenda callbacks and dialog results retain the same ownership.
+Razor captures that ownership when binding callbacks, not when a delayed child
+callback enters; a pending replacement read may still hold the prior event ID.
+Lifecycle confirmations capture the original event ID and concurrency stamp;
+navigation invalidates the confirmation rather than retargeting its command.
+Completed obsolete mutations cannot reload or navigate the replacement page.
+Event Team status is a native string enum; the explicit HAL schema registration
+keeps generated transport aligned with `"Active"` and the assignment affordance.
+
+Snapshot timestamps are rounded down to microseconds before persistence and
+cursor protection, including shortened source-bound expiry. PostgreSQL and
+MySQL-family precision therefore cannot extend authority or change an authentic
+cursor's stored deadline. `event_discovery.*` settings bypass process-local
+policy caches so a different replica's downward governance change takes effect.
+
+`EventDiscoveryRank` defines the shared source/merger order. Title keys encode
+invariant-uppercase UTF-16 units as fixed-width ASCII hex; source keys encode
+original source GUIDs as `N`. Both source models persist these non-wire keys under
+portable ordinal ASCII collation. Native ordering, seek predicates and the merger
+use the same primary rank and ascending source-kind/source-ID ties, including
+descending requests. Local-owned federation cards tie on original `Event.Id`.
+Null date ordering is explicit rather than provider-dependent. `EventSort` uses
+stable immutable sentinels, so title/views requests cannot fall through to date.
+
+Entity setters maintain keys atomically with identity/title changes. Migration
+bootstrap backfills 256-row keysets under migration authority, including suppressed
+rows, before readiness; the API does not run a compatibility reader during that
+transition. Criteria hashes include the rank-contract version, invalidating older
+ordering contracts rather than mixing membership. These keys add no external
+dependency, environment secret or public field.
+
+Retention enumerates durable ownership reservations, even after the source
+tenant/revision disappears. It does not bootstrap source authority. PostgreSQL
+uses a bounded ownership-only maintenance function with a restricted runtime
+execution role; it does not remove snapshot tenant filters or FORCE RLS.
+
+See [the authority ADR](adr/ADR-event-discovery-authority.md) for ordering and
+[operations](OPERATIONS.md#discovery-snapshot-retention) for bounded cleanup.
 
 ## Occurrence authority
 
@@ -78,6 +158,11 @@ report dialog remains available through the original event's `suggest-correction
 link. A saved decision is not represented as a delivered publisher notification;
 durable notification delivery is not implemented by this surface.
 
+The canonical page link resolves the existing public event resource through
+`GetPublicEventByIdAsync`, then uses `EventUrlHelper.BuildPublicPath` with its slug
+and public code. This read never falls back to management detail. Missing public
+data or code suppresses navigation rather than inventing a GUID page route.
+
 ### Durable publisher correction delivery
 
 `ReviewEventDiscoveryAliasCommandHandler` commits the relationship, tenant epoch,
@@ -103,7 +188,19 @@ payload reference and notification contain no counterpart identity or title.
 
 Domain tests exercise interval, local-date, day-publication and lifecycle invariants. SQLite integration tests exercise same-occurrence filtering, current parent eligibility, bounded graph projection and exact matching counts. Real SQLite-backed HTTP tests exercise committed restriction followed by conditional discovery, unknown areas and regional disclosure reductions. Component tests exercise matching-date presentation and truthful counts.
 
-The API assembly cleanup hook currently fails without Docker even on untouched `develop`; retain differential attribution rather than modifying an unrelated fixture. Successful test-body evidence does not turn that project exit into a pass. Desktop/mobile browser QA and the final provider matrix remain distinct gates.
+The selected discovery HTTP cohorts passed with real SQLite storage and response
+execution. Native authority and writer checks passed on PostgreSQL, SQLite, SQL
+Server, MariaDB and MySQL; subsequent adversarial repairs also passed the affected
+native source-writer and retaining-read authority-planning cases. Ten architecture
+failures originally reproduced on the phase3 baseline were incorrectly
+quarantined: that baseline already contained this workstream's identity
+migration. Their tests assumed a single migration rather than selecting the
+unique `Init` migration. The receipt guard assertions are preserved while that
+catalog-selection regression is repaired and reverified: target10 and full
+architecture654 passed with zero skips, preserving every safety assertion.
+Desktop/mobile browser and task-based attendee acceptance remain distinct gates;
+the task-owned execution ledger records exact commands, counts and outstanding
+observations.
 
 ## Primary framework evidence
 
@@ -114,7 +211,11 @@ Research accessed on 2026-10-02; functional constraints only, with no external i
 - [EF Core connection resiliency](https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-resiliency): an explicit transaction is a complete retry unit.
 - [ASP.NET Core time-limited protection](https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/consumer-apis/limited-lifetime-payloads?view=aspnetcore-10.0): token lifetime does not establish current disclosure authority.
 
-Context7 schemas were discoverable but tool execution returned registered-but-inactive. Official primary documentation was retrieved directly; no Context7 execution is claimed.
+Context7 was initially unavailable. On 2026-10-03 its official EF Core collection
+(`/websites/learn_microsoft_en-us_ef_core`) successfully confirmed whole-transaction
+execution-strategy replay and unique ordering for seek pagination. Unique ordering
+does not by itself freeze membership under mutable rank fields; bounded captured
+membership and fresh disclosure checks remain separate project invariants.
 
 ## Operator guide
 

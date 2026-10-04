@@ -471,7 +471,7 @@ public sealed class EventLocationDisclosureEvaluator
         return registrationAccess.AllowsAudience(requiredAudience);
     }
 
-    private static bool TryResolveEffectiveRevealTime(
+    internal static bool TryResolveEffectiveRevealTime(
         EventLocation eventLocation,
         TimeSpan defaultRevealOffset,
         out DateTime effectiveRevealFromUtc)

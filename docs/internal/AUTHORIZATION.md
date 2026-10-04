@@ -30,6 +30,14 @@ relations require current membership, management and explicit action grants
 across both identity groups, without owner/contributor conflicts. The browser
 never derives these actions from claims. These read-side capabilities do not
 replace the command's fresh fenced authority or expected tenant identity epoch.
+`RoleEnum.EventDiscoveryReviewer` (45) is an explicitly assignable event preset
+with `event:view`, `event:update` and the two discovery decision permissions.
+`EventRoleAuthorityCeilingService` retains its same-event subset ceiling; owner
+seed permissions include review/reversal so owners can delegate that preset.
+The typed conflict facts still deny owner, creator and publisher decisions even
+with these permissions. Existing EventManager permissions remain unchanged, and
+lookup seeding creates no reviewer assignment. The normal Team assignment and
+revocation commands own the user grants; HAL remains the UI authority.
 The command protects the undeleted reviewer, membership, actor/event ownership, event-role assignments,
 roles, active permissions and role-permission bindings with native row fences.
 Authority locks precede sorted identity locks and the terminal tenant epoch;

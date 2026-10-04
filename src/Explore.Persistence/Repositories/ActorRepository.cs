@@ -253,9 +253,11 @@ public class ActorRepository : GenericRepository<Actor, Guid>, IActorRepository
 
     public async Task<int> ForgetPiiAsync(Guid actorId)
     {
-        return await _dbContext.ActorPii
-            .Where(p => p.ActorId == actorId)
-            .ExecuteDeleteAsync();
+        return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            await _dbContext.DisclosureMutations.EnlistActorsAsync([actorId], token);
+            return await _dbContext.ActorPii.Where(p => p.ActorId == actorId).ExecuteDeleteAsync(token);
+        }, CancellationToken.None);
     }
 
     private IQueryable<Actor> PublicActorProfiles() =>

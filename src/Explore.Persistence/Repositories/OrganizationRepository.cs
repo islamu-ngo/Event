@@ -162,8 +162,14 @@ public class OrganizationRepository : GenericRepository<Organization, Guid>, IOr
 
     public async Task<int> ForgetPiiAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.OrganizationPii
-            .Where(p => p.OrganizationId == organizationId)
-            .ExecuteDeleteAsync(cancellationToken);
+        return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            Guid[] actors = await _dbContext.Actors
+                .Where(value => value.OrganizationId == organizationId)
+                .Select(value => value.Id).ToArrayAsync(token);
+            await _dbContext.DisclosureMutations.EnlistActorsAsync(actors, token);
+            return await _dbContext.OrganizationPii.Where(p => p.OrganizationId == organizationId)
+                .ExecuteDeleteAsync(token);
+        }, cancellationToken);
     }
 }

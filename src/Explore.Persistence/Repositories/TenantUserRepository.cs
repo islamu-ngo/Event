@@ -83,6 +83,11 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         Guid removedBy,
         DateTime removedAtUtc,
         CancellationToken cancellationToken = default)
+        => await _dbContext.ExecuteDisclosureMutationAsync(
+            token => RemoveMembershipAsync(tenantId, userId, removedBy, removedAtUtc, token), cancellationToken);
+
+    private async Task<bool> RemoveMembershipAsync(
+        Guid tenantId, Guid userId, Guid removedBy, DateTime removedAtUtc, CancellationToken cancellationToken)
     {
         if (tenantId == Guid.Empty || userId == Guid.Empty || removedBy == Guid.Empty)
         {
@@ -108,6 +113,7 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         }
 
         var removedAt = removedAtUtc.ToUniversalTime();
+        _dbContext.DisclosureMutations.Enlist([tenantId]);
         var claimed = await _dbContext.TenantUsers
             .Where(membership => membership.Id == membershipId
                 && membership.TenantId == tenantId

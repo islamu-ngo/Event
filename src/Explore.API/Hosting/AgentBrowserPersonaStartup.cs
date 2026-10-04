@@ -214,6 +214,8 @@ public static class AgentBrowserPersonaStartup
         foreach (var persona in All)
             if (!Ready(await ClassifyAsync(services, persona, persona.OperationId ?? marker.Id, token)))
                 throw Failure("completion_incomplete");
+        await using (var scope = services.CreateAsyncScope())
+            await Binder(scope.ServiceProvider).SeedDiscoverySourcesAsync(token);
     }
 
     internal static async Task ValidateResetOwnershipAsync(IServiceProvider services, IConfiguration configuration, CancellationToken token)
@@ -248,8 +250,8 @@ public static class AgentBrowserPersonaStartup
                 || await db.Users.CountAsync(token) != 6 || await db.Set<LocalIdentityUser>().CountAsync(token) != 6
                 || await db.Actors.CountAsync(token) != 8 || await db.UserExternalLogins.CountAsync(token) != 6
                 || await db.Tenants.CountAsync(token) != 2 || await db.Organizations.CountAsync(token) != 2
-                || await db.Events.CountAsync(token) != 2 || await db.TenantUsers.CountAsync(token) != 5
-                || await db.PlatformUserRoles.CountAsync(token) != 1 || await db.EventRoleAssignments.CountAsync(token) != 3
+                || await db.Events.CountAsync(token) != 4 || await db.TenantUsers.CountAsync(token) != 5
+                || await db.PlatformUserRoles.CountAsync(token) != 1 || await db.EventRoleAssignments.CountAsync(token) != 5
                 || await db.TenantUserRoleGrants.CountAsync(token) != 5
                 || await db.TenantUserRoleGrants.AnyAsync(row => row.RevokedAt != null, token))
                 throw Failure("reset_baseline_incomplete");

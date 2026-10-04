@@ -2,7 +2,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using FluentValidation;
 
-namespace Explore.Application.Features.Events.Discovery;
+namespace Explore.Application.Features.Events.Discovery.Commands;
 
 public sealed record ReviewEventDiscoveryAliasDto(
     Guid PrimaryEventId, long ExpectedRevision, string Decision, string ReasonCode);

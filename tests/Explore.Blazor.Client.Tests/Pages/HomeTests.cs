@@ -299,9 +299,8 @@ public class HomeTests : IDisposable
         IReadOnlyList<EventListDto>? featuredEvents = null)
     {
         var eventService = Substitute.For<IEventService>();
-        eventService.GetAllEventsAsync().Returns(new List<EventListDto>());
-        eventService.GetEventsPagedAsync(
-                Arg.Any<int>(),
+        eventService.GetEventDiscoveryAsync(
+                Arg.Any<string?>(),
                 Arg.Any<int>(),
                 searchTerm: Arg.Any<string?>(),
                 categoryId: Arg.Any<Guid?>(),
@@ -340,12 +339,17 @@ public class HomeTests : IDisposable
                 organizationId: Arg.Any<Guid?>(),
                 groupId: Arg.Any<Guid?>(),
                 cancellationToken: Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResult<EventListDto>
+            .Returns(new EventDiscoveryTraversalResource
             {
-                Items = featuredEvents?.ToList() ?? [],
-                PageNumber = 1,
-                PageSize = 3,
-                TotalCount = featuredEvents?.Count ?? 0
+                SnapshotCount = featuredEvents?.Count ?? 0,
+                _embedded = new HalCollectionEmbeddedOfEventDiscoveryItemDto
+                {
+                    Items = featuredEvents?.Select(item => new HalResourceOfEventDiscoveryItemDto
+                    {
+                        Source = "local",
+                        Event = item
+                    }).ToList() ?? []
+                }
             });
         _ctx.Services.AddSingleton(eventService);
 

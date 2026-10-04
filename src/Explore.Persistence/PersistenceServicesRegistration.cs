@@ -379,6 +379,10 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEventPublicActionRepository, EventPublicActionRepository>();
         services.AddScoped<IEventOrganizerClaimRepository, EventOrganizerClaimRepository>();
         services.AddScoped<IEventDiscoveryIdentityRepository, EventDiscoveryIdentityRepository>();
+        services.AddScoped<IEventDiscoveryDisclosureRepository, EventDiscoveryDisclosureRepository>();
+        services.AddScoped<IEventDiscoveryResponseBoundaryRepository, EventDiscoveryResponseBoundaryRepository>();
+        services.AddScoped<IEventDiscoverySnapshotRepository, EventDiscoverySnapshotRepository>();
+        services.AddScoped<IEventDiscoverySnapshotMaintenanceRepository, EventDiscoverySnapshotMaintenanceRepository>();
         services.AddScoped<IOrganizationTenantEvidenceRepository, OrganizationTenantEvidenceRepository>();
         services.AddScoped<IEventHeavyRedactionRepository, EventHeavyRedactionRepository>();
         services.AddScoped<IEventModerationRecordRepository, EventModerationRecordRepository>();

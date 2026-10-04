@@ -421,7 +421,7 @@ public class HierarchicalSettingsResolverTests : IDisposable
     }
 
     [Test]
-    public async Task ResolveGroupAsync_AtprotoBackfillRefreshesAfterTenantCacheInvalidation()
+    public async Task ResolveGroupAsync_AtprotoGovernanceChangesAreAuthoritativeWithoutCacheInvalidation()
     {
         const string enabledKey = "federation.atproto_events_backfill_enabled";
         const string modeKey = "federation.atproto_events_backfill_mode";
@@ -452,19 +452,36 @@ public class HierarchicalSettingsResolverTests : IDisposable
             tenantId,
             new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = enabledKey, Value = "true" },
             new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = modeKey, Value = "\"full\"" });
-        var cached = await _resolver.ResolveGroupAsync<AtprotoFederationSettingGroup>(context);
-        _resolver.InvalidateCache(SettingScope.Tenant, tenantId);
         var refreshed = await _resolver.ResolveGroupAsync<AtprotoFederationSettingGroup>(context);
 
         await Assert.That(initial.EventsBackfillEnabled).IsFalse();
         await Assert.That(initial.EventsBackfillMode).IsEqualTo("downtime_only");
-        await Assert.That(cached.EventsBackfillEnabled).IsFalse();
-        await Assert.That(cached.EventsBackfillMode).IsEqualTo("downtime_only");
         await Assert.That(refreshed.EventsBackfillEnabled).IsTrue();
         await Assert.That(refreshed.EventsBackfillMode).IsEqualTo("full");
     }
 
     // --- Batch resolution ---
+
+    [Test]
+    public async Task TraversalBoundsChangeWithoutAnotherReplicaInvalidatingTheLocalCache()
+    {
+        string key = GovernanceSettingKeys.EventDiscovery.MaxIdentities;
+        Guid tenantId = Guid.CreateVersion7();
+        SetupSystemSettings(new SystemSetting
+        {
+            SettingKey = key, Value = "1000", ValueType = SettingValueType.Integer, IsLocked = false
+        });
+        SetupTenantSettings(tenantId,
+            new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = "1000" });
+        var context = new SettingContext(TenantId: tenantId);
+        var initial = await _resolver.ResolveWithMetadataAsync(key, context);
+        SetupTenantSettings(tenantId,
+            new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = "100" });
+        var refreshed = await _resolver.ResolveWithMetadataAsync(key, context);
+
+        await Assert.That(initial!.Value).IsEqualTo("1000");
+        await Assert.That(refreshed!.Value).IsEqualTo("100");
+    }
 
     [Test]
     public async Task ResolveBatchAsync_ReturnsMultipleSettings()

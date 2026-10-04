@@ -55,6 +55,7 @@ public class EventAgendaItemRepository : GenericRepository<EventAgendaItem, Guid
             throw new InvalidOperationException("Moving an event agenda item requires an active transaction.");
         }
 
+        _dbContext.DisclosureMutations.Enlist([agendaItem.TenantId, eventLocation.TenantId]);
         _dbContext.Entry(agendaItem).State = EntityState.Detached;
         int affectedRows = await _dbContext.EventAgendaItems
             .Where(candidate =>

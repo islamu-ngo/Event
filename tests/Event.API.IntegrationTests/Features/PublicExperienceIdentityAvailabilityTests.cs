@@ -76,7 +76,13 @@ public sealed class PublicExperienceIdentityAvailabilityTests
             shellHandler ?? Substitute.For<IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>>(),
             homeDiscoveryHandler ?? Substitute.For<IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto>>(),
             Substitute.For<ILinkPolicy<EventDiscoveryItemDto>>(),
-            Substitute.For<IHateoasLinkGenerator>())
+            Substitute.For<IHateoasLinkGenerator>(),
+            new Explore.Application.Features.Events.Discovery.EventDiscoveryResponseAuthority(
+                Substitute.For<Explore.Application.Contracts.Persistence.IUnitOfWork>(),
+                Substitute.For<Explore.Application.Contracts.Persistence.IEventDiscoveryDisclosureRepository>(),
+                Substitute.For<Explore.Application.Contracts.Persistence.IEventDiscoveryIdentityRepository>(),
+                Substitute.For<Explore.Application.Contracts.Infrastructure.ITenantContext>(), TimeProvider.System,
+                Substitute.For<Explore.Application.Contracts.Persistence.IEventDiscoveryResponseBoundaryRepository>()))
         {
             ControllerContext = new ControllerContext
             {

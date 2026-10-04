@@ -104,7 +104,9 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         // Current policy boundaries cannot depend on another replica invalidating this process's cache.
         var requiresAuthoritativePolicy = keyList.Any(key => IsSmtpSetting(key)
             || key == GovernanceSettingKeys.TenantDelegation.LockSmtp
-            || key.StartsWith("public_experience.", StringComparison.Ordinal));
+            || key.StartsWith("public_experience.", StringComparison.Ordinal)
+            || key.StartsWith("event_discovery.", StringComparison.Ordinal)
+            || key.StartsWith("federation.", StringComparison.Ordinal));
         var systemSettings = requiresAuthoritativePolicy
             ? await _systemSettingRepository.GetAllSettings(cancellationToken: ct)
             : await GetSystemSettingsAsync(ct);

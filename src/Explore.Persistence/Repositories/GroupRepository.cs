@@ -288,13 +288,15 @@ public class GroupRepository : GenericRepository<Group, Guid>, IGroupRepository
         {
             try
             {
-                await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable, cancellationToken);
                 await using IAsyncDisposable hierarchyLease = await RelationalNamedLock.AcquireTransactionAsync(
                     _dbContext,
                     $"group-hierarchy:{tenantId}",
                     cancellationToken);
 
                 var result = await operation(cancellationToken);
+                await _dbContext.FlushDisclosureAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return result;
             }

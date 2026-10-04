@@ -102,6 +102,21 @@ internal sealed class GlobalExceptionHandler(
                 "Event discovery unavailable",
                 "Event discovery is temporarily unavailable.",
                 ApiProblemCodes.EventDiscoveryUnavailable),
+            EventDiscoveryCursorInvalidException => (
+                StatusCodes.Status400BadRequest,
+                "Discovery continuation invalid",
+                "The discovery continuation is invalid for this search.",
+                ApiProblemCodes.EventDiscoveryCursorInvalid),
+            EventDiscoveryCursorExpiredException => (
+                StatusCodes.Status410Gone,
+                "Discovery continuation expired",
+                "The discovery continuation has expired. Start a new traversal.",
+                ApiProblemCodes.EventDiscoveryCursorExpired),
+            EventDiscoveryRestartRequiredException => (
+                StatusCodes.Status409Conflict,
+                "Discovery restart required",
+                "Discovery results changed. Start a new traversal.",
+                ApiProblemCodes.EventDiscoveryRestartRequired),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "Internal server error",
@@ -125,7 +140,9 @@ internal sealed class GlobalExceptionHandler(
         }
 
         httpContext.Response.StatusCode = statusCode;
-        if (exception is AdmissionCheckInUnavailableException or EventDiscoveryUnavailableException)
+        if (exception is AdmissionCheckInUnavailableException or EventDiscoveryUnavailableException
+            or EventDiscoveryCursorInvalidException or EventDiscoveryCursorExpiredException
+            or EventDiscoveryRestartRequiredException)
         {
             httpContext.Response.Headers[HeaderNames.CacheControl] = "no-store";
             httpContext.Response.Headers["Referrer-Policy"] = "no-referrer";

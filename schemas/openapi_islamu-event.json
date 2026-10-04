@@ -26070,19 +26070,14 @@
           "Event"
         ],
         "summary": "Get all Events",
-        "description": "Get a paginated, filterable list of all Events (Conference, Webinar, Workshop...). Default page size is 20, max is 100. Supports filtering by category, tag, format, madhab, language, date range, and free-text search. Supports module-conditional aspect filters: Islamic (genderMode, quranRecitation, referencePrayer, islamicLanguage) and Tech (skillLevel, codingCompetition, hackathon, requiresLaptop, techStack). Aspect filters are silently ignored when the corresponding module is not enabled for the tenant. Supports custom-property projection filters and text search gated behind the tenant feature flag 'custom_properties.projection_discovery_enabled' — silently ignored when disabled. Supports sorting by date, title, views, or createdAt. When tenant governance enables ATProto Events, the result also includes tenant-visible community events within a bounded 1,000-item merge window, de-duplicated against locally-owned ATProto records. Response includes HATEOAS navigation links (first, prev, next, last) and safe source affordances. Send 'Prefer: return=minimal' header to strip links.",
+        "description": "Browse a bounded, filterable snapshot of Events (Conference, Webinar, Workshop...). Default batch size is 20, max is 100. Continue with the opaque cursor in the next HAL link. Supports filtering by category, tag, format, madhab, language, date range, and free-text search. Supports module-conditional aspect filters: Islamic (genderMode, quranRecitation, referencePrayer, islamicLanguage) and Tech (skillLevel, codingCompetition, hackathon, requiresLaptop, techStack). Aspect filters are silently ignored when the corresponding module is not enabled for the tenant. Supports custom-property projection filters and text search gated behind the tenant feature flag 'custom_properties.projection_discovery_enabled' — silently ignored when disabled. Supports sorting by date, title, views, or createdAt. When tenant governance enables ATProto Events, the result also includes tenant-visible community events within a bounded 1,000-item snapshot, de-duplicated against locally-owned ATProto records. Each batch rechecks current disclosure and identity authority. Expired cursors return 410; authority changes return 409 and require a new search. Response includes forward HATEOAS navigation and safe source affordances, not offset pages or global totals. Send 'Prefer: return=minimal' header to strip links.",
         "operationId": "GetEvents",
         "parameters": [
           {
-            "name": "PageNumber",
+            "name": "Cursor",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
+              "type": "string"
             }
           },
           {
@@ -26517,12 +26512,12 @@
             "content": {
               "application/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/HalCollectionResourceOfEventDiscoveryItemDto"
+                  "$ref": "#/components/schemas/EventDiscoveryTraversalResource"
                 }
               },
               "application/hal+json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/HalCollectionResourceOfEventDiscoveryItemDto"
+                  "$ref": "#/components/schemas/EventDiscoveryTraversalResource"
                 }
               },
               "application/json": { },
@@ -26548,6 +26543,40 @@
           },
           "503": {
             "description": "Service Unavailable",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "410": {
+            "description": "Gone",
             "content": {
               "application/json; v=0.1": {
                 "schema": {
@@ -125213,6 +125242,46 @@
           }
         }
       },
+      "EventDiscoveryTraversalResource": {
+        "required": [
+          "snapshotCount",
+          "truncated",
+          "expiresAt",
+          "hasMore",
+          "_links",
+          "_embedded"
+        ],
+        "type": "object",
+        "properties": {
+          "snapshotCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            }
+          },
+          "_embedded": {
+            "$ref": "#/components/schemas/HalCollectionEmbeddedOfEventDiscoveryItemDto"
+          }
+        }
+      },
       "EventDto": {
         "required": [
           "title",
@@ -128653,6 +128722,15 @@
           }
         }
       },
+      "EventRoleAssignmentStatus": {
+        "enum": [
+          "Pending",
+          "Active",
+          "Revoked",
+          "Expired"
+        ],
+        "type": "string"
+      },
       "EventRolePresetDto": {
         "required": [
           "masterCode",
@@ -131733,7 +131811,7 @@
             "type": "string"
           },
           "status": {
-            "type": "integer"
+            "$ref": "#/components/schemas/EventRoleAssignmentStatus"
           },
           "startsAtUtc": {
             "type": "string",
@@ -135276,58 +135354,6 @@
           },
           "_embedded": {
             "$ref": "#/components/schemas/HalCollectionEmbeddedOfEventDayListDto"
-          }
-        }
-      },
-      "HalCollectionResourceOfEventDiscoveryItemDto": {
-        "type": "object",
-        "properties": {
-          "pageNumber": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "pageSize": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "totalCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "totalPages": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "hasPrevious": {
-            "type": "boolean"
-          },
-          "hasNext": {
-            "type": "boolean"
-          },
-          "_links": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/HalLink"
-            }
-          },
-          "_embedded": {
-            "$ref": "#/components/schemas/HalCollectionEmbeddedOfEventDiscoveryItemDto"
           }
         }
       },
@@ -146768,7 +146794,7 @@
             "type": "string"
           },
           "status": {
-            "type": "integer"
+            "$ref": "#/components/schemas/EventRoleAssignmentStatus"
           },
           "startsAtUtc": {
             "type": "string",
@@ -177734,7 +177760,8 @@
           "EventOwner",
           "EventManager",
           "RegistrationManager",
-          "CheckInStaff"
+          "CheckInStaff",
+          "EventDiscoveryReviewer"
         ],
         "type": "string"
       },

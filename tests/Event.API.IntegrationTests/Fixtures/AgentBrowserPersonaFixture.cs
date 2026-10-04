@@ -201,7 +201,7 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         }
         await using var database = CreateDatabase();
         await Assert.That(await database.PlatformUserRoles.CountAsync(Token)).IsEqualTo(1);
-        await Assert.That(await database.EventRoleAssignments.CountAsync(Token)).IsEqualTo(3);
+        await Assert.That(await database.EventRoleAssignments.CountAsync(Token)).IsEqualTo(5);
         await Assert.That(await database.TenantUserRoleGrants.CountAsync(Token)).IsEqualTo(5);
     }
 
@@ -375,6 +375,8 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
                 "graph" => operation?.Stage == LocalCredentialOperationStage.ProvisioningPending && user,
                 "activation" => operation?.Stage == LocalCredentialOperationStage.ChangeRequired,
                 "replacement" => operation?.Stage == LocalCredentialOperationStage.Replaced,
+                "sources" => await database.Events.AnyAsync(
+                    row => row.Id == AgentBrowserPersonaCatalog.DiscoverySourceId, cancellationToken),
                 _ => false
             };
             if (!reached) return;

@@ -323,6 +323,10 @@ public static class ApplicationServicesRegistration
         services.AddSingleton<EventLocationDisclosureEvaluator>();
         services.AddScoped<PublicEventLocationDisclosureEvaluator>();
         services.AddScoped<AtprotoEventPublicationSnapshotFactory>();
+        services.AddScoped<Explore.Application.Features.Events.Discovery.EventDiscoveryLocalSource>();
+        services.AddScoped<Explore.Application.Features.Events.Discovery.EventDiscoveryCandidateReader>();
+        services.AddScoped<Explore.Application.Features.Events.Discovery.EventDiscoveryResponseAuthority>();
+        services.AddScoped<Explore.Application.Features.Events.Discovery.EventDiscoveryTraversal>();
         services.AddScoped<AtprotoEventGovernanceResolver>();
         services.AddScoped<AtprotoEventPublicationPlanner>();
         services.AddScoped<IAtprotoDeliveryGate>(provider =>

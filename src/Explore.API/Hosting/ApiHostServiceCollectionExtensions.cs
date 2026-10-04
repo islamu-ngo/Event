@@ -198,6 +198,8 @@ public static class ApiHostServiceCollectionExtensions
         builder.Services.AddScoped<IIncomingWebhookVerifier, RegistrationProviderIncomingWebhookVerifier>();
         builder.Services.AddScoped<IRegistrationProviderCallbackBindingResolver, RegistrationProviderCallbackBindingResolver>();
         builder.Services.AddScoped<IRegistrationProviderCallbackReceiptProtector, RegistrationProviderCallbackReceiptProtector>();
+        builder.Services.AddScoped<Explore.Application.Features.Events.Discovery.IEventDiscoveryCursorProtector,
+            EventDiscoveryCursorProtector>();
         builder.Services.AddScoped<IRegistrationProviderCallbackUriBuilder, RegistrationProviderCallbackUriBuilder>();
         builder.Services.AddScoped<IIncomingWebhookVerifierRegistry, IncomingWebhookVerifierRegistry>();
         builder.Services.AddScoped<IIncomingWebhookIntakeService, IncomingWebhookIntakeService>();
@@ -261,6 +263,7 @@ public static class ApiHostServiceCollectionExtensions
         builder.Services.AddScoped<ITenantContext, Explore.Infrastructure.Services.TenantContext>();
         builder.Services.AddHateoas();
         builder.Services.AddHateoasAssemblers();
+        builder.Services.AddScoped<Explore.API.Hateoas.Assemblers.EventDiscoveryTraversalResourceAssembler>();
         builder.Services.AddApiMediaTypeVersioning();
         builder.Services.AddSingleton<BusinessMetrics>();
 

@@ -96,6 +96,42 @@ The publication follow-up separately owes last-slot contention, transaction roll
 
 ## Escalation Needed
 
+### Discovery Technical Runtime Evidence - 2026-10-03
+
+The active discovery implementation now has executed native authority14 and
+writer3 witnesses on PostgreSQL, SQLite, SQL Server, MariaDB and MySQL, with no
+skipped provider. These exercise current disclosure/identity revision, alias
+invalidation, independent connection exclusion, capacity reservation, physical
+versus logical expiry, tenant isolation and source-before-epoch ordering.
+Generated identity/traversal migrations passed up/down/up on disposable
+databases and all four catalogs had clean model checks.
+
+Additional PostgreSQL evidence covers cold lookup bootstrap, stale empty/
+nonempty tenant catalogs, and bounded orphan retention under a distinct
+non-owner, non-bypass runtime after the production migration/RLS bootstrap.
+Real HTTP PNG/strong ETag/eligible304 and post-commit privacy concealment passed.
+The execution ledger contains exact counts, commands and the unrelated
+architecture failures reproduced on an untouched baseline.
+
+Independent review subsequently identified future-clock retention enumeration
+and two native lock-order defects. The restricted PostgreSQL witness now rejects
+future-cutoff access to live-only foreign ownership and live deletion. Source
+writer races passed seven cases each on PostgreSQL, SQL Server, MariaDB and
+MySQL; three actual ownership/grant-planning races also passed on each
+retaining-read engine, without skips. Browser inspection found and repaired a
+bundle-schema namespace regression and stale language-dependent controls.
+Existing bundle tests10 and affected list tests54 passed, including a subscribed
+locale-change regression; the real mobile RTL list then rendered translated
+search/results labels, membership summary, terminal state and batch selector.
+This is bounded surface evidence, not completion of persona or pilot evaluation.
+
+This is technical runtime evidence only. It does not close open findings,
+establish staff availability or response deadlines, validate representative
+pilot thresholds, prove legal retention acceptance, or substitute for
+desktop/mobile/RTL, keyboard and task-based attendee/organizer evaluation.
+Those human/surface gates remain open. Deferred publication trust, capacity,
+moderation and appeal work remains separately scoped and unactivated.
+
 - **Before active implementation:** none from this I-VSD revalidation. Scope and implementation authorization are supplied; missing runtime evidence is work to perform, not a reason to block authoring it.
 - **Before discovery release/activation:** execute the active security/privacy/provider/surface gates; validate finite limits with representative workload; record correction/revocation recovery, applicable retention purposes and an accountable operating arrangement. Do not offer a staffed service or response deadline without evidence.
 - **Before publication execution:** graduate the backlog into separately approved executable slices with fresh source binding and exact trust-refinement manifests. Identify/reuse moderation reconsideration or define its bounded event-scoped mechanism; S56 is not proof one exists.

@@ -268,7 +268,13 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
     }
 
     public async Task<bool> PurgeDefinition(Guid id, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => PurgeDefinitionCoreAsync(id, token), cancellationToken);
+
+    private async Task<bool> PurgeDefinitionCoreAsync(Guid id, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventSessionCustomPropertyDefinitions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+                .Where(value => value.Id == id).Select(value => value.TenantId), cancellationToken);
         var dependencies = await GetPurgeDependencies(id, cancellationToken);
         if (dependencies is null || dependencies.HasBlockingDependencies)
         {
@@ -357,7 +363,16 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
         Guid eventSessionId,
         IReadOnlyCollection<EventSessionCustomPropertyValue> values,
         CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(
+            token => SetMultiValuesCoreAsync(definitionId, eventSessionId, values, token), cancellationToken);
+
+    private async Task SetMultiValuesCoreAsync(
+        Guid definitionId, Guid eventSessionId, IReadOnlyCollection<EventSessionCustomPropertyValue> values,
+        CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventSessions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+                .Where(value => value.Id == eventSessionId).Select(value => value.TenantId), cancellationToken);
         await _dbContext.EventSessionCustomPropertyValues
             .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
             .Where(x => x.EventSessionCustomPropertyDefinitionId == definitionId && x.EventSessionId == eventSessionId)

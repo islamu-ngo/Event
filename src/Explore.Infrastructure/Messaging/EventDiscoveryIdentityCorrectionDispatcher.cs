@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Domain;
 
 namespace Explore.Infrastructure.Messaging;

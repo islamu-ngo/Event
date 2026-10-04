@@ -2,14 +2,19 @@ using System.Reflection;
 using System.Text.Json;
 using Explore.API.Attributes;
 using Explore.API.Controllers;
+using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
+using Explore.Application.Features.Events.Discovery;
 using Explore.Application.Hateoas;
 using Explore.Application.Models.PublicExperience;
+using Explore.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -33,7 +38,7 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
         Substitute.For<IHateoasLinkGenerator>();
 
     [Test]
-    public async Task HomeDiscoveryRouteHasStableAnonymousCachedMetadata()
+    public async Task HomeDiscoveryRouteHasStableAnonymousNoStoreMetadata()
     {
         var action = typeof(PublicExperienceController)
             .GetMethod(nameof(PublicExperienceController.GetHomeDiscovery))!;
@@ -44,7 +49,8 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
         await Assert.That(route.Name).IsEqualTo(RouteNames.GetHomeDiscovery);
         await Assert.That(action.GetCustomAttribute<AllowAnonymousAttribute>()).IsNotNull();
         await Assert.That(action.GetCustomAttribute<EndpointClassificationAttribute>()?.Class).IsEqualTo(EndpointClass.Public);
-        await Assert.That(action.GetCustomAttribute<OutputCacheAttribute>()?.PolicyName).IsEqualTo("PublicHomeDiscovery");
+        await Assert.That(action.GetCustomAttribute<OutputCacheAttribute>()).IsNull();
+        await Assert.That(action.GetCustomAttribute<PrivateNoStoreAttribute>()).IsNotNull();
     }
 
     [Test]
@@ -59,8 +65,13 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
                 SelectedAreaId = areaId
             }
         };
+        GetHomeDiscoveryQuery? dispatched = null;
         _homeDiscoveryHandler.QueryAsync(Arg.Any<GetHomeDiscoveryQuery>(), Arg.Any<CancellationToken>())
-            .Returns(expected);
+            .Returns(call =>
+            {
+                dispatched = call.Arg<GetHomeDiscoveryQuery>();
+                return expected;
+            });
         var controller = CreateController();
 
         var action = await controller.GetHomeDiscovery(areaId, "online", CancellationToken.None);
@@ -68,10 +79,9 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
         var ok = action.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsSameReferenceAs(expected);
-        await _homeDiscoveryHandler.Received(1).QueryAsync(
-            Arg.Is<GetHomeDiscoveryQuery>(query =>
-                query != null && query.AreaId == areaId && query.Mode == "online"),
-            Arg.Any<CancellationToken>());
+        await Assert.That(dispatched).IsNotNull();
+        await Assert.That(dispatched!.AreaId).IsEqualTo(areaId);
+        await Assert.That(dispatched.Mode).IsEqualTo("online");
     }
 
     [Test]
@@ -114,12 +124,28 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
         await Assert.That(source.GetProperty("method").GetString()).IsEqualTo("GET");
     }
 
-    private PublicExperienceController CreateController() =>
-        new(_settingsHandler, _shellHandler, _homeDiscoveryHandler, _linkPolicy, _linkGenerator)
+    private PublicExperienceController CreateController()
+    {
+        var tenant = Substitute.For<ITenantContext>();
+        Guid tenantId = Guid.CreateVersion7();
+        tenant.TenantId.Returns(tenantId);
+        var revision = new EventDiscoveryRevision { Id = Guid.CreateVersion7(), TenantId = tenantId };
+        var identities = Substitute.For<IEventDiscoveryIdentityRepository>();
+        identities.GetRevisionAsync(tenantId, Arg.Any<CancellationToken>()).Returns(revision);
+        var disclosure = Substitute.For<IEventDiscoveryDisclosureRepository>();
+        disclosure.AcquireCurrentAsync(tenantId, Arg.Any<CancellationToken>()).Returns(revision);
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.ExecuteReadCommittedAsync(
+                Arg.Any<Func<CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<bool>>>()(call.Arg<CancellationToken>()));
+        return new(_settingsHandler, _shellHandler, _homeDiscoveryHandler, _linkPolicy, _linkGenerator,
+            new EventDiscoveryResponseAuthority(unitOfWork, disclosure, identities, tenant, TimeProvider.System,
+                Substitute.For<IEventDiscoveryResponseBoundaryRepository>()))
         {
             ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext()
             }
         };
+    }
 }

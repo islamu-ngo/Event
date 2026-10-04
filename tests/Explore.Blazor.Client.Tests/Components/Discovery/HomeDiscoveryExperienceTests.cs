@@ -277,6 +277,7 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
         await Assert.That(cut.Markup).Contains("This section is temporarily unavailable");
         await Assert.That(cut.Markup).Contains("Most viewed online");
         await Assert.That(cut.Markup).Contains("Recently added");
+        await Assert.That(cut.FindAll(".home-discovery__section-failure").Count).IsGreaterThan(0);
     }
 
     [Test]

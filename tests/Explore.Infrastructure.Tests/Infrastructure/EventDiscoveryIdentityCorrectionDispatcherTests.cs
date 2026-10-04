@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Domain;
 using Explore.Infrastructure.Messaging;
 using NSubstitute;

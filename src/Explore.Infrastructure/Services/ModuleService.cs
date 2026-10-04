@@ -58,9 +58,12 @@ public class ModuleService : IModuleService
 
     public async Task<bool> IsModuleEnabledAsync(Guid tenantId, string moduleKey, CancellationToken cancellationToken = default)
     {
-        // Use cached enabled modules for the tenant
-        var enabledModules = await GetEnabledModulesAsync(tenantId, cancellationToken);
-        return enabledModules.Any(m => m.ModuleKey.Equals(moduleKey, StringComparison.OrdinalIgnoreCase));
+        cancellationToken.ThrowIfCancellationRequested();
+        // Discovery applies different predicates according to this authority. A
+        // process-local cache cannot participate in the committed disclosure fence.
+        var enabled = await _tenantCapabilityRepository.GetEnabledByTenantId(tenantId);
+        return enabled.Any(capability => capability.Module is not null
+            && capability.Module.ModuleKey.Equals(moduleKey, StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<string?> GetModuleWizardSchemaUrlAsync(string moduleKey, CancellationToken cancellationToken = default)

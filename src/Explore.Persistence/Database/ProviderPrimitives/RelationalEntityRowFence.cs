@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Explore.Domain;
 using Explore.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -79,6 +80,12 @@ internal static class RelationalEntityRowFence
         IProperty tenantProperty = entityType.FindProperty(nameof(ITenantEntity.TenantId))
             ?? throw new InvalidOperationException(
                 $"Admission authority entity '{typeof(TEntity).Name}' has no tenant property.");
+
+        // Discovery source INSERTs fence Tenant before their implicit Event FK.
+        // Authority callers already hold their Actor anchors; keep their native
+        // order Actor -> Tenant -> Event too, including the later identity fence.
+        if (typeof(TEntity) == typeof(Event))
+            await AcquireGlobalAsync<Tenant>(dbContext, tenantId, cancellationToken);
 
         if (providerName == RelationalNamedLock.SqliteProvider)
         {

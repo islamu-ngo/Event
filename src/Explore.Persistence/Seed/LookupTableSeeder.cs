@@ -2160,7 +2160,8 @@ public static class LookupTableSeeder
             new Role { Id = (int)RoleEnum.EventOwner, MasterCode = "event.owner", FullName = "Event Owner", Description = "Owns event team authority and ownership transfer", Scope = RoleScopeEnum.Event, IsSystem = true },
             new Role { Id = (int)RoleEnum.EventManager, MasterCode = "event.manager", FullName = "Event Manager", Description = "Manages day-to-day event operations", Scope = RoleScopeEnum.Event, IsSystem = true },
             new Role { Id = (int)RoleEnum.RegistrationManager, MasterCode = "event.registration_manager", FullName = "Registration Manager", Description = "Manages registrations for one event", Scope = RoleScopeEnum.Event, IsSystem = true },
-            new Role { Id = (int)RoleEnum.CheckInStaff, MasterCode = "event.check_in_staff", FullName = "Check-in Staff", Description = "Handles attendee check-in for one event", Scope = RoleScopeEnum.Event, IsSystem = true }
+            new Role { Id = (int)RoleEnum.CheckInStaff, MasterCode = "event.check_in_staff", FullName = "Check-in Staff", Description = "Handles attendee check-in for one event", Scope = RoleScopeEnum.Event, IsSystem = true },
+            new Role { Id = (int)RoleEnum.EventDiscoveryReviewer, MasterCode = "event.discovery_reviewer", FullName = "Discovery Reviewer", Description = "Independently reviews and reverses discovery identity for explicitly assigned events", Scope = RoleScopeEnum.Event, IsSystem = true }
         };
 
         var existingIds = await context.Roles
@@ -2375,6 +2376,8 @@ public static class LookupTableSeeder
                 PermissionCodes.EventManagePublicActions,
                 PermissionCodes.EventManageTickets,
                 PermissionCodes.EventViewOrganizerClaims,
+                PermissionCodes.EventReviewDiscoveryIdentity,
+                PermissionCodes.EventReverseDiscoveryIdentity,
                 "event_day:view",
                 PermissionCodes.EventDayCreate,
                 PermissionCodes.EventDayUpdate,
@@ -2441,6 +2444,13 @@ public static class LookupTableSeeder
                 PermissionCodes.EventRegistrationView,
                 PermissionCodes.EventCheckInView,
                 PermissionCodes.EventCheckInManage
+            ],
+            [RoleEnum.EventDiscoveryReviewer] =
+            [
+                "event:view",
+                PermissionCodes.EventUpdate,
+                PermissionCodes.EventReviewDiscoveryIdentity,
+                PermissionCodes.EventReverseDiscoveryIdentity
             ]
         };
 

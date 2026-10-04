@@ -1,12 +1,14 @@
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
+using Blazouter.Models;
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.EventReporting;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Events;
+using Explore.Blazor.Client.Pages.Events.Components;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Shared;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -22,6 +24,494 @@ public sealed class EventDetailTests : IDisposable
     {
         _ctx.Services.AddSingleton<TimeProvider>(
             new FixedTimeProvider(TestTime.UtcNow));
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ObsoletePublicRouteLoad_CannotReplaceReturnedEvent(bool failObsoleteLoad)
+    {
+        var original = CreateEventDto("PUBLISHED", "Published", "edit");
+        var related = CreateEventDto("PUBLISHED", "Published", "edit") with { Title = "Related offering" };
+        RegisterEventDetailServices(original);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var delayed = new TaskCompletionSource<EventDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(original);
+        service.GetEventBySlugCodeAsync("related-CODE2").Returns(_ =>
+        {
+            entered.TrySetResult();
+            return delayed.Task;
+        });
+        RouteMatch Match(string slugCode) => new()
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = $"/events/{slugCode}",
+            Params = new Dictionary<string, string> { ["slugCode"] = slugCode }
+        };
+        router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var obsoleteLoad = GetField<Task>(cut.Instance, "_routeLoadTask");
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1"));
+        await GetField<Task>(cut.Instance, "_routeLoadTask").WaitAsync(TimeSpan.FromSeconds(10));
+
+        if (failObsoleteLoad)
+            delayed.SetException(new ApiException("Discovery unavailable", 409, "",
+                new Dictionary<string, IEnumerable<string>>(), null));
+        else
+            delayed.SetResult(related);
+        await obsoleteLoad.WaitAsync(TimeSpan.FromSeconds(10));
+        await cut.InvokeAsync(() => { });
+
+        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsEmpty();
+        await Assert.That(cut.FindAll("section[data-public-detail-status]")).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("sessions")]
+    [Arguments("days")]
+    [Arguments("aspects")]
+    [Arguments("agenda")]
+    public async Task ObsoleteDependentLoad_CannotPublishIntoReturnedEvent(string stage)
+    {
+        var original = CreateEventDto("PUBLISHED", "Published", "edit");
+        var related = CreateEventDto("PUBLISHED", "Published", "edit") with
+        {
+            Title = "Related offering",
+            AvailableAspects = ["Islamic"]
+        };
+        RegisterEventDetailServices(original);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task HoldAsync()
+        {
+            entered.TrySetResult();
+            await released.Task;
+        }
+        if (stage == "sessions")
+            _ctx.Services.GetRequiredService<IEventSessionService>()
+                .GetSessionsByEventAsync(related.Id!.Value, Arg.Any<bool>()).Returns(async _ =>
+                {
+                    await HoldAsync();
+                    return (ICollection<EventSessionListDto>)new List<EventSessionListDto> { new() { Id = Guid.NewGuid() } };
+                });
+        if (stage == "days")
+            _ctx.Services.GetRequiredService<IEventDayService>()
+                .GetDaysByEventAsync(related.Id!.Value, Arg.Any<bool>()).Returns(async _ =>
+                {
+                    await HoldAsync();
+                    return (ICollection<EventDayListDto>)new List<EventDayListDto> { new() { Id = Guid.NewGuid() } };
+                });
+        if (stage == "aspects")
+            _ctx.Services.GetRequiredService<IEventAspectService>()
+                .GetIslamicAspectAsync(related.Id!.Value, Arg.Any<bool>()).Returns(async _ =>
+                {
+                    await HoldAsync();
+                    return new EventIslamicAspectDto();
+                });
+        if (stage == "agenda")
+            _ctx.Services.GetRequiredService<IEventAgendaItemService>()
+                .GetAgendaItemsByEventAsync(related.Id!.Value).Returns(async _ =>
+                {
+                    await HoldAsync();
+                    return (ICollection<EventAgendaItemListDto>)new List<EventAgendaItemListDto> { new() { Id = Guid.NewGuid() } };
+                });
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(original);
+        service.GetEventBySlugCodeAsync("related-CODE2").Returns(related);
+        RouteMatch Match(string slugCode) => new()
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = $"/events/{slugCode}",
+            Params = new Dictionary<string, string> { ["slugCode"] = slugCode }
+        };
+        router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var obsoleteLoad = GetField<Task>(cut.Instance, "_routeLoadTask");
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1"));
+        await GetField<Task>(cut.Instance, "_routeLoadTask").WaitAsync(TimeSpan.FromSeconds(10));
+        released.SetResult();
+        await obsoleteLoad.WaitAsync(TimeSpan.FromSeconds(10));
+        await cut.InvokeAsync(() => { });
+
+        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.Instance.PersistedState!.EventId).IsEqualTo(original.Id!.Value);
+        await Assert.That(cut.Instance.PersistedState.EventSessions).IsEmpty();
+        await Assert.That(cut.Instance.PersistedState.EventDays).IsEmpty();
+        await Assert.That(cut.Instance.PersistedState.IslamicAspect).IsNull();
+        await Assert.That(GetField<ICollection<EventSessionListDto>>(cut.Instance, "_eventSessions")).IsEmpty();
+        await Assert.That(GetField<ICollection<EventDayListDto>>(cut.Instance, "_eventDays")).IsEmpty();
+        await Assert.That(GetField<ICollection<EventAgendaItemListDto>>(cut.Instance, "_eventAgendaItems")).IsEmpty();
+        await Assert.That(typeof(EventDetail).GetField("_islamicAspect",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(cut.Instance)).IsNull();
+    }
+
+    [Test]
+    [Arguments("tags")]
+    [Arguments("islamic")]
+    [Arguments("tech")]
+    [Arguments("agenda")]
+    public async Task ObsoletePostEditRefresh_CannotPublishIntoNextEvent(string refresh)
+    {
+        var original = CreateEventDto("PUBLISHED", "Published", "edit");
+        var related = CreateEventDto("PUBLISHED", "Published", "edit") with { Title = "Related offering" };
+        RegisterEventDetailServices(original);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task HoldAsync()
+        {
+            entered.TrySetResult();
+            await released.Task;
+        }
+        service.GetEventByIdAsync(original.Id!.Value).Returns(async _ =>
+        {
+            await HoldAsync();
+            return original;
+        });
+        _ctx.Services.GetRequiredService<IEventAspectService>()
+            .GetIslamicAspectAsync(original.Id.Value, true).Returns(async _ =>
+            {
+                await HoldAsync();
+                return new EventIslamicAspectDto();
+            });
+        _ctx.Services.GetRequiredService<IEventAspectService>()
+            .GetTechAspectAsync(original.Id.Value, true).Returns(async _ =>
+            {
+                await HoldAsync();
+                return new EventTechAspectDto();
+            });
+        bool refreshing = false;
+        _ctx.Services.GetRequiredService<IEventDayService>()
+            .GetDaysByEventAsync(original.Id.Value, Arg.Any<bool>()).Returns(async _ =>
+            {
+                if (!refreshing)
+                    return (ICollection<EventDayListDto>)new List<EventDayListDto>();
+                await HoldAsync();
+                return (ICollection<EventDayListDto>)new List<EventDayListDto> { new() { Id = Guid.NewGuid() } };
+            });
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(original);
+        service.GetEventBySlugCodeAsync("related-CODE2").Returns(related);
+        RouteMatch Match(string slugCode) => new()
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = $"/events/{slugCode}",
+            Params = new Dictionary<string, string> { ["slugCode"] = slugCode }
+        };
+        router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        Task obsoleteRefresh = Task.CompletedTask;
+        await cut.InvokeAsync(() =>
+        {
+            refreshing = true;
+            if (refresh == "tags")
+                typeof(EventDetail).GetMethod("OpenDetailTagManagement",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(cut.Instance, null);
+            var methodName = refresh switch
+            {
+                "tags" => "HandleDetailTagCatSaved",
+                "islamic" => "ReloadIslamicAspectAsync",
+                "agenda" => "LoadEventAgendaAsync",
+                _ => "ReloadTechAspectAsync"
+            };
+            var method = typeof(EventDetail).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)!;
+            obsoleteRefresh = (Task)method.Invoke(cut.Instance,
+                refresh == "tags" ? [Array.Empty<Guid>(), GetField<long>(cut.Instance, "_loadGeneration")]
+                : refresh == "agenda" ? [GetField<long>(cut.Instance, "_loadGeneration")] : null)!;
+        });
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
+        await GetField<Task>(cut.Instance, "_routeLoadTask").WaitAsync(TimeSpan.FromSeconds(10));
+        released.SetResult();
+        await obsoleteRefresh.WaitAsync(TimeSpan.FromSeconds(10));
+        await cut.InvokeAsync(() => { });
+
+        await Assert.That(GetField<EventDto>(cut.Instance, "_eventDetails").Id).IsEqualTo(related.Id);
+        await Assert.That(cut.FindAll("h1").Any(node => node.TextContent == related.Title)).IsTrue();
+        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
+        await Assert.That(typeof(EventDetail).GetField("_islamicAspect",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(cut.Instance)).IsNull();
+        await Assert.That(typeof(EventDetail).GetField("_techAspect",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(cut.Instance)).IsNull();
+        await Assert.That(GetField<ICollection<EventDayListDto>>(cut.Instance, "_eventDays")).IsEmpty();
+        await Assert.That(GetField<ICollection<EventAgendaItemListDto>>(cut.Instance, "_eventAgendaItems")).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ObsoleteCancellation_CannotTargetNextEventOrInterruptItsLoad(bool holdConfirmation)
+    {
+        var original = CreateEventDto("PUBLISHED", "Published", "cancel");
+        var related = CreateEventDto("PUBLISHED", "Published", "edit") with { Title = "Related offering" };
+        RegisterEventDetailServices(original);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var confirmation = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mutation = new TaskCompletionSource<BaseCommandResponseOfGuid?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var nextRead = new TaskCompletionSource<EventDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var nextEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mutations = new List<(Guid EventId, Guid Stamp)>();
+        var dialog = Substitute.For<IDialogService>();
+        dialog.ShowMessageBoxAsync(Arg.Any<string>(), Arg.Any<string>(),
+            yesText: Arg.Any<string>(), cancelText: Arg.Any<string>()).ReturnsForAnyArgs(_ =>
+            {
+                if (holdConfirmation)
+                    entered.TrySetResult();
+                return confirmation.Task;
+            });
+        service.CancelEventAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), default).Returns(call =>
+        {
+            mutations.Add((call.ArgAt<Guid>(0), call.ArgAt<Guid>(1)));
+            entered.TrySetResult();
+            return mutation.Task;
+        });
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(original);
+        service.GetEventBySlugCodeAsync("related-CODE2").Returns(_ =>
+        {
+            nextEntered.TrySetResult();
+            return nextRead.Task;
+        });
+        RouteMatch Match(string slugCode) => new()
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = $"/events/{slugCode}",
+            Params = new Dictionary<string, string> { ["slugCode"] = slugCode }
+        };
+        router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        SetProperty(cut.Instance, "DialogService", dialog);
+        SetProperty(cut.Instance, "AccessibilityFocusService", CreateFocusService());
+        if (!holdConfirmation)
+            confirmation.SetResult(true);
+        Task oldAction = Task.CompletedTask;
+        await cut.InvokeAsync(() => { oldAction = InvokePrivate<Task>(cut.Instance, "CancelEventAsync"); });
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
+        await nextEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var nextLoad = GetField<Task>(cut.Instance, "_routeLoadTask");
+        if (holdConfirmation)
+            confirmation.SetResult(true);
+        else
+            mutation.SetResult(new BaseCommandResponseOfGuid { Success = true });
+        await oldAction.WaitAsync(TimeSpan.FromSeconds(10));
+        nextRead.SetResult(related);
+        await nextLoad.WaitAsync(TimeSpan.FromSeconds(10));
+        await cut.InvokeAsync(() => { });
+
+        await Assert.That(mutations.Any(call => call.EventId != original.Id
+            || call.Stamp != original.ConcurrencyStamp)).IsFalse();
+        await Assert.That(mutations.Count).IsEqualTo(holdConfirmation ? 0 : 1);
+        await Assert.That(GetField<EventDto>(cut.Instance, "_eventDetails").Id).IsEqualTo(related.Id);
+        await Assert.That(cut.FindAll("h1").Any(node => node.TextContent == related.Title)).IsTrue();
+        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
+    }
+
+    [Test]
+    public async Task ObsoleteReportAuthentication_CannotOpenDialogForNextEvent()
+    {
+        var original = CreateEventDto("PUBLISHED", "Published", "report-event");
+        var related = CreateEventDto("PUBLISHED", "Published", "edit");
+        RegisterEventDetailServices(original);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(original);
+        service.GetEventBySlugCodeAsync("related-CODE2").Returns(related);
+        RouteMatch Match(string slugCode) => new()
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = $"/events/{slugCode}",
+            Params = new Dictionary<string, string> { ["slugCode"] = slugCode }
+        };
+        router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var delayed = new TaskCompletionSource<AuthenticationState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var auth = Substitute.For<AuthenticationStateProvider>();
+        bool firstRead = true;
+        auth.GetAuthenticationStateAsync().Returns(_ =>
+        {
+            if (!firstRead)
+                return Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
+            firstRead = false;
+            entered.TrySetResult();
+            return delayed.Task;
+        });
+        var dialogs = Substitute.For<IDialogService>();
+        dialogs.ShowAsync<ReportEventDialog>(Arg.Any<string>(), Arg.Any<DialogParameters>(),
+            Arg.Any<DialogOptions>()).Returns(_ => Task.FromException<IDialogReference>(
+                new InvalidOperationException("Obsolete report dialog opened")));
+        SetProperty(cut.Instance, "AuthStateProvider", auth);
+        SetProperty(cut.Instance, "DialogService", dialogs);
+        SetField(cut.Instance, "_canReport", true);
+        Task oldReport = Task.CompletedTask;
+        await cut.InvokeAsync(() => { oldReport = InvokePrivate<Task>(cut.Instance, "OpenReportEventDialogAsync"); });
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
+        await GetField<Task>(cut.Instance, "_routeLoadTask").WaitAsync(TimeSpan.FromSeconds(10));
+        delayed.SetResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())], "TestAuth"))));
+        await oldReport.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That(GetField<bool>(cut.Instance, "_isAuthenticated")).IsFalse();
+        await Assert.That(GetField<EventDto>(cut.Instance, "_eventDetails").Id).IsEqualTo(related.Id);
+    }
+
+    [Test]
+    public async Task OldRenderedAgendaCallback_CannotBorrowPendingRouteGeneration()
+    {
+        var original = CreateEventDto("PUBLISHED", "Published", "edit");
+        var related = CreateEventDto("PUBLISHED", "Published", "edit");
+        var originalDay = new EventDayListDto { Id = Guid.NewGuid() };
+        var relatedDay = new EventDayListDto { Id = Guid.NewGuid() };
+        RegisterEventDetailServices(original, days: [originalDay],
+            eventAgendaItems: [new EventAgendaItemListDto { Id = Guid.NewGuid() }]);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var days = _ctx.Services.GetRequiredService<IEventDayService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        var nextEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var nextRead = new TaskCompletionSource<EventDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var oldDays = new TaskCompletionSource<ICollection<EventDayListDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool oldCallbackInvoked = false;
+        days.GetDaysByEventAsync(original.Id!.Value, Arg.Any<bool>()).Returns(_ =>
+            oldCallbackInvoked ? oldDays.Task : Task.FromResult<ICollection<EventDayListDto>>([originalDay]));
+        days.GetDaysByEventAsync(related.Id!.Value, Arg.Any<bool>())
+            .Returns(Task.FromResult<ICollection<EventDayListDto>>([relatedDay]));
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(original);
+        service.GetEventBySlugCodeAsync("related-CODE2").Returns(_ =>
+        {
+            nextEntered.TrySetResult();
+            return nextRead.Task;
+        });
+        RouteMatch Match(string slugCode) => new()
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = $"/events/{slugCode}",
+            Params = new Dictionary<string, string> { ["slugCode"] = slugCode }
+        };
+        router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        var oldCallback = cut.FindComponent<AgendaMillerColumns>().Instance.OnDataChanged;
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
+        await nextEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var nextLoad = GetField<Task>(cut.Instance, "_routeLoadTask");
+        oldCallbackInvoked = true;
+        Task oldRefresh = Task.CompletedTask;
+        await cut.InvokeAsync(() => { oldRefresh = oldCallback.InvokeAsync(); });
+        nextRead.SetResult(related);
+        await nextLoad.WaitAsync(TimeSpan.FromSeconds(10));
+        oldDays.SetResult([originalDay]);
+        await oldRefresh.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That(GetField<ICollection<EventDayListDto>>(cut.Instance, "_eventDays")
+            .Select(day => day.Id).ToArray()).IsEquivalentTo([relatedDay.Id]);
+        await Assert.That(GetField<EventDto>(cut.Instance, "_eventDetails").Id).IsEqualTo(related.Id);
+    }
+
+    [Test]
+    public async Task PublicRouteChange_ReplacesOriginalEventActionIdentifiers()
+    {
+        var original = CreateEventDto("PUBLISHED", "Published", "edit");
+        var related = CreateEventDto("PUBLISHED", "Published", "edit") with { Title = "Related offering" };
+        RegisterEventDetailServices(original);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(original);
+        service.GetEventBySlugCodeAsync("related-CODE2").Returns(related);
+        RouteMatch Match(string slugCode) => new()
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = $"/events/{slugCode}",
+            Params = new Dictionary<string, string> { ["slugCode"] = slugCode }
+        };
+        router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsNotEmpty();
+
+        await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
+
+        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsEmpty();
+        await Assert.That(cut.FindAll("h1").Any(node => node.TextContent == related.Title)).IsTrue();
+
+        await cut.InvokeAsync(() => router.SetCurrentRoute(new RouteMatch
+        {
+            Route = new RouteConfig { Path = "/" },
+            MatchedPath = "/",
+            Params = new Dictionary<string, string>()
+        }, "/"));
+        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
+    }
+
+    [Test]
+    public async Task ExplicitRecovery_RetainsPublicSlugWhenAmbientRouteIsCleared()
+    {
+        var current = CreateEventDto("PUBLISHED", "Published", "edit");
+        RegisterEventDetailServices(current);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        var router = _ctx.Services.GetRequiredService<RouterStateService>();
+        bool retryAllowed = false;
+        service.GetEventByIdAsync(Arg.Any<Guid>()).Returns((EventDto?)null);
+        service.GetEventBySlugCodeAsync("original-CODE1").Returns(_ => retryAllowed
+            ? Task.FromResult<EventDto?>(current)
+            : Task.FromException<EventDto?>(new ApiException(
+                "Discovery unavailable", 409, "", new Dictionary<string, IEnumerable<string>>(), null)));
+        router.SetCurrentRoute(new RouteMatch
+        {
+            Route = new RouteConfig { Path = "/events/:slugCode" },
+            MatchedPath = "/events/original-CODE1",
+            Params = new Dictionary<string, string> { ["slugCode"] = "original-CODE1" }
+        }, "/events/original-CODE1");
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+        var recovery = cut.Find("section[data-public-detail-status='409']");
+
+        await cut.InvokeAsync(() => router.SetCurrentRoute(new RouteMatch
+        {
+            Route = new RouteConfig { Path = "/" },
+            MatchedPath = "/",
+            Params = new Dictionary<string, string>()
+        }, "/"));
+        retryAllowed = true;
+        await recovery.QuerySelector("button")!.ClickAsync(new());
+
+        await Assert.That(cut.FindAll("section[data-public-detail-status]")).IsEmpty();
+        await Assert.That(cut.FindAll($"a[href='/events/{current.Id}/edit']")).IsNotEmpty();
+    }
+
+    [Test]
+    [Arguments(409)]
+    [Arguments(410)]
+    [Arguments(503)]
+    public async Task DiscoveryFailure_RendersRecoveryAndReloadsOnlyAfterExplicitAction(int status)
+    {
+        var current = CreateEventDto("PUBLISHED", "Published");
+        RegisterEventDetailServices(current);
+        var service = _ctx.Services.GetRequiredService<IEventService>();
+        bool retryAllowed = false;
+        service.GetEventByIdAsync(Arg.Any<Guid>()).Returns(_ => retryAllowed
+            ? Task.FromResult<EventDto?>(current)
+            : Task.FromException<EventDto?>(new ApiException(
+                "Discovery unavailable", status, "", new Dictionary<string, IEnumerable<string>>(), null)));
+
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+
+        var recovery = cut.Find($"section[data-public-detail-status='{status}']");
+        await Assert.That(recovery.QuerySelectorAll("h1").Length).IsEqualTo(1);
+        await Assert.That(cut.FindAll(".event-detail-wrapper").Count).IsEqualTo(0);
+        retryAllowed = true;
+        await recovery.QuerySelector("button")!.ClickAsync(new());
+
+        await Assert.That(cut.FindAll("section[data-public-detail-status]").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("h1").Any(node => node.TextContent == current.Title)).IsTrue();
     }
 
     [Test]

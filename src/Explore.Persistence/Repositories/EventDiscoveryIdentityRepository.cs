@@ -30,6 +30,10 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
         var fenceIds = identityIds.Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
         if (fenceIds.Contains(Guid.Empty))
             throw new ArgumentException("Identity fence keys must be nonempty.", nameof(identityIds));
+        // Audit insertion still takes its Tenant foreign-key lock when the epoch
+        // already exists. Acquire that source parent before any identity/epoch fence.
+        await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(
+            dbContext, tenantId, cancellationToken);
 
         foreach (var entry in dbContext.ChangeTracker.Entries()
                      .Where(entry => entry.Entity is EventDiscoveryIdentity or EventDiscoveryAlias or EventDiscoveryRevision)
@@ -49,23 +53,23 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
                 dbContext, tenantId, identity => identity.Id, id, cancellationToken);
         }
 
-        await RelationalNamedLock.AcquireTransactionAsync(
-            dbContext, $"discovery-epoch:{tenantId:N}", cancellationToken);
-        // SQLite executes a native UPDATE, even when bootstrapping an absent epoch row.
-        // This takes the database writer fence; the process-local named lock is not the proof.
-        await RelationalEntityRowFence.AcquireAsync<EventDiscoveryRevision>(
-            dbContext, tenantId, revision => revision.TenantId, tenantId, cancellationToken);
-
-        _revision = await dbContext.Set<EventDiscoveryRevision>()
-            .SingleOrDefaultAsync(revision => revision.TenantId == tenantId, cancellationToken);
-        if (_revision is null)
-        {
-            _revision = new EventDiscoveryRevision { Id = Guid.CreateVersion7(), TenantId = tenantId };
-            dbContext.Set<EventDiscoveryRevision>().Add(_revision);
-        }
+        // This is a proposed decision revision, never a tracked database epoch.
+        // Native epoch comparison/advancement belongs to transaction finalization,
+        // after the graph, audit, outbox and all source locks have been written.
+        _revision = new EventDiscoveryRevision { TenantId = tenantId };
+        dbContext.DisclosureMutations.EnlistIdentityRevision(tenantId);
         _tenantId = tenantId;
         _fencedIds = fenceIds.ToHashSet();
         _transactionId = transaction.TransactionId;
+    }
+
+    public void ExpectRevisionAtCommit(Guid tenantId, long expectedRevision)
+    {
+        RequireFence(tenantId);
+        if (expectedRevision < 0)
+            throw new InvalidOperationException("discovery_revision_conflict");
+        dbContext.DisclosureMutations.EnlistIdentityRevision(tenantId, expectedRevision);
+        _revision!.IdentityEpoch = expectedRevision;
     }
 
     public async Task<EventDiscoveryIdentity?> FindAsync(
@@ -134,8 +138,6 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
     {
         if (!HasTenant(tenantId))
             return Task.FromResult<EventDiscoveryRevision?>(null);
-        if (_transactionId == dbContext.Database.CurrentTransaction?.TransactionId && _tenantId == tenantId)
-            return Task.FromResult(_revision);
         return dbContext.Set<EventDiscoveryRevision>().AsNoTracking()
             .SingleOrDefaultAsync(revision => revision.TenantId == tenantId, cancellationToken);
     }
@@ -160,12 +162,13 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
         DecideAsync(tenantId, memberId, primaryId, expectedRevision, reviewerId, reasonCode,
             reviewedAtUtc, reverse: true, cancellationToken);
 
-    public async Task<EventDiscoveryRevision> AdvanceDisclosureAsync(Guid tenantId, CancellationToken cancellationToken)
+    public Task<EventDiscoveryRevision> AdvanceDisclosureAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         RequireFence(tenantId);
+        cancellationToken.ThrowIfCancellationRequested();
+        dbContext.DisclosureMutations.Enlist([tenantId]);
         _revision!.AdvanceDisclosure();
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return _revision;
+        return Task.FromResult(_revision);
     }
 
     private async Task<EventDiscoveryRevision> DecideAsync(
@@ -173,11 +176,17 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
         Guid reviewerId, string reasonCode, DateTime reviewedAtUtc, bool reverse, CancellationToken cancellationToken)
     {
         RequireFence(tenantId);
+        ExpectRevisionAtCommit(tenantId, expectedRevision);
         if (!_fencedIds.Contains(memberId) || !_fencedIds.Contains(primaryId))
             throw new InvalidOperationException("Both decision identities must be included in the fence.");
         var members = await LoadGroupAsync(tenantId, memberId, tracking: true, cancellationToken);
         var primaryMembers = await LoadGroupAsync(tenantId, primaryId, tracking: true, cancellationToken);
         var graph = members.Concat(primaryMembers).DistinctBy(identity => identity.Id).ToArray();
+        // A fenced, persisted relationship newer than the caller's revision already
+        // proves a stale decision. Do not misclassify it as graph corruption against
+        // the proposed revision; all other epoch comparisons remain terminal.
+        if (graph.Any(identity => identity.Alias?.RelationshipRevision > expectedRevision))
+            throw new InvalidOperationException("discovery_revision_conflict");
         var before = graph.Where(identity => identity.Alias is not null)
             .ToDictionary(identity => identity.Id, identity => identity.Alias!);
         if (reverse)
@@ -186,6 +195,7 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
         else
             EventDiscoveryIdentityRules.Review(_revision!, expectedRevision, graph,
                 memberId, primaryId, reviewerId, reasonCode, reviewedAtUtc);
+        dbContext.DisclosureMutations.EnlistIdentityRevision(tenantId, expectedRevision, advance: true);
 
         foreach (var identity in graph)
         {

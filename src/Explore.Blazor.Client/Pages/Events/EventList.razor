@@ -44,7 +44,7 @@
                         Class="event-list__workspace"
                         DataTestId="event-list-workspace-dock-host"
                         ContentDataTestId="event-list-workspace-content">
-        <div class="event-list__page">
+        <div class="event-list__page" aria-busy="@_isLoadingPage.ToString().ToLowerInvariant()">
 
         <main class="event-list__main">
 
@@ -122,10 +122,6 @@
 
                             CurrentLayoutChanged="@OnLayoutModeChanged"
 
-                            ResultCount="@_totalCount"
-
-                            ShowResultCount="@(_eventsLoaded && HasActiveFilters())"
-
                             EventTypes="@eventTypes"
 
                             Categories="@categories"
@@ -155,6 +151,9 @@
 
 
             @{ var bp = GetGridBreakpoints(); }
+            <h2 id="event-discovery-results" class="sr-only" tabindex="-1">
+                @T("ui.discovery.results_heading", "Current search results")
+            </h2>
 
             @if (_isLoadingPage)
             {
@@ -171,11 +170,11 @@
                         </MudItem>
                     }
                 }
-                else if (_browseMode == BrowseMode.Pagination)
+                else
                 {
                     @foreach (var evt in _pagedEvents)
                     {
-                        <MudItem @key="evt.Id" xs="@bp.Xs" sm="@bp.Sm" md="@bp.Md" lg="@bp.Lg">
+                        <MudItem @key="(evt.Id ?? evt.AtprotoRecordId)" xs="@bp.Xs" sm="@bp.Sm" md="@bp.Md" lg="@bp.Lg">
                             <EventCard Event="@evt"
                                        Layout="@_currentLayout"
                                        IsSelected="@(_selectedEvent?.Id == evt.Id && _detailDrawerOpen)"
@@ -187,44 +186,46 @@
                         </MudItem>
                     }
                 }
-                else
-                {
-                    <Virtualize @ref="_virtualize" ItemsProvider="LoadEventsAsync" ItemSize="350" OverscanCount="4" Context="evt">
-                        <ItemContent>
-                            <MudItem @key="evt.Id" xs="@bp.Xs" sm="@bp.Sm" md="@bp.Md" lg="@bp.Lg">
-                                <EventCard Event="@evt"
-                                           Layout="@_currentLayout"
-                                           IsSelected="@(_selectedEvent?.Id == evt.Id && _detailDrawerOpen)"
-                                           CardFieldVisibility="@_cardFieldVisibility"
-                                            OnClick="SelectEvent"
-                                            OnEditRequested="NavigateToEdit"
-                                            OnDeleteRequested="OpenDeleteDialog"
-                                            OnShareRequested="ShareEventAsync" />
-                            </MudItem>
-                        </ItemContent>
-                        <Placeholder>
-                            <MudItem xs="@bp.Xs" sm="@bp.Sm" md="@bp.Md" lg="@bp.Lg" xl="@bp.Xl">
-                                <EventCardSkeleton Layout="@_currentLayout" />
-                            </MudItem>
-                        </Placeholder>
-                    </Virtualize>
-                }
             </MudGrid>
 
-            @if (_browseMode == BrowseMode.Pagination && _eventsLoaded && _totalCount > 0)
+            @if (_eventsLoaded && _recoveryCode is not null)
             {
-                <EventListPagination CurrentPage="@_currentPage"
-                                     TotalPages="@((_totalCount + _pageSize - 1) / _pageSize)"
+                <section class="event-list__recovery" aria-labelledby="event-discovery-recovery-heading">
+                    <h2 id="event-discovery-recovery-heading">@T("ui.discovery.recovery.heading", "Search needs your attention")</h2>
+                    <p>@RecoveryMessage</p>
+                    @if (_pagedEvents.Count > 0)
+                    {
+                        <p>@T("ui.discovery.previous_results", "Previously loaded events remain here to keep your place. A new search replaces them; it does not add to this selection.")</p>
+                    }
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               Disabled="@_isLoadingPage" OnClick="RefreshList">
+                        @T("ui.discovery.restart", "Start a new search")
+                    </MudButton>
+                </section>
+            }
+            else if (_eventsLoaded && _traversal is not null)
+            {
+                @if (_traversal.Truncated)
+                {
+                    <p class="event-list__truncated">
+                        @T("ui.discovery.truncated", "This search is bounded and may not include every matching event. Refine your filters to explore further.")
+                    </p>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RefineFiltersAsync">
+                        @T("ui.discovery.refine", "Refine filters")
+                    </MudButton>
+                }
+                <EventListPagination LoadedCount="@_pagedEvents.Count"
+                                     SnapshotCount="@_traversal.SnapshotCount"
+                                     HasMore="@CanContinue"
                                      PageSize="@_pageSize"
-                                     TotalCount="@_totalCount"
                                      IsLoading="@_isLoadingPage"
-                                     CurrentPageChanged="OnPageChanged"
+                                     NextRequested="LoadMoreAsync"
                                      PageSizeChanged="OnPageSizeChanged" />
             }
 
 
 
-            @if (_eventsLoaded && _totalCount == 0)
+            @if (_eventsLoaded && _recoveryCode is null && _pagedEvents.Count == 0 && _traversal?.Truncated != true)
 
             {
 

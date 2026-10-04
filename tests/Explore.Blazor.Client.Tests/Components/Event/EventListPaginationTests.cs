@@ -1,92 +1,75 @@
+using Explore.Blazor.Client.Contracts.Services;
+using Microsoft.Extensions.DependencyInjection;
 using EventListPaginationComponent = Explore.Blazor.Client.Pages.Events.Components.EventListPagination;
 
 namespace Explore.Blazor.Client.Tests.Components.Event;
 
 public class EventListPaginationTests : IDisposable
 {
-    private readonly BlazorTestContext _ctx;
-
-    public EventListPaginationTests()
-    {
-        _ctx = new BlazorTestContext();
-    }
-
+    private readonly BlazorTestContext _ctx = new();
     public void Dispose() => _ctx.Dispose();
 
     [Test]
-    public async Task Pagination_RendersPageSummary()
+    public async Task Continuation_RendersNativeActionOnlyWhileServerOffersMore()
     {
+        var requested = false;
         var cut = _ctx.RenderMudComponent<EventListPaginationComponent>(p => p
-            .Add(x => x.CurrentPage, 1)
-            .Add(x => x.TotalPages, 5)
-            .Add(x => x.PageSize, 20)
-            .Add(x => x.TotalCount, 100));
+            .Add(x => x.LoadedCount, 20)
+            .Add(x => x.SnapshotCount, 43)
+            .Add(x => x.HasMore, true)
+            .Add(x => x.NextRequested, () => requested = true));
 
-        // "Showing 1–20 of 100 events"
-        await Assert.That(cut.Markup).Contains("Showing");
-        await Assert.That(cut.Markup).Contains("100");
-        await Assert.That(cut.Markup).Contains("events");
+        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        await Assert.That(requested).IsTrue();
+        await Assert.That(cut.FindAll("[role='navigation']").Count).IsEqualTo(0);
+
+        cut.Render(p => p.Add(x => x.HasMore, false));
+        await Assert.That(cut.FindAll("button").Count).IsEqualTo(0);
     }
 
     [Test]
-    public async Task Pagination_RendersPerPageLabel()
+    public async Task Continuation_DisablesNextDuringRequest()
     {
         var cut = _ctx.RenderMudComponent<EventListPaginationComponent>(p => p
-            .Add(x => x.CurrentPage, 1)
-            .Add(x => x.TotalPages, 5)
-            .Add(x => x.PageSize, 20)
-            .Add(x => x.TotalCount, 100));
-
-        await Assert.That(cut.Markup).Contains("Per page:");
+            .Add(x => x.HasMore, true)
+            .Add(x => x.IsLoading, true));
+        await Assert.That(cut.Find("button").HasAttribute("disabled")).IsTrue();
+        await Assert.That(cut.Find(".event-list-pagination").GetAttribute("aria-busy")).IsEqualTo("true");
     }
 
     [Test]
-    public async Task Pagination_RendersMudPaginationComponent()
+    public async Task Continuation_BatchSizeChangeIsAnExplicitAction()
     {
+        var chosenSize = 0;
         var cut = _ctx.RenderMudComponent<EventListPaginationComponent>(p => p
-            .Add(x => x.CurrentPage, 1)
-            .Add(x => x.TotalPages, 5)
-            .Add(x => x.PageSize, 20)
-            .Add(x => x.TotalCount, 100));
-
-        await Assert.That(cut.Markup).Contains("mud-pagination");
+            .Add(x => x.PageSizeChanged, (int size) => chosenSize = size));
+        await cut.InvokeAsync(() => cut.FindComponent<MudBlazor.MudSelect<int>>().Instance.ValueChanged.InvokeAsync(50));
+        await Assert.That(chosenSize).IsEqualTo(50);
     }
 
     [Test]
-    public async Task Pagination_ShowsCorrectRangeForPage2()
+    public async Task Continuation_LanguageChangeUpdatesBatchControlWithoutChangingMembership()
     {
+        var translation = Substitute.For<ITranslationService>();
+        var language = "en";
+        translation.T("ui.discovery.batch_size", Arg.Any<string?>()).Returns(_ => language);
+        _ctx.Services.AddSingleton(translation);
         var cut = _ctx.RenderMudComponent<EventListPaginationComponent>(p => p
-            .Add(x => x.CurrentPage, 2)
-            .Add(x => x.TotalPages, 5)
-            .Add(x => x.PageSize, 20)
-            .Add(x => x.TotalCount, 100));
+            .Add(x => x.LoadedCount, 20)
+            .Add(x => x.SnapshotCount, 43));
+        var rendered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnMarkupUpdated += (_, _) =>
+        {
+            if (cut.FindComponent<MudBlazor.MudSelect<int>>().Instance.Label == "ar")
+                rendered.TrySetResult();
+        };
 
-        // Page 2: items 21–40
-        await Assert.That(cut.Markup).Contains("21");
-        await Assert.That(cut.Markup).Contains("40");
-    }
+        language = "ar";
+        await cut.InvokeAsync(() => translation.OnLanguageChanged += Raise.Event<Action<string>>(language));
+        await rendered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-    [Test]
-    public async Task Pagination_HasNavigationRole()
-    {
-        var cut = _ctx.RenderMudComponent<EventListPaginationComponent>(p => p
-            .Add(x => x.CurrentPage, 1)
-            .Add(x => x.TotalPages, 5)
-            .Add(x => x.PageSize, 20)
-            .Add(x => x.TotalCount, 100));
-
-        await Assert.That(cut.Markup).Contains("role=\"navigation\"");
-    }
-
-    [Test]
-    public async Task Pagination_HidesSummary_WhenTotalCountIsZero()
-    {
-        var cut = _ctx.RenderMudComponent<EventListPaginationComponent>(p => p
-            .Add(x => x.CurrentPage, 1)
-            .Add(x => x.TotalPages, 0)
-            .Add(x => x.PageSize, 20)
-            .Add(x => x.TotalCount, 0));
-
-        await Assert.That(cut.Markup).DoesNotContain("Showing");
+        await Assert.That(cut.FindComponent<MudBlazor.MudSelect<int>>().Instance.Label).IsEqualTo(language);
+        await Assert.That(cut.Instance.LoadedCount).IsEqualTo(20);
+        await Assert.That(cut.Instance.SnapshotCount).IsEqualTo(43);
     }
 }

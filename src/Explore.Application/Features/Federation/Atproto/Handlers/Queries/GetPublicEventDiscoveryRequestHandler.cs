@@ -16,6 +16,7 @@ using Explore.Domain.Services.Discovery;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using FluentValidation;
+using static Explore.Application.Features.Federation.Atproto.Handlers.Queries.EventDiscoveryCandidateMapping;
 
 namespace Explore.Application.Features.Federation.Atproto.Handlers.Queries;
 
@@ -111,17 +112,7 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
                     federatedItems[index] = federatedItems[index] with { DiscoveryIdentityId = root };
         }
 
-        List<EventDiscoveryItemDto> merged = localItems
-            .Concat(federatedItems)
-            .GroupBy(HomeDiscoveryAllocator.CanonicalIdentity)
-            .Select(group => group
-                .OrderBy(item => item.Event is not null
-                    && bindingsByKey.TryGetValue(item.Event.Id.ToString("D"), out var binding)
-                    && binding.Alias is null ? 0 : 1)
-                .ThenBy(item => item.Source == "local" ? 0 : 1)
-                .ThenBy(item => item.Event?.Id ?? item.FederatedEvent!.Id)
-                .First())
-            .ToList();
+        List<EventDiscoveryItemDto> merged = Collapse(localItems.Concat(federatedItems), bindingsByKey);
         merged.Sort(CreateComparer(criteria.SortBy, criteria.SortDescending));
         int offset = checked((requestedPage - 1) * requestedPageSize);
         List<EventDiscoveryItemDto> pageItems = merged
@@ -135,8 +126,38 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
             requestedPage,
             requestedPageSize);
     }
+}
 
-    private static EventDiscoveryItemDto MapLocal(EventListDto value, bool includeFederationMetadata) => new()
+public static class EventDiscoveryCandidateMapping
+{
+    public static List<EventDiscoveryItemDto> Collapse(
+        IEnumerable<EventDiscoveryItemDto> items,
+        IReadOnlyDictionary<string, EventDiscoveryIdentity> bindingsByKey) => items
+            .GroupBy(HomeDiscoveryAllocator.CanonicalIdentity)
+            .Select(group => group
+                .Order(Comparer<EventDiscoveryItemDto>.Create((left, right) => CompareRepresentations(
+                    left, left.Event is not null
+                        && bindingsByKey.TryGetValue(left.Event.Id.ToString("D"), out var leftBinding)
+                        && leftBinding.Alias is null,
+                    right, right.Event is not null
+                        && bindingsByKey.TryGetValue(right.Event.Id.ToString("D"), out var rightBinding)
+                        && rightBinding.Alias is null)))
+                .First())
+            .ToList();
+
+    public static int CompareRepresentations(
+        EventDiscoveryItemDto left, bool leftIsPrimary, EventDiscoveryItemDto right, bool rightIsPrimary)
+    {
+        int primary = rightIsPrimary.CompareTo(leftIsPrimary);
+        if (primary != 0)
+            return primary;
+        int source = (right.Source == "local").CompareTo(left.Source == "local");
+        return source != 0 ? source : StringComparer.Ordinal.Compare(
+            EventDiscoveryRank.SourceKey(left.Event?.Id ?? left.FederatedEvent!.Id),
+            EventDiscoveryRank.SourceKey(right.Event?.Id ?? right.FederatedEvent!.Id));
+    }
+
+    public static EventDiscoveryItemDto MapLocal(EventListDto value, bool includeFederationMetadata) => new()
     {
         Source = "local",
         Event = value,
@@ -150,7 +171,7 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
             : null
     };
 
-    private static EventDiscoveryItemDto MapFederated(AtprotoEventProjection value) => new()
+    public static EventDiscoveryItemDto MapFederated(AtprotoEventProjection value) => new()
     {
         Source = "atproto",
         FederatedEvent = new FederatedEventDto
@@ -174,7 +195,7 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
         }
     };
 
-    private static bool TryCreateProjectionQuery(
+    public static bool TryCreateProjectionQuery(
         GetEventListRequest criteria,
         int take,
         DateTimeOffset now,
@@ -283,14 +304,15 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
         _ => AtprotoEventDiscoverySort.Date
     };
 
-    private static Comparison<EventDiscoveryItemDto> CreateComparer(string? sortBy, bool descending)
+    public static Comparison<EventDiscoveryItemDto> CreateComparer(string? sortBy, bool descending)
     {
         AtprotoEventDiscoverySort sort = MapSort(sortBy);
         return (left, right) =>
         {
             int primary = sort switch
             {
-                AtprotoEventDiscoverySort.Title => StringComparer.OrdinalIgnoreCase.Compare(Title(left), Title(right)),
+                AtprotoEventDiscoverySort.Title => StringComparer.Ordinal.Compare(
+                    EventDiscoveryRank.TitleKey(Title(left)), EventDiscoveryRank.TitleKey(Title(right))),
                 AtprotoEventDiscoverySort.Views => Views(left).CompareTo(Views(right)),
                 AtprotoEventDiscoverySort.CreatedAt => CreatedAt(left).CompareTo(CreatedAt(right)),
                 _ => Nullable.Compare(StartsAt(left), StartsAt(right))
@@ -299,12 +321,17 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
             {
                 primary = -primary;
             }
-            return primary != 0 ? primary : StableIdentity(left).CompareTo(StableIdentity(right));
+            if (primary != 0)
+                return primary;
+            int sourceKind = (left.Event is null ? EventDiscoverySourceKind.AtprotoRecord : EventDiscoverySourceKind.LocalEvent)
+                .CompareTo(right.Event is null ? EventDiscoverySourceKind.AtprotoRecord : EventDiscoverySourceKind.LocalEvent);
+            return sourceKind != 0 ? sourceKind : StringComparer.Ordinal.Compare(
+                EventDiscoveryRank.SourceKey(StableIdentity(left)), EventDiscoveryRank.SourceKey(StableIdentity(right)));
         };
     }
 
     private static Guid StableIdentity(EventDiscoveryItemDto value) =>
-        value.Federation?.AtprotoRecordId ?? value.Event?.Id ?? value.FederatedEvent?.Id ?? Guid.Empty;
+        value.Event?.Id ?? value.FederatedEvent?.Id ?? Guid.Empty;
 
     private static string Title(EventDiscoveryItemDto value) =>
         value.Event?.Title ?? value.FederatedEvent?.Name ?? string.Empty;
@@ -315,5 +342,5 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
         value.Event?.CreatedAtUtc ?? value.FederatedEvent?.CreatedAtUtc ?? DateTimeOffset.MinValue;
 
     private static DateTimeOffset? StartsAt(EventDiscoveryItemDto value) =>
-        value.Event?.FirstSessionStartUtc ?? value.FederatedEvent?.StartsAtUtc;
+        value.Event?.MatchingSession?.StartsAtUtc ?? value.Event?.FirstSessionStartUtc ?? value.FederatedEvent?.StartsAtUtc;
 }

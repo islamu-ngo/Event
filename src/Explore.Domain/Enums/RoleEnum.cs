@@ -26,5 +26,6 @@ public enum RoleEnum
     EventOwner = 41,
     EventManager = 42,
     RegistrationManager = 43,
-    CheckInStaff = 44
+    CheckInStaff = 44,
+    EventDiscoveryReviewer = 45
 }

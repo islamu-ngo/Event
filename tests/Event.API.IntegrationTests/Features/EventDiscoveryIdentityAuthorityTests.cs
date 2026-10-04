@@ -1,11 +1,14 @@
 using System.Net;
+using System.Text.Json;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using Explore.Persistence;
+using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +16,53 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed class EventDiscoveryIdentityAuthorityTests
 {
+    [Test]
+    public async Task ReviewerPresetSeedingRequiresExplicitAssignmentAndDoesNotAllowOwnerSelfReview()
+    {
+        await using var factory = new NativeEventTagsFactory(relational: true);
+        using var client = factory.CreateClient();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await LookupTableSeeder.SeedAsync(context, CancellationToken.None);
+            await LookupTableSeeder.SeedAsync(context, CancellationToken.None);
+            var reviewerPermissions = await context.RolePermissions
+                .Where(binding => binding.RoleId == (int)RoleEnum.EventDiscoveryReviewer)
+                .Select(binding => binding.Permission.MasterCode)
+                .ToArrayAsync();
+            await Assert.That(reviewerPermissions).IsEquivalentTo(
+            [
+                "event:view",
+                PermissionCodes.EventUpdate,
+                PermissionCodes.EventReviewDiscoveryIdentity,
+                PermissionCodes.EventReverseDiscoveryIdentity
+            ]);
+            var ownerPermissions = await context.RolePermissions
+                .Where(binding => binding.RoleId == (int)RoleEnum.EventOwner)
+                .Select(binding => binding.Permission.MasterCode)
+                .ToArrayAsync();
+            await Assert.That(ownerPermissions).Contains(PermissionCodes.EventReviewDiscoveryIdentity);
+            await Assert.That(ownerPermissions).Contains(PermissionCodes.EventReverseDiscoveryIdentity);
+            await Assert.That(await context.RolePermissions.AnyAsync(binding =>
+                binding.RoleId == (int)RoleEnum.EventManager
+                && (binding.Permission.MasterCode == PermissionCodes.EventReviewDiscoveryIdentity
+                    || binding.Permission.MasterCode == PermissionCodes.EventReverseDiscoveryIdentity))).IsFalse();
+            await Assert.That(await context.EventRoleAssignments.AnyAsync(
+                assignment => assignment.RoleId == (int)RoleEnum.EventDiscoveryReviewer)).IsFalse();
+        }
+        var seeded = await SeedAsync(factory);
+        client.DefaultRequestHeaders.Add(
+            TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(seeded.UserId));
+        using var response = await client.GetAsync(
+            $"/api/event/{seeded.SourceId:D}/discovery-identity?candidateEventId={seeded.PublicId:D}");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var links = body.RootElement.GetProperty("_links");
+        await Assert.That(links.TryGetProperty("candidates", out _)).IsTrue();
+        await Assert.That(links.TryGetProperty("review", out _)).IsFalse();
+        await Assert.That(links.TryGetProperty("reverse", out _)).IsFalse();
+    }
+
     [Test]
     public async Task CandidateEvidenceExcludesPrivateRecordsBeforeReturningManagedMatches()
     {

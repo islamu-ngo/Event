@@ -121,13 +121,12 @@ public sealed partial class HomeDiscoveryService(
         }
         catch (ApiException exception)
         {
-            var error = exception.InnerException?.Message ?? exception.Message;
-            LogApiFailure(logger, exception.StatusCode, error, exception);
+            LogApiFailure(logger, exception.StatusCode);
             return null;
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            LogUnexpectedFailure(logger, exception);
+            LogUnexpectedFailure(logger);
             return null;
         }
     }
@@ -164,9 +163,9 @@ public sealed partial class HomeDiscoveryService(
 
     private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180;
 
-    [LoggerMessage(LogLevel.Warning, "Home discovery API request failed with status {StatusCode}: {Error}")]
-    private static partial void LogApiFailure(ILogger logger, int statusCode, string error, Exception exception);
+    [LoggerMessage(LogLevel.Warning, "Home discovery API request failed with status {StatusCode}.")]
+    private static partial void LogApiFailure(ILogger logger, int statusCode);
 
     [LoggerMessage(LogLevel.Warning, "Home discovery API request failed unexpectedly.")]
-    private static partial void LogUnexpectedFailure(ILogger logger, Exception exception);
+    private static partial void LogUnexpectedFailure(ILogger logger);
 }

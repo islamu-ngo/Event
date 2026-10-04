@@ -14,11 +14,8 @@ public partial class ExploreDbContext
 {
     public override int SaveChanges() => SaveChanges(acceptAllChangesOnSuccess: true);
 
-    public override int SaveChanges(bool acceptAllChangesOnSuccess)
-    {
-        PrepareTrackedEntities();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
-    }
+    public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
+        SaveChangesAsync(acceptAllChangesOnSuccess, CancellationToken.None).GetAwaiter().GetResult();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
@@ -27,12 +24,49 @@ public partial class ExploreDbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        PrepareTrackedEntities();
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (!Database.IsRelational())
+        {
+            PrepareTrackedEntities();
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        if (Database.CurrentTransaction is not null)
+        {
+            await DisclosureMutations.CaptureAsync(cancellationToken);
+            PrepareTrackedEntities();
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        return await Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellationToken);
+            try
+            {
+                await DisclosureMutations.CaptureAsync(cancellationToken);
+                PrepareTrackedEntities();
+                // Preserve the source write states until the source/epoch transaction
+                // commits, including a provider retry after terminal fence failure.
+                int changed = await base.SaveChangesAsync(false, cancellationToken);
+                await FlushDisclosureAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                if (acceptAllChangesOnSuccess)
+                    ChangeTracker.AcceptAllChanges();
+                return changed;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                ResetDisclosureMutations();
+                throw;
+            }
+        });
     }
 
     internal async Task<int> SavePrivacyErasureChangesAsync(CancellationToken cancellationToken)
     {
+        if (Database.IsRelational())
+            await DisclosureMutations.CaptureAsync(cancellationToken);
         PrepareTrackedEntities();
         foreach (var entry in ChangeTracker.Entries()
                      .Where(item => item.State is EntityState.Added or EntityState.Modified))

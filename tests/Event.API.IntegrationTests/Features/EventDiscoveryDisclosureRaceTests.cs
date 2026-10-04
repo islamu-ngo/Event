@@ -17,6 +17,54 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class EventDiscoveryDisclosureRaceTests
 {
     [Test]
+    public async Task ConditionalImageExecutesNotModifiedOnlyWhileCurrentPublicAuthorityRemainsValid()
+    {
+        await using var factory = new NativeEventTagsFactory(relational: true);
+        using var client = factory.CreateClient();
+        var seed = await SeedAsync(factory, $"image-{Guid.CreateVersion7():N}");
+        string route;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var entity = await context.Events.FindAsync(seed.EventId);
+            ArgumentNullException.ThrowIfNull(entity);
+            route = $"/api/event/public/event-{entity.PublicCode}/og-image";
+        }
+
+        using var initial = await client.GetAsync(route);
+        await Assert.That(initial.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(initial.Content.Headers.ContentType?.MediaType).IsEqualTo("image/png");
+        await Assert.That(await initial.Content.ReadAsByteArrayAsync()).IsNotEmpty();
+        var etag = initial.Headers.ETag;
+        ArgumentNullException.ThrowIfNull(etag);
+        await Assert.That(etag.IsWeak).IsFalse();
+
+        using var unchanged = new HttpRequestMessage(HttpMethod.Get, route);
+        unchanged.Headers.IfNoneMatch.Add(etag);
+        using var notModified = await client.SendAsync(unchanged);
+        await Assert.That(notModified.StatusCode).IsEqualTo(HttpStatusCode.NotModified);
+        await Assert.That(await notModified.Content.ReadAsByteArrayAsync()).IsEmpty();
+        await Assert.That(notModified.Headers.ETag).IsEqualTo(etag);
+        await Assert.That(notModified.Headers.CacheControl?.MustRevalidate).IsTrue();
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var entity = await context.Events.FindAsync(seed.EventId);
+            ArgumentNullException.ThrowIfNull(entity);
+            entity.VisibilityTypeId = (int)VisibilityTypeEnum.Private;
+            await context.SaveChangesAsync();
+        }
+
+        using var restricted = new HttpRequestMessage(HttpMethod.Get, route);
+        restricted.Headers.IfNoneMatch.Add(etag);
+        using var concealed = await client.SendAsync(restricted);
+        await Assert.That(concealed.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(concealed.Headers.ETag).IsNull();
+        await Assert.That(concealed.Headers.CacheControl?.Public == true).IsFalse();
+    }
+
+    [Test]
     public async Task CommittedRestrictionPrecedesConditionalDiscoveryReadWithoutCachedMembership()
     {
         await using var factory = new NativeEventTagsFactory(relational: true);
@@ -45,7 +93,9 @@ public sealed class EventDiscoveryDisclosureRaceTests
         using var response = await heldRead;
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string body = await response.Content.ReadAsStringAsync(deadline.Token);
-        await Assert.That(body).DoesNotContain(marker);
+        using var parsed = JsonDocument.Parse(body);
+        await Assert.That(parsed.RootElement.GetProperty("_embedded").GetProperty("items").GetArrayLength()).IsEqualTo(0);
+        await Assert.That(parsed.RootElement.GetProperty("snapshotCount").GetInt32()).IsEqualTo(0);
         await Assert.That(body).DoesNotContain(eventId.ToString());
 
         async Task<HttpResponseMessage> ReadAfterRestrictionAsync()
@@ -74,7 +124,9 @@ public sealed class EventDiscoveryDisclosureRaceTests
             $"/api/event?searchTerm={marker}&areaId={Guid.CreateVersion7():D}");
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string body = await response.Content.ReadAsStringAsync();
-        await Assert.That(body).DoesNotContain(marker);
+        using var parsed = JsonDocument.Parse(body);
+        await Assert.That(parsed.RootElement.GetProperty("_embedded").GetProperty("items").GetArrayLength()).IsEqualTo(0);
+        await Assert.That(parsed.RootElement.GetProperty("snapshotCount").GetInt32()).IsEqualTo(0);
         await Assert.That(body).DoesNotContain(eventId.ToString());
     }
 
@@ -162,7 +214,7 @@ public sealed class EventDiscoveryDisclosureRaceTests
         using var initial = await client.GetAsync(route);
         await Assert.That(initial.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var initialBody = JsonDocument.Parse(await initial.Content.ReadAsStringAsync());
-        await Assert.That(initialBody.RootElement.GetProperty("totalCount").GetInt32()).IsEqualTo(1);
+        await Assert.That(initialBody.RootElement.GetProperty("snapshotCount").GetInt32()).IsEqualTo(1);
         var matching = initialBody.RootElement.GetProperty("_embedded")
             .GetProperty("items")[0].GetProperty("event").GetProperty("matchingSession");
         await Assert.That(matching.GetProperty("city").GetString()).IsEqualTo("Brussels");
@@ -191,8 +243,8 @@ public sealed class EventDiscoveryDisclosureRaceTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string body = await response.Content.ReadAsStringAsync();
         using var parsed = JsonDocument.Parse(body);
-        await Assert.That(parsed.RootElement.GetProperty("totalCount").GetInt32()).IsEqualTo(0);
-        await Assert.That(body).DoesNotContain(marker);
+        await Assert.That(parsed.RootElement.GetProperty("snapshotCount").GetInt32()).IsEqualTo(0);
+        await Assert.That(parsed.RootElement.GetProperty("_embedded").GetProperty("items").GetArrayLength()).IsEqualTo(0);
         await Assert.That(body).DoesNotContain(seeded.EventId.ToString());
         await Assert.That(body).DoesNotContain("Brussels");
     }

@@ -4,6 +4,9 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IUserLocationPrivacyErasureRepository
 {
+    /// <summary>Acquires the native subject fence before any erasure source write.</summary>
+    Task FenceSubjectAsync(Guid subjectId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Location>> GetOwnedPrivateHomesAsync(
         Guid ownerUserId,
         CancellationToken cancellationToken);

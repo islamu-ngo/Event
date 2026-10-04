@@ -7,9 +7,34 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
 {
     private readonly BlazorTestContext _context = new();
     private readonly IdentitySurface _service = new();
+    private readonly IEventClient _events = Substitute.For<IEventClient>();
+    private readonly List<Guid> _publicReads = [];
 
-    public EventDiscoveryIdentityPanelTests() =>
+    public EventDiscoveryIdentityPanelTests()
+    {
         _context.Services.AddSingleton<IEventDiscoveryIdentityService>(_service);
+        _events.GetEventByIdAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                _publicReads.Add(call.Arg<Guid>());
+                return PublicListing();
+            });
+        var management = Substitute.For<IEventManagementReadClient>();
+        management.GetEventManagementDetailsAsync(Arg.Any<Guid>(), cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(PublicListing());
+        _context.Services.AddSingleton<IEventService>(provider => new EventService(
+            _events,
+            Substitute.For<IEventLifecycleClient>(),
+            management,
+            Substitute.For<IEventParticipationClient>(),
+            Substitute.For<IEventPublicActionClient>(),
+            provider.GetRequiredService<ILogger<EventService>>()));
+    }
+
+    private HalResourceOfEventDto PublicListing() => new()
+    {
+        Id = _service.TargetId, Slug = "Related public listing", PublicCode = "ABC123"
+    };
 
     [Test]
     public async Task Refreshed_original_resource_discards_revoked_canonical_and_decision_links()
@@ -37,6 +62,7 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
             parameters.Add(component => component.Event, Event()));
         await Assert.That(cut.FindAll("[data-identity-canonical]")).IsEmpty();
         await Assert.That(cut.FindAll("[data-identity-same], [data-identity-reverse], [data-identity-candidates]")).IsEmpty();
+        await Assert.That(_publicReads).IsEmpty();
     }
 
     [Test]
@@ -48,10 +74,42 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
         string before = navigation.Uri;
         var cut = _context.RenderMudComponent<EventDiscoveryIdentityPanel>(parameters =>
             parameters.Add(component => component.Event, original));
-        await Assert.That(cut.Find("[data-identity-canonical]").GetAttribute("href")).IsEqualTo($"/events/{_service.TargetId:D}");
+        await Assert.That(cut.Find("[data-identity-canonical]").GetAttribute("href"))
+            .IsEqualTo("/events/related-public-listing-ABC123");
+        await Assert.That(_publicReads.Single()).IsEqualTo(_service.TargetId);
         await Assert.That(navigation.Uri).IsEqualTo(before);
         await Assert.That(original.Id).IsEqualTo(_service.SourceId);
         await Assert.That(_service.Decisions).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(404)]
+    [Arguments(403)]
+    [Arguments(503)]
+    public async Task Unavailable_public_canonical_does_not_use_management_detail(int status)
+    {
+        _service.Resource = Resource("canonical", "review");
+        _events.GetEventByIdAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new ApiException("unavailable", status, "", new Dictionary<string, IEnumerable<string>>(), null));
+        var original = Event();
+        var cut = _context.RenderMudComponent<EventDiscoveryIdentityPanel>(parameters =>
+            parameters.Add(component => component.Event, original));
+        await Assert.That(cut.FindAll("[data-identity-canonical]")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-identity-same]")).IsNotEmpty();
+        await Assert.That(original.Id).IsEqualTo(_service.SourceId);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Missing_public_resource_or_public_code_withholds_canonical_href(bool missingCode)
+    {
+        _service.Resource = Resource("canonical");
+        _events.GetEventByIdAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(missingCode ? new HalResourceOfEventDto { Id = _service.TargetId, Slug = "Related" } : null!);
+        var cut = _context.RenderMudComponent<EventDiscoveryIdentityPanel>(parameters =>
+            parameters.Add(component => component.Event, Event()));
+        await Assert.That(cut.FindAll("[data-identity-canonical]")).IsEmpty();
     }
 
     [Test]
@@ -61,11 +119,14 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
     public async Task DecisionRemainsBoundToOriginalEventAndExplicitCurrentTarget(string button)
     {
         _service.Resource = Resource("review", "reverse");
+        _service.Resource._links!["canonical"] = new() { Href = $"/api/event/{_service.TargetId}", Method = "GET" };
         var cut = _context.RenderMudComponent<EventDiscoveryIdentityPanel>(parameters =>
             parameters.Add(component => component.Event, Event()));
         await cut.Find("input[type=checkbox]").ChangeAsync(new() { Value = true });
         await cut.Find($"[data-identity-{button}]").ClickAsync(new());
         var decision = _service.Decisions.Single();
+        await Assert.That(cut.Find("[data-identity-canonical]").GetAttribute("href"))
+            .IsEqualTo("/events/related-public-listing-ABC123");
         await Assert.That(decision.EventId).IsEqualTo(_service.SourceId);
         await Assert.That(decision.Request.PrimaryEventId).IsEqualTo(_service.TargetId);
         await Assert.That(decision.Request.ExpectedRevision).IsEqualTo(7);

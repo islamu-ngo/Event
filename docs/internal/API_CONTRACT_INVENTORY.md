@@ -801,7 +801,7 @@
 | 773 | `/api/storageobject/upload-sessions/{uploadSessionId}/content` | `PUT` | `UploadStorageUploadSessionContent` | Upload bytes for a reserved storage session | StorageObject | `UploadStorageUploadSessionContent` | `Authenticated` | no | _(none)_ | `Write` | _(none)_ |
 | 774 | `/api/storageobject/{id}` | `GET` | `GetStorageObjectById` | Get Storage Object by ID | StorageObject | `GetStorageObjectById` | `Authenticated` | no | _(none)_ | _(none)_ | `DetailData` |
 | 775 | `/api/storageobject/{id}` | `PATCH` | `UpdateStorageObject` | Update Storage Object | StorageObject | `UpdateStorageObject` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
-| 776 | `/api/storageobject/{id}` | `DELETE` | `DeleteStorageObject` | Delete Storage Object | StorageObject | `DeleteStorageObject` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
+| 776 | `/api/storageobject/{id}` | `DELETE` | `DeleteStorageObject` | Retire Storage Object | StorageObject | `DeleteStorageObject` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
 | 777 | `/api/storageobject/{id}/content` | `GET` | `GetStorageObjectContent` | Get Storage Object Content | StorageObject | `GetStorageObjectContent` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
 | 778 | `/api/storageobject/{id}/presigned-url` | `GET` | `GetStorageObjectPresignedDownloadUrl` | Get Presigned Download URL | StorageObject | `GetStorageObjectPresignedDownloadUrl` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
 | 779 | `/api/storageobject/{id}/public` | `GET` | `GetPublicStorageObjectImage` | Get Public Image | StorageObject | `GetPublicStorageObjectImage` | `Public` | no | _(none)_ | _(none)_ | _(none)_ |

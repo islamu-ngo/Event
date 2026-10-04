@@ -6,10 +6,14 @@ using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Seed;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +33,8 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
     private readonly string _keycloakAuthority;
     private readonly string _keycloakMetadataAddress;
     private readonly string _cerbosGrpcEndpoint;
+    private readonly string _databasePath = Path.Combine(
+        Path.GetTempPath(), $"security-api-{Guid.CreateVersion7():N}.db");
 
     /// <summary>
     /// When non-null, replaces the real IAuthorizationProvider with this instance.
@@ -57,10 +63,8 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
         {
             var testConfig = new Dictionary<string, string?>
             {
-                ["Database:Provider"] = "PostgreSql",
-                ["Database:Host"] = "localhost",
-                ["Database:Port"] = "5432",
-                ["Database:Database"] = "explore_db_test",
+                ["Database:Provider"] = "Sqlite",
+                ["Database:Database"] = _databasePath,
                 ["Database:Runtime:TlsMode"] = "Prefer",
                 ["Database:Runtime:TrustServerCertificate"] = "false",
                 ["Keycloak:Authority"] = _keycloakAuthority,
@@ -84,7 +88,23 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
         {
             services.RemoveExploreDbContextRegistrations();
 
-            services.AddInMemoryExploreDbContext($"InMemoryDbForSecurityTesting_{Guid.NewGuid():N}");
+            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            ConfigureDatabase(options);
+            using (var database = new ExploreDbContext(options.Options))
+            {
+                database.Database.EnsureCreated();
+                SqliteDatabaseInitializer.InitializeAsync(database, CancellationToken.None).GetAwaiter().GetResult();
+                LookupTableSeeder.SeedAsync(database).GetAwaiter().GetResult();
+            }
+            services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+            services.AddScoped(provider =>
+            {
+                var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+                database.ClearTenantFilterBypass();
+                database.TenantContext = provider.GetRequiredService<ITenantContext>();
+                database.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
+                return database;
+            });
 
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
@@ -144,6 +164,24 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
         });
     }
 
+    private void ConfigureDatabase(DbContextOptionsBuilder options)
+    {
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _databasePath
+        });
+        options.UseSnakeCaseNamingConvention();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+            DeleteDatabase();
+    }
+
     public override async ValueTask DisposeAsync()
     {
         try
@@ -162,6 +200,21 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
         {
             // Providers may already be disposed when the test host is shutting down.
         }
+        finally
+        {
+            DeleteDatabase();
+        }
+    }
+
+    private void DeleteDatabase()
+    {
+        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        ConfigureDatabase(options);
+        using var database = new ExploreDbContext(options.Options);
+        SqliteConnection.ClearPool((SqliteConnection)database.Database.GetDbConnection());
+        File.Delete(_databasePath);
+        File.Delete(_databasePath + "-wal");
+        File.Delete(_databasePath + "-shm");
     }
 
     private sealed class FixedDeploymentModeProvider(DeploymentMode mode) : IDeploymentModeProvider

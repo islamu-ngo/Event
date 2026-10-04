@@ -7,7 +7,7 @@ public sealed class SemanticUpdateExceptionArchitectureTests
     private static readonly SemanticException[] Exceptions =
     [
         new("SaveTenantOnboardingStepProgress", "/api/tenantonboarding/steps", "put", "Atomic onboarding progress checkpoint."),
-        new("SetControlPlaneTenantSetting", "/api/admin/control-plane/tenants/{tenantId}/settings/{key}", "put", "Exact tenant setting replacement addressed by route key."),
+        new("SetInstanceAdminTenantSetting", "/api/admin/instance/tenants/{tenantId}/settings/{key}", "put", "Exact tenant setting replacement addressed by route key."),
         new("UpdateOrganizationMemberRole", "/api/organizationmember/role", "put", "Authorized member-role replacement with last-admin protection."),
         new("SetOrganizationNotificationPreferenceMute", "/api/organization/{id}/notification-preferences/mute", "put", "Exact organization mute-state replacement."),
         new("UpdateOrganizationApprovalStatus", "/api/organization/{id}/approval-status", "put", "Audited organization approval transition."),

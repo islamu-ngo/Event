@@ -483,7 +483,7 @@ Its environment form is `Hosting__Topology`.
 | Key / environment variable | Values and default | Effect |
 |---|---|---|
 | `Hosting:Topology` / `Hosting__Topology` | `Split` (default) or `Standalone` | `Split` registers API plus Blazor; `Standalone` registers only `Event.Standalone`. Unknown values fail AppHost startup. |
-| `CONTROL_PLANE_PUBLIC_ORIGIN` | Exact browser-facing admin origin; AppHost fallback `http://admin.localhost:7002` | Forwarded to the API or combined host for admin-link generation and used as the selected BFF admin-host value. |
+| `INSTANCE_ADMIN_PUBLIC_ORIGIN` | Exact browser-facing admin origin; AppHost default `http://admin.localhost:7002` | Forwarded to the API or combined host for admin-link generation and used as the selected BFF admin-host value. No legacy variable fallback. |
 | `Bff:AdminHosts:0` / `Bff__AdminHosts__0` | Same exact public admin origin | AppHost injects this onto the selected BFF surface. Set it explicitly only when running the BFF/combined host outside AppHost. |
 | `ASPNETCORE_URLS` | Host binding chosen by the launch profile unless overridden | AppHost uses `WithHttpEndpoint(name: "http")` for dynamic internal HTTP and explicit HTTPS `https://localhost:7180`; direct `Event.Standalone` launch profiles reserve `http://localhost:5180` (and `https://localhost:7180` for the HTTPS profile). |
 
@@ -492,7 +492,7 @@ matches the browser-facing endpoint:
 
 ```bash
 Hosting__Topology=Standalone \
-CONTROL_PLANE_PUBLIC_ORIGIN=https://admin.localhost:7180 \
+INSTANCE_ADMIN_PUBLIC_ORIGIN=https://admin.localhost:7180 \
 aspire run --apphost src/Explore.AppHost/Explore.AppHost.csproj
 ```
 

@@ -253,10 +253,9 @@ public sealed class EventDiscoveryIdentitySurfaceTests
                 ReasonCode = "private_primary_reason", RelationshipRevision = 1
             };
             context.Set<EventDiscoveryIdentity>().AddRange(member, primary);
-            context.Set<EventDiscoveryRevision>().Add(new EventDiscoveryRevision
-            {
-                Id = Guid.CreateVersion7(), TenantId = tenant.TenantId, IdentityEpoch = 1
-            });
+            var revision = await context.Set<EventDiscoveryRevision>()
+                .SingleAsync(row => row.TenantId == tenant.TenantId);
+            revision.IdentityEpoch = 1;
         }
         await context.SaveChangesAsync();
         return new(tenant.UserId, source.Id, target.Id, title);

@@ -105,7 +105,6 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ITenantRouteContextAccessor, TenantRouteContextAccessor>();
         services.AddScoped<CircuitHandler, TenantCircuitHandler>();
         services.AddScoped<CircuitHandler, TokenCircuitHandler>();
-        services.AddSingleton<AdminHostControlPlaneShellSelector>();
         services.Configure<AtprotoAuthenticationOptions>(configuration.GetSection("Atproto"));
         services.Configure<AtprotoClientKeyOptions>(configuration.GetSection("Atproto"));
         services.AddSingleton<AtprotoClientKeyProvider>();

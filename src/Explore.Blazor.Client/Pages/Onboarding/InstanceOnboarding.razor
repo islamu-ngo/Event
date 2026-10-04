@@ -5,7 +5,7 @@
 @using Explore.Blazor.Client.Helpers
 @using Explore.Blazor.Client.Models.Responses
 @using Explore.Blazor.Client.Pages.Onboarding.Components
-@using Explore.Blazor.Client.Routing.ControlPlane
+@using Explore.Blazor.Client.Routing.InstanceAdmin
 @using Explore.Blazor.Client.Services
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
@@ -132,7 +132,7 @@
                             <MudButton Elevation="0"
                                        Color="Color.Secondary"
                                        Variant="Variant.Outlined"
-                                       Href="@ControlPlaneRoutes.Tenants"
+                                       Href="@InstanceAdminRoutes.Tenants"
                                        StartIcon="@Icons.Material.Filled.Domain">
                                 @T("success.multi_secondary", "Manage first tenant (optional)")
                             </MudButton>
@@ -596,7 +596,7 @@
                         ? T("tasks.status.available", "Available")
                         : T("tasks.status.post_launch", "Post-launch"),
                     T("tasks.scope.tenant", "Tenant scope"),
-                    CanManageTenants ? ControlPlaneRoutes.Tenants : null,
+                    CanManageTenants ? InstanceAdminRoutes.Tenants : null,
                     CanManageTenants ? T("tasks.first_tenant.action", "Manage tenants") : null,
                     CanManageTenants ? T("tasks.first_tenant.action_aria", "Manage the optional first tenant") : null));
             }

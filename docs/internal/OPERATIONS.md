@@ -594,7 +594,7 @@ the API pipeline authorizes it.
 
 AppHost publishes dynamic/non-guaranteed internal HTTP via `WithHttpEndpoint(name: "http")`; HTTPS remains `https://localhost:7180`. Direct `Event.Standalone` launch profiles reserve `http://localhost:5180` (and `https://localhost:7180` for the HTTPS profile).
 
-`CONTROL_PLANE_PUBLIC_ORIGIN` remains the public admin-host input in both
+`INSTANCE_ADMIN_PUBLIC_ORIGIN` is the public admin-host input in both
 topologies. AppHost forwards it to the API/combined host and sets
 `Bff__AdminHosts__0` on the selected BFF surface. Set it to the browser-facing
 admin origin when testing an explicit admin host; it is not inferred from an
@@ -1423,6 +1423,14 @@ coverage belongs to the existing runtime lanes rather than making the full
 provider matrix an every-PR prerequisite. Explicit MTP coverage arguments in
 `_build-test.yml` produce uniquely named reports, validated before one Codecov
 upload per lane with the `fast` or `runtime` flag. No shell command is intercepted.
+Validation runs only after a coverage-producing test was attempted, including
+failed tests. A restore/build failure before test execution leaves coverage
+unavailable rather than adding a misleading missing-report failure. Artifact
+retention still runs after failures; attempted tests with missing or invalid
+reports still fail validation.
+The upload lane enumerates downloaded Cobertura files explicitly and disables
+Codecov discovery. Reports under gitignored `artifacts/` must not depend on
+source-tree search; an empty downloaded artifact still fails closed.
 The weekly/manual `Coverage Evidence` workflow requests all fast selections
 and the established runtime/provider lanes from that reusable workflow.
 

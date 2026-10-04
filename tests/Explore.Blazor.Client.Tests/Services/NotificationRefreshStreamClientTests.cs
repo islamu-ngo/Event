@@ -5,6 +5,42 @@ namespace Explore.Blazor.Client.Tests.Services;
 public sealed class NotificationRefreshStreamClientTests
 {
     [Test]
+    public async Task RefreshCallbacks_DoNotOverlapOrRunAfterDisposal()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = CreateClient();
+        var count = 0;
+        client.RefreshReceived += async _ =>
+        {
+            Interlocked.Increment(ref count);
+            entered.TrySetResult();
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        };
+
+        var first = client.HandleWebPushRefresh();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            var concurrent = client.HandleNotificationRefresh(5, true, "refresh", null);
+            await Assert.That(count).IsEqualTo(1);
+            await concurrent.WaitAsync(TimeSpan.FromSeconds(5));
+            await client.HandleNotificationPoll().WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.That(count).IsEqualTo(1);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await first.WaitAsync(TimeSpan.FromSeconds(5));
+            await client.DisposeAsync();
+        }
+
+        await client.HandleWebPushRefresh();
+        await client.HandleNotificationPoll();
+        await Assert.That(count).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task HandleNotificationRefresh_RaisesRefreshReceivedWithParsedGeneratedAt()
     {
         var generatedAt = TestTime.UtcNow;

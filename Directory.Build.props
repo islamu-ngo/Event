@@ -32,6 +32,8 @@
     <Deterministic>true</Deterministic>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- WASM pack selection must not depend on installed workloads or the runner's latest runtime. -->
+    <RuntimeFrameworkVersion Condition="'$(UsingMicrosoftNETSdkBlazorWebAssembly)' == 'true'">10.0.10</RuntimeFrameworkVersion>
     <Authors>Amir Akrari, ISLAMU Team, and Contributors</Authors>
     <Company>ISLAMU (ASBL en formation)</Company>
     <Copyright>Copyright (c) 2026 ISLAMU (ASBL en formation). Licensed under AGPL-3.0-or-later.</Copyright>

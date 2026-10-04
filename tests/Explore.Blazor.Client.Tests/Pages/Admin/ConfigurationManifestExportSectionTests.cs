@@ -1,6 +1,6 @@
-using Explore.Blazor.Client.Contracts.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 
 namespace Explore.Blazor.Client.Tests.Pages.Admin;
@@ -27,7 +27,7 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
         await Assert.That(cut.Markup).Contains("whole instance");
         await Assert.That(cut.Markup).Contains("Secrets are omitted");
         await Assert.That(cut.Markup).Contains("not a backup");
-        await Assert.That(cut.Markup).DoesNotContain("/api/control-plane/configuration-manifest/export");
+        await Assert.That(cut.FindAll("a")).IsEmpty();
     }
 
     [Test]
@@ -90,7 +90,7 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
     }
 
     private static IConfigurationManifestExportService ExportService(
-        HalResourceOfControlPlaneOverviewDto capabilities)
+        HalResourceOfInstanceOverviewDto capabilities)
     {
         var service = Substitute.For<IConfigurationManifestExportService>();
         service.GetCapabilitiesAsync(Arg.Any<CancellationToken>())
@@ -98,14 +98,14 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
         return service;
     }
 
-    private static HalResourceOfControlPlaneOverviewDto Overview(params string[] relations) =>
+    private static HalResourceOfInstanceOverviewDto Overview(params string[] relations) =>
         new()
         {
             _links = relations.ToDictionary(
                 relation => relation,
                 relation => new HalLink
                 {
-                    Href = $"/api/control-plane/configuration-manifest/export?relation={relation}",
+                    Href = $"/api/admin/instance/configuration-manifest/export?relation={relation}",
                     Method = "GET"
                 },
                 StringComparer.Ordinal)

@@ -1,6 +1,6 @@
-using Explore.Blazor.Client.Contracts.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Pages.Admin.Instance;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -10,17 +10,17 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
 {
     private readonly BlazorTestContext _ctx = new();
     private readonly Guid _tenantId = Guid.NewGuid();
-    private readonly IControlPlaneTenantConfigurationService _configurationService =
-        Substitute.For<IControlPlaneTenantConfigurationService>();
-    private readonly IControlPlanePlanCatalogService _planCatalog =
-        Substitute.For<IControlPlanePlanCatalogService>();
+    private readonly IInstanceTenantConfigurationService _configurationService =
+        Substitute.For<IInstanceTenantConfigurationService>();
+    private readonly IInstancePlanCatalogService _planCatalog =
+        Substitute.For<IInstancePlanCatalogService>();
     private readonly IAccessibilityFocusService _focusService = Substitute.For<IAccessibilityFocusService>();
     private readonly IAccessibilityAnnouncerService _announcer = Substitute.For<IAccessibilityAnnouncerService>();
 
     public InstanceTenantConfigurationTests()
     {
-        _ctx.Services.RemoveAll<IControlPlaneTenantConfigurationService>();
-        _ctx.Services.RemoveAll<IControlPlanePlanCatalogService>();
+        _ctx.Services.RemoveAll<IInstanceTenantConfigurationService>();
+        _ctx.Services.RemoveAll<IInstancePlanCatalogService>();
         _ctx.Services.RemoveAll<IAccessibilityFocusService>();
         _ctx.Services.RemoveAll<IAccessibilityAnnouncerService>();
         _ctx.Services.AddSingleton(_configurationService);
@@ -39,7 +39,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
         var cut = RenderPage();
 
         cut.WaitForAssertion(() => cut.Find("h1").TextContent.Equals("Tenant configuration", StringComparison.Ordinal));
-        await Assert.That(_ctx.Services.GetRequiredService<IControlPlanePlanCatalogService>())
+        await Assert.That(_ctx.Services.GetRequiredService<IInstancePlanCatalogService>())
             .IsSameReferenceAs(_planCatalog);
         await _planCatalog.DidNotReceive().GetPlansAsync(Arg.Any<CancellationToken>());
         await _configurationService.Received(1).GetEffectiveConfigurationAsync(_tenantId, Arg.Any<CancellationToken>());
@@ -48,7 +48,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     [Test]
     public async Task LoadingThenEmpty_RendersAccessibleStates()
     {
-        var pending = new TaskCompletionSource<HalResourceOfControlPlaneTenantEffectiveConfigurationDto>();
+        var pending = new TaskCompletionSource<HalResourceOfInstanceTenantEffectiveConfigurationDto>();
         _configurationService.GetEffectiveConfigurationAsync(_tenantId, Arg.Any<CancellationToken>()).Returns(pending.Task);
 
         var cut = RenderPage();
@@ -62,7 +62,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     public async Task ThrownLoad_RendersSafeErrorWithoutRawException()
     {
         _configurationService.GetEffectiveConfigurationAsync(_tenantId, Arg.Any<CancellationToken>())
-            .Returns<Task<HalResourceOfControlPlaneTenantEffectiveConfigurationDto>>(_ =>
+            .Returns<Task<HalResourceOfInstanceTenantEffectiveConfigurationDto>>(_ =>
                 throw new InvalidOperationException("raw provider credential"));
 
         var cut = RenderPage();
@@ -79,7 +79,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
             "smtp.password",
             "raw-secret-value",
             isSensitive: true,
-            links: [ControlPlaneLinkRelations.Override, ControlPlaneLinkRelations.Lock]));
+            links: [InstanceAdminLinkRelations.Override, InstanceAdminLinkRelations.Lock]));
 
         var cut = RenderPage();
 
@@ -94,9 +94,9 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     public async Task PerSettingLinks_RenderOnlyTheirOwnActions()
     {
         ReturnConfiguration(
-            Setting("feature.override", "off", links: ControlPlaneLinkRelations.Override),
-            Setting("feature.lock", "on", links: ControlPlaneLinkRelations.Lock),
-            Setting("feature.unlock", "on", isLocked: true, links: ControlPlaneLinkRelations.Unlock),
+            Setting("feature.override", "off", links: InstanceAdminLinkRelations.Override),
+            Setting("feature.lock", "on", links: InstanceAdminLinkRelations.Lock),
+            Setting("feature.unlock", "on", isLocked: true, links: InstanceAdminLinkRelations.Unlock),
             Setting("feature.readonly", "on"));
 
         var cut = RenderPage();
@@ -113,7 +113,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     [Test]
     public async Task EffectiveConfiguration_RendersLockSourceAndReadOnlyPlanAssignment()
     {
-        var assignment = new ControlPlaneTenantPlanAssignmentDto
+        var assignment = new InstanceTenantPlanAssignmentDto
         {
             Id = Guid.NewGuid(),
             TenantId = _tenantId,
@@ -127,7 +127,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
             AssignedByUserId = Guid.NewGuid()
         };
         _configurationService.GetEffectiveConfigurationAsync(_tenantId, Arg.Any<CancellationToken>())
-            .Returns(new HalResourceOfControlPlaneTenantEffectiveConfigurationDto
+            .Returns(new HalResourceOfInstanceTenantEffectiveConfigurationDto
             {
                 TenantId = _tenantId,
                 PlanAssignment = assignment,
@@ -143,7 +143,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
         await Assert.That(cut.Markup).Contains("Active");
         await Assert.That(cut.Find("[data-setting-key='feature.locked'] dd[data-lock-source]").TextContent)
             .IsEqualTo("Tenant");
-        await Assert.That(_ctx.Services.GetRequiredService<IControlPlanePlanCatalogService>())
+        await Assert.That(_ctx.Services.GetRequiredService<IInstancePlanCatalogService>())
             .IsSameReferenceAs(_planCatalog);
         await _planCatalog.DidNotReceive().GetPlansAsync(Arg.Any<CancellationToken>());
         await Assert.That(cut.Markup).DoesNotContain("Apply assignment");
@@ -162,7 +162,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     [Test]
     public async Task OverrideSuccess_SubmitsTrimmedValueReloadsRestoresFocusAndAnnounces()
     {
-        ReturnConfiguration(Setting("ai.max_daily_messages", "500", links: ControlPlaneLinkRelations.Override));
+        ReturnConfiguration(Setting("ai.max_daily_messages", "500", links: InstanceAdminLinkRelations.Override));
         _configurationService.SetSettingAsync(
                 _tenantId,
                 "ai.max_daily_messages",
@@ -194,7 +194,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     {
         const string key = "email.smtp_host";
         const string value = "smtp.example.test";
-        ReturnConfiguration(Setting(key, value, links: ControlPlaneLinkRelations.Override));
+        ReturnConfiguration(Setting(key, value, links: InstanceAdminLinkRelations.Override));
         _configurationService.SetSettingAsync(_tenantId, key, value, Arg.Any<CancellationToken>())
             .Returns(CommandResult(true, "Setting overridden."));
         var cut = RenderPage();
@@ -218,7 +218,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     [Test]
     public async Task OverrideFailure_KeepsEditorDoesNotReloadAndAnnouncesAssertively()
     {
-        ReturnConfiguration(Setting("ai.max_daily_messages", "500", links: ControlPlaneLinkRelations.Override));
+        ReturnConfiguration(Setting("ai.max_daily_messages", "500", links: InstanceAdminLinkRelations.Override));
         _configurationService.SetSettingAsync(
                 _tenantId,
                 "ai.max_daily_messages",
@@ -242,7 +242,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     [Test]
     public async Task LockSuccess_CallsServiceReloadsAndRestoresFocus()
     {
-        ReturnConfiguration(Setting("feature.lock", "on", links: ControlPlaneLinkRelations.Lock));
+        ReturnConfiguration(Setting("feature.lock", "on", links: InstanceAdminLinkRelations.Lock));
         _configurationService.LockSettingAsync(_tenantId, "feature.lock", Arg.Any<CancellationToken>())
             .Returns(CommandResult(true, "Setting locked."));
         var cut = RenderPage();
@@ -268,13 +268,13 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
             Description = "خادم SMTP الأساسي."
         };
         _configurationService.GetEffectiveConfigurationAsync(_tenantId, Arg.Any<CancellationToken>())
-            .Returns(new HalResourceOfControlPlaneTenantEffectiveConfigurationDto
+            .Returns(new HalResourceOfInstanceTenantEffectiveConfigurationDto
             {
                 TenantId = _tenantId,
                 Settings = [setting],
                 Quotas =
                 [
-                    new ControlPlaneTenantQuotaUsageDto
+                    new InstanceTenantQuotaUsageDto
                     {
                         Key = "storage.bytes",
                         Limit = 10_000,
@@ -303,7 +303,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     [Test]
     public async Task UnlockFailure_CallsServiceWithoutReloadAndAnnouncesAssertively()
     {
-        ReturnConfiguration(Setting("feature.unlock", "on", isLocked: true, links: ControlPlaneLinkRelations.Unlock));
+        ReturnConfiguration(Setting("feature.unlock", "on", isLocked: true, links: InstanceAdminLinkRelations.Unlock));
         _configurationService.UnlockSettingAsync(_tenantId, "feature.unlock", Arg.Any<CancellationToken>())
             .Returns(CommandResult(false, "Setting cannot be unlocked.", "conflict"));
         var cut = RenderPage();
@@ -321,11 +321,11 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
     private IRenderedComponent<InstanceTenantConfiguration> RenderPage() =>
         _ctx.RenderMudComponent<InstanceTenantConfiguration>(parameters => parameters.Add(p => p.TenantId, _tenantId));
 
-    private void ReturnConfiguration(params ControlPlaneTenantEffectiveSettingDto[] settings) =>
+    private void ReturnConfiguration(params InstanceTenantEffectiveSettingDto[] settings) =>
         _configurationService.GetEffectiveConfigurationAsync(_tenantId, Arg.Any<CancellationToken>())
             .Returns(Configuration(settings));
 
-    private HalResourceOfControlPlaneTenantEffectiveConfigurationDto Configuration(params ControlPlaneTenantEffectiveSettingDto[] settings) =>
+    private HalResourceOfInstanceTenantEffectiveConfigurationDto Configuration(params InstanceTenantEffectiveSettingDto[] settings) =>
         new()
         {
             TenantId = _tenantId,
@@ -333,7 +333,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
             Quotas = []
         };
 
-    private static ControlPlaneTenantEffectiveSettingDto Setting(
+    private static InstanceTenantEffectiveSettingDto Setting(
         string key,
         string value,
         bool isLocked = false,
@@ -366,7 +366,7 @@ public sealed class InstanceTenantConfigurationTests : IDisposable
             relation => relation,
             relation => new HalLink
             {
-                Href = $"/api/admin/control-plane/tenants/settings/{relation}",
+                Href = $"/api/admin/instance/tenants/settings/{relation}",
                 Method = "POST"
             },
             StringComparer.OrdinalIgnoreCase);

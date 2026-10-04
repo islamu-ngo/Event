@@ -73,7 +73,7 @@ public sealed class EmailOptionalStandaloneTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 challenge.GetProperty("replacementChallenge").GetProperty(TokenProperty).GetString());
             using (var denied = await client.GetAsync(
-                $"/api/admin/control-plane/tenants/{PlatformDefaults.DefaultTenantId}"))
+                $"/api/admin/instance/tenants/{PlatformDefaults.DefaultTenantId}"))
                 await AssertStatusAsync(denied, HttpStatusCode.Unauthorized);
             using (var replaced = await client.PostAsJsonAsync("/api/auth/local/credential-replacement", new { newPassword = privatePassword }))
                 await AssertStatusAsync(replaced, HttpStatusCode.NoContent);
@@ -378,7 +378,7 @@ public sealed class EmailOptionalStandaloneTests
         using (var stillPrivate = await client.GetAsync("/api/Event"))
             await AssertStatusAsync(stillPrivate, HttpStatusCode.NotFound);
         using var activated = await client.PostAsJsonAsync(
-            $"/api/admin/control-plane/tenants/{PlatformDefaults.DefaultTenantId}/activate", new { });
+            $"/api/admin/instance/tenants/{PlatformDefaults.DefaultTenantId}/activate", new { });
         await AssertStatusAsync(activated, HttpStatusCode.OK);
     }
 

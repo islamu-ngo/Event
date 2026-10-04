@@ -2,7 +2,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using Explore.Blazor.Client.Services.Accessibility;
 using Explore.Blazor.Client.Tests.Services;
@@ -573,7 +573,7 @@ public sealed class LocalAccountsSectionTests
         {
             Context.SetAuthenticatedUser(Guid.CreateVersion7(), "Instance administrator", "admin@example.test");
             _http = Transport.CreateHttpClient();
-            Context.Services.AddSingleton<IControlPlaneOverviewService>(Transport.CreateOverview(_http));
+            Context.Services.AddSingleton<IInstanceOverviewService>(Transport.CreateOverview(_http));
             Context.Services.AddScoped(_ => Transport.CreateService(_http));
             Context.Services.AddSingleton<IAccessibilityAnnouncerService>(Announcer);
             Context.Services.AddScoped<IAccessibilityFocusService, AccessibilityFocusService>();

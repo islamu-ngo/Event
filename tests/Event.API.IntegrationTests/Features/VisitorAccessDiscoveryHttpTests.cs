@@ -185,7 +185,7 @@ public sealed class VisitorAccessDiscoveryHttpTests
             {
                 values = new Dictionary<string, string> { [key] = "AnonymousOnly", [GovernanceSettingKeys.PublicExperience.EventCatalogLabel] = "must-not-commit" }
             }, Token),
-            "control-plane" => await client.PutAsJsonAsync($"/api/admin/control-plane/tenants/{PlatformDefaults.DefaultTenantId}/settings/{key}", new { value = "AnonymousOnly" }, Token),
+            "control-plane" => await client.PutAsJsonAsync($"/api/admin/instance/tenants/{PlatformDefaults.DefaultTenantId}/settings/{key}", new { value = "AnonymousOnly" }, Token),
             "provider" => await client.PatchAsJsonAsync("/api/instance/settings/auth-provider", new PatchAuthProviderConfigurationDto
             {
                 Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()

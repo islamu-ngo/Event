@@ -1,5 +1,5 @@
-using Explore.Blazor.Client.Contracts.ControlPlane;
-using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
+using Explore.Blazor.Client.Contracts.Services.InstanceAdmin;
 using Explore.Blazor.Client.Contracts.Services.Federation;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using MudBlazor;
@@ -9,16 +9,16 @@ namespace Explore.Blazor.Client.Tests.Pages.Admin;
 public class InstanceGovernanceSectionTests : IDisposable
 {
     private readonly BlazorTestContext _ctx;
-    private readonly IControlPlaneOperationsService _operationsService;
+    private readonly IInstanceOperationsService _operationsService;
     private readonly IAtprotoFederationSettingsService _settingsService;
 
     public InstanceGovernanceSectionTests()
     {
         _ctx = new BlazorTestContext();
         _ctx.SetAuthenticatedUser(Guid.NewGuid(), "Instance Admin", "admin@example.com");
-        _operationsService = Substitute.For<IControlPlaneOperationsService>();
+        _operationsService = Substitute.For<IInstanceOperationsService>();
         _operationsService.GetDeploymentModeRunbookAsync(Arg.Any<CancellationToken>())
-            .Returns(new HalResourceOfControlPlaneDeploymentModeRunbookDto());
+            .Returns(new HalResourceOfInstanceDeploymentModeRunbookDto());
         _settingsService = Substitute.For<IAtprotoFederationSettingsService>();
         _settingsService.GetInstanceAsync(Arg.Any<CancellationToken>())
             .Returns(CreateAtprotoSettings());
@@ -174,13 +174,13 @@ public class InstanceGovernanceSectionTests : IDisposable
     public async Task GovernanceSection_DeploymentModeRunbook_RendersHalGatedTransitionAndSubmitsTypedConfirmation()
     {
         _operationsService.GetDeploymentModeRunbookAsync(Arg.Any<CancellationToken>())
-            .Returns(CreateRunbook(Links(ControlPlaneLinkRelations.TransitionToMultiTenant)));
+            .Returns(CreateRunbook(Links(InstanceAdminLinkRelations.TransitionToMultiTenant)));
         _operationsService.TransitionDeploymentModeAsync(
                 "MultiTenant",
                 "ENABLE MULTI_TENANT",
                 "tenant launch",
                 Arg.Any<CancellationToken>())
-            .Returns(new BaseCommandResponseOfControlPlaneDeploymentModeTransitionDto
+            .Returns(new BaseCommandResponseOfInstanceDeploymentModeTransitionDto
             {
                 Success = true,
                 Message = "Deployment mode transition accepted."
@@ -519,7 +519,7 @@ public class InstanceGovernanceSectionTests : IDisposable
     private static Func<T, Task<BaseCommandResponseOfGuid>> SuccessfulSave<T>() =>
         _ => Task.FromResult(new BaseCommandResponseOfGuid { Success = true });
 
-    private static HalResourceOfControlPlaneDeploymentModeRunbookDto CreateRunbook(
+    private static HalResourceOfInstanceDeploymentModeRunbookDto CreateRunbook(
         IDictionary<string, HalLink> links) => new()
         {
             CurrentMode = "SingleTenant",
@@ -527,7 +527,7 @@ public class InstanceGovernanceSectionTests : IDisposable
             GeneratedAtUtc = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero),
             TargetOptions =
             [
-                new ControlPlaneDeploymentModeTargetOptionDto
+                new InstanceDeploymentModeTargetOptionDto
                 {
                     TargetMode = "MultiTenant",
                     Label = "Multi-Tenant",
@@ -538,7 +538,7 @@ public class InstanceGovernanceSectionTests : IDisposable
             ],
             Steps =
             [
-                new ControlPlaneDeploymentModeRunbookStepDto
+                new InstanceDeploymentModeRunbookStepDto
                 {
                     Key = "backup",
                     Title = "Back up instance data",

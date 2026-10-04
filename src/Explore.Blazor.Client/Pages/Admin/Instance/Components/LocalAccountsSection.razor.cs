@@ -1,10 +1,10 @@
 
 using System.ComponentModel.DataAnnotations;
 using Explore.Blazor.Client.Clients;
-using Explore.Blazor.Client.Contracts.ControlPlane;
+using Explore.Blazor.Client.Contracts.InstanceAdmin;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
-using Explore.Blazor.Client.Services.ControlPlane;
+using Explore.Blazor.Client.Services.InstanceAdmin;
 using Microsoft.AspNetCore.Components;
 
 namespace Explore.Blazor.Client.Pages.Admin.Instance.Components;
@@ -29,7 +29,7 @@ public partial class LocalAccountsSection : IDisposable
     private bool HasPendingOperations => _pendingOperations.Count != 0;
     private bool HasPendingReset(Guid subjectId) => _pendingOperations.ContainsValue(subjectId);
     private FormMode _mode = FormMode.None;
-    private HalResourceOfControlPlaneOverviewDto? _capabilities;
+    private HalResourceOfInstanceOverviewDto? _capabilities;
     private HalCollectionResourceOfLocalIdentitySummary? _identities;
     private HalResourceOfLocalIdentitySummary? _selectedIdentity;
     private HalResourceOfLocalCredentialOperationStatus? _operation;
@@ -60,17 +60,17 @@ public partial class LocalAccountsSection : IDisposable
         LocalCredentialOperationStage.Abandoned => T("stage.abandoned", "Abandoned"),
         _ => T("stage.unavailable", "Operation stage unavailable")
     };
-    private bool IsAvailable => ControlPlaneHal.HasLink(_capabilities?._links, ControlPlaneLinkRelations.LocalIdentities);
-    private bool CanCreate => ControlPlaneHal.HasLink(_identities?._links, ControlPlaneLinkRelations.CreateLocalIdentity);
+    private bool IsAvailable => InstanceAdminHal.HasLink(_capabilities?._links, InstanceAdminLinkRelations.LocalIdentities);
+    private bool CanCreate => InstanceAdminHal.HasLink(_identities?._links, InstanceAdminLinkRelations.CreateLocalIdentity);
     private IEnumerable<HalResourceOfLocalIdentitySummary> Identities => _identities?._embedded?.Items ?? [];
     private bool EmailInvalid => string.IsNullOrWhiteSpace(_email) || _email.Length > 256 || !new EmailAddressAttribute().IsValid(_email);
     private bool FirstNameInvalid => string.IsNullOrWhiteSpace(_firstName) || _firstName.Length > 200;
     private bool LastNameInvalid => _lastName.Length > 200;
     private bool ReasonInvalid => string.IsNullOrWhiteSpace(_reason) || _reason.Length > 1000;
     private bool CanReconcile => _operation?.Receipt is { OperationId: var id } && id != Guid.Empty
-        && ControlPlaneHal.HasLinkForResource(_operation._links, ControlPlaneLinkRelations.Reconcile, id);
+        && InstanceAdminHal.HasLinkForResource(_operation._links, InstanceAdminLinkRelations.Reconcile, id);
     private static bool CanReset(HalResourceOfLocalIdentitySummary identity) => identity.LocalSubjectId != Guid.Empty
-        && ControlPlaneHal.HasLinkForResource(identity._links, ControlPlaneLinkRelations.IssueTemporaryCredential, identity.LocalSubjectId);
+        && InstanceAdminHal.HasLinkForResource(identity._links, InstanceAdminLinkRelations.IssueTemporaryCredential, identity.LocalSubjectId);
 
     protected override async Task OnInitializedAsync()
     {

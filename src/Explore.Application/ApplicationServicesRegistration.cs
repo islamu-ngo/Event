@@ -16,7 +16,7 @@ using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Features.Authentication.Atproto.Services;
-using Explore.Application.Features.ControlPlane.Plans;
+using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Features.CustomPropertyDefinitions.Authorization;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
 using Explore.Application.Features.EventAgendaItems.Authorization;

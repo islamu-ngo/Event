@@ -49,7 +49,7 @@ public static partial class RateLimitingExtensions
     public const string EventOpenGraphImagePolicy = "EventOpenGraphImage";
     public const string AddressSuggestionsPolicy = "AddressSuggestions";
 
-    private const string ControlPlanePathPrefix = "/api/admin/control-plane";
+    private const string InstanceAdminPathPrefix = "/api/admin/instance";
 
     public static IServiceCollection AddApiRateLimiting(
         this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -558,7 +558,7 @@ public static partial class RateLimitingExtensions
 
         RateLimitPartition<string> CreateGlobalPartition(HttpContext httpContext)
         {
-            if (IsControlPlaneRequest(httpContext))
+            if (IsInstanceAdminRequest(httpContext))
             {
                 return RateLimitPartition.GetNoLimiter(ControlPlanePolicy);
             }
@@ -617,7 +617,7 @@ public static partial class RateLimitingExtensions
 
         RateLimitPartition<string> CreateControlPlaneConcurrencyPartition(HttpContext httpContext)
         {
-            if (!IsControlPlaneRequest(httpContext))
+            if (!IsInstanceAdminRequest(httpContext))
             {
                 return RateLimitPartition.GetNoLimiter("non-control-plane");
             }
@@ -683,7 +683,7 @@ public static partial class RateLimitingExtensions
 
     internal static string InferPolicyName(HttpContext context, bool hasRetryAfter)
     {
-        if (IsControlPlaneRequest(context))
+        if (IsInstanceAdminRequest(context))
         {
             return ControlPlanePolicy;
         }
@@ -813,9 +813,9 @@ public static partial class RateLimitingExtensions
         return slugLength > 0 && path.AsSpan(slugStart, slugLength).IndexOf('/') < 0;
     }
 
-    private static bool IsControlPlaneRequest(HttpContext context)
+    private static bool IsInstanceAdminRequest(HttpContext context)
     {
-        return context.Request.Path.StartsWithSegments(ControlPlanePathPrefix, StringComparison.OrdinalIgnoreCase);
+        return context.Request.Path.StartsWithSegments(InstanceAdminPathPrefix, StringComparison.OrdinalIgnoreCase);
     }
 
     internal static string GetAuthenticatedPartitionKey(HttpContext context)

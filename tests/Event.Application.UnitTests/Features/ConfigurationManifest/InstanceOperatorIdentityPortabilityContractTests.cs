@@ -166,13 +166,20 @@ public sealed class InstanceOperatorIdentityPortabilityContractTests
 
     private static InstanceOperatorIdentitySettings Complete() => new()
     {
-        OperatorId = Guid.CreateVersion7(), Revision = Guid.CreateVersion7(),
-        PublicName = "Independent Operator", LegalName = "Independent ASBL",
-        OperatorKindCode = "registered_organization", JurisdictionCountryCode = "BE",
-        RegistrationIdentifier = "BE 0123.456.789", PublicContactEmail = "contact@example.test",
-        WebsiteUrl = "https://example.test", LegalNoticeUrl = "https://example.test/legal",
-        TermsUrl = "https://example.test/terms", PrivacyUrl = "https://example.test/privacy",
-        OfficialOrigin = "https://example.test", IsOfficialInstance = false
+        OperatorId = Guid.CreateVersion7(),
+        Revision = Guid.CreateVersion7(),
+        PublicName = "Independent Operator",
+        LegalName = "Independent ASBL",
+        OperatorKindCode = "registered_organization",
+        JurisdictionCountryCode = "BE",
+        RegistrationIdentifier = "BE 0123.456.789",
+        PublicContactEmail = "contact@example.test",
+        WebsiteUrl = "https://example.test",
+        LegalNoticeUrl = "https://example.test/legal",
+        TermsUrl = "https://example.test/terms",
+        PrivacyUrl = "https://example.test/privacy",
+        OfficialOrigin = "https://example.test",
+        IsOfficialInstance = false
     };
 
     private sealed class Scenario : IDisposable
@@ -220,9 +227,14 @@ public sealed class InstanceOperatorIdentityPortabilityContractTests
         }
         private static SystemSetting? Copy(SystemSetting? source) => source is null ? null : new()
         {
-            Id = source.Id, SettingKey = source.SettingKey, Value = source.Value,
-            ValueType = source.ValueType, CreatedAt = source.CreatedAt, CreatedBy = source.CreatedBy,
-            UpdatedAt = source.UpdatedAt, UpdatedBy = source.UpdatedBy
+            Id = source.Id,
+            SettingKey = source.SettingKey,
+            Value = source.Value,
+            ValueType = source.ValueType,
+            CreatedAt = source.CreatedAt,
+            CreatedBy = source.CreatedBy,
+            UpdatedAt = source.UpdatedAt,
+            UpdatedBy = source.UpdatedBy
         };
         public Task<SystemSetting?> GetByKey(string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(Current?.SettingKey == key ? Copy(Current) : null);

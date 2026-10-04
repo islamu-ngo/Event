@@ -152,9 +152,9 @@ public sealed class GetOnboardingPreflightQueryHandler(
 
         var instanceBaseDomain = await GetSettingValueAsync(GovernanceSettingKeys.Domains.InstanceBaseDomain);
         var publicHost = NormalizeHost(instanceBaseDomain);
-        var adminHost = HostFromValue(configuration["ControlPlane:PublicOrigin"])
+        var adminHost = HostFromValue(configuration["InstanceAdmin:PublicOrigin"])
             ?? HostFromValue(configuration["Bff:PublicOrigin"])
-            ?? HostFromValue(configuration["CONTROL_PLANE_PUBLIC_ORIGIN"])
+            ?? HostFromValue(configuration["INSTANCE_ADMIN_PUBLIC_ORIGIN"])
             ?? NormalizeHost(await GetSettingValueAsync(GovernanceSettingKeys.Domains.AdminHost));
         var customDomainsEnabled = await HasEnabledSettingAsync(GovernanceSettingKeys.Domains.AllowTenantCustomDomain);
 

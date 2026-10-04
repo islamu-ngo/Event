@@ -9,6 +9,20 @@ public sealed class EnvironmentCatalogueInvariantTests
     private readonly string _repositoryRoot = EnvironmentMachineConfiguration.RepositoryRoot();
 
     [Test]
+    public async Task AdministrationOriginAndExternalFleetEndpointHaveSeparateConfiguration()
+    {
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
+        EnvironmentVariableDefinition origin = catalogue.Lookup("INSTANCE_ADMIN_PUBLIC_ORIGIN")!;
+        EnvironmentVariableDefinition fleet = catalogue.Lookup("CONTROL_PLANE_URL")!;
+
+        await Assert.That(origin.Category).IsEqualTo(EnvironmentVariableCategory.Deployment);
+        await Assert.That(origin.Sensitivity).IsEqualTo(EnvironmentVariableSensitivity.Public);
+        await Assert.That(origin.ValidatorId).IsEqualTo("absolute-uri");
+        await Assert.That(origin.Requirement).IsEqualTo(EnvironmentVariableRequirement.Optional);
+        await Assert.That(fleet).IsNotNull();
+    }
+
+    [Test]
     public async Task PublicUrlOverride_IsOptionalForSingleInstanceSetup()
     {
         var definition = PlatformEnvironmentCatalogue.Catalogue.Lookup("PUBLIC_BASE_URL")!;

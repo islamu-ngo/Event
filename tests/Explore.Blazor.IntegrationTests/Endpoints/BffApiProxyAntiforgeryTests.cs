@@ -298,7 +298,7 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
     public async Task ConfigurationImportMutation_RequiresAntiforgeryAndForwardsOnlyHeaderCapability()
     {
         const string path =
-            "/api/control-plane/configuration-import/sessions/11111111-1111-1111-1111-111111111111/preview";
+            "/api/admin/instance/configuration-import/sessions/11111111-1111-1111-1111-111111111111/preview";
         const string capability = "configuration-import-capability";
         _upstream.ResetCapture();
         using var rejected = CreateAuthenticatedRequest(HttpMethod.Post, path);

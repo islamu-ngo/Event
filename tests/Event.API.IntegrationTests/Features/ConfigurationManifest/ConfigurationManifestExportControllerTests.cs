@@ -26,9 +26,9 @@ using NSubstitute;
 public sealed class ConfigurationManifestExportControllerTests
 {
     private const string PrimaryPath =
-        "/api/control-plane/configuration-manifest/export";
+        "/api/admin/instance/configuration-manifest/export";
     private const string PrimaryRoute =
-        "api/control-plane/configuration-manifest/export";
+        "api/admin/instance/configuration-manifest/export";
     private const string OperationId = "ExportConfigurationManifest";
     private const string PrimaryFileName = "configuration-manifest-overrides.json";
     private const string ControllerTypeName =
@@ -288,7 +288,7 @@ public sealed class ConfigurationManifestExportControllerTests
         string[] obsoleteRoutes =
         [
             "/api/tenant/settings/configuration-manifest/export?view=Overrides",
-            "/api/admin/control-plane/tenants/0199464e-e388-7f56-9281-cefabd6a5673/configuration-manifest/export?view=Portable"
+            "/api/admin/instance/tenants/0199464e-e388-7f56-9281-cefabd6a5673/configuration-manifest/export?view=Portable"
         ];
 
         foreach (string obsoleteRoute in obsoleteRoutes)

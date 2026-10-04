@@ -1,4 +1,3 @@
-@using Explore.Blazor.Components.ControlPlane
 @using Explore.Blazor.Client.Layout
 @using Explore.Blazor.Client.Services
 @using Explore.Blazor.Extensions
@@ -6,7 +5,6 @@
 @using Microsoft.AspNetCore.Components.Web
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IRuntimeRenderPolicyService RuntimeRenderPolicyService
-@inject AdminHostControlPlaneShellSelector AdminHostShellSelector
 @inject ILogger<App> Logger
 @inject NavigationManager Navigation
 
@@ -56,14 +54,7 @@
         <CascadingValue Value="isDark" Name="InitialTheme">
             <ErrorBoundary>
                 <ChildContent>
-                    @if (ShouldUseControlPlaneShell())
-                    {
-                        <EmbeddedControlPlaneRoutes @rendermode="@_effectiveRenderMode" />
-                    }
-                    else
-                    {
-		                <Routes @rendermode="@_effectiveRenderMode" />
-                    }
+                    <Routes @rendermode="@_effectiveRenderMode" />
                 </ChildContent>
                 <ErrorContent Context="ex">
                     @{
@@ -119,11 +110,6 @@
                 return new InteractiveServerRenderMode(prerender: true);
             }
 
-            if (ShouldUseControlPlaneShell())
-            {
-                return new InteractiveServerRenderMode(prerender: true);
-            }
-
             return _asyncResolvedMode ?? new InteractiveServerRenderMode(prerender: true);
         }
     }
@@ -132,8 +118,8 @@
     {
         var requestPath = HttpContextAccessor.HttpContext?.Request.Path.Value;
 
-        // Onboarding and dedicated admin-host paths don't need async resolution — handled synchronously in _effectiveRenderMode.
-        if (IsOnboardingPath(requestPath) || ShouldUseControlPlaneShell())
+        // Onboarding paths resolve synchronously in _effectiveRenderMode.
+        if (IsOnboardingPath(requestPath))
         {
             return;
         }
@@ -161,13 +147,6 @@
         return string.IsNullOrWhiteSpace(pathBase)
             ? "/"
             : pathBase.TrimEnd('/') + "/";
-    }
-
-    private bool ShouldUseControlPlaneShell()
-    {
-        return AdminHostShellSelector.ShouldUseControlPlaneShell(
-            HttpContextAccessor.HttpContext,
-            new PathString(Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath));
     }
 
     private static bool IsOnboardingPath(string? path)

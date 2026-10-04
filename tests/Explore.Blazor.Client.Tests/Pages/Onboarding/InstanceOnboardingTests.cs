@@ -4,7 +4,7 @@ using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Models.Responses;
 using Explore.Blazor.Client.Pages.Onboarding;
 using Explore.Blazor.Client.Pages.Onboarding.Components;
-using Explore.Blazor.Client.Routing.ControlPlane;
+using Explore.Blazor.Client.Routing.InstanceAdmin;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Forms;
 using MudBlazor;
@@ -326,14 +326,14 @@ public class InstanceOnboardingTests : IDisposable
     }
 
     [Test]
-    public async Task MultiTenantCompletion_UsesControlPlaneHandoffAndLeavesAdminFieldsAtDefaults()
+    public async Task MultiTenantCompletion_UsesInstanceHandoffAndLeavesAdminFieldsAtDefaults()
     {
         var requestDefaults = new CompleteInstanceOnboardingRequest();
         var cut = RenderForDeploymentMode("MultiTenant");
 
         await cut.Find("form").SubmitAsync();
         Require(FindLink(cut, "/settings/instance?section=getting-started") is not null, "Expected private handoff.");
-        Require(FindLink(cut, ControlPlaneRoutes.Tenants) is not null, "Expected optional tenant handoff.");
+        Require(FindLink(cut, InstanceAdminRoutes.Tenants) is not null, "Expected optional tenant handoff.");
 
         await _instanceOnboardingService.Received(1).CompleteAsync(
             Arg.Is<CompleteInstanceOnboardingRequest>(request =>

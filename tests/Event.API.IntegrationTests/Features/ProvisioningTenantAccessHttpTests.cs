@@ -288,7 +288,7 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             client.DefaultRequestHeaders.Add("X-Tenant-Slug", "local-admission");
         }
         await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
-        string target = $"/api/admin/control-plane/tenants/{TenantId}";
+        string target = $"/api/admin/instance/tenants/{TenantId}";
         using var detail = await client.GetAsync(target, Token);
         await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var detailJson = JsonDocument.Parse(await detail.Content.ReadAsStringAsync(Token));
@@ -346,9 +346,9 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             db.Tenants.Add(new Tenant { Id = otherId, FullName = "Other private directory", Slug = "other-private", TenantStatusId = (int)TenantStatusEnum.Provisioning, TenantStatus = null! });
             await db.SaveChangesAsync(Token);
         }
-        using var detail = await client.GetAsync($"/api/admin/control-plane/tenants/{otherId}", Token);
+        using var detail = await client.GetAsync($"/api/admin/instance/tenants/{otherId}", Token);
         await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
-        using var activation = await client.PostAsJsonAsync($"/api/admin/control-plane/tenants/{otherId}/activate", new { }, Token);
+        using var activation = await client.PostAsJsonAsync($"/api/admin/instance/tenants/{otherId}/activate", new { }, Token);
         await Assert.That(activation.IsSuccessStatusCode).IsFalse();
         await using var verify = factory.CreateDatabase();
         await Assert.That((await verify.Tenants.SingleAsync(t => t.Id == otherId, Token)).TenantStatusId).IsEqualTo((int)TenantStatusEnum.Provisioning);
@@ -376,8 +376,8 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         using var json = JsonDocument.Parse(await login.Content.ReadAsStringAsync(Token));
         client.DefaultRequestHeaders.Authorization = new("Bearer", json.RootElement.GetProperty("token").GetString());
         await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
-        using var read = await client.GetAsync($"/api/admin/control-plane/tenants/{TenantId}", Token);
-        using var write = await client.PostAsJsonAsync($"/api/admin/control-plane/tenants/{TenantId}/activate", new { }, Token);
+        using var read = await client.GetAsync($"/api/admin/instance/tenants/{TenantId}", Token);
+        using var write = await client.PostAsJsonAsync($"/api/admin/instance/tenants/{TenantId}/activate", new { }, Token);
         await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(write.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
     }
@@ -409,12 +409,12 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
         using var client = CreateClient(factory);
         client.DefaultRequestHeaders.Add("X-API-Key", Explore.Application.Services.ApiKeyHashing.FormatPersistedApiKey(keyId, secret));
-        foreach (string path in new[] { $"/api/admin/control-plane/tenants/{TenantId}", "/api/tenant/settings/documents/branding", "/api/tenant/settings/documents/directory-operator-identity" })
+        foreach (string path in new[] { $"/api/admin/instance/tenants/{TenantId}", "/api/tenant/settings/documents/branding", "/api/tenant/settings/documents/directory-operator-identity" })
         {
             using var response = await client.GetAsync(path, Token);
             await Assert.That(response.IsSuccessStatusCode).IsFalse();
         }
-        using var activation = await client.PostAsJsonAsync($"/api/admin/control-plane/tenants/{TenantId}/activate", new { }, Token);
+        using var activation = await client.PostAsJsonAsync($"/api/admin/instance/tenants/{TenantId}/activate", new { }, Token);
         await Assert.That(activation.IsSuccessStatusCode).IsFalse();
         await using var verify = factory.CreateDatabase();
         await Assert.That(await verify.TenantLifecycleLogs.CountAsync(Token)).IsEqualTo(0);

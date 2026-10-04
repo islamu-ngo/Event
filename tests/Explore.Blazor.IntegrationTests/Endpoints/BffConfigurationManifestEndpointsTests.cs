@@ -8,9 +8,9 @@ namespace Explore.Blazor.IntegrationTests.Endpoints;
 
 public sealed class BffConfigurationManifestEndpointsTests
 {
-    private const string BffRoute = "/bff/control-plane/configuration-manifest/export";
-    private const string ApiOverviewRoute = "/api/admin/control-plane/overview";
-    private const string ApiExportRoute = "/api/control-plane/configuration-manifest/export";
+    private const string BffRoute = "/bff/admin/instance/configuration-manifest/export";
+    private const string ApiOverviewRoute = "/api/admin/instance/overview";
+    private const string ApiExportRoute = "/api/admin/instance/configuration-manifest/export";
     private const string MediaType = "application/vnd.islamu.configuration-manifest.v1alpha2+json";
     private const int MaximumBytes = 4 * 1024 * 1024;
 
@@ -150,10 +150,10 @@ public sealed class BffConfigurationManifestEndpointsTests
                 {
                     BaseAddress = new Uri("https://api.test/")
                 };
-                services.RemoveAll<IControlPlaneClient>();
-                services.AddSingleton<IControlPlaneClient>(new ControlPlaneClient(http));
-                services.RemoveAll<IControl_Plane_ConfigurationClient>();
-                services.AddSingleton<IControl_Plane_ConfigurationClient>(new Control_Plane_ConfigurationClient(http));
+                services.RemoveAll<IInstanceAdminClient>();
+                services.AddSingleton<IInstanceAdminClient>(new InstanceAdminClient(http));
+                services.RemoveAll<IInstance_ConfigurationClient>();
+                services.AddSingleton<IInstance_ConfigurationClient>(new Instance_ConfigurationClient(http));
                 services.RemoveAll<ITenantOnboardingClient>();
                 services.AddSingleton<ITenantOnboardingClient>(new TenantOnboardingClient(http));
                 services.RemoveAll<ITenant_ConfigurationClient>();
@@ -180,7 +180,7 @@ public sealed class BffConfigurationManifestEndpointsTests
     private static HttpResponseMessage OverviewResponse(params string[] relations) =>
         new(HttpStatusCode.OK)
         {
-            Content = JsonContent.Create(new HalResourceOfControlPlaneOverviewDto
+            Content = JsonContent.Create(new HalResourceOfInstanceOverviewDto
             {
                 _links = relations.ToDictionary(
                     relation => relation,

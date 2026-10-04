@@ -8,7 +8,6 @@ namespace Explore.Blazor.Client.Layout;
 public partial class NotificationBell : IAsyncDisposable
 {
     private const int PageSize = 20;
-    private const int PollIntervalMs = 60_000;
 
     [Inject]
     private INotificationService NotificationService { get; set; } = null!;
@@ -29,14 +28,12 @@ public partial class NotificationBell : IAsyncDisposable
     private int _currentPage = 1;
     private int? _selectedScope;
     private readonly List<NotificationListDto> _notifications = [];
-    private Timer? _pollTimer;
 
     private string BadgeContent => _unreadCount > 99 ? "99+" : _unreadCount.ToString();
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshUnreadCountAsync();
-        _pollTimer = new Timer(async _ => await PollUnreadCountAsync(), null, PollIntervalMs, PollIntervalMs);
         NotificationRefreshStreamClient.RefreshReceived += HandleNotificationRefreshAsync;
     }
 
@@ -81,6 +78,12 @@ public partial class NotificationBell : IAsyncDisposable
 
     private async Task HandleNotificationRefreshAsync(NotificationRefreshHintReceivedEventArgs hint)
     {
+        if (hint.Reason == "poll")
+        {
+            await PollUnreadCountAsync();
+            return;
+        }
+
         await InvokeAsync(async () =>
         {
             if (hint.UnreadCount < 0)
@@ -218,7 +221,6 @@ public partial class NotificationBell : IAsyncDisposable
             Logger.LogDebug(ex, "Notification refresh stream cleanup failed.");
         }
 
-        _pollTimer?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

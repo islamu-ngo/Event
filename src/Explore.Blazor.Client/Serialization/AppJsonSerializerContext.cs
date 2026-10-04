@@ -24,7 +24,7 @@ namespace Explore.Blazor.Client.Serialization;
 [JsonSerializable(typeof(HalResourceOfEmailDeliveryDisablePreviewDto))]
 [JsonSerializable(typeof(HalResourceOfSettingGroupResponseDto))]
 [JsonSerializable(typeof(EmailDeliveryDisableRequest))]
-[JsonSerializable(typeof(HalResourceOfControlPlaneOverviewDto))]
+[JsonSerializable(typeof(HalResourceOfInstanceOverviewDto))]
 [JsonSerializable(typeof(HalCollectionResourceOfLocalIdentitySummary))]
 [JsonSerializable(typeof(HalResourceOfLocalIdentitySummary))]
 [JsonSerializable(typeof(HalResourceOfLocalCredentialIssueDto))]

@@ -8,7 +8,7 @@ using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.Features.ManagedProviderProvisioning.Handlers.Commands;
 using Explore.Application.Features.Management.Handlers.Commands;
 using Explore.Application.Features.Management.Requests.Commands;
-using Explore.Application.Features.ControlPlane.Plans;
+using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Management;
 using Explore.Application.Responses;
 using Explore.Application.Services;

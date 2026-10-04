@@ -1,6 +1,6 @@
 # Event API Security Remediation - Planning Assessment
 
-Last Updated: 2026-10-01
+Last Updated: 2026-10-02
 
 ## Review Metadata
 
@@ -10,13 +10,13 @@ Last Updated: 2026-10-01
 - Report kind: planning-assessment
 - Report status: current
 - Disposition: plan-aligned
-- Evidence cutoff: 2026-10-01
-- Reviewed input: `event-api-security-remediation-r1`; consultation at SHA-256 `c01031ea05b993965b1104cf203977414168ca965d2a09d6512c4feb0cffeee4`; Event `22909436883ea90f3e1477685ce3020b230c41da` plus the inspected shared working tree
+- Evidence cutoff: 2026-10-02
+- Reviewed input: `event-api-security-remediation-r2`; unchanged consultation at SHA-256 `c01031ea05b993965b1104cf203977414168ca965d2a09d6512c4feb0cffeee4`; bounded source/test intake at Event `54391020ff7d0c31318d542f7c68d14fde69d4d9` plus shared changes, final identity `3d502c4d096695ce2fdd7cf85691e7a333ed35d2` qualified below
 - Supersedes: none; the maintained consultation remains the source assessment
 
 ## Scope
 
-The user requests exhaustive planning for every point in the [API security consultation](../consultations/i-vsd-event-api-security-compliance-check.md). This includes its 27 findings and mitigations, 53 documented families, all 209 reference records, ten API security categories, and explicitly missing release evidence. Protected records require regression evidence; Unverified records require actual investigation and closure; Not applicable records require bounded, revision-bound justification rather than invented implementation.
+The user requests exhaustive planning for every point in the [API security consultation](../consultations/i-vsd-event-api-security-compliance-check.md), expanded on 2026-10-02 by ten bug classes and twelve vulnerability classes. This includes the original 27 findings and mitigations, 53 documented families, all 209 reference records, ten API security categories, 22 additional mandatory class entries and explicitly missing release evidence. Protected records require regression evidence; Unverified records require actual investigation and closure; Not applicable records require bounded, revision-bound justification rather than invented implementation.
 
 The intended software scope includes Split API/BFF and Combined hosting, supported authentication and authorization modes, all five relational providers, API-triggered integrations, files, public projections, and API-fed browser consumption where the consultation deliberately withheld an end-to-end conclusion. The Official Instance is not the only supported security profile.
 
@@ -26,7 +26,7 @@ Planning changes only local working-memory documents and this assessment. Implem
 
 This report supplies provider-responsibility design validation and source traceability. It does not establish secure operation, ASVS certification, legal compliance, a scholarly ruling, or release approval. The consultation's findings remain open until the implementing revision and required runtime evidence exist.
 
-Inherited identifiers below retain the consultation's subject identity. `IVSD-F001` in this report means the same finding as `IVSD-F001` in that consultation, not a new finding with a coincidentally identical number. New workstream-specific findings, if needed, start after `IVSD-F027`.
+Inherited identifiers below retain the consultation's subject identity. `IVSD-F001` in this report means the same finding as `IVSD-F001` in that consultation, not a new finding with a coincidentally identical number. R2 adds workstream-owned IVSD-F028 through IVSD-F031 without silently rewriting the consultation. BUG/VULN labels are user-supplied priorities and investigation contracts, not exploit findings or verified global prevalence rankings.
 
 ## Findings
 
@@ -64,6 +64,48 @@ All inherited findings are **accepted for remediation**, not resolved. Each row 
 
 No row is risk-accepted merely by scheduling it. Confirmed unsafe paths require remediation before exposure; supported dormant modes require safe software contracts, not a waiver based on the Official Instance's intended configuration.
 
+### R2 Workstream Findings and Qualified Claims
+
+All four rows are open / accepted-for-remediation-or-assurance. Evidence is implementation traceability and planned design validation, not executed operational validation.
+
+| Finding / mitigation | Severity / claim and evidence | Principles / domains / stakeholders | Provider decision, plan ownership and closure |
+| --- | --- | --- | --- |
+| IVSD-F028 / IVSD-M028 | High configuration concern; confirmed `docker-compose.yml:90-94` fallback database passwords; actual deployed compromise untested | Amanah, Non-Harm / Technical, Operational / operators, tenants and data subjects | Require explicit selected authority and reject missing/empty/default rendered deployment credentials; phases 8.3/17.3/26.2, S47; actual binding/rendered-profile proof plus separately approved credential rotation if needed |
+| IVSD-F029 / IVSD-M029 | High robustness concern; custom-property Options `_options!` can expose explicit null to validator `options.Count`; runtime reproduction not performed | Ihsan, Non-Harm / Design, Technical / organizers and users sharing capacity | Define null/omitted/empty/value admission, preserve valid null clearing and shared candidate validation; phases 7.1-7.3, S35/S37; actual JSON, unchanged-state, fresh relational and generated-wire evidence |
+| IVSD-F030 / IVSD-M030 | Medium lifecycle concern; DefaultDoctorProcessRunner cancellation has no explicit child termination/reaping; no orphan demonstrated | Amanah, Non-Harm / Technical, Operational / operators and shared-host users | Own approved argv, output and process tree; phase 25.1-25.3, S43/S49; activated OS-child cancellation/exit/readers and safe output proof |
+| IVSD-F031 / IVSD-M031 | Critical-priority user threat class, not confirmed exploit; existing server prompt/tool/native action boundaries need full adversarial assurance | Amanah, Rights of People, Non-Harm / Technical, Governance / users, resource owners and model-provider subjects | Model/reference/output text never grants authority; phase 24.1-24.3, S45; current native auth, strict tools/schema/budgets, exact confirmation, no context/credential handoff, cancel/replay/disclosure proof |
+
+### R2 Class Traceability
+
+Every entry below is mandatory in the candidate register and maps to plan Sections 9.3-9.5. Scheduling is not closure.
+
+| User class | Observable scenarios | Mitigation ownership / acceptance evidence |
+| --- | --- | --- |
+| BUG-01 Null access | S35, S37, S42 | 7/20/23; explicit optionality and saved-state/wire null proof; IVSD-M029 |
+| BUG-02 Race conditions | S36, S16, S24, S27, S45 | 3/8/19/21/24; forced contention with persisted winners/effects |
+| BUG-03 Create/update drift | S37, S35, S42 | 7/19/20; same full-candidate invariant validation with omission semantics |
+| BUG-04 Disabled critical logic | S38, S02 | 1/8/17/18/24/26; actual non-Testing activation/failure/shutdown, not comments |
+| BUG-05 Async/await misuse | S39, S43, S27 | 19/21/24/25; real transaction outcome/cancellation and awaited settlement |
+| BUG-06 Boolean/boundary mistakes | S40, S12, S24, S33 | 7/8/13/15/18/19/21; exact truth tables and adjacent representable bounds |
+| BUG-07 Hardcoded dynamic values | S41, S47 | 1/2/5/8/10/12/17/24/26; current catalogue/options/state and isolated nondefault configs |
+| BUG-08 Schema consumer breakage | S42, S35 | 3/7/8/20/23/24/26; generated actual wire and consumer behavior |
+| BUG-09 Resource leaks | S43, S48, S49 | 4/8/13/15/23/24/25; explicit ownership/cleanup; IVSD-M030 |
+| BUG-10 Database anomalies | S44, S24, S33 | 1/8/19/21/26; five-provider duplicate/empty/normalized/range outcomes |
+| VULN-01 SQL injection | S50, S24, S25 | 8/19/22/26; real parameter/data and closed identifier boundary |
+| VULN-02 Path traversal | S29, S28, S49 | 16/22/25; approved root/operation custody and bounded archive paths |
+| VULN-03 Missing authorization | S25, S32, S38, S45 | 1/19/23/24; actual direct dispatch/tool/job/resource authority |
+| VULN-04 Attribute XSS | S31, S13 | 16/22/23; rendered text/attribute/protocol/interop contexts |
+| VULN-05 SSRF | S09-S11, S45 | 4/5/6/24; actual destination and model-selected link boundaries |
+| VULN-06 Source secrets | S15, S16, S23, S47, S30 | 2/3/8/12/17/22/26; external custody/artifact proof; IVSD-M028 |
+| VULN-07 Open redirect | S46, S22 | 17/23; actual final Location and safe callback authority |
+| VULN-08 Sensitive logs | S30, S07, S45, S49 | 9/22/23/24/25; actual final sinks and bounded safe diagnosis |
+| VULN-09 Prompt injection | S45, S25, S27, S30 | 24/5/19/21; model-independent authority; IVSD-M031 |
+| VULN-10 Default credentials | S47, S41 | 2/6/8/17/26; fail-closed profile and forgotten administrator input; IVSD-M028 |
+| VULN-11 Command injection | S49, S45 | 25/24/1; approved typed argv/no shell; IVSD-M030 |
+| VULN-12 PostMessage trust | S48, S43 | 23/26; exact Window origin/source versus owned worker/port correlation |
+
+Resource lifetime, dynamic configuration, race and null priorities protect availability and fair shared resource use; candidate parity and schema correctness protect promises about stored state; prompt/message/process authority protect people from an intermediary interpreting attacker content as permission. Delimiters and model refusals cannot replace authorization. Dedicated-worker replies are not authenticated by Window event.origin.
+
 ## Recommendations
 
 1. Preserve all stable finding and reference IDs in a candidate-bound, machine-consumed security evidence register. A green check with no executed tests is not closure evidence.
@@ -96,6 +138,11 @@ Strategic, Design, Technical, Operational, Governance and Evaluation domains are
 - Blocking recovery notifications globally to hide an account oracle removes a remedy rather than repairing confidentiality.
 - An old success body must not restore a revoked membership or consumed capability.
 - A privacy fix must preserve intentional public publisher identity without accidentally exposing its private membership evidence.
+- A normally returned business failure may still commit its UoW; test the exact caller contract, not only exception rollback.
+- Two concurrently launched tests may never overlap at the critical state; force contention before claiming race evidence.
+- A process disposed after canceled WaitForExitAsync may still run; cancellation needs explicit owned termination/reaping.
+- Treating Window and dedicated-worker messages as identical can create an ineffective “origin fix.”
+- A safety instruction in the system prompt cannot authorize or constrain the server's tool execution by itself.
 
 ## Validation Gaps
 
@@ -113,11 +160,13 @@ No product build, test, exploitation, external provider operation or deployment 
 
 - Complete source consultation, including all 209 individually compared records and all 27 findings.
 - Planning skill and resource contracts, I-VSD report/integration/evidence contracts, relevant security/privacy/persistence/API rules.
-- Event HEAD and origin/develop are equal after `git pull --ff-only`; no branch switch.
-- Relevant tracked backend/test diff SHA-256: `3147ebb500d3ae239b86484dfc7f69d4194ae14d580af03058a366a6464d0c24`. This differs from the consultation's diff fingerprint; the workstream therefore refreshes subsystem evidence rather than inheriting an unchanged-snapshot claim.
+- At intake HEAD and origin/develop both equal `54391020ff7d0c31318d542f7c68d14fde69d4d9` after exit-0 `git pull --ff-only`; no branch switch. Concurrent work advanced both to `3d502c4d096695ce2fdd7cf85691e7a333ed35d2` before handoff.
+- R2 intake tracked backend/test diff SHA-256: `bfe04ed2dcb3d3b48d8212570ad66b382ac49a806209216b78d1829339d1d4f6`; final working diff is empty. Final comparison against the intake base differs (`7b096f74eb7cfeea72684e2e110b58aa8075a03a063d4c854d1ce59882c4f8bb`), while direct new source-anchor probes returned no changes. Test-body claims remain intake-bound and complete candidate refresh is mandatory. Original R1 fingerprint is historical; no whole-snapshot unchanged claim.
 - OpenAPI SHA-256: `26d3a63374f28b6d2f8d2ae6fa479ce2521c54beecbc280b6f59bb7bd5ee1fec`.
 - Prior identity-linking decisions in `pre-release-contract-foundations`; publication/discovery scope and stale review state in `event-publication-and-identity-discovery`.
 - Official NIST password guidance, OWASP verification/API security guidance, PostgreSQL RLS documentation and ASP.NET Core Data Protection documentation; independently summarized functional constraints only.
+- R2 bounded data/runtime/AI/client source and actual test-body inspections; no test result inferred from reading. Current SecretBinding MySQL mitigation qualifies the recalled older defect. Dated earlyoom note informs final runner resource budgeting, not product behavior.
+- OWASP LLM01 functional trust-boundary guidance, rechecked 2026-10-02 without external implementation copying.
 
 ## Missing Evidence
 
@@ -131,10 +180,10 @@ The shared evidence packet includes parent investigation plus three bounded read
 
 - Workstream: event-api-security-remediation
 - Status: current
-- Reviewed input: event-api-security-remediation-r1
-- Findings and mitigations: inherited IVSD-F001 through IVSD-F027, each linked to IVSD-M001 through IVSD-M027
-- Required plan mappings: plan Section 9 binds all 27 inherited finding/mitigation pairs to S01-S34 and existing task IDs across 24 phases; Section 9.1 assigns all 209 reference records, including supplementary host/transport records; source Protected/Unverified/Not applicable dispositions remain distinct
-- Revalidation result: completed triad `event-api-security-remediation-r1` preserves exclusive external authority, current persisted resource checks, finite egress/compute/response boundaries, minimal disclosure, non-enumerating remedies, honest retry/recovery and candidate evidence. 121 unique checkbox tasks have explicit acceptance assertions; no finding is called implemented or resolved.
+- Reviewed input: event-api-security-remediation-r2
+- Findings and mitigations: inherited IVSD-F001 through IVSD-F027 plus qualified workstream IVSD-F028 through IVSD-F031, each linked to its corresponding IVSD-M identifier
+- Required plan mappings: Sections 9 and 9.5 bind all 31 qualified finding/mitigation pairs; Sections 9.3-9.4 independently bind every one of 22 user classes; S01-S50 and task IDs across 26 phases define observable outcomes. Section 9.1 still assigns all 209 reference records; source dispositions remain distinct.
+- Revalidation result: completed triad `event-api-security-remediation-r2` preserves R1 authority/custody/disclosure/recovery and adds candidate parity, runtime activation/lifetime, dynamic values, actual schema consumers/provider anomalies and model/message/process trust boundaries. All 132 checkbox tasks have concrete acceptance; no finding or class is called implemented or operationally resolved.
 - Escalations required before: implementation for user approval and shared ownership; release for actual operator/security evidence
 - Refresh triggers: scope, identity disclosure, credential custody, tenancy, topology, provider origin, budgets, replay semantics or release-claim changes
 
@@ -144,3 +193,4 @@ The shared evidence packet includes parent investigation plus three bounded read
 | --- | --- | --- | --- | --- |
 | 2026-10-01 | none | draft | Exhaustive security-remediation planning requested | Consultation, current revision and shared source packet; final triad mappings pending |
 | 2026-10-01 | draft | current | Completed triad revalidated with explicit recommended defaults | 27 mitigation mappings, 34 scenarios, 24 phases, 209 reference assignments and candidate-bound operational admission; disposition plan-aligned, not release approval |
+| 2026-10-02 | current | current | User added all ten bug and twelve vulnerability classes; R2 triad revalidated | 26 phases, 50 scenarios, 132 tasks, unchanged 209-reference coverage, 31 qualified finding mappings and all 22 distinct class obligations; plan-aligned, not implemented or release-approved |

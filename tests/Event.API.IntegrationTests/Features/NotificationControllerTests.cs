@@ -34,6 +34,33 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class NotificationControllerTests
 {
     [Test]
+    public async Task RefreshStreamDeliversInitialEventBeforeTheStreamCompletes()
+    {
+        await using var factory = await NotificationHttpFixture.CreateAsync();
+        using var owner = factory.Client(factory.UserId);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/notification/stream");
+        using var response = await owner.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, cancellation.Token);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Content.Headers.ContentType!.MediaType).IsEqualTo("text/event-stream");
+        await Assert.That(response.Headers.ETag).IsNull();
+        await using var body = await response.Content.ReadAsStreamAsync(cancellation.Token);
+        using var reader = new StreamReader(body);
+        var lines = new List<string>();
+        while (await reader.ReadLineAsync(cancellation.Token) is { Length: > 0 } line)
+            lines.Add(line);
+
+        await Assert.That(lines.Contains("event: notification-refresh")).IsTrue();
+        var data = lines.Single(line => line.StartsWith("data: ", StringComparison.Ordinal));
+        using var hint = JsonDocument.Parse(data["data: ".Length..]);
+        await Assert.That(hint.RootElement.GetProperty("reason").GetString()).IsEqualTo("initial");
+        await Assert.That(hint.RootElement.GetProperty("unreadCount").GetInt32()).IsEqualTo(0);
+        cancellation.Cancel();
+    }
+
+    [Test]
     public async Task ControllersConsumeOnlyClosedNativePortsForTheNotificationCohort()
     {
         var parameters = new[] { typeof(NotificationController), typeof(GroupController), typeof(OrganizationController) }

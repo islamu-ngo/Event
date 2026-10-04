@@ -1,0 +1,122 @@
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Components.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.InstanceAdmin
+@using Explore.Blazor.Client.Contracts.Services.InstanceAdmin
+@inject IInstanceDomainService DomainService
+
+<div class="control-plane-domains">
+    <InstanceAdminPageHeader Title="Domain inventory" IsSection="true"
+                            Eyebrow="Instance console"
+                            Description="Review public and admin host routing, DNS guidance, and domain governance.">
+        <ActionsContent>
+            @if (HasLink(InstanceAdminLinkRelations.Edit))
+            {
+        <InstanceAdminActionButton Href="/settings/instance?section=domain"
+                                          StartIcon="@Icons.Material.Filled.Edit"
+                                          AriaLabel="Edit domain governance">
+                    Edit domain governance
+                </InstanceAdminActionButton>
+            }
+            else if (HasLink(InstanceAdminLinkRelations.Settings))
+            {
+        <InstanceAdminActionButton Href="/settings/instance?section=domain"
+                                          Variant="Variant.Outlined"
+                                          StartIcon="@Icons.Material.Filled.Settings"
+                                          AriaLabel="Review domain settings">
+                    Review domain settings
+                </InstanceAdminActionButton>
+            }
+        </ActionsContent>
+    </InstanceAdminPageHeader>
+
+    @if (_loading)
+    {
+        <InstanceAdminPanel Title="Loading domains">
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        </InstanceAdminPanel>
+    }
+    else if (_domains is null)
+    {
+        <InstanceAdminPanel Title="Instance API unavailable" Description="Domain data is hidden until the instance API is available.">
+            <p class="control-plane-domains__message" role="alert">@_problemMessage</p>
+        </InstanceAdminPanel>
+    }
+    else if (DomainRecords.Count == 0)
+    {
+        <InstanceAdminPanel Title="No domains reported" Description="The instance API did not return public or admin domain records.">
+            <p class="control-plane-domains__message">Configure domain governance through instance settings when the API advertises that affordance.</p>
+        </InstanceAdminPanel>
+    }
+    else
+    {
+        <InstanceAdminPanel Title="Domain inventory" Description="@DomainCountLabel">
+            <MudAlert Severity="Severity.Info" Class="control-plane-domains__operator-status">
+                DNS verification is operator-managed. Apply the generated record guidance with your DNS provider, then review the resulting routing and certificate status in your hosting platform.
+            </MudAlert>
+            <div class="control-plane-domains__list" role="list">
+                @foreach (var domain in DomainRecords)
+                {
+                    <article class="control-plane-domains__item" role="listitem" @key="domain.Name">
+                        <div class="control-plane-domains__item-main">
+                            <h3 class="control-plane-domains__host">@domain.Name</h3>
+                            <dl class="control-plane-domains__facts">
+                                <div>
+                                    <dt>Purpose</dt>
+                                    <dd>@domain.Purpose</dd>
+                                </div>
+                                <div>
+                                    <dt>Status</dt>
+                                    <dd>@domain.Status</dd>
+                                </div>
+                                <div>
+                                    <dt>Target</dt>
+                                    <dd>@DisplayValue(domain.Target)</dd>
+                                </div>
+                            </dl>
+                            @if (!string.IsNullOrWhiteSpace(domain.Guidance))
+                            {
+                                <p class="control-plane-domains__verification">@domain.Guidance</p>
+                            }
+                        </div>
+
+                    </article>
+                }
+            </div>
+        </InstanceAdminPanel>
+    }
+</div>
+
+@code {
+    private HalResourceOfInstanceDomainOverviewDto? _domains;
+    private bool _loading = true;
+    private string _problemMessage = "The instance API is currently unavailable.";
+    private IReadOnlyList<InstanceDnsRecordDto> DomainRecords => _domains?.DnsRecords?.ToArray() ?? [];
+    private string DomainCountLabel => DomainRecords.Count == 1
+        ? "1 domain returned by the instance API."
+        : $"{DomainRecords.Count} domains returned by the instance API.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _domains = await DomainService.GetDomainsAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            _problemMessage = "Domain data is currently unavailable.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool HasLink(string relation) => InstanceAdminHal.HasLink(_domains?._links, relation);
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not configured" : value;
+}

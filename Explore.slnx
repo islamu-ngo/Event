@@ -50,6 +50,10 @@
   <Folder Name="/Tooling/Configuration Manifest/">
     <Project Path="eng/configuration-manifest-schema/src/ISLAMU.ConfigurationManifest.SchemaGenerator/ISLAMU.ConfigurationManifest.SchemaGenerator.csproj" />
   </Folder>
+  <Folder Name="/Tooling/Dependency Submission/">
+    <Project Path="eng/dependency-submission/src/ISLAMU.DependencySubmission/ISLAMU.DependencySubmission.csproj" />
+    <Project Path="eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj" />
+  </Folder>
   <Folder Name="/Tooling/Setup Assistant/">
     <Project Path="eng/setup-assistant/EnvironmentCatalogueGenerator/EnvironmentCatalogueGenerator.csproj" />
     <Project Path="eng/setup-assistant/SetupCliCommandSchemaGenerator/SetupCliCommandSchemaGenerator.csproj" />

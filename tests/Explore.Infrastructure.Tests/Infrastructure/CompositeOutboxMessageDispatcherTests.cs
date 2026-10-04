@@ -55,8 +55,12 @@ public sealed class CompositeOutboxMessageDispatcherTests
             EventType = OperatorIdentityImportAudit.EventType,
             Payload = JsonSerializer.Serialize(new
             {
-                audit.ActorUserId, audit.ContentDigest, audit.ExpectedRevisionHash, audit.CommittedRevision,
-                LegalName = "private-legal-name", Contact = "private-contact@example.test"
+                audit.ActorUserId,
+                audit.ContentDigest,
+                audit.ExpectedRevisionHash,
+                audit.CommittedRevision,
+                LegalName = "private-legal-name",
+                Contact = "private-contact@example.test"
             }),
             Status = OutboxMessageStatus.Pending,
             CreatedAt = DateTime.UtcNow,

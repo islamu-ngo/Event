@@ -32,11 +32,24 @@ jobs:
         with:
           name: ${{ inputs.artifact }}
           path: artifacts/coverage
+      - name: Select downloaded coverage reports
+        id: reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports=(artifacts/coverage/*.cobertura.xml)
+          if [[ ! -f "${reports[0]}" ]]; then
+            echo "Downloaded coverage artifact contains no Cobertura reports." >&2
+            exit 1
+          fi
+          printf -v report_list '%s,' "${reports[@]}"
+          printf 'files=%s\n' "${report_list%,}" >> "$GITHUB_OUTPUT"
       - name: Upload lane coverage
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
-          directory: artifacts/coverage
+          files: ${{ steps.reports.outputs.files }}
+          disable_search: true
           flags: ${{ inputs.flag }}
           name: ${{ inputs.flag }}
           override_commit: ${{ github.event.pull_request.head.sha || github.sha }}

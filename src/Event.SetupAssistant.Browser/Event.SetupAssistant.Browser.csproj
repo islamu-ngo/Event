@@ -8,9 +8,6 @@
     <SetupTargetEnabled>true</SetupTargetEnabled>
     <SetupTargetRole>StandalonePublicBrowser</SetupTargetRole>
     <IsPackable>false</IsPackable>
-    <!-- Blazor WASM client runtime packages (Microsoft.NET.Sdk.WebAssembly.Pack) track host runtime patch versions,
-         making static lock files non-portable across dev and CI runners. -->
-    <RestoreLockedMode>false</RestoreLockedMode>
   </PropertyGroup>
 
   <ItemGroup>

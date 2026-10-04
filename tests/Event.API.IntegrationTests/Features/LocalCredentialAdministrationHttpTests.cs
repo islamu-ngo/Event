@@ -157,7 +157,7 @@ public sealed class LocalCredentialAdministrationHttpTests
     {
         await using var fixture = await Fixture.CreateAsync(topology: topology);
         using HttpResponseMessage overview = await fixture.SendAsAdministratorAsync(
-            HttpMethod.Get, "/api/admin/control-plane/overview");
+            HttpMethod.Get, "/api/admin/instance/overview");
         await Assert.That(overview.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string collectionHref = (await ReadAsync(overview)).GetProperty("_links")
             .GetProperty("local-identities").GetProperty("href").GetString()!;

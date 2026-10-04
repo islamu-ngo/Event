@@ -152,8 +152,8 @@ public class AuthorizationPipelineIntegrationTests : IAsyncDisposable
     {
         var token = await _infra.TokenClient.GetAdminTokenAsync();
 
-        using var listRequest = CreateGetRequest("/api/admin/control-plane/tenants", token);
-        using var detailRequest = CreateGetRequest($"/api/admin/control-plane/tenants/{Guid.NewGuid()}", token);
+        using var listRequest = CreateGetRequest("/api/admin/instance/tenants", token);
+        using var detailRequest = CreateGetRequest($"/api/admin/instance/tenants/{Guid.NewGuid()}", token);
         var listResponse = await _instanceAdminControlPlaneClient.SendAsync(listRequest);
         var detailResponse = await _instanceAdminControlPlaneClient.SendAsync(detailRequest);
 
@@ -181,8 +181,8 @@ public class AuthorizationPipelineIntegrationTests : IAsyncDisposable
     {
         var token = await _infra.TokenClient.GetUserTokenAsync();
 
-        using var listRequest = CreateGetRequest("/api/admin/control-plane/tenants", token);
-        using var detailRequest = CreateGetRequest($"/api/admin/control-plane/tenants/{Guid.NewGuid()}", token);
+        using var listRequest = CreateGetRequest("/api/admin/instance/tenants", token);
+        using var detailRequest = CreateGetRequest($"/api/admin/instance/tenants/{Guid.NewGuid()}", token);
         var listResponse = await _regularUserControlPlaneClient.SendAsync(listRequest);
         var detailResponse = await _regularUserControlPlaneClient.SendAsync(detailRequest);
 
@@ -195,8 +195,8 @@ public class AuthorizationPipelineIntegrationTests : IAsyncDisposable
     {
         var token = await _infra.TokenClient.GetTenantAdminTokenAsync();
 
-        using var listRequest = CreateGetRequest("/api/admin/control-plane/tenants", token);
-        using var detailRequest = CreateGetRequest($"/api/admin/control-plane/tenants/{Guid.NewGuid()}", token);
+        using var listRequest = CreateGetRequest("/api/admin/instance/tenants", token);
+        using var detailRequest = CreateGetRequest($"/api/admin/instance/tenants/{Guid.NewGuid()}", token);
         var listResponse = await _tenantAdminClient.SendAsync(listRequest);
         var detailResponse = await _tenantAdminClient.SendAsync(detailRequest);
 

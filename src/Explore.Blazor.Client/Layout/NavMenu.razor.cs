@@ -103,12 +103,6 @@ public partial class NavMenu : IDisposable
     private string? ActingActorName => IsStudioWorkspace
         ? UiShellState.ActiveActor?.DisplayName
         : null;
-    private string? ProfileAdminSettingsHref => _isCurrentUserInstanceAdmin
-        ? "/settings/instance"
-        : _isCurrentUserTenantAdmin
-            ? "/settings/admin"
-            : null;
-
     protected override async Task OnInitializedAsync()
     {
         AiAssistantState.OnChange += StateHasChanged;

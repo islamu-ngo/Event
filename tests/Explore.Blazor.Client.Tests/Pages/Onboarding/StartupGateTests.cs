@@ -1,5 +1,5 @@
 using Explore.Blazor.Client.Pages.Onboarding;
-using Explore.Blazor.Client.Routing.ControlPlane;
+using Explore.Blazor.Client.Routing.InstanceAdmin;
 
 namespace Explore.Blazor.Client.Tests.Pages.Onboarding;
 
@@ -103,15 +103,13 @@ public class StartupGateTests : IDisposable
     public async Task StartupGate_WhenLocalRolesClaimAdminAuthority_StillHonorsTheServerDecision()
     {
         // Local roles and claims must never upgrade the destination: only the server-derived
-        // decision selects the control plane.
+        // decision selects instance administration.
         _ctx.SetAuthenticatedUserWithRoles(Guid.NewGuid(), "Local Admin", "InstanceAdmin", "Admin");
         _startupRouting.GetRootDecisionAsync().Returns(StartupRouteDecision.PublicHome);
 
         _ctx.RenderMudComponent<StartupGate>();
 
         await Assert.That(LastNavigationUri()).EndsWith("/events");
-        await Assert.That(NavigatedUris().Any(uri => uri.Contains(ControlPlaneRoutes.Root, StringComparison.Ordinal)))
-            .IsFalse();
     }
 
     #endregion

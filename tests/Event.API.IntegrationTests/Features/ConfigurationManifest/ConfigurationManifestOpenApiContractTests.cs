@@ -11,7 +11,7 @@ public sealed class ConfigurationManifestOpenApiContractTests(
 {
     private const string OpenApiEndpoint = "/openapi/islamu-event.json";
     private const string PrimaryPath =
-        "/api/control-plane/configuration-manifest/export";
+        "/api/admin/instance/configuration-manifest/export";
 
     [Test]
     public async Task NativeDocument_ExposesOnlyPrimaryTypedBinaryExport()
@@ -29,7 +29,7 @@ public sealed class ConfigurationManifestOpenApiContractTests(
             "/api/tenant/settings/configuration-manifest/export",
             out _)).IsFalse();
         await Assert.That(paths.TryGetProperty(
-            "/api/admin/control-plane/tenants/{tenantId}/configuration-manifest/export",
+            "/api/admin/instance/tenants/{tenantId}/configuration-manifest/export",
             out _)).IsFalse();
 
         JsonElement operation = paths.GetProperty(PrimaryPath).GetProperty("get");

@@ -2765,3 +2765,26 @@ References: `InstanceOnboardingGenerationReader`,
 - [x] Stays in journal only; the existing native ordering regressions guard this dispatch contract.
 
 ---
+
+## [2026-10-02 Europe/Brussels] Parameterize dynamic admission credential predicates
+
+**Context**: Full-suite verification exposed the PostgreSQL admission check-in latency gate while working on `update-repository-query`.
+
+**Symptom / Observation**: Fifty successful concurrent check-ins each performed one credential lookup, but p95 exceeded the unchanged 250 ms limit: 264.071 ms in the full cohort and 437.231 ms in a fresh one-case process. A deterministic live-query regression also showed that candidate digests and key versions were not bound as SQL parameters.
+
+**Root Cause**: `AdmissionCheckInRepository.BuildCredentialPredicate` embedded request-specific digests, key versions and tenant IDs in expression constant nodes. Different values therefore changed the query shape instead of supplying parameters to a reusable query plan. A one-query assertion alone did not detect this compilation and plan-cache cost.
+
+**Resolution**: Retain the bounded OR-of-version/digest-pairs predicate and tenant-qualified join, but supply captured member expressions for request values. The strengthened regression verifies actual command parameter values; a shared-cache regression verifies first-candidate matching, crossed-pair rejection, changed values and exact tenant-scoped ticket IDs. The 16-case PostgreSQL cohort passed without skips; the unchanged 50-request gate recorded p95 198.064 ms and p99 201.970 ms. Verification: `dotnet tests/Event.Persistence.IntegrationTests/bin/VerificationAdmissionParameterWitness/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/EventPersistence.IntegrationTests/AdmissionCheckInPostgreSqlRedTests/*" --minimum-expected-tests 16 --maximum-parallel-tests 2`.
+
+**Why This Matters for Future Work**: A set-based credential query can still miss its latency budget when dynamic expression values prevent plan reuse. Check parameter binding as well as command count, and protect pair integrity and tenant isolation when changing cached query shapes.
+
+**References**:
+- `src/Explore.Persistence/Repositories/AdmissionCheckInRepository.cs:233`
+- `tests/Event.Persistence.IntegrationTests/AdmissionCheckInPersistenceRedTests.cs:631`
+- `.agents/skills/optimize-ef-core-queries/SKILL.md`
+- https://learn.microsoft.com/ef/core/performance/advanced-performance-topics#dynamically-constructed-queries
+
+**Promotion Consideration**:
+- [x] Stays in journal only; promote to query guidance if another dynamic predicate encounters the same defect.
+
+---

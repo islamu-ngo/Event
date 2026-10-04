@@ -1,0 +1,342 @@
+@using Explore.Blazor.Client.Clients
+
+<form class="control-plane-plan-editor" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+    <div class="control-plane-plan-editor__grid">
+        <MudTextField T="string"
+                      Value="@Draft.Key"
+                      ValueChanged="SetKey"
+                      Label="Plan key"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      ReadOnly="@KeyReadOnly"
+                      Disabled="@Busy"
+                      autocomplete="off"
+                      dir="ltr" />
+        <MudTextField T="string"
+                      Value="@Draft.Name"
+                      ValueChanged="SetName"
+                      Label="Plan name"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      ReadOnly="@KeyReadOnly"
+                      Disabled="@Busy"
+                      autocomplete="off"
+                      dir="auto" />
+        <MudNumericField T="double"
+                         @bind-Value="Draft.Pricing.Amount"
+                         Label="Price amount"
+                         Variant="Variant.Outlined"
+                         Min="0"
+                         Disabled="@Busy"
+                         Required="true"
+                         dir="ltr" />
+        <MudTextField T="string"
+                      Value="@Draft.Pricing.CurrencyCode"
+                      ValueChanged="SetCurrency"
+                      Label="Currency code"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      MaxLength="3"
+                      Disabled="@Busy"
+                      autocomplete="off"
+                      dir="ltr" />
+        <MudSelect T="string"
+                   @bind-Value="Draft.Pricing.BillingPeriod"
+                   Label="Billing period"
+                   Variant="Variant.Outlined"
+                   Disabled="@Busy"
+                   Required="true">
+            <MudSelectItem Value="@("monthly")">Monthly</MudSelectItem>
+            <MudSelectItem Value="@("yearly")">Yearly</MudSelectItem>
+            <MudSelectItem Value="@("one-time")">One-time</MudSelectItem>
+        </MudSelect>
+    </div>
+
+    <MudCheckBox T="bool"
+                 @bind-Value="Draft.IsActiveForProvisioning"
+                 Disabled="@Busy"
+                 Color="Color.Primary">
+        Eligible for new tenant provisioning
+    </MudCheckBox>
+
+    <section class="control-plane-plan-editor__section" aria-labelledby="@SettingsHeadingId">
+        <div class="control-plane-plan-editor__section-heading">
+            <div>
+                <h3 id="@SettingsHeadingId">Setting overrides</h3>
+                <p>Use JSON values so booleans, numbers, arrays, and objects retain their type.</p>
+            </div>
+            <InstanceAdminActionButton Variant="Variant.Outlined"
+                                      Size="Size.Small"
+                                      StartIcon="@Icons.Material.Filled.Add"
+                                      Disabled="@Busy"
+                                      OnClick="AddSetting">
+                Add setting
+            </InstanceAdminActionButton>
+        </div>
+
+        @if (Draft.SettingOverrides.Count == 0)
+        {
+            <p class="control-plane-plan-editor__empty">No setting overrides.</p>
+        }
+        else
+        {
+            <div class="control-plane-plan-editor__rows" role="list">
+                @foreach (var setting in Draft.SettingOverrides)
+                {
+                    <div class="control-plane-plan-editor__row control-plane-plan-editor__row--setting" role="listitem" @key="setting">
+                        <MudTextField T="string"
+                                      Value="@setting.Key"
+                                      ValueChanged="@(value => setting.Key = value ?? string.Empty)"
+                                      Label="Setting key"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Disabled="@Busy"
+                                      autocomplete="off"
+                                      dir="ltr" />
+                        <MudTextField T="string"
+                                      Value="@setting.JsonValue"
+                                      ValueChanged="@(value => setting.JsonValue = value ?? string.Empty)"
+                                      Label="JSON value"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Disabled="@Busy"
+                                      autocomplete="off"
+                                      dir="ltr" />
+                        <MudCheckBox T="bool" @bind-Value="setting.IsLocked" Disabled="@Busy" Color="Color.Warning">
+                            Locked
+                        </MudCheckBox>
+                        <MudTooltip Text="Remove setting">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                                           Color="Color.Error"
+                                           Disabled="@Busy"
+                                           aria-label="@($"Remove setting {setting.Key}")"
+                                           OnClick="@(() => RemoveSetting(setting))" />
+                        </MudTooltip>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="control-plane-plan-editor__section" aria-labelledby="@QuotasHeadingId">
+        <div class="control-plane-plan-editor__section-heading">
+            <div>
+                <h3 id="@QuotasHeadingId">Quota limits</h3>
+                <p>Limits are whole-number units defined by each quota key.</p>
+            </div>
+            <InstanceAdminActionButton Variant="Variant.Outlined"
+                                      Size="Size.Small"
+                                      StartIcon="@Icons.Material.Filled.Add"
+                                      Disabled="@Busy"
+                                      OnClick="AddQuota">
+                Add quota
+            </InstanceAdminActionButton>
+        </div>
+
+        @if (Draft.QuotaLimits.Count == 0)
+        {
+            <p class="control-plane-plan-editor__empty">No quota limits.</p>
+        }
+        else
+        {
+            <div class="control-plane-plan-editor__rows" role="list">
+                @foreach (var quota in Draft.QuotaLimits)
+                {
+                    <div class="control-plane-plan-editor__row control-plane-plan-editor__row--quota" role="listitem" @key="quota">
+                        <MudTextField T="string"
+                                      Value="@quota.Key"
+                                      ValueChanged="@(value => quota.Key = value ?? string.Empty)"
+                                      Label="Quota key"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Disabled="@Busy"
+                                      autocomplete="off"
+                                      dir="ltr" />
+                        <MudNumericField T="long"
+                                         @bind-Value="quota.Limit"
+                                         Label="Limit"
+                                         Variant="Variant.Outlined"
+                                         Min="0"
+                                         Disabled="@Busy"
+                                         Required="true"
+                                         dir="ltr" />
+                        <MudTooltip Text="Remove quota">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                                           Color="Color.Error"
+                                           Disabled="@Busy"
+                                           aria-label="@($"Remove quota {quota.Key}")"
+                                           OnClick="@(() => RemoveQuota(quota))" />
+                        </MudTooltip>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    @if (_localErrors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" role="alert" aria-live="assertive">
+            <ul class="control-plane-plan-editor__issues">
+                @foreach (string error in _localErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </MudAlert>
+    }
+
+    @if (ValidationErrors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" role="alert" aria-live="assertive">
+            <strong>Draft validation found issues.</strong>
+            <ul class="control-plane-plan-editor__issues">
+                @foreach (TenantPlanValidationError error in ValidationErrors)
+                {
+                    <li><code dir="ltr">@error.Target</code>: @error.Message <span dir="ltr">(@error.Code)</span></li>
+                }
+            </ul>
+        </MudAlert>
+    }
+
+    @if (Diff is { } diff)
+    {
+        <section class="control-plane-plan-editor__diff" aria-labelledby="@DiffHeadingId">
+            <h3 id="@DiffHeadingId">Setting diff</h3>
+            @if (diff.SettingChanges.Count == 0)
+            {
+                <p class="control-plane-plan-editor__empty">No setting changes.</p>
+            }
+            else
+            {
+                <div class="control-plane-plan-editor__table-wrap" role="region" tabindex="0" aria-label="Tenant plan setting changes">
+                    <table>
+                        <thead><tr><th scope="col">Setting</th><th scope="col">Change</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Lock</th></tr></thead>
+                        <tbody>
+                            @foreach (TenantPlanSettingChange change in diff.SettingChanges)
+                            {
+                                <tr @key="change.Key">
+                                    <td><code dir="ltr">@change.Key</code></td>
+                                    <td>@ChangeLabel(change.ChangeType)</td>
+                                    <td><code dir="ltr">@DisplayValue(change.BeforeValue)</code></td>
+                                    <td><code dir="ltr">@DisplayValue(change.AfterValue)</code></td>
+                                    <td>@(change.LockChanged ? "Changed" : "Unchanged")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+
+    <div class="control-plane-plan-editor__actions">
+        @if (CanValidate)
+        {
+            <InstanceAdminActionButton Variant="Variant.Outlined" Disabled="@Busy" OnClick="ValidateAsync">Validate</InstanceAdminActionButton>
+        }
+        @if (CanPreviewDiff)
+        {
+            <InstanceAdminActionButton Variant="Variant.Outlined" Disabled="@Busy" OnClick="PreviewDiffAsync">Preview diff</InstanceAdminActionButton>
+        }
+        <InstanceAdminActionButton ButtonType="ButtonType.Submit" Disabled="@Busy">@SubmitLabel</InstanceAdminActionButton>
+        <InstanceAdminActionButton Variant="Variant.Text" Disabled="@Busy" OnClick="CancelAsync">Cancel</InstanceAdminActionButton>
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired] public TenantPlanDraft Draft { get; set; } = new();
+    [Parameter] public bool KeyReadOnly { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool CanValidate { get; set; }
+    [Parameter] public bool CanPreviewDiff { get; set; }
+    [Parameter] public string SubmitLabel { get; set; } = "Save draft";
+    [Parameter] public IReadOnlyList<TenantPlanValidationError> ValidationErrors { get; set; } = [];
+    [Parameter] public TenantPlanDiffResult? Diff { get; set; }
+    [Parameter] public EventCallback<TenantPlanDraft> OnValidate { get; set; }
+    [Parameter] public EventCallback<TenantPlanDraft> OnPreviewDiff { get; set; }
+    [Parameter, EditorRequired] public EventCallback<TenantPlanDraft> OnSubmit { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnCancel { get; set; }
+
+    private readonly List<string> _localErrors = [];
+    private readonly string _id = Guid.CreateVersion7().ToString("N");
+    private string SettingsHeadingId => $"plan-settings-{_id}";
+    private string QuotasHeadingId => $"plan-quotas-{_id}";
+    private string DiffHeadingId => $"plan-diff-{_id}";
+
+    private void SetKey(string value) => Draft.Key = value.Trim();
+    private void SetName(string value) => Draft.Name = value;
+    private void SetCurrency(string value) => Draft.Pricing.CurrencyCode = value.Trim().ToUpperInvariant();
+    private void AddSetting() => Draft.SettingOverrides.Add(new TenantPlanSettingOverride());
+    private void RemoveSetting(TenantPlanSettingOverride setting) => Draft.SettingOverrides.Remove(setting);
+    private void AddQuota() => Draft.QuotaLimits.Add(new TenantPlanQuotaLimit());
+    private void RemoveQuota(TenantPlanQuotaLimit quota) => Draft.QuotaLimits.Remove(quota);
+
+    private async Task SubmitAsync()
+    {
+        if (ValidateLocally())
+        {
+            await OnSubmit.InvokeAsync(Draft);
+        }
+    }
+
+    private async Task ValidateAsync()
+    {
+        if (ValidateLocally())
+        {
+            await OnValidate.InvokeAsync(Draft);
+        }
+    }
+
+    private async Task PreviewDiffAsync()
+    {
+        if (ValidateLocally())
+        {
+            await OnPreviewDiff.InvokeAsync(Draft);
+        }
+    }
+
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+
+    private bool ValidateLocally()
+    {
+        _localErrors.Clear();
+        if (string.IsNullOrWhiteSpace(Draft.Key)) _localErrors.Add("Plan key is required.");
+        if (string.IsNullOrWhiteSpace(Draft.Name)) _localErrors.Add("Plan name is required.");
+        if (Draft.Pricing.Amount < 0) _localErrors.Add("Price amount cannot be negative.");
+        if (Draft.Pricing.CurrencyCode.Trim().Length != 3) _localErrors.Add("Currency code must contain three characters.");
+        if (string.IsNullOrWhiteSpace(Draft.Pricing.BillingPeriod)) _localErrors.Add("Billing period is required.");
+
+        AddCollectionErrors(
+            Draft.SettingOverrides.Select(setting => setting.Key),
+            "setting",
+            Draft.SettingOverrides.Any(setting => string.IsNullOrWhiteSpace(setting.JsonValue))
+                ? "Each setting requires a JSON value."
+                : null);
+        AddCollectionErrors(Draft.QuotaLimits.Select(quota => quota.Key), "quota");
+
+        return _localErrors.Count == 0;
+    }
+
+    private void AddCollectionErrors(IEnumerable<string> keys, string label, string? additionalError = null)
+    {
+        string[] normalized = keys.Select(key => key.Trim()).ToArray();
+        if (normalized.Any(string.IsNullOrWhiteSpace))
+        {
+            _localErrors.Add($"Each {label} requires a key.");
+        }
+
+        if (normalized.Where(key => key.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+            != normalized.Count(key => key.Length > 0))
+        {
+            _localErrors.Add($"{char.ToUpperInvariant(label[0])}{label[1..]} keys must be unique.");
+        }
+
+        if (additionalError is not null)
+        {
+            _localErrors.Add(additionalError);
+        }
+    }
+
+    private static string ChangeLabel(int changeType) => changeType == 0 ? "Added" : "Changed";
+    private static string DisplayValue(string? value) => value ?? "Not set";
+}

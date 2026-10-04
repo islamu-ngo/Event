@@ -6,10 +6,18 @@ set +x
 set -euo pipefail
 umask 077
 
-if [[ $# -gt 1 || ( $# -eq 1 && "$1" != "--no-build" ) ]]; then
-    printf 'Usage: bash eng/scripts/run-local-agent.sh [--no-build]\n' >&2
-    exit 2
-fi
+no_build=false
+isolated=false
+for argument in "$@"; do
+    case "$argument" in
+        --no-build) no_build=true ;;
+        --isolated) isolated=true ;;
+        *)
+            printf 'Usage: bash eng/scripts/run-local-agent.sh [--no-build] [--isolated]\n' >&2
+            exit 2
+            ;;
+    esac
+done
 
 if [[ ${DOTNET_ENVIRONMENT:-Development} != Development ||
       ${ASPNETCORE_ENVIRONMENT:-Development} != Development ]]; then
@@ -65,7 +73,8 @@ for path in api postgresql; do
         case "$key" in
             POSTGRESQL_USERNAME|POSTGRESQL_PASSWORD|AGENT_BROWSER_REDIS_PASSWORD|\
             AGENT_BROWSER_PERSONA_PASSWORD|INSTANCE_BOOTSTRAP_LOCAL_PASSWORD|\
-            AUTHENTICATION_LOCAL_JWT_KEY)
+            AUTHENTICATION_LOCAL_JWT_KEY|PRIVACY_ERASURE_IDENTITY_FENCE_KEY|\
+            PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID)
                 value=$(printf '%s' "$encoded" | base64 -d)
                 export "$key=$value"
                 ;;
@@ -106,12 +115,23 @@ for key in POSTGRESQL_USERNAME POSTGRESQL_PASSWORD AGENT_BROWSER_REDIS_PASSWORD 
 done
 
 printf 'LOCAL_AGENT_AUTHORITY_READY\n'
-dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj \
-    --configuration Release --launch-profile local-agent "$@" 2>&1 |
+if $isolated; then
+    export ISLAMU_ASPIRE_MODE=AgentBrowser
+    export AGENT_BROWSER_SEED_ENABLED=true
+    export Hosting__Topology=Split
+    export ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite
+    export WEBHOOKS_PROVIDER=Local
+    startup=(aspire start --isolated --apphost src/Explore.AppHost/Explore.AppHost.csproj)
+else
+    startup=(dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj \
+        --configuration Release --launch-profile local-agent)
+fi
+if $no_build; then startup+=(--no-build); fi
+"${startup[@]}" 2>&1 |
     while IFS= read -r line; do
         case "$line" in
             *secret_authority_unavailable*) printf 'LOCAL_AGENT_AUTHORITY_FAILURE\n' ;;
-            *'Application started.'*|*'AppHost is running.'*)
+            *'Application started.'*|*'AppHost is running.'*|*'AppHost started'*|*'Started AppHost'*)
                 printf 'LOCAL_AGENT_APPHOST_STARTED\n' ;;
             *'Unhandled exception'*|*' error:'*) printf 'LOCAL_AGENT_STARTUP_ERROR\n' ;;
         esac

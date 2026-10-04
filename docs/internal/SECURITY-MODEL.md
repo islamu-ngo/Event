@@ -3,6 +3,24 @@
 
 # Security
 
+## Identity Correlation Authority
+
+Token admission and account adoption are separate trust decisions. Only the
+validated-principal adapter can construct external correlation evidence; a
+browser DTO cannot provide a trusted issuer or verification override. The
+deployment-owned `IdentityCorrelation:TrustedIssuers` allowlist is empty by
+default, exact after central issuer normalization, and not tenant-delegable.
+Provider-kind acceptance alone never grants correlation authority.
+
+Exact provider bindings take precedence over all email observations. Automatic
+adoption excludes Local-owned accounts and requires one unambiguous eligible
+candidate. The embedded resolver runs both before and inside the serializable
+sync transaction; changes to binding/candidate ownership fail without profile
+mutation. Safe first enrollment is a distinct decision, not a fallback from a
+binding or ambiguity conflict. Current-user reads resolve only exact bindings.
+Recovery responses contain no other account's identifiers or address and direct
+the caller to their original sign-in authority or operator support.
+
 ## Anonymous Registration Challenge And Replay Boundary
 
 Guest allocation requires a native protected challenge and proof of work in

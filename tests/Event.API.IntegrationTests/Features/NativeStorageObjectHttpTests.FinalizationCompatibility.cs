@@ -215,12 +215,15 @@ public sealed partial class NativeStorageObjectHttpTests
                     IdempotencyKey = $"normalized-{purpose}"
                 };
                 await Assert.That((await new CreateStorageUploadSessionDtoValidator().ValidateAsync(upload)).IsValid).IsTrue();
+                var targetBinding = CapturedStorageProviders.LocalBinding();
+                db.Add(targetBinding);
                 var session = new StorageUploadSession
                 {
                     Id = Guid.CreateVersion7(),
                     TenantId = owner.TenantId,
                     UserId = owner.UserId,
                     Provider = StorageProviders.Local,
+                    StorageProviderBindingId = targetBinding.Id,
                     ContentType = upload.ContentType,
                     Extension = upload.Extension,
                     SafeDisplayName = upload.OriginalFileName!,

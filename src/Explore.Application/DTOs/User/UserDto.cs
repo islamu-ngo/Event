@@ -28,7 +28,8 @@ public sealed record UserDto
     public bool? EmailVerified { get; init; }
     public Guid ConcurrencyStamp { get; init; }
 
-    // Profile image key (S3 object key) and URI for preview
-    public string? ProfileImageKey { get; init; }
+    public Guid? ProfilePictureStorageObjectId { get; init; }
+    public string? ExternalProfilePictureUri { get; init; }
+    /// <summary>Policy-filtered display URL, never a provider locator or ownership identifier.</summary>
     public string? ProfileImageUri { get; set; }
 }

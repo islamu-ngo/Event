@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3YPE15HMV8SRKXDWYTMNCVE
+Title: "Conserve storage quota through activation and retirement"
+Type: fix
+Scope: storage
+Summary: "Rebuild fenced tenant/provider quota from authoritative custody instead of historically subtracting active metadata. Session and generated-file activation, resource retirement and operator recalculation share one projection."
+Group: storage-quota-conservation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

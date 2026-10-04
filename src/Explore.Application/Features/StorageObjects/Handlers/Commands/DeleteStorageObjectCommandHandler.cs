@@ -1,75 +1,54 @@
-using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
-using Explore.Application.Models.Storage;
-using Explore.Application.Telemetry;
-using Explore.Application.Contracts.Operations;
+using Explore.Application.Exceptions;
+using Explore.Application.Responses;
+using Explore.Domain;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
-public class DeleteStorageObjectCommandHandler : ICommandHandler<DeleteStorageObjectCommand, bool>
+public sealed class DeleteStorageObjectCommandHandler(
+    IStorageObjectRepository storageObjects,
+    IEventResourceStorageLifecycleRepository lifecycle,
+    IUnitOfWork unitOfWork,
+    TimeProvider clock) : ICommandHandler<DeleteStorageObjectCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IFileStorageProviderResolver _providerResolver;
-    private readonly BusinessMetrics _metrics;
-
-    public DeleteStorageObjectCommandHandler(
-        IStorageObjectRepository storageObjectRepository,
-        IFileStorageProviderResolver providerResolver,
-        BusinessMetrics metrics)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        DeleteStorageObjectCommand request, CancellationToken cancellationToken)
     {
-        _storageObjectRepository = storageObjectRepository;
-        _providerResolver = providerResolver;
-        _metrics = metrics;
-    }
-
-    public async Task<bool> ExecuteAsync(DeleteStorageObjectCommand request, CancellationToken cancellationToken)
-    {
-        var entity = await _storageObjectRepository.GetForGenericAccessAsync(request.Id, cancellationToken);
-
-        if (entity == null)
-        {
-            _metrics.RecordStorageDelete(null, "failed", "metadata_not_found");
-            return false;
-        }
-
-        if (await _storageObjectRepository.IsRetainedEvidenceAsync(entity.Id, cancellationToken))
-        {
-            _metrics.RecordStorageDelete(entity.Provider, "failed", "retained_evidence");
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(entity.ObjectKey))
-        {
-            _metrics.RecordStorageDelete(entity.Provider, "failed", "missing_object_key");
-            return false;
-        }
-
+        var utcNow = clock.GetUtcNow().UtcDateTime;
         try
         {
-            var provider = _providerResolver.GetRequired(entity.Provider);
-            await provider.DeleteAsync(new FileStorageDeleteInput(entity.ObjectKey), cancellationToken);
+            return await unitOfWork.ExecuteSerializableAsync(async ct =>
+            {
+                var source = await storageObjects.GetForGenericAccessAsync(request.Id, ct);
+                if (source is null)
+                    return BaseCommandResponse.NotFound<Guid>(id: request.Id);
+
+                var admission = await lifecycle.TryQueueRetirementAsync(
+                    source.TenantId, source.Id, utcNow, ct);
+                return admission switch
+                {
+                    StorageRetirementAdmission.Pending =>
+                        BaseCommandResponse.Success(request.Id, "Storage cleanup is pending."),
+                    StorageRetirementAdmission.NotFound =>
+                        BaseCommandResponse.NotFound<Guid>(id: request.Id),
+                    StorageRetirementAdmission.InUse =>
+                        BaseCommandResponse.Failure(FailureCodes.StorageObjectInUse,
+                            "The storage object is still in use.", id: request.Id),
+                    StorageRetirementAdmission.RetentionBlocked =>
+                        BaseCommandResponse.Failure(FailureCodes.StorageObjectRetentionBlocked,
+                            "Storage retention prevents cleanup.", id: request.Id),
+                    StorageRetirementAdmission.InvalidTarget =>
+                        BaseCommandResponse.Failure(FailureCodes.StorageObjectInvalidTarget,
+                            "The captured storage target cannot be retired.", id: request.Id),
+                    _ => throw new InvalidOperationException("Unknown storage retirement acknowledgement.")
+                };
+            }, cancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (ConcurrencyConflictException)
         {
-            _metrics.RecordStorageDelete(entity.Provider, "failed", CategorizeDeleteFailure(ex));
-            return false;
+            return BaseCommandResponse.Conflict(request.Id);
         }
-
-        await _storageObjectRepository.Delete(entity);
-
-        _metrics.RecordStorageDelete(entity.Provider, "succeeded");
-
-        return true;
     }
-
-    private static string CategorizeDeleteFailure(Exception exception)
-        => exception switch
-        {
-            InvalidOperationException => "provider_unavailable",
-            ArgumentException => "delete_failed",
-            IOException => "delete_failed",
-            UnauthorizedAccessException => "access_denied",
-            _ => "delete_failed"
-        };
 }

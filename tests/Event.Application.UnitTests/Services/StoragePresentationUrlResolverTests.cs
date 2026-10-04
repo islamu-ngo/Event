@@ -12,7 +12,7 @@ public sealed class StoragePresentationUrlResolverTests
     public StoragePresentationUrlResolverTests()
     {
         _objectStorageService
-            .GeneratePresignedDownloadUrl(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>())
+            .GeneratePresignedDownloadUrl(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string?>())
             .Returns("https://storage.example.test/presigned");
     }
 
@@ -23,9 +23,11 @@ public sealed class StoragePresentationUrlResolverTests
 
         await Assert.That(result).IsNull();
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
     }
 
     [Test]
@@ -35,24 +37,27 @@ public sealed class StoragePresentationUrlResolverTests
 
         await Assert.That(result).IsEqualTo("https://cdn.example.test/images/object.png");
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
     }
 
     [Test]
     public async Task ResolveImageUrlAsync_WithLocalStorageApiPath_ReturnsPathWithoutSigning()
     {
-        var path = $"/api/storageobject/{Guid.CreateVersion7()}/content";
-        var expected = path.Replace("/content", "/public", StringComparison.Ordinal);
+        var path = $"/api/storageobject/{Guid.CreateVersion7()}/public";
 
         var result = await Resolve(path);
 
-        await Assert.That(result).IsEqualTo(expected);
+        await Assert.That(result).IsEqualTo(path);
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
     }
 
     [Test]
@@ -62,9 +67,18 @@ public sealed class StoragePresentationUrlResolverTests
 
         await Assert.That(result).IsNull();
         await _objectStorageService.DidNotReceive().GeneratePresignedDownloadUrl(
+            Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<int>());
+            Arg.Any<int>(),
+            Arg.Any<string?>());
+    }
+
+    [Test]
+    public async Task ResolveImageUrlAsync_DoesNotConvertAuthenticatedRouteToPublicDelivery()
+    {
+        var result = await Resolve($"/api/storageobject/{Guid.CreateVersion7()}/content");
+        await Assert.That(result).IsNull();
     }
 
     private Task<string?> Resolve(string? value)

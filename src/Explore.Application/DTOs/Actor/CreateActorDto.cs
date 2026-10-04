@@ -48,5 +48,5 @@ public sealed record CreateActorDto
 
     // Content addressing
     public string? ProfilePictureCid { get; init; }
-    public string? ProfilePictureUri { get; init; }
+    public string? ExternalProfilePictureUri { get; init; }
 }

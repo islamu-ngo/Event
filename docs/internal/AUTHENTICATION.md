@@ -11,9 +11,104 @@
 4. The browser receives only an encrypted, HttpOnly BFF cookie. Raw access tokens remain in server-side authentication properties and circuit state.
 5. Local and Keycloak JWTs use isolated bearer handlers. MultiAuth selects a bounded scheme from the unvalidated issuer, then that scheme performs full signature, issuer, audience, and lifetime validation.
 6. Switching the primary provider changes only new-login admission. Existing sessions retain their originating validation and refresh scheme until normal expiry.
-7. Administrator bootstrap and provider switching match the normalized `(provider_kind, provider_account_key)` identity. Email is never sufficient unless the provider supplied a verified-email claim.
+7. Administrator bootstrap and provider switching match the normalized `(provider_kind, provider_account_key)` identity. Ordinary email correlation additionally requires a verified address from an explicitly trusted exact issuer; neither email nor correlation trust grants administrator authority.
 8. `UserExternalLogin` is instance-global identity authority. Tenant participation exists only through `TenantUser`; a provider binding never derives authorization from a tenant ID.
 9. Public Local enrollment is closed. Instance email-delivery intent governs unverified Local token issuance, independently of SMTP availability and tenant overrides. It never changes provider-owned verification facts.
+
+## Embedded Account Correlation
+
+`IIdentityAccountResolver` is implemented by the embedded Application
+`IdentityAccountResolver`. It first resolves the exact provider account key, then
+applies the deterministic Domain `IdentityCorrelationPolicy`. An existing binding
+wins even when its email changes or its issuer is removed from correlation trust.
+Read-side current-user queries remain exact-binding-only and never adopt by email.
+
+`IdentityCorrelation:TrustedIssuers` is a deployment-owned array, empty by default.
+`IdentityCorrelationOptions` validates it at startup. Entries use the same
+`OidcIssuerAuthority` normalization as provider account keys: normalized scheme,
+host, default port and trailing slash, with case-sensitive paths and unchanged
+subjects. Malformed, wildcard or duplicate normalized entries reject startup.
+Trust applies to exact authorities, not provider kinds, hostname prefixes, realm
+families, tenant settings or browser input. The environment catalogue owns indexed
+`IDENTITYCORRELATION__TRUSTEDISSUERS__0` and subsequent numeric members, including
+setup composition validation and generated documentation.
+
+`PlatformIdentityPrincipalExtensions` constructs immutable
+`IdentityAuthorityEvidence` from the authenticated principal. The sync command
+carries this separately from `UserDto`; DTO email/verification values cannot
+replace external authority evidence. Provider verification remains a factual
+observation even when the issuer is not trusted for correlation. ATProto profile
+claims cannot gain verified-email correlation authority.
+
+For unbound OIDC identities, only trusted verified evidence may select one
+canonical non-Local owner. Otherwise permitted first signup remains separate
+from adoption, including absent or unverified email, but cannot bypass an
+existing canonical address claim; ATProto's email-free
+enrollment stays with its verified-DID bootstrap. Local native receipts and
+explicit Local bindings retain their credential, subject and actor checks.
+Local-owned accounts cannot be automatically adopted by an external issuer.
+Canonical address lookup trims surrounding whitespace and lowercases evidence
+before querying the normalized claim key, matching claim creation and the
+transactional ownership recheck. This does not widen issuer trust.
+
+The handler re-runs resolution inside its existing serializable mutation and
+rejects changed/removed bindings or changed candidate ownership before profile,
+Actor or binding writes. Ambiguity and binding conflicts return the bounded
+recovery/support outcome without identifying another account. The shipped
+recovery path is the original credential provider or operator support, not a
+self-service merge or an unimplemented Link action.
+
+## Canonical Identity Email Ownership
+
+`UserIdentityEmailClaim` owns an instance-global normalized address.
+`UserIdentityEmailEvidence` records the binding that supports that claim.
+Owner-qualified composite foreign keys prevent a proof from joining another
+User's claim or external login. An exact binding may support one address;
+independent bindings may support the same owner's address. Registry mutations
+require the User/Actor/binding transaction, and removing the last proof removes
+the claim rather than leaving an unsupported address eligible for correlation.
+
+Editable `UserPii.Email` and its verification snapshot are contact/profile data,
+not ownership authority. Correlation, mail recipient selection and guest-order
+adoption consume supported canonical claims. A changed verified address already
+owned by another User never moves the authenticated binding: synchronization
+removes that binding's obsolete proof, retains independently supported proof,
+and leaves the conflicting owner's claim intact. Validated native Local
+receipts and configured-administrator completion write evidence with their
+identity graph; provider kind alone never supplies verification.
+
+External enrollment enters `PrivacyIdentityFenceOperation` before resolution
+and holds retained-authority serialization through application commit.
+Co-located SQLite enlists both contexts in the same write transaction. Changes
+committed before this gate are resolved from the current canonical owner;
+writers cannot transfer ownership between its pre-read and graph mutation.
+The retained old-subject fact prevents linking to an erased internal User UUID.
+Ordinary erasure does not ban the reusable external identity: after binding and
+claim disposal, otherwise admissible authentication may create a fresh account
+without recovering old private data or authority. Enrollment does not require
+fingerprint secrets. See [Privacy Erasure](PRIVACY_ERASURE.md).
+
+ATProtocol bootstrap acquires the ordered visitor-setting lock group before
+entering this enrollment gate, then performs bootstrap convergence inside the
+retained-authority transaction. `RelationalSettingMutationLock` rejects acquiring
+ordered groups after a caller-owned transaction has started. Keep the setting
+leases outside both the identity fence and convergence; do not bypass the fence
+or move the signup-capability recheck outside the convergence snapshot.
+
+## Editable Profile Ownership
+
+Provider names initialize `UserPii.FirstName`, `UserPii.LastName` and the personal
+Actor's display name only when synchronization creates that identity graph.
+Subsequent synchronization retains all three editable values, including when a
+new external binding is added to an existing eligible account. Names continue
+to be edited through `UpdateUserCommandHandler`; Actor display editing retains
+its existing authorized update path.
+
+Credential verification and canonical identity-address proof reconciliation
+still run on sign-in. They do not derive authority from a names update, and
+recipient selection remains independent of the editable contact snapshot.
+Historical order contact details and pinned consent evidence remain owned by
+their registration records rather than the live profile.
 
 ## External OIDC Callback Identity
 

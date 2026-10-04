@@ -24,46 +24,20 @@ public partial class ExploreDbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        if (!Database.IsRelational())
+        return await SaveWithStorageReferencesAsync(async acceptChanges =>
         {
             PrepareTrackedEntities();
-            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        }
-
-        if (Database.CurrentTransaction is not null)
-        {
-            await DisclosureMutations.CaptureAsync(cancellationToken);
-            PrepareTrackedEntities();
-            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        }
-
-        return await Database.CreateExecutionStrategy().ExecuteAsync(async () =>
-        {
-            await using var transaction = await Database.BeginTransactionAsync(
-                System.Data.IsolationLevel.Serializable, cancellationToken);
-            try
-            {
-                await DisclosureMutations.CaptureAsync(cancellationToken);
-                PrepareTrackedEntities();
-                // Preserve the source write states until the source/epoch transaction
-                // commits, including a provider retry after terminal fence failure.
-                int changed = await base.SaveChangesAsync(false, cancellationToken);
-                await FlushDisclosureAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                if (acceptAllChangesOnSuccess)
-                    ChangeTracker.AcceptAllChanges();
-                return changed;
-            }
-            catch
-            {
-                await transaction.RollbackAsync(CancellationToken.None);
-                ResetDisclosureMutations();
-                throw;
-            }
-        });
+            return await base.SaveChangesAsync(acceptChanges, cancellationToken);
+        }, acceptAllChangesOnSuccess, cancellationToken);
     }
 
     internal async Task<int> SavePrivacyErasureChangesAsync(CancellationToken cancellationToken)
+        => await SaveWithStorageReferencesAsync(
+            acceptChanges => SavePrivacyErasureGraphAsync(acceptChanges, cancellationToken),
+            acceptAllChangesOnSuccess: true, cancellationToken);
+
+    private async Task<int> SavePrivacyErasureGraphAsync(
+        bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
     {
         if (Database.IsRelational())
             await DisclosureMutations.CaptureAsync(cancellationToken);
@@ -89,7 +63,7 @@ public partial class ExploreDbContext
             }
         }
 
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     private void PrepareTrackedEntities()
@@ -388,9 +362,14 @@ public partial class ExploreDbContext
                         : null;
                     break;
                 case StorageObject storageObject:
-                    entry.Property("ProviderObjectKeyUniquenessHash").CurrentValue = storageObject.ObjectKey is { } objectKey
-                        ? ComputeMySqlUniquenessHash(storageObject.Provider, objectKey)
+                    entry.Property("BindingObjectKeyUniquenessHash").CurrentValue =
+                        storageObject.ObjectKey is { } objectKey && storageObject.StorageProviderBindingId is { } bindingId
+                        ? ComputeMySqlUniquenessHash(bindingId.ToString("D"), objectKey)
                         : null;
+                    break;
+                case StorageProducerOperation producer:
+                    entry.Property("BindingObjectKeyUniquenessHash").CurrentValue =
+                        ComputeMySqlUniquenessHash(producer.ProviderBindingId.ToString("D"), producer.ObjectKey);
                     break;
                 case WebPushSubscription webPushSubscription:
                     var active = webPushSubscription.IsActive && !webPushSubscription.IsDeleted;

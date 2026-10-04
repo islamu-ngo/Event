@@ -11,6 +11,7 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Services.Registration.Providers.SubmissionSinks;
 using Explore.Infrastructure.Webhooks;
+using Explore.Infrastructure.Tests.Infrastructure;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -21,26 +22,15 @@ public sealed class RegistrationProviderSubmissionSinkAdapterTests
     [Test]
     public async Task CsvSinkStoresStableSubmissionFileAndMetadata()
     {
-        Guid submissionId = Guid.CreateVersion7();
-        var provider = Substitute.For<IFileStorageProvider>();
-        provider.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                var input = call.Arg<FileStorageWriteInput>();
-                return new FileStorageWriteResult(StorageProviders.Local, input.ObjectKey!, input.ExpectedSizeBytes!.Value, input.ContentType, "sha256:test");
-            });
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
-        var storageObjects = Substitute.For<IStorageObjectRepository>();
-        var sink = new CsvRegistrationProviderSubmissionSink(resolver, storageObjects);
-
-        await sink.AcceptAsync(Request(CsvRegistrationProviderSubmissionSink.SupportedTuple, submissionId), CancellationToken.None);
-
-        await provider.Received(1).WriteAsync(
-            Arg.Is<FileStorageWriteInput>(input => input.ObjectKey == $"registration-submission-sinks/{TenantId:N}/{submissionId:N}.csv"),
-            Arg.Any<CancellationToken>());
-        await storageObjects.Received(1).Create(Arg.Is<StorageObject>(obj =>
-            obj.OwningResourceId == submissionId && obj.Purpose == StorageObjectPurposes.Document));
+        await using var environment = await StorageTestEnvironment.CreateAsync();
+        var request = ManagedStorageBindingTests.CsvRequest(environment.Database.TenantId);
+        var sink = new CsvRegistrationProviderSubmissionSink(environment.Producer, environment.Objects, environment.Unit);
+        await sink.AcceptAsync(request, CancellationToken.None);
+        var stored = (await environment.Objects.GetAll()).Single();
+        await Assert.That(stored.OwningResourceId).IsEqualTo(request.RegistrationSubmissionId);
+        await Assert.That(stored.Purpose).IsEqualTo(StorageObjectPurposes.Document);
+        var provider = await environment.Bindings.ResolveTargetAsync(stored.StorageProviderBindingId, stored.Provider, default);
+        await Assert.That(await provider.ExistsAsync(new(stored.ObjectKey!), default)).IsTrue();
     }
 
     [Test]

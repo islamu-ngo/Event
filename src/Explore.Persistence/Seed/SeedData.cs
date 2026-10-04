@@ -413,7 +413,7 @@ public static class SeedData
     public static StorageObject DefaultEventImage => new()
     {
         Id = SeedIds.DefaultEventImageId,
-        Uri = "https://placeholder.islamu.org/event-default.jpg",
+        SourceUri = "https://placeholder.islamu.org/event-default.jpg",
         Provider = StorageProviders.LegacyExternal,
         ObjectKey = null,
         FullName = "Default Event Image",
@@ -434,7 +434,7 @@ public static class SeedData
     public static StorageObject DefaultProfileImage => new()
     {
         Id = SeedIds.DefaultProfileImageId,
-        Uri = "https://placeholder.islamu.org/profile-default.jpg",
+        SourceUri = "https://placeholder.islamu.org/profile-default.jpg",
         Provider = StorageProviders.LegacyExternal,
         ObjectKey = null,
         FullName = "Default Profile Image",
@@ -455,7 +455,7 @@ public static class SeedData
     public static StorageObject DefaultOrganizationLogo => new()
     {
         Id = SeedIds.DefaultOrganizationLogoId,
-        Uri = "https://placeholder.islamu.org/org-default.jpg",
+        SourceUri = "https://placeholder.islamu.org/org-default.jpg",
         Provider = StorageProviders.LegacyExternal,
         ObjectKey = null,
         FullName = "Default Organization Logo",

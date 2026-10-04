@@ -1,8 +1,11 @@
 using System.Threading.Channels;
+using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -13,6 +16,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Npgsql;
+using Testcontainers.PostgreSql;
 
 namespace Event.Api.IntegrationTests.Fixtures;
 
@@ -22,7 +27,11 @@ namespace Event.Api.IntegrationTests.Fixtures;
 /// </summary>
 public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly string _databaseName = $"InMemoryDbForAuthTesting_{Guid.NewGuid():N}";
+    private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:18-alpine")
+        .WithDatabase("authenticated_api")
+        .WithUsername("postgres")
+        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
+        .Build();
 
     /// <summary>
     /// When non-null, replaces the real IAuthorizationProvider with this instance.
@@ -40,18 +49,13 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        _database.StartAsync().GetAwaiter().GetResult();
         builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((context, config) =>
         {
             var inMemoryConfig = new Dictionary<string, string?>
             {
-                {"Database:Provider", "PostgreSql"},
-                {"Database:Host", "localhost"},
-                {"Database:Port", "5432"},
-                {"Database:Database", "explore_db_test"},
-                {"Database:Runtime:TlsMode", "Prefer"},
-                {"Database:Runtime:TrustServerCertificate", "false"},
                 {"Keycloak:Authority", "https://auth.example.com"},
                 {"Keycloak:Realm", "ISLAMU"},
                 {"Keycloak:Audience", "islamu-event-api"},
@@ -79,6 +83,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
                 {"Instance:OperatorIdentity:PrivacyUrl", "https://instance.example.test/privacy"}
             };
 
+            TestDatabaseConfiguration.AddPostgreSql(inMemoryConfig, _database.GetConnectionString());
             foreach (var pair in AdditionalConfiguration)
             {
                 inMemoryConfig[pair.Key] = pair.Value;
@@ -91,7 +96,21 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
         {
             services.RemoveExploreDbContextRegistrations();
 
-            services.AddInMemoryExploreDbContext(_databaseName);
+            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            ConfigureDatabase(options);
+            using (var database = new ExploreDbContext(options.Options))
+            {
+                database.Database.Migrate();
+            }
+            services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+            services.AddScoped(provider =>
+            {
+                var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+                database.ClearTenantFilterBypass();
+                database.TenantContext = provider.GetRequiredService<ITenantContext>();
+                database.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
+                return database;
+            });
 
             // Override Redis with in-memory distributed cache for tests
             services.RemoveAll<IDistributedCache>();
@@ -158,6 +177,28 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
         {
             // Test host disposal can race service-provider cleanup after failed startup paths.
         }
+        finally
+        {
+            using var connection = new NpgsqlConnection(_database.GetConnectionString());
+            NpgsqlConnection.ClearPool(connection);
+            await _database.DisposeAsync();
+        }
+    }
+
+    private void ConfigureDatabase(DbContextOptionsBuilder options)
+    {
+        var connection = new NpgsqlConnectionStringBuilder(_database.GetConnectionString());
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = connection.Host,
+            Port = connection.Port,
+            Database = connection.Database,
+            Username = connection.Username,
+            Password = connection.Password,
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
+        });
     }
 
     private sealed class SeedingHostedService(IServiceProvider serviceProvider, IHostEnvironment environment,

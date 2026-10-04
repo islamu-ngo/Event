@@ -499,6 +499,21 @@ public sealed class EmailDeliveryGraphRevisionTests
             JoinedAt = now,
             CreatedAt = now
         });
+        var binding = new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+            AuthenticationProvider = null!,
+            ProviderKey = Explore.Application.Authentication.PlatformIdentityPrincipalExtensions
+                .CreateOidcAccountKey("https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
+            CreatedAt = now
+        };
+        var claim = UserIdentityEmailClaim.Create(user.Id, user.Email!);
+        context.UserExternalLogins.Add(binding);
+        context.UserIdentityEmailClaims.Add(claim);
+        context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(user.Id, claim.Id, binding.Id, now));
         await context.SaveChangesAsync();
         return new(TenantId: tenant.Id, UserId: user.Id, Email: user.Email!);
     }

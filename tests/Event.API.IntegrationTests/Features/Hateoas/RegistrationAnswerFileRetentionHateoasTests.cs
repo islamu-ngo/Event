@@ -213,7 +213,6 @@ public sealed class RegistrationAnswerFileRetentionHateoasTests
             Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
-            Uri = $"/api/storageobject/{storageId}/content",
             ObjectKey = $"tenants/{tenant.TenantId:N}/{storageId:N}.pdf",
             Provider = StorageProviders.Local,
             FullName = FileName,

@@ -38,6 +38,8 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         var file = Draft(fileId, EventResourceDeliveryTypeEnum.StoredFile);
         var link = Draft(linkId, EventResourceDeliveryTypeEnum.ExternalLink);
         string checksum = Convert.ToHexString(SHA256.HashData("%PDF-1.7\ncleanup\n%%EOF"u8));
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
         var storage = new StorageObject
         {
             Id = objectId,
@@ -46,8 +48,8 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             ObjectKey = $"tenants/{scope.TenantAId:N}/{objectId:N}.pdf",
-            Uri = $"/api/eventresource/{fileId}/content",
             FullName = "handout.pdf",
             SafeDisplayName = "handout.pdf",
             Extension = "pdf",
@@ -72,8 +74,16 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await context.SaveChangesAsync();
         var repository = new EventHeavyRedactionRepository(context);
         var graph = await repository.GetForUpdateAsync(scope.EventAId, default);
-        EventHeavyRedactionApplicator.Apply(graph!, managerId, new DateTimeOffset(Now));
-        await repository.SaveChangesAsync(default);
+        await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async ct =>
+        {
+            await new StorageObjectReferenceRepository(context).FenceAsync([objectId], ct);
+            EventHeavyRedactionApplicator.Apply(graph!, managerId, new DateTimeOffset(Now));
+            await repository.SaveChangesAsync(ct);
+            var lifecycle = new EventResourceStorageLifecycleRepository(context);
+            await lifecycle.RetireAsync(scope.TenantAId, [fileId, linkId], [], Now, ct);
+            await lifecycle.RemoveTransferredSourcesAsync(scope.TenantAId, [fileId, linkId], [], ct);
+            return true;
+        }, default);
 
         await using var verify = database.CreateContext();
         var saved = await verify.EventResources.IgnoreQueryFilters()
@@ -83,10 +93,12 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await Assert.That(saved.All(row => row.IsDeleted)).IsTrue();
         await Assert.That(saved.All(row => row.StorageObjectId is null && row.ExternalDestinationCiphertext is null
             && row.ExternalDestinationProtectionVersion is null && row.ExternalDestinationSafeOrigin is null)).IsTrue();
-        var retired = await verify.StorageObjects.SingleAsync(row => row.Id == objectId);
-        await Assert.That(retired.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
-        await Assert.That(retired.OwningResourceKind).IsEqualTo(StorageOwningResourceKinds.EventResource);
-        await Assert.That(retired.OwningResourceId).IsEqualTo(fileId);
+        await Assert.That(await verify.StorageObjects.AnyAsync(row => row.Id == objectId)).IsFalse();
+        var retired = await verify.StorageObjectDeletionTombstones.SingleAsync(row => row.Id == objectId);
+        await Assert.That(retired.State).IsEqualTo(StorageObjectDeletionState.Ready);
+        await Assert.That(retired.ProviderBindingId).IsEqualTo(binding.Id);
+        await Assert.That(retired.ObjectKey).IsEqualTo(storage.ObjectKey);
+        await Assert.That(retired.ProviderObjectVersion).IsEqualTo(storage.ProviderVersionId);
 
         EventResource Draft(Guid id, EventResourceDeliveryTypeEnum delivery) =>
             EventResource.CreateDraft(id, scope.TenantAId, scope.EventAId, null,
@@ -142,7 +154,6 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
             Provider = StorageProviders.Local,
             StorageProviderBindingId = binding.Id,
             ObjectKey = key,
-            Uri = "/private",
             FullName = "private.pdf",
             SafeDisplayName = "private.pdf",
             Extension = "pdf",

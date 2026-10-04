@@ -11,6 +11,74 @@ namespace Event.Persistence.IntegrationTests;
 public sealed partial class EventResourceManagementPersistenceTests
 {
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task StoredDestinationConversionRetiresOnlyUnsharedTarget(bool shared)
+    {
+        var (scope, actor) = await SeedAsync();
+        var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
+        resource.SetStoredFile(scope.StorageAId, resource.ConcurrencyStamp, actor, Now);
+        await using (var seed = database.CreateContext())
+        {
+            seed.EventResources.Add(resource);
+            if (shared)
+            {
+                var participation = new OrganizationTenant
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = scope.TenantAId,
+                    Tenant = null!,
+                    Organization = new Organization
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Pii = new OrganizationPii { FullName = "Retained document owner" }
+                    },
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                    ApprovalStatus = null!
+                };
+                var document = await seed.StorageObjects.SingleAsync(row => row.Id == scope.StorageAId);
+                seed.OrganizationTenantEvidence.Add(
+                    OrganizationTenantEvidence.CreatePending(participation, document));
+            }
+            await seed.SaveChangesAsync();
+        }
+        await using var context = database.CreateContext();
+        var workflow = Workflow(context, scope.TenantAId, actor,
+            Policy(origins: ["https://files.example.com"]));
+        var protector = Substitute.For<IEventResourceDestinationProtector>();
+        protector.CurrentVersion.Returns(1);
+        protector.Protect(Arg.Any<string>(), scope.TenantAId, resource.Id, 1)
+            .Returns("opaque-conversion-envelope");
+
+        var result = await workflow.ConfigureExternalDestinationAsync(resource.Id,
+            resource.ConcurrencyStamp, "https://files.example.com/material", protector, default);
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await using var verify = database.CreateContext();
+        var converted = await verify.EventResources.SingleAsync(row => row.Id == resource.Id);
+        await Assert.That(converted.StorageObjectId).IsNull();
+        await Assert.That(converted.EventResourceDeliveryTypeId)
+            .IsEqualTo((int)EventResourceDeliveryTypeEnum.ExternalLink);
+        if (shared)
+        {
+            var source = await verify.StorageObjects.SingleAsync(row => row.Id == scope.StorageAId);
+            await Assert.That(source.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+            await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == source.Id))
+                .IsFalse();
+            await Assert.That(await verify.OrganizationTenantEvidence.CountAsync(row => row.DocumentStorageObjectId == source.Id))
+                .IsEqualTo(1);
+        }
+        else
+        {
+            await Assert.That(await verify.StorageObjects.AnyAsync(row => row.Id == scope.StorageAId)).IsFalse();
+            var custody = await verify.StorageObjectDeletionTombstones.SingleAsync(row => row.Id == scope.StorageAId);
+            await Assert.That(custody.State).IsEqualTo(StorageObjectDeletionState.Ready);
+            await Assert.That(custody.ProviderBindingId).IsNotEqualTo(Guid.Empty);
+            await Assert.That(custody.ObjectKey).IsNotNull();
+        }
+    }
+
+    [Test]
     public async Task ProtectedDestinationWriteCommitsOpaquePayloadAndAuditBeforeExternalPublication()
     {
         var (scope, actor) = await SeedAsync();

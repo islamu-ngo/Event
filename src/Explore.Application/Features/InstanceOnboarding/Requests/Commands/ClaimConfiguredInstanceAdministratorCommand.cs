@@ -14,4 +14,5 @@ public sealed record ClaimConfiguredInstanceAdministratorCommand : ICommand<Base
     public string? FirstName { get; init; }
     public string? LastName { get; init; }
     public bool? EmailVerified { get; init; }
+    public IdentityAuthorityEvidence? AuthorityEvidence { get; init; }
 }

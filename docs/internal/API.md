@@ -498,6 +498,22 @@ this partition does not change Application request or handler execution.
 
 ### Grouped Entity PATCH Contracts
 
+User profile media at `PATCH /api/user/{id}` is a replacement group:
+omitting `profileImage` preserves the image, `{"profileImage":{}}` clears it,
+and a supplied group selects either `profilePictureId` (a managed storage UUID)
+or `externalProfilePictureUri` (an absolute HTTP(S) source). Both together,
+empty UUIDs, relative URLs and credential-bearing URLs are invalid. Existing
+route-user authorization and `If-Match` concurrency checks still apply.
+The native Actor update command retains `OptionalUpdate<T>` presence semantics
+and accepts exactly one managed-ID or external-URI operation in its image group.
+
+Actor and current-user responses distinguish `profilePictureStorageObjectId`
+from `externalProfilePictureUri`; only one may be populated. `profilePictureUri`
+(Actor) and `profileImageUri` (User) are display projections, not stored ownership.
+The obsolete User `profileImageKey` is removed. Managed projections use the
+stable public-image route only after current publication/tenant checks; external
+sources remain external even when their paths resemble Event routes.
+
 Tag, Tenant metadata, tenant navigation links, footer link groups, footer links, control-plane tenant-plan drafts, current-user appearance localization, user appearance profiles, UI themes, EventLocation disclosure, EventSession agenda items, EventSession groups, EventSession speaker assignments, EventTemplate, EventSessionTemplate, and shared/Event/EventSession custom-property definitions use route-ID or current-resource `PATCH`. Their bodies contain only nullable logical groups; omitted groups preserve persisted values, and identity comes from the route plus trusted tenant context rather than body-owned IDs. Template PATCH uses metadata and definitions groups: supplied definitions atomically replace definitions and nested options, while omission preserves the existing set. Template detail reads expose the required concurrency stamp, and sync diff/apply/history remain dedicated operations. Custom-property definition PATCH uses metadata, validation, and options groups; the shared definition additionally exposes its entity-type relation group. Supplying options atomically replaces the option set, while omitting options leaves it untouched. Template and custom-property definition updates require the observed concurrency stamp through strong `If-Match`; Event and EventSession projection refresh remains inside the write transaction. Session-group and speaker updates also require strong `If-Match`; group list/detail reads expose that stamp. Islamic and Tech aspects use separate `POST` create operations and grouped `PATCH` update operations. Appearance active-profile selection, current theme mode, profile archive, Tenant lifecycle, navigation reorder, footer reorder, and tenant-plan publish/archive/clone remain dedicated actions rather than generic property groups. UI-theme PATCH keeps the observed row version at the wrapper level and validates the merged metadata/state/palette candidate before one transactional update.
 
 `OptionalUpdate<T>` preserves three distinct JSON states: an omitted member leaves the persisted value unchanged, an explicitly supplied `null` clears a nullable value, and a supplied non-null value replaces it. Record request bodies keep constructor/member names and types aligned for ASP.NET Core and `System.Text.Json`; validation metadata remains on the constructor parameter or bound member used by the public contract. Do not add compatibility readers or aliases for removed authority fields.

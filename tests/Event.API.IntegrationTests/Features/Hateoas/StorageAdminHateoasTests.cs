@@ -227,7 +227,6 @@ public sealed class StorageAdminHateoasTests
             Id = Guid.CreateVersion7(),
             FileTypeId = 1,
             Uri = "/storage/test.png",
-            Provider = StorageProviders.Local,
             FullName = "test.png",
             SafeDisplayName = "test.png",
             Extension = ".png",
@@ -235,6 +234,8 @@ public sealed class StorageAdminHateoasTests
             Visibility = StorageObjectVisibilities.PublicImage,
             Purpose = StorageObjectPurposes.EventImage,
             LifecycleState = StorageObjectLifecycleStates.Active,
+            SupportsPresignedDownload = true,
+            RetirementAllowed = true,
             TenantId = tenantId
         };
 

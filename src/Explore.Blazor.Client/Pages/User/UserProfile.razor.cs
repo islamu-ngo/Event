@@ -69,14 +69,12 @@ public partial class UserProfile : ComponentBase, IDisposable
             {
                 Logger.LogWarning("[UserProfile] User data not found, attempting sync...");
 
-                // Sync user from Keycloak to local database
+                // Synchronization uses the validated provider identity and commits before success.
                 var syncResult = await UserService.SyncUserAsync();
 
                 if (syncResult?.Success == true)
                 {
                     Logger.LogInformation("[UserProfile] User synced successfully, retrying load...");
-                    // Small delay to ensure database write is complete
-                    await Task.Delay(200);
                     userData = await UserService.GetCurrentUserAsync();
                 }
                 else
@@ -108,7 +106,7 @@ public partial class UserProfile : ComponentBase, IDisposable
             else
             {
                 Logger.LogWarning("[UserProfile] UserData is still null after sync attempt");
-                ErrorMessage = "Unable to load user profile. Please try refreshing the page.";
+                ErrorMessage = "Unable to load user profile. Use the original sign-in provider for an existing account, or contact the instance operator for recovery.";
             }
         }
         catch (Exception ex)

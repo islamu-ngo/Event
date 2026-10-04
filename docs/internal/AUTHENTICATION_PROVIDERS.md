@@ -37,6 +37,18 @@ The BFF applies the same resolved primary authority:
 - AT Protocol-only discovery returns exactly one ready `handle_input` provider;
 - browser code receives provider metadata, never bearer tokens.
 
+## Correlation Trust Is Not Login Admission
+
+Selecting Keycloak or accepting a Google token does not authorize email-based
+account adoption. Deployment `IdentityCorrelation:TrustedIssuers` explicitly
+lists exact normalized OIDC issuers and defaults to empty. Existing exact
+bindings and otherwise permitted safe signup continue to work without that
+allowlist. Removing trust blocks future email correlation, not existing bindings.
+Local-owned accounts remain excluded from automatic adoption, and ATProto
+remains a DID authority rather than an email authority. See
+[embedded account correlation](AUTHENTICATION.md#embedded-account-correlation)
+for the principal evidence and transactional resolver contract.
+
 ## AT Protocol Provisioning Authority
 
 An independently verified DID is the account key. A mutable handle is challenge

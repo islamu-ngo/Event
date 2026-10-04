@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Telemetry;
 using Explore.Application.Models.Storage;
 using Explore.Application.Services;
@@ -105,8 +106,10 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
         var bindings = Substitute.For<IStorageProviderBindingService>();
         bindings.ResolveAsync(work.ProviderBindingId, Arg.Any<CancellationToken>()).Returns(provider);
         using var metrics = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var inventoryBindings = Substitute.For<IStorageProviderBindingRepository>();
+        inventoryBindings.ListLocalAsync(Arg.Any<CancellationToken>()).Returns([]);
         var service = new StorageReconciliationService(
-            new StorageObjectRepository(context), Substitute.For<IFileStorageProviderResolver>(), [],
+            new StorageObjectRepository(context), bindings, inventoryBindings, new StorageObjectRepository(context),
             Options.Create(new StorageReconciliationSettings
             {
                 DryRun = dryRun,
@@ -117,7 +120,8 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
             NullLogger<StorageReconciliationService>.Instance,
             new EventResourceStorageCleanupService(tombstones, bindings, new Clock(new DateTimeOffset(Now)),
                 NullLogger<EventResourceStorageCleanupService>.Instance,
-                new EventResourceStorageLifecycleRepository(context), new EfCoreUnitOfWork(context)));
+                new EventResourceStorageLifecycleRepository(context), new EfCoreUnitOfWork(context)),
+            new EventResourceStorageLifecycleRepository(context), new EfCoreUnitOfWork(context));
         await service.ReconcileAsync(Now, default);
         await Assert.That(await tombstones.GetByIdAsync(work.Id, default) is not null).IsEqualTo(dryRun);
         await Assert.That(exists).IsEqualTo(dryRun);
@@ -157,7 +161,6 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
             Provider = StorageProviders.Local,
             StorageProviderBindingId = binding.Id,
             ObjectKey = work.ObjectKey,
-            Uri = "/private",
             FullName = "private.pdf",
             SafeDisplayName = "private.pdf",
             Extension = "pdf",
@@ -245,11 +248,13 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
         };
         session.BindEventResourceVersion(resource.ConcurrencyStamp);
         Guid objectId = Guid.CreateVersion7();
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
+        session.StorageProviderBindingId = binding.Id;
         if (started)
         {
-            var binding = StorageProviderBinding.Local(Path.GetTempPath());
-            string key = $"objects/{objectId:N}";
-            context.AddRange(binding, new StorageObject
+            session.ReserveObjectKey($"objects/{objectId:N}");
+            context.Add(new StorageObject
             {
                 Id = objectId,
                 TenantId = scope.TenantAId,
@@ -258,8 +263,7 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
                 FileType = null!,
                 Provider = StorageProviders.Local,
                 StorageProviderBindingId = binding.Id,
-                ObjectKey = key,
-                Uri = "/private",
+                ObjectKey = session.ObjectKey,
                 FullName = "file.pdf",
                 SafeDisplayName = "file.pdf",
                 Extension = "pdf",
@@ -272,9 +276,7 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
                 LifecycleState = StorageObjectLifecycleStates.DeleteRequested,
                 CreatedAt = Now.AddMinutes(-2)
             });
-            session.ReserveObjectKey(key);
             session.MarkUploading(Now.AddMinutes(-2));
-            session.StorageProviderBindingId = binding.Id;
             session.StageEventResourceObject(objectId);
         }
         context.AddRange(session, new StorageUsageCounter

@@ -1,0 +1,28 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M40AFA983SQ5CP808EKZWHAE
+Title: "Acquire visitor authority locks before ATProtocol enrollment"
+Type: fix
+Scope: access
+Summary: "ATProtocol bootstrap acquires ordered visitor-setting authority locks before the retained identity enrollment transaction and still rechecks signup permission inside convergence, avoiding transaction-order failures."
+Group: atproto-enrollment-lock-order
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

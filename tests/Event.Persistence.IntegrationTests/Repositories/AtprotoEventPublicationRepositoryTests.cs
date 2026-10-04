@@ -19,6 +19,7 @@ using Explore.Persistence.Seed;
 using Explore.Infrastructure.Services.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -74,7 +75,10 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
             LocationDisclosureAudienceEnum.AnyCurrentRegistrant, TimeSpan.FromDays(30)));
         var snapshotFactory = new AtprotoEventPublicationSnapshotFactory(
             new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()));
-        var payload = await new AtprotoPublicationPayloadBuilder(snapshotFactory)
+        var publicAddress = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["PUBLIC_BASE_URL"] = "https://publication.example.test" }).Build();
+        var settings = new SystemSettingRepository(context, Substitute.For<ISettingMutationLock>());
+        var payload = await new AtprotoPublicationPayloadBuilder(snapshotFactory, publicAddress, settings)
             .BuildEventAsync(graph, DateTimeOffset.UtcNow, CancellationToken.None);
         await Assert.That(payload.IsValid).IsTrue().Because(payload.FailureCode ?? "Publication payload was invalid");
         await Assert.That(payload.Payload!.Json).Contains("Bounded publication graph");

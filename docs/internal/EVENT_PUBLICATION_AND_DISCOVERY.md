@@ -26,6 +26,14 @@ rows. Mutation writers accumulate affected tenants across saves and advance thei
 sorted epochs only after source, audit and outbox writes, at transaction commit.
 Snapshot and pure view-count writes do not advance disclosure epochs.
 
+Managed-storage reference saves share that Serializable boundary: disclosure
+source anchors are captured before storage-object fences, and storage commit
+stamps retain the existing uncertain-commit verification. Joined saves never
+finalize the caller's transaction. For colocated SQLite identity enrollment,
+the authority-owned transaction flushes application disclosure after the complete
+enrollment callback and before its shared commit; a failed identity or storage
+operation rolls back both application writes and discovery epochs.
+
 The API assembles the complete HAL resource before
 `EventDiscoveryResponseAuthority` performs its fresh native release check.
 Continuations use purpose-isolated ASP.NET Core Data Protection and bind tenant,

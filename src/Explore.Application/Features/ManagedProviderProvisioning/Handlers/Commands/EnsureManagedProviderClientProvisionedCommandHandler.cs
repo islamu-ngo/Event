@@ -64,7 +64,8 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
     IOptions<ManagedControlPlaneOptions> managedControlPlaneOptions,
     ISettingMutationLock mutationLock,
     IUnitOfWork unitOfWork,
-    ILogger<EnsureManagedProviderClientProvisionedCommandHandler> logger)
+    ILogger<EnsureManagedProviderClientProvisionedCommandHandler> logger,
+    Explore.Application.Services.PrivacyIdentityFenceOperation identityFence)
     : ICommandHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>,
         IManagedProviderClientProvisioner
 {
@@ -114,517 +115,524 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         ProviderAccountKey accountKey = dto.LocalIdentity is not null
             ? new ProviderAccountKey(AuthenticationProviderKind.Local, normalizedSubject)
             : CreateManagedProviderAccountKey(normalizedIdentityProvider, identityAuthority!, normalizedSubject);
-        ManagedTenantProvisioningOperation? managedOperation = null;
-        if (managementRequest is not null)
+        return await identityFence.ExecuteEnrollmentAsync(accountKey, async cancellationToken =>
         {
-            if (operationId is null
-                || operationId == Guid.Empty
-                || expectedOutboxMessageId is null
-                || expectedOutboxMessageId == Guid.Empty)
+            ManagedTenantProvisioningOperation? managedOperation = null;
+            if (managementRequest is not null)
             {
-                return Failure(
-                    "Managed tenant provisioning operation identity is missing.",
-                    "Durable operation and outbox-generation identifiers are required.",
-                    "tenant_provisioning_operation_missing");
-            }
-
-            var managementValidation = await new ManagementTenantProvisioningRequestValidator()
-                .ValidateAsync(managementRequest, cancellationToken);
-            if (!managementValidation.IsValid)
-                return BaseCommandResponse.Validation<ManagedProviderClientProvisioningResultDto>(
-                    managementValidation.Errors.Select(error => error.ErrorMessage));
-            managementRequest = ManagedTenantProvisioningRequestCodec.Normalize(managementRequest);
-            if (dto != ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(managementRequest))
-                return Failure("Managed tenant provisioning input differs from its snapshot.",
-                    "Only the durable request may select the administrator and tenant bootstrap inputs.",
-                    "tenant_provisioning_operation_conflict");
-            managedOperation = await managedTenantProvisioningOperationRepository.GetByIdAsNoTrackingAsync(
-                operationId.Value,
-                cancellationToken);
-            string expectedHash = ManagedTenantProvisioningRequestCodec.ComputeHash(managementRequest);
-            if (managedOperation is null
-                || !string.Equals(managedOperation.RequestHash, expectedHash, StringComparison.Ordinal)
-                || !string.Equals(
-                    managedOperation.ExternalCustomerReference,
-                    managementRequest.ExternalCustomerReference,
-                    StringComparison.Ordinal)
-                || !string.Equals(managedOperation.TenantSlug, managementRequest.TenantSlug, StringComparison.Ordinal)
-                || managedOperation.CurrentOutboxMessageId != expectedOutboxMessageId
-                || managedOperation.Status != ManagedTenantProvisioningStatus.Processing)
-            {
-                return Failure(
-                    "Managed tenant provisioning operation does not match its request snapshot.",
-                    "The durable operation identity, customer reference, tenant slug, and request hash must match.",
-                    "tenant_provisioning_operation_conflict");
-            }
-        }
-
-        ManagementTenantProvisioningBlockerDto? authorityBlocker = await EvaluateAuthorityAsync(managedOperation, cancellationToken);
-        if (authorityBlocker is not null)
-            return Failure(authorityBlocker.Message, authorityBlocker.Message, authorityBlocker.Code);
-        LocalIdentityBinding? localBinding = dto.LocalIdentity is { } local
-            ? await credentials.ReadLinkedIdentityAsync(local.LocalSubjectId, cancellationToken) : null;
-        if (dto.LocalIdentity is not null && localBinding is null)
-            return Failure("Local administrator is unavailable.", "An exact linked ChangeRequired or Ready Local identity is required.",
-                "tenant_local_administrator_unavailable");
-
-        var existingCustomerBinding = await externalBindingRepository.GetByExternalKeyAsync(
-            normalizedProviderKey,
-            normalizedExternalSystem,
-            ExternalBindingTypes.External.ProviderCustomer,
-            normalizedExternalCustomerId,
-            scopeTenantId: null,
-            cancellationToken);
-
-        if (existingCustomerBinding != null)
-        {
-            return await RehydrateExistingProvisioningResultAsync(
-                existingCustomerBinding,
-                normalizedProviderKey,
-                normalizedExternalSystem,
-                normalizedIdentityProvider,
-                normalizedSubject,
-                managedOperation,
-                localBinding,
-                cancellationToken);
-        }
-
-        ManagedTenantProvisioningResolvedBootstrap? resolvedBootstrap = null;
-        if (managementRequest is not null)
-        {
-            ManagedTenantProvisioningPreflightResult preflight =
-                await managedTenantProvisioningPreflight.EvaluateAsync(
-                    managementRequest,
-                    requireProvisionablePlan: true,
-                    cancellationToken);
-            if (!preflight.Success)
-            {
-                return Failure(
-                    "Managed tenant provisioning policy validation failed.",
-                    preflight.Error!,
-                    preflight.FailureCode);
-            }
-
-            resolvedBootstrap = preflight.Resolved!;
-        }
-
-        var existingTenant = await tenantRepository.GetTenantBySlug(normalizedTenantSlug);
-        if (existingTenant != null)
-        {
-            return Failure("A tenant with this slug already exists.", "Tenant slug must be unique across managed provider provisioning requests.");
-        }
-
-        var existingLogin = await userExternalLoginRepository.GetByProviderAndKey(accountKey);
-        User? existingUser = existingLogin == null ? null : await userRepository.GetById(existingLogin.UserId);
-        if (existingLogin != null && existingUser == null)
-        {
-            return Failure("External admin identity is linked to a missing user.", "The external login points to a user that could not be found.");
-        }
-        if (localBinding is not null && (existingUser?.Id != localBinding.LocalSubjectId
-            || existingLogin?.Id != localBinding.ExternalLoginId))
-            return Failure("Local administrator is unavailable.", "The exact global Local user and login must already exist.",
-                "tenant_local_administrator_unavailable");
-
-        var tenantId = Guid.CreateVersion7();
-        var brandingDocumentId = Guid.CreateVersion7();
-        var directoryOperatorIdentityDocumentId = Guid.CreateVersion7();
-        DateTime tenantOccurredAt = DateTime.UtcNow;
-        TenantSettingsDocument brandingSeed =
-            TenantBrandingSettingsDocumentDefaults.Create(tenantId, dto.TenantFullName);
-        TenantSettingsDocument identitySeed = dto.DirectoryOperatorIdentity is null
-            ? TenantDirectoryOperatorIdentityDocumentDefaults.Create(tenantId)
-            : TenantDirectoryOperatorIdentityDocumentDefaults.Create(
-                tenantId,
-                dto.DirectoryOperatorIdentity.ToPayload());
-        var userId = existingUser?.Id ?? Guid.CreateVersion7();
-        var tenantUserId = Guid.CreateVersion7();
-        var tenantUserProfileId = Guid.CreateVersion7();
-        var userActorId = Guid.CreateVersion7();
-        var userExternalLoginId = existingLogin?.Id ?? Guid.CreateVersion7();
-        var tenantUserRoleGrantId = Guid.CreateVersion7();
-        var organizerId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
-        var organizerActorId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
-        var organizerParticipationId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
-        var organizerMembershipId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
-        async Task<ManagedProviderClientProvisioningResultDto> ProvisionAsync(CancellationToken ct)
-        {
-            ManagementTenantProvisioningBlockerDto? currentAuthority = await EvaluateAuthorityAsync(managedOperation, ct);
-            if (currentAuthority is not null)
-                throw new AdministratorLinkageException(currentAuthority.Code, currentAuthority.Message);
-            if (dto.LocalIdentity is { } localIdentity)
-            {
-                LocalIdentityBinding? currentBinding = await credentials.ReadLinkedIdentityAsync(localIdentity.LocalSubjectId, ct);
-                if (currentBinding is null || currentBinding.LocalSubjectId != localBinding!.LocalSubjectId
-                    || currentBinding.PersonalActorId != localBinding.PersonalActorId
-                    || currentBinding.ExternalLoginId != localBinding.ExternalLoginId)
-                    throw new AdministratorLinkageException("tenant_local_administrator_unavailable", "The exact Local administrator binding is unavailable.");
-            }
-            TenantCreationOutcome creation =
-                await tenantCreationService.CreateInCurrentTransactionAsync(
-                    new TenantCreationRequest(
-                        tenantId,
-                        dto.TenantFullName,
-                        normalizedTenantSlug,
-                        dto.ActivateTenant
-                            ? (int)TenantStatusEnum.Active
-                            : (int)TenantStatusEnum.Provisioning,
-                        ActorUserId: null,
-                        tenantOccurredAt,
-                        new TenantBrandingDocumentSeed(
-                            brandingDocumentId,
-                            brandingSeed.SchemaVersion,
-                            brandingSeed.DefaultsVersion,
-                            brandingSeed.PayloadJson),
-                        new TenantDirectoryOperatorIdentityDocumentSeed(
-                            directoryOperatorIdentityDocumentId,
-                            identitySeed.SchemaVersion,
-                            identitySeed.DefaultsVersion,
-                            identitySeed.PayloadJson)),
-                    ct);
-            Tenant tenant = creation.Tenant;
-            tenant.Description = $"Provisioned from {dto.ExternalSystem.Trim()} customer {dto.ExternalCustomerId.Trim()} by provider {dto.ProviderKey.Trim()}.";
-            var user = localBinding is not null ? existingUser!
-                : await EnsureUserAsync(dto.ExternalAdmin!, normalizedIdentityProvider, accountKey, existingUser, userId);
-            var userActor = localBinding is not null
-                ? (await actorRepository.GetActorWithDetails(localBinding.PersonalActorId, ct))!
-                : await EnsureUserActorAsync(dto.ExternalAdmin!, user, userActorId);
-            var tenantUser = await EnsureTenantUserAsync(tenant.Id, user.Id, userActor.Id, tenantUserId, user.Id);
-            var tenantUserProfile = await EnsureTenantUserProfileAsync(dto.ExternalAdmin, tenant.Id, tenantUser.Id, tenantUserProfileId, user.Id);
-
-            if (localBinding is null && existingLogin == null)
-            {
-                await userExternalLoginRepository.Create(new UserExternalLogin
+                if (operationId is null
+                    || operationId == Guid.Empty
+                    || expectedOutboxMessageId is null
+                    || expectedOutboxMessageId == Guid.Empty)
                 {
-                    Id = userExternalLoginId,
-                    UserId = user.Id,
-                    User = null!,
-                    AuthenticationProviderId = (int)accountKey.ProviderKind,
-                    AuthenticationProvider = null!,
-                    ProviderKey = accountKey.Value,
-                    ProviderDisplayName = dto.ExternalAdmin!.IdentityProvider.Trim(),
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = user.Id
-                });
+                    return Failure(
+                        "Managed tenant provisioning operation identity is missing.",
+                        "Durable operation and outbox-generation identifiers are required.",
+                        "tenant_provisioning_operation_missing");
+                }
+
+                var managementValidation = await new ManagementTenantProvisioningRequestValidator()
+                    .ValidateAsync(managementRequest, cancellationToken);
+                if (!managementValidation.IsValid)
+                    return BaseCommandResponse.Validation<ManagedProviderClientProvisioningResultDto>(
+                        managementValidation.Errors.Select(error => error.ErrorMessage));
+                managementRequest = ManagedTenantProvisioningRequestCodec.Normalize(managementRequest);
+                if (dto != ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(managementRequest))
+                    return Failure("Managed tenant provisioning input differs from its snapshot.",
+                        "Only the durable request may select the administrator and tenant bootstrap inputs.",
+                        "tenant_provisioning_operation_conflict");
+                managedOperation = await managedTenantProvisioningOperationRepository.GetByIdAsNoTrackingAsync(
+                    operationId.Value,
+                    cancellationToken);
+                string expectedHash = ManagedTenantProvisioningRequestCodec.ComputeHash(managementRequest);
+                if (managedOperation is null
+                    || !string.Equals(managedOperation.RequestHash, expectedHash, StringComparison.Ordinal)
+                    || !string.Equals(
+                        managedOperation.ExternalCustomerReference,
+                        managementRequest.ExternalCustomerReference,
+                        StringComparison.Ordinal)
+                    || !string.Equals(managedOperation.TenantSlug, managementRequest.TenantSlug, StringComparison.Ordinal)
+                    || managedOperation.CurrentOutboxMessageId != expectedOutboxMessageId
+                    || managedOperation.Status != ManagedTenantProvisioningStatus.Processing)
+                {
+                    return Failure(
+                        "Managed tenant provisioning operation does not match its request snapshot.",
+                        "The durable operation identity, customer reference, tenant slug, and request hash must match.",
+                        "tenant_provisioning_operation_conflict");
+                }
             }
 
-            var tenantUserRoleGrant = await EnsureTenantAdminRoleGrantAsync(tenant.Id, tenantUser.Id, user.Id, tenantUserRoleGrantId);
-            var organizerResult = dto.Organizer == null
-                ? (OrganizerId: (Guid?)null, ActorId: (Guid?)null, MembershipId: (Guid?)null)
-                : await CreateOrganizerAsync(
-                    dto.Organizer,
-                    tenant.Id,
-                    user.Id,
-                    organizerId!.Value,
-                    organizerActorId!.Value,
-                    organizerParticipationId!.Value,
-                    organizerMembershipId!.Value,
-                    ct);
+            ManagementTenantProvisioningBlockerDto? authorityBlocker = await EvaluateAuthorityAsync(managedOperation, cancellationToken);
+            if (authorityBlocker is not null)
+                return Failure(authorityBlocker.Message, authorityBlocker.Message, authorityBlocker.Code);
+            LocalIdentityBinding? localBinding = dto.LocalIdentity is { } local
+                ? await credentials.ReadLinkedIdentityAsync(local.LocalSubjectId, cancellationToken) : null;
+            if (dto.LocalIdentity is not null && localBinding is null)
+                return Failure("Local administrator is unavailable.", "An exact linked ChangeRequired or Ready Local identity is required.",
+                    "tenant_local_administrator_unavailable");
 
-            await EnsureExternalBindingAsync(
+            var existingCustomerBinding = await externalBindingRepository.GetByExternalKeyAsync(
                 normalizedProviderKey,
                 normalizedExternalSystem,
                 ExternalBindingTypes.External.ProviderCustomer,
                 normalizedExternalCustomerId,
-                ExternalBindingTypes.Internal.Tenant,
-                tenant.Id,
                 scopeTenantId: null,
-                createdBy: user.Id,
-                ct);
+                cancellationToken);
 
-            if (managedOperation is not null)
+            if (existingCustomerBinding != null)
             {
-                await EnsureExternalBindingAsync(
+                return await RehydrateExistingProvisioningResultAsync(
+                    existingCustomerBinding,
                     normalizedProviderKey,
                     normalizedExternalSystem,
-                    ExternalBindingTypes.External.ManagedTenantProvisioningOperation,
-                    managedOperation.Id.ToString("D"),
-                    ExternalBindingTypes.Internal.Tenant,
-                    tenant.Id,
-                    tenant.Id,
-                    user.Id,
-                    ct);
+                    normalizedIdentityProvider,
+                    normalizedSubject,
+                    managedOperation,
+                    localBinding,
+                    cancellationToken);
             }
 
-            await EnsureExternalBindingAsync(
-                normalizedProviderKey,
-                normalizedIdentityProvider,
-                ExternalBindingTypes.External.ExternalAdminUser,
-                normalizedSubject,
-                ExternalBindingTypes.Internal.User,
-                user.Id,
-                tenant.Id,
-                user.Id,
-                ct);
-
-            await EnsureExternalBindingAsync(
-                normalizedProviderKey,
-                normalizedIdentityProvider,
-                ExternalBindingTypes.External.ExternalAdminTenantUser,
-                normalizedSubject,
-                ExternalBindingTypes.Internal.TenantUser,
-                tenantUser.Id,
-                tenant.Id,
-                user.Id,
-                ct);
-
-            await EnsureExternalBindingAsync(
-                normalizedProviderKey,
-                normalizedIdentityProvider,
-                ExternalBindingTypes.External.ExternalAdminTenantUserProfile,
-                normalizedSubject,
-                ExternalBindingTypes.Internal.TenantUserProfile,
-                tenantUserProfile.Id,
-                tenant.Id,
-                user.Id,
-                ct);
-
-            await EnsureExternalBindingAsync(
-                normalizedProviderKey,
-                normalizedIdentityProvider,
-                ExternalBindingTypes.External.ExternalAdminUserActor,
-                normalizedSubject,
-                ExternalBindingTypes.Internal.Actor,
-                userActor.Id,
-                tenant.Id,
-                user.Id,
-                ct);
-
-            await EnsureExternalBindingAsync(
-                normalizedProviderKey,
-                normalizedIdentityProvider,
-                ExternalBindingTypes.External.ExternalAdminUserLogin,
-                normalizedSubject,
-                ExternalBindingTypes.Internal.UserExternalLogin,
-                existingLogin?.Id ?? userExternalLoginId,
-                tenant.Id,
-                user.Id,
-                ct);
-
-            if (dto.Organizer != null && organizerResult.OrganizerId.HasValue)
+            ManagedTenantProvisioningResolvedBootstrap? resolvedBootstrap = null;
+            if (managementRequest is not null)
             {
-                var organizerExternalType = dto.Organizer.Kind == ManagedProviderOrganizerKindDto.Group
-                    ? ExternalBindingTypes.External.CustomerGroup
-                    : ExternalBindingTypes.External.CustomerOrganization;
-                var organizerActorExternalType = dto.Organizer.Kind == ManagedProviderOrganizerKindDto.Group
-                    ? ExternalBindingTypes.External.CustomerGroupActor
-                    : ExternalBindingTypes.External.CustomerOrganizationActor;
-                var organizerInternalType = dto.Organizer.Kind == ManagedProviderOrganizerKindDto.Group
-                    ? ExternalBindingTypes.Internal.Group
-                    : ExternalBindingTypes.Internal.Organization;
+                ManagedTenantProvisioningPreflightResult preflight =
+                    await managedTenantProvisioningPreflight.EvaluateAsync(
+                        managementRequest,
+                        requireProvisionablePlan: true,
+                        cancellationToken);
+                if (!preflight.Success)
+                {
+                    return Failure(
+                        "Managed tenant provisioning policy validation failed.",
+                        preflight.Error!,
+                        preflight.FailureCode);
+                }
+
+                resolvedBootstrap = preflight.Resolved!;
+            }
+
+            var existingTenant = await tenantRepository.GetTenantBySlug(normalizedTenantSlug);
+            if (existingTenant != null)
+            {
+                return Failure("A tenant with this slug already exists.", "Tenant slug must be unique across managed provider provisioning requests.");
+            }
+
+            var existingLogin = await userExternalLoginRepository.GetByProviderAndKey(accountKey);
+            User? existingUser = existingLogin == null ? null : await userRepository.GetById(existingLogin.UserId);
+            if (existingLogin != null && existingUser == null)
+            {
+                return Failure("External admin identity is linked to a missing user.", "The external login points to a user that could not be found.");
+            }
+            if (localBinding is not null && (existingUser?.Id != localBinding.LocalSubjectId
+                || existingLogin?.Id != localBinding.ExternalLoginId))
+                return Failure("Local administrator is unavailable.", "The exact global Local user and login must already exist.",
+                    "tenant_local_administrator_unavailable");
+
+            var tenantId = Guid.CreateVersion7();
+            var brandingDocumentId = Guid.CreateVersion7();
+            var directoryOperatorIdentityDocumentId = Guid.CreateVersion7();
+            DateTime tenantOccurredAt = DateTime.UtcNow;
+            TenantSettingsDocument brandingSeed =
+                TenantBrandingSettingsDocumentDefaults.Create(tenantId, dto.TenantFullName);
+            TenantSettingsDocument identitySeed = dto.DirectoryOperatorIdentity is null
+                ? TenantDirectoryOperatorIdentityDocumentDefaults.Create(tenantId)
+                : TenantDirectoryOperatorIdentityDocumentDefaults.Create(
+                    tenantId,
+                    dto.DirectoryOperatorIdentity.ToPayload());
+            var userId = existingUser?.Id ?? Guid.CreateVersion7();
+            var tenantUserId = Guid.CreateVersion7();
+            var tenantUserProfileId = Guid.CreateVersion7();
+            var userActorId = Guid.CreateVersion7();
+            var userExternalLoginId = existingLogin?.Id ?? Guid.CreateVersion7();
+            var tenantUserRoleGrantId = Guid.CreateVersion7();
+            var organizerId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
+            var organizerActorId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
+            var organizerParticipationId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
+            var organizerMembershipId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
+            async Task<ManagedProviderClientProvisioningResultDto> ProvisionAsync(CancellationToken ct)
+            {
+                ManagementTenantProvisioningBlockerDto? currentAuthority = await EvaluateAuthorityAsync(managedOperation, ct);
+                if (currentAuthority is not null)
+                    throw new AdministratorLinkageException(currentAuthority.Code, currentAuthority.Message);
+                if (dto.LocalIdentity is { } localIdentity)
+                {
+                    LocalIdentityBinding? currentBinding = await credentials.ReadLinkedIdentityAsync(localIdentity.LocalSubjectId, ct);
+                    if (currentBinding is null || currentBinding.LocalSubjectId != localBinding!.LocalSubjectId
+                        || currentBinding.PersonalActorId != localBinding.PersonalActorId
+                        || currentBinding.ExternalLoginId != localBinding.ExternalLoginId)
+                        throw new AdministratorLinkageException("tenant_local_administrator_unavailable", "The exact Local administrator binding is unavailable.");
+                }
+                TenantCreationOutcome creation =
+                    await tenantCreationService.CreateInCurrentTransactionAsync(
+                        new TenantCreationRequest(
+                            tenantId,
+                            dto.TenantFullName,
+                            normalizedTenantSlug,
+                            dto.ActivateTenant
+                                ? (int)TenantStatusEnum.Active
+                                : (int)TenantStatusEnum.Provisioning,
+                            ActorUserId: null,
+                            tenantOccurredAt,
+                            new TenantBrandingDocumentSeed(
+                                brandingDocumentId,
+                                brandingSeed.SchemaVersion,
+                                brandingSeed.DefaultsVersion,
+                                brandingSeed.PayloadJson),
+                            new TenantDirectoryOperatorIdentityDocumentSeed(
+                                directoryOperatorIdentityDocumentId,
+                                identitySeed.SchemaVersion,
+                                identitySeed.DefaultsVersion,
+                                identitySeed.PayloadJson)),
+                        ct);
+                Tenant tenant = creation.Tenant;
+                tenant.Description = $"Provisioned from {dto.ExternalSystem.Trim()} customer {dto.ExternalCustomerId.Trim()} by provider {dto.ProviderKey.Trim()}.";
+                var user = localBinding is not null ? existingUser!
+                    : await EnsureUserAsync(dto.ExternalAdmin!, normalizedIdentityProvider, accountKey, existingUser, userId, ct);
+                var userActor = localBinding is not null
+                    ? (await actorRepository.GetActorWithDetails(localBinding.PersonalActorId, ct))!
+                    : await EnsureUserActorAsync(dto.ExternalAdmin!, user, userActorId);
+                var tenantUser = await EnsureTenantUserAsync(tenant.Id, user.Id, userActor.Id, tenantUserId, user.Id);
+                var tenantUserProfile = await EnsureTenantUserProfileAsync(dto.ExternalAdmin, tenant.Id, tenantUser.Id, tenantUserProfileId, user.Id);
+
+                if (localBinding is null && existingLogin == null)
+                {
+                    await userExternalLoginRepository.Create(new UserExternalLogin
+                    {
+                        Id = userExternalLoginId,
+                        UserId = user.Id,
+                        User = null!,
+                        AuthenticationProviderId = (int)accountKey.ProviderKind,
+                        AuthenticationProvider = null!,
+                        ProviderKey = accountKey.Value,
+                        ProviderDisplayName = dto.ExternalAdmin!.IdentityProvider.Trim(),
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = user.Id
+                    });
+                }
+
+                var tenantUserRoleGrant = await EnsureTenantAdminRoleGrantAsync(tenant.Id, tenantUser.Id, user.Id, tenantUserRoleGrantId);
+                var organizerResult = dto.Organizer == null
+                    ? (OrganizerId: (Guid?)null, ActorId: (Guid?)null, MembershipId: (Guid?)null)
+                    : await CreateOrganizerAsync(
+                        dto.Organizer,
+                        tenant.Id,
+                        user.Id,
+                        organizerId!.Value,
+                        organizerActorId!.Value,
+                        organizerParticipationId!.Value,
+                        organizerMembershipId!.Value,
+                        ct);
 
                 await EnsureExternalBindingAsync(
                     normalizedProviderKey,
                     normalizedExternalSystem,
-                    organizerExternalType,
+                    ExternalBindingTypes.External.ProviderCustomer,
                     normalizedExternalCustomerId,
-                    organizerInternalType,
-                    organizerResult.OrganizerId.Value,
+                    ExternalBindingTypes.Internal.Tenant,
                     tenant.Id,
-                    user.Id,
+                    scopeTenantId: null,
+                    createdBy: user.Id,
                     ct);
 
-                if (organizerResult.ActorId.HasValue)
+                if (managedOperation is not null)
                 {
                     await EnsureExternalBindingAsync(
                         normalizedProviderKey,
                         normalizedExternalSystem,
-                        organizerActorExternalType,
-                        normalizedExternalCustomerId,
-                        ExternalBindingTypes.Internal.Actor,
-                        organizerResult.ActorId.Value,
+                        ExternalBindingTypes.External.ManagedTenantProvisioningOperation,
+                        managedOperation.Id.ToString("D"),
+                        ExternalBindingTypes.Internal.Tenant,
+                        tenant.Id,
                         tenant.Id,
                         user.Id,
                         ct);
                 }
-            }
 
-            Guid? tenantPlanAssignmentId = null;
-            if (managementRequest is not null && resolvedBootstrap is not null)
-            {
-                tenantPlanAssignmentId = await ApplyManagedBootstrapAsync(
-                    managementRequest,
-                    resolvedBootstrap,
-                    operationId!.Value,
-                    managedOperation!.ManagedInstanceId,
-                    tenant,
-                    user,
-                    ct);
-            }
-
-            var provisioningResult = new ManagedProviderClientProvisioningResultDto
-            {
-                TenantId = tenant.Id,
-                UserId = user.Id,
-                TenantUserId = tenantUser.Id,
-                TenantUserProfileId = tenantUserProfile.Id,
-                UserActorId = userActor.Id,
-                UserExternalLoginId = existingLogin?.Id ?? userExternalLoginId,
-                TenantUserRoleGrantId = tenantUserRoleGrant.Id,
-                OrganizerId = organizerResult.OrganizerId,
-                OrganizerActorId = organizerResult.ActorId,
-                OrganizerKind = dto.Organizer?.Kind,
-                OrganizerMembershipId = organizerResult.MembershipId,
-                TenantPlanAssignmentId = tenantPlanAssignmentId
-            };
-
-            if (managedOperation is not null)
-            {
-                bool completed = await managedTenantProvisioningOperationRepository.TryCompleteAsync(
-                    managedOperation.Id,
-                    expectedOutboxMessageId!.Value,
+                await EnsureExternalBindingAsync(
+                    normalizedProviderKey,
+                    normalizedIdentityProvider,
+                    ExternalBindingTypes.External.ExternalAdminUser,
+                    normalizedSubject,
+                    ExternalBindingTypes.Internal.User,
+                    user.Id,
                     tenant.Id,
                     user.Id,
-                    DateTime.UtcNow,
                     ct);
-                if (!completed)
+
+                await EnsureExternalBindingAsync(
+                    normalizedProviderKey,
+                    normalizedIdentityProvider,
+                    ExternalBindingTypes.External.ExternalAdminTenantUser,
+                    normalizedSubject,
+                    ExternalBindingTypes.Internal.TenantUser,
+                    tenantUser.Id,
+                    tenant.Id,
+                    user.Id,
+                    ct);
+
+                await EnsureExternalBindingAsync(
+                    normalizedProviderKey,
+                    normalizedIdentityProvider,
+                    ExternalBindingTypes.External.ExternalAdminTenantUserProfile,
+                    normalizedSubject,
+                    ExternalBindingTypes.Internal.TenantUserProfile,
+                    tenantUserProfile.Id,
+                    tenant.Id,
+                    user.Id,
+                    ct);
+
+                await EnsureExternalBindingAsync(
+                    normalizedProviderKey,
+                    normalizedIdentityProvider,
+                    ExternalBindingTypes.External.ExternalAdminUserActor,
+                    normalizedSubject,
+                    ExternalBindingTypes.Internal.Actor,
+                    userActor.Id,
+                    tenant.Id,
+                    user.Id,
+                    ct);
+
+                await EnsureExternalBindingAsync(
+                    normalizedProviderKey,
+                    normalizedIdentityProvider,
+                    ExternalBindingTypes.External.ExternalAdminUserLogin,
+                    normalizedSubject,
+                    ExternalBindingTypes.Internal.UserExternalLogin,
+                    existingLogin?.Id ?? userExternalLoginId,
+                    tenant.Id,
+                    user.Id,
+                    ct);
+
+                if (dto.Organizer != null && organizerResult.OrganizerId.HasValue)
                 {
-                    throw new ConcurrencyConflictException(
-                        ConcurrencyConflictException.ConcurrentUpdate,
-                        "Managed tenant provisioning generation changed before its side effects could commit.",
-                        nameof(ManagedTenantProvisioningOperation),
-                        managedOperation.Id.ToString("D"));
+                    var organizerExternalType = dto.Organizer.Kind == ManagedProviderOrganizerKindDto.Group
+                        ? ExternalBindingTypes.External.CustomerGroup
+                        : ExternalBindingTypes.External.CustomerOrganization;
+                    var organizerActorExternalType = dto.Organizer.Kind == ManagedProviderOrganizerKindDto.Group
+                        ? ExternalBindingTypes.External.CustomerGroupActor
+                        : ExternalBindingTypes.External.CustomerOrganizationActor;
+                    var organizerInternalType = dto.Organizer.Kind == ManagedProviderOrganizerKindDto.Group
+                        ? ExternalBindingTypes.Internal.Group
+                        : ExternalBindingTypes.Internal.Organization;
+
+                    await EnsureExternalBindingAsync(
+                        normalizedProviderKey,
+                        normalizedExternalSystem,
+                        organizerExternalType,
+                        normalizedExternalCustomerId,
+                        organizerInternalType,
+                        organizerResult.OrganizerId.Value,
+                        tenant.Id,
+                        user.Id,
+                        ct);
+
+                    if (organizerResult.ActorId.HasValue)
+                    {
+                        await EnsureExternalBindingAsync(
+                            normalizedProviderKey,
+                            normalizedExternalSystem,
+                            organizerActorExternalType,
+                            normalizedExternalCustomerId,
+                            ExternalBindingTypes.Internal.Actor,
+                            organizerResult.ActorId.Value,
+                            tenant.Id,
+                            user.Id,
+                            ct);
+                    }
                 }
+
+                Guid? tenantPlanAssignmentId = null;
+                if (managementRequest is not null && resolvedBootstrap is not null)
+                {
+                    tenantPlanAssignmentId = await ApplyManagedBootstrapAsync(
+                        managementRequest,
+                        resolvedBootstrap,
+                        operationId!.Value,
+                        managedOperation!.ManagedInstanceId,
+                        tenant,
+                        user,
+                        ct);
+                }
+
+                var provisioningResult = new ManagedProviderClientProvisioningResultDto
+                {
+                    TenantId = tenant.Id,
+                    UserId = user.Id,
+                    TenantUserId = tenantUser.Id,
+                    TenantUserProfileId = tenantUserProfile.Id,
+                    UserActorId = userActor.Id,
+                    UserExternalLoginId = existingLogin?.Id ?? userExternalLoginId,
+                    TenantUserRoleGrantId = tenantUserRoleGrant.Id,
+                    OrganizerId = organizerResult.OrganizerId,
+                    OrganizerActorId = organizerResult.ActorId,
+                    OrganizerKind = dto.Organizer?.Kind,
+                    OrganizerMembershipId = organizerResult.MembershipId,
+                    TenantPlanAssignmentId = tenantPlanAssignmentId
+                };
+
+                if (managedOperation is not null)
+                {
+                    bool completed = await managedTenantProvisioningOperationRepository.TryCompleteAsync(
+                        managedOperation.Id,
+                        expectedOutboxMessageId!.Value,
+                        tenant.Id,
+                        user.Id,
+                        DateTime.UtcNow,
+                        ct);
+                    if (!completed)
+                    {
+                        throw new ConcurrencyConflictException(
+                            ConcurrencyConflictException.ConcurrentUpdate,
+                            "Managed tenant provisioning generation changed before its side effects could commit.",
+                            nameof(ManagedTenantProvisioningOperation),
+                            managedOperation.Id.ToString("D"));
+                    }
+                }
+
+                return provisioningResult;
             }
 
-            return provisioningResult;
-        }
-
-        ManagedProviderClientProvisioningResultDto? result;
-        try
-        {
-            if (managementRequest is null)
+            ManagedProviderClientProvisioningResultDto? result;
+            try
             {
-                if (dto.ActivateTenant && tenantActivationCapacityPolicy.IsEnforced)
+                if (managementRequest is null)
                 {
-                    (ManagedProviderClientProvisioningResultDto? Result,
-                        BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) ordinaryOutcome =
-                        await mutationLock.ExecuteAsync<(
-                            ManagedProviderClientProvisioningResultDto? Result,
-                            BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
-                            GovernanceSettingKeys.Deployment.Mode,
-                            async ct =>
-                            {
-                                TenantActivationCapacityAssessment capacity =
-                                    await tenantActivationCapacityPolicy.EvaluateAsync(
-                                        requireMultiTenant: false,
-                                        cancellationToken: ct);
-                                return capacity.Allowed
-                                    ? (await ProvisionAsync(ct), null)
-                                    : (null, Failure(
-                                        "Tenant activation capacity validation failed.",
-                                        capacity.Error!,
-                                        capacity.FailureCode));
-                            },
-                            cancellationToken);
-                    if (ordinaryOutcome.Failure is not null)
+                    if (dto.ActivateTenant && tenantActivationCapacityPolicy.IsEnforced)
                     {
-                        return ordinaryOutcome.Failure;
-                    }
+                        (ManagedProviderClientProvisioningResultDto? Result,
+                            BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) ordinaryOutcome =
+                            await mutationLock.ExecuteAsync<(
+                                ManagedProviderClientProvisioningResultDto? Result,
+                                BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
+                                GovernanceSettingKeys.Deployment.Mode,
+                                async ct =>
+                                {
+                                    TenantActivationCapacityAssessment capacity =
+                                        await tenantActivationCapacityPolicy.EvaluateAsync(
+                                            requireMultiTenant: false,
+                                            cancellationToken: ct);
+                                    return capacity.Allowed
+                                        ? (await ProvisionAsync(ct), null)
+                                        : (null, Failure(
+                                            "Tenant activation capacity validation failed.",
+                                            capacity.Error!,
+                                            capacity.FailureCode));
+                                },
+                                cancellationToken);
+                        if (ordinaryOutcome.Failure is not null)
+                        {
+                            return ordinaryOutcome.Failure;
+                        }
 
-                    result = ordinaryOutcome.Result;
+                        result = ordinaryOutcome.Result;
+                    }
+                    else
+                    {
+                        result = await unitOfWork.ExecuteInTransactionAsync(ProvisionAsync, cancellationToken);
+                    }
                 }
                 else
                 {
-                    result = await unitOfWork.ExecuteInTransactionAsync(ProvisionAsync, cancellationToken);
-                }
-            }
-            else
-            {
-                (ManagedProviderClientProvisioningResultDto? Result,
-                    BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) outcome =
-                    await mutationLock.ExecuteOrderedGroupsAsync(
-                    [EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp)],
-                    policyToken => mutationLock.ExecuteManyAsync<(
-                        ManagedProviderClientProvisioningResultDto? Result,
-                        BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
-                    BuildManagedMutationKeys(resolvedBootstrap!),
-                    async ct =>
+                    (ManagedProviderClientProvisioningResultDto? Result,
+                        BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) outcome =
+                        await mutationLock.ExecuteOrderedGroupsAsync(
+                        [EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp)],
+                        policyToken => mutationLock.ExecuteManyAsync<(
+                            ManagedProviderClientProvisioningResultDto? Result,
+                            BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
+                        BuildManagedMutationKeys(resolvedBootstrap!),
+                        async ct =>
+                        {
+                            ManagedTenantProvisioningOperation? currentOperation =
+                                await managedTenantProvisioningOperationRepository.GetByIdAsNoTrackingAsync(
+                                    operationId!.Value,
+                                    ct);
+                            if (!IsCurrentGeneration(
+                                    currentOperation,
+                                    managedOperation!,
+                                    expectedOutboxMessageId!.Value))
+                            {
+                                return (null, Failure(
+                                    "Managed tenant provisioning generation is stale.",
+                                    "The operation was retried, cancelled, or completed before tenant mutation began.",
+                                    "tenant_provisioning_generation_stale"));
+                            }
+
+                            managedOperation = currentOperation;
+                            TenantActivationCapacityAssessment capacity = await tenantActivationCapacityPolicy.EvaluateAsync(
+                                requireMultiTenant: true,
+                                excludedReservationOperationId: operationId,
+                                cancellationToken: ct);
+                            if (!capacity.Allowed)
+                            {
+                                return (null, Failure(
+                                    "Managed tenant provisioning capacity validation failed.",
+                                    capacity.Error!,
+                                    capacity.FailureCode));
+                            }
+
+                            ManagedTenantProvisioningPreflightResult recheck =
+                                await managedTenantProvisioningPreflight.EvaluateAsync(
+                                    managementRequest,
+                                    requireProvisionablePlan: true,
+                                    ct);
+                            if (!recheck.Success)
+                            {
+                                return (null, Failure(
+                                    "Managed tenant provisioning policy validation failed.",
+                                    recheck.Error!,
+                                    recheck.FailureCode));
+                            }
+
+                            resolvedBootstrap = recheck.Resolved!;
+                            return (await ProvisionAsync(ct), null);
+                        },
+                        policyToken), cancellationToken);
+
+                    if (outcome.Failure is not null)
                     {
-                        ManagedTenantProvisioningOperation? currentOperation =
-                            await managedTenantProvisioningOperationRepository.GetByIdAsNoTrackingAsync(
-                                operationId!.Value,
-                                ct);
-                        if (!IsCurrentGeneration(
-                                currentOperation,
-                                managedOperation!,
-                                expectedOutboxMessageId!.Value))
-                        {
-                            return (null, Failure(
-                                "Managed tenant provisioning generation is stale.",
-                                "The operation was retried, cancelled, or completed before tenant mutation began.",
-                                "tenant_provisioning_generation_stale"));
-                        }
+                        return outcome.Failure;
+                    }
 
-                        managedOperation = currentOperation;
-                        TenantActivationCapacityAssessment capacity = await tenantActivationCapacityPolicy.EvaluateAsync(
-                            requireMultiTenant: true,
-                            excludedReservationOperationId: operationId,
-                            cancellationToken: ct);
-                        if (!capacity.Allowed)
-                        {
-                            return (null, Failure(
-                                "Managed tenant provisioning capacity validation failed.",
-                                capacity.Error!,
-                                capacity.FailureCode));
-                        }
-
-                        ManagedTenantProvisioningPreflightResult recheck =
-                            await managedTenantProvisioningPreflight.EvaluateAsync(
-                                managementRequest,
-                                requireProvisionablePlan: true,
-                                ct);
-                        if (!recheck.Success)
-                        {
-                            return (null, Failure(
-                                "Managed tenant provisioning policy validation failed.",
-                                recheck.Error!,
-                                recheck.FailureCode));
-                        }
-
-                        resolvedBootstrap = recheck.Resolved!;
-                        return (await ProvisionAsync(ct), null);
-                    },
-                    policyToken), cancellationToken);
-
-                if (outcome.Failure is not null)
-                {
-                    return outcome.Failure;
+                    result = outcome.Result;
                 }
-
-                result = outcome.Result;
             }
-        }
-        catch (AdministratorLinkageException exception)
-        {
-            return Failure(exception.Message, exception.Message, exception.FailureCode);
-        }
-        catch (TenantDirectoryOperatorIdentityReadinessException exception)
-        {
-            return BaseCommandResponse.Failure<ManagedProviderClientProvisioningResultDto>(
-                exception.FailureCode,
-                exception.Message,
-                exception.ReasonCodes);
-        }
+            catch (AdministratorLinkageException exception)
+            {
+                return Failure(exception.Message, exception.Message, exception.FailureCode);
+            }
+            catch (TenantDirectoryOperatorIdentityReadinessException exception)
+            {
+                return BaseCommandResponse.Failure<ManagedProviderClientProvisioningResultDto>(
+                    exception.FailureCode,
+                    exception.Message,
+                    exception.ReasonCodes);
+            }
 
-        if (result is null)
-        {
-            return Failure(
-                "Managed tenant provisioning is unavailable in SingleTenant mode.",
-                "The persisted deployment mode must remain MultiTenant until tenant creation commits.",
-                "tenant_provisioning_requires_multi_tenant");
-        }
+            if (result is null)
+            {
+                return Failure(
+                    "Managed tenant provisioning is unavailable in SingleTenant mode.",
+                    "The persisted deployment mode must remain MultiTenant until tenant creation commits.",
+                    "tenant_provisioning_requires_multi_tenant");
+            }
 
-        if (managementRequest is not null)
-        {
-            settingsResolver.InvalidateCache(SettingScope.Tenant, result.TenantId);
-            typedSettingsDocumentResolver.InvalidateTenantDocumentCache(
-                result.TenantId,
-                SettingsDocumentKeys.Tenant.Branding);
-        }
+            if (managementRequest is not null)
+            {
+                await identityFence.AfterEnrollmentCommitAsync(() =>
+                {
+                    settingsResolver.InvalidateCache(SettingScope.Tenant, result.TenantId);
+                    typedSettingsDocumentResolver.InvalidateTenantDocumentCache(
+                        result.TenantId,
+                        SettingsDocumentKeys.Tenant.Branding);
+                    return Task.CompletedTask;
+                });
+            }
 
-        return BaseCommandResponse.Success(
-            result,
-            "Managed provider client provisioned successfully.");
+            return BaseCommandResponse.Success(
+                result,
+                "Managed provider client provisioned successfully.");
+        }, cancellationToken);
     }
 
     private async Task<ManagementTenantProvisioningBlockerDto?> EvaluateAuthorityAsync(
@@ -652,8 +660,10 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         string normalizedIdentityProvider,
         ProviderAccountKey accountKey,
         User? existingUser,
-        Guid userId)
+        Guid userId,
+        CancellationToken cancellationToken)
     {
+        await identityFence.EnsureSubjectMayEnrollAsync(existingUser?.Id ?? userId, cancellationToken);
         if (existingUser != null)
         {
             if (admin.EmailVerified && existingUser.EmailVerified != true)

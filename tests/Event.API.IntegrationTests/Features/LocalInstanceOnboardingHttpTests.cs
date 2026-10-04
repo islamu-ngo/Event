@@ -285,8 +285,12 @@ public sealed class LocalInstanceOnboardingHttpTests
         {
             UserExternalLogin binding = await database.UserExternalLogins.SingleAsync(
                 row => row.ProviderKey == jwt.Subject, CancellationToken);
+            await using var transaction = await database.Database.BeginTransactionAsync(CancellationToken);
+            await new Explore.Persistence.Repositories.UserIdentityEmailRepository(database)
+                .RemoveEvidenceByBindingAsync(binding.Id, CancellationToken);
             database.UserExternalLogins.Remove(binding);
             await database.SaveChangesAsync(CancellationToken);
+            await transaction.CommitAsync(CancellationToken);
         }
         using HttpResponseMessage detachedBearer = await client.GetAsync("/api/user", CancellationToken);
         await Assert.That(detachedBearer.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);

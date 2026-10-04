@@ -17,6 +17,7 @@ using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Hosting;
@@ -82,8 +83,14 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         }
         SetEnvironment("SECRET_PROVIDER", "Environment");
         SetEnvironment("SecretProvider__Provider", "Environment");
+        SetEnvironment("PrivacyErasure__Authority__Topology", "CoLocated");
+        SetEnvironment("Database__Provider", "Sqlite");
+        SetEnvironment("Database__Database", _databasePath);
+        SetEnvironment("Database__Runtime__Database", _databasePath);
         SetEnvironment("Authentication__Local__JwtKey", null);
         SetEnvironment(SigningKeyVariable, Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)));
+        SetEnvironment("PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID", Guid.CreateVersion7().ToString("N"));
+        SetEnvironment("PRIVACY_ERASURE_IDENTITY_FENCE_KEY", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
     }
 
     public static async Task<LocalAdmissionWebApplicationFactory> CreateAsync(
@@ -107,6 +114,13 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         };
         try
         {
+            if (postgreSqlConnectionString is not null)
+            {
+                var databaseSettings = new Dictionary<string, string?>();
+                TestDatabaseConfiguration.AddPostgreSql(databaseSettings, postgreSqlConnectionString);
+                foreach (var setting in databaseSettings)
+                    factory.SetEnvironment(setting.Key.Replace(":", "__", StringComparison.Ordinal), setting.Value);
+            }
             if (incompleteSetup)
                 factory.SetEnvironment("SETUP_SECRET", factory.SetupSecret);
             await factory.SeedDatabaseAsync();
@@ -144,6 +158,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 ["IdentityDatabase:Provider"] = "Sqlite",
                 ["IdentityDatabase:Name"] = _identityDatabasePath,
                 ["SecretProvider:Provider"] = "Environment",
+                ["PrivacyErasure:Authority:Topology"] = "CoLocated",
                 ["Database:Provider"] = "Sqlite",
                 ["Database:Database"] = _databasePath,
                 ["Database:Runtime:Database"] = _databasePath,
@@ -178,6 +193,18 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         {
             services.RemoveExploreDbContextRegistrations();
             services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+            if (_postgreSqlConnectionString is null)
+            {
+                services.RemoveAll<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>();
+                services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>(options =>
+                    EmbeddedPrivacyErasureAuthorityDbContextFactory.ConfigureCoLocated(options,
+                        new PrimaryDatabaseConnectionOptions
+                        {
+                            Role = PrimaryDatabaseRole.Runtime,
+                            Provider = PrimaryDatabaseProvider.Sqlite,
+                            Database = _databasePath
+                        }));
+            }
             services.AddScoped(provider =>
             {
                 var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>()
@@ -531,7 +558,21 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         await using ExploreDbContext database = CreateDatabase();
         await database.Database.EnsureCreatedAsync();
         if (_postgreSqlConnectionString is null)
+        {
             await SqliteDatabaseInitializer.InitializeAsync(database, CancellationToken.None);
+            await using var scope = Services.CreateAsyncScope();
+            await using var authority = await scope.ServiceProvider
+                .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>()
+                .CreateDbContextAsync();
+            await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
+        }
+        else
+        {
+            await using var scope = Services.CreateAsyncScope();
+            var authority = scope.ServiceProvider
+                .GetRequiredService<CoLocatedPrivacyErasureAuthorityDbContext>();
+            await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
+        }
         await LookupTableSeeder.SeedAsync(database);
         DateTime now = DateTime.UtcNow;
         var bootstrapUser = new User
@@ -603,7 +644,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
     private void SetEnvironment(string name, string? value)
     {
-        _previousEnvironment.Add(name, Environment.GetEnvironmentVariable(name));
+        _previousEnvironment.TryAdd(name, Environment.GetEnvironmentVariable(name));
         Environment.SetEnvironmentVariable(name, value);
     }
 }

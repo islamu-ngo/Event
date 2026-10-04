@@ -11,12 +11,147 @@ ISLAMU Event implements a clean storage abstraction supporting both **Local Moun
 ## 1. Object Authority & Presigned Security
 
 * **Metadata-Backed Storage**: The primary PostgreSQL database owns the metadata record (UUID, owning tenant, mime-type, byte size, authorization rules); the storage provider stores the raw binary bytes.
-* **ID-Based Retrieval**: Files are accessed via authorized storage-object IDs (`/api/storage/{id}`), never via raw filesystem paths or raw S3 bucket URLs submitted by users.
+* **ID-Based Retrieval**: Files are accessed via stable storage-object IDs (`/api/storageobject/{id}/content`), never via raw filesystem paths or raw S3 bucket URLs submitted by users. Public safe-raster images use `/api/storageobject/{id}/public`; resource files use the separately authenticated `/api/eventresource/{id}/content` route.
 * **Presigned Download URLs**: For S3-compatible storage, the API generates short-lived, cryptographically signed presigned download URLs only after verifying caller authorization (see [Authorization Guide](../security-and-identity/authorization.md)).
+
+### Origin is not a download URL
+
+Storage keeps optional foreign-origin provenance separately from captured
+managed file ownership. Native uploads and generated CSV files have no invented
+origin; an imported thumbnail can retain its foreign origin without serving
+bytes from that address. A legacy external reference does not become a managed
+file automatically.
+
+Use the returned ID-derived `uri` for display and HAL links for permitted
+actions. `uri` can be null when no delivery is allowed. It never contains a
+provider address or a foreign-origin locator. Ordinary detail/list and upload
+responses omit backend provider identity, bucket, key, binding, version, and
+origin. Explicit operator diagnostics remain separately scoped.
+
+Federated managed-image links use the deployment's `PUBLIC_BASE_URL` or the
+public address established during authorized setup. Event preserves its path
+base when producing absolute image links for external readers. Publication
+with managed images fails if that address is missing or invalid; Event does
+not substitute a provider address or imported origin.
+
+When applying the pre-release provenance cutover, first classify and clear old
+locator values deliberately. A generated rename rejects every nonempty old
+value rather than guessing whether it is provenance. Blank old values become
+null; reapply only confirmed foreign origins after cutover. Follow the ordered
+migration procedure supplied with the deployment, not a URL-shape conversion.
 
 ---
 
 ## 2. Choosing Your Storage Provider
+
+### Profile images: managed files and external sources
+
+An uploaded profile image is selected by its Event storage-object UUID. Event
+checks that it belongs to the current tenant and is an active public safe-raster
+image, not private/resource-only content or another Actor's assigned image.
+Public delivery uses `/api/storageobject/{id}/public`; clients never need the
+provider bucket, object key or filesystem location.
+
+An external profile image is explicitly a foreign HTTP(S) URL. Loading it
+contacts that external host; Event does not acquire or delete those bytes.
+Even a foreign URL that resembles an Event content route remains external.
+Replacing or clearing either kind of profile reference does not delete a
+previous uploaded file.
+An upload whose retirement has already committed cannot be attached as a new
+profile image. The failed attachment leaves both the profile and retained
+cleanup work unchanged; select another eligible upload rather than retrying
+the retired UUID.
+
+Changing a retired upload's metadata back to active does not make it attachable.
+Only the verified upload-finalization flow can activate its settled target.
+Shared-use and retention checks include hidden or deleted owner records: hiding
+an item, rejecting evidence or releasing an answer file does not detach its
+storage reference. These checks do not reveal other owners' private identities.
+Cleanup must keep its captured target and retry authority after an uncertain
+provider response; requesting cleanup is not confirmation that bytes are absent.
+
+Heavy resource redaction detaches the moderated resource before scheduling its
+file cleanup. A retained organization evidence document stays stored even when
+the resource is redacted. Pending producer work keeps its original target until
+that exact write is acknowledged; age alone cannot authorize deletion.
+
+`DELETE /api/storageobject/{id}` returns `202 Accepted` with the object UUID
+when cleanup custody has committed. It does not synchronously erase provider
+bytes. In-use, retention-blocked or invalid captured targets return `409` with
+a bounded problem code, without other owners' names. Missing eligible metadata
+returns `404`; a fresh request cannot authorize from the retained cleanup record.
+
+Use the metadata response's HAL `delete` link to offer retirement. An `edit`
+link alone does not permit deletion. A file can remain editable while another
+physical reference or retention hold prevents retirement. The link is a current
+hint, not a reservation: a new attachment can make a later request return `409`.
+Refresh the metadata rather than infer permission from a role or file name.
+
+After acceptance, the existing cleanup worker retries the captured target.
+An uncertain provider response retains durable retry custody. An unfinished
+upload remains pending until its exact producer acknowledges completion; a
+late acknowledgement cannot recreate erased metadata. Do not change provider
+keys or infer completion from elapsed time to clear pending work.
+
+Tenant storage administration includes a bounded file list. It checks the
+collection and fresh detail response's retirement links, asks for confirmation,
+and announces accepted cleanup as pending. A stale in-use, retention or invalid
+target response refreshes current metadata; it does not reveal the identity of
+another reference owner. Removing a profile or resource attachment is a separate
+action and does not itself prove that provider bytes have been erased.
+
+For API integrations, `PATCH /api/user/{id}` accepts a `profileImage` group with
+either `profilePictureId` or `externalProfilePictureUri`. Supply neither value
+in a present group to clear; omit the group to preserve the image. Supplying both
+values, a relative URL, credentials in a URL, or an empty UUID is rejected.
+Use the current concurrency stamp in `If-Match`.
+Actor/User responses expose `profilePictureStorageObjectId` or
+`externalProfilePictureUri` alongside the display URL. The former User
+`profileImageKey` field is removed. Existing organization/group backgrounds
+remain managed images rather than introducing another external-image setting.
+
+Apply the matching database upgrade before deploying this contract. Old profile
+URLs are not proof of ownership: operators must use verified file identity or
+explicitly classify a source as external rather than guess from the URL.
+The upgrade stops if any old profile URL remains, including an absolute HTTP(S)
+URL. Preserve the reviewed file/source selections before approved development
+data recreation, then apply them through the new profile API. An empty-profile
+database upgrades directly; no automatic URL classification or data clearing runs.
+
+### Existing files keep their original target
+
+Changing the default local root, S3 bucket or provider affects new reservations,
+not existing files. Uploads, generated registration CSVs and imported thumbnails
+capture their storage target before writing persistent bytes. Downloads and
+cleanup continue using that captured target. Keep old mounts, buckets and retained
+credential references available while files or pending cleanup still depend on them.
+Local files use application content links; they do not advertise S3 presigned
+downloads. S3 downloads retain the saved object version rather than selecting a
+newer object at the same key.
+
+Usage includes activated generated CSVs and imported files as well as user
+uploads. Replacement and retirement rebuild the affected tenant/provider usage
+from retained metadata and upload reservations; cleanup retries do not release
+the same charge twice. Hiding or soft-deleting an owner does not itself release
+its file charge. A durable cleanup handoff can release the charge while physical
+deletion remains pending, so usage totals are not proof of provider absence.
+
+A missing historical binding is an error, not permission to try today's backend.
+Before upgrading development data, inventory the original bytes and verify their
+target, relative keys and checksums. Use an explicitly reviewed historical mapping
+only where that evidence is conclusive; otherwise re-upload from a trusted source.
+Recreate a disposable development environment only after approving the data loss.
+No automatic target guessing or unbound-row deletion is performed.
+
+Install the matching generated database migrations with the application upgrade.
+Do not deploy source changes against the old schema. Preserve pending producer
+records with backups: a timeout or absent current object is not proof that an
+unacknowledged write can never finish.
+
+For generated registration CSVs, set the connection's workspace to `local` or
+`s3_compatible`. Other workspace values are rejected rather than silently choosing
+local storage. If disclosure permission expires while a write is in flight, its
+captured bytes remain tracked for cleanup and no downloadable artifact is activated.
 
 Configured via `STORAGE_PROVIDER` in [Environment Variables](../configuration-and-operations/environment-variables.md#5-storage-providers-local--cloud-s3):
 
@@ -138,6 +273,8 @@ changing a root setting never migrates existing files.
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):
 * Restoring a database without the corresponding storage volume causes broken image links.
 * Restoring a storage volume without the database leaves orphaned, unreferenced files.
+* Include every captured target, even if it is no longer the default. Bound local
+  files must remain reachable at their captured absolute mount path.
 * After restoring the Compose MinIO volume, rerun `minio-init` before reopening traffic so the existing bucket is private.
 * [Configuration Manifests](../configuration-and-operations/configuration-manifests.md) deliberately exclude binary media and do not replace storage volume backups.
 * Retain required Data Protection keys and the selected secret authority with the

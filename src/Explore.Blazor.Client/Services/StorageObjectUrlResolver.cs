@@ -20,10 +20,15 @@ public sealed class StorageObjectUrlResolver : IStorageObjectUrlResolver
             return null;
         }
 
-        var normalizedReference = NormalizeReference(storageReference);
+        var normalizedReference = storageReference.Trim();
         if (normalizedReference.StartsWith(StorageObjectApiPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            return normalizedReference;
+            var segments = normalizedReference[StorageObjectApiPrefix.Length..].Split('/');
+            return segments.Length == 2
+                && Guid.TryParse(segments[0], out var id)
+                && segments[1].Equals("public", StringComparison.OrdinalIgnoreCase)
+                    ? ResolvePublicImageUrl(id)
+                    : null;
         }
 
         return Guid.TryParse(normalizedReference, out var storageObjectId)
@@ -45,16 +50,4 @@ public sealed class StorageObjectUrlResolver : IStorageObjectUrlResolver
             : $"{StorageObjectApiPrefix}{storageObjectId}/content";
     }
 
-    private static string NormalizeReference(string storageReference)
-    {
-        var trimmed = storageReference.Trim();
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) &&
-            (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)))
-        {
-            return uri.AbsolutePath;
-        }
-
-        return trimmed;
-    }
 }

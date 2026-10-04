@@ -42,7 +42,7 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
     /// Deletes an entity. If entity implements ISoftDeletable, performs soft delete (sets IsDeleted=true).
     /// Otherwise performs hard delete (permanent removal from database).
     /// </summary>
-    public async Task Delete(T entity)
+    public virtual async Task Delete(T entity)
     {
         // Check if entity supports soft delete
         if (entity is ISoftDeletable)

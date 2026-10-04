@@ -751,6 +751,22 @@ public sealed class EmailDispatchRepositoriesSqliteTests
         context.Users.Add(user);
         context.TenantUsers.Add(tenantUser);
         context.NotificationIntents.Add(intent);
+        var binding = new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+            AuthenticationProvider = null!,
+            ProviderKey = Explore.Application.Authentication.PlatformIdentityPrincipalExtensions
+                .CreateOidcAccountKey("https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
+            CreatedAt = now
+        };
+        var claim = UserIdentityEmailClaim.Create(user.Id, user.Email!);
+        context.UserExternalLogins.Add(binding);
+        context.UserIdentityEmailClaims.Add(claim);
+        context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(
+            user.Id, claim.Id, binding.Id, now));
         await context.SaveChangesAsync();
         return new SeededDispatch(tenant.Id, dispatch.Id, dispatch.PublishEventId);
     }

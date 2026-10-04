@@ -35,6 +35,10 @@ public sealed class InstanceOnboardingCompletionOperation(
     IUserRepository userRepository,
     IActorRepository actorRepository,
     IUserExternalLoginRepository externalLoginRepository,
+    IUserIdentityEmailRepository identityEmails,
+    IPrivacyErasureStateRepository privacyErasure,
+    Explore.Application.Contracts.Identity.IIdentityAccountResolver identityResolver,
+    Explore.Application.Services.IdentityEmailSynchronizationOperation identityEmailSynchronization,
     ITenantRepository tenantRepository,
     ITenantCreationService tenantCreationService,
     ISystemSettingRepository systemSettingRepository,
@@ -47,6 +51,7 @@ public sealed class InstanceOnboardingCompletionOperation(
     IUnitOfWork unitOfWork,
     IInstanceOnboardingGenerationReader generationReader,
     IConfiguration configuration,
+    Explore.Application.Services.PrivacyIdentityFenceOperation identityFence,
     IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null)
 {
     private static readonly JsonSerializerOptions IdentitySerializerOptions = new(JsonSerializerDefaults.Web);
@@ -87,9 +92,16 @@ public sealed class InstanceOnboardingCompletionOperation(
         PersistenceOutcome outcome;
         try
         {
-            outcome = input.LocalCredential is null
-                ? await unitOfWork.ExecuteSerializableAsync(token => PersistAsync(input, token), cancellationToken)
-                : await unitOfWork.ExecuteBootstrapConvergenceAsync(token => PersistAsync(input, token), cancellationToken);
+            outcome = await identityFence.ExecuteEnrollmentAsync(input.AccountKey,
+                async token =>
+                {
+                    if (input.AccountKey.ProviderKind != AuthenticationProviderKind.Local)
+                        await identityFence.EnsureSubjectMayEnrollAsync(input.UserId, token);
+                    return input.LocalCredential is null
+                        ? await unitOfWork.ExecuteSerializableAsync(inner => PersistAsync(input, inner), token)
+                        : await unitOfWork.ExecuteBootstrapConvergenceAsync(inner => PersistAsync(input, inner), token);
+                },
+                cancellationToken);
         }
         catch (TenantDirectoryOperatorIdentityReadinessException exception)
         {
@@ -104,15 +116,18 @@ public sealed class InstanceOnboardingCompletionOperation(
             return outcome.Response;
         }
 
-        setupSecretProvider.Lock();
-        await deploymentModeProvider.InvalidateCacheAsync();
-        await jwtRefreshNotifier.ReloadAsync(CancellationToken.None);
-        auditLogger.Log(new InstanceBootstrapAuditEvent(
-            InstanceBootstrapAuditEventType.SetupModeDisabled,
-            Operation: outcome.AuditOperation,
-            Outcome: "disabled",
-            ActorUserId: input.UserId,
-            DeploymentMode: outcome.DeploymentMode.ToString()));
+        await identityFence.AfterEnrollmentCommitAsync(async () =>
+        {
+            setupSecretProvider.Lock();
+            await deploymentModeProvider.InvalidateCacheAsync();
+            await jwtRefreshNotifier.ReloadAsync(CancellationToken.None);
+            auditLogger.Log(new InstanceBootstrapAuditEvent(
+                InstanceBootstrapAuditEventType.SetupModeDisabled,
+                Operation: outcome.AuditOperation,
+                Outcome: "disabled",
+                ActorUserId: input.UserId,
+                DeploymentMode: outcome.DeploymentMode.ToString()));
+        });
         return outcome.Response;
     }
 
@@ -234,7 +249,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             defaultTenantId = tenant.Id;
         }
 
-        user ??= await CreateUserAsync(input, administratorProfile, defaultTenantId);
+        user ??= await CreateUserAsync(input, administratorProfile, defaultTenantId, cancellationToken);
         await PersistDeploymentModeAsync(admission.DeploymentMode);
         await PersistSiteProfileAsync(admission.SiteProfile!, singleTenant, cancellationToken);
         await PersistAdministrationAccessAsync(settings, singleTenant);
@@ -466,9 +481,11 @@ public sealed class InstanceOnboardingCompletionOperation(
     private async Task<User> CreateUserAsync(
         CompletionInput input,
         ConfiguredAdministratorProfile? administratorProfile,
-        Guid? tenantId)
+        Guid? tenantId,
+        CancellationToken cancellationToken)
     {
-        string email = (input.LocalCredential?.Email ?? administratorProfile?.Email ?? input.Email ?? string.Empty).Trim().ToLowerInvariant();
+        var evidence = input.InteractiveCommand?.AuthorityEvidence ?? input.ConfiguredCommand?.AuthorityEvidence;
+        string email = (input.LocalCredential?.Email ?? administratorProfile?.Email ?? evidence?.Email ?? input.Email ?? string.Empty).Trim().ToLowerInvariant();
         string? suppliedFirstName = input.LocalCredential?.FirstName ?? administratorProfile?.FirstName ?? input.FirstName;
         string? suppliedLastName = input.LocalCredential?.LastName ?? administratorProfile?.LastName ?? input.LastName;
         string firstName = string.IsNullOrWhiteSpace(suppliedFirstName)
@@ -494,7 +511,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             providerKind = input.ConfiguredCommand.AuthenticatedAccount.ProviderKind;
             provider = providerKind.ToAuthenticationProviderCode();
             providerKey = input.ConfiguredCommand.AuthenticatedAccount.Value;
-            emailVerified = false;
+            emailVerified = evidence?.EmailVerified ?? input.ConfiguredCommand.EmailVerified ?? false;
         }
         else
         {
@@ -507,8 +524,25 @@ public sealed class InstanceOnboardingCompletionOperation(
             providerKey = string.IsNullOrWhiteSpace(command.AuthProviderId)
                 ? input.UserId.ToString()
                 : command.AuthProviderId.Trim();
-            emailVerified = input.EmailVerified ?? (provider is "keycloak" or "google");
+            emailVerified = evidence?.EmailVerified ?? input.EmailVerified ?? false;
         }
+
+        if (await privacyErasure.GetBySubjectAsync(input.UserId, cancellationToken) is not null)
+            throw new InvalidOperationException("Erased identity metadata cannot be recreated.");
+        var account = new ProviderAccountKey(providerKind, providerKey);
+        bool canClaim = providerKind == AuthenticationProviderKind.Local;
+        if (!canClaim)
+        {
+            var resolution = await identityResolver.ResolveAsync(account, evidence, cancellationToken);
+            if (resolution.Decision == Explore.Domain.Services.Identity.IdentityCorrelationDecision.RecoveryRequired)
+                throw new InvalidOperationException("Identity metadata requires account recovery.");
+            canClaim = resolution.CanClaimVerifiedEmail;
+        }
+        string? identityEmail = (input.LocalCredential?.Email ?? evidence?.Email)?.Trim().ToLowerInvariant();
+        if (canClaim && emailVerified && !string.IsNullOrWhiteSpace(identityEmail)
+            && await identityEmails.GetByNormalizedEmailAsync(identityEmail, cancellationToken) is { } claim
+            && claim.UserId != input.UserId)
+            throw new InvalidOperationException("Identity address requires account recovery.");
 
         var user = new User
         {
@@ -525,14 +559,14 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         await actorRepository.Create(new Actor
         {
-            Id = input.LocalCredential?.Receipt.PersonalActorId ?? Guid.CreateVersion7(),
+            Id = input.LocalCredential?.Receipt.PersonalActorId ?? input.PersonalActorId,
             ActorTypeId = (int)ActorTypeEnum.User,
             ActorType = null!,
             Pii = new ActorPii { DisplayName = $"{firstName} {lastName}".Trim() },
             Description = null,
             UserId = user.Id
         });
-        await externalLoginRepository.Create(new UserExternalLogin
+        UserExternalLogin login = await externalLoginRepository.Create(new UserExternalLogin
         {
             Id = input.LocalCredential?.Receipt.ExternalLoginId ?? input.ExternalLoginId,
             UserId = user.Id,
@@ -542,6 +576,9 @@ public sealed class InstanceOnboardingCompletionOperation(
             ProviderKey = providerKey,
             ProviderDisplayName = provider
         });
+        await identityEmailSynchronization.ExecuteAsync(user, login,
+            new Explore.Application.Services.IdentityEmailObservation(identityEmail, emailVerified, canClaim,
+                input.IdentityClaimId, input.IdentityEvidenceId, input.CompletedAt), cancellationToken);
         return user;
     }
 
@@ -848,12 +885,25 @@ public sealed class InstanceOnboardingCompletionOperation(
         LocalCredentialProvisioningSnapshot? LocalCredential = null,
         ConfiguredAdministratorBootstrapBinding? LocalBinding = null)
     {
+        public Guid PersonalActorId { get; } = Guid.CreateVersion7();
+        public Guid IdentityClaimId { get; } = Guid.CreateVersion7();
+        public Guid IdentityEvidenceId { get; } = Guid.CreateVersion7();
         public bool IsConfigured => ConfiguredCommand is not null || LocalBinding is not null;
         public Guid UserId => LocalCredential?.Receipt.LocalSubjectId ?? InteractiveCommand?.UserId ?? ConfiguredCommand!.UserId;
         public string? Email => InteractiveCommand?.Email ?? ConfiguredCommand?.Email;
         public string? FirstName => InteractiveCommand?.FirstName ?? ConfiguredCommand?.FirstName;
         public string? LastName => InteractiveCommand?.LastName ?? ConfiguredCommand?.LastName;
         public bool? EmailVerified => InteractiveCommand?.EmailVerified ?? ConfiguredCommand?.EmailVerified;
+        public ProviderAccountKey AccountKey => LocalCredential is not null
+            ? new(AuthenticationProviderKind.Local, UserId.ToString("D"))
+            : LocalBinding?.AccountKey ?? ConfiguredCommand?.AuthenticatedAccount
+                ?? InteractiveCommand?.AuthorityEvidence?.AccountKey
+                ?? new ProviderAccountKey(
+                    (string.IsNullOrWhiteSpace(InteractiveCommand!.AuthProvider)
+                        ? AuthSchemeNames.Keycloak.ToLowerInvariant()
+                        : InteractiveCommand.AuthProvider.Trim().ToLowerInvariant()).ParseAuthenticationProviderKind(),
+                    string.IsNullOrWhiteSpace(InteractiveCommand.AuthProviderId)
+                        ? UserId.ToString() : InteractiveCommand.AuthProviderId.Trim());
 
         public static CompletionInput Interactive(
             CompleteInstanceOnboardingCommand command,

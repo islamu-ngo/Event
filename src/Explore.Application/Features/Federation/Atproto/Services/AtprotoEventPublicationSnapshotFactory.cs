@@ -94,8 +94,8 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
             new(
                 Normalize(eventEntity.BackgroundColor),
                 Normalize(eventEntity.BackgroundEffect),
-                PublicStorageDescription(eventEntity.FeaturedImage),
-                PublicStorageDescription(eventEntity.BackgroundImage)),
+                PublicStorageDescription(eventEntity.FeaturedImage, eventEntity.TenantId),
+                PublicStorageDescription(eventEntity.BackgroundImage, eventEntity.TenantId)),
             graph.Categories
                 .Select(link => LookupPath(link.Category))
                 .Order(StringComparer.Ordinal)
@@ -331,7 +331,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
             session.RegistrationMode is null ? null : LookupLabel(session.RegistrationMode.MasterCode, session.RegistrationMode.FullName, session.RegistrationMode.Description),
             session.MaxAudienceAttendees,
             session.CurrentAudienceAttendees,
-            PublicStorageDescription(session.FeaturedImage),
+            PublicStorageDescription(session.FeaturedImage, session.TenantId),
             resolveLocation(session.EventLocationId, session.LocationId, session.RoomId),
             MapSessionIslamicAspect(session.IslamicAspect),
             graph.SessionCategories
@@ -353,7 +353,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
                 .Where(link => link.EventSessionId == session.Id)
                 .OrderBy(link => link.Actor.Pii.DisplayName, StringComparer.Ordinal)
                 .ThenBy(link => PrimaryAtprotoHandle(link.Actor), StringComparer.Ordinal)
-                .ThenBy(link => link.Actor.Pii.ProfilePictureUri, StringComparer.Ordinal)
+                .ThenBy(link => Explore.Application.Services.StoragePresentationUrlResolver.ActorProfilePictureUri(link.Actor.Pii), StringComparer.Ordinal)
                 .ThenBy(link => link.Actor.Description, StringComparer.Ordinal)
                 .ThenBy(link => link.ActorId)
                 .ThenBy(link => link.Id)
@@ -361,7 +361,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
                     Normalize(link.Actor.Pii.DisplayName)!,
                     Normalize(PrimaryAtprotoHandle(link.Actor)),
                     Normalize(link.Actor.Description),
-                    Normalize(link.Actor.Pii.ProfilePictureUri),
+                    Normalize(Explore.Application.Services.StoragePresentationUrlResolver.ActorProfilePictureUri(link.Actor.Pii)),
                     null,
                     null,
                     Normalize(link.Actor.BackgroundColor),
@@ -458,7 +458,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
             Normalize(organization?.Pii.City),
             Normalize(actor.Group?.FullName),
             Normalize(actor.Group?.Description),
-            Normalize(actor.Pii.ProfilePictureUri),
+            Normalize(Explore.Application.Services.StoragePresentationUrlResolver.ActorProfilePictureUri(actor.Pii)),
             null,
             null,
             Normalize(actor.BackgroundColor),
@@ -485,7 +485,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
                 eventOrder,
                 Normalize(series.Actor?.Pii.DisplayName) ?? string.Empty,
                 Normalize(series.Actor is null ? null : PrimaryAtprotoHandle(series.Actor)),
-                PublicStorageDescription(series.FeaturedImage));
+                PublicStorageDescription(series.FeaturedImage, series.TenantId));
 
     private static string? PrimaryAtprotoHandle(Actor actor)
         => actor.AtprotoIdentities
@@ -501,7 +501,7 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
             Normalize(day.Label),
             Normalize(day.Description),
             Normalize(day.BannerText),
-            PublicStorageDescription(day.BannerImage),
+            PublicStorageDescription(day.BannerImage, day.TenantId),
             day.AllowsDayScopeRegistration,
             day.SortOrder);
 
@@ -752,8 +752,8 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
                 .FirstOrDefault()
             : null;
         AddUri(values, externalRegistration?.Url, "Registration");
-        AddUri(values, PublicStorageUri(eventEntity.FeaturedImage), "Featured image");
-        AddUri(values, PublicStorageUri(eventEntity.BackgroundImage), "Background image");
+        AddUri(values, PublicStorageUri(eventEntity.FeaturedImage, eventEntity.TenantId), "Featured image");
+        AddUri(values, PublicStorageUri(eventEntity.BackgroundImage, eventEntity.TenantId), "Background image");
         return values
             .Distinct()
             .OrderBy(value => value.Uri, StringComparer.Ordinal)
@@ -862,17 +862,12 @@ public sealed partial class AtprotoEventPublicationSnapshotFactory(
             && !definition.IsDeleted
             && definition.ExposureLevel == ExposureLevel.Public;
 
-    private static string? PublicStorageUri(StorageObject? storageObject)
-        => storageObject is not null
-            && !storageObject.IsDeleted
-            && string.Equals(storageObject.Visibility, StorageObjectVisibilities.PublicImage, StringComparison.Ordinal)
-            && string.Equals(storageObject.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal)
-                ? Normalize(storageObject.Uri)
-                : null;
+    private static string? PublicStorageUri(StorageObject? storageObject, Guid tenantId)
+        => StoragePresentationUrlResolver.PublicImageUri(storageObject, tenantId);
 
-    private static string? PublicStorageDescription(StorageObject? storageObject)
+    private static string? PublicStorageDescription(StorageObject? storageObject, Guid tenantId)
     {
-        string? uri = PublicStorageUri(storageObject);
+        string? uri = PublicStorageUri(storageObject, tenantId);
         if (uri is null || storageObject is null)
         {
             return null;

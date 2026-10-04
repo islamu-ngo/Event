@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3YE9AZGGDPV1297BB29DH5S
+Title: "Publish managed images through absolute public routes"
+Type: fix
+Scope: federation
+Summary: "AT Protocol publication resolves managed image routes against the configured or setup-authorized public address, preserving path base and stable storage identity. Missing or invalid authority fails closed without consulting imported provenance or ambient request hosts."
+Group: federation-managed-media-origin
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

@@ -11,18 +11,19 @@ namespace Explore.Infrastructure;
 
 public sealed class StorageReconciliationService(
     IStorageObjectRepository storageObjectRepository,
-    IFileStorageProviderResolver providerResolver,
-    IEnumerable<IFileStorageProvider> storageProviders,
+    IStorageProviderBindingService providerResolver,
+    IStorageProviderBindingRepository bindings,
+    IStorageProducerOperationRepository producers,
     IOptions<StorageReconciliationSettings> settings,
     BusinessMetrics metrics,
     ILogger<StorageReconciliationService> logger,
-    IEventResourceStorageCleanupService resourceCleanup) : IStorageReconciliationService
+    IEventResourceStorageCleanupService resourceCleanup,
+    IEventResourceStorageLifecycleRepository lifecycle,
+    IUnitOfWork unitOfWork) : IStorageReconciliationService
 {
     private const string MissingBackingObjectReason = "backing_object_missing";
     private const string MissingMetadataRecordReason = "metadata_record_missing";
 
-    private readonly IReadOnlyList<IFileStorageInventoryProvider> _inventoryProviders =
-        storageProviders.OfType<IFileStorageInventoryProvider>().ToArray();
     private readonly StorageReconciliationSettings _settings = settings.Value;
 
     public async Task<StorageReconciliationResult> ReconcileAsync(
@@ -98,9 +99,10 @@ public sealed class StorageReconciliationService(
 
             try
             {
-                var provider = providerResolver.GetRequired(storageObject.Provider);
+                var provider = await providerResolver.ResolveTargetAsync(
+                    storageObject.StorageProviderBindingId, storageObject.Provider, cancellationToken);
                 var exists = await provider.ExistsAsync(
-                    new FileStorageExistsInput(storageObject.ObjectKey),
+                    new FileStorageExistsInput(storageObject.ObjectKey, storageObject.ProviderVersionId),
                     cancellationToken);
 
                 if (exists)
@@ -128,7 +130,6 @@ public sealed class StorageReconciliationService(
                 counts.FailedCount++;
                 metrics.RecordStorageReconciliationObjects(1, storageObject.Provider, "metadata", "missing", "failed", CategorizeProviderFailure(ex));
                 logger.LogWarning(
-                    ex,
                     "Storage reconciliation failed while checking metadata object for provider {Provider}.",
                     NormalizeProviderForLog(storageObject.Provider));
             }
@@ -154,23 +155,33 @@ public sealed class StorageReconciliationService(
 
             if (string.IsNullOrWhiteSpace(storageObject.ObjectKey))
             {
-                storageObject.MarkDeleted(null, utcNow);
-                await storageObjectRepository.Update(storageObject);
-                counts.DeletedMetadataCount++;
+                counts.FailedCount++;
                 continue;
             }
 
             try
             {
-                var provider = providerResolver.GetRequired(storageObject.Provider);
-                await provider.DeleteAsync(
-                    new FileStorageDeleteInput(storageObject.ObjectKey),
+                // Each transaction declares one complete source set through admission's fence.
+                // Pending means durable custody transfer; only the tombstone worker deletes bytes.
+                var admission = await unitOfWork.ExecuteSerializableAsync(
+                    ct => lifecycle.TryQueueRetirementAsync(storageObject.TenantId, storageObject.Id, utcNow, ct),
                     cancellationToken);
-
-                storageObject.MarkDeleted(null, utcNow);
-                await storageObjectRepository.Update(storageObject);
-                counts.DeletedMetadataCount++;
-                metrics.RecordStorageDelete(storageObject.Provider, "succeeded");
+                switch (admission)
+                {
+                    case StorageRetirementAdmission.Pending:
+                        counts.DeletedMetadataCount++;
+                        break;
+                    case StorageRetirementAdmission.NotFound:
+                    case StorageRetirementAdmission.InUse:
+                    case StorageRetirementAdmission.RetentionBlocked:
+                        counts.SkippedCount++;
+                        break;
+                    case StorageRetirementAdmission.InvalidTarget:
+                        counts.FailedCount++;
+                        break;
+                    default:
+                        throw new InvalidOperationException("Unknown storage retirement acknowledgement.");
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -181,8 +192,7 @@ public sealed class StorageReconciliationService(
                 counts.FailedCount++;
                 metrics.RecordStorageDelete(storageObject.Provider, "failed", CategorizeProviderFailure(ex));
                 logger.LogWarning(
-                    ex,
-                    "Storage reconciliation failed while deleting quarantined metadata object for provider {Provider}.",
+                    "Storage reconciliation failed while admitting quarantined metadata retirement for provider {Provider}.",
                     NormalizeProviderForLog(storageObject.Provider));
             }
         }
@@ -195,7 +205,8 @@ public sealed class StorageReconciliationService(
     {
         var orphanBeforeUtc = utcNow.AddHours(-_settings.OrphanFileQuarantineGraceHours);
 
-        foreach (var provider in _inventoryProviders)
+        var captured = await bindings.ListLocalAsync(cancellationToken);
+        foreach (var target in captured.GroupBy(binding => binding.LocalRootPath, StringComparer.Ordinal))
         {
             var remaining = _settings.BatchSize - counts.ScannedBackingObjectCount;
             if (remaining <= 0)
@@ -204,8 +215,11 @@ public sealed class StorageReconciliationService(
             }
 
             var inventory = new List<FileStorageInventoryObject>();
+            IFileStorageInventoryProvider provider;
             try
             {
+                provider = (IFileStorageInventoryProvider)await providerResolver.ResolveTargetAsync(
+                    target.First().Id, StorageProviders.Local, cancellationToken);
                 await foreach (var item in provider.ListObjectsAsync(remaining, cancellationToken))
                 {
                     inventory.Add(item);
@@ -218,11 +232,10 @@ public sealed class StorageReconciliationService(
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SystemException)
             {
                 counts.FailedCount++;
-                metrics.RecordStorageReconciliationObjects(1, provider.Provider, "backing_object", "scan", "failed", "inventory_unavailable");
+                metrics.RecordStorageReconciliationObjects(1, StorageProviders.Local, "backing_object", "scan", "failed", "inventory_unavailable");
                 logger.LogWarning(
-                    ex,
                     "Storage reconciliation inventory scan failed for provider {Provider}.",
-                    NormalizeProviderForLog(provider.Provider));
+                    StorageProviders.Local);
                 continue;
             }
 
@@ -236,8 +249,8 @@ public sealed class StorageReconciliationService(
                 .Select(item => item.ObjectKey)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
-            var knownKeys = await storageObjectRepository.ListKnownObjectKeysAsync(
-                provider.Provider,
+            var knownKeys = await producers.ListKnownObjectKeysAsync(
+                target.Select(binding => binding.Id).ToArray(),
                 objectKeys,
                 cancellationToken);
             var knownKeySet = new HashSet<string>(knownKeys, StringComparer.Ordinal);
@@ -289,7 +302,6 @@ public sealed class StorageReconciliationService(
                     counts.FailedCount++;
                     metrics.RecordStorageReconciliationObjects(1, provider.Provider, "backing_object", "quarantine", "failed", "quarantine_failed");
                     logger.LogWarning(
-                        ex,
                         "Storage reconciliation failed while quarantining orphan backing object for provider {Provider}.",
                         NormalizeProviderForLog(provider.Provider));
                 }

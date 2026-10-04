@@ -29,6 +29,16 @@ namespace Explore.Persistence.Migrations.PrivacyErasureAuthority
                         .HasColumnType("boolean")
                         .HasColumnName("singleton");
 
+                    b.Property<string>("IdentityKeyId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("identity_key_id");
+
+                    b.Property<string>("IdentityKeyVerificationTag")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("identity_key_verification_tag");
+
                     b.Property<long>("LastSequence")
                         .HasColumnType("bigint")
                         .HasColumnName("last_sequence");
@@ -49,6 +59,46 @@ namespace Explore.Persistence.Migrations.PrivacyErasureAuthority
                             t.HasCheckConstraint("ck_privacy_erasure_authority_counter_retained_floor", "retained_floor_sequence >= 0 AND retained_floor_sequence <= last_sequence");
 
                             t.HasCheckConstraint("ck_privacy_erasure_authority_counter_singleton", "singleton");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.PrivacyErasureIdentityFence", b =>
+                {
+                    b.Property<long>("AuthoritySequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authority_sequence");
+
+                    b.Property<int>("IdentityKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("identity_kind");
+
+                    b.Property<string>("KeyId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key_id");
+
+                    b.Property<string>("Fingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<DateTime>("RetentionExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retention_expires_at_utc");
+
+                    b.HasKey("AuthoritySequence", "IdentityKind", "KeyId", "Fingerprint")
+                        .HasName("pk_identity_fences");
+
+                    b.HasIndex("IdentityKind", "KeyId", "Fingerprint")
+                        .HasDatabaseName("ix_identity_fences_identity_kind_key_id_fingerprint");
+
+                    b.ToTable("identity_fences", "privacy_erasure_authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_identity_fences_digest", "length(fingerprint) = 64");
+
+                            t.HasCheckConstraint("ck_identity_fences_key", "length(key_id) BETWEEN 1 AND 64");
+
+                            t.HasCheckConstraint("ck_identity_fences_kind", "identity_kind BETWEEN 1 AND 5");
                         });
                 });
 
@@ -101,6 +151,9 @@ namespace Explore.Persistence.Migrations.PrivacyErasureAuthority
                     b.HasKey("AuthoritySequence")
                         .HasName("pk_erasure_intents");
 
+                    b.HasIndex("SubjectKind", "SubjectId")
+                        .HasDatabaseName("ix_erasure_intents_subject_kind_subject_id");
+
                     b.HasIndex("IntentId", "SubjectKind", "PolicyVersion")
                         .IsUnique()
                         .HasDatabaseName("ix_erasure_intents_intent_id_subject_kind_policy_version");
@@ -125,6 +178,21 @@ namespace Explore.Persistence.Migrations.PrivacyErasureAuthority
 
                             t.HasCheckConstraint("ck_privacy_erasure_intents_subject_nonempty", "subject_id <> '00000000-0000-0000-0000-000000000000'::uuid");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.PrivacyErasureIdentityFence", b =>
+                {
+                    b.HasOne("Explore.Domain.PrivacyErasureIntent", null)
+                        .WithMany("IdentityFences")
+                        .HasForeignKey("AuthoritySequence")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_identity_fences_erasure_intents_authority_sequence");
+                });
+
+            modelBuilder.Entity("Explore.Domain.PrivacyErasureIntent", b =>
+                {
+                    b.Navigation("IdentityFences");
                 });
 #pragma warning restore 612, 618
         }

@@ -131439,14 +131439,14 @@ namespace Explore.Blazor.Client.Clients
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// Delete Storage Object
+        /// Retire Storage Object
         /// </summary>
         /// <remarks>
-        /// Delete a storage object
+        /// Admit durable cleanup of an unreferenced storage object. Acceptance does not confirm provider absence.
         /// </remarks>
-        /// <returns>No Content</returns>
+        /// <returns>Accepted</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteStorageObjectAsync(System.Guid id, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<BaseCommandResponseOfGuid> DeleteStorageObjectAsync(System.Guid id, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -131921,14 +131921,14 @@ namespace Explore.Blazor.Client.Clients
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// Delete Storage Object
+        /// Retire Storage Object
         /// </summary>
         /// <remarks>
-        /// Delete a storage object
+        /// Admit durable cleanup of an unreferenced storage object. Acceptance does not confirm provider absence.
         /// </remarks>
-        /// <returns>No Content</returns>
+        /// <returns>Accepted</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteStorageObjectAsync(System.Guid id, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<BaseCommandResponseOfGuid> DeleteStorageObjectAsync(System.Guid id, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (id == null)
                 throw new System.ArgumentNullException("id");
@@ -131980,9 +131980,24 @@ namespace Explore.Blazor.Client.Clients
                         ProcessResponse(client_, response_);
 
                         var status_ = (int)response_.StatusCode;
-                        if (status_ == 204)
+                        if (status_ == 202)
                         {
-                            return;
+                            var objectResponse_ = await ReadObjectResponseAsync<BaseCommandResponseOfGuid>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 401)
@@ -131995,6 +132010,16 @@ namespace Explore.Blazor.Client.Clients
                             throw new ApiException<ProblemDetails>("Unauthorized", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 404)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -132003,6 +132028,16 @@ namespace Explore.Blazor.Client.Clients
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -154559,6 +154594,12 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("displayName")]
         public string? DisplayName { get; init; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; init; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureCid")]
         public string? ProfilePictureCid { get; init; } = default!;
 
@@ -154659,6 +154700,12 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("didCustodyTypeFullName")]
         public string? DidCustodyTypeFullName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureUri")]
         public string? ProfilePictureUri { get; init; } = default!;
@@ -174818,6 +174865,12 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("displayName")]
         public string? DisplayName { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureCid")]
         public string? ProfilePictureCid { get; set; } = default!;
 
@@ -174925,6 +174978,12 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("didCustodyTypeFullName")]
         public string? DidCustodyTypeFullName { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureUri")]
         public string? ProfilePictureUri { get; set; } = default!;
@@ -185771,12 +185830,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeMasterCode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; set; } = default!;
+        public string? Uri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -185880,12 +185934,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; set; } = default!;
+        public string? Uri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -187068,8 +187117,11 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("concurrencyStamp")]
         public System.Guid? ConcurrencyStamp { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("profileImageKey")]
-        public string? ProfileImageKey { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profileImageUri")]
         public string? ProfileImageUri { get; set; } = default!;
@@ -205400,12 +205452,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeMasterCode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; init; } = default!;
+        public string? Uri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -205502,12 +205549,7 @@ namespace Explore.Blazor.Client.Clients
         public string? FileTypeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("uri")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Uri { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; init; } = default!;
+        public string? Uri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -205651,10 +205693,6 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("userId")]
         public System.Guid? UserId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("provider")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Provider { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("routeKey")]
         public string? RouteKey { get; init; } = default!;
@@ -212640,6 +212678,9 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("profilePictureId")]
         public System.Guid? ProfilePictureId { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -213068,8 +213109,11 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("concurrencyStamp")]
         public System.Guid? ConcurrencyStamp { get; init; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("profileImageKey")]
-        public string? ProfileImageKey { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("profilePictureStorageObjectId")]
+        public System.Guid? ProfilePictureStorageObjectId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("externalProfilePictureUri")]
+        public string? ExternalProfilePictureUri { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("profileImageUri")]
         public string? ProfileImageUri { get; init; } = default!;

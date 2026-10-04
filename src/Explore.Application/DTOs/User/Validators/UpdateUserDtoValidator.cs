@@ -38,7 +38,8 @@ public class UpdateUserProfileImageDtoValidator : AbstractValidator<UpdateUserPr
 {
     public UpdateUserProfileImageDtoValidator()
     {
-        RuleFor(p => p.ProfilePictureId)
-            .NotEmpty().WithMessage("{PropertyName} is required.");
+        RuleFor(p => p)
+            .Must(p => Explore.Domain.ActorPii.IsValidProfilePicture(p.ProfilePictureId, p.ExternalProfilePictureUri))
+            .WithMessage("Profile image must be absent, a managed storage ID, or an external HTTP(S) URI.");
     }
 }

@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ public sealed partial class NativeEventDayHttpTests
         var responses = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
         try
         {
+            await Assert.That(factory.DayWrites.Arrivals).IsEqualTo(2);
             await Assert.That(responses.Select(response => response.StatusCode))
                 .IsEquivalentTo(new[] { HttpStatusCode.OK, HttpStatusCode.Conflict });
             await ProblemAsync(responses.Single(response => response.StatusCode == HttpStatusCode.Conflict), HttpStatusCode.Conflict);
@@ -39,14 +41,16 @@ public sealed partial class NativeEventDayHttpTests
         public DayWriteBarrier DayWrites { get; } = new();
     }
 
-    private sealed class DayWriteBarrier : SaveChangesInterceptor
+    private sealed class DayWriteBarrier : DbTransactionInterceptor
     {
         private readonly TaskCompletionSource _bothArrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _arrivals;
         public bool Enabled { get; set; }
+        public int Arrivals => Volatile.Read(ref _arrivals);
 
-        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
-            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        public override async ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection, TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result, CancellationToken cancellationToken = default)
         {
             if (Enabled && eventData.Context!.ChangeTracker.Entries<EventDay>().Any(entry => entry.State == EntityState.Modified))
             {

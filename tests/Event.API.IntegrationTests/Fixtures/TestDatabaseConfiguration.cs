@@ -18,6 +18,7 @@ internal static class TestDatabaseConfiguration
         configuration["Database:Host"] = parsed.Host;
         configuration["Database:Port"] = parsed.Port.ToString(CultureInfo.InvariantCulture);
         configuration["Database:Database"] = parsed.Database;
+        configuration["Database:Runtime:Database"] = parsed.Database;
         configuration["Database:Runtime:Username"] = parsed.Username;
         configuration["Database:Runtime:Password"] = parsed.Password;
         configuration["Database:Runtime:TlsMode"] = parsed.SslMode switch

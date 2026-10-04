@@ -20,5 +20,7 @@ public sealed class PrivacyErasureCounterConfiguration
         builder.HasKey(item => item.Singleton);
         builder.Property(item => item.Singleton).ValueGeneratedNever();
         builder.Property(item => item.RetainedFloorSequence).HasDefaultValue(0L);
+        builder.Property(item => item.IdentityKeyId).HasMaxLength(64);
+        builder.Property(item => item.IdentityKeyVerificationTag).HasMaxLength(64);
     }
 }

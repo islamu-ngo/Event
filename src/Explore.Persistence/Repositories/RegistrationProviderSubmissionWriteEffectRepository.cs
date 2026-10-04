@@ -44,6 +44,8 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
                 .Take(batchSize)
                 .ToListAsync(cancellationToken);
             List<RegistrationProviderSubmissionWriteClaim> claims = new(rows.Count);
+            Guid[] effectIds = rows.Select(row => row.Id).ToArray();
+            await FenceDeliveryArtifactsAsync(effectIds, cancellationToken);
             foreach (RegistrationProviderSubmissionWriteEffect row in rows)
             {
                 if (row.Status == OutboxMessageStatus.Processing)
@@ -126,7 +128,7 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
     }
 
     public async Task<bool> CompleteAsync(RegistrationProviderSubmissionWriteClaim claim, DateTime completedAt, CancellationToken cancellationToken) =>
-        completedAt.Kind == DateTimeKind.Utc && await ActiveClaim(claim, completedAt)
+        completedAt.Kind == DateTimeKind.Utc && await MutateFencedAsync(claim, async () => await ActiveClaim(claim, completedAt)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.Status, OutboxMessageStatus.Completed)
                 .SetProperty(value => value.CompletedAt, completedAt)
@@ -135,21 +137,21 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
                 .SetProperty(value => value.ProcessingLeaseOwner, (string?)null)
                 .SetProperty(value => value.ProcessingLeaseToken, (Guid?)null)
                 .SetProperty(value => value.ProcessingLeaseExpiresAt, (DateTime?)null)
-                .SetProperty(value => value.UpdatedAt, completedAt), cancellationToken) == 1;
+                .SetProperty(value => value.UpdatedAt, completedAt), cancellationToken) == 1, cancellationToken);
 
     public async Task<bool> RetryAsync(RegistrationProviderSubmissionWriteClaim claim, string failureCode, DateTime nextAttemptAt, DateTime failedAt, CancellationToken cancellationToken) =>
         failedAt.Kind == DateTimeKind.Utc && nextAttemptAt.Kind == DateTimeKind.Utc && nextAttemptAt > failedAt &&
-        await ActiveClaim(claim, failedAt).ExecuteUpdateAsync(setters => setters
+        await MutateFencedAsync(claim, async () => await ActiveClaim(claim, failedAt).ExecuteUpdateAsync(setters => setters
             .SetProperty(value => value.Status, OutboxMessageStatus.Failed)
             .SetProperty(value => value.NextAttemptAt, nextAttemptAt)
             .SetProperty(value => value.FailureCode, failureCode)
             .SetProperty(value => value.ProcessingLeaseOwner, (string?)null)
             .SetProperty(value => value.ProcessingLeaseToken, (Guid?)null)
             .SetProperty(value => value.ProcessingLeaseExpiresAt, (DateTime?)null)
-            .SetProperty(value => value.UpdatedAt, failedAt), cancellationToken) == 1;
+            .SetProperty(value => value.UpdatedAt, failedAt), cancellationToken) == 1, cancellationToken);
 
     public async Task<bool> DeadLetterAsync(RegistrationProviderSubmissionWriteClaim claim, string failureCode, DateTime deadLetteredAt, CancellationToken cancellationToken) =>
-        deadLetteredAt.Kind == DateTimeKind.Utc && await ActiveClaim(claim, deadLetteredAt)
+        deadLetteredAt.Kind == DateTimeKind.Utc && await MutateFencedAsync(claim, async () => await ActiveClaim(claim, deadLetteredAt)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.Status, OutboxMessageStatus.DeadLettered)
                 .SetProperty(value => value.DeadLetteredAt, deadLetteredAt)
@@ -158,10 +160,10 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
                 .SetProperty(value => value.ProcessingLeaseOwner, (string?)null)
                 .SetProperty(value => value.ProcessingLeaseToken, (Guid?)null)
                 .SetProperty(value => value.ProcessingLeaseExpiresAt, (DateTime?)null)
-                .SetProperty(value => value.UpdatedAt, deadLetteredAt), cancellationToken) == 1;
+                .SetProperty(value => value.UpdatedAt, deadLetteredAt), cancellationToken) == 1, cancellationToken);
 
     public async Task<bool> ParkAmbiguousAsync(RegistrationProviderSubmissionWriteClaim claim, string failureCode, DateTime parkedAt, CancellationToken cancellationToken) =>
-        parkedAt.Kind == DateTimeKind.Utc && await ActiveClaim(claim, parkedAt)
+        parkedAt.Kind == DateTimeKind.Utc && await MutateFencedAsync(claim, async () => await ActiveClaim(claim, parkedAt)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.Status, OutboxMessageStatus.DeadLettered)
                 .SetProperty(value => value.ParkedAt, parkedAt)
@@ -170,7 +172,43 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
                 .SetProperty(value => value.ProcessingLeaseOwner, (string?)null)
                 .SetProperty(value => value.ProcessingLeaseToken, (Guid?)null)
                 .SetProperty(value => value.ProcessingLeaseExpiresAt, (DateTime?)null)
-                .SetProperty(value => value.UpdatedAt, parkedAt), cancellationToken) == 1;
+                .SetProperty(value => value.UpdatedAt, parkedAt), cancellationToken) == 1, cancellationToken);
+
+    private async Task<bool> MutateFencedAsync(
+        RegistrationProviderSubmissionWriteClaim claim, Func<Task<bool>> mutate, CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.CurrentTransaction is not null)
+        {
+            await FenceDeliveryArtifactsAsync([claim.EffectId], cancellationToken, claim.TenantId);
+            return await mutate();
+        }
+
+        return await dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await FenceDeliveryArtifactsAsync([claim.EffectId], cancellationToken, claim.TenantId);
+            bool changed = await mutate();
+            await transaction.CommitAsync(cancellationToken);
+            return changed;
+        });
+    }
+
+    private async Task FenceDeliveryArtifactsAsync(
+        Guid[] effectIds, CancellationToken cancellationToken, Guid? tenantId = null)
+    {
+        // Resolve lineage from persisted effects, never from a caller's claim
+        // submission ID. Settlements release or preserve indirect CSV holds.
+        Guid[] storageIds = await (from effect in dbContext.RegistrationProviderSubmissionWriteEffects.AsNoTracking()
+                .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
+                                   join storage in dbContext.StorageObjects.AsNoTracking()
+                                       .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                                       on new { effect.TenantId, Id = (Guid?)effect.RegistrationSubmissionId }
+                                       equals new { storage.TenantId, Id = storage.OwningResourceId }
+                                   where effectIds.Contains(effect.Id) && (tenantId == null || effect.TenantId == tenantId)
+                                       && storage.OwningResourceKind == "registration_submission_sink"
+                                   select storage.Id).Distinct().ToArrayAsync(cancellationToken);
+        await new StorageObjectReferenceRepository(dbContext).FenceAsync(storageIds, cancellationToken);
+    }
 
     private IQueryable<RegistrationProviderSubmissionWriteEffect> ActiveClaim(
         RegistrationProviderSubmissionWriteClaim claim,

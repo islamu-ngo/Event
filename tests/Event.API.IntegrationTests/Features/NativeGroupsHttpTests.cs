@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Group;
@@ -139,15 +140,16 @@ public sealed class NativeGroupsHttpTests
         var betaId = await CreateAsync(client, new { fullName = "Beta" });
         var foreignId = Guid.CreateVersion7();
         var objectId = Guid.CreateVersion7();
-        var contentPath = $"/api/storageobject/{objectId}/content";
         var publicPath = $"/api/storageobject/{objectId}/public";
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             var alphaActor = await db.Actors.Include(actor => actor.Pii).SingleAsync(actor => actor.GroupId == alphaId);
             var betaActor = await db.Actors.Include(actor => actor.Pii).SingleAsync(actor => actor.GroupId == betaId);
-            alphaActor.Pii.ProfilePictureUri = "private/raw-object-key";
-            betaActor.Pii.ProfilePictureUri = contentPath;
+            await Assert.That(() => alphaActor.Pii.ExternalProfilePictureUri = "private/raw-object-key")
+                .Throws<ArgumentException>();
+            betaActor.Pii.ProfilePictureStorageObjectId = objectId;
+            betaActor.Pii.ProfilePicture = ProfileMediaSeed.Add(db, objectId, PlatformDefaults.DefaultTenantId);
             var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
             var foreignTenant = new Tenant
             {
@@ -232,7 +234,7 @@ public sealed class NativeGroupsHttpTests
         using var verifyScope = factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await Assert.That((await verifyDb.Actors.AsNoTracking().Include(actor => actor.Pii)
-            .SingleAsync(actor => actor.GroupId == betaId)).Pii.ProfilePictureUri).IsEqualTo(contentPath);
+            .SingleAsync(actor => actor.GroupId == betaId)).Pii.ProfilePictureStorageObjectId).IsEqualTo(objectId);
     }
 
     [Test]

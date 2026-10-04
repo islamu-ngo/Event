@@ -74,6 +74,8 @@ public partial class ExploreDbContext
     public DbSet<ExternalApiKeyQuota> ExternalApiKeyQuotas { get; set; }
     public DbSet<UserAuthenticationToken> UserAuthenticationTokens { get; set; }
     public DbSet<UserExternalLogin> UserExternalLogins { get; set; }
+    public DbSet<UserIdentityEmailClaim> UserIdentityEmailClaims { get; set; }
+    public DbSet<UserIdentityEmailEvidence> UserIdentityEmailEvidence { get; set; }
     public DbSet<LocalIdentityUser> LocalIdentityUsers { get; set; }
     public DbSet<LocalIdentityRole> LocalIdentityRoles { get; set; }
     public DbSet<LocalIdentityLifecycleOperation> LocalIdentityLifecycleOperations { get; set; }

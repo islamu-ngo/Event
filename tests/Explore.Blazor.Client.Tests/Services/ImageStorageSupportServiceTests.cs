@@ -347,6 +347,16 @@ public class ImageStorageSupportServiceTests
         await Assert.That(result).IsNull();
     }
 
+    [Test]
+    [Arguments("https://foreign.example.test/api/storageobject/00000000-0000-0000-0000-000000000001/public")]
+    [Arguments("/api/storageobject/00000000-0000-0000-0000-000000000001/content")]
+    [Arguments("/api/storageobject/not-an-id/public")]
+    public async Task StorageObjectUrlResolver_DoesNotConvertForeignOrAuthenticatedLocations(string reference)
+    {
+        var resolver = new StorageObjectUrlResolver();
+        await Assert.That(resolver.ResolvePublicImageUrl(reference)).IsNull();
+    }
+
     private static bool LogStateContains(object? state, string value)
     {
         return state.ToString()?.Contains(value, StringComparison.Ordinal) == true;

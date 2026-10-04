@@ -1612,6 +1612,22 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
             }
         };
         context.AddRange(tenant, user);
+        var recipientBinding = new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+            AuthenticationProvider = null!,
+            ProviderKey = Explore.Application.Authentication.PlatformIdentityPrincipalExtensions
+                .CreateOidcAccountKey("https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
+            CreatedAt = UtcNow
+        };
+        var recipientClaim = UserIdentityEmailClaim.Create(user.Id, user.Email!);
+        context.UserExternalLogins.Add(recipientBinding);
+        context.UserIdentityEmailClaims.Add(recipientClaim);
+        context.UserIdentityEmailEvidence.Add(UserIdentityEmailEvidence.Create(
+            user.Id, recipientClaim.Id, recipientBinding.Id, UtcNow));
         await context.SaveChangesAsync();
         var actor = new Actor
         {

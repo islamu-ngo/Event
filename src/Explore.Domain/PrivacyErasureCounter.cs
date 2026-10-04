@@ -9,6 +9,19 @@ public sealed class PrivacyErasureCounter
     public bool Singleton { get; private set; }
     public long LastSequence { get; private set; }
     public long RetainedFloorSequence { get; private set; }
+    public string? IdentityKeyId { get; private set; }
+    public string? IdentityKeyVerificationTag { get; private set; }
+
+    public void BindIdentityKey(string keyId, string verificationTag)
+    {
+        PrivacyIdentityFingerprint.ValidateKeyId(keyId);
+        PrivacyIdentityFingerprint.ValidateDigest(verificationTag);
+        if (IdentityKeyId is not null
+            && (IdentityKeyId != keyId || IdentityKeyVerificationTag != verificationTag))
+            throw new InvalidOperationException("privacy_identity_fence_key_mismatch");
+        IdentityKeyId = keyId;
+        IdentityKeyVerificationTag = verificationTag;
+    }
 
     public static PrivacyErasureCounter Start() => new()
     {
@@ -48,5 +61,5 @@ public sealed class PrivacyErasureCounter
     }
 
     public PrivacyErasureAuthorityState GetState() =>
-        new(LastSequence, RetainedFloorSequence);
+        new(LastSequence, RetainedFloorSequence, IdentityKeyId, IdentityKeyVerificationTag);
 }

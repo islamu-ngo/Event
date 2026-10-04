@@ -1,9 +1,11 @@
+using Explore.Domain.Keycloak;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using System.Text.RegularExpressions;
 
 namespace Event.Architecture.Tests;
@@ -20,18 +22,15 @@ public sealed class KeycloakReceiptDowngradeGenerationTests
         PrimaryDatabaseProvider provider)
     {
         await using ExploreDbContext context = CreateContext(provider);
-        IMigrationsAssembly migrations =
-            context.GetService<IMigrationsAssembly>();
-        string initialMigration = migrations.Migrations.Keys.Single(
-            id => id.EndsWith("_Init", StringComparison.Ordinal));
+        (string beforeReceipts, string receiptMigration) = GetReceiptMigrationInterval(context);
         IMigrator migrator = context.GetService<IMigrator>();
 
         string first = migrator.GenerateScript(
-            initialMigration,
-            Migration.InitialDatabase);
+            receiptMigration,
+            beforeReceipts);
         string second = migrator.GenerateScript(
-            initialMigration,
-            Migration.InitialDatabase);
+            receiptMigration,
+            beforeReceipts);
         int guardIndex = first.IndexOf(
             "ck_keycloak_receipts_no_unresolved_downgrade",
             StringComparison.OrdinalIgnoreCase);
@@ -57,16 +56,32 @@ public sealed class KeycloakReceiptDowngradeGenerationTests
         PrimaryDatabaseProvider provider)
     {
         await using ExploreDbContext context = CreateContext(provider);
-        IMigrationsAssembly migrations =
-            context.GetService<IMigrationsAssembly>();
-        string initialMigration = migrations.Migrations.Keys.Single(
-            id => id.EndsWith("_Init", StringComparison.Ordinal));
+        (string beforeReceipts, string receiptMigration) = GetReceiptMigrationInterval(context);
 
         string script = context.GetService<IMigrator>()
-            .GenerateScript(Migration.InitialDatabase, initialMigration);
+            .GenerateScript(beforeReceipts, receiptMigration);
 
         await Assert.That(script).DoesNotContain(
             "ck_keycloak_receipts_no_unresolved_downgrade");
+    }
+
+    private static (string BeforeReceipts, string ReceiptMigration) GetReceiptMigrationInterval(
+        ExploreDbContext context)
+    {
+        IMigrationsAssembly migrations = context.GetService<IMigrationsAssembly>();
+        string provider = context.Database.ProviderName!;
+        var receiptEntity = context.Model.FindEntityType(typeof(KeycloakOperation))!;
+        string receiptTable = receiptEntity.GetTableName()!;
+        string? receiptSchema = receiptEntity.GetSchema();
+        var orderedMigrations = migrations.Migrations.OrderBy(entry => entry.Key, StringComparer.Ordinal).ToArray();
+        int receiptIndex = Enumerable.Range(0, orderedMigrations.Length)
+            .Single(index => migrations.CreateMigration(orderedMigrations[index].Value, provider)
+                .UpOperations.OfType<CreateTableOperation>()
+                .Any(operation => operation.Name == receiptTable && operation.Schema == receiptSchema));
+
+        return (
+            receiptIndex == 0 ? Migration.InitialDatabase : orderedMigrations[receiptIndex - 1].Key,
+            orderedMigrations[receiptIndex].Key);
     }
 
     private static ExploreDbContext CreateContext(

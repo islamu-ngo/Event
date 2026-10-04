@@ -1,5 +1,4 @@
 using Event.Persistence.IntegrationTests.Fixtures;
-using Explore.Application.Authorization;
 using Explore.Application.Features.Events.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -24,8 +23,16 @@ public sealed class EventHeavyRedactionRepositoryTests(PostgreSqlContainerFixtur
         var graph = await repository.GetForUpdateAsync(@event.Id, CancellationToken.None);
 
         await Assert.That(graph).IsNotNull();
-        EventHeavyRedactionApplicator.Apply(graph!, Guid.NewGuid(), DateTimeOffset.UtcNow);
-        await repository.SaveChangesAsync(CancellationToken.None);
+        await new Explore.Persistence.EfCoreUnitOfWork(context).ExecuteSerializableAsync(async ct =>
+        {
+            await new StorageObjectReferenceRepository(context).FenceAsync([image.Id], ct);
+            EventHeavyRedactionApplicator.Apply(graph!, Guid.NewGuid(), DateTimeOffset.UtcNow);
+            await repository.SaveChangesAsync(ct);
+            var admission = await new EventResourceStorageLifecycleRepository(context)
+                .TryQueueRetirementAsync(tenant.Id, image.Id, DateTime.UtcNow, ct);
+            await Assert.That(admission).IsEqualTo(StorageRetirementAdmission.Pending);
+            return true;
+        }, CancellationToken.None);
 
         await using var assertionContext = fixture.CreateDbContext();
         var savedEvent = await assertionContext.Events
@@ -37,7 +44,7 @@ public sealed class EventHeavyRedactionRepositoryTests(PostgreSqlContainerFixtur
         var savedDay = await assertionContext.EventDays
             .AsNoTracking()
             .SingleAsync(d => d.EventId == @event.Id);
-        var savedStorageObject = await assertionContext.StorageObjects
+        var savedRetirement = await assertionContext.StorageObjectDeletionTombstones
             .AsNoTracking()
             .SingleAsync(s => s.Id == image.Id);
 
@@ -53,9 +60,11 @@ public sealed class EventHeavyRedactionRepositoryTests(PostgreSqlContainerFixtur
         await Assert.That(savedSession.FeaturedImageId).IsNull();
         await Assert.That(savedDay.Label).IsEqualTo(EventRedactionSentinelPolicy.DisplayText);
         await Assert.That(savedDay.BannerImageId).IsNull();
-        await Assert.That(savedStorageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
-        await Assert.That(savedStorageObject.OwningResourceKind).IsEqualTo(ResourceKinds.Event);
-        await Assert.That(savedStorageObject.OwningResourceId).IsEqualTo(@event.Id);
+        await Assert.That(await assertionContext.StorageObjects.AnyAsync(item => item.Id == image.Id)).IsFalse();
+        await Assert.That(savedRetirement.State).IsEqualTo(StorageObjectDeletionState.Ready);
+        await Assert.That(savedRetirement.ProviderBindingId).IsEqualTo(image.StorageProviderBindingId);
+        await Assert.That(savedRetirement.ObjectKey).IsEqualTo(image.ObjectKey);
+        await Assert.That(savedRetirement.ProviderObjectVersion).IsEqualTo(image.ProviderVersionId);
     }
 
     private static async Task<(Tenant Tenant, Explore.Domain.Event Event, StorageObject Image)> SetupEventGraphAsync(
@@ -91,6 +100,8 @@ public sealed class EventHeavyRedactionRepositoryTests(PostgreSqlContainerFixtur
         context.Actors.Add(actor);
         await context.SaveChangesAsync();
 
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
         var image = new StorageObject
         {
             Id = Guid.NewGuid(),
@@ -101,8 +112,8 @@ public sealed class EventHeavyRedactionRepositoryTests(PostgreSqlContainerFixtur
             FileTypeId = (int)FileTypeEnum.Image,
             FileType = null!,
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             ObjectKey = $"tenants/{tenant.Id:N}/illegal.png",
-            Uri = "/images/illegal.png",
             FullName = "illegal.png",
             SafeDisplayName = "illegal.png",
             Extension = ".png",

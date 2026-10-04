@@ -30,7 +30,8 @@ public sealed class UserMapperTests
              "actorBackgroundColor":"","actorBackgroundEffect":"stars","actorBannerColor":"blue",
              "actorBannerPictureId":null,"actorBannerPictureUri":null,"actorBackgroundImageId":null,"actorBackgroundImageUri":null,
              "authProvider":null,"authProviderId":null,"emailVerified":false,
-             "concurrencyStamp":"018e4e5c-7f00-7000-8000-000000000033","profileImageKey":null,"profileImageUri":null}
+              "concurrencyStamp":"018e4e5c-7f00-7000-8000-000000000033","profilePictureStorageObjectId":null,
+              "externalProfilePictureUri":"https://images.example.invalid/profile.png","profileImageUri":"https://images.example.invalid/profile.png"}
             """);
     }
 
@@ -143,7 +144,7 @@ public sealed class UserMapperTests
             ActorType = null!,
             UserId = UserId,
             User = user,
-            Pii = new ActorPii { DisplayName = "Public name", ProfilePictureUri = "https://images.example.invalid/profile.png" },
+            Pii = new ActorPii { DisplayName = "Public name", ExternalProfilePictureUri = "https://images.example.invalid/profile.png" },
             BackgroundColor = "",
             BackgroundEffect = "stars",
             BannerColor = "blue",

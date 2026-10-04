@@ -15,6 +15,8 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Persistence.Database;
 using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
@@ -508,6 +510,12 @@ public sealed class ConfiguredAdministratorBootstrapTests
         TenantStatusEnum tenantStatus = TenantStatusEnum.Provisioning)
     {
         await using var scope = factory.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>().EnsureReadyAsync();
+        await using (var authority = await scope.ServiceProvider
+            .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>().CreateDbContextAsync())
+        {
+            await authority.Database.MigrateAsync();
+        }
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         db.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder()
             .WithId(Explore.Domain.Constants.PlatformDefaults.DefaultTenantId)
@@ -550,14 +558,21 @@ public sealed class ConfiguredAdministratorBootstrapTests
         : AuthenticatedWebApplicationFactory
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"configured-bootstrap-{Guid.CreateVersion7():N}.db");
+        private readonly TestPrivacyIdentityFenceKeyProvider _identityFenceKeys = new();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            AdditionalConfiguration["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite";
+            AdditionalConfiguration["PrivacyErasureAuthorityEmbedded:Path"] = _identityFenceKeys.AuthorityPath;
+            builder.UseSetting("PrivacyErasure:Authority:Topology", "EmbeddedSqlite");
+            builder.UseSetting("PrivacyErasureAuthorityEmbedded:Path", _identityFenceKeys.AuthorityPath);
             if (boundTenantId.HasValue)
                 AdditionalConfiguration["Deployment:DefaultTenantId"] = boundTenantId.Value.ToString();
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {
+                services.RemoveAll<IPrivacyIdentityFenceKeyProvider>();
+                services.AddSingleton<IPrivacyIdentityFenceKeyProvider>(_identityFenceKeys);
                 services.RemoveExploreDbContextRegistrations();
                 var options = new DbContextOptionsBuilder<ExploreDbContext>();
                 ConfigureDatabase(options);
@@ -596,6 +611,7 @@ public sealed class ConfiguredAdministratorBootstrapTests
         public override async ValueTask DisposeAsync()
         {
             await base.DisposeAsync();
+            _identityFenceKeys.Dispose();
             var options = new DbContextOptionsBuilder<ExploreDbContext>();
             ConfigureDatabase(options);
             await using var db = new ExploreDbContext(options.Options);

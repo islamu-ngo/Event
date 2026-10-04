@@ -2788,3 +2788,33 @@ References: `InstanceOnboardingGenerationReader`,
 - [x] Stays in journal only; promote to query guidance if another dynamic predicate encounters the same defect.
 
 ---
+
+[2026-10-04 Europe/Brussels] — Keyless enrollment still needs authority validation
+
+**Context**: While implementing ordinary-erasure re-registration, external
+enrollment stopped resolving an unnecessary fingerprint secret but retained
+the existing SQLite authority serialization gate.
+
+**Symptom / Observation**: `KeylessEnrollmentStillRejectsUnavailableAuthorityBeforeApplicationWrites`
+failed because dropping the authority counter table no longer stopped a fresh
+account write. Ten other relational cases passed.
+
+**Root Cause**: SQLite's gate had relied on `ValidateKeyAsync` to read or
+initialize the counter and detect missing metadata. Removing key validation
+also removed that structural validation; obtaining a SQLite write transaction
+alone does not prove the erasure authority is usable.
+
+**Resolution**: Share counter-state validation between keyless serialization and
+explicit key validation. Initialize only an empty authority; reject missing
+state with retained facts/index rows, preserve existing key commitments, and
+perform validation before primary writes. The eleven-case relational rerun
+passed without weakening the failure assertion.
+
+**References**:
+- `src/Explore.Persistence/Privacy/ErasureAuthority/Repositories/EmbeddedPrivacyErasureAuthorityRepository.IdentityFence.cs`
+- `tests/Event.Persistence.IntegrationTests/Privacy/RetainedIdentityFenceTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; structural authority readiness is not optional when removing an unrelated credential dependency.
+
+---

@@ -1,6 +1,7 @@
 namespace Explore.Secrets.Extensions;
 
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.SetupLive;
 using Explore.Secrets.HealthChecks;
@@ -46,6 +47,7 @@ public static class SecretResolutionServiceCollectionExtensions
 
         // ---- Resolver --------------------------------------------------------
         services.TryAddScoped<ISecretResolver, SecretResolver>();
+        services.TryAddScoped<IPrivacyIdentityFenceKeyProvider, PrivacyIdentityFenceKeyProvider>();
         services.TryAddScoped<IRetainedSecretResolver>(provider =>
             (IRetainedSecretResolver)provider.GetRequiredService<ISecretResolver>());
         services.TryAddScoped<ISetupSecretBindingWriter, SetupSecretBindingWriter>();

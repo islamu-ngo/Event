@@ -15,6 +15,7 @@ using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Payments;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Contracts.Strategies;
@@ -359,7 +360,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IFileStorageProvider, S3FileStorageProvider>();
         services.AddScoped<IFileStorageProviderResolver, FileStorageProviderResolver>();
         services.AddScoped<IStorageProviderBindingService, StorageProviderBindingService>();
-        services.AddScoped<IStorageObjectDeletionService, StorageObjectDeletionService>();
+        services.AddScoped<ManagedStorageProducer>();
 
         // Identity services
         services.AddScoped<IUserContext, UserContext>();

@@ -53,7 +53,7 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
         await Assert.That(retained.ReviewStatusId).IsEqualTo((int)ApprovalStatusEnum.Pending);
         await Assert.That(retained.DocumentStorageObject!.FullName).IsEqualTo("Retained document");
         await Assert.That(retained.DocumentStorageObject.FileType.FullName).IsEqualTo(fileTypeName);
-        await Assert.That(retained.DocumentStorageObject.ConcurrencyStamp).IsEqualTo(documentStamp);
+        await Assert.That(retained.DocumentStorageObject.ConcurrencyStamp == documentStamp).IsFalse();
         var organization = await readback.Organizations.Include(item => item.Pii).SingleAsync(item => item.Id == seeded.OrganizationId);
         await Assert.That(organization.Pii.FullName).IsEqualTo("Retained organization");
     }
@@ -91,13 +91,21 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
             document = (await new StorageObjectRepository(context).GetEvidenceDocumentAsync(seeded.DocumentId, default))!;
             document.Id = Guid.CreateVersion7();
         }
-        document.ObjectKey = $"untrusted/{Guid.CreateVersion7():N}";
         var evidence = OrganizationTenantEvidence.CreatePending(participation, document);
         var repository = new OrganizationTenantEvidenceRepository(context);
 
-        var failure = await Assert.That(async () => await new EfCoreUnitOfWork(context)
-            .ExecuteSerializableAsync(_ => repository.Create(evidence))).Throws<DbUpdateException>();
-        await Assert.That((failure?.InnerException as SqliteException)?.SqliteExtendedErrorCode).IsEqualTo(787);
+        if (foreignDocument)
+        {
+            var failure = await Assert.That(async () => await new EfCoreUnitOfWork(context)
+                .ExecuteSerializableAsync(_ => repository.Create(evidence))).Throws<DbUpdateException>();
+            await Assert.That((failure?.InnerException as SqliteException)?.SqliteExtendedErrorCode).IsEqualTo(787);
+        }
+        else
+        {
+            var failure = await Assert.That(async () => await new EfCoreUnitOfWork(context)
+                .ExecuteSerializableAsync(_ => repository.Create(evidence))).Throws<ConcurrencyConflictException>();
+            await Assert.That(failure!.Code).IsEqualTo(ConcurrencyConflictException.ConcurrentUpdate);
+        }
         await Assert.That(await repository.ListByParticipationAsync(participation.Id, default)).IsEmpty();
         await Assert.That(await new StorageObjectRepository(context).GetEvidenceDocumentAsync(document.Id, default)).IsNull();
         await using var foreignReadback = CreateContext(connection, foreignTenantId);
@@ -170,6 +178,8 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
             ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
             ApprovalStatus = null!
         };
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
         var document = new StorageObject
         {
             Id = Guid.CreateVersion7(),
@@ -179,9 +189,9 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
             FileType = null!,
             FullName = "Retained document",
             SafeDisplayName = "evidence.pdf",
-            Uri = string.Empty,
             ObjectKey = $"tenants/{tenantId:N}/evidence.pdf",
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             Extension = "pdf",
             ContentType = "application/pdf",
             Size = 5,

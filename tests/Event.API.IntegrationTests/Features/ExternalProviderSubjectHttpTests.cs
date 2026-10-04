@@ -1,13 +1,17 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
+using Explore.Application.Configuration;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Event.API.IntegrationTests.Features;
@@ -15,6 +19,56 @@ namespace Event.API.IntegrationTests.Features;
 [NotInParallel]
 public sealed class ExternalProviderSubjectHttpTests
 {
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ValidatedIssuerNotRequestBodyControlsCorrelationAndReadsStayBindingOnly(bool trusted)
+    {
+        var ct = TestContext.Current!.Execution.CancellationToken;
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(
+            primaryProvider: AuthenticationProviderKind.Keycloak);
+        factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value.TrustedIssuers =
+            trusted ? [factory.ExternalIssuer] : [];
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+        Guid firstSubject = Guid.CreateVersion7();
+        string email = $"correlation-{firstSubject:N}@example.test";
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            factory.CreateExternalProviderToken(firstSubject, email, true));
+        using HttpResponseMessage first = await client.PostAsync("/api/user/sync", null, ct);
+        await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await using var before = factory.CreateDatabase();
+        Guid firstUserId = (await before.UserExternalLogins.SingleAsync(ct)).UserId;
+        int usersBefore = await before.Users.CountAsync(ct);
+        Guid secondSubject = Guid.CreateVersion7();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            factory.CreateExternalProviderToken(secondSubject, email, true));
+
+        using HttpResponseMessage unboundRead = await client.GetAsync("/api/user", ct);
+        await Assert.That(unboundRead.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        using HttpResponseMessage synchronized = await client.PostAsJsonAsync("/api/user/sync", new
+        {
+            id = firstUserId,
+            email,
+            emailVerified = true,
+            trustedIssuer = true,
+            issuer = factory.ExternalIssuer
+        }, ct);
+
+        await Assert.That(synchronized.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await using var database = factory.CreateDatabase();
+        string key = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            factory.ExternalIssuer, secondSubject.ToString("D")).Value;
+        var binding = await database.UserExternalLogins.Include(login => login.User)
+            .SingleAsync(login => login.ProviderKey == key, ct);
+        await Assert.That(binding.UserId == firstUserId).IsEqualTo(trusted);
+        await Assert.That(binding.User.EmailVerified).IsEqualTo(true);
+        await Assert.That(await database.Users.CountAsync(ct)).IsEqualTo(usersBefore + (trusted ? 0 : 1));
+    }
+
     [Test]
     [Arguments("opaque", true)]
     [Arguments("opaque", false)]

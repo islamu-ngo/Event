@@ -6,6 +6,11 @@ namespace Explore.Application.Services;
 public sealed class EventResourceStorageLifecycleService(
     IEventResourceStorageLifecycleRepository repository, IUnitOfWork unitOfWork, TimeProvider clock)
 {
+    /// <summary>Caller has persisted detachment; admission preserves other physical references and holds.</summary>
+    public Task<StorageRetirementAdmission> TryQueueRetirementAsync(Guid tenantId, Guid objectId,
+        DateTime utcNow, CancellationToken cancellationToken) =>
+        repository.TryQueueRetirementAsync(tenantId, objectId, utcNow, cancellationToken);
+
     /// <summary>Participates in the native caller's detachment/redaction transaction.</summary>
     public Task RetireAsync(Guid tenantId, IReadOnlyCollection<Guid> resourceIds,
         IReadOnlyCollection<Guid> objectIds, DateTime utcNow, CancellationToken cancellationToken) =>

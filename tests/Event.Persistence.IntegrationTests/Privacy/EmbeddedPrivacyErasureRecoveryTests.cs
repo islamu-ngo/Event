@@ -239,12 +239,20 @@ public sealed class EmbeddedPrivacyErasureRecoveryTests
             {
                 IPrivacyErasureAuthority authority =
                     firstProcess.GetRequiredService<IPrivacyErasureAuthority>();
-                retained = await authority.AppendAsync(new PrivacyErasureRequest(
-                    Guid.CreateVersion7(),
-                    PrivacyErasureSubjectKind.User,
-                    graph.OwnerUserId,
-                    PrivacyErasureReasonCode.AccountDeletion,
-                    1));
+                Guid intentId = Guid.CreateVersion7();
+                await using (ExploreDbContext erasureContext = CreatePrimaryContext(primaryPath))
+                await using (GlobalLocationPrivacyErasureTests.ErasureRuntime runtime =
+                    GlobalLocationPrivacyErasureTests.CreateRuntime(erasureContext, authority))
+                {
+                    await runtime.Service.EraseUserAsync(
+                        graph.OwnerUserId, intentId, CancellationToken.None);
+                }
+                await using (ExploreDbContext erased = CreatePrimaryContext(primaryPath))
+                {
+                    await AssertErasedAsync(erased, graph);
+                }
+                retained = (await authority.ReadAfterAsync(0, 100))
+                    .Single(fact => fact.IntentId == intentId);
                 authorityBeforeRestore = await ReadAuthoritySnapshotAsync(authority);
             }
 
@@ -253,6 +261,10 @@ public sealed class EmbeddedPrivacyErasureRecoveryTests
             {
                 await Assert.That(await restored.UserPii
                     .AnyAsync(pii => pii.UserId == graph.OwnerUserId)).IsTrue();
+                await Assert.That(await restored.UserIdentityEmailClaims
+                    .CountAsync(claim => claim.UserId == graph.OwnerUserId)).IsEqualTo(1);
+                await Assert.That(await restored.UserIdentityEmailEvidence
+                    .CountAsync(evidence => evidence.UserId == graph.OwnerUserId)).IsEqualTo(2);
                 await Assert.That(await restored.PrivacyErasureReplayCheckpoints.CountAsync())
                     .IsEqualTo(0);
                 await AssertPrimaryContainsNoAuthorityTablesAsync(restored);
@@ -508,6 +520,16 @@ public sealed class EmbeddedPrivacyErasureRecoveryTests
             .AnyAsync(pii => pii.UserId == graph.OwnerUserId)).IsFalse();
         await Assert.That(await context.UserPii
             .AnyAsync(pii => pii.UserId == graph.UnrelatedUserId)).IsTrue();
+        await Assert.That(await context.UserIdentityEmailClaims
+            .AnyAsync(claim => claim.UserId == graph.OwnerUserId)).IsFalse();
+        await Assert.That(await context.UserIdentityEmailEvidence
+            .AnyAsync(evidence => evidence.UserId == graph.OwnerUserId)).IsFalse();
+        await Assert.That(await context.UserExternalLogins
+            .AnyAsync(binding => binding.UserId == graph.OwnerUserId)).IsFalse();
+        await Assert.That(await context.UserIdentityEmailClaims
+            .CountAsync(claim => claim.UserId == graph.UnrelatedUserId)).IsEqualTo(1);
+        await Assert.That(await context.UserIdentityEmailEvidence
+            .CountAsync(evidence => evidence.UserId == graph.UnrelatedUserId)).IsEqualTo(1);
         Location[] homes = await context.Locations
             .IgnoreQueryFilters()
             .Include(location => location.Pii)

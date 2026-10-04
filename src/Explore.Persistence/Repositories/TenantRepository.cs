@@ -14,6 +14,24 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
         _dbContext = dbContext;
     }
 
+    public override async Task Delete(Tenant entity)
+    {
+        await new EfCoreUnitOfWork(_dbContext).ExecuteSerializableAsync(async cancellationToken =>
+        {
+            _dbContext.DisclosureMutations.Enlist([entity.Id]);
+            await _dbContext.DisclosureMutations.CaptureAsync(cancellationToken);
+            // Unloaded series are physically removed by the database cascade, not tracked saves.
+            Guid[] pictureIds = await _dbContext.EventSeries.AsNoTracking()
+                .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                .Where(series => series.TenantId == entity.Id && series.FeaturedImageId.HasValue)
+                .Select(series => series.FeaturedImageId!.Value).Distinct()
+                .ToArrayAsync(cancellationToken);
+            await new StorageObjectReferenceRepository(_dbContext).FenceAsync(pictureIds, cancellationToken);
+            await base.Delete(entity);
+            return true;
+        }, CancellationToken.None);
+    }
+
     public async Task<Tenant?> GetTenantBySlug(string slug)
     {
         return await _dbContext.Tenants

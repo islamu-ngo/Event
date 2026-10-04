@@ -12,7 +12,7 @@ namespace Explore.Application.Services;
 public sealed class StorageObjectContentReader : IStorageObjectContentReader
 {
     private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IFileStorageProviderResolver _providerResolver;
+    private readonly IStorageProviderBindingService _providerResolver;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<StorageObjectContentReader> _logger;
     private readonly BusinessMetrics _metrics;
@@ -20,7 +20,7 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
 
     public StorageObjectContentReader(
         IStorageObjectRepository storageObjectRepository,
-        IFileStorageProviderResolver providerResolver,
+        IStorageProviderBindingService providerResolver,
         ICurrentUserService currentUserService,
         ILogger<StorageObjectContentReader> logger,
         BusinessMetrics metrics,
@@ -96,9 +96,10 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
 
         try
         {
-            var provider = _providerResolver.GetRequired(storageObject.Provider);
+            var provider = await _providerResolver.ResolveTargetAsync(
+                storageObject.StorageProviderBindingId, storageObject.Provider, cancellationToken);
             var readResult = await provider.OpenReadAsync(
-                new FileStorageReadInput(storageObject.ObjectKey, storageObject.ContentType),
+                new FileStorageReadInput(storageObject.ObjectKey, storageObject.ContentType, storageObject.ProviderVersionId),
                 cancellationToken);
 
             if (!CanDiscloseRegistrationContent(storageObject, answerFile, order, registrationOwned,

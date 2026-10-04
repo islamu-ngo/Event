@@ -31,6 +31,17 @@ These settings add no environment variable, key service or publication quota.
 See [retention operations](OPERATIONS.md#discovery-snapshot-retention) and
 [the public guide](../public/documentation/readme/events-and-ticketing/publication-and-sessions.md#operating-bounded-browsing).
 
+## Retained Identity Erasure Key
+
+`PrivacyIdentityFenceKeyProvider` resolves the dedicated deployment-owned
+`privacy.identity_fence_key` secret through `SecretAuthorityConfiguration`, not
+the primary database's mutable secret bindings. The environment catalogue owns
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID`;
+the public reference documents provisioning. Authority readiness and external
+enrollment fail closed without the matching retained key commitment. See
+[the privacy authority contract](PRIVACY_ERASURE.md#retained-external-identity-fence)
+for encoding, retention and restore behavior.
+
 ## Guided Setup Configuration Boundary
 
 Onboarding has no public URL field, confirmation, or generic address launch gate.

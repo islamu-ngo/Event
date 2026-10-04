@@ -158,7 +158,19 @@ public sealed partial class NativeStorageObjectHttpTests
         var invalid = await ReserveEvidencePdfAsync(client, owner.OrganizationId);
         using (var rejected = await PutAsync(client, invalid.Id, "wrong"u8.ToArray()))
             await ProblemAsync(rejected, HttpStatusCode.BadRequest, FailureCodes.StorageUploadContentSignatureMismatch);
-        await AssertFinalizationReservationAsync(factory, invalid.Id, StorageUploadSessionStates.Failed, 0);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await Assert.That(await db.StorageUploadSessions.AnyAsync(row => row.Id == invalid.Id)).IsFalse();
+            await Assert.That(await db.StorageObjects.AnyAsync(row => row.Id == invalid.Id)).IsFalse();
+            var custody = await db.StorageObjectDeletionTombstones.SingleAsync(row => row.Id == invalid.Id);
+            await Assert.That(custody.State).IsEqualTo(StorageObjectDeletionState.Ready);
+            await Assert.That(custody.ProviderBindingId).IsNotEqualTo(Guid.Empty);
+            await Assert.That(custody.ObjectKey).IsNotNull();
+            var counters = await scope.ServiceProvider.GetRequiredService<IStorageUsageCounterRepository>()
+                .GetByTenantAsync(PlatformDefaults.DefaultTenantId, default);
+            await Assert.That(counters.Single().ReservedBytes).IsEqualTo(0);
+        }
         var fenced = await ReserveEvidencePdfAsync(client, owner.OrganizationId);
         using (var scope = factory.Services.CreateScope())
         {

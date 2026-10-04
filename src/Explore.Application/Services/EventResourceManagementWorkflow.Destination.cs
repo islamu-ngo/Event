@@ -51,8 +51,6 @@ public sealed partial class EventResourceManagementWorkflow
                     || resource.ConcurrencyStamp != expectedVersion)
                     return BaseCommandResponse.Conflict(resourceId);
 
-                if (resource.StorageObjectId is { } oldObject)
-                    await lifecycle.RetireAsync(request.TenantId, [], [oldObject], now, ct);
                 Guid? detached = resource.SetExternalDestination(protectedDestination, protector.CurrentVersion, safeOrigin!,
                     expectedVersion, request.SubjectUserId!.Value, now);
                 resources.Update(resource);
@@ -61,7 +59,12 @@ public sealed partial class EventResourceManagementWorkflow
                         EventResourceAuditAction.ConfigureDelivery, now), ct);
                 await resources.SaveChangesAsync(ct);
                 if (detached is { } removedObject)
-                    await lifecycle.RemoveTransferredSourcesAsync(request.TenantId, [], [removedObject], ct);
+                {
+                    var admission = await lifecycle.TryQueueRetirementAsync(
+                        request.TenantId, removedObject, now, ct);
+                    if (admission is StorageRetirementAdmission.NotFound or StorageRetirementAdmission.InvalidTarget)
+                        throw new InvalidOperationException("Resource conversion requires exact retained storage custody.");
+                }
                 return BaseCommandResponse.Success(resourceId);
             }, cancellationToken);
         }

@@ -466,7 +466,7 @@ public sealed class UserPiiInventoryArchitectureTests
                 "AiToolExecution.ToolName",
                 "AiToolExecution.FailureMessage",
                 "WebhookMessage._payloadBytes",
-                "StorageObject.Uri",
+                "StorageObject.SourceUri",
                 "PdsSyncOutbox.Did",
                 "UserExternalLogin.ProviderKey",
                 "ExternalApiKey.SecretHash",

@@ -20,6 +20,8 @@ public sealed class StorageResourceReconciliationTests(EventResourceFileUploadTe
         var scope = await seeds.SeedScopeAsync();
         Guid resourceId = Guid.CreateVersion7(), ownedId = Guid.CreateVersion7(), ordinaryId = Guid.CreateVersion7();
         await using var context = database.CreateContext();
+        var binding = StorageProviderBinding.Local(Path.GetTempPath());
+        context.Add(binding);
         context.AddRange(Object(ownedId, true), Object(ordinaryId, false));
         await context.SaveChangesAsync();
         var repository = new StorageObjectRepository(context);
@@ -40,8 +42,8 @@ public sealed class StorageResourceReconciliationTests(EventResourceFileUploadTe
             FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!,
             Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
             ObjectKey = $"objects/{id:N}",
-            Uri = "/private",
             FullName = "file.pdf",
             SafeDisplayName = "file.pdf",
             Extension = "pdf",
@@ -66,7 +68,7 @@ public sealed class StorageResourceReconciliationTests(EventResourceFileUploadTe
         context.AddRange(binding, work);
         await context.SaveChangesAsync();
         var repository = new StorageObjectRepository(context);
-        var known = await repository.ListKnownObjectKeysAsync(StorageProviders.Local,
+        var known = await repository.ListKnownObjectKeysAsync([binding.Id],
             [work.ObjectKey, $"unknown/{Guid.CreateVersion7():N}"], default);
         await Assert.That(known).Contains(work.ObjectKey);
         await Assert.That(known.Count).IsEqualTo(1);

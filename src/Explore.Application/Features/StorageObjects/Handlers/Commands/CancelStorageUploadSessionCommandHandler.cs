@@ -16,6 +16,7 @@ public class CancelStorageUploadSessionCommandHandler
     private readonly IStoragePolicyResolver _storagePolicyResolver;
     private readonly IStorageUploadSessionRepository _uploadSessionRepository;
     private readonly IStorageUsageCounterRepository _usageCounterRepository;
+    private readonly IEventResourceStorageLifecycleRepository _storageLifecycle;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
@@ -26,6 +27,7 @@ public class CancelStorageUploadSessionCommandHandler
         IStoragePolicyResolver storagePolicyResolver,
         IStorageUploadSessionRepository uploadSessionRepository,
         IStorageUsageCounterRepository usageCounterRepository,
+        IEventResourceStorageLifecycleRepository storageLifecycle,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork,
@@ -35,6 +37,7 @@ public class CancelStorageUploadSessionCommandHandler
         _storagePolicyResolver = storagePolicyResolver;
         _uploadSessionRepository = uploadSessionRepository;
         _usageCounterRepository = usageCounterRepository;
+        _storageLifecycle = storageLifecycle;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
@@ -119,7 +122,9 @@ public class CancelStorageUploadSessionCommandHandler
             or StorageUploadSessionStates.Expired
             or StorageUploadSessionStates.Failed)
         {
-            return Success(session, policy, counter, "Upload session is already closed.");
+            var response = Success(session, policy, counter, "Upload session is already closed.");
+            await TransferClosedCustodyAsync(session, cancellationToken);
+            return response;
         }
 
         if (counter is not null)
@@ -140,7 +145,19 @@ public class CancelStorageUploadSessionCommandHandler
 
         await _uploadSessionRepository.Update(session);
 
-        return Success(session, policy, counter, "Upload session canceled successfully.");
+        var canceled = Success(session, policy, counter, "Upload session canceled successfully.");
+        await TransferClosedCustodyAsync(session, cancellationToken);
+        return canceled;
+    }
+
+    private async Task TransferClosedCustodyAsync(StorageUploadSession session, CancellationToken cancellationToken)
+    {
+        // Never-started generic reservations have no object key or provider write.
+        if (session.ObjectKey is null) return;
+        var admitted = await _storageLifecycle.TryQueueRetirementAsync(
+            session.TenantId, session.Id, DateTime.UtcNow, cancellationToken);
+        if (admitted != StorageRetirementAdmission.Pending)
+            throw new InvalidOperationException("Closed upload requires exact retained cleanup custody.");
     }
 
     private static BaseCommandResponse<StorageUploadSessionDto> Success(

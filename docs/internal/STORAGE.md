@@ -7,7 +7,7 @@ ABOUTME: Covers local-first runtime storage, optional S3-compatible mode, reconc
 > **Status:** Mixed
 > **Owner:** Platform/Ops
 > **Last Verified:** 2026-07-29
-> **Source Anchors:** `Explore.Infrastructure/Storage/`, `Explore.Infrastructure/StorageObjectDeletionService.cs`, `Explore.Infrastructure/Services/ObjectStorageService.cs`, `Explore.API/Controllers/StorageObjectController.cs`, `Explore.API/Controllers/TenantStorageSettingsController.cs`, `Explore.Blazor.Client/Services/ImageStorageService.cs`, `docs/CONFIGURATION.md`, `docs/SECRETS.md`
+> **Source Anchors:** `src/Explore.Infrastructure/Storage/`, `src/Explore.Application/Services/EventResourceStorageCleanupService.cs`, `src/Explore.Persistence/Repositories/EventResourceStorageLifecycleRepository.cs`, `src/Explore.Persistence/Repositories/StorageObjectReferenceRepository.cs`, `src/Explore.Infrastructure/Services/ObjectStorageService.cs`, `src/Explore.API/Controllers/StorageObjectController.cs`, `src/Explore.API/Controllers/TenantStorageSettingsController.cs`, `src/Explore.Blazor.Client/Services/ImageStorageService.cs`, `docs/internal/CONFIGURATION.md`, `docs/internal/SECRETS.md`
 
 Storage is moving to a local-first, provider-neutral model. New upload/read flows use metadata-backed `StorageObject` records and the selected `IFileStorageProvider`; S3-compatible storage remains optional for instances that select and configure it. S3-compatible presigned downloads are ID-bound and are not an upload path.
 
@@ -24,9 +24,53 @@ Storage is moving to a local-first, provider-neutral model. New upload/read flow
 | Blazor admin UI | Instance and tenant storage dashboards consume service models mapped from HAL settings resources. The tenant dashboard autosaves isolated `policy` and `s3` patches only when `_links.edit` is present. Action buttons are driven by `_links` and read-only state, not client-side role checks. |
 | Local self-hosting | Docker Compose mounts a durable `local_storage_data` volume for local-first storage by default. MinIO remains optional through the `storage` profile for instances that select S3-compatible storage. Its initializer creates or repairs the sample bucket with anonymous access disabled. |
 | Reconciliation | API hosts a dry-run-first reconciliation worker that checks metadata/object drift, reports missing backing objects and local orphan files, and performs quarantine/delete mutations only when explicit policy flags are enabled. |
-| Moderation image deletion | Heavy event redaction marks referenced event image metadata as `delete_requested` with the owning event resource id, commits the redaction, then deletes provider objects through `IFileStorageProvider`. Failures leave metadata retryable and do not log object keys, filenames, paths, endpoints, buckets, or raw provider errors. |
+| Moderation image deletion | Heavy event redaction fences and detaches references, then admits eligible exact targets in its transaction. Shared or held sources stay active; independent tombstones retain cleanup authority. Only the existing worker deletes provider bytes. Logs exclude private object locators and raw provider errors. |
 
-The API delete endpoint exists, but `Explore.Blazor.Client/Services/ImageStorageService.cs` still returns `false` from `DeleteImageAsync`. Do not document a completed Blazor client delete flow until that helper is implemented.
+Tenant storage administration exposes a bounded metadata list and retirement action
+through `TenantStoredFiles` and `TenantStorageSettingsAdminService`, not the image
+display helper. Collection and detail HAL independently gate the action. A 202
+response means cleanup is pending; stale 409 responses refresh current links.
+
+## Origin provenance and derived delivery
+
+`StorageObject.SourceUri` is nullable foreign-origin provenance, not byte identity,
+ownership, or permission to read content. Generic native finalization, resource
+uploads, and CSV production leave it null. Federation thumbnail capture records
+the truthful foreign blob URI separately from the captured managed binding,
+object key, version, and checksum. Explicit `legacy_external` records remain
+non-owning; neither their source nor a missing binding creates managed delivery.
+
+`StoragePresentationUrlResolver` projects active managed IDs. Public safe-raster
+images use `/api/storageobject/{id}/public`; private-owner and authenticated-tenant
+content use `/api/storageobject/{id}/content`. Event/series/session/federation
+image projections also require the image's tenant to match its owner. Resource
+files remain on the authenticated `/api/eventresource/{id}/content` route and
+have no generic storage projection. These URLs select an existing policy gate;
+they do not replace fresh content eligibility, tenant checks, selected authority,
+or byte-signature validation. Actor media keeps its stricter C5a owner checks and
+fresh current-user display projection.
+
+AT Protocol publication resolves managed image routes at the payload boundary.
+`AtprotoPublicationPayloadBuilder` uses `PublicAddressResolver` to read an explicit
+deployment override or authorized setup address, never the ambient request host.
+The native record mapper preserves that address's path base and the stable
+storage UUID. Missing or invalid authority rejects publication with
+`public_origin_unavailable`; imported `SourceUri` cannot fill the gap.
+
+Ordinary storage DTO `uri` is nullable derived delivery, never `SourceUri` or a
+provider locator. Storage detail/list and upload-session JSON omit backend
+provider identity. Binding, key, bucket, version, and origin remain server-side;
+explicit operator binding/diagnostic APIs retain their scoped detail. HAL
+presigning uses a nonserialized capability fact and rechecks authorization.
+
+The native migration SQL generators fence an inferred `uri` to `source_uri`
+rename: any nonempty legacy value fails before schema mutation, including a
+foreign URL or a native route. Empty legacy values normalize to null after the
+native nullable alteration/rebuild. Operators must explicitly classify and
+clear old locator semantics before cutover and reapply only verified foreign
+origins afterward; never classify by URL shape. The parent workstream owns the
+ordered generated catalogs and deployed-data procedure. Real SQLite DDL tests
+check rejection, successful absent provenance, and transaction rollback.
 
 ## Configuration
 
@@ -91,14 +135,166 @@ The server first requires tenant-admin or instance-admin authority and rejects t
 | `StorageReconciliation:BatchSize` | `500` | Maximum metadata rows or local inventory objects processed per pass. |
 | `StorageReconciliation:MissingObjectQuarantineGraceHours` | `24` | Active metadata older than this grace window can be quarantined when its backing object is missing. |
 | `StorageReconciliation:OrphanFileQuarantineGraceHours` | `24` | Local files older than this grace window can be quarantined when no metadata row exists. |
-| `StorageReconciliation:DeleteGraceHours` | `720` | Quarantined/delete-requested metadata older than this window can be physically deleted and soft-deleted. |
+| `StorageReconciliation:DeleteGraceHours` | `720` | Selects aged quarantined/delete-requested candidates for fenced retirement admission; age alone is not deletion authority. |
 | `StorageReconciliation:QuarantineMissingObjects` | `false` | Allows metadata quarantine for missing backing objects, only when `DryRun=false`. |
 | `StorageReconciliation:QuarantineOrphanLocalFiles` | `false` | Allows local orphan files to be moved into provider quarantine, only when `DryRun=false`. |
-| `StorageReconciliation:DeleteQuarantinedObjects` | `false` | Allows idempotent provider delete plus metadata soft-delete for eligible rows, only when `DryRun=false`. |
+| `StorageReconciliation:DeleteQuarantinedObjects` | `false` | Allows native retirement admission for eligible candidates, only when `DryRun=false`; the leased worker owns provider deletion. |
 
 Destructive cleanup requires both `DryRun=false` and the specific mutation flag. This prevents a single configuration typo from turning reporting mode into data deletion.
 
 ## Upload And Download Flow
+
+### Captured target and producer ownership
+
+Managed objects use an immutable `StorageProviderBinding`, not the current provider
+label as their physical destination. Generic and resource upload reservations capture
+the binding before finalization. Finalization records the exact key before provider
+I/O and preserves acknowledged provider versions. Reads, presigning, reconciliation
+and deletion resolve that binding; missing or mismatched bindings fail closed.
+
+CSV submission output and federation thumbnail staging use
+`StorageProducerOperation` because they have no user upload session. The operation
+and binding commit before the persistent write. A compare-and-swap transaction
+transfers a settled producer into `StorageObject`; abandonment instead transfers
+its exact target/version into `StorageObjectDeletionTombstone`. These transfers
+cannot both win. An unknown write remains unsettled cleanup authority, not a
+successful deletion. Provider calls stay outside database transactions.
+
+CSV storage connections must select `local` or `s3_compatible` explicitly in
+`ProviderWorkspaceId`; an arbitrary workspace identifier is not a storage target.
+The captured binding still owns the physical root/bucket and retained credential
+references. Disclosure expiry before handoff prevents producer admission. Expiry
+after a settled write transfers the producer to deletion authority without
+activating a readable storage row.
+
+Local inventory groups captured bindings by their physical root and recognizes
+object metadata, upload sessions, producer operations and tombstones. A different
+binding row for the same root does not make another producer's key an orphan.
+Inspection spools and bounded federation downloads remain temporary inputs.
+Explicit `legacy_external` references do not own managed bytes or gain a fabricated
+binding.
+
+Tracked storage foreign-key writes enroll their persisted old and proposed new
+object identities in the storage-row concurrency fence before SaveChanges.
+Discovery, fencing and persistence share one transaction; failed enrollment
+poisons a joined unit of work even when a handler translates its exception.
+A committed tombstone or deleted source rejects a new attachment. Actor PII
+profile references participate; upload sessions remain producer custody.
+Acquisitions follow tenant/object order within the transaction.
+
+`IStorageObjectReferenceRepository.FenceAsync` declares the complete persisted
+object set before multi-save or bulk mutations, using the same CAS and transaction
+ordering ledger as tracked saves. A missing row or reversed acquisition poisons
+the transaction. Returned entities carry refreshed stamps, not deletion authority.
+The reference predicate scans mapped physical FK constraints, including hidden,
+soft-deleted and other-tenant owners, without returning their identities. Sessions
+and producer operations are custody rather than readable references. The hold
+predicate checks published registration CSV retention and unresolved provider
+delivery using a server-owned UTC instant. Both predicates require the caller's
+transaction; neither a false predicate nor fence acquisition authorizes provider I/O.
+
+A tracked `DeleteRequested` to `Active` change is not activation proof.
+Resource activation records its existing successful settled-session CAS in the
+owning transaction before the attachment save may accept that transition.
+
+Usage is a tenant/provider materialized projection, not a historical charge flag
+on active metadata. `StorageUsageCounterRepository.RecalculateScopeAsync` CAS
+fences the scope counter before reading persisted cohorts in the caller's
+transaction. Activated metadata remains counted through hidden/soft-deleted
+owners until tombstone custody transfers; never-finalized resource staging is
+excluded. Reserved/uploading sessions supply reservation bytes. Resource
+retirement, session finalization, non-session producer activation and operator
+recalculation use this same projection. Worker retries do not debit usage.
+In particular, retiring a previously uncounted CSV or imported file cannot
+subtract another file's charge, and replacement finalization cannot add bytes
+already counted by the retirement projection.
+
+The lifecycle owner's `TryQueueRetirementAsync` is transaction-bound admission
+for an already-authorized object. It fences the row, flushes tracked detachment,
+checks physical uses and CSV holds, validates source/session/operation target
+agreement and transfers exact identity into the existing tombstone. Bounded
+acknowledgements are `NotFound`, `InUse`, `RetentionBlocked`, `InvalidTarget`
+and `Pending`. `Pending` is custody transfer, not provider absence. Unsettled
+custody overrides Active metadata and remains `AwaitingProducer`; a known
+captured version cannot be replaced by a later acknowledgement.
+
+Transferred-source removal checks every mapped owner and hold, closes session/
+operation custody under CAS and projects quota in the same transaction. Worker
+claims and absence confirmation reject any surviving source, session or producer.
+Heavy resource redaction declares its whole object set and persists detachment
+before retirement. Indirectly selected shared or held sources stay intact;
+explicit object removals and still-attached resource sources fail closed.
+
+Generic `DeleteStorageObjectCommand` returns `BaseCommandResponse<Guid>` and
+owns one serializable unit: re-read generic eligibility, admit exact retirement,
+commit, then return the Pending acknowledgement. It has no provider dependency.
+The same named DELETE route maps success to 202 and bounded failures through
+`CommandFailurePolicy` to 404/409. Tenant-only tombstone authority cannot authorize
+a fresh generic request; the existing cleanup worker alone confirms absence.
+
+`IStorageObjectRetirementEligibilityReader` projects a server-only bounded hint
+using the same physical reference, CSV hold and exact-target predicates. Detail
+and collection HAL advertise `delete` only when the hint and authorization
+allow it; `edit` is independent. The hint is not serialized and is not command
+authority. An earlier link can become stale; DELETE rescans transactionally.
+Content disclosure refreshes server time after asynchronous hint reads, so a
+retention deadline crossed during projection still redacts names and URLs.
+
+Registration authoring and provider-delivery mutations explicitly enroll their
+indirect CSV targets before save or bulk SQL. Retention cleanup declares the
+complete candidate union before removing answers/effects and admits expired
+CSV targets through the same lifecycle owner. Federation import fences existing
+thumbnail targets before mutation, saves producer consumption with new owner
+activation, admits detached targets and projects quota before its final consumer
+commit fence. Losing that fence rolls back the entire database transition.
+
+When registration authoring owns the transaction, its execution strategy saves
+with `acceptAllChangesOnSuccess: false` and accepts tracked changes only after
+commit succeeds or a persisted graph concurrency stamp verifies a lost commit
+acknowledgement. A rolled-back attempt restores fence stamps before retrying the
+still-pending graph. Joining a caller-owned transaction does not introduce a
+second transaction or an independent retry owner.
+
+Account erasure includes detached picture IDs as well as upload/audit ownership.
+A source-less uploading session transfers its saved target without manufacturing
+metadata. Retained unresolved work can receive a validated late producer ACK
+without restoring source authority; settlement does not synchronously delete
+bytes. Bulk Actor PII removal fences persisted picture IDs before ExecuteDelete.
+The producer port is not the shared-reference admission API; the obsolete
+direct-provider deletion service and its DI registration are removed.
+Never discard an unsettled operation merely because its creation time is old.
+The existing erasure owner may clear a deleted metadata row's key while retaining
+its captured binding. The model permits that terminal metadata shape, but not a
+different replacement key; a cleared key is not evidence of provider absence.
+Retirement integration must preserve the retained provider work that owns cleanup.
+
+Schema integration requires generated provider migrations for the producer table,
+binding-scoped key indexes and managed-target checks. The captured-target migrations
+follow canonical identity ownership in each application catalog; no retained
+erasure, credential or Data Protection catalog changes are part of targeting.
+Existing managed rows must already have a trustworthy captured binding. Never
+infer an old root or bucket from the current provider settings to make migration
+or reads succeed.
+
+MySQL and MariaDB replace the long `(binding, object key)` index with a persisted
+`binary(32)` SHA-256 identity populated by `ExploreDbContext.SaveChanges`.
+`PortableRelationalModelPolicy` applies this to metadata and producer operations.
+Length-prefixed UTF-8 components include the binding UUID, not the provider label:
+the same key on two targets is distinct, while producer-to-metadata transfer
+retains the same byte identity. Other providers retain their binding-scoped
+relational key indexes.
+
+The native MySQL migration SQL generator recomputes that derived identity when
+the hash column changes between provider-wide and binding-scoped inputs. A
+column rename alone would retain old digests and permit a later duplicate target
+key. Both directions use the same length-prefixed byte encoding as the runtime;
+the generated migration and snapshot files remain untouched. Downgrading data
+that now uses one provider key on multiple targets can fail the older uniqueness
+constraint rather than silently merging distinct byte owners.
+
+Local files expose the mediated content route, not the S3-only presign affordance.
+S3 signing uses the captured bucket and exact version; a missing version in a
+versioned bucket is rejected instead of signing the latest object.
 
 1. Browser callers ask the Blazor BFF for an upload session with filename, content type, and expected byte count.
 2. The BFF calls the provider-neutral API upload-session endpoint. The API resolves tenant policy, max upload size, provider, quota, and reservation state.
@@ -113,6 +309,46 @@ The internal S3 server-side `GetFileStream` helper translates provider 404 respo
 Direct object-key read routes are not part of the local-first contract. The removed `file/{fileKey}` and `presigned-url-by-key/{objectKey}` endpoints bypassed metadata visibility and owner checks; clients must carry a `StorageObject.Id` instead of raw provider keys.
 
 ## Blazor Client Boundary
+
+### Actor profile-media ownership
+
+`ActorPii` persists either `ProfilePictureStorageObjectId` or
+`ExternalProfilePictureUri`, never both. Both null means no image.
+`SetProfilePicture` switches or clears the reference atomically; property writes
+validate the same shape. External sources must be absolute HTTP(S) URIs without
+embedded credentials. A foreign URL resembling an Event content route is still
+external and never becomes an ownership or deletion claim.
+
+The managed FK uses restricted deletion and stays in the hard-deleteable PII
+extension. Its optional navigation retains normal storage tenant and soft-delete
+filters. Profile selection requires an active, public safe-raster managed object
+in the current tenant, with a captured storage target, no resource-only owner,
+and no different Actor owner. `UpdateUserCommandHandler` loads the tracked Actor
+and stores the UUID, not `StorageObject.Uri`. Clearing or replacing a profile
+does not retire the previous bytes.
+
+`StoragePresentationUrlResolver` derives `/api/storageobject/{id}/public` only
+from eligible managed references. Actor/User responses explicitly expose the
+managed ID or external source alongside a policy-filtered display URL; no
+provider, bucket, key or binding is projected. The current-user account cache
+does not cache media authority: media is re-projected from the current
+tenant-filtered graph on each read. Existing tenant-participation banners and
+backgrounds remain managed-only and derive their display routes from IDs.
+No global Actor background-image source or remote asset service is introduced.
+
+The API/OpenAPI/NSwag owners generate the response changes. Existing Blazor
+profile uploads already submit storage IDs, and avatar components consume the
+derived display URL. HAL affordances remain the action authority. Install the
+parent-owned generated migrations before deployment; do not guess an ownership
+mapping from old profile URLs.
+
+The native migration generator rejects any non-null legacy `profile_picture_uri`
+before the generated rename executes. This includes absolute HTTP(S) values:
+syntax cannot distinguish foreign provenance from a historical provider locator.
+An empty-profile database upgrades directly. For development data with images,
+review and retain explicit UUID/source decisions before an approved recreation,
+then reselect the managed object or external source through the new profile
+contract. The migration does not clear, classify or backfill those values.
 
 The Blazor client must treat metadata-backed API URLs as the display contract. `StorageObjectUrlResolver` accepts a storage object `Guid`, an existing `/api/storageobject/...` path, or an absolute application URL whose path is already metadata-backed. It rejects provider object keys such as bucket-relative paths because those bypass storage metadata, lifecycle, and visibility decisions.
 
@@ -161,10 +397,22 @@ Object storage is always part of the backup set when users can upload files.
 - Back up storage secrets and environment configuration with the same release manifest as the database backup.
 - Restore object storage before reopening user traffic, then verify representative object metadata resolves to actual objects.
 - During rollback, verify the application version still understands the stored `StorageObject` metadata and key layout.
+- Preserve every captured root/bucket, provider version and retained secret reference,
+  including targets no longer selected by current settings. Back up outstanding
+  producer operations and tombstones with the database.
 
 See [BACKUP_RESTORE_UPGRADE.md](BACKUP_RESTORE_UPGRADE.md) for the full operational runbook.
 
 ### Relocating Earlier Standalone Uploads
+
+For already-bound files, preserve the captured absolute mount path. Changing
+`Storage:Local:RootPath` selects a target for future reservations; it does not
+relocate existing files. Before upgrading unbound development rows, inventory
+metadata and verify original bytes, keys, checksums and target identity. An
+operator-reviewed repair must establish that historical target explicitly;
+otherwise re-upload from a trusted source. An approved disposable development
+environment may be recreated through its existing reset procedure. There is no
+automatic historical-binding backfill or runtime deletion of unbound rows.
 
 The new Standalone default does not move existing bytes. Before replacing an
 older container, stop application writes and reconciliation/deletion workers.
@@ -189,12 +437,15 @@ The reconciliation worker compares `StorageObject` metadata with provider backin
 
 - active metadata with missing backing objects is reported first, then optionally moved to `quarantined` lifecycle state;
 - local provider inventory reports files that are present on disk but absent from metadata, then optionally moves them under the provider quarantine area;
-- delete-eligible quarantined or delete-requested metadata can be physically deleted from the selected provider and then soft-deleted in metadata.
+- aged quarantined or delete-requested candidates pass shared reference/hold
+  admission; eligible exact targets transfer to independent tombstones, and the
+  existing leased worker later confirms provider absence.
 
 These generic loops exclude event-resource purpose, ownership, retained
 attachment references and deletion tombstones. The same job separately invokes
 the fenced resource lifecycle worker; it never treats upload staging as an
-ordinary deletion request. Tombstone keys remain known to inventory after
+ordinary deletion request. Upload-session and producer keys are also known.
+Tombstone keys remain known to inventory after
 source metadata is removed. Resource retirement, unknown-producer handling and
 immutable target recovery are specified in
 [Event Resources](EVENT_RESOURCES.md#retirement-and-producer-settlement).
@@ -203,13 +454,25 @@ The local provider intentionally skips temporary files and existing quarantine f
 
 ## Heavy Moderation Image Deletion
 
-Resource files use the separate transactional retirement path, even when a
-malformed image reference aliases one. Image redaction must not rewrite their
-owner to `event` or send them to the unfenced image deletion service.
+Resource files and generic images use the same fenced retirement owner.
+Malformed image references do not authorize ownership reassignment or bypass
+resource custody. Indirect shared or held sources remain active.
 
-Heavy event moderation uses the same provider-neutral delete boundary as normal storage cleanup, but it does not wait for the dry-run-first reconciliation schedule. The event redaction transaction clears event/session/day image foreign keys and marks the affected `StorageObject` rows as `delete_requested` with `OwningResourceKind=event` and the redacted event id. After commit, `StorageObjectDeletionService` loads those rows for the tenant/event, calls the selected `IFileStorageProvider.DeleteAsync`, then soft-deletes the storage metadata when the provider delete succeeds or when metadata has no object key.
+Heavy event moderation declares the complete existing image target set before
+mutation and persists detached event/session/day and resource references within
+its transaction. Native admission scans remaining physical references and
+retention holds. Eligible sources transfer exact binding/key/version custody
+into independent tombstones before source/session removal and quota projection
+commit. The existing leased worker performs provider deletion after commit;
+failure retains retry custody rather than depending on deleted source metadata.
 
-If a local or S3-compatible delete fails, the redaction remains committed and public APIs cannot use the image metadata, but the command reports a pending retry failure instead of full success. The rows stay in `delete_requested` so a repeated heavy-redaction command or the reconciliation worker can retry idempotently. Local deletion is idempotent for already-missing files, and S3-compatible deletion issues the provider delete request through the AWS SDK adapter.
+Provider deletion is not part of the redaction command. After retirement commits,
+the independent tombstone retains exact cleanup authority even when source
+metadata has been removed. A local or S3-compatible failure schedules a leased
+worker retry; repeating heavy redaction is not the retry mechanism. Shared or
+held sources remain available to surviving authorized owners. The worker must
+confirm exact-target absence before recording completion; an S3 delete marker
+alone is insufficient.
 
 Operational evidence for this path must remain bounded. Logs and metrics may include provider name, tenant id, owning resource kind/id, storage object id, outcome, and failure category. They must not include object keys, filenames, filesystem paths, S3 endpoints, bucket names, credentials, raw provider response bodies, or raw exception text.
 
@@ -239,6 +502,8 @@ All storage metric dimensions are bounded to provider, operation, outcome, failu
 
 ## Related Documentation
 
+- [ADR-037](adr/ADR-037-managed-file-reference-and-retirement-authority.md) - physical reference, CAS and durable retirement authority.
+- [Future ISLAMU Asset integration](../../dev/backlog/islamu-asset-provider-integration.md) - deferred provider activation and migration contract.
 - [CONFIGURATION.md](CONFIGURATION.md) - runtime configuration keys.
 - [SECRETS.md](SECRETS.md) - secret-provider naming and sensitive value handling.
 - [SELF_HOSTING.md](SELF_HOSTING.md) - Compose local storage volume, optional `storage` profile, and MinIO ports.

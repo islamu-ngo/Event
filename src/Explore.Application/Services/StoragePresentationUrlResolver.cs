@@ -1,10 +1,71 @@
 using Microsoft.Extensions.Logging;
+using Explore.Domain;
 
 namespace Explore.Application.Services;
 
 public static class StoragePresentationUrlResolver
 {
     private const string StorageObjectApiPathPrefix = "/api/storageobject/";
+
+    public static bool HasManagedBytes(StorageObject? storageObject) =>
+        storageObject is { Id: var id, StorageProviderBindingId: { } bindingId }
+        && id != Guid.Empty && bindingId != Guid.Empty
+        && storageObject.Provider is StorageProviders.Local or StorageProviders.S3Compatible
+        && !string.IsNullOrWhiteSpace(storageObject.ObjectKey);
+
+    public static string? PublicImageUri(StorageObject? image) =>
+        HasManagedBytes(image)
+        && SafeRasterContentPolicy.IsSafePublicImageMetadata(image)
+        && image!.Purpose != StorageObjectPurposes.EventResource
+        && image.OwningResourceKind != StorageOwningResourceKinds.EventResource
+            ? $"{StorageObjectApiPathPrefix}{image.Id}/public"
+            : null;
+
+    public static string? PublicImageUri(StorageObject? image, Guid tenantId) =>
+        tenantId != Guid.Empty && image?.TenantId == tenantId ? PublicImageUri(image) : null;
+
+    public static string? DeliveryUri(StorageObject storageObject) =>
+        !HasManagedBytes(storageObject) || storageObject.IsDeleted
+        || storageObject.LifecycleState != StorageObjectLifecycleStates.Active
+        || storageObject.Purpose == StorageObjectPurposes.EventResource
+        || storageObject.OwningResourceKind == StorageOwningResourceKinds.EventResource
+            ? null
+            : storageObject.Visibility == StorageObjectVisibilities.PublicImage
+                ? PublicImageUri(storageObject)
+                : storageObject.Visibility is StorageObjectVisibilities.AuthenticatedTenant or StorageObjectVisibilities.PrivateOwner
+                    ? $"{StorageObjectApiPathPrefix}{storageObject.Id}/content"
+                    : null;
+
+    public static bool IsManagedProfileImage(StorageObject? image) =>
+        PublicImageUri(image) is not null
+        && image!.OwningResourceKind is null
+        && image.OwningResourceId is null;
+
+    public static Guid? ManagedProfilePictureId(ActorPii? pii) =>
+        pii is { ExternalProfilePictureUri: null, ProfilePictureStorageObjectId: { } id }
+        && pii.ProfilePicture?.Id == id
+        && IsManagedProfileImage(pii.ProfilePicture)
+            ? id
+            : null;
+
+    public static string? ExternalProfilePictureUri(ActorPii? pii) =>
+        pii is { ProfilePictureStorageObjectId: null }
+        && ActorPii.IsValidProfilePicture(null, pii.ExternalProfilePictureUri)
+            ? pii.ExternalProfilePictureUri
+            : null;
+
+    public static string? ActorProfilePictureUri(ActorPii? pii) =>
+        ManagedProfilePictureId(pii) is { } id
+            ? $"{StorageObjectApiPathPrefix}{id}/public"
+            : ExternalProfilePictureUri(pii);
+
+    public static string? ActorProfilePictureUri(Actor actor) =>
+        ActorProfilePictureUri(actor.Pii);
+
+    public static string? PublicProfileImageUri(StorageObject? image, Guid tenantId) =>
+        IsManagedProfileImage(image) && image!.TenantId == tenantId && tenantId != Guid.Empty
+            ? $"{StorageObjectApiPathPrefix}{image.Id}/public"
+            : null;
 
     public static Task<string?> ResolveImageUrlAsync(
         string? objectKeyOrUri,
@@ -50,8 +111,8 @@ public static class StoragePresentationUrlResolver
 
         return segments.Length == 2
             && Guid.TryParse(segments[0], out var storageObjectId)
-            && (segments[1].Equals("content", StringComparison.OrdinalIgnoreCase)
-                || segments[1].Equals("public", StringComparison.OrdinalIgnoreCase))
+            && storageObjectId != Guid.Empty
+            && segments[1].Equals("public", StringComparison.OrdinalIgnoreCase)
                 ? $"{StorageObjectApiPathPrefix}{storageObjectId}/public"
                 : null;
     }

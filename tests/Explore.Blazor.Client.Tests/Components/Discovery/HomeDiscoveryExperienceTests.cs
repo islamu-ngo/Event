@@ -321,7 +321,8 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
 
         await Assert.That(cut.Markup).Contains("Federated neighborhood iftar");
         await Assert.That(row.HasAttribute("href")).IsFalse();
-        await Assert.That(row.GetAttribute("aria-label")).IsEqualTo("AT Protocol event: Federated neighborhood iftar");
+        await Assert.That(row.GetAttribute("aria-label"))
+            .IsEqualTo($"AT Protocol event: Federated neighborhood iftar. {row.QuerySelector("time")!.TextContent}");
     }
 
     [Test]

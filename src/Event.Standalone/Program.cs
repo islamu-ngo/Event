@@ -34,14 +34,18 @@ builder.Services.AddCombinedApiDataProtection();
 builder.Services.AddCombinedApiBridge();
 builder.AddStandaloneSchedulerDashboard();
 
-await using var app = builder.Build();
-var primaryDatabase = PrimaryDatabaseConfiguration.BindRuntime(app.Configuration);
-if (primaryDatabase.Provider == PrimaryDatabaseProvider.Sqlite &&
-    app.Configuration.GetValue("Hosting:ReplicaCount", 1) != 1)
+builder.Host.ConfigureContainer<IServiceCollection>((context, _) =>
 {
-    throw new InvalidOperationException(
-        "Hosting:ReplicaCount must be 1 when Database:Provider=Sqlite. Event.Standalone local SQLite storage supports exactly one application replica.");
-}
+    var primaryDatabase = PrimaryDatabaseConfiguration.BindRuntime(context.Configuration);
+    if (primaryDatabase.Provider == PrimaryDatabaseProvider.Sqlite &&
+        context.Configuration.GetValue("Hosting:ReplicaCount", 1) != 1)
+    {
+        throw new InvalidOperationException(
+            "Hosting:ReplicaCount must be 1 when Database:Provider=Sqlite. Event.Standalone local SQLite storage supports exactly one application replica.");
+    }
+});
+
+await using var app = builder.Build();
 
 await ExternalIdentityDatabaseMigrator.MigrateIfExternalAsync(
     app.Configuration,

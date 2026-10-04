@@ -4,24 +4,34 @@ using System.Security.Cryptography;
 using System.Text;
 using CarpaNet;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Models.Storage;
 using Explore.Atproto.Transport;
 using Explore.Infrastructure.Services.Federation;
+using Explore.Application.Services;
+using Explore.Domain;
+using Explore.Infrastructure.Storage;
+using Explore.Infrastructure.Tests.Infrastructure;
+using Explore.Persistence;
+using Explore.Persistence.Repositories;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Explore.Infrastructure.Tests.Federation;
 
+[NotInParallel("StorageTargetSqlite")]
 public sealed class AtprotoThumbnailBlobGatewayContractTests
 {
+    private StorageTestEnvironment _environment = null!;
+    [Before(Test)]
+    public async Task InitializeAsync() => _environment = await StorageTestEnvironment.CreateAsync();
+    [After(Test)]
+    public async Task DisposeAsync() => await _environment.DisposeAsync();
+
     private const string Did = "did:plc:z72i7hdynmk6r22z27h6tvur";
     private const string Cid = "bafyreicmjnvdxyjrjk4gcof66qyu3xqcfzqasygyncnczd4gggac2ig2wy";
     private const string OtherCid = "bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const int MaximumBytes = 8;
-    private const string ReturnedProvider = "recording-provider";
-    private const string ReturnedObjectKey = "returned/staged-object";
-    private const long ReturnedSizeBytes = 777;
-    private const string ReturnedContentType = "provider/returned-content-type";
-    private const string ReturnedSha256Checksum = "provider-returned-sha256";
     private static readonly byte[] ImageBytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
     private static readonly byte[] ValidPngBytes = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAABAAAAAQBPJcTWAAAAEElEQVR4nGP8ywACLGCSAQANEQED1LYyQAAAAABJRU5ErkJggg==");
@@ -32,7 +42,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     public async Task FetchAndStageAsync_ValidBlob_UsesCurrentVerifiedPdsAndStagesExactBytes()
     {
         string cid = CidFor(ValidPngBytes);
-        var fixture = new Fixture(ValidPngBytes, maximumBytes: ValidPngBytes.Length);
+        var fixture = new Fixture(_environment, ValidPngBytes, maximumBytes: ValidPngBytes.Length);
 
         var result = await fixture.Gateway.FetchAndStageAsync(
             Candidate(cid, "image/png", ValidPngBytes.Length),
@@ -53,12 +63,10 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
             null,
             ValidPngBytes.Length,
             ValidPngBytes.Length));
-        await Assert.That(result!).IsEqualTo(new FileStorageWriteResult(
-            ReturnedProvider,
-            ReturnedObjectKey,
-            ReturnedSizeBytes,
-            ReturnedContentType,
-            ReturnedSha256Checksum));
+        await Assert.That(result!.Write).IsEqualTo(new FileStorageWriteResult(
+            StorageProviders.Local, fixture.Storage.LastObjectKey!, ValidPngBytes.Length,
+            "image/png", Convert.ToHexStringLower(SHA256.HashData(ValidPngBytes))));
+        await Assert.That(result.BindingId).IsNotEqualTo(Guid.Empty);
     }
 
     [Test]
@@ -69,7 +77,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Arguments("text/plain")]
     public async Task FetchAndStageAsync_NonAllowlistedCandidateNeverFetchesOrStages(string mimeType)
     {
-        var fixture = new Fixture(ImageBytes) { ResponseMimeType = mimeType };
+        var fixture = new Fixture(_environment, ImageBytes) { ResponseMimeType = mimeType };
 
         var result = await fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, mimeType, ImageBytes.Length),
@@ -89,7 +97,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         byte[] svgBytes = Encoding.UTF8.GetBytes(
             """<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>""");
         string cid = ATCid.FromSha256Hash(SHA256.HashData(svgBytes)).Value;
-        var fixture = new Fixture(svgBytes, maximumBytes: svgBytes.Length)
+        var fixture = new Fixture(_environment, svgBytes, maximumBytes: svgBytes.Length)
         {
             ResponseMimeType = "image/png"
         };
@@ -116,7 +124,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     {
         byte[] bytes = ActiveContentContainerBytes(mimeType);
         string cid = CidFor(bytes);
-        var fixture = new Fixture(bytes, maximumBytes: bytes.Length)
+        var fixture = new Fixture(_environment, bytes, maximumBytes: bytes.Length)
         {
             ResponseMimeType = mimeType
         };
@@ -148,7 +156,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     {
         byte[] bytes = ValidRasterBytes(mimeType, alternateSignature);
         string cid = CidFor(bytes);
-        var fixture = new Fixture(bytes, maximumBytes: bytes.Length)
+        var fixture = new Fixture(_environment, bytes, maximumBytes: bytes.Length)
         {
             ResponseMimeType = mimeType.ToUpperInvariant()
         };
@@ -168,7 +176,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     public async Task FetchAndStageAsync_PngBytesRelabeledAsJpegNeverStage()
     {
         string cid = ATCid.FromSha256Hash(SHA256.HashData(ImageBytes)).Value;
-        var fixture = new Fixture(ImageBytes)
+        var fixture = new Fixture(_environment, ImageBytes)
         {
             ResponseMimeType = "image/jpeg"
         };
@@ -196,7 +204,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         byte[] valid = ValidRasterBytes(mimeType, alternateSignature: false);
         byte[] truncated = valid[..^1];
         string cid = CidFor(truncated);
-        var fixture = new Fixture(truncated, maximumBytes: truncated.Length)
+        var fixture = new Fixture(_environment, truncated, maximumBytes: truncated.Length)
         {
             ResponseMimeType = mimeType
         };
@@ -216,7 +224,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_ReResolvesDidForEveryCallAndUsesRemappedPds()
     {
-        var fixture = new Fixture(ImageBytes)
+        var fixture = new Fixture(_environment, ImageBytes)
         {
             PdsOrigins = ["https://old-pds.example", "https://new-pds.example"]
         };
@@ -235,7 +243,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_RedirectTargetIsNeverFollowed()
     {
-        var fixture = new Fixture(ImageBytes) { RedirectBlobResponse = true };
+        var fixture = new Fixture(_environment, ImageBytes) { RedirectBlobResponse = true };
 
         var result = await fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, "image/png", 8),
@@ -252,7 +260,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_DeclaredOversizeRejectsBeforeBodyOrStorage()
     {
-        var fixture = new Fixture(ImageBytes);
+        var fixture = new Fixture(_environment, ImageBytes);
         var source = new ChunkedMemoryStream([.. ImageBytes, 0x00], chunkSize: 1);
         fixture.ContentFactory = () => new ProbeContent(source, declaredLength: MaximumBytes + 1, "image/png");
 
@@ -270,7 +278,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_UndeclaredOversizeStopsAtBoundBeforeStorage()
     {
-        var fixture = new Fixture(ImageBytes);
+        var fixture = new Fixture(_environment, ImageBytes);
         var source = new ChunkedMemoryStream([.. ImageBytes, 0x00], chunkSize: 1);
         fixture.ContentFactory = () => new ProbeContent(source, declaredLength: null, "image/png");
 
@@ -288,12 +296,12 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_StalledBodyEndsOnCallerCancellationWithoutStorage()
     {
-        var fixture = new Fixture(ImageBytes);
+        var fixture = new Fixture(_environment, ImageBytes);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.ContentFactory = () => new ProbeContent(new StallingStream(started), declaredLength: null, "image/png");
         using var cancellation = new CancellationTokenSource();
 
-        Task<FileStorageWriteResult?> fetch = fixture.Gateway.FetchAndStageAsync(
+        Task<StagedStorageWrite?> fetch = fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, "image/png", MaximumBytes), TenantId(), cancellation.Token);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
         cancellation.Cancel();
@@ -306,7 +314,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_StalledBodyEndsOnGatewayTimeoutWithoutCallerCancellationOrStorage()
     {
-        var fixture = new Fixture(ImageBytes, TimeSpan.FromMilliseconds(25));
+        var fixture = new Fixture(_environment, ImageBytes, TimeSpan.FromMilliseconds(25));
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.ContentFactory = () => new ProbeContent(
@@ -314,12 +322,12 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
             declaredLength: null,
             "image/png");
 
-        Task<FileStorageWriteResult?> fetch = fixture.Gateway.FetchAndStageAsync(
+        Task<StagedStorageWrite?> fetch = fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, "image/png", MaximumBytes), TenantId(), CancellationToken.None);
 
         await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        FileStorageWriteResult? result = await fetch.WaitAsync(TimeSpan.FromSeconds(10));
+        StagedStorageWrite? result = await fetch.WaitAsync(TimeSpan.FromSeconds(10));
         await Assert.That(result).IsNull();
         await Assert.That(fixture.Storage.WriteCount).IsEqualTo(0);
         await Assert.That(fixture.Storage.Objects).IsEmpty();
@@ -328,7 +336,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_CancellationMidStreamPropagatesWithoutStorage()
     {
-        var fixture = new Fixture(ImageBytes);
+        var fixture = new Fixture(_environment, ImageBytes);
         using var cancellation = new CancellationTokenSource();
         var source = new ChunkedMemoryStream(ImageBytes, chunkSize: 1, cancellation.Cancel);
         fixture.ContentFactory = () => new ProbeContent(source, declaredLength: null, "image/png");
@@ -345,25 +353,26 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     public async Task FetchAndStageAsync_CancellationAfterStorageDeletesExactObject()
     {
         string cid = CidFor(ValidPngBytes);
-        var fixture = new Fixture(ValidPngBytes, maximumBytes: ValidPngBytes.Length);
+        var fixture = new Fixture(_environment, ValidPngBytes, maximumBytes: ValidPngBytes.Length);
         using var cancellation = new CancellationTokenSource();
         fixture.Storage.CancelAfterWrite = cancellation;
 
         await Assert.That(async () => await fixture.Gateway.FetchAndStageAsync(
                 Candidate(cid, "image/png", ValidPngBytes.Length), TenantId(), cancellation.Token))
             .Throws<OperationCanceledException>();
+        await fixture.DrainCleanupAsync();
         await Assert.That(fixture.Storage.Objects).IsEmpty();
-        await Assert.That(fixture.Storage.DeletedKeys).IsEquivalentTo([ReturnedObjectKey]);
+        await Assert.That(fixture.Storage.DeletedKeys).IsEquivalentTo([fixture.Storage.LastObjectKey!]);
     }
 
     [Test]
     public async Task FetchAndStageAsync_InvalidCidOrContentBindingMismatchDoesNotStage()
     {
-        var invalid = new Fixture(ImageBytes);
+        var invalid = new Fixture(_environment, ImageBytes);
         var invalidResult = await invalid.Gateway.FetchAndStageAsync(
             Candidate("not-a-cid", "image/png", MaximumBytes), TenantId(), CancellationToken.None);
 
-        var mismatch = new Fixture(ImageBytes);
+        var mismatch = new Fixture(_environment, ImageBytes);
         var mismatchResult = await mismatch.Gateway.FetchAndStageAsync(
             Candidate(OtherCid, "image/png", MaximumBytes), TenantId(), CancellationToken.None);
 
@@ -382,7 +391,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Arguments("image/png; instruction=ignore-previous-validation")]
     public async Task FetchAndStageAsync_NonImageResponseMimeDoesNotStage(string responseMime)
     {
-        var fixture = new Fixture(ImageBytes) { ResponseMimeType = responseMime };
+        var fixture = new Fixture(_environment, ImageBytes) { ResponseMimeType = responseMime };
 
         var result = await fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, "image/png", MaximumBytes), TenantId(), CancellationToken.None);
@@ -395,7 +404,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_DeclaredAndResponseRasterMimeMustMatch()
     {
-        var fixture = new Fixture(ImageBytes) { ResponseMimeType = "image/jpeg" };
+        var fixture = new Fixture(_environment, ImageBytes) { ResponseMimeType = "image/jpeg" };
 
         var result = await fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, "image/png", MaximumBytes), TenantId(), CancellationToken.None);
@@ -414,7 +423,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         long httpSize,
         int actualSize)
     {
-        var fixture = new Fixture(ImageBytes[..actualSize]) { DeclaredResponseLength = httpSize };
+        var fixture = new Fixture(_environment, ImageBytes[..actualSize]) { DeclaredResponseLength = httpSize };
 
         var result = await fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, "image/png", candidateSize), TenantId(), CancellationToken.None);
@@ -428,7 +437,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     public async Task FetchAndStageAsync_StorageFailureLeavesNoObject()
     {
         string cid = CidFor(ValidPngBytes);
-        var fixture = new Fixture(ValidPngBytes, maximumBytes: ValidPngBytes.Length)
+        var fixture = new Fixture(_environment, ValidPngBytes, maximumBytes: ValidPngBytes.Length)
         {
             Storage = { FailWrite = true }
         };
@@ -446,16 +455,18 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     public async Task CleanupAsync_DownstreamFailureDeletesExactStagedObjectIdempotently()
     {
         string cid = CidFor(ValidPngBytes);
-        var fixture = new Fixture(ValidPngBytes, maximumBytes: ValidPngBytes.Length);
+        var fixture = new Fixture(_environment, ValidPngBytes, maximumBytes: ValidPngBytes.Length);
         var staged = await fixture.Gateway.FetchAndStageAsync(
             Candidate(cid, "image/png", ValidPngBytes.Length), TenantId(), CancellationToken.None);
 
         await fixture.Gateway.CleanupAsync(staged!, CancellationToken.None);
         await fixture.Gateway.CleanupAsync(staged!, CancellationToken.None);
+        await fixture.DrainCleanupAsync();
+        await fixture.DrainCleanupAsync();
 
         await Assert.That(fixture.Storage.DeletedKeys).IsEquivalentTo(
-            [ReturnedObjectKey, ReturnedObjectKey]);
-        await Assert.That(fixture.Storage.DeleteResults).IsEquivalentTo([true, false]);
+            [staged!.Write.ObjectKey]);
+        await Assert.That(fixture.Storage.DeleteResults).IsEquivalentTo([true]);
         await Assert.That(fixture.Storage.Objects).IsEmpty();
     }
 
@@ -470,7 +481,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         string mimeType,
         long declaredSize)
     {
-        var fixture = new Fixture(ImageBytes);
+        var fixture = new Fixture(_environment, ImageBytes);
 
         var result = await fixture.Gateway.FetchAndStageAsync(
             Candidate(cid, mimeType, declaredSize), TenantId(), CancellationToken.None);
@@ -485,7 +496,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     [Test]
     public async Task FetchAndStageAsync_AbsentOptionalCandidate_PerformsNoNetworkOrStorage()
     {
-        var fixture = new Fixture(ImageBytes);
+        var fixture = new Fixture(_environment, ImageBytes);
 
         var result = await fixture.Gateway.FetchAndStageAsync(null, TenantId(), CancellationToken.None);
 
@@ -545,17 +556,23 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     private sealed class Fixture
     {
         private readonly byte[] _bytes;
+        private readonly StorageTestEnvironment _environment;
+        private readonly RecordingBindings _bindings;
 
         public Fixture(
+            StorageTestEnvironment environment,
             byte[] bytes,
             TimeSpan? requestTimeout = null,
             int maximumBytes = MaximumBytes)
         {
             _bytes = bytes;
+            _environment = environment;
             Storage = new RecordingStorageProvider();
+            _bindings = new RecordingBindings(environment.Context, environment.Root, Storage);
             Gateway = new AtprotoThumbnailBlobGateway(
                 CreatePrimaryHandler,
-                Storage,
+                new ManagedStorageProducer(_bindings, environment.Objects, environment.Unit),
+                environment.Policy,
                 maximumBytes,
                 requestTimeout: requestTimeout ?? TimeSpan.FromSeconds(5));
         }
@@ -572,6 +589,12 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         public int RedirectTargetRequests { get; private set; }
         public List<string> PdsRequestUris { get; } = [];
         public HttpRequestMessage? LastPdsRequest { get; private set; }
+
+        public Task<StorageObjectDeletionResult> DrainCleanupAsync() =>
+            new EventResourceStorageCleanupService(new StorageObjectDeletionTombstoneRepository(_environment.Context),
+                _bindings, TimeProvider.System, NullLogger<EventResourceStorageCleanupService>.Instance,
+                new EventResourceStorageLifecycleRepository(_environment.Context), _environment.Unit)
+                .ProcessDueAsync(10, false, default);
 
         private HttpMessageHandler CreatePrimaryHandler(AtprotoOutboundPolicy _) =>
             new DelegateHandler((request, cancellationToken) =>
@@ -613,9 +636,29 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         };
     }
 
+    private sealed class RecordingBindings(ExploreDbContext context, string root, IFileStorageProvider provider)
+        : IStorageProviderBindingService
+    {
+        private readonly StorageProviderBindingRepository _repository = new(context);
+        public async Task<StorageProviderBinding> CaptureAsync(string name, Guid tenantId, CancellationToken cancellationToken)
+        {
+            if (name != provider.Provider) throw new InvalidOperationException("Unexpected test provider.");
+            var binding = StorageProviderBinding.Local(root);
+            await _repository.AddAsync(binding, cancellationToken);
+            return binding;
+        }
+        public async Task<IFileStorageProvider> ResolveAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var binding = await _repository.GetByIdAsync(id, cancellationToken)
+                ?? throw new InvalidOperationException("Missing persisted test binding.");
+            if (binding.Provider != provider.Provider) throw new InvalidOperationException("Mismatched test binding.");
+            return provider;
+        }
+    }
+
     private sealed class RecordingStorageProvider : IFileStorageProvider
     {
-        public string Provider => "memory";
+        public string Provider => StorageProviders.Local;
         public bool FailWrite { get; set; }
         public CancellationTokenSource? CancelAfterWrite { get; set; }
         public int WriteCount { get; private set; }
@@ -624,12 +667,14 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         public List<string> DeletedKeys { get; } = [];
         public List<bool> DeleteResults { get; } = [];
         public FileStorageWriteEnvelope? LastWrite { get; private set; }
+        public string? LastObjectKey { get; private set; }
 
         public async Task<FileStorageWriteResult> WriteAsync(
             FileStorageWriteInput input,
             CancellationToken cancellationToken)
         {
             WriteCount++;
+            LastObjectKey = input.ObjectKey;
             LastWrite = new(
                 input.TenantId,
                 input.ContentType,
@@ -645,14 +690,14 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
             using var buffer = new MemoryStream();
             await input.Content.CopyToAsync(buffer, cancellationToken);
             Bytes = buffer.ToArray();
-            Objects[ReturnedObjectKey] = Bytes;
+            Objects[input.ObjectKey!] = Bytes;
             CancelAfterWrite?.Cancel();
             return new(
-                ReturnedProvider,
-                ReturnedObjectKey,
-                ReturnedSizeBytes,
-                ReturnedContentType,
-                ReturnedSha256Checksum);
+                Provider,
+                input.ObjectKey!,
+                Bytes.Length,
+                input.ContentType,
+                Convert.ToHexStringLower(SHA256.HashData(Bytes)));
         }
 
         public Task<FileStorageDeleteResult> DeleteAsync(

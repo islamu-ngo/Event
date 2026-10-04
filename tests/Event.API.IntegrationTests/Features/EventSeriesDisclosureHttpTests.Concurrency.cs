@@ -1,4 +1,5 @@
 using System.Net;
+using System.Data.Common;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
@@ -36,6 +37,7 @@ public sealed partial class EventSeriesDisclosureHttpTests
         var responses = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
         try
         {
+            await Assert.That(barrier.Arrivals).IsEqualTo(2);
             await Assert.That(responses.Select(response => response.StatusCode))
                 .IsEquivalentTo(new[] { HttpStatusCode.OK, HttpStatusCode.Conflict });
             var after = await DetailAsync(admin, data.PublicId);
@@ -102,14 +104,16 @@ public sealed partial class EventSeriesDisclosureHttpTests
         await Assert.That(after.ConcurrencyStamp).IsNotEqualTo(original.ConcurrencyStamp);
     }
 
-    private sealed class SeriesWriteBarrier : SaveChangesInterceptor
+    private sealed class SeriesWriteBarrier : DbTransactionInterceptor
     {
         private readonly TaskCompletionSource _bothArrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _arrivals;
         public bool Enabled { get; set; }
+        public int Arrivals => Volatile.Read(ref _arrivals);
 
-        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
-            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        public override async ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection, TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result, CancellationToken cancellationToken = default)
         {
             if (Enabled && eventData.Context!.ChangeTracker.Entries<EventSeries>().Any(entry => entry.State == EntityState.Modified))
             {

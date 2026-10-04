@@ -191,6 +191,8 @@ public sealed class EventModerationConcurrencyTests(PostgreSqlContainerFixture f
                     "losing-heavy",
                     DateTimeOffset.UtcNow);
 
+                await new StorageObjectReferenceRepository(losingContext).FenceAsync(
+                    staleGraph.ImageStorageObjects.Select(source => source.Id).ToArray(), ct);
                 EventHeavyRedactionApplicator.Apply(staleGraph, user.Id, DateTimeOffset.UtcNow);
 
                 await losingRedactionRepository.SaveChangesAsync(ct);
@@ -308,9 +310,15 @@ public sealed class EventModerationConcurrencyTests(PostgreSqlContainerFixture f
                 correlationId,
                 DateTimeOffset.UtcNow);
 
+            await new StorageObjectReferenceRepository(context).FenceAsync(
+                graph.ImageStorageObjects.Select(source => source.Id).ToArray(), ct);
             EventHeavyRedactionApplicator.Apply(graph, moderatorUserId, DateTimeOffset.UtcNow);
 
             await redactionRepository.SaveChangesAsync(ct);
+            var lifecycle = new EventResourceStorageLifecycleRepository(context);
+            foreach (var image in graph.ImageStorageObjects)
+                await Assert.That(await lifecycle.TryQueueRetirementAsync(
+                    eventEntity.TenantId, image.Id, DateTime.UtcNow, ct)).IsEqualTo(StorageRetirementAdmission.Pending);
             await new EventModerationRecordRepository(context).Create(moderationRecord);
             await new OutboxRepository(context).Create(
                 EventModerationOutboxMessageFactory.CreateHeavyRedactionNotificationFanoutMessage(eventEntity, moderationRecord));
@@ -355,6 +363,8 @@ public sealed class EventModerationConcurrencyTests(PostgreSqlContainerFixture f
         StorageObject? image = null;
         if (withImage)
         {
+            var binding = StorageProviderBinding.Local(Path.GetTempPath());
+            context.Add(binding);
             image = new StorageObject
             {
                 Id = Guid.NewGuid(),
@@ -365,8 +375,8 @@ public sealed class EventModerationConcurrencyTests(PostgreSqlContainerFixture f
                 FileTypeId = (int)FileTypeEnum.Image,
                 FileType = null!,
                 Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
                 ObjectKey = $"tenants/{tenant.Id:N}/illegal.png",
-                Uri = "/images/illegal.png",
                 FullName = "illegal.png",
                 SafeDisplayName = "illegal.png",
                 Extension = ".png",

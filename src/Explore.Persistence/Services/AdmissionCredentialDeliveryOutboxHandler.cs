@@ -83,6 +83,8 @@ public sealed class AdmissionCredentialDeliveryOutboxHandler(
     {
         if (!userId.HasValue) return null;
         User? user = await dbContext.Users.AsNoTracking().Include(value => value.Pii)
+            .Include(value => value.IdentityEmailClaims)
+                .ThenInclude(claim => claim.Evidence)
             .SingleOrDefaultAsync(value => value.Id == userId.Value, cancellationToken);
         return RecipientEmailAddressResolver.Resolve(user, userId.Value).Email;
     }

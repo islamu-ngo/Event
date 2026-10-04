@@ -17,6 +17,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Explore.Persistence.Services;
@@ -80,9 +81,10 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         using var meters = new TestMeterFactory();
         using var metrics = new BusinessMetrics(meters);
         var policy = Substitute.For<IStoragePolicyResolver>();
-        var handler = new FinalizeStorageUploadSessionCommandHandler(Substitute.For<IFileStorageProviderResolver>(), policy,
+        var handler = new FinalizeStorageUploadSessionCommandHandler(Substitute.For<IStorageProviderBindingService>(), policy,
             sessions, new StorageUsageCounterRepository(context), new StorageObjectRepository(context),
-            new PrivacyErasureStateRepository(context), tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
+            new PrivacyErasureStateRepository(context), new EventResourceStorageLifecycleRepository(context),
+            tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
         var result = await handler.ExecuteAsync(command, default);
         await Assert.That(result.IsSuccess).IsTrue();
         await using var read = database.CreateContext();
@@ -94,7 +96,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             pending.Id.ToString("D"), new StorageObjectCollectionAuthorizationFacts(seed.TenantId), default);
         await Assert.That(bound.Facts is EventResourceUploadAuthorizationFacts).IsTrue();
         var cancel = new CancelStorageUploadSessionCommandHandler(policy, sessions, new StorageUsageCounterRepository(context),
-            tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
+            new EventResourceStorageLifecycleRepository(context), tenant, user, new EfCoreUnitOfWork(context), metrics, workflow);
         await Assert.That((await cancel.ExecuteAsync(cancelCommand, default)).Id!.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
     }
 
@@ -586,7 +588,9 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
     }
 
     [Test]
-    public async Task HeavyModerationRetainsEvidenceBytesWhileRetiringOrdinaryResourceBytes()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task HeavyModerationRetainsEvidenceBytesWhileRetiringOrdinaryResourceBytes(bool actorPicture)
     {
         var seed = await SeedAsync();
         EventResource retainedResource;
@@ -630,7 +634,14 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
                 ApprovalStatus = null!
             };
             var source = await evidenceContext.StorageObjects.SingleAsync(item => item.Id == retainedObjectId);
-            evidenceContext.Add(OrganizationTenantEvidence.CreatePending(participation, source));
+            if (actorPicture)
+            {
+                var picture = await evidenceContext.Set<ActorPii>()
+                    .SingleAsync(item => item.Actor != null && item.Actor.UserId == seed.UserId);
+                picture.SetProfilePicture(retainedObjectId, null);
+            }
+            else
+                evidenceContext.Add(OrganizationTenantEvidence.CreatePending(participation, source));
             await evidenceContext.SaveChangesAsync();
         }
         await using (var redacting = database.CreateContext())
@@ -639,10 +650,12 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
                 var resources = await redacting.EventResources.Where(item =>
                     item.Id == seed.ResourceId || item.Id == retainedResource.Id).ToArrayAsync(ct);
                 var lifecycle = new EventResourceStorageLifecycleRepository(redacting);
-                await lifecycle.RetireAsync(seed.TenantId, resources.Select(item => item.Id).ToArray(), [], Now, ct);
+                await new StorageObjectReferenceRepository(redacting).FenceAsync(
+                    [ordinaryObjectId, retainedObjectId], ct);
                 foreach (var resource in resources)
                     resource.ApplyParentModeration("Removed", seed.UserId, Now);
                 await redacting.SaveChangesAsync(ct);
+                await lifecycle.RetireAsync(seed.TenantId, resources.Select(item => item.Id).ToArray(), [], Now, ct);
                 await lifecycle.RemoveTransferredSourcesAsync(seed.TenantId,
                     resources.Select(item => item.Id).ToArray(), [], ct);
                 return true;
@@ -650,8 +663,12 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         await using var verify = database.CreateContext();
         await Assert.That(await verify.StorageObjects.AnyAsync(item => item.Id == retainedObjectId)).IsTrue();
         await Assert.That(await verify.StorageObjects.AnyAsync(item => item.Id == ordinaryObjectId)).IsFalse();
-        await Assert.That(await verify.OrganizationTenantEvidence.AnyAsync(item =>
-            item.DocumentStorageObjectId == retainedObjectId)).IsTrue();
+        if (actorPicture)
+            await Assert.That(await verify.Set<ActorPii>().AnyAsync(item =>
+                item.ProfilePictureStorageObjectId == retainedObjectId)).IsTrue();
+        else
+            await Assert.That(await verify.OrganizationTenantEvidence.AnyAsync(item =>
+                item.DocumentStorageObjectId == retainedObjectId)).IsTrue();
         await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(item =>
             item.Id == retainedObjectId)).IsFalse();
         await Assert.That((await verify.StorageObjectDeletionTombstones.SingleAsync(item =>
@@ -976,6 +993,9 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         await using var seeder = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
         var scope = await seeder.SeedScopeAsync();
         await using var context = database.CreateContext();
+        // The relational-model fixture's large, unattached local document is not
+        // part of this upload-only quota fixture. Keep the foreign-tenant document.
+        await context.StorageObjects.Where(value => value.Id == scope.StorageAId).ExecuteDeleteAsync();
         var actor = (await context.Actors.SingleAsync(value => value.Id == scope.ActorId)).UserId!.Value;
         (await context.Events.SingleAsync(value => value.Id == scope.EventAId)).OrganizerActorId = scope.ActorId;
         context.TenantUsers.Add(new TenantUser
@@ -1017,6 +1037,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             new ResolvedStoragePolicy(seed.TenantId, StorageProviders.Local, 1_000_000, quotaBytes, 1_000_000,
                 false, true, SettingSource.SystemDefault, SettingSource.SystemDefault, SettingSource.SystemDefault));
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
         {
             await Assert.That(context.Database.CurrentTransaction).IsNull();
@@ -1113,9 +1134,14 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         {
             _connection = await SqliteTestDatabaseFactory.CreateOpenIsolatedConnectionAsync();
             _options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(_connection.ConnectionString)
-                .UseSnakeCaseNamingConvention().Options;
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(
+                    EventDiscoveryDisclosureTransactionInterceptor.Instance,
+                    SqliteNamedLockTransactionInterceptor.Instance,
+                    SqliteProjectionLockTransactionInterceptor.Instance).Options;
             await using var schema = new ExploreDbContext(_options);
             await schema.Database.EnsureCreatedAsync();
+            await SqliteDatabaseInitializer.InitializeAsync(schema, CancellationToken.None);
             await LookupTableSeeder.SeedAsync(schema);
             _options = TestDbContextOptions.Create(_options).UseModel(schema.Model).Options;
         }

@@ -267,11 +267,6 @@ public sealed class StorageUploadOpenApiContractTests
             "Handlers",
             "Commands",
             "FinalizeStorageUploadSessionCommandHandler.cs"));
-        var deletionService = await File.ReadAllTextAsync(Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Infrastructure",
-            "StorageObjectDeletionService.cs"));
         var reconciliationService = await File.ReadAllTextAsync(Path.Combine(
             repositoryRoot,
             "src",
@@ -282,8 +277,21 @@ public sealed class StorageUploadOpenApiContractTests
         await Assert.That(objectStorageService).DoesNotContain("GeneratePresignedUploadUrl");
         await Assert.That(presignedDownloadHandler).Contains("GeneratePresignedDownloadUrl");
         await Assert.That(finalizeHandler).Contains("provider.WriteAsync");
-        await Assert.That(deletionService).Contains("provider.DeleteAsync");
         await Assert.That(reconciliationService).Contains("ListKnownObjectKeysAsync");
+    }
+
+    [Test]
+    public async Task StorageRetirement_MustUseNativeAdmissionWithoutImmediateProviderEngine()
+    {
+        var dependencies = typeof(Explore.Application.Features.StorageObjects.Handlers.Commands.DeleteStorageObjectCommandHandler)
+            .GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType).ToArray();
+        await Assert.That(dependencies).Contains(typeof(Explore.Application.Contracts.Persistence.IEventResourceStorageLifecycleRepository));
+        await Assert.That(dependencies).DoesNotContain(typeof(Explore.Application.Contracts.Infrastructure.IFileStorageProvider));
+        await Assert.That(dependencies).DoesNotContain(typeof(Explore.Application.Contracts.Infrastructure.IStorageProviderBindingService));
+        await Assert.That(typeof(Explore.Infrastructure.InfrastructureServicesRegistration).Assembly
+            .GetType("Explore.Infrastructure.StorageObjectDeletionService")).IsNull();
+        await Assert.That(typeof(Explore.Application.Services.EventResourceStorageCleanupService).Assembly
+            .GetType("Explore.Application.Contracts.Services.IStorageObjectDeletionService")).IsNull();
     }
 
     private static string ResolveRepositoryRoot()

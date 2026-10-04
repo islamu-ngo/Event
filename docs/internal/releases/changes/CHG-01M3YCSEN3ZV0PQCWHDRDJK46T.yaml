@@ -1,0 +1,26 @@
+Change-Id: CHG-01M3YCSEN3ZV0PQCWHDRDJK46T
+Title: "Reject tracked attachments after storage retirement"
+Type: fix
+Scope: storage
+Summary: "Tracked managed-file references share the storage-row transaction fence with persisted old and proposed identities. Committed retirement rejects new attachments and failed enrollment prevents unit-of-work commit."
+Group: storage-reference-enrollment
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented

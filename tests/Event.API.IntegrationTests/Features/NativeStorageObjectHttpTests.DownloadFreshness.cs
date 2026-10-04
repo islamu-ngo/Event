@@ -185,6 +185,8 @@ public sealed partial class NativeStorageObjectHttpTests
         {
             var db = metadataScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             var document = await db.StorageObjects.SingleAsync(item => item.Id == objectId);
+            await Assert.That(document.SourceUri).IsNull();
+            document.SourceUri = "https://foreign.example.test/private-origin?locator=not-delivery";
             document.Visibility = visibility;
             if (visibility == StorageObjectVisibilities.PublicImage)
             {

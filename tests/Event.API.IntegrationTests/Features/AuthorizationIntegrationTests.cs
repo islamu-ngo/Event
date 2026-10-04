@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.Responses;
@@ -209,26 +210,38 @@ public class AuthorizationIntegrationTests
     private async Task SeedTenantAdminGrantAsync(Guid tenantId, Guid userId)
     {
         var createdAt = DateTime.UtcNow;
+        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var tenant = await db.Tenants.SingleAsync(value => value.Id == tenantId);
+        var user = new UserBuilder().WithId(userId).Build();
+        var actor = new ActorBuilder()
+            .WithId(Guid.CreateVersion7())
+            .WithUserId(userId)
+            .WithDisplayName("Tenant Admin")
+            .Build();
+        actor.User = user;
+        db.Users.Add(user);
+        db.Actors.Add(actor);
         var tenantUser = new TenantUser
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            Tenant = null!,
+            Tenant = tenant,
             UserId = userId,
-            User = null!,
+            User = user,
+            ActorId = actor.Id,
+            Actor = actor,
             StatusId = (int)TenantUserStatusEnum.Active,
             JoinedAt = createdAt,
             CreatedAt = createdAt
         };
 
-        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         db.TenantUsers.Add(tenantUser);
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            Tenant = null!,
+            Tenant = tenant,
             TenantUserId = tenantUser.Id,
             TenantUser = tenantUser,
             RoleId = (int)RoleEnum.TenantAdmin,

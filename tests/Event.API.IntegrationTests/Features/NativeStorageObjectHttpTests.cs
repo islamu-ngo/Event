@@ -168,7 +168,7 @@ public sealed partial class NativeStorageObjectHttpTests
     [Test]
     public async Task UploadReplayQuotaFinalizeReadUpdateCapabilityAndDeleteKeepTheirEffects()
     {
-        await using var factory = await StorageFactory.CreateAsync();
+        await using var factory = await StorageFactory.CreateAsync(provider: StorageProviders.S3Compatible);
         using var client = Client(factory, factory.OwnerId);
         var reserved = await ReserveAsync(client, Upload("first"));
         await Assert.That(reserved.TotalReservedBytes).IsEqualTo(5);
@@ -221,13 +221,21 @@ public sealed partial class NativeStorageObjectHttpTests
         using (var canceled = await client.DeleteAsync($"{Root}/upload-sessions/{reserved.Id}"))
             await ProblemAsync(canceled, HttpStatusCode.Conflict, FailureCodes.StorageUploadSessionFinalized);
         using (var deleted = await client.DeleteAsync($"{Root}/{id}"))
-            await Assert.That(deleted.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
-        await Assert.That(factory.Objects).IsEmpty();
+        {
+            await Assert.That(deleted.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+            var acknowledgement = (await deleted.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>())!;
+            await Assert.That(acknowledgement.IsSuccess).IsTrue();
+            await Assert.That(acknowledgement.Id).IsEqualTo(id);
+        }
+        await Assert.That(factory.Objects.Values.Single()).IsEquivalentTo("hello"u8.ToArray());
         using (var scope = factory.Services.CreateScope())
         {
             var visible = await scope.ServiceProvider.GetRequiredService<IStorageObjectRepository>()
                 .GetForGenericAccessAsync(id, default);
             await Assert.That(visible).IsNull();
+            var work = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .Set<StorageObjectDeletionTombstone>().SingleAsync(row => row.Id == id);
+            await Assert.That(work.State).IsEqualTo(StorageObjectDeletionState.Ready);
         }
         using (var missing = await client.GetAsync($"{Root}/{id}/content"))
             await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
@@ -286,9 +294,27 @@ public sealed partial class NativeStorageObjectHttpTests
     }
 
     [Test]
-    public async Task CapabilityAuthorizationAndNullableReadsFailClosedBeforeProviderEffects()
+    public async Task LocalUploadDoesNotAdvertiseOrIssueAnS3Presign()
     {
         await using var factory = await StorageFactory.CreateAsync();
+        using var owner = Client(factory, factory.OwnerId);
+        var reserved = await ReserveAsync(owner, Upload("local-content"));
+        Guid id = (await FinalizeAsync(owner, reserved.Id)).StorageObjectId!.Value;
+        using var detail = await owner.GetAsync($"{Root}/{id}");
+        await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var json = System.Text.Json.JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+        var links = json.RootElement.GetProperty("_links");
+        await Assert.That(links.TryGetProperty("content", out _)).IsTrue();
+        await Assert.That(links.TryGetProperty("presigned-download", out _)).IsFalse();
+        using var direct = await owner.GetAsync($"{Root}/{id}/presigned-url");
+        await Assert.That(direct.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(factory.Signings).IsEmpty();
+    }
+
+    [Test]
+    public async Task CapabilityAuthorizationAndNullableReadsFailClosedBeforeProviderEffects()
+    {
+        await using var factory = await StorageFactory.CreateAsync(provider: StorageProviders.S3Compatible);
         using var owner = Client(factory, factory.OwnerId);
         var reserved = await ReserveAsync(owner, Upload("capability"));
         Guid id = (await FinalizeAsync(owner, reserved.Id)).StorageObjectId!.Value;
@@ -384,7 +410,8 @@ public sealed partial class NativeStorageObjectHttpTests
 
         public static async Task<StorageFactory> CreateAsync(
             bool useProductionAuthorization = false,
-            Microsoft.EntityFrameworkCore.Diagnostics.DbTransactionInterceptor? transactionObserver = null)
+            Microsoft.EntityFrameworkCore.Diagnostics.DbTransactionInterceptor? transactionObserver = null,
+            string provider = StorageProviders.Local)
         {
             var factory = new StorageFactory { _transactionObserver = transactionObserver };
             if (useProductionAuthorization)
@@ -414,7 +441,7 @@ public sealed partial class NativeStorageObjectHttpTests
                 var settings = scope.ServiceProvider.GetRequiredService<IHierarchicalSettingsResolver>();
                 await settings.SetValueAsync(GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes, "12",
                     SettingScope.Tenant, PlatformDefaults.DefaultTenantId, factory.OwnerId);
-                await settings.SetValueAsync(GovernanceSettingKeys.Storage.Provider, "\"local\"",
+                await settings.SetValueAsync(GovernanceSettingKeys.Storage.Provider, System.Text.Json.JsonSerializer.Serialize(provider),
                     SettingScope.Tenant, PlatformDefaults.DefaultTenantId, factory.OwnerId);
                 return factory;
             }
@@ -448,44 +475,49 @@ public sealed partial class NativeStorageObjectHttpTests
                     db.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
                     return db;
                 });
-                var storage = Substitute.For<IFileStorageProvider>();
-                storage.Provider.Returns(StorageProviders.Local);
-                storage.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
-                {
-                    var input = call.Arg<FileStorageWriteInput>() ?? throw new ArgumentException("Missing storage write input.");
-                    if (FailWrite) throw new IOException("Boundary write failure.");
-                    if (input.ObjectKey is null || !input.ObjectKey.StartsWith($"tenants/{input.TenantId:N}/", StringComparison.Ordinal))
-                        throw new InvalidOperationException("Upload destination was not tenant-bound.");
-                    using var bytes = new MemoryStream();
-                    await input.Content.CopyToAsync(bytes, call.Arg<CancellationToken>());
-                    byte[] value = bytes.ToArray();
-                    Objects.Add(input.ObjectKey, value);
-                    WriteCount++;
-                    return new FileStorageWriteResult(StorageProviders.Local, input.ObjectKey, value.Length,
-                        input.ContentType, Convert.ToHexString(SHA256.HashData(value)));
-                });
-                storage.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>()).Returns(call =>
-                {
-                    var input = call.Arg<FileStorageReadInput>() ?? throw new ArgumentException("Missing storage read input.");
-                    byte[] value = Objects[input.ObjectKey];
-                    return new FileStorageReadResult(new TrackedStream(value, () => DisposedReads++), "text/plain",
-                        value.Length, DateTimeOffset.UtcNow);
-                });
-                storage.DeleteAsync(Arg.Any<FileStorageDeleteInput>(), Arg.Any<CancellationToken>()).Returns(call =>
-                {
-                    var input = call.Arg<FileStorageDeleteInput>() ?? throw new ArgumentException("Missing storage delete input.");
-                    string key = input.ObjectKey;
-                    return new FileStorageDeleteResult(StorageProviders.Local, key, Objects.Remove(key));
-                });
                 var resolver = Substitute.For<IFileStorageProviderResolver>();
-                resolver.GetRequired(StorageProviders.Local).Returns(storage);
+                foreach (var providerName in new[] { StorageProviders.Local, StorageProviders.S3Compatible })
+                {
+                    var storage = Substitute.For<IFileStorageProvider>();
+                    storage.Provider.Returns(providerName);
+                    storage.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
+                    {
+                        var input = call.Arg<FileStorageWriteInput>() ?? throw new ArgumentException("Missing storage write input.");
+                        if (FailWrite) throw new IOException("Boundary write failure.");
+                        if (input.ObjectKey is null || !input.ObjectKey.StartsWith($"tenants/{input.TenantId:N}/", StringComparison.Ordinal))
+                            throw new InvalidOperationException("Upload destination was not tenant-bound.");
+                        using var bytes = new MemoryStream();
+                        await input.Content.CopyToAsync(bytes, call.Arg<CancellationToken>());
+                        byte[] value = bytes.ToArray();
+                        Objects.Add(input.ObjectKey, value);
+                        WriteCount++;
+                        return new FileStorageWriteResult(providerName, input.ObjectKey, value.Length,
+                            input.ContentType, Convert.ToHexString(SHA256.HashData(value)));
+                    });
+                    storage.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>()).Returns(call =>
+                    {
+                        var input = call.Arg<FileStorageReadInput>() ?? throw new ArgumentException("Missing storage read input.");
+                        byte[] value = Objects[input.ObjectKey];
+                        return new FileStorageReadResult(new TrackedStream(value, () => DisposedReads++), "text/plain",
+                            value.Length, DateTimeOffset.UtcNow);
+                    });
+                    storage.DeleteAsync(Arg.Any<FileStorageDeleteInput>(), Arg.Any<CancellationToken>()).Returns(call =>
+                    {
+                        var input = call.Arg<FileStorageDeleteInput>() ?? throw new ArgumentException("Missing storage delete input.");
+                        string key = input.ObjectKey;
+                        return new FileStorageDeleteResult(providerName, key, Objects.Remove(key));
+                    });
+                    resolver.GetRequired(providerName).Returns(storage);
+                }
                 services.RemoveAll<IFileStorageProviderResolver>();
                 services.AddSingleton(resolver);
+                services.AddCapturedStorageProviders();
                 var signing = Substitute.For<IObjectStorageService>();
-                signing.GeneratePresignedDownloadUrl(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>()).Returns(call =>
+                signing.GeneratePresignedDownloadUrl(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(),
+                    Arg.Any<int>(), Arg.Any<string?>()).Returns(call =>
                 {
-                    if (!Objects.ContainsKey(call.ArgAt<string>(0))) throw new FileNotFoundException();
-                    Signings.Add((call.ArgAt<string>(1), call.Arg<int>()));
+                    if (!Objects.ContainsKey(call.ArgAt<string>(1))) throw new FileNotFoundException();
+                    Signings.Add((call.ArgAt<string>(2), call.Arg<int>()));
                     return Capability;
                 });
                 services.RemoveAll<IObjectStorageService>();

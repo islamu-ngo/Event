@@ -264,6 +264,7 @@
         <div role="status" aria-live="polite" aria-atomic="true">@_saveStatusMessage</div>
         <div role="alert">@_saveErrorMessage</div>
     </MudStack>
+    <TenantStoredFiles @key="Model.TenantId" TenantId="Model.TenantId" />
 </div>
 
 @code {

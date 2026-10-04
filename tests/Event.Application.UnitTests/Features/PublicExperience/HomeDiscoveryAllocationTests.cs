@@ -11,6 +11,7 @@ using Explore.Application.Features.PublicExperience.Handlers.Queries;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
 using Explore.Application.Models.PublicExperience;
 using Explore.Application.Responses;
+using Explore.Application.Specifications.Events;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -78,7 +79,8 @@ public sealed class HomeDiscoveryAllocationTests
         pool[1] = pool[1] with { Event = pool[1].Event! with { AtprotoRecordId = recordId } };
         pool.Add(new EventDiscoveryItemDto
         {
-            Source = "atproto", FederatedEvent = new FederatedEventDto { Id = recordId }
+            Source = "atproto",
+            FederatedEvent = new FederatedEventDto { Id = recordId }
         });
         var result = await allocator.AllocateAsync(new(), 10,
             (criteria, _) => Task.FromResult(new PaginatedResult<EventDiscoveryItemDto>(
@@ -124,7 +126,27 @@ public sealed class HomeDiscoveryAllocationTests
     }
 
     [Test]
-    public async Task AreaAndConfiguredCuratedOrderAllocateBeforeRecentlyAdded()
+    public async Task UpcomingUsesInstantEligibilityWithoutUtcCalendarDateGate()
+    {
+        GetEventListRequest? criteria = null;
+        var reader = new CandidateReader(Pool(20))
+        {
+            Read = (request, _) =>
+            {
+                if (criteria is null && request.Criteria.SortBy == "date")
+                    criteria = request.Criteria;
+                return Task.CompletedTask;
+            }
+        };
+        await CreateHandler(reader).QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(criteria?.View).IsEqualTo(TemporalView.UpcomingAndOngoing);
+        await Assert.That(criteria!.DateFrom).IsNull();
+        await Assert.That(criteria.DateTo).IsNull();
+    }
+
+    [Test]
+    public async Task OtherShelvesRetainExclusivePriorityWithoutRestrictingRecentlyAdded()
     {
         var pool = Pool(100);
         var locationId = Guid.CreateVersion7();
@@ -139,24 +161,28 @@ public sealed class HomeDiscoveryAllocationTests
         var home = await CreateHandler(new CandidateReader(pool), area, presets)
             .QueryAsync(new(Mode: "area"), CancellationToken.None);
 
-        await Assert.That(home.MostViewedInArea[0].Event!.Id).IsEqualTo(pool[31].Event!.Id);
-        await Assert.That(home.MostViewedOnline[0].Event!.Id).IsEqualTo(pool[41].Event!.Id);
+        await Assert.That(home.MostViewedInArea[0].Event!.Id).IsEqualTo(pool[21].Event!.Id);
+        await Assert.That(home.MostViewedOnline[0].Event!.Id).IsEqualTo(pool[31].Event!.Id);
         await Assert.That(home.CuratedSections[0].Key).IsEqualTo("first");
-        await Assert.That(home.CuratedSections[0].Items[0].Event!.Id).IsEqualTo(pool[51].Event!.Id);
-        await Assert.That(home.CuratedSections[1].Items[0].Event!.Id).IsEqualTo(pool[61].Event!.Id);
-        await Assert.That(home.RecentlyAdded[0].Event!.Id).IsEqualTo(pool[71].Event!.Id);
-        await Assert.That(Items(home).Select(item => item.Event!.Id).Distinct().Count()).IsEqualTo(81);
+        await Assert.That(home.CuratedSections[0].Items[0].Event!.Id).IsEqualTo(pool[41].Event!.Id);
+        await Assert.That(home.CuratedSections[1].Items[0].Event!.Id).IsEqualTo(pool[51].Event!.Id);
+        await Assert.That(home.RecentlyAdded[0].Event!.Id).IsEqualTo(pool[18].Event!.Id);
+        await Assert.That(Items(home).Select(item => item.Event!.Id).Distinct().Count()).IsEqualTo(61);
     }
 
     [Test]
-    public async Task OverlappingSectionsContainEachIdentityOnlyOnce()
+    public async Task FeaturedEventsRemainInTheirUpcomingChronologicalPositions()
     {
         var reader = new CandidateReader(Pool(100));
         var home = await CreateHandler(reader).QueryAsync(new(), CancellationToken.None);
         var ids = Items(home).Select(item => item.Event!.Id).ToArray();
 
         await Assert.That(ids.Length).IsEqualTo(51);
-        await Assert.That(ids.Distinct().Count()).IsEqualTo(51);
+        await Assert.That(ids.Distinct().Count()).IsEqualTo(31);
+        await Assert.That(home.Hero.Select(item => item.Event!.Id))
+            .IsEquivalentTo(home.UpcomingInArea.Take(10).Select(item => item.Event!.Id));
+        await Assert.That(home.UpcomingInArea.Select(item => item.Event!.Id).Distinct().Count())
+            .IsEqualTo(home.UpcomingInArea.Count);
     }
 
     [Test]
@@ -166,10 +192,10 @@ public sealed class HomeDiscoveryAllocationTests
         var home = await CreateHandler(new CandidateReader(pool)).QueryAsync(new(), CancellationToken.None);
 
         await Assert.That(home.Hero[0].Event!.Id).IsEqualTo(pool[0].Event!.Id);
-        await Assert.That(home.UpcomingInArea[0].Event!.Id).IsEqualTo(pool[10].Event!.Id);
-        await Assert.That(home.Spotlight!.Items[0].Event!.Id).IsEqualTo(pool[28].Event!.Id);
-        await Assert.That(home.MostViewedOnline[0].Event!.Id).IsEqualTo(pool[31].Event!.Id);
-        await Assert.That(home.RecentlyAdded[0].Event!.Id).IsEqualTo(pool[41].Event!.Id);
+        await Assert.That(home.UpcomingInArea[0].Event!.Id).IsEqualTo(pool[0].Event!.Id);
+        await Assert.That(home.Spotlight!.Items[0].Event!.Id).IsEqualTo(pool[18].Event!.Id);
+        await Assert.That(home.MostViewedOnline[0].Event!.Id).IsEqualTo(pool[21].Event!.Id);
+        await Assert.That(home.RecentlyAdded[0].Event!.Id).IsEqualTo(pool[18].Event!.Id);
     }
 
     [Test]
@@ -178,13 +204,21 @@ public sealed class HomeDiscoveryAllocationTests
         var pool = Pool(100);
         var first = pool[0];
         var title = new string('x', 300);
-        pool[0] = first with { Event = first.Event! with { Title = title } };
+        pool[0] = first with
+        {
+            Event = first.Event! with
+            {
+                Title = title,
+                Timezone = "Pacific/Kiritimati"
+            }
+        };
         var reader = new CandidateReader(pool);
         var home = await CreateHandler(reader).QueryAsync(new(), CancellationToken.None);
 
         await Assert.That(pool.Count).IsEqualTo(100);
         await Assert.That(pool[0].Event!.Title).IsEqualTo(title);
         await Assert.That(home.Hero[0].Event!.Title.Length).IsEqualTo(240);
+        await Assert.That(home.Hero[0].Event!.Timezone).IsEqualTo("Pacific/Kiritimati");
     }
 
     [Test]
@@ -197,19 +231,79 @@ public sealed class HomeDiscoveryAllocationTests
         await Assert.That(home.Hero.Count).IsEqualTo(10);
         await Assert.That(home.UpcomingInArea.Count).IsEqualTo(18);
         await Assert.That(home.Hero.Select(item => item.Event!.Id).Distinct().Count()).IsEqualTo(10);
-        await Assert.That(home.UpcomingInArea[0].Event!.Id).IsEqualTo(unique[10].Event!.Id);
+        await Assert.That(home.UpcomingInArea[0].Event!.Id).IsEqualTo(unique[0].Event!.Id);
     }
 
     [Test]
-    public async Task ExhaustedEligiblePoolProducesHonestEmptyLaterSections()
+    public async Task SmallEligiblePoolRefillsRecentlyAddedWithoutFabricatingCards()
     {
         var home = await CreateHandler(new CandidateReader(Pool(2)))
             .QueryAsync(new(), CancellationToken.None);
 
         await Assert.That(home.Hero.Count).IsEqualTo(2);
-        await Assert.That(home.UpcomingInArea.Count).IsEqualTo(0);
+        await Assert.That(home.UpcomingInArea.Count).IsEqualTo(2);
+        await Assert.That(home.RecentlyAdded.Count).IsEqualTo(2);
+        await Assert.That(home.RecentlyAdded.Select(item => item.Event!.Id).Distinct().Count()).IsEqualTo(2);
         await Assert.That(home.SectionStatuses["hero"]).IsEqualTo(HomeDiscoverySectionStatus.Available);
-        await Assert.That(home.SectionStatuses["upcoming"]).IsEqualTo(HomeDiscoverySectionStatus.Empty);
+        await Assert.That(home.SectionStatuses["upcoming"]).IsEqualTo(HomeDiscoverySectionStatus.Available);
+        await Assert.That(home.SectionStatuses["recently-added"]).IsEqualTo(HomeDiscoverySectionStatus.Available);
+    }
+
+    [Test]
+    public async Task RecentlyAddedSelectsNovelThenFeaturedOnlyThenUpcomingAndRestoresNewestOrder()
+    {
+        var pool = Pool(16);
+        var featured = new[] { pool[1], pool[5], pool[8] };
+        var upcoming = new[] { pool[0], pool[3], pool[6], pool[9], pool[11], pool[12], pool[13], pool[14], pool[15] };
+        var reader = new CandidateReader(pool)
+        {
+            Candidates = criteria => criteria.SortBy switch
+            {
+                "views" => featured,
+                "date" => upcoming,
+                _ => pool
+            }
+        };
+
+        var home = await CreateHandler(reader).QueryAsync(new(), CancellationToken.None);
+        var expected = new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 10 }.Select(index => pool[index].Event!.Id);
+
+        await Assert.That(home.RecentlyAdded.Select(item => item.Event!.Id)).IsEquivalentTo(expected);
+        await Assert.That(home.RecentlyAdded.Select(item => item.Event!.Id).SequenceEqual(expected)).IsTrue();
+    }
+
+    [Test]
+    public async Task RecentlyAddedFindsNovelCandidatesBeyondOverlappingFirstPage()
+    {
+        var unique = Pool(12);
+        var pool = Enumerable.Repeat(unique[0], 100).Concat(unique.Skip(1)).ToList();
+        var reader = new CandidateReader(pool)
+        {
+            Candidates = criteria => criteria.SortBy == "createdat"
+                ? pool
+                : [unique[0], unique[1]]
+        };
+        var home = await CreateHandler(reader).QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(home.RecentlyAdded.Select(item => item.Event!.Id)
+            .SequenceEqual(unique.Skip(2).Select(item => item.Event!.Id))).IsTrue();
+        await Assert.That(home.SectionStatuses["recently-added"]).IsEqualTo(HomeDiscoverySectionStatus.Available);
+    }
+
+    [Test]
+    public async Task ReviewedAliasesAreUniqueWithinEveryShelfButMayOverlapAcrossShelves()
+    {
+        var pool = Pool(3);
+        var root = Guid.CreateVersion7();
+        pool[0] = pool[0] with { DiscoveryIdentityId = root };
+        pool[1] = pool[1] with { DiscoveryIdentityId = root };
+        var home = await CreateHandler(new CandidateReader(pool)).QueryAsync(new(), CancellationToken.None);
+
+        foreach (var shelf in new[] { home.Hero, home.UpcomingInArea, home.RecentlyAdded })
+        {
+            await Assert.That(shelf.Select(item => item.Event!.Id)
+                .SequenceEqual([pool[0].Event!.Id, pool[2].Event!.Id])).IsTrue();
+        }
     }
 
     [Test]
@@ -329,10 +423,16 @@ public sealed class HomeDiscoveryAllocationTests
         {
             Event = new EventListDto
             {
-                Id = Guid.CreateVersion7(), Title = $"Event {index}",
-                EventTypeFullName = null, AudienceGenderFullName = null,
-                AudienceAgeFullName = null, ActorDisplayName = null, ActorTypeFullName = null,
-                EventStatusFullName = null, VisibilityTypeFullName = null, EventFormatFullName = null
+                Id = Guid.CreateVersion7(),
+                Title = $"Event {index}",
+                EventTypeFullName = null,
+                AudienceGenderFullName = null,
+                AudienceAgeFullName = null,
+                ActorDisplayName = null,
+                ActorTypeFullName = null,
+                EventStatusFullName = null,
+                VisibilityTypeFullName = null,
+                EventFormatFullName = null
             }
         }).ToList();
 
@@ -387,6 +487,7 @@ public sealed class HomeDiscoveryAllocationTests
     {
         public bool FailUpcoming { get; init; }
         public Func<GetPublicEventDiscoveryRequest, CancellationToken, Task>? Read { get; init; }
+        public Func<GetEventListRequest, IReadOnlyList<EventDiscoveryItemDto>>? Candidates { get; init; }
         public int LargestWindow { get; private set; }
 
         public async Task<PaginatedResult<EventDiscoveryItemDto>> QueryAsync(
@@ -397,10 +498,11 @@ public sealed class HomeDiscoveryAllocationTests
             if (FailUpcoming && request.Criteria.SortBy == "date" && request.Criteria.ActorId is null)
                 throw new OperationCanceledException();
             var criteria = request.Criteria;
+            var candidates = Candidates?.Invoke(criteria) ?? pool;
             LargestWindow = Math.Max(LargestWindow, criteria.PageNumber * criteria.PageSize);
             return new PaginatedResult<EventDiscoveryItemDto>(
-                pool.Skip((criteria.PageNumber - 1) * criteria.PageSize).Take(criteria.PageSize).ToList(),
-                pool.Count, criteria.PageNumber, criteria.PageSize);
+                candidates.Skip((criteria.PageNumber - 1) * criteria.PageSize).Take(criteria.PageSize).ToList(),
+                candidates.Count, criteria.PageNumber, criteria.PageSize);
         }
     }
 

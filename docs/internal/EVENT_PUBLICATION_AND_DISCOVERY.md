@@ -115,7 +115,22 @@ Country is the existing public location value, not an invented ISO-code conversi
 
 ### Home allocation
 
-`GetHomeDiscoveryQueryHandler` owns one response-local `HomeDiscoveryAllocator`. Sections claim canonical keys sequentially in the approved priority order. Local and ATProto namespaces remain distinct, while known local ATProto bindings share one key. A section excludes earlier assignments before its final take and reads ordered next-page batches to refill duplicates.
+`GetHomeDiscoveryQueryHandler` owns one response-local `HomeDiscoveryAllocator` with explicit section policies. Featured and Upcoming select independently: appearing in the carousel never removes an eligible event from its chronological Upcoming position. Every section deduplicates its own canonical identities. Local and ATProto namespaces remain distinct, while known local ATProto bindings and reviewed aliases share their respective canonical keys.
+
+Recently Added uses the existing newest-added (`createdat` descending) eligible public candidate stream. Selection prefers identities absent from both Featured and Upcoming, then Featured-only identities, then Upcoming identities. Within each band it keeps the newest candidates; after selection it restores the stream's overall newest-first order. Spotlight, most-viewed and curated assignments do not change these three bands. No catalog-size threshold, invented freshness badge or repeated identity within a shelf fills missing supply. Other shelves retain their exclusive earlier-assignment policy.
+
+The allocator scans later ordered batches before falling back to overlap. It buffers at most the section limit per band and returns only real cards. The browser's existing chunked Upcoming columns and horizontally scrolling rails adapt to actual supply without empty card slots; a genuinely short catalog remains short.
+
+Upcoming explicitly selects ongoing-or-future occurrences at the shared
+`OperationNow`, without imposing a UTC-calendar `DateFrom` cutoff on event-local
+dates. This keeps an ongoing occurrence eligible when its local day differs from
+UTC and excludes occurrences that have already ended. The home projection
+preserves the existing public IANA `Timezone` field. `UpcomingEventList` uses
+`GeneratedAtUtc` as its reference instant for event-local Today/Tomorrow labels
+and finite/open-ended ongoing status. It never substitutes the browser clock or
+infers a timezone from a serialized date. Missing/unavailable timezone metadata
+leaves the absolute date visible. Matching start time precedes secondary session
+titles, wraps on small screens, and is included in the accessible link name.
 
 Refill examines at most 1000 candidates in 10 batches per section. A source-confirmed end permits an empty or short result. Exhausted budget or an empty page contradicting remaining-count metadata is `Failed`, not a claim that no eligible events exist. Partial returned candidates remain reserved, and completed curated sections survive cancellation of a later section.
 

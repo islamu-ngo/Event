@@ -156,9 +156,18 @@ The tenant settings navigation never exposes this instance-authority action.
 
 ## Public Home Discovery Boundary
 
-The server allocates each canonical event to at most one home section in fixed priority order. Later sections refill from ordered eligible batches, bounded to 1000 candidates and 10 batches per section. Proven exhaustion is empty/short; timeout, uncertain exhaustion and budget limits are failed states. The browser renders these assignments directly and does not reallocate them.
+The server deduplicates canonical identities within each home section. Featured and Upcoming are independent, so carousel assignment cannot remove an imminent event from the chronological Upcoming shelf. Recently Added prefers candidates absent from both, then Featured-only candidates, then Upcoming candidates as needed; the selected cards retain newest-added order. Other shelves retain exclusive earlier-assignment priority. Selection is bounded to 1000 candidates and 10 batches per section. Proven exhaustion is empty/short; timeout, uncertain exhaustion and budget limits are failed states. The browser preserves the server's allowed overlap and does not reallocate cards.
 
 Home responses use `PrivateNoStore`, and public-experience configuration reads are authoritative. One application-controlled `OperationNow` is shared across section and refill occurrence reads; the HTTP model accepts only the public selection context, not this timestamp. Component tests compare assigned identities with the rendered hero, upcoming and card layouts.
+
+`UpcomingEventList` receives the response's `GeneratedAtUtc`. Relative day labels
+use the already-public event `Timezone` through the existing `DateTimeHelper`,
+while ongoing status uses the matching occurrence's UTC start/end and explicit
+open-ended discriminator. The renderer does not sample browser time, assume
+UTC for missing timezone metadata, or treat an unspecified end as indefinite.
+The matching start time comes before secondary titles and remains available in
+the link's accessible name. Metadata wraps, while secondary titles retain their
+one-line truncation and short columns do not stretch into empty card positions.
 
 `/home` renders the same discovery composition for anonymous and authenticated visitors unless the existing organization-centric shell branch is authoritative. `HomeDiscoveryExperience` owns one persisted `HomeDiscoveryDto`, so PublicSeo prerendering can hydrate without issuing a duplicate discovery request. The obsolete standalone marketing page has been removed.
 
@@ -166,7 +175,7 @@ Home responses use `PrivateNoStore`, and public-experience configuration reads a
 
 Browser geolocation is requested only from the explicit “Use my current location” action. The browser compares the one-shot, low-accuracy result with configured coarse centroids, immediately reduces it to an area ID, and never sends or stores the origin. The BFF `Permissions-Policy` is `geolocation=(self)`; camera, microphone, and payment remain disabled. Online mode preserves the selected area so returning to area discovery does not require another location request.
 
-The composite response owns section truth, ordering, and failure status. Each semantic section evaluates inventory independently, so an event can correctly appear in the hero and in every matching upcoming, online, curated, or recent section. The UI uses the manual `HeroCarousel`, the dedicated link-based `UpcomingEventList`, the production `EventCard` for spotlight and compact rails, and native `EventHorizontalRail`; edit/delete affordances remain HAL-gated. Upcoming returns at most 18 items so responsive layouts can expose one, two, or three six-item columns; other standard sections return at most 10 items. Up to two explicit curated rails are included, each section has a one-second budget, and the full composition has a three-second budget.
+The composite response owns section truth, ordering, and failure status. An event can correctly appear in both Featured and Upcoming, and Recently Added may repeat it after exhausting higher novelty bands. Online, spotlight and curated shelves remain subject to exclusive allocation. The UI uses the manual `HeroCarousel`, the dedicated link-based `UpcomingEventList`, the production `EventCard` for spotlight and compact rails, and native `EventHorizontalRail`; edit/delete affordances remain HAL-gated. Upcoming returns at most 18 items so responsive layouts can expose one, two, or three six-item columns; other standard sections return at most 10 items. Up to two explicit curated rails are included, each section has a one-second budget, and the full composition has a three-second budget.
 
 ## BFF Endpoint Families
 

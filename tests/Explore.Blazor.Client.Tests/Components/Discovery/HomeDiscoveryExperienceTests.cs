@@ -33,9 +33,14 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
     public void Dispose() => context.Dispose();
 
     [Test]
-    public async Task ServerAllocatedIdentitiesReachEveryLayoutOnceWithoutBrowserReallocation()
+    public async Task ServerApprovedOverlapReachesEveryLayoutWithoutBrowserReallocation()
     {
         var home = CompleteHome(Guid.CreateVersion7());
+        home = home with
+        {
+            UpcomingInArea = [home.Hero!.Single(), .. home.UpcomingInArea!],
+            RecentlyAdded = [home.Hero.Single(), .. home.RecentlyAdded!]
+        };
         discoveryService.LoadAsync(null, null, Arg.Any<CancellationToken>()).Returns(home);
         var cut = context.RenderMudComponent<HomeDiscoveryExperience>();
         cut.WaitForElement("[data-testid='home-discovery-context']", TimeSpan.FromSeconds(2));
@@ -53,8 +58,10 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
             .Concat(home.CuratedSections!.SelectMany(section => section.Items!))
             .Select(item => item.Event!.Id).ToArray();
 
-        await Assert.That(rendered.Distinct().Count()).IsEqualTo(rendered.Length);
         await Assert.That(rendered).IsEquivalentTo(assigned);
+        await Assert.That(cut.FindComponent<UpcomingEventList>().Instance.Events
+            .Any(item => item.Id == home.Hero.Single().Event!.Id)).IsTrue();
+        await Assert.That(cut.FindAll("[data-testid='event-rail-skeleton']").Count).IsEqualTo(0);
     }
 
     [Test]

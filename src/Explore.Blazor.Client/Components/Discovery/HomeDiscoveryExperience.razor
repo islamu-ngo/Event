@@ -170,6 +170,10 @@
             @if (UpcomingEvents.Count > 0)
             {
                 <UpcomingEventList Events="UpcomingEvents"
+                                   ReferenceTimeUtc="_discovery.GeneratedAtUtc"
+                                   TodayLabel="@T("ui.home.discovery.today", "Today")"
+                                   TomorrowLabel="@T("ui.home.discovery.tomorrow", "Tomorrow")"
+                                   OngoingLabel="@T("ui.home.discovery.ongoing", "Ongoing")"
                                    DateToBeAnnouncedLabel="@T("home.discovery.date_tba", "Date to be announced")"
                                    ViewEventLabel="@T("home.discovery.view_event", "View event")" />
             }

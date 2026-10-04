@@ -3,6 +3,23 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-04
+
+- **Homepage deadline visibility and supply-aware overlap.** Featured and
+  Upcoming now select independently; carousel inclusion never excludes an
+  otherwise eligible event from its chronological Upcoming position. Recently
+  Added prefers identities absent from both shelves, then Featured-only
+  identities, then Upcoming identities as needed, preserving newest-added
+  display order. Each shelf remains internally unique. Existing limits,
+  disclosure checks, section failures and transport shapes remain authoritative.
+- **Homepage occurrence urgency.** Upcoming uses explicit ongoing-or-future
+  instant eligibility rather than a UTC-calendar date cutoff. Home cards retain
+  their existing public timezone metadata; matching start times wrap before
+  secondary titles, Today/Tomorrow labels use that event timezone and the
+  response timestamp, and Ongoing observes finite half-open or explicit
+  open-ended intervals. English/Arabic labels are shipped without inventing
+  freshness or treating a missing end as indefinite.
+
 ## 2026-10-02
 
 - **Breaking public discovery traversal.** `GetEvents` accepts opaque `cursor`

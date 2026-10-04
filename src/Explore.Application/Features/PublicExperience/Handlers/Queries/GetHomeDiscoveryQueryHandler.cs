@@ -9,6 +9,7 @@ using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
 using Explore.Application.Models.PublicExperience;
 using Explore.Application.Responses;
+using Explore.Application.Specifications.Events;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -82,7 +83,8 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
             if (heroRequest is not null)
             {
                 hero = await QuerySectionAsync(
-                    "hero", heroRequest, HeroLimit, allocator, sectionStatuses, operationToken);
+                    "hero", heroRequest, HeroLimit, allocator, sectionStatuses, operationToken,
+                    HomeDiscoverySectionPolicy.Featured);
             }
             else
             {
@@ -90,12 +92,17 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
             }
 
             var upcomingRequest = ApplyContext(
-                CreateUpcomingRequest(today, "date", sortDescending: false, UpcomingLimit),
+                CreateUpcomingRequest(today, "date", sortDescending: false, UpcomingLimit) with
+                {
+                    DateFrom = null,
+                    View = TemporalView.UpcomingAndOngoing
+                },
                 areaState);
             if (upcomingRequest is not null)
             {
                 upcomingInArea = await QuerySectionAsync(
-                    "upcoming", upcomingRequest, UpcomingLimit, allocator, sectionStatuses, operationToken);
+                    "upcoming", upcomingRequest, UpcomingLimit, allocator, sectionStatuses, operationToken,
+                    HomeDiscoverySectionPolicy.Upcoming);
             }
             else
             {
@@ -159,7 +166,8 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
                     StandardLimit,
                     allocator,
                     sectionStatuses,
-                    operationToken);
+                    operationToken,
+                    HomeDiscoverySectionPolicy.RecentlyAdded);
             }
             else
             {
@@ -369,7 +377,8 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         int limit,
         HomeDiscoveryAllocator allocator,
         Dictionary<string, HomeDiscoverySectionStatus> statuses,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HomeDiscoverySectionPolicy policy = HomeDiscoverySectionPolicy.Exclusive)
     {
         try
         {
@@ -381,7 +390,8 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
                 limit,
                 (criteria, token) => eventDiscoveryHandler.QueryAsync(
                     new GetPublicEventDiscoveryRequest(criteria), token),
-                sectionCancellation.Token);
+                sectionCancellation.Token,
+                policy);
             var items = allocation.Items
                 .Select(MapDiscoveryItem)
                 .ToList();
@@ -462,6 +472,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         MatchingSession = source.MatchingSession,
         AdditionalSessionCount = source.AdditionalSessionCount,
         FirstSessionStartUtc = source.FirstSessionStartUtc,
+        Timezone = source.Timezone,
         IsPast = source.IsPast,
         CreatedAtUtc = source.CreatedAtUtc,
         AtprotoRecordId = source.AtprotoRecordId,

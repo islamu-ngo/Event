@@ -16,7 +16,18 @@ An additional-session count describes other currently eligible matches. If the c
 
 ## Regional visibility
 
-The home page assigns each event to one section. Earlier sections take priority, and later sections refill with other eligible events instead of repeating the same listing.
+Featured highlights events independently. Upcoming lists the next relevant published occurrences chronologically, including featured events: a carousel slide is not proof that an attendee has seen a deadline. Each section still shows a listing identity only once.
+
+Recently Added prefers eligible listings absent from both Featured and Upcoming, then featured listings absent from Upcoming, then Upcoming listings when needed to fill its shelf. Candidates are selected newest-added first within each group and displayed in newest-added order. Other homepage shelves retain their earlier-section exclusions.
+
+Small catalogs can therefore overlap across these sections without leaving artificial gaps. The layout renders only actual cards and adapts to their count; it never repeats a listing within a section or invents freshness to fill an empty position.
+
+Upcoming includes ongoing and future occurrences, rather than events that
+already ended today. Its date and actual start time remain visible on narrow
+screens. Today and Tomorrow are relative to the event's configured timezone,
+not the attendee's browser clock; ongoing occurrences are distinguished from
+ones that have not started. Absolute dates remain visible when timezone
+guidance is unavailable, and later-year occurrences include their year.
 
 A short section can mean its eligible candidates are exhausted. If a section cannot finish within its bounded work or deadline, it reports failure separately from an empty result; other completed sections remain available.
 

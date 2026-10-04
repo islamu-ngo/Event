@@ -4,7 +4,9 @@ using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Secrets.Services;
+using Explore.Secrets.Extensions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Secrets.UnitTests.Configuration;
 
@@ -17,14 +19,18 @@ public sealed class PrivacyIdentityFenceKeyTests
     public async Task SelectedEnvironmentKeySurvivesProviderRecreation()
     {
         string? original = Environment.GetEnvironmentVariable(Variable);
+        string? originalId = Environment.GetEnvironmentVariable("PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID");
         byte[] material = RandomNumberGenerator.GetBytes(32);
         try
         {
             Environment.SetEnvironmentVariable(Variable, Convert.ToBase64String(material));
+            Environment.SetEnvironmentVariable("PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID", "selected-key");
             using PrivacyIdentityFenceKey first = await new PrivacyIdentityFenceKeyProvider(
                 Configuration("Environment")).ResolveAsync(CancellationToken.None);
             using PrivacyIdentityFenceKey restarted = await new PrivacyIdentityFenceKeyProvider(
                 Configuration("Environment")).ResolveAsync(CancellationToken.None);
+            await Assert.That(first.KeyId).IsEqualTo("selected-key");
+            await Assert.That(restarted.KeyId).IsEqualTo(first.KeyId);
             var account = new ProviderAccountKey(AuthenticationProviderKind.Atproto, "did:plc:opaque");
             await Assert.That(first.Fingerprint(account)).IsEqualTo(restarted.Fingerprint(account));
             await Assert.That(first.VerificationTag).IsEqualTo(restarted.VerificationTag);
@@ -32,6 +38,7 @@ public sealed class PrivacyIdentityFenceKeyTests
         finally
         {
             Environment.SetEnvironmentVariable(Variable, original);
+            Environment.SetEnvironmentVariable("PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID", originalId);
             CryptographicOperations.ZeroMemory(material);
         }
     }
@@ -76,9 +83,36 @@ public sealed class PrivacyIdentityFenceKeyTests
         await Assert.That(definition.IsBootstrapSecret).IsTrue();
         await Assert.That(definition.AllowedScopes).IsEquivalentTo([SecretScope.Instance]);
         await Assert.That(definition.DefaultEnvironmentVariableName).IsEqualTo(Variable);
-        await Assert.That(definition.DefaultInfisicalPath).IsEqualTo("/privacy");
+        await Assert.That(definition.DefaultInfisicalPath).IsEqualTo("/api");
         await Assert.That(SecretDefinitionRegistry.GetRotationProfile(definition.Key).Mode)
             .IsEqualTo(SecretRotationMode.UnsupportedLive);
+    }
+
+    [Test]
+    public async Task RegistrationDoesNotRequireFingerprintAuthorityUntilInvoked()
+    {
+        string? original = Environment.GetEnvironmentVariable(Variable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Variable, null);
+            var services = new ServiceCollection();
+            services.AddSingleton(Configuration("Environment"));
+            services.AddSecretResolution();
+            using ServiceProvider provider = services.BuildServiceProvider(
+                new ServiceProviderOptions { ValidateScopes = true });
+            using IServiceScope scope = provider.CreateScope();
+            IPrivacyIdentityFenceKeyProvider keys = scope.ServiceProvider
+                .GetRequiredService<IPrivacyIdentityFenceKeyProvider>();
+
+            await Assert.That(async () =>
+            {
+                using var key = await keys.ResolveAsync(CancellationToken.None);
+            }).Throws<InvalidOperationException>();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Variable, original);
+        }
     }
 
     private static IConfiguration Configuration(string provider, string environment = "Testing") =>

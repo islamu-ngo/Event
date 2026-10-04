@@ -3,6 +3,19 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-10-04
+
+- **Fresh registration after ordinary erasure.** External authentication retains
+  the combined sign-in/JIT-signup flow. An erased provider identity or released
+  verified email may create a fresh User/Actor graph without restoring old
+  profile data, roles, memberships or consent. Retained old-subject fencing,
+  atomic disposal and sequence-validated startup replay remain effective.
+  Replay no longer erases a different fresh UUID by matching external identity.
+  Ordinary signup, erasure and startup do not require reserved fingerprint
+  secrets. The optional key and key-ID definitions resolve from `/api`;
+  moderation enforcement remains a future feature. Routes and payload shapes
+  are unchanged.
+
 ## 2026-10-02
 
 - **Breaking: storage provenance versus delivery.** Persisted `StorageObject.Uri`

@@ -59,8 +59,8 @@ persona initialization passwords. Never print their values.
 | `POSTGRESQL_USERNAME` | Username for the isolated PostgreSQL resource. |
 | `POSTGRESQL_PASSWORD` | Password for the isolated PostgreSQL resource. |
 | `AGENT_BROWSER_REDIS_PASSWORD` | Password for the isolated Redis resource. |
-| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` | Retained external-identity fingerprint authority; Base64-encoded key material from the selected secret authority. |
-| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` | Stable identifier paired with the retained fingerprint key; preserve both across restart and restore. |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` | Optional reserved FUTURE moderation recognition anchor; Base64-encoded key material from the selected secret authority, not required for ordinary erasure or startup. |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` | Optional stable identifier paired with the reserved fingerprint key; preserve both across restart and restore when provisioned. |
 
 Do not put values for any of these names in commands, browser scripts, logs, or
 screenshots. The profile does not choose Environment, User Secrets, or
@@ -83,7 +83,7 @@ Infisical selection correctly rejects the Local-only agent API. The
 repository-native `bash eng/scripts/run-local-agent.sh --no-build` instead
 reads approved Development Universal Auth bootstrap values from the shared
 User Secrets store, imports only allowlisted agent credentials from the
-selected `/api`, `/postgresql` and `/privacy` vault folders into this process,
+selected `/api` and `/postgresql` vault folders into this process,
 and selects Environment plus the agent's compiled Local topology. It does not
 rewrite the shared vault, the ignored `.env`, or any credential. The operator
 needs `curl`, `jq`, `base64`, and `dotnet`; omit `--no-build` after source edits
@@ -91,9 +91,12 @@ until a Release build has produced the intended binaries. The implement-tasks
 workflow copies any repository-root `.env` into a new or resumed worktree
 without overwriting a task-specific copy. An empty source `.env` does not
 supply missing secrets.
-The `/privacy` folder must contain the retained identity-fence key and its stable
-identifier. Missing authority blocks startup replay even on a new Local-only
-database; the agent must not invent replacement key material or bypass replay.
+The two reserved fingerprint names remain allowlisted imports from `/api`, but
+the launcher neither fetches `/privacy` nor requires fingerprint values for an
+ordinary Local-only browser host. Explicit key-provider invocation resolves the
+selected `/api` authority and still fails closed if key material or its stable
+identifier is absent. Never invent replacement material or rotate a provisioned
+key while retained fingerprints or supported backups depend on it.
 
 The profile binds loopback-only HTTP endpoints. Register the AppHost
 resource-state observer before launch, then wait for the migration resource to

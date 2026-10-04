@@ -19,20 +19,19 @@ sequenceDiagram
     autonumber
     actor User as User / Data Subject
     participant API as Explore.API
-    participant Fence as Retained Identity Fence
     participant AuthStore as Privacy Erasure Authority
     participant AppDB as Primary Application DB
     participant Outbox as Provider Cleanup Outbox
 
     User->>API: DELETE /api/user (Idempotency-Key: UUIDv7)
-    API->>Fence: Serialize with enrollment and capture external identities
-    API->>AuthStore: Commit erasure fact and keyed fingerprints atomically
+    API->>AuthStore: Commit erasure fact for the old internal account
+    API->>AppDB: Establish old-subject fence
     API->>AppDB: Serializable Settlement (Purge PII, anonymize foreign keys)
     API->>Outbox: Enqueue async cleanup (Keycloak user, avatars in S3, Stripe customer)
     API-->>User: 202 Accepted (Location: /api/privacy-erasure/status + ErasureReceipt)
 ```
 
-1. **Anti-Resurrection Fence**: An authority database transaction orders enrollment against erasure capture. A retained keyed fingerprint prevents the same external identity from enrolling under a fresh User UUID after its binding has been removed.
+1. **Anti-Resurrection Fence**: A retained old-subject fact and local fence prevent stale work from recreating the erased internal account. This does not prohibit new registration with the same external identity.
 2. **Authority Fact**: The erasure event is recorded in a dedicated, isolated authority store *before* local data disposal begins.
 3. **Serializable Settlement**: In one atomic transaction, the user’s personal data is scrubbed, registrations are anonymized, and foreign keys are safely unlinked.
 4. **Asynchronous External Cleanup**: Background outbox workers delete the user from Keycloak, purge media from S3/local storage, and notify external payment gateways.
@@ -54,33 +53,39 @@ traffic is admitted, provided the retained authority is preserved independently.
 Releasing an address claim does not lift the erased account's anti-resurrection
 fence or authorize a delayed synchronization to recreate its personal data.
 
-## External Identity Retention And Key Provisioning
+## Fresh Registration After Erasure
 
-Deleting an account retains a minimal keyed fingerprint of each external sign-in
-identity for the existing erasure-authority retention period. The index contains
-no email, plaintext issuer/subject or DID. It is still pseudonymous privacy
-evidence, not anonymous data. A delayed sign-in cannot automatically create a new
-account with the same identity during retention. Explicit reenrollment is not
-available.
+Ordinary erasure removes profile PII, provider bindings and verified-address
+proofs. It does not create an external-identity registration ban. Otherwise
+admissible external authentication may automatically create a fresh account,
+including with the same provider identity or released email. The new account
+does not inherit the old account's ID, private data, permissions or consent.
 
-Before starting the API, provision `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` with
-32 securely generated random bytes encoded as base64, and assign the nonsecret
-`PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID`. Store the secret in your explicitly
-selected Infisical authority (`/privacy`) or injected environment. Explicit shared
-.NET User Secrets are supported only in Development/Testing. Do not put the key
-in application settings, source control, backup manifests or support logs.
+Startup still validates and replays retained old-subject erasure facts before
+admitting traffic. It does not erase a legitimate fresh account merely because
+its provider identity resembles an erased account. Preserve the retained
+authority and supported backup horizon; a fresh signup does not bypass an
+invalid restore or an unavailable authority.
 
-Use the same key and ID on every replica and retain them securely alongside the
-recovery procedure for every supported authority backup. A missing or mismatched
-key blocks readiness and external enrollment; there is no fallback. Live rotation
-is unsupported. Back up the authority counter, retained intents and identity index
-as one unit, independently of a primary-only restore. Startup re-erases matching
-restored bindings before serving traffic, including when a restored account has a
-different User UUID or legal-hold audit identifiers have been pseudonymized.
+## Reserved Future Moderation Keys
 
-Compaction uses the existing maximum backup horizon plus safety margin. A held
-fact keeps its fingerprint until the hold is released and the fact is compacted.
-This is not a separate indefinite raw-identifier catalogue.
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` remain optional reserved configuration.
+They are not required for ordinary enrollment, erasure or API startup. Their
+approved Infisical folder is `/api`, not a separate `/privacy` folder.
+
+If a future moderation feature uses identity recognition, its key must be stable,
+held in the explicitly selected approved authority and preserved across restart
+and restore. The explicit key provider still rejects missing/invalid material;
+no ephemeral or predictable replacement is generated. Live rotation is not
+implemented. The configuration names alone do not enable banning.
+
+Future moderation is a separate lifecycle: an existing banned account may
+authenticate into restricted pages with a remaining-ban timer and deletion.
+An identity deleted during an active ban must instead receive Account suspended
+before a replacement account is provisioned. Capture and retention need a
+defined moderation purpose and expiry; erasure records are not automatically
+moderation records. That banning behavior is not implemented in this change.
 
 ## Choosing an Authority Storage Topology
 

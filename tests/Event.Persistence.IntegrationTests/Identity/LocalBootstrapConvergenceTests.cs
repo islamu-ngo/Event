@@ -420,10 +420,7 @@ public sealed class LocalBootstrapConvergenceTests
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
                 GenerationReader(scope), Configuration,
                 new PrivacyIdentityFenceOperation(
-                    Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>(),
-                    Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyErasureAuthority>(),
-                    Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceKeyProvider>(),
-                    logins),
+                    Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()),
                 OperatorOptions);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,

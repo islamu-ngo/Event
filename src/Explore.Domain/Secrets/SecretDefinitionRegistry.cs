@@ -332,11 +332,11 @@ public static class SecretDefinitionRegistry
                 Key = Keys.PrivacyIdentityFenceKey,
                 AllowedScopes = instanceOnly,
                 AllowedSources = bootstrapSources,
-                DefaultInfisicalPath = "/privacy",
+                DefaultInfisicalPath = "/api",
                 DefaultInfisicalKey = "PRIVACY_ERASURE_IDENTITY_FENCE_KEY",
                 DefaultEnvironmentVariableName = "PRIVACY_ERASURE_IDENTITY_FENCE_KEY",
                 IsBootstrapSecret = true,
-                Description = "Persistent identity-erasure HMAC key; retain with all supported authority backups.",
+                Description = "Reserved FUTURE moderation recognition HMAC key; preserve its stable lifecycle across restart and supported backups.",
             },
 
             // --- storage/STORAGE_S3_* ---

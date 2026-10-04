@@ -15,7 +15,6 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
     IPrivacyErasureReplayCheckpointRepository checkpointRepository,
     IPrivacyErasureStateRepository stateRepository,
     IPrivacyErasureAuthority authority,
-    PrivacyIdentityFenceOperation identityFence,
     IUnitOfWork unitOfWork,
     PrivacyErasureApplier applier,
     IOptions<PrivacyErasureOptions> options,
@@ -156,11 +155,7 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                     throw new PrivacyErasureSequenceGapException();
                 }
 
-                if (await identityFence.CaptureRestoredBindingsAsync(
-                        _options.CurrentPolicyVersion, cancellationToken) == 0)
-                    return;
-                state = await authority.GetStateAsync(cancellationToken);
-                continue;
+                return;
             }
 
             foreach (PrivacyErasureIntent intent in facts)
@@ -239,14 +234,14 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
     {
         try
         {
-            return await identityFence.CaptureAndAppendAsync(request, cancellationToken);
+            return await authority.AppendAsync(request, cancellationToken);
         }
         catch (Exception exception) when (
             !cancellationToken.IsCancellationRequested
             && exception is TimeoutException or IOException or InvalidOperationException or OperationCanceledException)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return await identityFence.CaptureAndAppendAsync(request, cancellationToken);
+            return await authority.AppendAsync(request, cancellationToken);
         }
     }
 

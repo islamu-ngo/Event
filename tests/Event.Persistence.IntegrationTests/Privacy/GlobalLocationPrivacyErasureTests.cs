@@ -38,7 +38,6 @@ namespace Event.Persistence.IntegrationTests.Privacy;
 [NotInParallel("PersistenceDb")]
 public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyErasurePostgreSqlFixture fixture)
 {
-    private static readonly RetainedIdentityFenceTests.TestKeyProvider IdentityFenceKeys = new();
     [Test]
     public async Task OwnerPrivateHomeQuery_ReturnsExactCrossTenantSetWithoutEnumeratingOtherRows()
     {
@@ -347,17 +346,13 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         await Assert.That(retained.SubjectId).IsEqualTo(graph.OwnerUserId);
         await Assert.That(retained.SubjectKind).IsEqualTo(PrivacyErasureSubjectKind.User);
 
-        using PrivacyIdentityFenceKey identityKey = await IdentityFenceKeys.ResolveAsync(CancellationToken.None);
         PrivacyErasureIntent duplicate = await authority.AppendAsync(
             new PrivacyErasureRequest(
                 retained.IntentId,
                 retained.SubjectKind,
                 retained.SubjectId,
                 retained.ReasonCode,
-                retained.PolicyVersion,
-                retained.IdentityFences.Select(fence => fence.GetFingerprint()).ToArray(),
-                identityKey.KeyId,
-                identityKey.VerificationTag));
+                retained.PolicyVersion));
         await Assert.That(duplicate.AuthoritySequence).IsEqualTo(retained.AuthoritySequence);
         await Assert.That((await authority.ReadAfterAsync(0, 10)).Count).IsEqualTo(1);
 
@@ -618,8 +613,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
 
     internal static ErasureRuntime CreateRuntime(
         ExploreDbContext context,
-        IPrivacyErasureAuthority authority,
-        IPrivacyIdentityFenceKeyProvider? identityFenceKeys = null)
+        IPrivacyErasureAuthority authority)
     {
         var services = new ServiceCollection();
         services.AddHybridCache();
@@ -652,8 +646,6 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             checkpointRepository,
             stateRepository,
             authority,
-            new PrivacyIdentityFenceOperation((IPrivacyIdentityFenceAuthority)authority, authority,
-                identityFenceKeys ?? IdentityFenceKeys, new UserExternalLoginRepository(context)),
             new EfCoreUnitOfWork(context),
             applier,
             Options.Create(new PrivacyErasureOptions()),

@@ -144,12 +144,23 @@ Claims and evidence are PII.
 [UserLocationPrivacyErasureRepository](../../../src/Explore.Persistence/Repositories/UserLocationPrivacyErasureRepository.cs)
 removes evidence before claims and binding cleanup.
 [PrivacyIdentityFenceOperation](../../../src/Explore.Application/Services/PrivacyIdentityFenceOperation.cs)
-uses retained erasure authority, subject fences and keyed external-binding
-fingerprints to serialize enrollment against erasure and fence restored
-bindings. The retained authority prevents late sign-in/sync or restore from
-resurrecting erased readable identity/profile data; deleting the local email
-registry is not permission to enroll the erased external identity again.
-Secret resolution precedes the authority write transaction.
+uses keyless retained-authority serialization and old internal-subject fences.
+The retained authority prevents stale subject writes and restore replay from
+resurrecting the erased account's readable identity/profile data.
+
+The explicit 2026-10-04 policy correction permits otherwise admissible external
+authentication to create a fresh account after ordinary erasure, including the
+same provider identity or released verified address. The fresh account does not
+recover the old UUID, profile, permissions, private history or consent. The
+combined sign-in/JIT-signup flow remains frictionless; trusted correlation and
+ownership conflicts still apply. Ordinary erasure and startup replay neither
+capture nor resolve external-identity fingerprint secrets.
+
+Reserved fingerprint configuration lives under `/api` for future moderation,
+not an ordinary-erasure non-reenrollment policy. Banning remains outside this
+implementation: existing banned accounts would receive restricted pages,
+timer and deletion, while identities deleted during an active ban would receive
+Account suspended before fresh provisioning. Erasure facts are not ban records.
 
 ## Alternatives
 

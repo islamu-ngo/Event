@@ -298,10 +298,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                     new ManagedTenantProvisioningOperationRepository(app), _managedOptions), _managedOptions,
                 mutation, unit, NullLogger<EnsureManagedProviderClientProvisionedCommandHandler>.Instance,
                 new PrivacyIdentityFenceOperation(
-                    NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>(),
-                    NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyErasureAuthority>(),
-                    NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceKeyProvider>(),
-                    new UserExternalLoginRepository(app)));
+                    NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()));
         }
 
         internal async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> EnsureAsync()

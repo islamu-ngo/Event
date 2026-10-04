@@ -34,7 +34,7 @@ public sealed class RetainedIdentityFenceTests
                 BEGIN SELECT RAISE(ABORT, 'injected_fence_failure'); END;
                 """, Token);
 
-        await Assert.That(async () => { await fixture.Operation.CaptureAndAppendAsync(Request(user), Token); })
+        await Assert.That(async () => { await fixture.AppendFingerprintAsync(Request(user)); })
             .Throws<DbUpdateException>();
 
         await Assert.That((await fixture.Authority.GetStateAsync(Token)).HighWaterSequence).IsEqualTo(0);
@@ -45,36 +45,37 @@ public sealed class RetainedIdentityFenceTests
     }
 
     [Test]
-    public async Task DeletedBindingCannotEnrollAnotherUuidAndSameKeySurvivesRestart()
+    public async Task ErasedIdentityCanEnrollFreshUuidAndSurviveRestartReplay()
     {
         await using var fixture = await Fixture.CreateAsync();
         ProviderAccountKey account = Account();
         Guid original = await fixture.EnrollAsync(account);
-        PrivacyErasureIntent retained = await fixture.Operation.CaptureAndAppendAsync(Request(original), Token);
-        await fixture.Primary.UserExternalLogins.ExecuteDeleteAsync(Token);
+        await using (var runtime = fixture.CreateRuntime())
+            await runtime.Service.EraseUserAsync(original, Guid.CreateVersion7(), Token);
         fixture.Primary.ChangeTracker.Clear();
 
         await using ExploreDbContext restarted = fixture.CreatePrimary();
         PrivacyIdentityFenceOperation operation = fixture.CreateOperation(restarted);
-        await Assert.That(() => fixture.EnrollAsync(account, restarted, operation)).Throws<InvalidOperationException>();
+        Guid fresh = await fixture.EnrollAsync(account, restarted, operation);
+        await Assert.That(fresh).IsNotEqualTo(original);
         await Assert.That(await restarted.Users.CountAsync(Token)).IsEqualTo(1);
-        await Assert.That(await restarted.UserExternalLogins.CountAsync(Token)).IsEqualTo(0);
-        await Assert.That(retained.IdentityFences.Single().AuthoritySequence).IsEqualTo(retained.AuthoritySequence);
-        await fixture.EnrollAsync(Account("opaquesubject"), restarted, operation);
-        await Assert.That(await restarted.Users.CountAsync(Token)).IsEqualTo(2);
+        UserExternalLogin login = await restarted.UserExternalLogins.SingleAsync(Token);
+        await Assert.That(login.UserId).IsEqualTo(fresh);
+        await using var replay = GlobalLocationPrivacyErasureTests.CreateRuntime(restarted, fixture.Authority);
+        await replay.ReplayService.ReplayAsync(Token);
+        await Assert.That(await restarted.Users.AnyAsync(user => user.Id == fresh, Token)).IsTrue();
+        await Assert.That(await restarted.UserPii.AnyAsync(pii => pii.UserId == original, Token)).IsFalse();
+        await Assert.That((await fixture.Authority.GetStateAsync(Token)).HighWaterSequence).IsEqualTo(1);
+        await Assert.That((await fixture.Authority.ReadAfterAsync(0, 10, Token)).Single().IdentityFences).IsEmpty();
     }
 
     [Test]
-    public async Task WrongMissingKeyAndUnavailableAuthorityDenyBeforeApplicationWrites()
+    public async Task KeylessEnrollmentStillRejectsUnavailableAuthorityBeforeApplicationWrites()
     {
         await using var fixture = await Fixture.CreateAsync();
         await fixture.EnrollAsync(Account());
         await using ExploreDbContext other = fixture.CreatePrimary();
-        using var wrongKey = new TestKeyProvider();
-        PrivacyIdentityFenceOperation wrong = fixture.CreateOperation(other, wrongKey);
-        await Assert.That(() => fixture.EnrollAsync(Account("other"), other, wrong)).Throws<InvalidOperationException>();
-        PrivacyIdentityFenceOperation missing = fixture.CreateOperation(other, new MissingKeyProvider());
-        await Assert.That(() => fixture.EnrollAsync(Account("other"), other, missing)).Throws<InvalidOperationException>();
+        await Assert.That((await fixture.Authority.GetStateAsync(Token)).IdentityKeyId).IsNull();
         await using (var corrupt = fixture.AuthorityFactory.CreateDbContext())
             await corrupt.Database.ExecuteSqlRawAsync("DROP TABLE ie_authority_counter", Token);
         await Assert.That(() => fixture.EnrollAsync(Account("other"), other, fixture.CreateOperation(other)))
@@ -88,7 +89,7 @@ public sealed class RetainedIdentityFenceTests
         await using var fixture = await Fixture.CreateAsync();
         Guid user = await fixture.EnrollAsync(Account());
         PrivacyErasureRequest request = Request(user);
-        PrivacyErasureIntent retained = await fixture.Operation.CaptureAndAppendAsync(request, Token);
+        PrivacyErasureIntent retained = await fixture.AppendFingerprintAsync(request);
         await Assert.That(async () => { await fixture.Authority.AppendAsync(request, Token); })
             .Throws<InvalidOperationException>();
         fixture.Clock.Now = fixture.Clock.Now.Add(fixture.Options.AuthorityRetention).AddTicks(1);
@@ -101,10 +102,11 @@ public sealed class RetainedIdentityFenceTests
         await Assert.That(held.IsLegalHoldPseudonymized).IsTrue();
         await Assert.That(held.IdentityFences.Single().AuthoritySequence).IsEqualTo(retained.AuthoritySequence);
         await fixture.Primary.UserExternalLogins.ExecuteDeleteAsync(Token);
-        await Assert.That(() => fixture.EnrollAsync(Account())).Throws<InvalidOperationException>();
+        Guid fresh = await fixture.EnrollAsync(Account());
+        await Assert.That(fresh).IsNotEqualTo(user);
         await fixture.Authority.CompactExpiredIntentsAsync(new(fixture.Clock.Now.UtcDateTime, 100, []), Token);
         await Assert.That(await db.Set<PrivacyErasureIdentityFence>().CountAsync(Token)).IsEqualTo(0);
-        await fixture.EnrollAsync(Account());
+        await Assert.That(await fixture.Primary.Users.AnyAsync(value => value.Id == fresh, Token)).IsTrue();
     }
 
     [Test]
@@ -112,12 +114,13 @@ public sealed class RetainedIdentityFenceTests
     {
         await using var fixture = await Fixture.CreateAsync();
         Guid user = await fixture.EnrollAsync(Account());
-        await fixture.Operation.CaptureAndAppendAsync(Request(user), Token);
+        await fixture.AppendFingerprintAsync(Request(user));
         fixture.Clock.Now = fixture.Clock.Now.Add(fixture.Options.MaximumBackupHorizon);
         var result = await fixture.Authority.CompactExpiredIntentsAsync(
             new(fixture.Clock.Now.UtcDateTime, 100, []), Token);
         await Assert.That(result.DeletedCount).IsEqualTo(0);
-        await Assert.That(() => fixture.EnrollAsync(Account())).Throws<InvalidOperationException>();
+        await using var retained = fixture.AuthorityFactory.CreateDbContext();
+        await Assert.That(await retained.Set<PrivacyErasureIdentityFence>().CountAsync(Token)).IsEqualTo(1);
     }
 
     [Test]
@@ -146,16 +149,20 @@ public sealed class RetainedIdentityFenceTests
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
         var starting = new TransactionStartingSignal();
         await using ExploreDbContext erasing = fixture.CreatePrimary();
-        PrivacyIdentityFenceOperation eraseOperation = fixture.CreateOperation(erasing, interceptor: starting);
+        EmbeddedPrivacyErasureAuthorityRepository eraseAuthority = fixture.CreateAuthority(erasing, starting);
         Task<PrivacyErasureIntent> erasure = Task.Run(
-            () => eraseOperation.CaptureAndAppendAsync(Request(userId), Token), Token);
+            () => eraseAuthority.AppendAsync(Request(userId), Token), Token);
         await starting.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
         commit.SetResult();
         await enrollment.WaitAsync(TimeSpan.FromSeconds(10), Token);
         PrivacyErasureIntent fact = await erasure.WaitAsync(TimeSpan.FromSeconds(10), Token);
-        await Assert.That(fact.IdentityFences.Count).IsEqualTo(1);
+        await Assert.That(fact.IdentityFences).IsEmpty();
         await Assert.That(await erasing.Users.AnyAsync(user => user.Id == userId, Token)).IsTrue();
-        await Assert.That(() => fixture.EnrollAsync(account)).Throws<InvalidOperationException>();
+        await Assert.That(() => fixture.Operation.ExecuteEnrollmentAsync(Account("AnotherSubject"), async token =>
+        {
+            await fixture.Operation.EnsureSubjectMayEnrollAsync(userId, token);
+            return true;
+        }, Token)).Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -168,7 +175,7 @@ public sealed class RetainedIdentityFenceTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Task erasure = fixture.Authority.ExecuteSerializedAsync(async token =>
         {
-            await fixture.Operation.CaptureAndAppendAsync(Request(userId), token);
+            await fixture.Authority.AppendAsync(Request(userId), token);
             appended.SetResult();
             await release.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
             return true;
@@ -177,7 +184,13 @@ public sealed class RetainedIdentityFenceTests
         var starting = new TransactionStartingSignal();
         await using ExploreDbContext enrolling = fixture.CreatePrimary();
         PrivacyIdentityFenceOperation operation = fixture.CreateOperation(enrolling, interceptor: starting);
-        Task<Guid> enrollment = Task.Run(() => fixture.EnrollAsync(account, enrolling, operation), Token);
+        Task<Guid> enrollment = Task.Run(() => operation.ExecuteEnrollmentAsync(
+            Account("AnotherSubject"), async token =>
+            {
+                await operation.EnsureSubjectMayEnrollAsync(userId, token);
+                await fixture.WriteUserAsync(enrolling, Account("AnotherSubject"), Guid.CreateVersion7());
+                return userId;
+            }, Token), Token);
         await starting.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
         release.SetResult();
         await erasure.WaitAsync(TimeSpan.FromSeconds(10), Token);
@@ -214,7 +227,7 @@ public sealed class RetainedIdentityFenceTests
     {
         await using var fixture = await Fixture.CreateAsync();
         Guid userId = await fixture.EnrollAsync(Account());
-        await fixture.Operation.CaptureAndAppendAsync(Request(userId), Token);
+        await fixture.Authority.AppendAsync(Request(userId), Token);
         await Assert.That(await new PrivacyErasureStateRepository(fixture.Primary)
             .GetBySubjectAsync(userId, Token)).IsNull();
         ProviderAccountKey newIdentity = Account("AnotherSubject");
@@ -238,7 +251,7 @@ public sealed class RetainedIdentityFenceTests
         Guid.CreateVersion7(), PrivacyErasureSubjectKind.User, user, PrivacyErasureReasonCode.AccountDeletion, 1);
 
     [Test]
-    public async Task RestoreReconcilesFreshUuidAfterLegalHoldPseudonymizationBeforeReadiness()
+    public async Task FreshRegistrationSurvivesReplayAfterLegalHoldPseudonymization()
     {
         await using var fixture = await Fixture.CreateAsync();
         ProviderAccountKey account = Account();
@@ -249,17 +262,16 @@ public sealed class RetainedIdentityFenceTests
         await fixture.Authority.CompactExpiredIntentsAsync(
             new(fixture.Clock.Now.UtcDateTime, 100, [1L]), Token);
         fixture.Primary.ChangeTracker.Clear();
-        Guid resurrected = Guid.CreateVersion7();
-        await fixture.WriteUserAsync(fixture.Primary, account, resurrected);
+        Guid fresh = await fixture.EnrollAsync(account);
         fixture.Primary.ChangeTracker.Clear();
 
         await runtime.ReplayService.ReplayAsync(Token);
 
-        await Assert.That(await fixture.Primary.UserExternalLogins.AnyAsync(Token)).IsFalse();
-        await Assert.That(await fixture.Primary.UserPii.AnyAsync(pii => pii.UserId == resurrected, Token)).IsFalse();
-        await Assert.That(await fixture.Primary.Users.AnyAsync(user => user.Id == resurrected, Token)).IsFalse();
-        await Assert.That((await fixture.Authority.GetStateAsync(Token)).HighWaterSequence).IsEqualTo(2);
-        await Assert.That(() => fixture.EnrollAsync(account)).Throws<InvalidOperationException>();
+        await Assert.That(fresh).IsNotEqualTo(original);
+        await Assert.That(await fixture.Primary.UserExternalLogins.AnyAsync(login => login.UserId == fresh, Token)).IsTrue();
+        await Assert.That(await fixture.Primary.UserPii.AnyAsync(pii => pii.UserId == fresh, Token)).IsTrue();
+        await Assert.That(await fixture.Primary.Users.AnyAsync(user => user.Id == fresh, Token)).IsTrue();
+        await Assert.That((await fixture.Authority.GetStateAsync(Token)).HighWaterSequence).IsEqualTo(1);
     }
 
     private sealed class TransactionStartingSignal : DbTransactionInterceptor
@@ -286,12 +298,6 @@ public sealed class RetainedIdentityFenceTests
         public Task<PrivacyIdentityFenceKey> ResolveAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new PrivacyIdentityFenceKey("test-key", _key));
         public void Dispose() => CryptographicOperations.ZeroMemory(_key);
-    }
-
-    private sealed class MissingKeyProvider : IPrivacyIdentityFenceKeyProvider
-    {
-        public Task<PrivacyIdentityFenceKey> ResolveAsync(CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("privacy_identity_fence_key_unavailable");
     }
 
     private sealed class AuthorityFactory(DbContextOptions<EmbeddedPrivacyErasureAuthorityDbContext> options)
@@ -329,8 +335,7 @@ public sealed class RetainedIdentityFenceTests
             }
             fixture.Authority = new(fixture.AuthorityFactory, fixture.Clock,
                 Microsoft.Extensions.Options.Options.Create(fixture.Options), applicationContext: fixture.Primary);
-            fixture.Operation = new(fixture.Authority, fixture.Authority, fixture._key,
-                new UserExternalLoginRepository(fixture.Primary));
+            fixture.Operation = new(fixture.Authority);
             return fixture;
         }
 
@@ -350,16 +355,24 @@ public sealed class RetainedIdentityFenceTests
             return new(builder.Options);
         }
 
+        public EmbeddedPrivacyErasureAuthorityRepository CreateAuthority(
+            ExploreDbContext primary, DbTransactionInterceptor? interceptor = null) =>
+            new(CreateAuthorityFactory(interceptor), Clock,
+                Microsoft.Extensions.Options.Options.Create(Options), applicationContext: primary);
+
         public PrivacyIdentityFenceOperation CreateOperation(ExploreDbContext primary,
-            IPrivacyIdentityFenceKeyProvider? key = null, DbTransactionInterceptor? interceptor = null)
+            DbTransactionInterceptor? interceptor = null) => new(CreateAuthority(primary, interceptor));
+
+        public async Task<PrivacyErasureIntent> AppendFingerprintAsync(PrivacyErasureRequest request)
         {
-            var authority = new EmbeddedPrivacyErasureAuthorityRepository(CreateAuthorityFactory(interceptor),
-                Clock, Microsoft.Extensions.Options.Options.Create(Options), applicationContext: primary);
-            return new(authority, authority, key ?? _key, new UserExternalLoginRepository(primary));
+            using PrivacyIdentityFenceKey key = await _key.ResolveAsync(Token);
+            return await Authority.AppendAsync(new PrivacyErasureRequest(
+                request.IntentId, request.SubjectKind, request.SubjectId, request.ReasonCode,
+                request.PolicyVersion, [key.Fingerprint(Account())], key.KeyId, key.VerificationTag), Token);
         }
 
         public GlobalLocationPrivacyErasureTests.ErasureRuntime CreateRuntime() =>
-            GlobalLocationPrivacyErasureTests.CreateRuntime(Primary, Authority, _key);
+            GlobalLocationPrivacyErasureTests.CreateRuntime(Primary, Authority);
 
         public Task<Guid> EnrollAsync(ProviderAccountKey account, ExploreDbContext? primary = null,
             PrivacyIdentityFenceOperation? operation = null)

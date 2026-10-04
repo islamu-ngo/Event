@@ -681,10 +681,6 @@ public class UserExternalLoginIntegrationTests
                 Arg.Any<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>()(
                 call.Arg<CancellationToken>()));
-        var fenceKeys = Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceKeyProvider>();
-        fenceKeys.ResolveAsync(Arg.Any<CancellationToken>()).Returns(_ =>
-            new Explore.Application.Contracts.PrivacyErasure.PrivacyIdentityFenceKey(
-                "unit-key", System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
         return new BootstrapAtprotoSessionCommandHandler(
             gateway,
             tokenIssuer,
@@ -705,10 +701,7 @@ public class UserExternalLoginIntegrationTests
             tenantContext,
             configuration,
             TimeProvider.System,
-            new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority,
-                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyErasureAuthority>(),
-                fenceKeys,
-                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityBindingReader>()));
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority));
     }
 
     private async Task EnsureUserExistsAsync(Guid userId, string? email = null)

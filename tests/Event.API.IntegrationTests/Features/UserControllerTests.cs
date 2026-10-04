@@ -9,6 +9,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.PrivacyErasure;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.DTOs.User;
@@ -298,6 +299,122 @@ public class UserControllerTests
     #region DELETE Endpoints
 
     [Test]
+    [Category(TestCategories.Fast)]
+    public async Task SyncUser_AfterOrdinaryErasure_ReusesIdentityAndEmailWithoutInheritingErasedAccount()
+    {
+        await using var factory = new UserEnrollmentFactory { SeedActiveDefaultTenant = true };
+        string subject = Guid.NewGuid().ToString("D");
+        const string issuer = "https://auth.example.test/realms/ISLAMU";
+        const string email = "reenrollment@example.test";
+        factory.AdditionalConfiguration["IdentityCorrelation:TrustedIssuers:0"] = issuer;
+        using var client = factory.CreateClient();
+        using var initialRequest = CreateOidcSyncRequest(subject, issuer, email, emailVerified: true);
+        using HttpResponseMessage initialResponse = await client.SendAsync(initialRequest);
+        await Assert.That(initialResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var initial = await initialResponse.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
+        await Assert.That(initial).IsNotNull();
+        Guid erasedUserId = initial!.Id;
+        Guid erasedActorId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            User user = await database.Users.Include(x => x.Pii).SingleAsync(x => x.Id == erasedUserId);
+            erasedActorId = await database.Actors.Where(x => x.UserId == erasedUserId).Select(x => x.Id).SingleAsync();
+            user.Pii.FirstName = "Erased";
+            user.Pii.LastName = "Private";
+            user.LastActiveTenantId = PlatformDefaults.DefaultTenantId;
+            database.PlatformUserRoles.Add(new PlatformUserRole
+            {
+                Id = Guid.CreateVersion7(), UserId = erasedUserId, User = user,
+                RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = DateTime.UtcNow
+            });
+            database.TenantUsers.Add(new TenantUser
+            {
+                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
+                UserId = erasedUserId, User = user, ActorId = erasedActorId,
+                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow, CreatedBy = erasedUserId
+            });
+            database.AiConsentGrants.Add(new AiConsentGrant
+            {
+                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId,
+                SubjectUserId = erasedUserId, SubjectUser = user,
+                EntityName = nameof(UserPii), FieldName = nameof(UserPii.Email),
+                ProviderTrustTierId = (int)AiProviderTrustTierEnum.LocalInProcessOrSameNetworkModel,
+                StatusId = (int)AiConsentGrantStatusEnum.Granted,
+                GrantedAtUtc = DateTimeOffset.UtcNow, CreatedAt = DateTime.UtcNow, CreatedBy = erasedUserId
+            });
+            await database.SaveChangesAsync();
+            await Assert.That(await database.UserIdentityEmailClaims.AnyAsync(x =>
+                x.UserId == erasedUserId && x.NormalizedEmail == email)).IsTrue();
+        }
+
+        using var eraseRequest = new HttpRequestMessage(HttpMethod.Delete, BaseUrl);
+        eraseRequest.Headers.Add(TestAuthHandler.AuthHeaderName,
+            initialRequest.Headers.GetValues(TestAuthHandler.AuthHeaderName));
+        eraseRequest.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("D"));
+        using HttpResponseMessage eraseResponse = await client.SendAsync(eraseRequest);
+        await Assert.That(eraseResponse.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        var receipt = await eraseResponse.Content.ReadFromJsonAsync<PrivacyErasureStartDto>();
+        await Assert.That(receipt).IsNotNull();
+        await Assert.That(receipt!.Status).IsNotEqualTo("fenced");
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await Assert.That(await database.UserPii.AnyAsync(x => x.UserId == erasedUserId)).IsFalse();
+            await Assert.That(await database.UserExternalLogins.AnyAsync(x => x.UserId == erasedUserId)).IsFalse();
+            await Assert.That(await database.UserIdentityEmailClaims.AnyAsync(x => x.NormalizedEmail == email)).IsFalse();
+            await Assert.That(await database.PlatformUserRoles.AnyAsync(x => x.UserId == erasedUserId)).IsFalse();
+            await Assert.That(await database.TenantUsers.AnyAsync(x => x.UserId == erasedUserId)).IsFalse();
+            await Assert.That(await database.AiConsentGrants.AnyAsync(x => x.SubjectUserId == erasedUserId)).IsFalse();
+        }
+
+        using var reenrollRequest = CreateOidcSyncRequest(subject, issuer, email, emailVerified: true);
+        using HttpResponseMessage reenrollResponse = await client.SendAsync(reenrollRequest);
+        await Assert.That(reenrollResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var reenrolled = await reenrollResponse.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
+        await Assert.That(reenrolled).IsNotNull();
+        await Assert.That(reenrolled!.Id).IsNotEqualTo(erasedUserId);
+        await Assert.That(reenrolled.Id.Version).IsEqualTo(7);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IPrivacyErasureService>()
+                .ReplayPendingAsync(CancellationToken.None);
+        }
+
+        using var repeatRequest = CreateOidcSyncRequest(subject, issuer, email, emailVerified: true);
+        using HttpResponseMessage repeatResponse = await client.SendAsync(repeatRequest);
+        await Assert.That(repeatResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var repeated = await repeatResponse.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
+        await Assert.That(repeated!.Id).IsEqualTo(reenrolled.Id);
+        using var authorityRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/admin-authority");
+        authorityRequest.Headers.Add(TestAuthHandler.AuthHeaderName,
+            reenrollRequest.Headers.GetValues(TestAuthHandler.AuthHeaderName));
+        using HttpResponseMessage authorityResponse = await client.SendAsync(authorityRequest);
+        await Assert.That(authorityResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var authority = await authorityResponse.Content.ReadFromJsonAsync<AdminAuthorityDto>();
+        await Assert.That(authority!.HasAnyAuthority).IsFalse();
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verification = verificationScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        User fresh = await verification.Users.Include(x => x.Pii).SingleAsync(x => x.Id == reenrolled.Id);
+        await Assert.That(fresh.Pii.Email).IsEqualTo(email);
+        await Assert.That(fresh.Pii.FirstName).IsEqualTo("OIDC");
+        await Assert.That(fresh.Pii.LastName).IsEqualTo("User");
+        await Assert.That(fresh.LastActiveTenantId).IsNull();
+        await Assert.That(await verification.UserIdentityEmailClaims
+            .Where(x => x.NormalizedEmail == email).Select(x => x.UserId).SingleAsync()).IsEqualTo(fresh.Id);
+        await Assert.That(await verification.Actors.Where(x => x.UserId == fresh.Id)
+            .Select(x => x.Id).SingleAsync()).IsNotEqualTo(erasedActorId);
+        await Assert.That(await verification.TenantUsers.AnyAsync(x => x.UserId == fresh.Id)).IsFalse();
+        await Assert.That(await verification.AiConsentGrants.AnyAsync(x => x.SubjectUserId == fresh.Id)).IsFalse();
+        await Assert.That(await verification.UserPii.AnyAsync(x => x.UserId == erasedUserId)).IsFalse();
+    }
+
+    [Test]
     public async Task DeleteUser_WithoutAuth_ShouldReturnUnauthorized()
     {
         // Act
@@ -498,7 +615,8 @@ public class UserControllerTests
     private static HttpRequestMessage CreateOidcSyncRequest(
         string subject,
         string issuer,
-        string email)
+        string email,
+        bool emailVerified = false)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/sync");
         request.Headers.Add(
@@ -509,6 +627,7 @@ public class UserControllerTests
                 ("iss", issuer),
                 ("idp", "keycloak"),
                 ("email", email),
+                ("email_verified", emailVerified.ToString().ToLowerInvariant()),
                 ("given_name", "OIDC"),
                 ("family_name", "User")));
         return request;

@@ -11,10 +11,10 @@ public sealed class PrivacyIdentityFenceKeyProvider(IConfiguration configuration
     {
         cancellationToken.ThrowIfCancellationRequested();
         IConfiguration authority = SecretAuthorityConfiguration.Build(
-            configuration, SecretAuthorityConfiguration.GetEnvironmentName(configuration), "/privacy");
+            configuration, SecretAuthorityConfiguration.GetEnvironmentName(configuration), "/api");
         string? encoded = authority["PRIVACY_ERASURE_IDENTITY_FENCE_KEY"];
         string? keyId = configuration["PrivacyErasure:IdentityFence:KeyId"]
-            ?? configuration["PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID"];
+            ?? authority["PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID"];
         if (string.IsNullOrEmpty(encoded) || string.IsNullOrEmpty(keyId))
             throw new InvalidOperationException("privacy_identity_fence_key_unavailable");
         byte[] material;

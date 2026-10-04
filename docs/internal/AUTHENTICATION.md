@@ -82,8 +82,11 @@ and holds retained-authority serialization through application commit.
 Co-located SQLite enlists both contexts in the same write transaction. Changes
 committed before this gate are resolved from the current canonical owner;
 writers cannot transfer ownership between its pre-read and graph mutation.
-Retained keyed account fingerprints also prevent an erased external identity
-from returning under a new User UUID. See [Privacy Erasure](PRIVACY_ERASURE.md).
+The retained old-subject fact prevents linking to an erased internal User UUID.
+Ordinary erasure does not ban the reusable external identity: after binding and
+claim disposal, otherwise admissible authentication may create a fresh account
+without recovering old private data or authority. Enrollment does not require
+fingerprint secrets. See [Privacy Erasure](PRIVACY_ERASURE.md).
 
 ATProtocol bootstrap acquires the ordered visitor-setting lock group before
 entering this enrollment gate, then performs bootstrap convergence inside the

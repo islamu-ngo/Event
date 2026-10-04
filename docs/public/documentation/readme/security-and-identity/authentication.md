@@ -58,11 +58,12 @@ account. Event discards that provider's obsolete address proof while preserving
 proof supplied independently by another linked identity. Mail recipient
 selection uses supported identity-address claims.
 
-Erasing an account retains a purpose-bound keyed fingerprint of its external
-sign-in identities for the configured erasure-authority retention period.
-Signing in again does not silently recreate that erased identity under a fresh
-account ID. Operators must preserve the configured fingerprint key across
-restore; see [Privacy Erasure](privacy-erasure.md).
+After ordinary account erasure, authenticating again with the same external
+provider identity or released email may automatically create a fresh Event
+account. It does not recover the old account ID, profile, permissions, private
+history or consent. Existing matching and address-conflict rules still apply.
+Old-account replay protection remains intact; fingerprint keys are not required
+for ordinary signup, erasure or startup. See [Privacy Erasure](privacy-erasure.md).
 
 ## Profile Names
 

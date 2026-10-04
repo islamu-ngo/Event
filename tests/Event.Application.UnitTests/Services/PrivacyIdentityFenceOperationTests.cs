@@ -4,14 +4,13 @@ using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using NSubstitute;
 
 namespace Event.Application.UnitTests.Services;
 
 public sealed class PrivacyIdentityFenceOperationTests
 {
     [Test]
-    public async Task RetainedExternalIdentityNeverReachesEnrollmentMutation()
+    public async Task RetainedExternalIdentityCanEnrollFreshSubjectWithoutReusingErasedSubject()
     {
         var keys = new FenceTestKeyProvider();
         using PrivacyIdentityFenceKey key = await keys.ResolveAsync(CancellationToken.None);
@@ -21,41 +20,62 @@ public sealed class PrivacyIdentityFenceOperationTests
         authority.Retained = PrivacyErasureIntent.Record(Guid.CreateVersion7(), 1,
             PrivacyErasureSubjectKind.User, Guid.CreateVersion7(), PrivacyErasureReasonCode.AccountDeletion,
             1, now, now, now.AddDays(90), [key.Fingerprint(account)]);
-        var operation = Create(authority, keys);
+        var operation = Create(authority);
         bool written = false;
 
-        await Assert.That(() => operation.ExecuteEnrollmentAsync(account, _ =>
+        Guid fresh = await operation.ExecuteEnrollmentAsync(account, _ =>
         {
             written = true;
             return Task.FromResult(Guid.CreateVersion7());
-        }, CancellationToken.None)).Throws<InvalidOperationException>();
+        }, CancellationToken.None);
 
-        await Assert.That(written).IsFalse();
+        await Assert.That(written).IsTrue();
+        await Assert.That(fresh).IsNotEqualTo(authority.Retained.SubjectId);
     }
 
     [Test]
-    public async Task UnavailableKeyFailsBeforeIdentityLookupOrMutation()
+    public async Task EnrollmentDoesNotRequireFingerprintAuthority()
     {
-        var keys = Substitute.For<IPrivacyIdentityFenceKeyProvider>();
-        keys.ResolveAsync(Arg.Any<CancellationToken>())
-            .Returns< Task<PrivacyIdentityFenceKey>>(_ => throw new InvalidOperationException("key_unavailable"));
         var authority = new FenceTestAuthority();
-        var operation = Create(authority, keys);
+        var operation = Create(authority);
         bool written = false;
-        await Assert.That(() => operation.ExecuteEnrollmentAsync(
+        bool admitted = await operation.ExecuteEnrollmentAsync(
             new ProviderAccountKey(AuthenticationProviderKind.Google, "canonical-account"), _ =>
             {
                 written = true;
                 return Task.FromResult(true);
-            }, CancellationToken.None)).Throws<InvalidOperationException>();
-        await Assert.That(written).IsFalse();
+            }, CancellationToken.None);
+        await Assert.That(admitted).IsTrue();
+        await Assert.That(written).IsTrue();
         await Assert.That(authority.Counter.IdentityKeyId).IsNull();
     }
 
+    [Test]
+    public async Task FreshExternalIdentityCannotAttachToRetainedErasedSubject()
+    {
+        var authority = new FenceTestAuthority();
+        Guid erased = Guid.CreateVersion7();
+        DateTime now = DateTime.UtcNow;
+        authority.Retained = PrivacyErasureIntent.Record(Guid.CreateVersion7(), 1,
+            PrivacyErasureSubjectKind.User, erased, PrivacyErasureReasonCode.AccountDeletion,
+            1, now, now, now.AddDays(90));
+        var operation = Create(authority);
+        bool written = false;
+
+        await Assert.That(() => operation.ExecuteEnrollmentAsync(
+            new ProviderAccountKey(AuthenticationProviderKind.Atproto, "did:plc:fresh"),
+            async token =>
+            {
+                await operation.EnsureSubjectMayEnrollAsync(erased, token);
+                written = true;
+                return erased;
+            }, CancellationToken.None)).Throws<InvalidOperationException>();
+
+        await Assert.That(written).IsFalse();
+    }
+
     private static PrivacyIdentityFenceOperation Create(
-        IPrivacyIdentityFenceAuthority authority, IPrivacyIdentityFenceKeyProvider keys) =>
-        new(authority, Substitute.For<IPrivacyErasureAuthority>(), keys,
-            Substitute.For<IPrivacyIdentityBindingReader>());
+        IPrivacyIdentityFenceAuthority authority) => new(authority);
 }
 
 internal sealed class FenceTestKeyProvider : IPrivacyIdentityFenceKeyProvider

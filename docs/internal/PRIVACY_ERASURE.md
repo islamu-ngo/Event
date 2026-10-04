@@ -47,14 +47,13 @@ erasure request -> append authority fact (committed first)
 5. **Startup & Restore Replay**: At application startup, the startup gate replays all authority facts missing from the local checkpoint before serving traffic.
 6. **Bounded Retention**: The authority publishes a PII-free high-water/floor state. Compaction deletes only an expired contiguous prefix, preserves and pseudonymizes held evidence, and advances the floor in the same transaction.
 
-### Retained External Identity Fence
+### Serialized Enrollment And Erased-Subject Fencing
 
-`PrivacyIdentityFenceOperation` serializes external enrollment and erasure
-capture through `IPrivacyIdentityFenceAuthority`. Enrollment checks the exact
-existing `ProviderAccountKey` before its first binding lookup and holds the
-authority gate through the application commit. Erasure captures every current
-external binding under the same gate and atomically appends its fingerprints
-with the ordinary retained intent before any primary deletion. Sync,
+`PrivacyIdentityFenceOperation` serializes external enrollment through
+`IPrivacyIdentityFenceAuthority` before binding resolution and holds the
+authority gate through the application commit. This gate is keyless. Ordinary
+erasure appends its old internal-subject fact through `IPrivacyErasureAuthority`
+before primary deletion; it does not capture reusable provider fingerprints. Sync,
 instance/configured onboarding, DID bootstrap and managed external administrator
 provisioning all use this gate. Native Local identity continues to use its
 credential-operation receipts and User UUID fences.
@@ -64,47 +63,46 @@ retained subject fact under that gate. This closes the interval between retained
 append and saving the primary saga: a different external key cannot join the
 erased user while its primary UUID fence is not yet visible.
 
-`PrivacyIdentityFenceKey` uses HMAC-SHA-256 over length-prefixed UTF-8 fields
-(32-bit big-endian byte lengths): purpose/version, closed provider kind and the
-already-canonical account key. It never normalizes an opaque subject again.
-The separate key-verification purpose binds the nonsecret key ID. Authority
-state retains that ID and verification tag; `PrivacyErasureIdentityFence` retains
-only provider kind, key ID, digest, expiry and immutable `AuthoritySequence`.
-Its composite lookup index excludes raw subjects, issuer-account strings, DIDs,
-email addresses and User UUIDs. Duplicate append compares the complete digest
-set; a failed append rolls back both the intent and its index.
-
 Dedicated SQLite holds a real write transaction. CoLocated SQLite enlists the
 application context in that same connection/transaction; `EfCoreUnitOfWork`
 recognizes only this explicit enlistment, while ordinary nested transactions
 remain rejected. CoLocated PostgreSQL locks the authority counter row in its
 transaction. External PostgreSQL retains function-only runtime privileges through
 `PrivacyIdentityFenceDatabaseContract`; it does not grant raw table access.
-Secret resolution happens before the gate, never as network I/O inside it.
+No fingerprint secret is resolved or validated by ordinary enrollment, erasure
+or startup replay.
 
-Replay exports include the intent's fingerprints, and authority state includes
-the key commitment. Physical authority backups must include the counter, intents
-and identity index together. After ordinary sequence replay, startup checks all
-restored external bindings against retained fingerprints, even if their User UUID
-differs or a legal hold has pseudonymized both audit UUIDs. A match appends another
-ordinary erasure fact for the restored user and drains the existing applier
-before readiness; it does not introduce a second purge engine.
+Replay validates retained floor, high-water, sequence continuity and checkpoint
+identity before purging old-subject records. It does not scan reusable provider
+identities and append erasure facts for a different fresh User UUID. After normal
+erasure removes bindings and identity-email ownership, otherwise admissible
+external authentication may automatically create a fresh account with the same
+provider identity or released address. It never restores the old internal ID,
+profile, permissions, private history or consent. Trusted correlation and
+verified-address conflicts still apply.
 
-Fences expire only through the existing contiguous-prefix authority compaction:
-`MaximumBackupHorizon + AuthorityRetentionSafetyMargin`. Held audit UUID
-pseudonymization never moves the index's sequence association. A legal hold
-retains matching until its fact is actually compacted. Missing/wrong key,
-missing retained key metadata and unavailable authority fail closed. No automatic
-reenrollment or bypass mode exists.
+Preserve the supported authority backup and compaction contract, including
+`MaximumBackupHorizon + AuthorityRetentionSafetyMargin`. An unavailable authority
+or invalid restore sequence still fails closed; permitting a fresh account is not
+permission to bypass replay or restore erased old-subject data.
 
-Provision `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` as base64-encoded 32 random bytes
-in the selected approved secret authority, with nonsecret
-`PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` (or `PrivacyErasure:IdentityFence:KeyId`).
-The bootstrap catalogue entry is `privacy.identity_fence_key`, Infisical path
-`/privacy`. Environment reads use explicit process injection; shared User Secrets
-are accepted only when explicitly selected in Development/Testing. No application
-database binding or configuration fallback supplies this key. Retain the same key
-for every replica and all supported authority backups. Live rotation is unsupported.
+### Reserved Moderation Recognition Configuration
+
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY` and
+`PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` remain optional reserved configuration for
+future moderation recognition, not mandatory ordinary-erasure startup inputs.
+Their approved Infisical location is `/api`. If the explicit key provider is
+invoked, it requires stable Base64-encoded key material and its matching nonsecret
+ID; no ephemeral key, source-code credential or silent fallback is supplied.
+Live rotation remains unsupported.
+
+The existing fingerprint payload/index contracts and key commitments are not
+overwritten by keyless enrollment. They do not constitute an implemented ban
+ledger, and an erasure fingerprint must not be interpreted as a sanction. Future
+moderation needs its own purpose, retention and expiry contract. The accepted
+future policy permits restricted authenticated sessions for existing banned
+accounts, but rejects provisioning of an identity deleted during an active ban.
+No banning or strike-history enforcement is activated by this correction.
 
 ### Verified Identity Email Ownership
 

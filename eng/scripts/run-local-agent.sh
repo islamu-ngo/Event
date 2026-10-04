@@ -62,7 +62,7 @@ access_token=$(
         jq -er '.accessToken // empty'
 )
 
-for path in api postgresql privacy; do
+for path in api postgresql; do
     encoded_path=$(jq -nr --arg value "/$path" '$value|@uri')
     response=$(
         curl --silent --show-error --fail --ipv4 --max-time 20 \
@@ -107,8 +107,7 @@ export DEPLOYMENT_MODE=multi_tenant
 export CONFIGURATION_MANIFEST_MODE=Off
 
 for key in POSTGRESQL_USERNAME POSTGRESQL_PASSWORD AGENT_BROWSER_REDIS_PASSWORD \
-    AGENT_BROWSER_PERSONA_PASSWORD AUTHENTICATION_LOCAL_JWT_KEY \
-    PRIVACY_ERASURE_IDENTITY_FENCE_KEY PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID; do
+    AGENT_BROWSER_PERSONA_PASSWORD AUTHENTICATION_LOCAL_JWT_KEY; do
     [[ -n ${!key:-} ]] || {
         printf 'Missing approved agent secret: %s\n' "$key" >&2
         exit 4

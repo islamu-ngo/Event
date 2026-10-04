@@ -1,6 +1,6 @@
 # I-VSD Planning Assessment: Pre-Release Contract Foundations
 
-Last Updated: 2026-10-03
+Last Updated: 2026-10-04
 
 ## Review Metadata
 
@@ -9,13 +9,50 @@ Last Updated: 2026-10-03
 - Workstream: pre-release-contract-foundations
 - Report kind: implementation-planning-assessment
 - Report status: current
-- Disposition: architecture-aligned; final acceptance pending
-- Report revision: 2026-10-03-r4
-- Evidence cutoff: 2026-10-03
+- Disposition: architecture-aligned; browser acceptance pending
+- Report revision: 2026-10-04-r6
+- Evidence cutoff: 2026-10-04
+- Current correction receipts: Release build passed 65 projects; Application 3,592, Architecture 678, Secrets 253, relational erasure/enrollment/replay eleven, real HTTP re-registration one, and 49 owning catalogue/provider checks passed. Browser acceptance remains unverified; prior candidate input below is historical evidence.
 - Reviewed input: committed runtime `80e8070b86ef42b09ce597b8b15e7f2cfe06fce7` and profile recovery `70a1719131bea7f8eb1d66267c8c0220de1d483e`, inspected native acceptance receipts and graduation documents. Corrected owning-case gates reconcile final API/Persistence coverage; actual Development browser acceptance is not inferred from those tests.
 - Supersedes: none; consumes the pre-release consultancy and the user's accepted correlation-policy correction
 
 ## Scope
+
+### Explicit Policy Correction, 2026-10-04
+
+The user rejects the agent-selected blanket prohibition on re-enrollment after
+ordinary erasure. External authentication must retain frictionless sign-in or
+automatic signup. An erased identity or released email may create a fresh
+account, without recovering the old account's private data or authority.
+Old internal-subject fences, stale-work rejection and restore replay remain
+required. This correction supersedes the earlier external-identity
+non-reenrollment interpretation in F005/M005 and its implementation receipts;
+the historical tests alone do not prove the corrected behavior.
+
+Retained identity recognition and its key/key-ID lifecycle have an explicitly
+accepted future moderation purpose: warnings, ban history and an unexpired ban
+must survive account deletion and re-registration under the same recognized
+identifier. That future feature must allow an existing banned account restricted
+authenticated sessions, a visible remaining-ban timer and account deletion.
+An identity deleted during an active ban must receive Account suspended before
+new provisioning. Capture new fingerprints only for active-ban deletion.
+A different genuine
+identifier may evade matching; shared contact addresses and speculative person
+tracking do not justify spreading sanctions. The future requirements are
+written in the main checkout's `dev/next/account-moderation-retention.md`.
+
+The correction is implemented: enrollment is keyless and authority-serialized,
+old internal subjects remain fenced, ordinary erasure appends no new provider
+fingerprints, and replay does not erase fresh UUIDs by identity matching.
+The optional reserved key/key-ID definitions now belong to `/api`. Real relational
+and HTTP cases prove fresh registration and replay survival without old PII or
+authority. Explicit SQLite counter-state validation also preserves failure before
+application writes when the authority is unavailable. Historical acceptance
+counts below remain separate evidence for the preceding candidate.
+No moderation engine is activated. Real browser acceptance remains pending:
+Chrome DevTools MCP is disabled, the native desktop capability probe fails with
+`No such built-in module: node:sqlite`, and the isolated agent profile still
+overrides framework ports with occupied loopback addresses.
 
 Plan clean pre-v0.1 changes to Event's durable identity, profile, file reference and lifecycle contracts. Preserve the standalone path without building the future ISLAMU Asset or ISLAMU Identity services now.
 
@@ -89,7 +126,7 @@ IDs preserve correspondence with the foundational consultancy, but statuses and 
 - Evidence: sync writes names/email/verification and Actor display; profile commands write local names; Local credential lifecycle has its own binding/receipt authority.
 - Validation: implementation traceability.
 - Mitigation **IVSD-M002**: preserve user-edited profile fields after creation. Keep exact binding resolution during email conflicts, invalidate obsolete proof from that binding, retain independent valid evidence and suppress unsupported email delivery/correlation. A later Identity owner must not race Event's independent writer or grant Event roles.
-- Owner/next validation: identity/application owner; PR01-07 prove edit preservation, evidence transitions and erasure safety.
+- Owner/next validation: identity/application owner; PR01-08 prove edit preservation, evidence transitions, old-subject fencing and fresh registration after erasure.
 - Escalation: no blocking policy choice; implementation still requires the specified security review.
 
 ### IVSD-F003: All persistent file paths need stable identity and pinned storage targets
@@ -121,7 +158,7 @@ IDs preserve correspondence with the foundational consultancy, but statuses and 
 - Stakeholders/control: users, guests, independent participants; correlation claims, retention, erasure and replay.
 - Evidence: retained-authority workflow and PII inventory already own local deletion/fencing; consent is purpose/subject/version scoped.
 - Validation: implementation traceability.
-- Mitigation **IVSD-M005**: explicitly include new identity-claim/profile data in existing erasure and replay; do not add global consent or destructive cross-product cascade semantics. Preserve shared live files and retained evidence.
+- Mitigation **IVSD-M005**: include new identity-claim/profile data in existing erasure and old-subject replay; permit clean fresh registration without inheriting old authority or PII. Do not add global consent, ordinary-erasure provider tracking or destructive cross-product cascades. Reserve `/api` fingerprints for future moderation only.
 - Owner/next validation: privacy owner; PII inventory, race and restore-replay scenarios.
 - Escalation: legal holds/retention require applicable policy; no new legal determination here.
 
@@ -238,10 +275,10 @@ Original planning inventory: fresh `develop`, consultancy and two bounded scouts
 | Finding / mitigation | Plan scenarios | Task mapping / disposition |
 | --- | --- | --- |
 | IVSD-F001 / IVSD-M001 | ID01-ID09, OP03 | T1.1-T2.5 |
-| IVSD-F002 / IVSD-M002 | PR01-07 | T2.1-T3.3 |
+| IVSD-F002 / IVSD-M002 | PR01-08 | T2.1-T3.3, T7.2 |
 | IVSD-F003 / IVSD-M003 | ST01-06 | T4.1-T5.5 |
 | IVSD-F004 / IVSD-M004 | ST07, DL01-05 | T6.1-T6.5 |
-| IVSD-F005 / IVSD-M005 | PR07, DL05/06 | T2.4, T6.3, T7.2 |
+| IVSD-F005 / IVSD-M005 | PR07/08, DL05/06 | T2.4, T6.3, T7.2 |
 | IVSD-F006 / IVSD-M006 | OP01/02 | T1.2, T7.1/T7.3; remote adapters/activation explicitly deferred |
 | IVSD-F007 / IVSD-M007 | OP04 | Owning generation/docs tasks and T7.3 |
 | IVSD-F008 / IVSD-M008 | Preserve event identity/time contracts | T7.1/T7.3; implementation owned by existing publication/discovery workstream |

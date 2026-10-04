@@ -433,8 +433,8 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
 | `ERASURE_DATABASE_TOPOLOGY` | platform | public | None | optional | process |
 | `ERASURE_EMBEDDED_PATH` | platform | public | None | optional | process |
-| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` | platform | public | None | required | process |
-| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` | platform | secret | None (secret) | required | process |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID` | platform | public | None | optional | process |
+| `PRIVACY_ERASURE_IDENTITY_FENCE_KEY` | platform | secret | None (secret) | optional | process |
 | `SETUP_SECRET` | platform | secret | None (secret) | required | process |
 | `INSTANCE_BOOTSTRAP_MODE` | identity | public | None | required | process |
 | `INSTANCE__OPERATORIDENTITY__OPERATORID` | identity | public | None | required | process |

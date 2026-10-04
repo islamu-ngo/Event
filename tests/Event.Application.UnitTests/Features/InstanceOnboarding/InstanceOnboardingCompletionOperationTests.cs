@@ -828,10 +828,7 @@ internal sealed class OnboardingCompletionScenario
             _unitOfWork,
             GenerationReader, HostConfiguration,
             new Explore.Application.Services.PrivacyIdentityFenceOperation(
-                new Event.Application.UnitTests.Services.FenceTestAuthority(),
-                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyErasureAuthority>(),
-                new Event.Application.UnitTests.Services.FenceTestKeyProvider(),
-                Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityBindingReader>()));
+                new Event.Application.UnitTests.Services.FenceTestAuthority()));
     }
 
     public CompleteInstanceOnboardingRequest Configuration { get; set; } = Settings();

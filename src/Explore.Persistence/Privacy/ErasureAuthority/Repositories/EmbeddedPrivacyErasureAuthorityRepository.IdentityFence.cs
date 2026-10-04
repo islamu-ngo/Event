@@ -34,6 +34,8 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
                 applicationContext.IdentityFenceOwnsTransaction = true;
                 applicationContext.IdentityFenceTransactionFailed = false;
             }
+            _ = await ReadOrInitializeIdentityCounterAsync(db, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             _identityGate.Value = db;
             T result = await operation(cancellationToken);
             if (applicationContext?.IdentityFenceTransactionFailed == true)
@@ -64,6 +66,14 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
     {
         EmbeddedPrivacyErasureAuthorityDbContext db = _identityGate.Value
             ?? throw new InvalidOperationException("Identity key validation requires the authority gate.");
+        PrivacyErasureCounter counter = await ReadOrInitializeIdentityCounterAsync(db, cancellationToken);
+        counter.BindIdentityKey(keyId, verificationTag);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task<PrivacyErasureCounter> ReadOrInitializeIdentityCounterAsync(
+        EmbeddedPrivacyErasureAuthorityDbContext db, CancellationToken cancellationToken)
+    {
         PrivacyErasureCounter? counter = await db.AuthorityCounters.SingleOrDefaultAsync(cancellationToken);
         if (counter is null)
         {
@@ -74,8 +84,7 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
         }
         if (counter.IdentityKeyId is null && await db.Set<PrivacyErasureIdentityFence>().AnyAsync(cancellationToken))
             throw new InvalidOperationException("privacy_identity_fence_authority_state_unavailable");
-        counter.BindIdentityKey(keyId, verificationTag);
-        await db.SaveChangesAsync(cancellationToken);
+        return counter;
     }
 
     public Task<PrivacyErasureIntent?> FindAsync(

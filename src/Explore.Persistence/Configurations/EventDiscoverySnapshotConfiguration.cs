@@ -25,7 +25,11 @@ public sealed class EventDiscoverySnapshotConfiguration : IEntityTypeConfigurati
             .HasConversion(value => value, value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
         builder.HasIndex(snapshot => new
         {
-            snapshot.TenantId, snapshot.CriteriaHash, snapshot.IdentityEpoch, snapshot.DisclosureEpoch, snapshot.ExpiresAtUtc
+            snapshot.TenantId,
+            snapshot.CriteriaHash,
+            snapshot.IdentityEpoch,
+            snapshot.DisclosureEpoch,
+            snapshot.ExpiresAtUtc
         });
         builder.HasIndex(snapshot => new { snapshot.TenantId, snapshot.ExpiresAtUtc, snapshot.Id });
         builder.HasOne<EventDiscoverySnapshotReservation>().WithMany().HasForeignKey(snapshot => snapshot.TenantId)

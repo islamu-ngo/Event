@@ -33,8 +33,13 @@ public sealed class EventDiscoveryRankTests
         var second = Guid.Parse("00000000-0000-7000-8000-000000000012");
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = first, Title = "a", Actor = null!, Tenant = null!, VisibilityType = null!,
-            EventFormat = null!, EventStatus = null!
+            Id = first,
+            Title = "a",
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventFormat = null!,
+            EventStatus = null!
         };
         await Assert.That(entity.DiscoverySourceSortKey).IsEqualTo("00000000000070008000000000000011");
         await Assert.That(entity.DiscoveryTitleSortKey).IsEqualTo("0041");

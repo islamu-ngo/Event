@@ -36,23 +36,36 @@ public sealed class EventDiscoveryWriterProviderTests
             Id = Guid.CreateVersion7(),
             Pii = new UserPii
             {
-                Email = $"writer-{Guid.CreateVersion7():N}@example.test", FirstName = "Writer", LastName = "Owner"
+                Email = $"writer-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Writer",
+                LastName = "Owner"
             }
         }).ToArray();
         var actors = owners.Select(user => new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Writer owner" }
         }).ToArray();
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantId, Tenant = null!,
-            ActorId = actors[0].Id, Actor = actors[0], OrganizerActorId = actors[0].Id,
-            Title = "Detached owner", PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantId,
+            Tenant = null!,
+            ActorId = actors[0].Id,
+            Actor = actors[0],
+            OrganizerActorId = actors[0].Id,
+            Title = "Detached owner",
+            PublicCode = Guid.CreateVersion7().ToString("N")[..12],
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
             Timezone = "UTC"
         };
         await using (var seed = scope.Fixture.CreateSystemContext())
@@ -99,13 +112,18 @@ public sealed class EventDiscoveryWriterProviderTests
             Id = Guid.CreateVersion7(),
             Pii = new UserPii
             {
-                Email = $"source-{Guid.CreateVersion7():N}@example.test", FirstName = "Source", LastName = "Owner"
+                Email = $"source-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Source",
+                LastName = "Owner"
             }
         }).ToArray();
         var actors = users.Select(user => new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Independent source owner" }
         }).ToArray();
         await using (var seed = scope.Fixture.CreateSystemContext())
@@ -192,8 +210,12 @@ public sealed class EventDiscoveryWriterProviderTests
                     if (secondIsMembership)
                         writer.TenantUsers.Add(new TenantUser
                         {
-                            Id = secondId, TenantId = scope.TenantId, Tenant = null!,
-                            UserId = users[1].Id, User = null!, ActorId = actors[1].Id,
+                            Id = secondId,
+                            TenantId = scope.TenantId,
+                            Tenant = null!,
+                            UserId = users[1].Id,
+                            User = null!,
+                            ActorId = actors[1].Id,
                             StatusId = (int)TenantUserStatusEnum.Active
                         });
                     else
@@ -210,12 +232,20 @@ public sealed class EventDiscoveryWriterProviderTests
 
         Explore.Domain.Event SourceEvent(Guid id, int owner) => new(EventStatusEnum.Published)
         {
-            Id = id, TenantId = scope.TenantId, Tenant = null!,
-            ActorId = actors[owner].Id, Actor = null!, SubmittedByUserId = users[owner].Id,
-            Title = "Independent tenant source", PublicCode = id.ToString("N")[^12..],
+            Id = id,
+            TenantId = scope.TenantId,
+            Tenant = null!,
+            ActorId = actors[owner].Id,
+            Actor = null!,
+            SubmittedByUserId = users[owner].Id,
+            Title = "Independent tenant source",
+            PublicCode = id.ToString("N")[^12..],
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
             Timezone = "UTC"
         };
     }
@@ -235,23 +265,35 @@ public sealed class EventDiscoveryWriterProviderTests
             Id = Guid.CreateVersion7(),
             Pii = new UserPii
             {
-                Email = $"review-{Guid.CreateVersion7():N}@example.test", FirstName = "Review", LastName = "Owner"
+                Email = $"review-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Review",
+                LastName = "Owner"
             }
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Review owner" }
         };
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantId, Tenant = null!,
-            ActorId = actor.Id, Actor = actor,
-            Title = "Reviewed parent", PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantId,
+            Tenant = null!,
+            ActorId = actor.Id,
+            Actor = actor,
+            Title = "Reviewed parent",
+            PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
             Timezone = "UTC"
         };
         await using (var seed = scope.Fixture.CreateSystemContext())
@@ -333,8 +375,12 @@ public sealed class EventDiscoveryWriterProviderTests
                     else
                         writer.EventSessions.Add(new EventSession(EventSessionStatusEnum.Draft)
                         {
-                            Id = sessionId, EventId = entity.Id, Event = null!,
-                            TenantId = scope.TenantId, Tenant = null!, Title = "Competing session"
+                            Id = sessionId,
+                            EventId = entity.Id,
+                            Event = null!,
+                            TenantId = scope.TenantId,
+                            Tenant = null!,
+                            Title = "Competing session"
                         });
                     await writer.SaveChangesAsync(ct);
                     return true;
@@ -424,15 +470,24 @@ public sealed class EventDiscoveryWriterProviderTests
                     nameof(EventDiscoveryRevision.TenantId), scope.TenantId, token)).IsFalse();
             writer.AuditLogs.Add(new AuditLog
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantId, Tenant = null!,
-                EntityType = nameof(EventDiscoveryIdentity), EntityId = Guid.CreateVersion7().ToString("D"),
-                Action = "different-offering", Timestamp = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantId,
+                Tenant = null!,
+                EntityType = nameof(EventDiscoveryIdentity),
+                EntityId = Guid.CreateVersion7().ToString("D"),
+                Action = "different-offering",
+                Timestamp = DateTime.UtcNow
             });
             writer.Set<OutboxMessage>().Add(new OutboxMessage
             {
-                Id = Guid.CreateVersion7(), AggregateType = nameof(EventDiscoveryIdentity),
-                AggregateId = Guid.CreateVersion7(), EventType = "identity-review", Payload = "{}",
-                Status = OutboxMessageStatus.Pending, CreatedAt = DateTime.UtcNow, MaxRetries = 5
+                Id = Guid.CreateVersion7(),
+                AggregateType = nameof(EventDiscoveryIdentity),
+                AggregateId = Guid.CreateVersion7(),
+                EventType = "identity-review",
+                Payload = "{}",
+                Status = OutboxMessageStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                MaxRetries = 5
             });
             await writer.SaveChangesAsync(token);
             await writer.FlushDisclosureAsync(token);
@@ -503,7 +558,8 @@ public sealed class EventDiscoveryWriterProviderTests
         var second = Tenant();
         seed.AddRange(first, second, new EventDiscoveryRevision
         {
-            Id = Guid.CreateVersion7(), TenantId = first.Id
+            Id = Guid.CreateVersion7(),
+            TenantId = first.Id
         });
         await seed.SaveChangesAsync(token);
         var relational = seed.GetService<IDbContextOptions>().Extensions
@@ -516,8 +572,11 @@ public sealed class EventDiscoveryWriterProviderTests
 
         static Tenant Tenant() => new()
         {
-            Id = Guid.CreateVersion7(), Slug = $"writer-witness-{Guid.CreateVersion7():N}",
-            FullName = "Writer witness", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            Slug = $"writer-witness-{Guid.CreateVersion7():N}",
+            FullName = "Writer witness",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
     }
 

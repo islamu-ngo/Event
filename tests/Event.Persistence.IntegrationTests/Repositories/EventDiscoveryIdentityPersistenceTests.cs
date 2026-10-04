@@ -30,16 +30,24 @@ public sealed class EventDiscoveryIdentityPersistenceTests
         {
             var user = new User
             {
-                Id = userId, IsDeleted = true, Pii = new UserPii
+                Id = userId,
+                IsDeleted = true,
+                Pii = new UserPii
                 {
-                    Email = $"deleted-{userId:N}@example.test", FirstName = "Deleted", LastName = "Subject"
+                    Email = $"deleted-{userId:N}@example.test",
+                    FirstName = "Deleted",
+                    LastName = "Subject"
                 }
             };
             seed.Users.Add(user);
             seed.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = store.TenantId, Tenant = null!,
-                UserId = userId, User = user, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = store.TenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active
             });
             await seed.SaveChangesAsync();
         }
@@ -90,16 +98,23 @@ public sealed class EventDiscoveryIdentityPersistenceTests
         {
             var user = new User
             {
-                Id = userId, Pii = new UserPii
+                Id = userId,
+                Pii = new UserPii
                 {
-                    Email = $"reviewer-{userId:N}@example.test", FirstName = "Review", LastName = "Subject"
+                    Email = $"reviewer-{userId:N}@example.test",
+                    FirstName = "Review",
+                    LastName = "Subject"
                 }
             };
             seed.Users.Add(user);
             seed.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = store.TenantId, Tenant = null!,
-                UserId = userId, User = user, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = store.TenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active
             });
             await seed.SaveChangesAsync();
         }
@@ -443,10 +458,14 @@ public sealed class EventDiscoveryIdentityPersistenceTests
         else
             context.Set<EventDiscoveryAlias>().Add(new EventDiscoveryAlias
             {
-                Id = Guid.CreateVersion7(), TenantId = violation == "cross_tenant" ? store.OtherTenantId : store.TenantId,
-                MemberIdentityId = ids[1], PrimaryIdentityId = violation == "self" ? ids[1] : ids[0],
-                RelationshipRevision = violation == "revision" ? 0 : 1, ReviewerId = Reviewer,
-                ReasonCode = "same_offering", ReviewedAtUtc = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = violation == "cross_tenant" ? store.OtherTenantId : store.TenantId,
+                MemberIdentityId = ids[1],
+                PrimaryIdentityId = violation == "self" ? ids[1] : ids[0],
+                RelationshipRevision = violation == "revision" ? 0 : 1,
+                ReviewerId = Reviewer,
+                ReasonCode = "same_offering",
+                ReviewedAtUtc = Now
             });
         await Assert.That(async () => await context.SaveChangesAsync()).Throws<DbUpdateException>();
         context.ChangeTracker.Clear();
@@ -548,7 +567,9 @@ public sealed class EventDiscoveryIdentityPersistenceTests
             _options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(new SqliteConnectionStringBuilder
                 {
-                    DataSource = _path, DefaultTimeout = 5, Pooling = false
+                    DataSource = _path,
+                    DefaultTimeout = 5,
+                    Pooling = false
                 }.ToString())
                 .UseSnakeCaseNamingConvention()
                 .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,
@@ -575,13 +596,19 @@ public sealed class EventDiscoveryIdentityPersistenceTests
             store._options = TestDbContextOptions.Create(store._options).UseModel(context.Model).Options;
             context.Set<TenantStatus>().Add(new TenantStatus
             {
-                Id = (int)TenantStatusEnum.Active, MasterCode = "Active", FullName = "Active", IsActiveState = true
+                Id = (int)TenantStatusEnum.Active,
+                MasterCode = "Active",
+                FullName = "Active",
+                IsActiveState = true
             });
             foreach (var tenantId in new[] { store.TenantId, store.OtherTenantId })
                 context.Tenants.Add(new Tenant
                 {
-                    Id = tenantId, Slug = $"identity-{tenantId:N}", FullName = "Identity tenant",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = tenantId,
+                    Slug = $"identity-{tenantId:N}",
+                    FullName = "Identity tenant",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
             await context.SaveChangesAsync();
             return store;
@@ -600,7 +627,8 @@ public sealed class EventDiscoveryIdentityPersistenceTests
             context.Set<EventDiscoveryIdentity>().AddRange(identities);
             context.Set<EventDiscoveryRevision>().Add(new EventDiscoveryRevision
             {
-                Id = Guid.CreateVersion7(), TenantId = TenantId
+                Id = Guid.CreateVersion7(),
+                TenantId = TenantId
             });
             await context.SaveChangesAsync();
             return identities.Select(identity => identity.Id).ToArray();

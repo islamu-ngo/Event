@@ -114,8 +114,13 @@ public sealed class EventOccurrenceEligibilityTests
         var session = Session(Now, Now.AddHours(1), SessionEndTimeType.Fixed);
         var day = new EventDay
         {
-            Id = Guid.CreateVersion7(), EventId = session.EventId, TenantId = session.TenantId,
-            Event = null!, Tenant = null!, LocalDate = session.LocalStartDate!.Value, IsPublished = true
+            Id = Guid.CreateVersion7(),
+            EventId = session.EventId,
+            TenantId = session.TenantId,
+            Event = null!,
+            Tenant = null!,
+            LocalDate = session.LocalStartDate!.Value,
+            IsPublished = true
         };
         session.EventDayId = day.Id;
         session.EventDay = day;
@@ -153,8 +158,11 @@ public sealed class EventOccurrenceEligibilityTests
     {
         var session = new EventSession(EventSessionStatusEnum.Published)
         {
-            Event = null!, Tenant = null!, StartTime = Now,
-            EndTime = Now.AddHours(1), EndTimeType = SessionEndTimeType.Fixed
+            Event = null!,
+            Tenant = null!,
+            StartTime = Now,
+            EndTime = Now.AddHours(1),
+            EndTimeType = SessionEndTimeType.Fixed
         };
         await Assert.That(EventOccurrenceEligibility.Published().Compile()(session)).IsFalse();
     }

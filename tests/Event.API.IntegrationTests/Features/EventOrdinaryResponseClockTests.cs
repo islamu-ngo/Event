@@ -91,11 +91,17 @@ public sealed class EventOrdinaryResponseClockTests
             var authority = new EventDiscoveryResponseAuthority(unit, disclosure, identities, tenant, Clock, boundaries);
             var detail = new EventDto
             {
-                Id = eventId, TenantId = tenantId, Title = "Prepared event",
-                ActorDisplayName = "Publisher", ActorTypeFullName = "User",
-                EventStatusFullName = "Published", EventStatusMasterCode = "Published",
-                VisibilityTypeFullName = "Public", VisibilityTypeMasterCode = "Public",
-                EventFormatFullName = "Local", EventFormatMasterCode = "Local"
+                Id = eventId,
+                TenantId = tenantId,
+                Title = "Prepared event",
+                ActorDisplayName = "Publisher",
+                ActorTypeFullName = "User",
+                EventStatusFullName = "Published",
+                EventStatusMasterCode = "Published",
+                VisibilityTypeFullName = "Public",
+                VisibilityTypeMasterCode = "Public",
+                EventFormatFullName = "Local",
+                EventFormatMasterCode = "Local"
             };
             var details = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
             details.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>()).Returns(detail);

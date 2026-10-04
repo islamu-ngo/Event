@@ -21,7 +21,10 @@ public sealed class ModuleDiscoveryAuthorityTests
         bool enabled = true;
         var module = new ModuleDefinition
         {
-            Id = Guid.CreateVersion7(), ModuleKey = "Mod_Islamic", Name = "Islamic", IsActive = true
+            Id = Guid.CreateVersion7(),
+            ModuleKey = "Mod_Islamic",
+            Name = "Islamic",
+            IsActive = true
         };
         capabilities.GetEnabledByTenantId(tenantId).Returns(_ => enabled
             ? new List<TenantCapability>

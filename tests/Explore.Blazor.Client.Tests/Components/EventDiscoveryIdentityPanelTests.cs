@@ -33,7 +33,9 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
 
     private HalResourceOfEventDto PublicListing() => new()
     {
-        Id = _service.TargetId, Slug = "Related public listing", PublicCode = "ABC123"
+        Id = _service.TargetId,
+        Slug = "Related public listing",
+        PublicCode = "ABC123"
     };
 
     [Test]
@@ -55,8 +57,10 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
     {
         _service.Resource = new()
         {
-            EventId = _service.SourceId, PublicPrimaryEventId = _service.TargetId,
-            ReviewTargetEventId = _service.TargetId, ExpectedRevision = 7
+            EventId = _service.SourceId,
+            PublicPrimaryEventId = _service.TargetId,
+            ReviewTargetEventId = _service.TargetId,
+            ExpectedRevision = 7
         };
         var cut = _context.RenderMudComponent<EventDiscoveryIdentityPanel>(parameters =>
             parameters.Add(component => component.Event, Event()));
@@ -132,7 +136,9 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
         await Assert.That(decision.Request.ExpectedRevision).IsEqualTo(7);
         await Assert.That(decision.Request.Decision).IsEqualTo(button switch
         {
-            "same" => "same-offering", "different" => "different-offering", _ => "reverse"
+            "same" => "same-offering",
+            "different" => "different-offering",
+            _ => "reverse"
         });
         await Assert.That(cut.FindAll("[data-identity-reload]").Count).IsEqualTo(1);
     }
@@ -179,8 +185,10 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
     private HalResourceOfEventDiscoveryIdentityDto Resource(string first, string? second = null, long revision = 7) =>
         HalLinkTestFactory.WithLinks(new HalResourceOfEventDiscoveryIdentityDto
         {
-            EventId = _service.SourceId, PublicPrimaryEventId = _service.TargetId,
-            ReviewTargetEventId = _service.TargetId, ExpectedRevision = revision
+            EventId = _service.SourceId,
+            PublicPrimaryEventId = _service.TargetId,
+            ReviewTargetEventId = _service.TargetId,
+            ExpectedRevision = revision
         }, new[] { first, second }.OfType<string>(),
             $"/api/event/{_service.SourceId}/discovery-identity/review", "POST");
 
@@ -204,7 +212,8 @@ public sealed class EventDiscoveryIdentityPanelTests : IDisposable
             Guid eventId, CancellationToken cancellationToken = default) =>
             Task.FromResult(new HalResourceOfEventDuplicateCandidatesDto
             {
-                EventId = SourceId, ExpectedRevision = 7,
+                EventId = SourceId,
+                ExpectedRevision = 7,
                 Candidates = [new EventDuplicateCandidateDto { Id = TargetId, Title = "Public candidate" }]
             });
 

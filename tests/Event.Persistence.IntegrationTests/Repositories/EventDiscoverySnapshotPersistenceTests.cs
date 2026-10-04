@@ -280,7 +280,9 @@ public sealed class EventDiscoverySnapshotPersistenceTests
             _options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(new SqliteConnectionStringBuilder
                 {
-                    DataSource = _path, DefaultTimeout = 30, Pooling = false
+                    DataSource = _path,
+                    DefaultTimeout = 30,
+                    Pooling = false
                 }.ToString())
                 .UseSnakeCaseNamingConvention().Options;
         }
@@ -302,13 +304,19 @@ public sealed class EventDiscoverySnapshotPersistenceTests
             store._options = TestDbContextOptions.Create(store._options).UseModel(context.Model).Options;
             context.Set<TenantStatus>().Add(new TenantStatus
             {
-                Id = (int)TenantStatusEnum.Active, MasterCode = "Active", FullName = "Active", IsActiveState = true
+                Id = (int)TenantStatusEnum.Active,
+                MasterCode = "Active",
+                FullName = "Active",
+                IsActiveState = true
             });
             foreach (var tenant in new[] { store.TenantId, store.OtherTenantId })
                 context.Tenants.Add(new Tenant
                 {
-                    Id = tenant, Slug = $"snapshot-{tenant:N}", FullName = "Snapshot tenant",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = tenant,
+                    Slug = $"snapshot-{tenant:N}",
+                    FullName = "Snapshot tenant",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
             await context.SaveChangesAsync();
             return store;

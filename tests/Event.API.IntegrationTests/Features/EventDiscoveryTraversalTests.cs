@@ -317,8 +317,13 @@ public sealed partial class EventDiscoveryTraversalTests
             var start = new DateTimeOffset(2100, 1, 1, 12, 0, 0, TimeSpan.Zero);
             var session = new EventSession(EventSessionStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), EventId = entity.Id, Event = entity, TenantId = tenant.TenantId,
-                Tenant = null!, StartTime = start, EndTime = start.AddHours(1)
+                Id = Guid.CreateVersion7(),
+                EventId = entity.Id,
+                Event = entity,
+                TenantId = tenant.TenantId,
+                Tenant = null!,
+                StartTime = start,
+                EndTime = start.AddHours(1)
             };
             session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
             entity.Sessions.Add(session);

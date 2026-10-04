@@ -53,10 +53,16 @@ public sealed class EventDiscoverySnapshot : ITenantEntity
             throw new ArgumentOutOfRangeException(nameof(expiresAtUtc));
         var snapshot = new EventDiscoverySnapshot
         {
-            Id = id, TenantId = tenantId, CriteriaHash = criteriaHash,
-            IdentityEpoch = identityEpoch, DisclosureEpoch = disclosureEpoch,
-            CreatedAtUtc = createdAtUtc, ExpiresAtUtc = expiresAtUtc, Truncated = truncated,
-            LocalSourceComplete = localSourceComplete, RemoteSourceComplete = remoteSourceComplete
+            Id = id,
+            TenantId = tenantId,
+            CriteriaHash = criteriaHash,
+            IdentityEpoch = identityEpoch,
+            DisclosureEpoch = disclosureEpoch,
+            CreatedAtUtc = createdAtUtc,
+            ExpiresAtUtc = expiresAtUtc,
+            Truncated = truncated,
+            LocalSourceComplete = localSourceComplete,
+            RemoteSourceComplete = remoteSourceComplete
         };
         var keys = new HashSet<(EventDiscoveryCanonicalKind, Guid)>();
         foreach (var item in items)

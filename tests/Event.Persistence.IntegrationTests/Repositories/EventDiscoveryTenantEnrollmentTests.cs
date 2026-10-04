@@ -112,15 +112,19 @@ public sealed class EventDiscoveryTenantEnrollmentTests(PostgreSqlContainerFixtu
 
     private static Tenant Tenant() => new()
     {
-        Id = Guid.CreateVersion7(), Slug = $"discovery-enrollment-{Guid.CreateVersion7():N}",
+        Id = Guid.CreateVersion7(),
+        Slug = $"discovery-enrollment-{Guid.CreateVersion7():N}",
         FullName = "Discovery enrollment tenant",
-        TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+        TenantStatusId = (int)TenantStatusEnum.Active,
+        TenantStatus = null!
     };
 
     private static SystemSetting Policy() => new()
     {
-        Id = Guid.CreateVersion7(), SettingKey = $"public_experience.enrollment_{Guid.CreateVersion7():N}",
-        Value = "false", ValueType = SettingValueType.Boolean
+        Id = Guid.CreateVersion7(),
+        SettingKey = $"public_experience.enrollment_{Guid.CreateVersion7():N}",
+        Value = "false",
+        ValueType = SettingValueType.Boolean
     };
 
     private sealed record TenantScope(Guid TenantId) : ITenantContext;

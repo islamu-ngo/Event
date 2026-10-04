@@ -148,8 +148,13 @@ public sealed class EventDiscoveryOccurrenceQueryTests
         {
             var eventDay = new EventDay
             {
-                Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-                EventId = session.EventId, Event = session.Event, IsPublished = published, LocalDate = date
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                EventId = session.EventId,
+                Event = session.Event,
+                IsPublished = published,
+                LocalDate = date
             };
             fixture.Context.EventDays.Add(eventDay);
             session.EventDayId = eventDay.Id;
@@ -171,16 +176,23 @@ public sealed class EventDiscoveryOccurrenceQueryTests
         AddSession(fixture, AddEvent(fixture, "deleted-session"), Now, Now.AddHours(1)).IsDeleted = true;
         var otherTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Other occurrence tenant",
+            Id = Guid.CreateVersion7(),
+            FullName = "Other occurrence tenant",
             Slug = $"occurrence-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         fixture.Context.Tenants.Add(otherTenant);
         fixture.Context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = otherTenant.Id, Tenant = otherTenant,
-            UserId = fixture.UserId, User = null!, ActorId = fixture.ActorId,
-            StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = Now.UtcDateTime
+            Id = Guid.CreateVersion7(),
+            TenantId = otherTenant.Id,
+            Tenant = otherTenant,
+            UserId = fixture.UserId,
+            User = null!,
+            ActorId = fixture.ActorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = Now.UtcDateTime
         });
         var foreign = AddEvent(fixture, "foreign");
         foreign.TenantId = otherTenant.Id;
@@ -276,13 +288,22 @@ public sealed class EventDiscoveryOccurrenceQueryTests
     {
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            Title = title, PublicCode = Guid.CreateVersion7().ToString("N"),
-            ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            Title = title,
+            PublicCode = Guid.CreateVersion7().ToString("N"),
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-            Timezone = "Europe/Brussels", CreatedAt = Now.UtcDateTime
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            Timezone = "Europe/Brussels",
+            CreatedAt = Now.UtcDateTime
         };
         fixture.Context.Events.Add(entity);
         return entity;
@@ -292,8 +313,11 @@ public sealed class EventDiscoveryOccurrenceQueryTests
     {
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId,
-            FullName = "Public venue", City = "Brussels", Country = "BE"
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            FullName = "Public venue",
+            City = "Brussels",
+            Country = "BE"
         };
         if (active)
         {
@@ -310,9 +334,14 @@ public sealed class EventDiscoveryOccurrenceQueryTests
     {
         var session = new EventSession(status)
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            EventId = entity.Id, Event = entity, StartTime = start,
-            EndTime = end?.ToOffset(start.Offset), EndTimeType = endType
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            EventId = entity.Id,
+            Event = entity,
+            StartTime = start,
+            EndTime = end?.ToOffset(start.Offset),
+            EndTimeType = endType
         };
         session.ReprojectLocalTimes(entity.GetEffectiveScheduleTimeZoneId(), new EventScheduleProjectionCalculator());
         if (location is not null)

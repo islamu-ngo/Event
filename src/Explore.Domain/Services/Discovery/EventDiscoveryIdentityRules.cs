@@ -32,9 +32,12 @@ public static class EventDiscoveryIdentityRules
                 continue;
             var alias = identity.Alias ?? new EventDiscoveryAlias
             {
-                Id = Guid.CreateVersion7(), TenantId = revision.TenantId,
-                MemberIdentityId = identity.Id, Member = identity,
-                CreatedAt = reviewedAtUtc, CreatedBy = reviewerId
+                Id = Guid.CreateVersion7(),
+                TenantId = revision.TenantId,
+                MemberIdentityId = identity.Id,
+                Member = identity,
+                CreatedAt = reviewedAtUtc,
+                CreatedBy = reviewerId
             };
             alias.PrimaryIdentityId = primaryId;
             alias.Primary = primary;

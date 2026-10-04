@@ -32,15 +32,23 @@ public sealed class EventDiscoverySnapshotItem : ITenantEntity
             throw new ArgumentException("Snapshot membership requires supported namespaces and nonempty identifiers.");
         return new EventDiscoverySnapshotItem
         {
-            SourceKind = sourceKind, SourceId = sourceId,
-            CanonicalKind = canonicalKind, CanonicalId = canonicalId, MatchingSessionId = matchingSessionId
+            SourceKind = sourceKind,
+            SourceId = sourceId,
+            CanonicalKind = canonicalKind,
+            CanonicalId = canonicalId,
+            MatchingSessionId = matchingSessionId
         };
     }
 
     internal EventDiscoverySnapshotItem Bind(Guid tenantId, Guid snapshotId, long ordinal) => new()
     {
-        TenantId = tenantId, SnapshotId = snapshotId, Ordinal = ordinal,
-        SourceKind = SourceKind, SourceId = SourceId,
-        CanonicalKind = CanonicalKind, CanonicalId = CanonicalId, MatchingSessionId = MatchingSessionId
+        TenantId = tenantId,
+        SnapshotId = snapshotId,
+        Ordinal = ordinal,
+        SourceKind = SourceKind,
+        SourceId = SourceId,
+        CanonicalKind = CanonicalKind,
+        CanonicalId = CanonicalId,
+        MatchingSessionId = MatchingSessionId
     };
 }

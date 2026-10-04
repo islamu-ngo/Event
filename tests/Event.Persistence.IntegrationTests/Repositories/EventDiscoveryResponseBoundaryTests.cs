@@ -64,8 +64,11 @@ public sealed class EventDiscoveryResponseBoundaryTests
         var session = AddSession(fixture, "venue", Now.AddDays(1), Now.AddDays(2));
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId,
-            FullName = "Public venue", City = "Brussels", Country = "BE"
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            FullName = "Public venue",
+            City = "Brussels",
+            Country = "BE"
         };
         location.SetManualAddress("Public venue address", "1000");
         fixture.Context.Locations.Add(location);
@@ -101,18 +104,32 @@ public sealed class EventDiscoveryResponseBoundaryTests
     {
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            Title = title, PublicCode = Guid.CreateVersion7().ToString("N"),
-            ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            Title = title,
+            PublicCode = Guid.CreateVersion7().ToString("N"),
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-            Timezone = "UTC", CreatedAt = Now.UtcDateTime
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            Timezone = "UTC",
+            CreatedAt = Now.UtcDateTime
         };
         var session = new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            EventId = entity.Id, Event = entity, StartTime = start, EndTime = end,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            EventId = entity.Id,
+            Event = entity,
+            StartTime = start,
+            EndTime = end,
             EndTimeType = SessionEndTimeType.Fixed
         };
         session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());

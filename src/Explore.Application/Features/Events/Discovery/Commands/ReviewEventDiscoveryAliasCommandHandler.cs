@@ -162,9 +162,15 @@ public sealed class ReviewEventDiscoveryAliasCommandHandler(
                 string payload = JsonSerializer.Serialize(receipt);
                 await audit.Create(new AuditLog
                 {
-                    Id = receiptId, TenantId = tenant, Tenant = null!,
-                    EntityType = nameof(EventDiscoveryIdentity), EntityId = request.EventId.ToString("D"),
-                    Action = action, ActorId = reviewer, Timestamp = occurredAt, NewValues = payload
+                    Id = receiptId,
+                    TenantId = tenant,
+                    Tenant = null!,
+                    EntityType = nameof(EventDiscoveryIdentity),
+                    EntityId = request.EventId.ToString("D"),
+                    Action = action,
+                    ActorId = reviewer,
+                    Timestamp = occurredAt,
+                    NewValues = payload
                 });
                 await outbox.CreateRange([new OutboxMessage
                 {

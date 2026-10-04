@@ -31,16 +31,23 @@ public sealed class EventDiscoveryIdentitySurfaceTests
             tenantId = (await context.Events.SingleAsync(entity => entity.Id == seed.SourceId)).TenantId;
             var reviewer = new User
             {
-                Id = reviewerId, Pii = new UserPii
+                Id = reviewerId,
+                Pii = new UserPii
                 {
-                    Email = $"reviewer-{reviewerId:N}@example.test", FirstName = "Independent", LastName = "Reviewer"
+                    Email = $"reviewer-{reviewerId:N}@example.test",
+                    FirstName = "Independent",
+                    LastName = "Reviewer"
                 }
             };
             context.Users.Add(reviewer);
             context.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                UserId = reviewerId, User = reviewer, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                UserId = reviewerId,
+                User = reviewer,
+                StatusId = (int)TenantUserStatusEnum.Active
             });
             foreach (Guid id in new[] { seed.SourceId, seed.TargetId })
                 context.EventRoleAssignments.Add(EventRoleAssignment.Create(
@@ -51,7 +58,10 @@ public sealed class EventDiscoveryIdentitySurfaceTests
                 var permission = await context.Permissions.SingleAsync(row => row.MasterCode == code);
                 context.RolePermissions.Add(new RolePermission
                 {
-                    RoleId = (int)RoleEnum.EventManager, Role = null!, PermissionId = permission.Id, Permission = permission
+                    RoleId = (int)RoleEnum.EventManager,
+                    Role = null!,
+                    PermissionId = permission.Id,
+                    Permission = permission
                 });
             }
             await context.SaveChangesAsync();
@@ -128,9 +138,15 @@ public sealed class EventDiscoveryIdentitySurfaceTests
                 .SingleAsync(row => row.SourceKey == seed.TargetId.ToString("D"));
             var invalidAlias = new EventDiscoveryAlias
             {
-                Id = Guid.CreateVersion7(), TenantId = primary.TenantId, MemberIdentityId = primary.Id,
-                Member = primary, PrimaryIdentityId = source.Id, Primary = source,
-                RelationshipRevision = 1, ReviewerId = seed.UserId, ReasonCode = "invalid_cycle",
+                Id = Guid.CreateVersion7(),
+                TenantId = primary.TenantId,
+                MemberIdentityId = primary.Id,
+                Member = primary,
+                PrimaryIdentityId = source.Id,
+                Primary = source,
+                RelationshipRevision = 1,
+                ReviewerId = seed.UserId,
+                ReasonCode = "invalid_cycle",
                 ReviewedAtUtc = DateTime.UtcNow
             };
             context.Set<EventDiscoveryAlias>().Add(invalidAlias);
@@ -247,10 +263,16 @@ public sealed class EventDiscoveryIdentitySurfaceTests
             var primary = EventDiscoveryIdentity.Create(tenant.TenantId, EventDiscoverySourceKind.LocalEvent, target.Id.ToString("D"));
             member.Alias = new EventDiscoveryAlias
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.TenantId,
-                MemberIdentityId = member.Id, Member = member, PrimaryIdentityId = primary.Id, Primary = primary,
-                ReviewerId = tenant.UserId, ReviewedAtUtc = DateTime.UtcNow,
-                ReasonCode = "private_primary_reason", RelationshipRevision = 1
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.TenantId,
+                MemberIdentityId = member.Id,
+                Member = member,
+                PrimaryIdentityId = primary.Id,
+                Primary = primary,
+                ReviewerId = tenant.UserId,
+                ReviewedAtUtc = DateTime.UtcNow,
+                ReasonCode = "private_primary_reason",
+                RelationshipRevision = 1
             };
             context.Set<EventDiscoveryIdentity>().AddRange(member, primary);
             var revision = await context.Set<EventDiscoveryRevision>()
@@ -269,8 +291,13 @@ public sealed class EventDiscoveryIdentitySurfaceTests
             var start = new DateTimeOffset(2100, 1, 1, 12, 0, 0, TimeSpan.Zero);
             var session = new EventSession(EventSessionStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), EventId = entity.Id, Event = entity,
-                TenantId = tenant.TenantId, Tenant = null!, StartTime = start, EndTime = start.AddHours(1)
+                Id = Guid.CreateVersion7(),
+                EventId = entity.Id,
+                Event = entity,
+                TenantId = tenant.TenantId,
+                Tenant = null!,
+                StartTime = start,
+                EndTime = start.AddHours(1)
             };
             session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
             entity.Sessions.Add(session);

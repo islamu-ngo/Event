@@ -23,7 +23,9 @@ public sealed class EventDiscoveryCandidateReaderTests
     private static readonly DateTimeOffset Now = new(2028, 6, 15, 12, 0, 0, TimeSpan.Zero);
     private static readonly GetEventListRequest Criteria = new()
     {
-        View = TemporalView.All, OperationNow = Now, SortBy = "title",
+        View = TemporalView.All,
+        OperationNow = Now,
+        SortBy = "title",
         SortDescending = false
     };
 
@@ -33,10 +35,17 @@ public sealed class EventDiscoveryCandidateReaderTests
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         var entity = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Title = "initial", TenantId = fixture.TenantId, Tenant = null!,
-            ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+            Title = "initial",
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated
         };
         fixture.Context.Events.Add(entity);
@@ -140,8 +149,11 @@ public sealed class EventDiscoveryCandidateReaderTests
         if (enabled is null)
             fixture.Context.Set<SystemSetting>().Add(new()
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-                Value = "true", ValueType = SettingValueType.Boolean, IsLocked = true
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                IsLocked = true
             });
         else
             enabled.Value = "true";
@@ -162,18 +174,28 @@ public sealed class EventDiscoveryCandidateReaderTests
         {
             var record = new AtprotoRecord
             {
-                Id = recordId, Did = $"did:plc:{recordId:N}", Collection = "community.lexicon.calendar.event",
-                RecordKey = entity.Id.ToString("N"), Direction = AtprotoRecordDirection.Outbound,
-                Provenance = AtprotoRecordProvenance.LocalLifecycle, SourceVersion = 1, UpdatedAt = Now.UtcDateTime
+                Id = recordId,
+                Did = $"did:plc:{recordId:N}",
+                Collection = "community.lexicon.calendar.event",
+                RecordKey = entity.Id.ToString("N"),
+                Direction = AtprotoRecordDirection.Outbound,
+                Provenance = AtprotoRecordProvenance.LocalLifecycle,
+                SourceVersion = 1,
+                UpdatedAt = Now.UtcDateTime
             };
             entity.AtprotoRecordId = recordId;
             entity.AtprotoRecord = record;
             fixture.Context.AddRange(record, new AtprotoOutboundRecordOwnership
             {
-                TenantId = fixture.TenantId, UserId = fixture.UserId, AtprotoRecordId = recordId,
-                AtprotoRecord = record, SourceEntityType = nameof(Explore.Domain.Event),
-                SourceEntityId = entity.Id, SourceVersion = Guid.CreateVersion7(),
-                CreatedAt = Now.UtcDateTime, UpdatedAt = Now.UtcDateTime
+                TenantId = fixture.TenantId,
+                UserId = fixture.UserId,
+                AtprotoRecordId = recordId,
+                AtprotoRecord = record,
+                SourceEntityType = nameof(Explore.Domain.Event),
+                SourceEntityId = entity.Id,
+                SourceVersion = Guid.CreateVersion7(),
+                CreatedAt = Now.UtcDateTime,
+                UpdatedAt = Now.UtcDateTime
             });
         }
     }
@@ -241,21 +263,24 @@ public sealed class EventDiscoveryCandidateReaderTests
         if (setting is null)
             fixture.Context.Set<SystemSetting>().Add(new()
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-                Value = "true", ValueType = SettingValueType.Boolean, IsLocked = true
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                IsLocked = true
             });
         else
             setting.Value = "true";
         await SaveAsync(fixture);
         await using var transaction = await fixture.Context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         foreach (string sort in new[] { "title", "views", "createdat", "date" })
-        foreach (bool descending in new[] { false, true })
-        {
-            var capture = await CreateReader(fixture).CaptureAsync(
-                Criteria with { SortBy = sort, SortDescending = descending }, new(maxIdentities: 1));
-            await Assert.That(capture.Membership.Single().SourceKind).IsEqualTo(EventDiscoverySourceKind.LocalEvent);
-            await Assert.That(capture.Membership.Single().SourceId).IsEqualTo(local.Id);
-        }
+            foreach (bool descending in new[] { false, true })
+            {
+                var capture = await CreateReader(fixture).CaptureAsync(
+                    Criteria with { SortBy = sort, SortDescending = descending }, new(maxIdentities: 1));
+                await Assert.That(capture.Membership.Single().SourceKind).IsEqualTo(EventDiscoverySourceKind.LocalEvent);
+                await Assert.That(capture.Membership.Single().SourceId).IsEqualTo(local.Id);
+            }
     }
 
     [Test]
@@ -419,8 +444,11 @@ public sealed class EventDiscoveryCandidateReaderTests
         session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, FullName = "Public venue",
-            City = "Brussels", Country = "BE"
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            FullName = "Public venue",
+            City = "Brussels",
+            Country = "BE"
         };
         location.SetManualAddress("Test venue", "1000");
         fixture.Context.Locations.Add(location);
@@ -450,8 +478,11 @@ public sealed class EventDiscoveryCandidateReaderTests
         if (setting is null)
             fixture.Context.Set<SystemSetting>().Add(new()
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-                Value = "true", ValueType = SettingValueType.Boolean, IsLocked = true
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                IsLocked = true
             });
         else
             setting.Value = "true";
@@ -589,13 +620,22 @@ public sealed class EventDiscoveryCandidateReaderTests
     {
         var entity = new Explore.Domain.Event(status)
         {
-            Id = id ?? Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            Title = title, PublicCode = Guid.CreateVersion7().ToString("N"),
-            ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+            Id = id ?? Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            Title = title,
+            PublicCode = Guid.CreateVersion7().ToString("N"),
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-            Timezone = "UTC", CreatedAt = Now.UtcDateTime
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            Timezone = "UTC",
+            CreatedAt = Now.UtcDateTime
         };
         fixture.Context.Events.Add(entity);
         AddSession(fixture, entity, Now);
@@ -608,11 +648,19 @@ public sealed class EventDiscoveryCandidateReaderTests
         var did = $"did:plc:{id:N}";
         var record = new AtprotoRecord
         {
-            Id = id, Did = did, Collection = "community.lexicon.calendar.event", RecordKey = id.ToString("N"),
-            Cid = "bafy-source-test", Uri = $"at://{did}/community.lexicon.calendar.event/{id:N}",
-            Direction = AtprotoRecordDirection.Inbound, Provenance = AtprotoRecordProvenance.Jetstream,
-            SourceVersion = 1, RecordJson = "{}", RecordHash = new string('a', 64),
-            IndexedAt = Now.UtcDateTime, UpdatedAt = Now.UtcDateTime
+            Id = id,
+            Did = did,
+            Collection = "community.lexicon.calendar.event",
+            RecordKey = id.ToString("N"),
+            Cid = "bafy-source-test",
+            Uri = $"at://{did}/community.lexicon.calendar.event/{id:N}",
+            Direction = AtprotoRecordDirection.Inbound,
+            Provenance = AtprotoRecordProvenance.Jetstream,
+            SourceVersion = 1,
+            RecordJson = "{}",
+            RecordHash = new string('a', 64),
+            IndexedAt = Now.UtcDateTime,
+            UpdatedAt = Now.UtcDateTime
         };
         var imported = AddEvent(fixture, "remote", status: EventStatusEnum.Draft);
         imported.EventProvenanceTypeId = (int)EventProvenanceTypeEnum.Federated;
@@ -620,17 +668,30 @@ public sealed class EventDiscoveryCandidateReaderTests
         imported.AtprotoRecord = record;
         fixture.Context.AddRange(record, new AtprotoEventProjection
         {
-            AtprotoRecordId = id, Name = "remote", CreatedAt = Now,
-            StartsAt = start, EndsAt = start?.AddHours(1), SourceVersion = 1, MaterializedAt = Now.UtcDateTime
+            AtprotoRecordId = id,
+            Name = "remote",
+            CreatedAt = Now,
+            StartsAt = start,
+            EndsAt = start?.AddHours(1),
+            SourceVersion = 1,
+            MaterializedAt = Now.UtcDateTime
         }, new AtprotoRecordTenantPresentation
         {
-            TenantId = fixture.TenantId, AtprotoRecordId = id, IsVisible = true,
-            SourceVersion = 1, EvaluatedAt = Now.UtcDateTime
+            TenantId = fixture.TenantId,
+            AtprotoRecordId = id,
+            IsVisible = true,
+            SourceVersion = 1,
+            EvaluatedAt = Now.UtcDateTime
         }, new AtprotoIdentity(AtprotoDid.Parse(did))
         {
-            Id = Guid.CreateVersion7(), ActorId = fixture.ActorId, Actor = null!,
-            PdsHost = "https://pds.example.test", IsActive = true,
-            LastResolvedAt = Now.UtcDateTime, LastSeenAt = Now.UtcDateTime, CreatedAt = Now.UtcDateTime
+            Id = Guid.CreateVersion7(),
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            PdsHost = "https://pds.example.test",
+            IsActive = true,
+            LastResolvedAt = Now.UtcDateTime,
+            LastSeenAt = Now.UtcDateTime,
+            CreatedAt = Now.UtcDateTime
         });
         return id;
     }
@@ -640,9 +701,14 @@ public sealed class EventDiscoveryCandidateReaderTests
     {
         var session = new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            EventId = entity.Id, Event = entity, StartTime = start,
-            EndTime = start.AddHours(1), EndTimeType = SessionEndTimeType.Fixed
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            EventId = entity.Id,
+            Event = entity,
+            StartTime = start,
+            EndTime = start.AddHours(1),
+            EndTimeType = SessionEndTimeType.Fixed
         };
         session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
         fixture.Context.EventSessions.Add(session);
@@ -660,9 +726,15 @@ public sealed class EventDiscoveryCandidateReaderTests
         EventDiscoveryIdentity member, EventDiscoveryIdentity primary) =>
         fixture.Context.Set<EventDiscoveryAlias>().Add(new()
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId,
-            MemberIdentityId = member.Id, Member = member, PrimaryIdentityId = primary.Id, Primary = primary,
-            RelationshipRevision = 1, ReviewerId = fixture.UserId, ReasonCode = "same_event",
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            MemberIdentityId = member.Id,
+            Member = member,
+            PrimaryIdentityId = primary.Id,
+            Primary = primary,
+            RelationshipRevision = 1,
+            ReviewerId = fixture.UserId,
+            ReasonCode = "same_event",
             ReviewedAtUtc = Now.UtcDateTime
         });
 

@@ -36,19 +36,25 @@ public sealed class EventAuthorityPlanningProviderTests
         var token = timeout.Token;
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = $"authority-planning-{Guid.CreateVersion7():N}",
-            FullName = "Authority planning", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            Slug = $"authority-planning-{Guid.CreateVersion7():N}",
+            FullName = "Authority planning",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var actors = Enumerable.Range(0, 2).Select(_ => new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             User = new User
             {
                 Id = Guid.CreateVersion7(),
                 Pii = new UserPii
                 {
                     Email = $"authority-{Guid.CreateVersion7():N}@example.test",
-                    FirstName = "Authority", LastName = "Planner"
+                    FirstName = "Authority",
+                    LastName = "Planner"
                 }
             },
             Pii = new ActorPii { DisplayName = "Authority planner" }
@@ -56,12 +62,20 @@ public sealed class EventAuthorityPlanningProviderTests
         Guid reviewerId = actors[0].User!.Id;
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            ActorId = actors[0].Id, Actor = actors[0], OrganizerActorId = actors[0].Id,
-            Title = "Before detached update", PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            ActorId = actors[0].Id,
+            Actor = actors[0],
+            OrganizerActorId = actors[0].Id,
+            Title = "Before detached update",
+            PublicCode = Guid.CreateVersion7().ToString("N")[..12],
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
             Timezone = "UTC"
         };
         var assignment = EventRoleAssignment.Create(tenant.Id, entity.Id, reviewerId,

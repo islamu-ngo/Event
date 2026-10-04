@@ -55,7 +55,9 @@ public sealed class GetPublicEventDiscoveryClockTests
             local, projection, new AtprotoEventGovernanceResolver(settings), tenant, clock, lifecycle, identities);
         await handler.QueryAsync(new GetPublicEventDiscoveryRequest(new GetEventListRequest
         {
-            PageNumber = 1, PageSize = 10, OperationNow = capturedNow
+            PageNumber = 1,
+            PageSize = 10,
+            OperationNow = capturedNow
         }), CancellationToken.None);
         await Assert.That(queries.Single().Now).IsEqualTo(capturedNow);
         await Assert.That(clock.Now).IsEqualTo(capturedNow.AddHours(1));

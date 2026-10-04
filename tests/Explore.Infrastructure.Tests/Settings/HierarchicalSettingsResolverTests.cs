@@ -469,7 +469,10 @@ public class HierarchicalSettingsResolverTests : IDisposable
         Guid tenantId = Guid.CreateVersion7();
         SetupSystemSettings(new SystemSetting
         {
-            SettingKey = key, Value = "1000", ValueType = SettingValueType.Integer, IsLocked = false
+            SettingKey = key,
+            Value = "1000",
+            ValueType = SettingValueType.Integer,
+            IsLocked = false
         });
         SetupTenantSettings(tenantId,
             new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = "1000" });

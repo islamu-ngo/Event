@@ -79,8 +79,11 @@ public sealed class DiscoveryOccurrencePresentationTests : IDisposable
         _ctx.Services.AddSingleton(Substitute.For<Explore.Blazor.Client.Contracts.Services.IEventOrganizerClaimService>());
         var cut = _ctx.RenderMudComponent<EventProvenancePanel>(p => p.Add(c => c.Event, new EventDto
         {
-            Id = Guid.CreateVersion7(), Title = "Reported event", ProvenanceTypeCode = "COMMUNITY_REPORTED",
-            ActorDisplayName = "Contributor account", SourcePublisherName = "Original publisher"
+            Id = Guid.CreateVersion7(),
+            Title = "Reported event",
+            ProvenanceTypeCode = "COMMUNITY_REPORTED",
+            ActorDisplayName = "Contributor account",
+            SourcePublisherName = "Original publisher"
         }));
         await Assert.That(cut.Find("[data-attribution='contributor']").TextContent).Contains("Contributor account");
         await Assert.That(cut.Find("[data-attribution='source-publisher']").TextContent).Contains("Original publisher");
@@ -95,12 +98,16 @@ public sealed class DiscoveryOccurrencePresentationTests : IDisposable
 
     private static EventListDto CreateEvent() => new()
     {
-        Id = Guid.CreateVersion7(), Title = "Multi-session event", Slug = "multi-session", PublicCode = "MATCH",
+        Id = Guid.CreateVersion7(),
+        Title = "Multi-session event",
+        Slug = "multi-session",
+        PublicCode = "MATCH",
         FirstSessionDate = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero),
         LastSessionDate = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero),
         MatchingSession = new()
         {
-            Id = Guid.CreateVersion7(), Title = "June occurrence",
+            Id = Guid.CreateVersion7(),
+            Title = "June occurrence",
             LocalStartDate = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(14)),
             LocalStartTime = TimeSpan.FromHours(9),
             StartsAtUtc = new DateTimeOffset(2026, 5, 31, 19, 0, 0, TimeSpan.Zero),

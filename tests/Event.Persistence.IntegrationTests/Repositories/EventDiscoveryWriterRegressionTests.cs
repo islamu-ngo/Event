@@ -27,13 +27,22 @@ public sealed class EventDiscoveryWriterRegressionTests
         var entity = await fixture.SeedEventAsync(published: true);
         var definition = new EventCustomPropertyDefinition
         {
-            Id = Guid.CreateVersion7(), EventId = entity.Id, TenantId = fixture.TenantId,
-            Namespace = "test", Key = "owner", DisplayName = "Owner", PropertyType = PropertyType.Text
+            Id = Guid.CreateVersion7(),
+            EventId = entity.Id,
+            TenantId = fixture.TenantId,
+            Namespace = "test",
+            Key = "owner",
+            DisplayName = "Owner",
+            PropertyType = PropertyType.Text
         };
         var option = new EventCustomPropertyOption
         {
-            Id = Guid.CreateVersion7(), EventCustomPropertyDefinitionId = definition.Id,
-            Namespace = "test", Key = "option", DisplayName = "Option", Value = "before"
+            Id = Guid.CreateVersion7(),
+            EventCustomPropertyDefinitionId = definition.Id,
+            Namespace = "test",
+            Key = "option",
+            DisplayName = "Option",
+            Value = "before"
         };
         fixture.Context.AddRange(definition, option);
         await fixture.Context.SaveChangesAsync();
@@ -71,12 +80,16 @@ public sealed class EventDiscoveryWriterRegressionTests
         Guid otherId = Guid.CreateVersion7();
         fixture.Context.Tenants.Add(new Tenant
         {
-            Id = otherId, Slug = $"lookup-{otherId:N}", FullName = "Other",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = otherId,
+            Slug = $"lookup-{otherId:N}",
+            FullName = "Other",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         fixture.Context.Set<EventDiscoveryRevision>().Add(new()
         {
-            Id = Guid.CreateVersion7(), TenantId = otherId
+            Id = Guid.CreateVersion7(),
+            TenantId = otherId
         });
         await fixture.Context.SaveChangesAsync();
         long before = await EpochAsync(fixture.Context, fixture.TenantId);
@@ -104,8 +117,11 @@ public sealed class EventDiscoveryWriterRegressionTests
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "New owner" }
         };
         fixture.Context.AddRange(user, actor);
@@ -139,34 +155,62 @@ public sealed class EventDiscoveryWriterRegressionTests
         Guid sourceId = Guid.CreateVersion7();
         var record = new AtprotoRecord
         {
-            Id = Guid.CreateVersion7(), Did = "did:plc:terminal-replay",
-            Collection = "community.lexicon.calendar.event", RecordKey = "replay",
+            Id = Guid.CreateVersion7(),
+            Did = "did:plc:terminal-replay",
+            Collection = "community.lexicon.calendar.event",
+            RecordKey = "replay",
             Uri = "at://did:plc:terminal-replay/community.lexicon.calendar.event/replay",
-            Cid = "old-cid", RecordJson = "{\"name\":\"old\"}", RecordHash = new string('a', 64),
-            Direction = AtprotoRecordDirection.Outbound, Provenance = AtprotoRecordProvenance.LocalLifecycle,
-            UpdatedAt = now, SourceVersion = 1
+            Cid = "old-cid",
+            RecordJson = "{\"name\":\"old\"}",
+            RecordHash = new string('a', 64),
+            Direction = AtprotoRecordDirection.Outbound,
+            Provenance = AtprotoRecordProvenance.LocalLifecycle,
+            UpdatedAt = now,
+            SourceVersion = 1
         };
         var outbox = new PdsSyncOutbox
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, UserId = fixture.UserId,
-            Did = record.Did, Collection = record.Collection, RecordKey = record.RecordKey,
-            Operation = PdsSyncOperation.Update, ExpectedCid = record.Cid,
-            Payload = "{\"name\":\"new\"}", PayloadHash = new string('b', 64),
-            IdempotencyKey = Guid.CreateVersion7().ToString("N"), PdsHost = "https://pds.example.test",
-            SourceEntityType = "Event", SourceEntityId = sourceId, SourceVersion = Guid.CreateVersion7(),
-            AtprotoRecordId = record.Id, Status = PdsSyncStatus.Processing, CreatedAt = now,
-            MaxRetries = 5, LeaseOwner = "terminal-replay", LeaseToken = Guid.CreateVersion7(),
-            LeaseFence = 1, LeaseExpiresAt = now.AddMinutes(5)
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            UserId = fixture.UserId,
+            Did = record.Did,
+            Collection = record.Collection,
+            RecordKey = record.RecordKey,
+            Operation = PdsSyncOperation.Update,
+            ExpectedCid = record.Cid,
+            Payload = "{\"name\":\"new\"}",
+            PayloadHash = new string('b', 64),
+            IdempotencyKey = Guid.CreateVersion7().ToString("N"),
+            PdsHost = "https://pds.example.test",
+            SourceEntityType = "Event",
+            SourceEntityId = sourceId,
+            SourceVersion = Guid.CreateVersion7(),
+            AtprotoRecordId = record.Id,
+            Status = PdsSyncStatus.Processing,
+            CreatedAt = now,
+            MaxRetries = 5,
+            LeaseOwner = "terminal-replay",
+            LeaseToken = Guid.CreateVersion7(),
+            LeaseFence = 1,
+            LeaseExpiresAt = now.AddMinutes(5)
         };
         fixture.Context.AddRange(record, outbox, new AtprotoOutboundRecordOwnership
         {
-            AtprotoRecordId = record.Id, TenantId = fixture.TenantId, UserId = fixture.UserId,
-            SourceEntityType = "Event", SourceEntityId = sourceId, SourceVersion = Guid.CreateVersion7(),
-            CreatedAt = now, UpdatedAt = now
+            AtprotoRecordId = record.Id,
+            TenantId = fixture.TenantId,
+            UserId = fixture.UserId,
+            SourceEntityType = "Event",
+            SourceEntityId = sourceId,
+            SourceVersion = Guid.CreateVersion7(),
+            CreatedAt = now,
+            UpdatedAt = now
         }, new AtprotoRecordTenantPresentation
         {
-            AtprotoRecordId = record.Id, TenantId = fixture.TenantId,
-            IsVisible = false, SourceVersion = 1, EvaluatedAt = now
+            AtprotoRecordId = record.Id,
+            TenantId = fixture.TenantId,
+            IsVisible = false,
+            SourceVersion = 1,
+            EvaluatedAt = now
         });
         await fixture.Context.SaveChangesAsync();
         long before = await EpochAsync(fixture.Context, fixture.TenantId);
@@ -197,7 +241,8 @@ public sealed class EventDiscoveryWriterRegressionTests
         new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(new SqliteConnectionStringBuilder
             {
-                DataSource = fixture.DatabasePath, Pooling = false
+                DataSource = fixture.DatabasePath,
+                Pooling = false
             }.ToString())
             .UseSnakeCaseNamingConvention()
             .UseModel(fixture.Context.Model)

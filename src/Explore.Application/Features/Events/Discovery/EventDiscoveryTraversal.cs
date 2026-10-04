@@ -126,8 +126,12 @@ public sealed class EventDiscoveryTraversal(
                     }
                     return new EventDiscoveryTraversalDto
                     {
-                        Items = cards, SnapshotCount = currentSnapshot.ItemCount, Truncated = currentSnapshot.Truncated,
-                        ExpiresAt = new(currentSnapshot.ExpiresAtUtc), HasMore = hasMore, NextCursor = nextCursor,
+                        Items = cards,
+                        SnapshotCount = currentSnapshot.ItemCount,
+                        Truncated = currentSnapshot.Truncated,
+                        ExpiresAt = new(currentSnapshot.ExpiresAtUtc),
+                        HasMore = hasMore,
+                        NextCursor = nextCursor,
                         Authority = new(tenant.TenantId, current.IdentityEpoch, current.DisclosureEpoch,
                             new DateTimeOffset(currentSnapshot.ExpiresAtUtc))
                     };

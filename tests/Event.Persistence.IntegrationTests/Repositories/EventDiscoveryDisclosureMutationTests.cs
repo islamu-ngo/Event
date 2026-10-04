@@ -49,15 +49,24 @@ public sealed class EventDiscoveryDisclosureMutationTests
                     Guid.CreateVersion7(), "same_event", DateTime.UtcNow, token);
                 writer.AuditLogs.Add(new AuditLog
                 {
-                    Id = Guid.CreateVersion7(), TenantId = store.TenantId, Tenant = null!,
-                    EntityType = nameof(EventDiscoveryIdentity), EntityId = member.Id.ToString("D"),
-                    Action = "identity-review", Timestamp = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = store.TenantId,
+                    Tenant = null!,
+                    EntityType = nameof(EventDiscoveryIdentity),
+                    EntityId = member.Id.ToString("D"),
+                    Action = "identity-review",
+                    Timestamp = DateTime.UtcNow
                 });
                 writer.Set<OutboxMessage>().Add(new OutboxMessage
                 {
-                    Id = Guid.CreateVersion7(), AggregateType = nameof(EventDiscoveryIdentity),
-                    AggregateId = member.Id, EventType = "identity-review", Payload = "{}",
-                    Status = OutboxMessageStatus.Pending, CreatedAt = DateTime.UtcNow, MaxRetries = 5
+                    Id = Guid.CreateVersion7(),
+                    AggregateType = nameof(EventDiscoveryIdentity),
+                    AggregateId = member.Id,
+                    EventType = "identity-review",
+                    Payload = "{}",
+                    Status = OutboxMessageStatus.Pending,
+                    CreatedAt = DateTime.UtcNow,
+                    MaxRetries = 5
                 });
                 await writer.SaveChangesAsync(token);
                 return true;
@@ -89,9 +98,13 @@ public sealed class EventDiscoveryDisclosureMutationTests
                 await new EventDiscoveryDisclosureRepository(writer).AcquireCurrentAsync(store.TenantId, token);
                 writer.AuditLogs.Add(new AuditLog
                 {
-                    Id = Guid.CreateVersion7(), TenantId = store.TenantId, Tenant = null!,
-                    EntityType = "Event", EntityId = Guid.CreateVersion7().ToString("D"),
-                    Action = "late", Timestamp = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = store.TenantId,
+                    Tenant = null!,
+                    EntityType = "Event",
+                    EntityId = Guid.CreateVersion7().ToString("D"),
+                    Action = "late",
+                    Timestamp = DateTime.UtcNow
                 });
                 await writer.SaveChangesAsync(token);
                 return true;
@@ -145,9 +158,13 @@ public sealed class EventDiscoveryDisclosureMutationTests
                     .AcquireFenceAsync(store.TenantId, [], token);
                 reviewer.AuditLogs.Add(new AuditLog
                 {
-                    Id = Guid.CreateVersion7(), TenantId = store.TenantId, Tenant = null!,
-                    EntityType = nameof(EventDiscoveryIdentity), EntityId = Guid.CreateVersion7().ToString("D"),
-                    Action = "different-offering", Timestamp = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = store.TenantId,
+                    Tenant = null!,
+                    EntityType = nameof(EventDiscoveryIdentity),
+                    EntityId = Guid.CreateVersion7().ToString("D"),
+                    Action = "different-offering",
+                    Timestamp = DateTime.UtcNow
                 });
                 await reviewer.SaveChangesAsync(token);
                 return true;
@@ -474,8 +491,11 @@ public sealed class EventDiscoveryDisclosureMutationTests
                 Guid id = Guid.CreateVersion7();
                 seed.Tenants.Add(new Tenant
                 {
-                    Id = id, Slug = $"bounded-{id:N}", FullName = "Bounded",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = id,
+                    Slug = $"bounded-{id:N}",
+                    FullName = "Bounded",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
             }
             await seed.SaveChangesAsync();
@@ -493,8 +513,10 @@ public sealed class EventDiscoveryDisclosureMutationTests
 
     private static SystemSetting Policy() => new()
     {
-        Id = Guid.CreateVersion7(), SettingKey = "federation.atproto_events_enabled",
-        Value = "false", ValueType = SettingValueType.Boolean
+        Id = Guid.CreateVersion7(),
+        SettingKey = "federation.atproto_events_enabled",
+        Value = "false",
+        ValueType = SettingValueType.Boolean
     };
 
     [Test]
@@ -508,22 +530,32 @@ public sealed class EventDiscoveryDisclosureMutationTests
         {
             seed.AtprotoRecords.Add(new AtprotoRecord
             {
-                Id = recordId, Did = "did:plc:disclosuretest", Collection = "community.lexicon.calendar.event",
-                RecordKey = "source", Direction = AtprotoRecordDirection.Inbound,
-                Provenance = AtprotoRecordProvenance.Jetstream, SourceVersion = 1,
+                Id = recordId,
+                Did = "did:plc:disclosuretest",
+                Collection = "community.lexicon.calendar.event",
+                RecordKey = "source",
+                Direction = AtprotoRecordDirection.Inbound,
+                Provenance = AtprotoRecordProvenance.Jetstream,
+                SourceVersion = 1,
                 UpdatedAt = DateTime.UtcNow
             });
             seed.AtprotoEventProjections.Add(new AtprotoEventProjection
             {
-                AtprotoRecordId = recordId, Name = "Public source", SourceVersion = 1,
-                SourceUrl = "https://example.test/current-source", CreatedAt = DateTimeOffset.UtcNow,
+                AtprotoRecordId = recordId,
+                Name = "Public source",
+                SourceVersion = 1,
+                SourceUrl = "https://example.test/current-source",
+                CreatedAt = DateTimeOffset.UtcNow,
                 MaterializedAt = DateTime.UtcNow
             });
             foreach (Guid tenantId in new[] { store.TenantId, store.OtherTenantId })
                 seed.AtprotoRecordTenantPresentations.Add(new AtprotoRecordTenantPresentation
                 {
-                    TenantId = tenantId, AtprotoRecordId = recordId, SourceVersion = 1,
-                    IsVisible = tenantId == store.TenantId, EvaluatedAt = DateTime.UtcNow
+                    TenantId = tenantId,
+                    AtprotoRecordId = recordId,
+                    SourceVersion = 1,
+                    IsVisible = tenantId == store.TenantId,
+                    EvaluatedAt = DateTime.UtcNow
                 });
             await seed.SaveChangesAsync();
         }
@@ -584,8 +616,11 @@ public sealed class EventDiscoveryDisclosureMutationTests
         Explore.Domain.Event entity = AddPublishedEvent(fixture);
         var session = new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            EventId = entity.Id, Event = entity,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            EventId = entity.Id,
+            Event = entity,
             StartTime = new DateTimeOffset(2040, 6, 1, 12, 0, 0, TimeSpan.Zero),
             EndTime = new DateTimeOffset(2040, 6, 1, 13, 0, 0, TimeSpan.Zero),
             EndTimeType = SessionEndTimeType.Fixed
@@ -612,13 +647,23 @@ public sealed class EventDiscoveryDisclosureMutationTests
     {
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            Title = "Ranked event", PublicCode = Guid.CreateVersion7().ToString("N"),
-            ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            Title = "Ranked event",
+            PublicCode = Guid.CreateVersion7().ToString("N"),
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-            Timezone = "Europe/Brussels", TotalViews = 0, CreatedAt = DateTime.UtcNow
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            Timezone = "Europe/Brussels",
+            TotalViews = 0,
+            CreatedAt = DateTime.UtcNow
         };
         fixture.Context.Events.Add(entity);
         return entity;
@@ -641,7 +686,7 @@ public sealed class EventDiscoveryDisclosureMutationTests
 
         public ExploreDbContext Open(params IInterceptor[] interceptors) =>
             new(new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptors).Options)
-                { TenantContext = new TenantScope(TenantId) };
+            { TenantContext = new TenantScope(TenantId) };
 
         public static async Task<Store> CreateAsync()
         {
@@ -649,7 +694,9 @@ public sealed class EventDiscoveryDisclosureMutationTests
             store._options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(new SqliteConnectionStringBuilder
                 {
-                    DataSource = store._path, DefaultTimeout = 5, Pooling = false
+                    DataSource = store._path,
+                    DefaultTimeout = 5,
+                    Pooling = false
                 }.ToString())
                 .UseSnakeCaseNamingConvention()
                 .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,
@@ -662,28 +709,38 @@ public sealed class EventDiscoveryDisclosureMutationTests
             seed.Set<TenantStatus>().AddRange(
                 new TenantStatus
                 {
-                    Id = (int)TenantStatusEnum.Active, MasterCode = "Active",
-                    FullName = "Active", IsActiveState = true
+                    Id = (int)TenantStatusEnum.Active,
+                    MasterCode = "Active",
+                    FullName = "Active",
+                    IsActiveState = true
                 },
                 new TenantStatus
                 {
-                    Id = (int)TenantStatusEnum.Suspended, MasterCode = "Suspended",
-                    FullName = "Suspended", IsActiveState = false
+                    Id = (int)TenantStatusEnum.Suspended,
+                    MasterCode = "Suspended",
+                    FullName = "Suspended",
+                    IsActiveState = false
                 });
             seed.Set<SettingValueTypeLookup>().Add(new SettingValueTypeLookup
             {
-                Id = (int)SettingValueType.Boolean, MasterCode = "Boolean", FullName = "Boolean"
+                Id = (int)SettingValueType.Boolean,
+                MasterCode = "Boolean",
+                FullName = "Boolean"
             });
             foreach (Guid id in new[] { store.TenantId, store.OtherTenantId })
             {
                 seed.Tenants.Add(new Tenant
                 {
-                    Id = id, Slug = $"disclosure-{id:N}", FullName = "Original",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = id,
+                    Slug = $"disclosure-{id:N}",
+                    FullName = "Original",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
                 seed.Set<EventDiscoveryRevision>().Add(new EventDiscoveryRevision
                 {
-                    Id = Guid.CreateVersion7(), TenantId = id
+                    Id = Guid.CreateVersion7(),
+                    TenantId = id
                 });
             }
             await seed.SaveChangesAsync();

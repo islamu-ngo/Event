@@ -415,11 +415,16 @@ public sealed class EventDiscoveryIdentityAuthorityTests
 
         public Event NewEvent(bool privateEvent = false, Guid? tenantId = null) => new(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId ?? TenantId,
-            Title = "Shared programme", PublicCode = Guid.CreateVersion7().ToString("N"),
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId ?? TenantId,
+            Title = "Shared programme",
+            PublicCode = Guid.CreateVersion7().ToString("N"),
             ActorId = Guid.CreateVersion7(),
             Actor = new() { Id = Guid.CreateVersion7(), ActorType = null!, Pii = null! },
-            Tenant = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!,
             VisibilityTypeId = (int)(privateEvent ? VisibilityTypeEnum.Private : VisibilityTypeEnum.Public)
         };
 
@@ -448,7 +453,9 @@ public sealed class EventDiscoveryIdentityAuthorityTests
             _expectedRevision = expectedRevision;
             _proposedRevision ??= new EventDiscoveryRevision
             {
-                Id = Revision.Id, TenantId = TenantId, IdentityEpoch = expectedRevision,
+                Id = Revision.Id,
+                TenantId = TenantId,
+                IdentityEpoch = expectedRevision,
                 DisclosureEpoch = Revision.DisclosureEpoch
             };
         }

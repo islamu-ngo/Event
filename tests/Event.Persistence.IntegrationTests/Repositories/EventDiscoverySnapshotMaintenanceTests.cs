@@ -529,14 +529,19 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         foreach (TenantStatusEnum status in (statuses ?? []).Distinct())
             context.Set<TenantStatus>().Add(new TenantStatus
             {
-                Id = (int)status, MasterCode = status.ToString(), FullName = status.ToString(),
+                Id = (int)status,
+                MasterCode = status.ToString(),
+                FullName = status.ToString(),
                 IsActiveState = status == TenantStatusEnum.Active
             });
         for (int index = 0; index < ids.Length; index++)
             context.Tenants.Add(new Tenant
             {
-                Id = ids[index], Slug = $"maintenance-{ids[index]:N}", FullName = "Maintenance tenant",
-                TenantStatusId = (int)(statuses?[index] ?? TenantStatusEnum.Active), TenantStatus = null!
+                Id = ids[index],
+                Slug = $"maintenance-{ids[index]:N}",
+                FullName = "Maintenance tenant",
+                TenantStatusId = (int)(statuses?[index] ?? TenantStatusEnum.Active),
+                TenantStatus = null!
             });
         await context.SaveChangesAsync();
         return ids;

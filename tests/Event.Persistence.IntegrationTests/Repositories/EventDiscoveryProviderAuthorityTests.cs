@@ -531,17 +531,24 @@ public sealed class EventDiscoveryProviderAuthorityTests
         var otherTenant = Tenant();
         var user = new User
         {
-            Id = Guid.CreateVersion7(), CreatedAt = Now,
+            Id = Guid.CreateVersion7(),
+            CreatedAt = Now,
             Pii = new UserPii
             {
                 Email = $"provider-{Guid.CreateVersion7():N}@example.test",
-                FirstName = "Provider", LastName = "Reviewer"
+                FirstName = "Provider",
+                LastName = "Reviewer"
             }
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = user.Id, User = user, Pii = new ActorPii { DisplayName = "Provider reviewer" }, CreatedAt = Now
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = user.Id,
+            User = user,
+            Pii = new ActorPii { DisplayName = "Provider reviewer" },
+            CreatedAt = Now
         };
         seed.AddRange(tenant, otherTenant, user, actor);
         foreach (var owner in new[] { tenant, otherTenant })
@@ -549,9 +556,14 @@ public sealed class EventDiscoveryProviderAuthorityTests
             seed.Set<EventDiscoveryRevision>().Add(new() { Id = Guid.CreateVersion7(), TenantId = owner.Id });
             seed.TenantUsers.Add(new()
             {
-                Id = Guid.CreateVersion7(), TenantId = owner.Id, Tenant = owner,
-                UserId = user.Id, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = owner.Id,
+                Tenant = owner,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = Now
             });
         }
         var primary = AddEvent(tenant, primaryEventId, primaryTitle);
@@ -573,8 +585,11 @@ public sealed class EventDiscoveryProviderAuthorityTests
 
         static Tenant Tenant() => new()
         {
-            Id = Guid.CreateVersion7(), Slug = $"discovery-provider-{Guid.CreateVersion7():N}",
-            FullName = "Discovery provider tenant", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            Slug = $"discovery-provider-{Guid.CreateVersion7():N}",
+            FullName = "Discovery provider tenant",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
 
         (Guid Event, Guid Session) AddEvent(
@@ -582,19 +597,33 @@ public sealed class EventDiscoveryProviderAuthorityTests
         {
             var entity = new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = id ?? Guid.CreateVersion7(), TenantId = owner.Id, Tenant = owner,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
-                Title = title, PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
+                Id = id ?? Guid.CreateVersion7(),
+                TenantId = owner.Id,
+                Tenant = owner,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
+                Title = title,
+                PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-                Timezone = "UTC", CreatedAt = Now
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!,
+                Timezone = "UTC",
+                CreatedAt = Now
             };
             var session = new EventSession(EventSessionStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), TenantId = owner.Id, Tenant = owner,
-                EventId = entity.Id, Event = entity, StartTime = new DateTimeOffset(Now),
-                EndTime = new DateTimeOffset(Now.AddHours(1)), EndTimeType = SessionEndTimeType.Fixed
+                Id = Guid.CreateVersion7(),
+                TenantId = owner.Id,
+                Tenant = owner,
+                EventId = entity.Id,
+                Event = entity,
+                StartTime = new DateTimeOffset(Now),
+                EndTime = new DateTimeOffset(Now.AddHours(1)),
+                EndTimeType = SessionEndTimeType.Fixed
             };
             session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
             seed.AddRange(entity, session);

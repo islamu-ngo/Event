@@ -193,9 +193,13 @@ public sealed class EventDiscoveryIdentityRulesTests
     private static EventDiscoveryAlias Alias(EventDiscoveryIdentity member, EventDiscoveryIdentity primary) =>
         new()
         {
-            Id = Guid.CreateVersion7(), TenantId = member.TenantId,
-            MemberIdentityId = member.Id, PrimaryIdentityId = primary.Id,
-            Member = member, Primary = primary, RelationshipRevision = 1
+            Id = Guid.CreateVersion7(),
+            TenantId = member.TenantId,
+            MemberIdentityId = member.Id,
+            PrimaryIdentityId = primary.Id,
+            Member = member,
+            Primary = primary,
+            RelationshipRevision = 1
         };
 
     internal static EventDiscoveryIdentity Identity(Guid tenantId, string? key = null) =>

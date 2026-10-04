@@ -160,11 +160,23 @@ dotnet build --configuration Release --verbosity quiet
 - **Todos**: Create immediately for multi-step tasks.
 - **Context**: Follow [`.agents/CONTEXT_ENGINEERING.md`](.agents/CONTEXT_ENGINEERING.md); duplicate unchanged context is a defect.
 
+### Readable Technical Communication
+
+This applies to commit messages, PR descriptions, plans, I-VSD reports, progress/completion reports, and feedback or decision requests.
+
+- Lead with the concrete problem, who is affected, what changes, and why it matters. Then explain the technical mechanism and reasoning.
+- Improve readability by **adding explanations, not removing technical detail or terminology**. Define consequential terms in context and connect them to practical effects; include examples when needed.
+- Preserve mechanisms, architecture, rationale, invariants, exceptions, trade-offs, exact identifiers, deployment/rollback actions, ethical reasoning, evidence, and uncertainty. Prefer a longer complete explanation over a concise account that loses information.
+- Summaries introduce the full analysis; they do not replace it. Tables and file inventories support explanation rather than forcing the reader to decode it.
+- Decision requests must explain the practical consequences and technical trade-offs of each option, the recommendation, and what happens after the answer, without requiring the developer to open a plan.
+
+Use the [shared writing guide](.agents/skills/conventional-commit/resources/reader-first-writing.md) for examples and PR structure, and [readable I-VSD reports](.agents/skills/i-vsd/resources/reader-first-reports.md) for findings, ethical reasoning, and traceability. These rules apply even when no writing skill is loaded.
+
 ### Final Teaching Summary Requirement
 
 Before an implementation agent ends a task, pauses for the user's next prompt, performs a handoff, or claims work is complete, the final response MUST teach the user what changed. Do not give only an abstract status line such as “email sending implemented” or “docs updated.” The user is a developer and must understand the implementation without opening the diff.
 
-The final summary must be medium-sized and technically specific. Include the architecture/design pattern used, concrete libraries/frameworks/infrastructure/protocols, important files/classes/handlers/components changed, data/control flow, relevant best practices such as transactional outbox, CQRS/MediatR, Clean Architecture, HAL affordance gating, tenant isolation, idempotency, retry/error handling, and what was verified or remains. Keep it concise enough for chat, but detailed enough that the user learns the implemented approach.
+The final summary must be complete and technically specific. Explain the delivered result before the architecture/design pattern used, concrete libraries/frameworks/infrastructure/protocols, important files/classes/handlers/components changed, data/control flow, relevant best practices such as transactional outbox, CQRS/MediatR, Clean Architecture, HAL affordance gating, tenant isolation, idempotency, retry/error handling, and what was verified or remains. Explain how the relevant mechanisms produce the result. Expand the account as needed so the user understands the implementation without losing technical substance to brevity.
 
 ### Self-Contained Human Interaction & Decision Brief Requirement
 

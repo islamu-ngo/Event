@@ -136,8 +136,8 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 
 #### Planned Commit Contract [Contract 1 of N for multi-commit phases]
 - **Type & Scope:** `type(scope)`
-- **Title:** `benefit-led phase outcome`
-- **Description:** Exact motivation and data/control-flow description for this phase.
+- **Title:** `concrete changed behavior or engineering outcome`
+- **Description:** Exact problem and reader-visible consequence, followed by the relevant technical mechanism, data/control flow, and constraints.
 - **Changelog treatment:** Public feature/fix | Change fragment `CHG-YYYY-NNNN` | `Changelog: skip`
 - **Required trailers:** Exact terminal trailer lines, or `None`
 - **Commit paths:** Exact ordered list of wholly phase-owned files for this commit.

@@ -10,6 +10,7 @@ Use these resources in this order for broad reviews:
 3. [scope-boundaries.md](scope-boundaries.md) - refusal, narrowing, and attribution rules for unrelated, adjacent, and religious-legal authority requests.
 4. [context-discovery.md](context-discovery.md) - concise user-facing context gate plus deeper search across docs, text artifacts, policies, configs, tests, code, relevant project-context integrations, and user-provided paths.
 5. [report-contract.md](report-contract.md) - report identity, schema, evidence fields, finding IDs, and lifecycle.
+   - [reader-first-reports.md](reader-first-reports.md) - use when writing report prose or chat: explanatory summaries, expanded findings, terminology, and full-detail examples.
 6. [framework-overview.md](framework-overview.md) - identity, scope, value hierarchy, domains, and quick workflow.
 7. [glossary.md](glossary.md) - terms used by the framework and output templates.
 8. [principles-and-domains.md](principles-and-domains.md) - core principles and six review domains.

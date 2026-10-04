@@ -63,6 +63,7 @@
 - Tasks are checkable and mirror the plan's phases.
 - The implementation-agent contract makes `tasks.md` the hot ledger, batches task updates at phase milestones, and separates implementation completion, verification disposition, and the phase commit.
 - Every phase records exact phase-owned paths, a concrete planned declarative commit contract, and post-verification commit checkboxes; completed phases confirm clean status on the feature branch.
+- Executive summaries, planned commit messages, and decision briefs pass the [shared readability check](../../conventional-commit/resources/reader-first-writing.md#readability-check): concrete meaning first, sufficient technical detail next.
 - Context and plan update triggers are narrow enough to prevent documentation churn, while a dated handoff remains mandatory before pause or transfer.
 - Resume guidance reads tasks first and only relevant plan sections, avoiding repeated full-workstream rereads.
 
@@ -80,12 +81,13 @@
 
 Planning artifacts in `dev/active/<task-name>` are gitignored local working memory; they are accessed and verified directly using native harness file tools by deterministic path.
 
-If this workflow skill or other agent-context infrastructure changed, run:
+For prose-only skill changes, check metadata, links, and readability, then run:
 
 ```bash
-dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
-git diff --check -- .agents/skills .agents/contract tests/Event.Architecture.Tests
+git diff --check -- .agents/skills .agents/contract
 ```
+
+Validate changed machine-consumed manifests with their repository parser; run product tests only when executable behavior changed.
 
 Run the planned implementation test suite only during implementation, not while producing the plan. Record known baseline failures honestly in context and tasks.
 
@@ -100,15 +102,16 @@ Created/updated implementation plan for `<task-name>`:
 - dev/active/<task-name>/<task-name>-tasks.md
 
 ### Executive Summary & Architectural Approach
-<2-3 sentences explaining what will change, the core architectural design pattern, and the primary business/platform benefit.>
+<Concrete problem and what will change for users/operators or engineering work.
+Then explain the core technical approach and its important constraint.>
 
 ### Phase Roadmap
-- **Phase 1: <Descriptive Name>** — <What is built, layers touched, and invariants verified>
-- **Phase 2: <Descriptive Name>** — <What is built, layers touched, and invariants verified>
+- **Phase 1: <Descriptive Name>** — <Concrete result, then components and behavior to verify>
+- **Phase 2: <Descriptive Name>** — <Concrete result, then components and behavior to verify>
 - ...
 
 ### Key Decisions & Trade-offs
-- <Bullet points on major technical or architectural choices made during intake/planning>
+- <Choice and practical consequence, followed by the technical rationale>
 
 ### Potential Risks & Hardest Unknowns
 <Short evidence-grounded paragraph naming the hardest unresolved area or edge case.>

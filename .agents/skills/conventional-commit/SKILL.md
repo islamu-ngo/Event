@@ -1,6 +1,6 @@
 ---
 name: conventional-commit
-description: "Load when asked to author/review commit messages or when material divergence requires replacing an approved phase commit contract; not for implementing code or executing a still-truthful planned contract."
+description: "Load when authoring/reviewing commit messages or PR titles/descriptions, or replacing a materially diverged phase commit contract; not for ordinary implementation or executing an unchanged approved contract."
 type: guardrail
 enforcement: block
 priority: high
@@ -15,7 +15,7 @@ priority: high
 2. **No Orphaned Generated Code**: Generated clients/schemas must travel in the commit that triggered them.
 3. **No Layer Scopes**: Scopes describe capability/engineering concern—never code layers (`api`, `domain`, `persistence`, `blazor`, `client`, `dto` are forbidden).
 4. **Cross-Domain Precedence**: When a feature spans domains, select the primary initiating capability (`registration`).
-5. **Subject Quality**: State user/operator benefit in imperative mood; clear without reading the body.
+5. **Reader-First Messages**: Subjects state the concrete user/operator or engineering outcome in imperative mood, without decoding internal jargon. Bodies explain the problem and changed behavior before the mechanism. Apply [reader-first writing](resources/reader-first-writing.md) to messages and PR descriptions; preserve exact identifiers, breaking-change instructions, and trailers.
 6. **Breaking Work & Change-Id**: Breaking changes require `!` and `BREAKING CHANGE:` footer. Governed security/migration work requires its change fragment in `docs/internal/releases/changes/` and matching `Change-Id: CHG-...` footer.
 7. **Internal Nonbreaking Work**: Commits of type `test`, `build`, `ci`, `refactor`, `style`, or internal `docs`/`fix` must carry both `Changelog: skip` and non-empty `Changelog-Reason: <reason>`.
 8. **Safe Staging**: Never use blind `git add .` on mixed trees. Explicitly name staged files per atomic commit. On a shared checkout, inspect the existing index first; never unstage another contributor's work. If unrelated paths are already staged, use an explicit path-limited commit only when you own the complete diff of every named file, then verify the resulting commit file list. A file containing another contributor's hunks is a blocker until ownership is separated or coordinated.
@@ -58,7 +58,8 @@ File count is a warning signal, not the definition of atomicity. Small commits a
 ```text
 type(scope): benefit-led subject
 
-Optional description explaining motivation and data flow.
+Explain the problem and what changes for the reader.
+Then explain the relevant technical mechanism and constraints.
 
 Changelog: skip
 Changelog-Reason: concise explanation of why commit is excluded from public release notes
@@ -70,44 +71,23 @@ Changelog-Reason: concise explanation of why commit is excluded from public rele
 | `revert` / `docs` | Rollback with stated outcome, or documentation-only change |
 | `test/build/ci/refactor/chore` | Internal outcome (skipped from public release notes) |
 
-### CLI Recipes
+### CLI Recipe
 
 ```bash
-# Vertical feature commit (single-outcome staging)
-git add path/to/Domain.cs path/to/Page.razor path/to/ApiClient.g.cs
-git commit -m "feat(registration): present tenant-branded intermediary disclaimer on paid events" -m "Format primary directory notice dynamically based on tenant branding."
-
-# Internal nonbreaking commit (with required skip trailers)
-git add path/to/ProjectionUpdater.cs
-git commit -m "fix(database): wrap session projection rebuilds in db execution strategy" \
-  -m "Execute projection rebuilds within execution strategies." -m "Changelog: skip" -m "Changelog-Reason: internal projection resilience enhancement"
-
-# Checkout with unrelated paths already staged
 git status --short
 git diff --cached --name-only
 git add -- path/to/OwnedChange.cs path/to/OwnedChangeTests.cs
-git commit --only -m "fix(registration): reject expired holds before attendee confirmation" -m "Keep registration state unchanged when the submitted hold is no longer valid." \
+git commit --only -m "fix(registration): reject expired holds before confirming attendance" \
+  -m "An expired reservation must not become a confirmed registration. Check the hold expiry before changing registration state." \
   -- path/to/OwnedChange.cs path/to/OwnedChangeTests.cs
 git show --name-only --format=fuller HEAD
 ```
 
-## Anti-Pattern Catalog
-
-| ❌ Anti-Pattern | ✅ Best Practice | Why |
-|---|---|---|
-| `feat(api): add disclaimer` | `feat(registration): present disclaimer on paid events` | Layer scope rejected; use product capability. |
-| `fix(persistence): retry query` | `fix(database): wrap session projection in execution strategy` | `persistence` is a layer; use `database` scope. |
-| `chore: update client` | *[Bundle in originating feature commit]* | Never split generated client from triggering feature. |
-| `docs: update cla` | `docs(documentation): clarify legal entity status` | Explicit engineering scope and benefit-led subject. |
-| `test: update tests` | `test(testing): harden persistence integration tests` | Descriptive subject and specific scope. |
-| One commit for an entire multi-feature dirty tree | Separate commits for each independently reviewable behavior | Shared timing or scope does not make changes atomic. |
-| “Vertical slice” containing hundreds of loosely related files | Large commit only for one provably indivisible transformation or generated set | Atomic means smallest complete outcome, not largest complete workstream. |
-| Normal `git commit` while unrelated paths are already staged | Explicit path-limited commit plus post-commit file-list verification | Shared index state must not leak another contributor's work into the commit. |
-| Path-limited commit of a file containing another contributor's hunks | Stop and separate or coordinate ownership before committing | Path limitation isolates files, not mixed-author hunks inside one file. |
-| Loading this skill to reuse a truthful contract, or silently replacing a false one | Execute the self-sufficient default directly; load only to record material-divergence replacement contracts | Avoid context waste while making necessary drift explicit. |
+Use literal owned paths. Path-limited commits isolate files, not another contributor's hunks inside a shared file. Add the required changelog/breaking-change trailers for the classified change.
 
 ## Resources
 
+- [Reader-first writing](resources/reader-first-writing.md) - use for commit wording, PR composition, reports, and decision briefs; includes balanced examples and a PR template.
 - [Governed releases](../../../docs/internal/releases/README.md)
 - [Release policy](../../../docs/internal/RELEASE_POLICY.md)
 - [Release policy schema](../../../eng/release/policy/release-policy.yaml)
@@ -117,4 +97,4 @@ git show --name-only --format=fuller HEAD
 ## Verification
 
 - `git log --format='- %s' "$(git merge-base HEAD origin/develop)"..HEAD`
-- Confirm every visible subject is plain-language, every skipped commit has both trailers, and every breaking commit has the required footer.
+- Apply the resource's readability check; confirm every skipped commit has both trailers and every breaking commit has its required footer. Readability never substitutes for release metadata.

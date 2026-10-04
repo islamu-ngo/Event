@@ -1,6 +1,6 @@
 ---
 name: implement-tasks
-description: "Load when executing, running, or resuming an approved task plan from `dev/active/<task>/` or `.worktrees/<task>`; orchestrates fresh worktree setup, in-flight worktree/develop resume, Red/Green/Refactor task loops, failure triage/quarantine, semantic phase commits, pre-PR rebase conflict protection, PR creation with pre-flight Release Impact, and parked worktree lifecycle."
+description: "Load when executing or resuming an approved plan from `dev/active/<task>/` or `.worktrees/<task>`, including phase commits, verification, PR creation, and handoff; not for plan authorship or review."
 type: workflow
 enforcement: suggest
 priority: high
@@ -66,7 +66,7 @@ priority: high
    - **Rolling Context Compaction Invariant (< 200–300 lines / < 15KB)**:
      `*-context.md` is strictly **ephemeral working memory**, NOT a permanent historical log. In multi-phase or multi-cohort migrations, agents must NEVER accumulate dozens of pages of detailed commit logs or test output digests in `context.md` (which exhausts token budgets upon cold resume). Once a phase or cohort is integrated and committed to Git:
      1. Summarize the completed milestone into a concise 1-line checkpoint under `## Quick Resume`.
-     2. Archive detailed findings or lessons to `dev/_journal/` or the PR description.
+      2. Graduate durable findings to `dev/_journal/`; summarize final evidence in the PR, not the execution diary.
      3. Prune old ephemeral session logs from `context.md`. The Git commit history (`git log`) is the sole durable source of truth for commits, never markdown text dumps.
 5. **Phase-by-Phase Execution Cadence & Progressive Verification**:
    - **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Shift pure domain invariants to `Event.Domain.UnitTests`. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails at runtime.
@@ -80,12 +80,7 @@ priority: high
    - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
 6. **Self-Contained Phase Reporting, Decision Briefs & Mid-Flight Slicing**:
-   When pausing for user feedback, milestone approvals, or architectural decisions between phases, executing agents must **never** send cryptic prompts referencing bare IDs. Always provide an inline **Decision Brief**:
-   - Current progress milestone in plain English.
-   - Descriptive names of components/services involved.
-   - The concrete decision required, why it matters, and trade-offs.
-   - Explicit numbered options with a recommended default.
-   - Immediate next action upon reply.
+   Apply [reader-first writing](../conventional-commit/resources/reader-first-writing.md) to reports and questions: delivered behavior first, relevant mechanism and verification next. Never use bare phase IDs. Decision Briefs name the exact choice, practical consequences, technical rationale, recommended option, and next action; ordinary progress reports need no invented decision.
    - **Mid-Flight Workstream Slicing Trigger**: If an approved plan spans > 3 functional domains or integration repairs reveal that downstream phases will trigger wide structural refactoring, the agent MUST proactively propose slicing the workstream via a Decision Brief: ship completed, green phases in the current PR to lock in value, and spin off remaining phases into a clean follow-up worktree.
 7. **Knowledge Graduation Gate (Mandatory Before PR)**:
    Before declaring work complete or pushing, promote durable knowledge within the execution context:
@@ -103,6 +98,7 @@ priority: high
      Resolve any conflicts inside the execution context, verify tests, and complete rebase (`git rebase --continue`).
 9. **Pull Request Creation & Lifecycle Protocol**:
    - **Push Branch**: `git push -u origin <branch> --force-with-lease`
+   - **Reader-First PR Body**: Use the shared writing guide's PR structure and readability check. Lead with changed behavior; retain technical review details, operator actions, evidence, and limitations. Do not paste phase logs.
    - **Pre-Flight PR Release Impact Generation (Zero CI Failures)**:
      Never use a bare `gh pr create --fill` that omits metadata. PR descriptions MUST contain the `## Release Impact` checklist mandated by `.ci/scripts/validate-release-impact-pr.cs`. Inspect changed files against category rules:
      - `security` (auth, cerbos, keycloak, cla, secrets): `- [x] Security/auth impact documented`
@@ -123,9 +119,9 @@ priority: high
      1. PR URL and branch name.
      2. Confirmation of worktree status (e.g. parked at `.worktrees/<task-name>`).
      3. **Partitioned Workstream Summary**:
-        - *Delivered Features*: Capabilities and behaviors added by the approved plan.
-        - *Integration Repairs*: Necessary mechanical adjustments to fixtures/callers matching new contracts.
-        - *Quarantined Baseline Issues*: Pre-existing repo rot or flaky suites logged in `context.md` / `dev/backlog/` and excluded from this PR.
+        - *Delivered Features*: Concrete changes for users/operators, then the relevant components and mechanisms.
+        - *Integration Repairs*: What needed alignment, why, and the affected contracts.
+        - *Quarantined Baseline Issues*: Pre-existing failures, their practical effect, and what remains unverified.
      4. Notification that CI checks and automated bot reviewers are running.
      5. Clear instruction to user: notify agent of any review comments or CI failures; OR confirm PR approval/merge to trigger teardown.
    - **Worktree Teardown (Only Upon Explicit User Confirmation)**:
@@ -189,7 +185,7 @@ priority: high
 
 6. PR Creation & Handoff:
    a. git push -u origin <branch> --force-with-lease
-   b. Inspect changed files and construct PR body with mandatory `## Release Impact` checklist
+    b. Construct a reader-first PR body with the shared guide; preserve mandatory `## Release Impact` metadata
    c. gh pr create --base develop --title "..." --body "..."
    d. If Worktree topology: PARK .worktrees/<task> — DO NOT remove it!
    e. Stop and deliver partitioned status brief to user (Delivered Features, Integration Repairs, Quarantined Baseline Issues).

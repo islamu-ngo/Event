@@ -5,6 +5,8 @@
 
 Use [report-contract.md](report-contract.md) for every report's subject path, metadata, stable IDs, required headings, evidence fields, and lifecycle. Use [action-routing.md](action-routing.md) to select the standalone report kind and [context-discovery.md](context-discovery.md) before artifact-based findings.
 
+Use [reader-first-reports.md](reader-first-reports.md) while filling these templates. Expand labels into explanatory paragraphs; retain the full technical vocabulary, ethical reasoning, traceability, alternatives, and uncertainty. The templates name information to supply, not a terse label-only output format.
+
 ## Persistence Boundary
 
 Persist substantive findings, recommendations, advisories, audits, and consultations. Do not create reports for refusals, menus, context inventories, clarification questions, or agreement prompts.
@@ -18,34 +20,43 @@ When a report reviews a concrete feature request, add `## Common Overlooked Fail
 ## Executive I-VSD Review
 
 ```text
+Practical conclusion and who is affected:
+What this status/disposition means for the next decision:
 Scope:
 Claim boundary: I-VSD design reasoning, not fatwa, certification, or proof.
 Top risks:
 Strengths:
 Priority recommendations:
+Technical mechanisms and ethical rationale behind the recommendations:
 Stakeholders:
 Validation gaps:
 Evidence reviewed:
 ```
 
+The executive section orients the reader; detailed findings, evidence, and recommendations still follow under the required headings.
+
 ## Detailed Moral Design Audit
 
 ```text
+Practical problem and affected people:
 Scope and exclusions:
 Method: stakeholder map, provider responsibility map, principle/domain review, evidence classification.
 Findings: severity, principle, domain, evidence, missing evidence, recommendation.
+Per-finding explanation: concrete scenario, harm/benefit, provider-controlled decision,
+technical mechanism, ethical rationale, mitigation, trade-offs, and evidence limits.
 Roadmap: quick fixes, structural changes, evidence-building, escalation.
 Validation gaps:
 ```
 
 ## Compliance-Style Checklist
 
-Use categories and finding levels from [compliance-checks.md](compliance-checks.md). Include “not reviewed” instead of guessing.
+Use categories and finding levels from [compliance-checks.md](compliance-checks.md). Include “not reviewed” instead of guessing. Explain why each material result matters, what evidence supports it, and what remains unproved; a Pass/Concern label or matrix alone is insufficient.
 
 ## Design Direction Memo
 
 ```text
 User job:
+Concrete before/after experience:
 Provider responsibility:
 Common overlooked failures and outcomes:
 Protective defaults:
@@ -53,12 +64,14 @@ Pricing/limits/consent clarity:
 Dark-pattern check:
 Accessibility/localization:
 Rejected manipulative alternatives:
+Technical and ethical reasons for the chosen defaults:
 Evidence needed:
 ```
 
 ## Implementation Or Code Review Memo
 
 ```text
+What the change means for people using or operating the system:
 Reviewed artifacts:
 Principle-to-implementation traceability:
 Architecture/security/data/account/workspace/tenant boundaries:
@@ -66,6 +79,7 @@ Common overlooked failures and outcomes:
 Tests or docs supporting the claim:
 Operational gaps:
 Recommendations:
+Why each recommendation addresses the risk, and its limitations/trade-offs:
 ```
 
 ## Moral Diff Review
@@ -90,6 +104,7 @@ Cover riba/gharar/deception concerns, data monetization, sponsor influence, hidd
 
 ```text
 Incident:
+What happened to affected people, in concrete terms:
 Affected stakeholders:
 Provider responsibility breached:
 Principles/domains:
@@ -97,6 +112,7 @@ Evidence:
 Immediate correction:
 Restitution or user repair:
 Prevention:
+How the prevention mechanism works and which failure it cannot rule out:
 Operational validation needed:
 Trust repair communication:
 ```

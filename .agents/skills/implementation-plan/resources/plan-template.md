@@ -33,7 +33,7 @@ Record:
 
 ## 1. Executive Summary
 
-State what will change, why it matters, the intended user/business/platform outcome, and explicit non-goals.
+Lead with the concrete problem and what changes for users/operators or engineering work. Then explain the core approach and explicit non-goals, keeping detailed architecture in Section 5. Apply [reader-first writing](../../conventional-commit/resources/reader-first-writing.md); a workstream name is not an explanation.
 
 ## 2. Source-Grounded Current State Report
 
@@ -194,8 +194,8 @@ While writing or updating the workstream, the planning agent MUST load `conventi
 ```markdown
 #### Planned Commit Contract [or Planned Commit Contract N.1 for multi-commit phases]
 - **Type & Scope:** `type(scope)`
-- **Title:** `benefit-led phase outcome`
-- **Description:** Exact motivation and data/control-flow description for the planned phase outcome.
+- **Title:** `concrete changed behavior or engineering outcome`
+- **Description:** Exact problem and reader-visible consequence, followed by the relevant technical mechanism, data/control flow, and constraints.
 - **Changelog treatment:** Public feature/fix | Change fragment `CHG-YYYY-NNNN` | `Changelog: skip`
 - **Required trailers:** Exact terminal trailer lines, or `None`
 - **Commit paths:** Exact ordered list of wholly phase-owned files for this commit.

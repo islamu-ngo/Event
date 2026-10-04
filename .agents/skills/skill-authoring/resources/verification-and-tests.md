@@ -26,7 +26,7 @@ application code changed. Prose-only skill changes do not run product tests.
 - The loaded body contains no repeated activation section.
 - Resource links resolve.
 - Resource index links every resource.
-- Resource files start with two `ABOUTME` comments.
+- Resource files use natural Markdown metadata or standard frontmatter under the governance header policy.
 - No skip-list exception was added.
 - No claim exceeds the available evidence.
 

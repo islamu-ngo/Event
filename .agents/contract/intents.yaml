@@ -1028,8 +1028,9 @@ intents:
       - .agents/skills/_SKILL_SCHEMA.md
     unique_acceptance:
       - "New SKILL.md satisfies the skill schema without adding a schema-test skip exception"
-      - "Every resource linked from SKILL.md or resources/index.md exists and has two ABOUTME lines"
+      - "Every linked skill resource exists and uses natural Markdown metadata or standard frontmatter under the governance header policy"
       - "The description alone supports the pre-load routing decision, while the loaded body contains only non-inferable rules, workflow, just-in-time resources, and verification"
+      - "Human-facing guidance and examples add concrete explanations without removing technical terminology, mechanisms, rationale, consequential constraints, or evidence"
     forbidden_without_approval:
       - "Creating a skill that claims authority beyond its evidence or domain scope"
       - "Inlining long framework material in SKILL.md instead of resource files"

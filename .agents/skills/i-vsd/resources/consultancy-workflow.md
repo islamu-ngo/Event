@@ -35,11 +35,15 @@ Use [context-discovery.md](context-discovery.md) for artifact-based or project-c
 
 Classify findings as strengths, concerns, high-risk violations, unknowns, or escalation needs. Include the principle, domain, stakeholder, evidence, missing evidence, severity, and validation level.
 
+Apply [reader-first-reports.md](reader-first-reports.md): explain each material finding in prose, then retain its complete traceability fields. Expand technical and ethical reasoning rather than reducing it to a readable but incomplete summary.
+
 For feature consultations, include a `Common Overlooked Failures And Outcomes` section or finding group. It should explain feature-specific mistakes teams often miss, concrete harms and operational consequences, and the moral/compliance/audit benefits of implementing the feature responsibly.
 
 ## Recommendations
 
 Group recommendations into quick fixes, design/policy changes, architecture changes, operational changes, evidence-building steps, and deferred scholarly/expert review.
+
+For each material recommendation, explain the action, practical consequence, technical mechanism, ethical basis, trade-offs, owner, and evidence or escalation needed. A named pattern or principle alone does not explain the recommendation.
 
 ## Output Modes
 

@@ -73,6 +73,10 @@ Section names beyond these are allowed when they communicate the domain more dir
 - Prefer links and exact headings over copied governing rules. Repetition with different wording is still duplication.
 - Broad read-only discovery belongs to an economical scout using the cap in [Context Engineering](../CONTEXT_ENGINEERING.md); the main agent owns decisions and synthesis.
 
+### Human-facing output guidance
+
+Skills that produce commit/PR text, reports, or decision requests follow [Reader-First Technical Communication](../../docs/internal/GOVERNANCE.md#reader-first-technical-communication). Route to the [shared writing guide](conventional-commit/resources/reader-first-writing.md) rather than copying its rules. Examples must add concrete explanations while preserving technical terminology, mechanisms, constraints, and evidence; vague benefits and unexplained internal jargon both fail review. Do not impose brevity that removes substance.
+
 ## 6. Forbidden Content
 
 - Activation sections or trigger lists already represented in `description`.

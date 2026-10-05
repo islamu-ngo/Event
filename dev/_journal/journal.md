@@ -2818,3 +2818,38 @@ passed without weakening the failure assertion.
 - [x] Stays in journal only; structural authority readiness is not optional when removing an unrelated credential dependency.
 
 ---
+
+[2026-10-05 Europe/Brussels] - Typed response tests can miss omitted null HTTP fields
+
+**Context**: While implementing one-time external API-key issuance, native and
+typed HTTP response tests accepted metadata recovery with a null `ApiKey`.
+Dedicated and Combined public-ingress tests additionally inspected the JSON
+property itself.
+
+**Symptom / Observation**: Recovery returned HTTP 200, but
+`JsonElement.GetProperty("apiKey")` failed with `KeyNotFoundException`.
+Deserialization had silently mapped the absent field to null.
+
+**Root Cause**: `ApiHostServiceCollectionExtensions` configures API-wide
+`JsonIgnoreCondition.WhenWritingNull`. A nullable C# property and a nullable
+OpenAPI schema do not override that serializer policy, and a typed round-trip
+cannot distinguish omission from an explicit JSON null.
+
+**Resolution**: Apply `JsonIgnoreCondition.Never` only to the issuance result's
+`ApiKey` property. The production-ingress recovery regression requires that
+property to exist with `JsonValueKind.Null`; other API-wide null omission remains.
+
+**Why This Matters for Future Work**: When field presence is part of a public
+contract, verify the actual HTTP JSON shape as well as typed client consumption.
+Do not infer wire presence from DTO nullability or an isolated serializer test.
+
+**References**:
+- `src/Explore.API/Hosting/ApiHostServiceCollectionExtensions.cs:286`
+- `src/Explore.Application/Responses/CreateExternalApiKeyCommandResponse.cs`
+- `tests/Event.API.IntegrationTests/Features/ExternalApiKeyIssuanceIngressTests.cs`
+- `docs/internal/API.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; production HTTP field-presence assertions are the regression.
+
+---

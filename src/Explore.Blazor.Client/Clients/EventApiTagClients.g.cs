@@ -66174,11 +66174,12 @@ namespace Explore.Blazor.Client.Clients
         /// Create a new external API key
         /// </summary>
         /// <remarks>
-        /// Issue a tenant-bound external API key and reveal the raw secret once.
+        /// Issue an external API key with a required Idempotency-Key. The acknowledged creation reveals the secret once; authorized retries return metadata only.
         /// </remarks>
+        /// <param name="idempotency_Key">Client-generated replay key bound by the server to the current principal or hashed capability and resolved route.</param>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CreateExternalApiKeyCommandResponse> CreateExternalApiKeyAsync(CreateExternalApiKeyDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<CreateExternalApiKeyCommandResponse> CreateExternalApiKeyAsync(string idempotency_Key, CreateExternalApiKeyDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -66369,11 +66370,12 @@ namespace Explore.Blazor.Client.Clients
         /// Create a new external API key
         /// </summary>
         /// <remarks>
-        /// Issue a tenant-bound external API key and reveal the raw secret once.
+        /// Issue an external API key with a required Idempotency-Key. The acknowledged creation reveals the secret once; authorized retries return metadata only.
         /// </remarks>
+        /// <param name="idempotency_Key">Client-generated replay key bound by the server to the current principal or hashed capability and resolved route.</param>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<CreateExternalApiKeyCommandResponse> CreateExternalApiKeyAsync(CreateExternalApiKeyDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<CreateExternalApiKeyCommandResponse> CreateExternalApiKeyAsync(string idempotency_Key, CreateExternalApiKeyDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -66384,6 +66386,10 @@ namespace Explore.Blazor.Client.Clients
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
+
+                    if (idempotency_Key == null)
+                        throw new System.ArgumentNullException("idempotency_Key");
+                    request_.Headers.TryAddWithoutValidation("Idempotency-Key", ConvertToString(idempotency_Key, System.Globalization.CultureInfo.InvariantCulture));
 
                     if (x_Api_Version != null)
                         request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
@@ -66466,6 +66472,26 @@ namespace Explore.Blazor.Client.Clients
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Not Found", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Conflict", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -161441,6 +161467,9 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("keyId")]
         public string? KeyId { get; init; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("disclosureStatus")]
+        public ExternalApiKeyDisclosureStatus? DisclosureStatus { get; init; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("id")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public System.Guid Id { get; init; } = default!;
@@ -169648,6 +169677,18 @@ namespace Explore.Blazor.Client.Clients
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
         }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ExternalApiKeyDisclosureStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Issued")]
+        Issued = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"PreviouslyIssued")]
+        PreviouslyIssued = 1,
 
     }
 

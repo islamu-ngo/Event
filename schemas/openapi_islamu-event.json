@@ -47864,7 +47864,7 @@
           "ExternalApiKey"
         ],
         "summary": "Create a new external API key",
-        "description": "Issue a tenant-bound external API key and reveal the raw secret once.",
+        "description": "Issue an external API key with a required Idempotency-Key. The acknowledged creation reveals the secret once; authorized retries return metadata only.",
         "operationId": "CreateExternalApiKey",
         "parameters": [
           {
@@ -47877,6 +47877,15 @@
           {
             "name": "X-Api-Version",
             "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated replay key bound by the server to the current principal or hashed capability and resolved route.",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -47982,10 +47991,51 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "x-endpoint-class": "Authenticated",
-        "x-rate-limit-policy": "Write"
+        "x-rate-limit-policy": "Write",
+        "x-idempotency-key-required": true
       }
     },
     "/api/externalapikey/{id}": {
@@ -120844,6 +120894,7 @@
         "required": [
           "apiKey",
           "keyId",
+          "disclosureStatus",
           "id",
           "success",
           "message",
@@ -120864,6 +120915,9 @@
               "null",
               "string"
             ]
+          },
+          "disclosureStatus": {
+            "$ref": "#/components/schemas/ExternalApiKeyDisclosureStatus"
           },
           "id": {
             "type": "string",
@@ -131527,6 +131581,13 @@
             "format": "date-time"
           }
         }
+      },
+      "ExternalApiKeyDisclosureStatus": {
+        "enum": [
+          "Issued",
+          "PreviouslyIssued",
+          null
+        ]
       },
       "ExternalApiKeyListDto": {
         "required": [

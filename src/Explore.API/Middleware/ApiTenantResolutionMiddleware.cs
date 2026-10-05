@@ -117,6 +117,14 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
+        // Native key management checks owner authority and supports global keys.
+        // Preserve any tenant resolution above rather than inventing a scope.
+        if (IsApiKeyManagementRequest(context.Request))
+        {
+            await _next(context);
+            return;
+        }
+
         context.Response.StatusCode = StatusCodes.Status404NotFound;
         context.Response.Headers.CacheControl = "no-store";
 
@@ -196,6 +204,17 @@ public sealed class ApiTenantResolutionMiddleware
                 path.Value,
                 "/api/instance/settings/resolver-config",
                 StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool IsApiKeyManagementRequest(HttpRequest request)
+    {
+        if (request.Path.Equals(new PathString("/api/externalapikey"), StringComparison.OrdinalIgnoreCase))
+            return HttpMethods.IsPost(request.Method) || HttpMethods.IsGet(request.Method);
+
+        return HttpMethods.IsDelete(request.Method)
+            && request.Path.StartsWithSegments("/api/externalapikey", StringComparison.OrdinalIgnoreCase, out var remainder)
+            && remainder.Value is { Length: > 1 } path
+            && Guid.TryParse(path.AsSpan(1), out _);
     }
 
     private static bool IsEnabledMcpPath(HttpContext context, McpAdapterSettings settings)

@@ -34,6 +34,12 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             await next(context);
             return;
         }
+        if (!tenantContext.IsResolved && ApiTenantResolutionMiddleware.IsApiKeyManagementRequest(context.Request))
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            await next(context);
+            return;
+        }
         if (!tenantSurface || ApiTenantResolutionMiddleware.IsTenantExemptPath(context.Request)
             || IsExistingAuthenticationOrSignedCallback(context)
             || HttpMethods.IsGet(context.Request.Method)

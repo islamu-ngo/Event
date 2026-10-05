@@ -16,6 +16,7 @@
             <EditForm EditContext="_editContext">
                 <FluentValidationValidator />
                 <FormSubmissionGuard State="@_submitState">
+                <fieldset disabled="@(_pendingRequest is not null)" style="border: 0; padding: 0; margin: 0; min-inline-size: 0;">
                 <AppValidationSummary />
                 <MudStack Spacing="4">
                     <MudTextField Variant="Variant.Outlined" T="string"
@@ -23,6 +24,7 @@
                                   Label="Name"
                                   Required="true"
                                   RequiredError="Name is required"
+                                  Disabled="@(_pendingRequest is not null)"
                                   MaxLength="200"
                                   Counter="200"
                                   HelperText="A descriptive name for this API key" />
@@ -30,6 +32,7 @@
                     <MudTextField Variant="Variant.Outlined" T="string"
                                   @bind-Value="_dto.Description"
                                   Label="Description"
+                                  Disabled="@(_pendingRequest is not null)"
                                   Lines="2"
                                   MaxLength="1000"
                                   Counter="1000"
@@ -47,6 +50,7 @@
                         {
                             <MudCheckBox T="bool"
                                          Value="@_selectedScopes.Contains(scope.Value)"
+                                         Disabled="@(_pendingRequest is not null)"
                                          ValueChanged="@(v => ToggleScope(scope.Value, v))"
                                          Label="@($"{scope.Value} — {scope.Description}")"
                                          Dense="true"
@@ -56,16 +60,30 @@
 
                     <MudDatePicker Label="Expires At (optional)"
                                    @bind-Date="_expiresAt"
+                                   Disabled="@(_pendingRequest is not null)"
                                    MinDate="DateTime.Today.AddDays(1)"
                                    Clearable="true"
                                    HelperText="Leave empty for no expiration" />
                 </MudStack>
+                </fieldset>
                 </FormSubmissionGuard>
             </EditForm>
         }
         else
         {
             <MudStack Spacing="4">
+                @if (_createdSecret is null)
+                {
+                    <div role="status" aria-live="polite" aria-atomic="true">
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                            This key was already created. Its secret cannot be shown again.
+                            If you did not save it, revoke this key from the API-key list, then deliberately create a replacement.
+                        </MudAlert>
+                        <MudText Typo="Typo.body2">Key ID: @_createdKeyId</MudText>
+                    </div>
+                }
+                else
+                {
                 <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
                     Copy this API key now. You will not be able to see it again.
                 </MudAlert>
@@ -83,6 +101,7 @@
                 <MudText Typo="Typo.caption" Color="Color.Secondary">
                     Use this key in the <code>X-API-Key</code> header for API requests.
                 </MudText>
+                }
             </MudStack>
         }
     </DialogContent>
@@ -91,7 +110,7 @@
         {
             <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" OnClick="Cancel" Disabled="_submitState.IsSubmitting">Cancel</MudButton>
             <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_submitState.IsSubmitting || !_selectedScopes.Any())">
-                @(_submitState.IsSubmitting ? "Creating..." : "Create API Key")
+                @(_submitState.IsSubmitting ? "Checking..." : _pendingRequest is not null ? "Retry this operation" : "Create API Key")
             </MudButton>
         }
         else
@@ -110,10 +129,12 @@
 
     private bool _created;
     private string? _createdSecret;
+    private string? _createdKeyId;
+    private CreateExternalApiKeyDto? _pendingRequest;
+    private readonly string _operationKey = Guid.CreateVersion7().ToString("N");
 
     private EditContext _editContext = default!;
     private FormSubmitState _submitState = new();
-    private ServerValidationErrorStore _errorStore = new();
 
     private readonly CreateExternalApiKeyDto _dto = new() { Name = string.Empty };
     private readonly HashSet<string> _selectedScopes = new(StringComparer.OrdinalIgnoreCase);
@@ -122,11 +143,12 @@
     protected override void OnInitialized()
     {
         _editContext = new EditContext(_dto);
-        _errorStore.Init(_editContext);
     }
 
     private void ToggleScope(string scope, bool selected)
     {
+        if (_pendingRequest is not null)
+            return;
         if (selected)
             _selectedScopes.Add(scope);
         else
@@ -135,60 +157,63 @@
 
     private async Task Submit()
     {
-        if (_submitState.IsSubmitting) return;
-
-        if (!_editContext.Validate() || !_selectedScopes.Any())
+        if (_submitState.IsSubmitting || _created) return;
+        if (_pendingRequest is null)
         {
-            if (!_selectedScopes.Any())
+            _dto.ExternalApiKeyOwnerTypeId = OwnerType;
+            _dto.OrganizationId = OrganizationId;
+            _dto.GroupId = GroupId;
+            _dto.Scopes = _selectedScopes.OrderBy(scope => scope, StringComparer.Ordinal).ToArray();
+            _dto.Name = _dto.Name?.Trim() ?? string.Empty;
+            _dto.Description = string.IsNullOrWhiteSpace(_dto.Description) ? null : _dto.Description.Trim();
+            _dto.ExpiresAt = _expiresAt.HasValue ? new DateTimeOffset(_expiresAt.Value, TimeSpan.Zero) : null;
+            if (!_editContext.Validate() || !_selectedScopes.Any())
             {
-                _submitState.Fail("Select at least one scope.");
+                if (!_selectedScopes.Any())
+                    _submitState.Fail("Select at least one scope.");
+                return;
             }
-            return;
+            _pendingRequest = new CreateExternalApiKeyDto
+            {
+                Name = _dto.Name,
+                Description = _dto.Description,
+                ExternalApiKeyOwnerTypeId = _dto.ExternalApiKeyOwnerTypeId,
+                OrganizationId = _dto.OrganizationId,
+                GroupId = _dto.GroupId,
+                Scopes = Array.AsReadOnly(_dto.Scopes.ToArray()),
+                ExpiresAt = _dto.ExpiresAt,
+                CreditPeriodId = _dto.CreditPeriodId,
+                CreditLimit = _dto.CreditLimit,
+                MaxRolloverCredits = _dto.MaxRolloverCredits
+            };
         }
 
         try
         {
             _submitState.Start();
 
-            _dto.ExternalApiKeyOwnerTypeId = OwnerType;
-            _dto.OrganizationId = OrganizationId;
-            _dto.GroupId = GroupId;
-            _dto.Scopes = _selectedScopes.OrderBy(s => s).ToList();
-            _dto.Name = _dto.Name.Trim();
-            _dto.Description = string.IsNullOrWhiteSpace(_dto.Description) ? null : _dto.Description.Trim();
-            _dto.ExpiresAt = _expiresAt.HasValue ? new DateTimeOffset(_expiresAt.Value, TimeSpan.Zero) : null;
+            var response = await ApiKeyService.CreateApiKeyAsync(_pendingRequest, _operationKey);
 
-            var response = await ApiKeyService.CreateApiKeyAsync(_dto);
-
-            if (response?.Success == true && !string.IsNullOrWhiteSpace(response.ApiKey))
+            if (response?.Success == true && response.DisclosureStatus == ExternalApiKeyDisclosureStatus.Issued
+                && !string.IsNullOrWhiteSpace(response.ApiKey))
             {
                 _createdSecret = response.ApiKey;
                 _created = true;
             }
-            else
+            else if (response?.Success == true && response.DisclosureStatus == ExternalApiKeyDisclosureStatus.PreviouslyIssued
+                && response.ApiKey is null && !string.IsNullOrWhiteSpace(response.KeyId))
             {
-                var msg = response?.Message ?? "Failed to create API key.";
-                if (response?.Errors?.Any() == true)
-                {
-                    msg += " " + string.Join("; ", response.Errors);
-                }
-                _submitState.Fail(msg);
-            }
-        }
-        catch (ApiException ex)
-        {
-            if (!_errorStore.HandleApiError(ex))
-            {
-                _submitState.Fail($"Failed to create API key: {ex.Message}");
+                _createdKeyId = response.KeyId;
+                _created = true;
             }
             else
             {
-                _submitState.Fail("Please fix the validation errors below.");
+                _submitState.Fail("The request did not complete. Retry this operation to check its outcome.");
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _submitState.Fail($"Error creating API key: {ex.Message}");
+            _submitState.Fail("The request did not complete. Retry this operation to check its outcome.");
         }
         finally
         {

@@ -253,6 +253,8 @@ public static class PersistenceServicesRegistration
         // User & Authentication Repositories
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
+        services.AddScoped<IExternalApiKeyIssuanceReceiptRepository, ExternalApiKeyIssuanceReceiptRepository>();
+        services.AddScoped<IExternalApiKeyIssuanceAuthority, ExternalApiKeyIssuanceAuthority>();
         services.AddScoped<IManagedControlPlaneRegistrationRepository, ManagedControlPlaneRegistrationRepository>();
         services.AddScoped<IManagedTenantProvisioningOperationRepository, ManagedTenantProvisioningOperationRepository>();
         services.AddScoped<IConfigurationManifestOperationRepository, ConfigurationManifestOperationRepository>();

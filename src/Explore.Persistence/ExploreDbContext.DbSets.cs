@@ -68,6 +68,7 @@ public partial class ExploreDbContext
     public DbSet<UserPii> UserPii { get; set; }
     public DbSet<AuthenticationProvider> AuthenticationProviders { get; set; }
     public DbSet<ExternalApiKey> ExternalApiKeys { get; set; }
+    public DbSet<ExternalApiKeyIssuanceReceipt> ExternalApiKeyIssuanceReceipts { get; set; }
     public DbSet<ExternalApiKeyOwnerTypeLookup> ExternalApiKeyOwnerTypes { get; set; }
     public DbSet<ExternalApiKeyStatus> ExternalApiKeyStatuses { get; set; }
     public DbSet<ExternalApiKeyCreditPeriod> ExternalApiKeyCreditPeriods { get; set; }

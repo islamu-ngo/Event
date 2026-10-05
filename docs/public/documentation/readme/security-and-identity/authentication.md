@@ -331,6 +331,82 @@ External programmatic clients and integration workers authenticate using either:
 > [!NOTE]
 > Do not supply both headers simultaneously. Authentication establishes *who* the caller is; [Authorization](authorization.md) and [Multi-Tenancy](multi-tenancy.md) boundaries still evaluate independently on every request.
 
+### API Key Issuance And Lost-Response Recovery
+
+Creating a key through `POST /api/ExternalApiKey` now requires exactly one
+`Idempotency-Key` header. Its value must contain 1..128 ASCII characters from
+`A-Z`, `a-z`, `0-9`, `.`, `_`, `:`, and `-`; case matters. For example, use
+`Idempotency-Key: key-create-20261005-01` for one creation intent. Missing,
+duplicate, comma-combined, whitespace, and non-ASCII values fail validation.
+The header is required in OpenAPI; C# SDK callers pass it as the first argument
+to `CreateExternalApiKeyAsync(operationKey, dto)`.
+
+Keep that operation key and the same request policy until the outcome is known.
+The operation key is not an API credential and does not grant authority.
+Identity and current tenant come from the server's authenticated context, not
+the creation body. User-owned tenant keys require active tenant membership;
+organization/group keys require current persisted management permission;
+linked tenants must be active. These requirements apply on recovery too.
+
+Instance administrators can issue, list, and revoke global keys from the
+administrator host without selecting a tenant. Tenant, personal, organization,
+and group issuance still requires the correct resolved tenant; the server never
+invents one from the creation body.
+
+The first acknowledged creation returns HTTP `200` with
+`disclosureStatus = "Issued"` and the raw `apiKey`. Save it directly in your
+approved secret store before leaving the creation dialog. The service persists
+only the secret hash and a digest-only receipt, not a recoverable response.
+There is no endpoint that can show that secret again.
+
+If a connection fails or a response is lost:
+
+1. Retry with the same operation key and unchanged policy. Do not generate a
+   new key merely because the first response was lost. The creation dialog
+   preserves its operation key and freezes its canonical request for this
+   retry while it remains open; failure guidance does not display server
+   response bodies or exception text.
+2. An authorized retry of a committed operation returns HTTP `200` with
+   `disclosureStatus = "PreviouslyIssued"`, stable `id`/`keyId`, and
+   `apiKey = null`. This confirms creation, not secret recovery. No second
+   credential is minted. A retry that had not committed can instead complete
+   issuance and return `"Issued"`.
+3. If you never received or saved the secret, select Done to refresh the
+   parent list, find the key by its metadata, and revoke it using the existing
+   HAL-provided revoke action. Then deliberately start a replacement intent
+   with a new operation key. Do not automatically create a replacement as part
+   of a retry. If revoke is unavailable, restore legitimate management
+   authority rather than bypass the action gate.
+
+The server compares normalized policy, including name/description, owner-type
+and organization/group targets, scopes, expiry, and all credit/rollover fields.
+Changing policy for the same operation returns `409 Conflict`; use a new intent
+only for a deliberate new issuance. Loss of owner authority returns `403`
+without recovery metadata; a missing authenticated platform-user binding
+returns `401`. A removed, revoked, expired, or otherwise unusable issued key
+returns `404`. Deleting a credential does not free its old operation key:
+the retained receipt still prevents duplicate issuance.
+
+#### Deployment, Retention, And Rollback
+
+The new executable requires the generated issuance-receipt table migration.
+Receipt rows have no expiry and do not cascade away with key/user deletion;
+they contain operation/input digests and identifiers, not raw credentials.
+Retain them as duplicate-issuance evidence. They are not a credential backup,
+and reverting the executable cannot restore discarded raw material.
+
+Before reverting to code that captures generic replay responses, assess that
+secret-storage boundary explicitly. Historical generic key-route replay
+records must be inspected for secret-bearing responses. Purging those records
+and rotating actually exposed keys require explicit operator authorization;
+this remediation does not authorize or perform either operation. Preserve
+receipt evidence during rollback planning rather than treating its removal as
+a harmless cleanup.
+
+This is the bounded key issuance change dated 2026-10-05, not a declaration of
+release security readiness. Final provider/migration proof remains pending,
+and the other 25 remediation phases remain launch blockers.
+
 ---
 
 ## AT Protocol Sign-In

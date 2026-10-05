@@ -6,5 +6,6 @@ namespace Explore.Application.Features.ExternalApiKeys.Requests.Commands;
 
 public sealed record CreateExternalApiKeyCommand : ICommand<CreateExternalApiKeyCommandResponse>
 {
+    public required string OperationKey { get; init; }
     public required CreateExternalApiKeyDto ExternalApiKeyDto { get; init; }
 }

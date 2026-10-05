@@ -3,24 +3,28 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
+using Event.Api.IntegrationTests.Builders;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain.Constants;
+using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel("SingleTenantAuthenticatedApiFixture")]
-[ClassDataSource<SingleTenantAuthenticatedApiTestFixture>(Shared = SharedType.PerAssembly)]
+[ClassDataSource<ExternalApiKeyIntegrationFixture>(Shared = SharedType.PerAssembly)]
 public class ExternalApiKeyIntegrationTests
 {
-    private readonly SingleTenantAuthenticatedApiTestFixture _fixture;
+    private readonly ExternalApiKeyIntegrationFixture _fixture;
 
-    public ExternalApiKeyIntegrationTests(SingleTenantAuthenticatedApiTestFixture fixture)
+    public ExternalApiKeyIntegrationTests(ExternalApiKeyIntegrationFixture fixture)
     {
         _fixture = fixture;
     }
@@ -119,6 +123,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -133,6 +138,7 @@ public class ExternalApiKeyIntegrationTests
     public async Task CreateExternalApiKey_WithNameControlCharacter_ShouldReturnValidationProblemDetails()
     {
         var userId = Guid.NewGuid();
+        await SeedIssuanceOwnerAsync(userId);
         var payload = new CreateExternalApiKeyDto
         {
             Name = "Invalid\nKey",
@@ -141,6 +147,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -155,6 +162,7 @@ public class ExternalApiKeyIntegrationTests
     public async Task CreateExternalApiKey_WithDescriptionTooLong_ShouldReturnValidationProblemDetails()
     {
         var userId = Guid.NewGuid();
+        await SeedIssuanceOwnerAsync(userId);
         var payload = new CreateExternalApiKeyDto
         {
             Name = "Description Validation",
@@ -164,6 +172,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -187,6 +196,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -210,6 +220,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -445,8 +456,34 @@ public class ExternalApiKeyIntegrationTests
         return body.Id;
     }
 
+    private async Task SeedIssuanceOwnerAsync(Guid userId)
+    {
+        await using (var seedScope = _fixture.Factory.Services.CreateAsyncScope())
+        {
+            var database = seedScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            if (!await database.Users.AnyAsync(user => user.Id == userId))
+            {
+                var user = new UserBuilder().WithId(userId).Build();
+                database.Users.Add(user);
+                database.TenantUsers.Add(new TenantUser
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = userId,
+                    User = user,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    JoinedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                });
+                await database.SaveChangesAsync();
+            }
+        }
+    }
+
     private async Task<CreateExternalApiKeyCommandResponse> CreateIssuedExternalApiKeyAsync(Guid userId, string name, List<string> scopes)
     {
+        await SeedIssuanceOwnerAsync(userId);
         var payload = new CreateExternalApiKeyDto
         {
             Name = name,
@@ -455,6 +492,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -473,5 +511,42 @@ public class ExternalApiKeyIntegrationTests
         await Assert.That(stored.SecretHash).IsEqualTo(ApiKeyHashing.ComputeHash(secret));
 
         return body;
+    }
+}
+
+public sealed class ExternalApiKeyIntegrationFixture : IAsyncInitializer, IAsyncDisposable
+{
+    private readonly string _authorityPath = Path.Combine(
+        Path.GetTempPath(), $"external-api-key-authority-{Guid.CreateVersion7():N}.db");
+
+    public SingleTenantAuthenticatedWebApplicationFactory Factory { get; private set; } = null!;
+    public HttpClient Client { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        Factory = new SingleTenantAuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
+        Factory.AdditionalConfiguration["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite";
+        Factory.AdditionalConfiguration["PrivacyErasureAuthorityEmbedded:Path"] = _authorityPath;
+        Factory.AdditionalConfiguration["PrivacyErasureAuthorityEmbedded:WriterReplicaCount"] = "1";
+        Client = Factory.CreateClient();
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var authority = scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityDbContext>();
+        await authority.Database.MigrateAsync();
+    }
+
+    public HttpRequestMessage CreateAuthenticatedRequest(HttpMethod method, string url, Guid userId)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(userId));
+        return request;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Client?.Dispose();
+        if (Factory is not null)
+            await Factory.DisposeAsync();
+        if (File.Exists(_authorityPath))
+            File.Delete(_authorityPath);
     }
 }

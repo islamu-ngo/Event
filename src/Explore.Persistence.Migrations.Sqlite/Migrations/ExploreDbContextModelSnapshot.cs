@@ -13864,6 +13864,51 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.ToTable("ie_external_api_key_credit_periods", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.ExternalApiKeyIssuanceReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("ExternalApiKeyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("external_api_key_id");
+
+                    b.Property<string>("InputDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("input_digest");
+
+                    b.Property<string>("OperationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operation_fingerprint");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_external_api_key_issuance_receipts");
+
+                    b.HasIndex("OperationFingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_external_api_key_issuance_receipts_operation_fingerprint");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_external_api_key_issuance_receipts_tenant_id");
+
+                    b.ToTable("ie_external_api_key_issuance_receipts", (string)null);
+                });
+
             modelBuilder.Entity("Explore.Domain.ExternalApiKeyOwnerTypeLookup", b =>
                 {
                     b.Property<int>("Id")

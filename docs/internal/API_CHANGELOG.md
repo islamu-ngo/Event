@@ -3,6 +3,41 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-05
+
+- **Breaking: bounded external API key issuance.** `POST /api/ExternalApiKey`
+  now requires exactly one case-sensitive `Idempotency-Key` containing 1..128
+  ASCII `[A-Za-z0-9._:-]` characters. Native creation requires `OperationKey`;
+  HTTP/OpenAPI and the generated SDK carry the required header. Clients must
+  preserve one key and the same normalized DTO per intent after response loss.
+- Successful command results distinguish `"Issued"` (raw `apiKey` returned)
+  from `"PreviouslyIssued"` (`apiKey = null`, metadata only). Authorized recovery
+  of committed operations does not mint credentials. Changed normalized policy
+  returns `409`, revoked owner authority returns `403`, an unbound identity returns `401`, and an
+  unavailable issued key returns `404`. Recovery never reveals metadata to a
+  caller who has lost owner authority.
+- Generic idempotency response storage is suppressed for creation and no-store
+  remains. A new digest-only issuance-receipt table retains operation evidence
+  independently of credential deletion; its unique operation fingerprint
+  prevents a deleted key from making the original intent reusable. Credential
+  and receipt writes share a serializable transaction under retained-erasure
+  and current persisted authority fences.
+- User-owned tenant issuance and recovery require active tenant membership.
+  Organization/group issuance requires positive active persisted management
+  permission; empty permission mappings do not authorize. Linked tenants must
+  have an active status. The browser freezes the canonical request and operation
+  key for retries, then offers metadata-only recovery guidance and refreshes the
+  parent list on Done.
+- **Deployment and rollback boundary:** install the generated receipt-table
+  migration before running the new executable. Final provider/migration proof
+  remains pending; this bounded change is not release security readiness and
+  the other 25 remediation phases remain launch blockers. Reverting executable
+  code cannot restore discarded raw material. Historical generic key-route
+  replay records require inspection, authorized purge, and rotation of actually
+  exposed keys under explicit operator authorization; this change does not
+  perform those operations. See the [HTTP contract](API.md#bounded-key-issuance-and-metadata-recovery)
+  and [operator recovery and rollback guidance](../public/documentation/readme/security-and-identity/authentication.md#api-key-issuance-and-lost-response-recovery).
+
 ## 2026-10-04
 
 - **Homepage deadline visibility and supply-aware overlap.** Featured and

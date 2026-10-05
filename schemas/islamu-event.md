@@ -16,6 +16,19 @@ Project islamu_event {
 // Lookup / Reference Tables (int PK, ValueGeneratedNever)
 // ============================================================
 
+Table "external_api_key_issuance_receipts" {
+  "id" uuid [pk, not null]
+  "operation_fingerprint" varchar(64) [not null, unique]
+  "input_digest" varchar(64) [not null]
+  "tenant_id" uuid
+  "external_api_key_id" uuid [not null]
+  "created_at_utc" timestamptz [not null]
+  indexes {
+    tenant_id
+  }
+  Note: 'Durable one-time issuance identity. Digests only; no recoverable credential, TTL, or cascading user/key foreign key. Null tenant denotes explicit global scope.'
+}
+
 Table "event_discovery_snapshot_reservations" {
   "tenant_id" uuid [pk, not null]
   Note: 'Dedicated native reservation fence. No public-source foreign key; capture acquires this before source reads.'

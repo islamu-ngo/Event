@@ -794,6 +794,8 @@ public partial class ExploreDbContext
         // ===== User-Related Tenant Entities =====
         modelBuilder.Entity<ExternalApiKey>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || (e.TenantId != null && e.TenantId == TenantFilterTenantId));
+        modelBuilder.Entity<ExternalApiKeyIssuanceReceipt>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || (e.TenantId != null && e.TenantId == TenantFilterTenantId));
         modelBuilder.Entity<ExternalApiKeyQuota>()
             .HasQueryFilter(QueryFilterNames.Tenant,
                 e => IsTenantFilterBypassed

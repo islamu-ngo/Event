@@ -39,7 +39,11 @@ public class RevokeExternalApiKeyCommandHandler : ICommandHandler<RevokeExternal
 
     public async Task<bool> ExecuteAsync(RevokeExternalApiKeyCommand request, CancellationToken cancellationToken)
     {
-        var currentUserId = _userContext.GetRequiredUserId();
+        if (!_userContext.IsAuthenticated)
+            return false;
+        var resolvedUserId = await _adminContext.ResolveUserIdAsync(cancellationToken);
+        if (resolvedUserId is not Guid currentUserId || currentUserId == Guid.Empty)
+            return false;
         var externalApiKey = await _externalApiKeyRepository.GetByIdIgnoringTenantFilter(request.Id, cancellationToken);
 
         if (externalApiKey is null || !await CanManageAsync(externalApiKey, currentUserId, cancellationToken))
@@ -62,10 +66,8 @@ public class RevokeExternalApiKeyCommandHandler : ICommandHandler<RevokeExternal
             externalApiKey.OwnerType.ToString());
 
         _logger.LogInformation(
-            "External API key {KeyId} revoked for tenant {TenantId} by user {UserId}.",
-            externalApiKey.KeyId,
-            externalApiKey.TenantId?.ToString() ?? "platform",
-            currentUserId);
+            "External API key revoked. OwnerType: {OwnerType}.",
+            externalApiKey.OwnerType);
 
         return true;
     }

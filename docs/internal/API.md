@@ -1058,12 +1058,62 @@ Non-interactive callers authenticate with long-lived `X-API-Key` credentials in 
 |---|---|---|---|
 | `GET` | `/api/ExternalApiKey` | List keys visible to the caller | HAL collection |
 | `GET` | `/api/ExternalApiKey/{id}` | Key detail (metadata only, no secret) | HAL resource |
-| `POST` | `/api/ExternalApiKey` | Create key — secret revealed **once** in response | HAL resource + secret field |
-| `PUT` | `/api/ExternalApiKey/{id}` | Update policy (scopes, expiry, quotas) | HAL resource |
+| `POST` | `/api/ExternalApiKey` | Issue once or recover metadata with a required operation key | `200` command result with `disclosureStatus` |
+| `PATCH` | `/api/ExternalApiKey/{id}` | Update policy (scopes, expiry, quotas) | Command result |
 | `DELETE` | `/api/ExternalApiKey/{id}` | Revoke key (soft delete, status=Revoked) | `204 No Content` |
 | `GET` | `/api/ExternalApiKey/usage-report` | Tenant admins see their tenant; instance admins see platform-wide | Aggregated report |
 
 Create/revoke/update emit business metrics (`created`, `revoked`, `policy_updated`) tagged with `tenant_id` and `owner_type`.
+
+#### Bounded Key Issuance And Metadata Recovery
+
+`POST /api/ExternalApiKey` requires exactly one `Idempotency-Key` header:
+1..128 ASCII characters matching `[A-Za-z0-9._:-]`. Missing, duplicate,
+comma-combined, whitespace, Unicode, or otherwise invalid values fail `400`.
+The key is case-sensitive. The native `CreateExternalApiKeyCommand` also
+requires `OperationKey` and validates the same Domain grammar, so non-HTTP
+callers cannot bypass this requirement. OpenAPI marks the header as required.
+
+For example, send `Idempotency-Key: key-create-20261005-01` on a single
+creation intent. The generated C# client call is
+`CreateExternalApiKeyAsync(operationKey, dto)`; keep both arguments stable
+after a lost response. The body chooses requested policy and legitimate
+organization/group targets, not the current actor or tenant. The handler
+resolves the platform user through `IAdminContext.ResolveUserIdAsync` and
+takes scope from the trusted tenant context; InstanceAdmin issuance is
+explicitly global (`TenantId = null`).
+
+| Outcome | HTTP | Disclosure |
+|---|---|---|
+| First acknowledged creation | `200` | `disclosureStatus = "Issued"`; `apiKey` contains the raw credential |
+| Authorized retry with the same normalized policy | `200` | `disclosureStatus = "PreviouslyIssued"`; `apiKey = null`; stable `id` and `keyId` |
+| Same operation identity, different normalized policy | `409` | Conflict; no new credential |
+| Missing authenticated platform-user binding | `401` | No recovery metadata |
+| Current owner authority revoked or unavailable | `403` | No recovery metadata |
+| Issued key removed, revoked, expired, or otherwise unusable | `404` | No recovered credential |
+
+The input digest covers every accepted field: trimmed name, normalized optional
+description, owner-type and target IDs, trimmed/lowercased/deduplicated/sorted
+scopes, UTC expiry, normalized credit period, credit limit, and rollover limit.
+It excludes current actor and tenant identity; those bind the separate operation
+fingerprint. Recovery of a committed operation does not generate entropy or
+create another credential; an uncommitted attempt can still complete issuance.
+
+`[SuppressIdempotencyResponseStorage]` bypasses generic replay response capture
+for this action; `[ResponseCache(NoStore = true)]` remains. Recovery comes from
+a digest-only issuance receipt, never a saved response body. See
+[receipt retention](DOMAIN.md#external-api-key-issuance-receipts),
+[commit authority](SECURITY-MODEL.md#bounded-issuance-commit-and-recovery-authority),
+and the [operator recovery guide](../public/documentation/readme/security-and-identity/authentication.md#api-key-issuance-and-lost-response-recovery).
+
+The exact GET-list and POST-creation route, and DELETE with one aggregate ID,
+may proceed without a tenant only after normal tenant resolution has been
+attempted. This supports global InstanceAdmin issuance and the existing
+revoke/reissue remedy on the administrator host. It grants no owner authority:
+native handlers retain their current ownership checks, and issuance rejects
+tenant-bound owners without a resolved scope. List, revoke, and issuance resolve
+the current provider-to-platform-user binding instead of parsing a provider's
+GUID subject as the platform user ID.
 
 ### Managed Provider Provisioning
 

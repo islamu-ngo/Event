@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Microsoft.Extensions.Logging;
 
@@ -15,8 +14,8 @@ public interface IExternalApiKeyService
     /// <summary>Returns a single API key by ID.</summary>
     Task<ExternalApiKeyListDto?> GetApiKeyByIdAsync(Guid id);
 
-    /// <summary>Creates a new API key. Response includes the one-time secret.</summary>
-    Task<CreateExternalApiKeyCommandResponse?> CreateApiKeyAsync(CreateExternalApiKeyDto dto);
+    /// <summary>Creates or recovers one intended operation; only its acknowledged first creation discloses a secret.</summary>
+    Task<CreateExternalApiKeyCommandResponse?> CreateApiKeyAsync(CreateExternalApiKeyDto dto, string operationKey);
 
     /// <summary>Updates the name, scopes, or expiry of an existing key.</summary>
     Task<BaseCommandResponseOfGuid?> UpdateApiKeyPolicyAsync(Guid id, UpdateExternalApiKeyPolicyDto dto);
@@ -75,49 +74,31 @@ public class ExternalApiKeyService : IExternalApiKeyService
     }
 
     /// <inheritdoc />
-    public async Task<CreateExternalApiKeyCommandResponse?> CreateApiKeyAsync(CreateExternalApiKeyDto dto)
+    public async Task<CreateExternalApiKeyCommandResponse?> CreateApiKeyAsync(CreateExternalApiKeyDto dto, string operationKey)
     {
         try
         {
-            return await _apiClient.CreateExternalApiKeyAsync(dto);
-        }
-        catch (ApiException ex) when (ex.StatusCode == 400)
-        {
-            // Controller returns BadRequest(CreateExternalApiKeyCommandResponse) but NSwag
-            // deserializes 400 as ProblemDetails — actual validation errors are lost.
-            // Parse the raw response body to surface them.
-            _logger.LogWarning(ex,
-                "[ExternalApiKeyService.CreateApiKeyAsync] Validation error. StatusCode: {StatusCode}, Body: {Body}",
-                ex.StatusCode, ex.Response);
-            return ParseCommandResponse(ex.Response);
+            var response = await _apiClient.CreateExternalApiKeyAsync(operationKey, dto);
+            return response?.Success == true ? response : CreationNotAcknowledged();
         }
         catch (ApiException ex)
         {
-            _logger.LogError(ex, "[ExternalApiKeyService.CreateApiKeyAsync] API error. StatusCode: {StatusCode}", ex.StatusCode);
-            throw;
+            _logger.LogWarning("API key creation was not acknowledged. StatusCode: {StatusCode}", ex.StatusCode);
+            return CreationNotAcknowledged();
+        }
+        catch (Exception)
+        {
+            _logger.LogWarning("API key creation ended without an acknowledged response.");
+            return CreationNotAcknowledged();
         }
     }
 
-    private static readonly JsonSerializerOptions CaseInsensitiveJson = new() { PropertyNameCaseInsensitive = true };
-
-    private static CreateExternalApiKeyCommandResponse ParseCommandResponse(string? responseBody)
-    {
-        if (string.IsNullOrWhiteSpace(responseBody))
-            return new CreateExternalApiKeyCommandResponse { Success = false, Message = "Request failed with no details." };
-
-        try
+    private static CreateExternalApiKeyCommandResponse CreationNotAcknowledged() =>
+        new()
         {
-            var parsed = JsonSerializer.Deserialize<CreateExternalApiKeyCommandResponse>(responseBody, CaseInsensitiveJson);
-            if (parsed is not null)
-                return parsed;
-        }
-        catch
-        {
-            // Response body isn't BaseCommandResponse shape — return raw text as message
-        }
-
-        return new CreateExternalApiKeyCommandResponse { Success = false, Message = responseBody };
-    }
+            Success = false,
+            Message = "The API key request did not complete. Retry this operation to check its outcome."
+        };
 
     /// <inheritdoc />
     public async Task<BaseCommandResponseOfGuid?> UpdateApiKeyPolicyAsync(Guid id, UpdateExternalApiKeyPolicyDto dto)

@@ -222,8 +222,11 @@ public sealed class ExternalApiKeyIssuanceIngressTests
                         database.Users.Add(user);
                         database.UserExternalLogins.Add(new UserExternalLogin
                         {
-                            Id = Guid.CreateVersion7(), UserId = actor, User = user,
-                            AuthenticationProviderId = (int)provider, AuthenticationProvider = null!,
+                            Id = Guid.CreateVersion7(),
+                            UserId = actor,
+                            User = user,
+                            AuthenticationProviderId = (int)provider,
+                            AuthenticationProvider = null!,
                             ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
                                 host.Native.ExternalIssuer, subject.ToString("D")).Value,
                             CreatedAt = DateTime.UtcNow
@@ -235,26 +238,39 @@ public sealed class ExternalApiKeyIssuanceIngressTests
                     {
                         var member = new TenantUser
                         {
-                            Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId,
-                            Tenant = null!, UserId = actor, User = null!,
+                            Id = Guid.CreateVersion7(),
+                            TenantId = PlatformDefaults.DefaultTenantId,
+                            Tenant = null!,
+                            UserId = actor,
+                            User = null!,
                             StatusId = (int)TenantUserStatusEnum.Active,
-                            JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                            JoinedAt = DateTime.UtcNow,
+                            CreatedAt = DateTime.UtcNow
                         };
                         database.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                         {
-                            Id = host.GrantId, TenantId = member.TenantId, Tenant = null!,
-                            TenantUserId = member.Id, TenantUser = member,
-                            RoleId = (int)RoleEnum.TenantAdmin, Role = null!,
+                            Id = host.GrantId,
+                            TenantId = member.TenantId,
+                            Tenant = null!,
+                            TenantUserId = member.Id,
+                            TenantUser = member,
+                            RoleId = (int)RoleEnum.TenantAdmin,
+                            Role = null!,
                             RoleScopeId = (int)RoleScopeEnum.Tenant,
-                            GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                            GrantedAt = DateTime.UtcNow,
+                            CreatedAt = DateTime.UtcNow
                         });
                     }
                     else
                     {
                         database.PlatformUserRoles.Add(new PlatformUserRole
                         {
-                            Id = host.GrantId, UserId = actor, User = null!,
-                            RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = DateTime.UtcNow
+                            Id = host.GrantId,
+                            UserId = actor,
+                            User = null!,
+                            RoleId = (int)RoleEnum.Admin,
+                            Role = null!,
+                            GrantedAt = DateTime.UtcNow
                         });
                     }
                     await database.SaveChangesAsync(CancellationToken);
@@ -262,7 +278,9 @@ public sealed class ExternalApiKeyIssuanceIngressTests
 
                 using var dedicated = host.Native.CreateClient(new WebApplicationFactoryClientOptions
                 {
-                    BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false
+                    BaseAddress = new Uri("https://localhost"),
+                    AllowAutoRedirect = false,
+                    HandleCookies = false
                 });
                 if (token is null)
                 {
@@ -277,7 +295,9 @@ public sealed class ExternalApiKeyIssuanceIngressTests
                         host.Native.Services.GetRequiredService<IConfiguration>(), multiTenant);
                     host._client = host._combined.CreateClient(new WebApplicationFactoryClientOptions
                     {
-                        BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false
+                        BaseAddress = new Uri("https://localhost"),
+                        AllowAutoRedirect = false,
+                        HandleCookies = false
                     });
                 }
                 else
@@ -291,7 +311,9 @@ public sealed class ExternalApiKeyIssuanceIngressTests
                         : null;
                     host._client = (host._dedicated ?? host.Native).CreateClient(new WebApplicationFactoryClientOptions
                     {
-                        BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false
+                        BaseAddress = new Uri("https://localhost"),
+                        AllowAutoRedirect = false,
+                        HandleCookies = false
                     });
                 }
                 host._client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

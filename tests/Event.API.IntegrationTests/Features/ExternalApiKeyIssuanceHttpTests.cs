@@ -292,29 +292,45 @@ public sealed class ExternalApiKeyIssuanceHttpTests
                 };
                 context.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), User = user, UserId = userId,
-                    Role = role, RoleId = role.Id, GrantedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    User = user,
+                    UserId = userId,
+                    Role = role,
+                    RoleId = role.Id,
+                    GrantedAt = DateTime.UtcNow
                 });
                 context.Tenants.Add(new Tenant
                 {
-                    Id = tenantId, FullName = "Issuance tests", Slug = "issuance-tests",
+                    Id = tenantId,
+                    FullName = "Issuance tests",
+                    Slug = "issuance-tests",
                     TenantStatus = new TenantStatus { Id = 1, MasterCode = "ACTIVE", FullName = "Active" }
                 });
                 context.ExternalApiKeyOwnerTypes.Add(new ExternalApiKeyOwnerTypeLookup
                 {
-                    Id = (int)ExternalApiKeyOwnerType.InstanceAdmin, MasterCode = "INSTANCE_ADMIN", FullName = "Instance administrator"
+                    Id = (int)ExternalApiKeyOwnerType.InstanceAdmin,
+                    MasterCode = "INSTANCE_ADMIN",
+                    FullName = "Instance administrator"
                 });
                 context.ExternalApiKeyStatuses.Add(new ExternalApiKeyStatus
                 {
-                    Id = (int)ExternalApiKeyStatusEnum.Active, MasterCode = "ACTIVE", FullName = "Active", IsUsable = true
+                    Id = (int)ExternalApiKeyStatusEnum.Active,
+                    MasterCode = "ACTIVE",
+                    FullName = "Active",
+                    IsUsable = true
                 });
                 context.ExternalApiKeyStatuses.Add(new ExternalApiKeyStatus
                 {
-                    Id = (int)ExternalApiKeyStatusEnum.Revoked, MasterCode = "REVOKED", FullName = "Revoked", IsUsable = false
+                    Id = (int)ExternalApiKeyStatusEnum.Revoked,
+                    MasterCode = "REVOKED",
+                    FullName = "Revoked",
+                    IsUsable = false
                 });
                 context.ExternalApiKeyCreditPeriods.Add(new ExternalApiKeyCreditPeriod
                 {
-                    Id = (int)ExternalApiKeyCreditPeriodEnum.None, MasterCode = "NONE", FullName = "None"
+                    Id = (int)ExternalApiKeyCreditPeriodEnum.None,
+                    MasterCode = "NONE",
+                    FullName = "None"
                 });
                 await context.SaveChangesAsync();
             }

@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Data;
 using System.Security.Claims;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -26,6 +27,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Data.SqlClient;
+using MySqlConnector;
+using Npgsql;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -131,6 +138,7 @@ public sealed class ExternalApiKeyIssuanceTests
         await Assert.That(winnerScope.Context.ContextId.InstanceId)
             .IsNotEqualTo(contenderScope.Context.ContextId.InstanceId);
         var command = Command(owner);
+        await boundary.SelectGrantAsync(winnerScope.Context, owner, fixture.UserId, fixture.TenantId);
         boundary.Arm(winnerScope.Id, contenderScope.Id, BoundaryPoint.KeyInsert);
         Task arrived = boundary.WinnerArrived.Task.WaitAsync(Deadline);
         Task contenderArrived = boundary.ContenderArrived.Task.WaitAsync(Deadline);
@@ -141,9 +149,10 @@ public sealed class ExternalApiKeyIssuanceTests
             await ReachBoundaryAsync(arrived, winner);
             contender = Task.Run(() => contenderScope.ExecuteAsync(command));
             await ReachBoundaryAsync(contenderArrived, contender);
+            await Assert.That(boundary.ContenderExcluded).IsTrue();
+            await Assert.That(winner.IsCompleted).IsFalse();
             boundary.ReleaseWinner.TrySetResult();
             var issued = await winner.WaitAsync(Deadline);
-            boundary.ReleaseContender.TrySetResult();
             var recovered = await contender.WaitAsync(Deadline);
             await AssertIssuedAsync(issued);
             await AssertRecoveredAsync(recovered, issued.Id);
@@ -152,7 +161,6 @@ public sealed class ExternalApiKeyIssuanceTests
         finally
         {
             boundary.ReleaseWinner.TrySetResult();
-            boundary.ReleaseContender.TrySetResult();
             await Task.WhenAll(winner, contender ?? Task.CompletedTask).WaitAsync(Deadline);
         }
     }
@@ -265,16 +273,24 @@ public sealed class ExternalApiKeyIssuanceTests
         {
             seed.Context.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = bindingId, UserId = fixture.UserId, User = null!,
-                AuthenticationProviderId = (int)accountKey.ProviderKind, AuthenticationProvider = null!,
-                ProviderKey = accountKey.Value, CreatedAt = DateTime.UtcNow
+                Id = bindingId,
+                UserId = fixture.UserId,
+                User = null!,
+                AuthenticationProviderId = (int)accountKey.ProviderKind,
+                AuthenticationProvider = null!,
+                ProviderKey = accountKey.Value,
+                CreatedAt = DateTime.UtcNow
             });
             // Another binding for this user must not substitute for the authenticated account.
             seed.Context.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = fixture.UserId, User = null!,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak, AuthenticationProvider = null!,
-                ProviderKey = $"unrelated-{Guid.CreateVersion7():N}", CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                UserId = fixture.UserId,
+                User = null!,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+                AuthenticationProvider = null!,
+                ProviderKey = $"unrelated-{Guid.CreateVersion7():N}",
+                CreatedAt = DateTime.UtcNow
             });
             await seed.Context.SaveChangesAsync();
         }
@@ -299,9 +315,13 @@ public sealed class ExternalApiKeyIssuanceTests
                 await changer.Context.SaveChangesAsync();
                 changer.Context.UserExternalLogins.Add(new UserExternalLogin
                 {
-                    Id = bindingId, UserId = otherUser, User = null!,
-                    AuthenticationProviderId = binding.AuthenticationProviderId, AuthenticationProvider = null!,
-                    ProviderKey = binding.ProviderKey, CreatedAt = DateTime.UtcNow
+                    Id = bindingId,
+                    UserId = otherUser,
+                    User = null!,
+                    AuthenticationProviderId = binding.AuthenticationProviderId,
+                    AuthenticationProvider = null!,
+                    ProviderKey = binding.ProviderKey,
+                    CreatedAt = DateTime.UtcNow
                 });
             }
             else
@@ -325,6 +345,9 @@ public sealed class ExternalApiKeyIssuanceTests
         await using var fixture = await IssuanceFixture.CreateAsync(runtime, boundary, boundary.Transactions);
         await using var request = fixture.Open();
         await using var revoker = fixture.Open();
+        await Assert.That(request.Context.ContextId.InstanceId)
+            .IsNotEqualTo(revoker.Context.ContextId.InstanceId);
+        await boundary.SelectGrantAsync(request.Context, owner, fixture.UserId, fixture.TenantId);
         boundary.Arm(request.Id, revoker.Id, BoundaryPoint.KeyInsert);
         Task arrived = boundary.WinnerArrived.Task.WaitAsync(Deadline);
         Task revokerArrived = boundary.ContenderArrived.Task.WaitAsync(Deadline);
@@ -336,9 +359,10 @@ public sealed class ExternalApiKeyIssuanceTests
             await ReachBoundaryAsync(arrived, pending);
             revocation = Task.Run(() => fixture.RevokeAsync(owner, revoker));
             await ReachBoundaryAsync(revokerArrived, revocation);
+            await Assert.That(boundary.ContenderExcluded).IsTrue();
+            await Assert.That(pending.IsCompleted).IsFalse();
             boundary.ReleaseWinner.TrySetResult();
             var issued = await pending.WaitAsync(Deadline);
-            boundary.ReleaseContender.TrySetResult();
             await revocation.WaitAsync(Deadline);
             await AssertIssuedAsync(issued);
             await fixture.AssertPairCountAsync(1);
@@ -347,7 +371,6 @@ public sealed class ExternalApiKeyIssuanceTests
         finally
         {
             boundary.ReleaseWinner.TrySetResult();
-            boundary.ReleaseContender.TrySetResult();
             await Task.WhenAll(pending, revocation ?? Task.CompletedTask).WaitAsync(Deadline);
         }
     }
@@ -427,9 +450,14 @@ public sealed class ExternalApiKeyIssuanceTests
         {
             var added = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = foreignTenant, Tenant = null!,
-                UserId = fixture.UserId, User = null!, StatusId = (int)TenantUserStatusEnum.Active,
-                JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = foreignTenant,
+                Tenant = null!,
+                UserId = fixture.UserId,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             };
             pendingId = added.Id;
             request.Context.TenantUsers.Add(added);
@@ -819,15 +847,25 @@ public sealed class ExternalApiKeyIssuanceTests
             await using var grant = fixture.Open();
             grant.Context.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = fixture.UserId, User = null!,
-                RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                UserId = fixture.UserId,
+                User = null!,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = DateTime.UtcNow
             });
             var membership = await grant.Context.TenantUsers.SingleAsync(value => value.UserId == fixture.UserId);
             grant.Context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = null!, RoleId = (int)RoleEnum.TenantAdmin,
-                Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow,
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = null!,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
             });
             await grant.Context.SaveChangesAsync();
@@ -914,8 +952,14 @@ public sealed class ExternalApiKeyIssuanceTests
             await using var seed = Open(userId, tenantId);
             seed.Context.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, UserId = userId, User = null!,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             });
             await seed.Context.SaveChangesAsync();
         }
@@ -935,12 +979,16 @@ public sealed class ExternalApiKeyIssuanceTests
                 permission = new Permission
                 {
                     Id = (await seed.Context.Permissions.Select(value => (int?)value.Id).MaxAsync() ?? 0) + 1,
-                    MasterCode = permissionCode, FullName = "Manage issuance owner",
+                    MasterCode = permissionCode,
+                    FullName = "Manage issuance owner",
                     ResourceKind = owner == ExternalApiKeyOwnerType.Organization ? "organization" : "group",
-                    Action = "manage", GroupName = "Issuance owners",
+                    Action = "manage",
+                    GroupName = "Issuance owners",
                     RoleScopeId = owner == ExternalApiKeyOwnerType.Organization
                         ? (int)RoleScopeEnum.Organization : (int)RoleScopeEnum.Group,
-                    RoleScope = null!, IsActive = true, CreatedAt = DateTime.UtcNow
+                    RoleScope = null!,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
                 };
                 seed.Context.Permissions.Add(permission);
             }
@@ -949,47 +997,84 @@ public sealed class ExternalApiKeyIssuanceTests
                     mapping.RoleId == roleId && mapping.PermissionId == permissionId))
                 seed.Context.RolePermissions.Add(new RolePermission
                 {
-                    RoleId = roleId, Role = null!, PermissionId = permissionId, Permission = null!,
+                    RoleId = roleId,
+                    Role = null!,
+                    PermissionId = permissionId,
+                    Permission = null!,
                     GrantedAt = DateTime.UtcNow
                 });
             if (owner == ExternalApiKeyOwnerType.Organization)
             {
                 seed.Context.Organizations.Add(new Organization
                 {
-                    Id = id, Pii = new OrganizationPii { FullName = "Issuance organization" },
-                    CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.CreateVersion7()
+                    Id = id,
+                    Pii = new OrganizationPii { FullName = "Issuance organization" },
+                    CreatedAt = DateTime.UtcNow,
+                    ConcurrencyStamp = Guid.CreateVersion7()
                 });
                 seed.Context.OrganizationTenants.Add(new OrganizationTenant
                 {
-                    Id = placement, OrganizationId = id, Organization = null!, TenantId = TenantId, Tenant = null!,
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, IsVisible = true,
-                    IsOrganizerEligible = true, CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.CreateVersion7()
+                    Id = placement,
+                    OrganizationId = id,
+                    Organization = null!,
+                    TenantId = TenantId,
+                    Tenant = null!,
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                    ApprovalStatus = null!,
+                    IsVisible = true,
+                    IsOrganizerEligible = true,
+                    CreatedAt = DateTime.UtcNow,
+                    ConcurrencyStamp = Guid.CreateVersion7()
                 });
                 seed.Context.OrganizationMembers.Add(new OrganizationMember
                 {
-                    Id = Guid.CreateVersion7(), OrganizationTenantId = placement, OrganizationTenant = null!,
-                    TenantId = TenantId, Tenant = null!, UserId = UserId, User = null!,
-                    RoleId = (int)RoleEnum.OrgAdmin, Role = null!, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    OrganizationTenantId = placement,
+                    OrganizationTenant = null!,
+                    TenantId = TenantId,
+                    Tenant = null!,
+                    UserId = UserId,
+                    User = null!,
+                    RoleId = (int)RoleEnum.OrgAdmin,
+                    Role = null!,
+                    CreatedAt = DateTime.UtcNow
                 });
             }
             else
             {
                 seed.Context.Groups.Add(new Group
                 {
-                    Id = id, FullName = "Issuance group", CreatedAt = DateTime.UtcNow,
+                    Id = id,
+                    FullName = "Issuance group",
+                    CreatedAt = DateTime.UtcNow,
                     ConcurrencyStamp = Guid.CreateVersion7()
                 });
                 seed.Context.GroupTenants.Add(new GroupTenant
                 {
-                    Id = placement, GroupId = id, Group = null!, TenantId = TenantId, Tenant = null!,
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, IsVisible = true,
-                    IsOrganizerEligible = true, CreatedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.CreateVersion7()
+                    Id = placement,
+                    GroupId = id,
+                    Group = null!,
+                    TenantId = TenantId,
+                    Tenant = null!,
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                    ApprovalStatus = null!,
+                    IsVisible = true,
+                    IsOrganizerEligible = true,
+                    CreatedAt = DateTime.UtcNow,
+                    ConcurrencyStamp = Guid.CreateVersion7()
                 });
                 seed.Context.GroupMembers.Add(new GroupMember
                 {
-                    Id = Guid.CreateVersion7(), GroupTenantId = placement, GroupTenant = null!,
-                    TenantId = TenantId, Tenant = null!, UserId = UserId, User = null!,
-                    RoleId = (int)RoleEnum.GroupAdmin, Role = null!, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    GroupTenantId = placement,
+                    GroupTenant = null!,
+                    TenantId = TenantId,
+                    Tenant = null!,
+                    UserId = UserId,
+                    User = null!,
+                    RoleId = (int)RoleEnum.GroupAdmin,
+                    Role = null!,
+                    CreatedAt = DateTime.UtcNow
                 });
             }
             await seed.Context.SaveChangesAsync();
@@ -998,7 +1083,8 @@ public sealed class ExternalApiKeyIssuanceTests
 
         private static User NewUser(Guid id) => new()
         {
-            Id = id, Pii = new UserPii { Email = string.Empty, FirstName = "Issuance", LastName = "Principal" },
+            Id = id,
+            Pii = new UserPii { Email = string.Empty, FirstName = "Issuance", LastName = "Principal" },
             CreatedAt = DateTime.UtcNow
         };
 
@@ -1020,11 +1106,30 @@ public sealed class ExternalApiKeyIssuanceTests
         private int _winnerArmed;
         private int _contenderArmed;
         private int _initialAuthorityRead;
+        private Type? _grantType;
+        private Guid _grantId;
+        internal bool ContenderExcluded { get; private set; }
         internal TaskCompletionSource WinnerArrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource ContenderArrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource ReleaseWinner { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal TaskCompletionSource ReleaseContender { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal DbTransactionInterceptor Transactions => new TransactionBoundary(this);
+
+        internal async Task SelectGrantAsync(
+            ExploreDbContext context, ExternalApiKeyOwnerType owner, Guid userId, Guid tenantId)
+        {
+            if (owner == ExternalApiKeyOwnerType.InstanceAdmin)
+            {
+                _grantType = typeof(PlatformUserRole);
+                _grantId = await context.PlatformUserRoles.AsNoTracking()
+                    .Where(value => value.UserId == userId).Select(value => value.Id).SingleAsync();
+            }
+            else if (owner == ExternalApiKeyOwnerType.Tenant)
+            {
+                _grantType = typeof(TenantUserRoleGrant);
+                _grantId = await context.TenantUserRoleGrants.AsNoTracking()
+                    .Where(value => value.TenantId == tenantId).Select(value => value.Id).SingleAsync();
+            }
+        }
 
         internal void Arm(Guid winner, Guid? contender, BoundaryPoint point)
         {
@@ -1035,13 +1140,29 @@ public sealed class ExternalApiKeyIssuanceTests
             Interlocked.Exchange(ref _contenderArmed, 1);
         }
 
-        private async Task ObserveAsync(DbCommand? command, DbContext? context, CancellationToken token)
+        private async Task ObserveAsync(
+            DbCommand? command, DbContext? context, CancellationToken token, DbConnection? connection = null)
         {
             if (Invocation.Value == _contender && _contender is not null
+                && (command is null && context is EmbeddedPrivacyErasureAuthorityDbContext
+                    || command is not null && context is ExploreDbContext application && _grantType is not null
+                    && command.CommandText.Contains(application.Model.FindEntityType(_grantType)!.GetTableName()!,
+                        StringComparison.Ordinal)
+                    && (command.CommandText.TrimStart().StartsWith("DELETE", StringComparison.OrdinalIgnoreCase)
+                        || command.CommandText.TrimStart().StartsWith("UPDATE", StringComparison.OrdinalIgnoreCase)
+                        // SQL Server's initial authority read itself conflicts with the held grant write.
+                        || command.Connection is SqlConnection))
                 && Interlocked.Exchange(ref _contenderArmed, 0) == 1)
             {
+                // Attempt the exact native fence on the contender's own connection. NOWAIT/BUSY
+                // proves exclusion before signalling; no test gate holds this invocation back.
+                await Assert.That(WinnerArrived.Task.IsCompleted && !ReleaseWinner.Task.IsCompleted).IsTrue();
+                await AssertExcludedAsync(command?.Connection ?? connection!, context!, token);
+                ContenderExcluded = true;
+                Console.WriteLine(context is EmbeddedPrivacyErasureAuthorityDbContext
+                    ? "Contention witnessed: retained-authority BEGIN IMMEDIATE returned SQLITE_BUSY."
+                    : $"Contention witnessed: {context.Database.ProviderName} grant mutation fence excluded contender.");
                 ContenderArrived.TrySetResult();
-                await ReleaseContender.Task.WaitAsync(Deadline, token);
             }
             bool selected = _point == BoundaryPoint.BeforeIssuanceTransaction
                 && command is null && context is ExploreDbContext
@@ -1056,6 +1177,58 @@ public sealed class ExternalApiKeyIssuanceTests
                 WinnerArrived.TrySetResult();
                 await ReleaseWinner.Task.WaitAsync(Deadline, token);
             }
+        }
+
+        private async Task AssertExcludedAsync(DbConnection connection, DbContext context, CancellationToken token)
+        {
+            if (connection is SqliteConnection sqlite)
+            {
+                int busyTimeout = checked(sqlite.DefaultTimeout * 1000);
+                SQLitePCL.raw.sqlite3_busy_timeout(sqlite.Handle, 0);
+                int result;
+                try
+                {
+                    result = SQLitePCL.raw.sqlite3_exec(sqlite.Handle, "BEGIN IMMEDIATE");
+                    if (result == SQLitePCL.raw.SQLITE_OK)
+                        SQLitePCL.raw.sqlite3_exec(sqlite.Handle, "ROLLBACK");
+                }
+                finally
+                {
+                    SQLitePCL.raw.sqlite3_busy_timeout(sqlite.Handle, busyTimeout);
+                }
+                await Assert.That(result & 255).IsEqualTo(SQLitePCL.raw.SQLITE_BUSY);
+                return;
+            }
+
+            // Same exact-row native NOWAIT witness as EventDiscoveryWriterProviderTests.
+            // The normal handler/revoker operation follows immediately, with no contender gate.
+            var entity = context.Model.FindEntityType(_grantType!)!;
+            var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+            var property = entity.FindProperty(nameof(PlatformUserRole.Id))!;
+            var sql = context.GetService<ISqlGenerationHelper>();
+            string table = sql.DelimitIdentifier(store.Name, store.Schema);
+            string key = sql.DelimitIdentifier(property.GetColumnName(store)!);
+            await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, token);
+            await using var probe = connection.CreateCommand();
+            probe.Transaction = transaction;
+            probe.CommandTimeout = 5;
+            probe.CommandText = connection is SqlConnection
+                ? $"SELECT {key} FROM {table} WITH (XLOCK, ROWLOCK, NOWAIT) WHERE {key} = @id"
+                : $"SELECT {key} FROM {table} WHERE {key} = @id FOR UPDATE NOWAIT";
+            probe.Parameters.Add(property.GetRelationalTypeMapping().CreateParameter(probe, "@id", _grantId));
+            bool excluded = false;
+            try
+            {
+                await probe.ExecuteScalarAsync(token);
+            }
+            catch (PostgresException exception) when (exception.SqlState == "55P03") { excluded = true; }
+            catch (SqlException exception) when (exception.Number == 1222) { excluded = true; }
+            catch (MySqlException exception) when (exception.Number is 3572 or 1205) { excluded = true; }
+            finally
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            await Assert.That(excluded).IsTrue();
         }
 
         public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
@@ -1095,7 +1268,7 @@ public sealed class ExternalApiKeyIssuanceTests
                 DbConnection connection, TransactionStartingEventData eventData,
                 InterceptionResult<DbTransaction> result, CancellationToken cancellationToken = default)
             {
-                await owner.ObserveAsync(null, eventData.Context, cancellationToken);
+                await owner.ObserveAsync(null, eventData.Context, cancellationToken, connection);
                 return result;
             }
         }

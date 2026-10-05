@@ -47,7 +47,7 @@ For events with matchers (PreToolUse, PostToolUse):
 | Build failure (Stop) | `auto-error-resolver` | Parses CS errors and applies C# fixes |
 | Auth keywords (UserPromptSubmit) | `auth-route-debugger` | Debugs Keycloak JWT and Cerbos policies |
 | Frontend keywords (UserPromptSubmit) | `frontend-error-fixer` | Fixes Blazor lifecycle and MudBlazor syntax |
-| Architecture keywords (UserPromptSubmit) | `code-refactor-master` | Validates CQRS pattern and MediatR usage |
+| Architecture keywords (UserPromptSubmit) | `code-refactor-master` | Validates CQS pattern and native operation usage |
 | Test keywords (UserPromptSubmit) | `codebase-verifier` | Runs build/test verification sequence |
 | Outbox keywords (UserPromptSubmit) | (skill suggestion) | Points to `outbox-pattern` skill |
 | Design system keywords (UserPromptSubmit) | (skill suggestion) | Points to `design-system` skill |

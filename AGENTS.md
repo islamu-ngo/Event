@@ -27,6 +27,8 @@ Every change must answer these eight questions **before editing any file**:
 | Concern | Authoritative File | Purpose |
 |---|---|---|
 | AI agent contract | `AGENTS.md` (this) | Every agent starts here |
+| Project map & bounds | `PROJECTS.md` | Solution project roles, protected paths, and targeted verification commands |
+| Pre-submission review | `AI_REVIEW.md` | Fast 30-second self-review checklist before PR submission |
 | Invariant reference | `docs/internal/QUICK_REFERENCE.md` | Global hard constraints |
 | Governance | `docs/internal/GOVERNANCE.md` | Conventions, design patterns |
 | Intent registry | `.agents/contract/intents.yaml` | Machine-readable task mapping |
@@ -84,6 +86,9 @@ Every change must answer these eight questions **before editing any file**:
     - **Ring 2 (Phase Exit Gate)**: Verify the single touched project against ONE selected provider (e.g., SQLite in-memory or single PostgreSQL container) in **< 15 seconds**.
     - **Ring 3 (Plan Exit / Workstream Gate)**: The full multi-database provider matrix (PostgreSQL, SQLite, SQL Server, MySQL), migration checks, and full suites are run ONCE at the end of the entire implementation plan before PR creation.
     - **Yak-Shaving Quarantine**: Agents are strictly FORBIDDEN from absorbing or repairing pre-existing unrelated test suite rot encountered during feature work. If an existing test fails outside the task's path, verify if it reproduces on an untouched base worktree, log it under `*-context.md` (or `dev/backlog/`), and quarantine it. Never derail feature implementation to fix unrelated persistence suite failures.
+16. **No Warning Suppressions to Force Build/Tests**: Never suppress compiler warnings or analyzer diagnostics via `#pragma warning disable` or `[SuppressMessage]` to force a build through. Fix the underlying root cause. If an intentional compiler ratchet is needed, obtain explicit maintainer approval to adjust `Directory.Build.props`.
+17. **Execution Continuity Directive for Approved Tasks**: For tasks within an approved plan, agents must continue implementation and proportional verification end-to-end without routine stage pauses. Pause only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
+18. **Targeted Verification Default & Verification Evidence**: Always target verification against the specific affected project(s) by default using the verified commands in [`PROJECTS.md`](PROJECTS.md). Every task completion, milestone report, or PR description must record exact commands executed and their outcomes, plus any checks not run and why. Never state or imply a build or test suite passed when it was not physically executed.
 
 **Full list:** [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md)
 
@@ -173,7 +178,7 @@ Use the [shared writing guide](.agents/skills/conventional-commit/resources/read
 
 Before an implementation agent ends a task, pauses for the user's next prompt, performs a handoff, or claims work is complete, the final response MUST teach the user what changed. Do not give only an abstract status line such as “email sending implemented” or “docs updated.” The user is a developer and must understand the implementation without opening the diff.
 
-The final summary must be complete and technically specific. Explain the delivered result before the architecture/design pattern used, concrete libraries/frameworks/infrastructure/protocols, important files/classes/handlers/components changed, data/control flow, relevant best practices such as transactional outbox, CQRS/MediatR, Clean Architecture, HAL affordance gating, tenant isolation, idempotency, retry/error handling, and what was verified or remains. Explain how the relevant mechanisms produce the result. Expand the account as needed so the user understands the implementation without losing technical substance to brevity.
+The final summary must be complete and technically specific. Explain the delivered result before the architecture/design pattern used, concrete libraries/frameworks/infrastructure/protocols, important files/classes/handlers/components changed, data/control flow, relevant best practices such as transactional outbox, CQRS/native operations, Clean Architecture, HAL affordance gating, tenant isolation, idempotency, retry/error handling, and what was verified or remains. Explain how the relevant mechanisms produce the result. Expand the account as needed so the user understands the implementation without losing technical substance to brevity.
 
 ### Self-Contained Human Interaction & Decision Brief Requirement
 
@@ -191,15 +196,17 @@ Whenever an agent prompts for approval, requests architectural direction, report
 
 ---
 
-## 10. Tool-Specific Bootloaders
+## 10. Tool-Specific Bootloaders (Single Entrypoint Architecture)
 
-| Tool / Harness | Entry File | Dynamic Rules Injected Via |
-|---|---|---|
-| OmO (OpenCode / Senpi / Codex LazyCodex) | `AGENTS.md` (this) | [`.omo/rules/*.md`](.omo/rules/) (Hook: `rules-injector`, picomatch + distance) |
-| Claude Code | `AGENTS.md` (this) | `.claude/rules/` + `AGENTS.md` |
-| Cursor / Windsurf | `.cursorrules` | `.cursor/rules/` + `AGENTS.md` |
-| GitHub Copilot | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | `.github/instructions/` |
-| Gemini / Antigravity | [`AGENTS.md`](AGENTS.md) | Session rules injection |
+`AGENTS.md` is the **single source of truth** for all agent instructions. Harness-specific files (`CLAUDE.md`, `.github/copilot-instructions.md`, `.cursorrules`) are **pure pointers** that redirect to `AGENTS.md` with zero complementary or diverged implementations.
+
+| Tool / Harness | Entry File | Nature of Entry File | Dynamic Rules Injected Via |
+|---|---|---|---|
+| OmO (OpenCode / Senpi / Codex LazyCodex) | `AGENTS.md` (this) | Primary contract | [`.omo/rules/*.md`](.omo/rules/) (Hook: `rules-injector`, picomatch + distance) |
+| Claude Code | `CLAUDE.md` | Pure pointer to `AGENTS.md` | Session AGENTS.md ingestion |
+| Cursor / Windsurf | `.cursorrules` | Pure pointer to `AGENTS.md` | Session AGENTS.md ingestion |
+| GitHub Copilot | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | Pure pointer to `AGENTS.md` | [`.github/instructions/`](.github/instructions/) (`applyTo` globs) |
+| Gemini / Antigravity | [`AGENTS.md`](AGENTS.md) | Primary contract | Session rules injection |
 
 > **Twin Rules Policy**: Path-scoped rules are maintained as identical copies in both `.agents/rules/*.md` (for the repository contribution contract system) and `.omo/rules/*.md` (for OmO's native `rules-injector` hook). When editing a rule, update both twin files — each twin's `ABOUTME:` header documents its counterpart path. This dual presence ensures that agents running through **any** harness receive automatic path-scoped rule injection without manual loading.
 

@@ -28,7 +28,7 @@ sequenceDiagram
     participant BFF as Explore.Blazor (BFF)<br/>(YARP Reverse Proxy)
     participant APIMiddleware as Explore.API<br/>(Middleware Pipeline)
     participant Controller as EventLifecycleController
-    participant MediatR as MediatR Pipeline<br/>(Behaviors)
+    participant Pipeline as CQS Pipeline<br/>(Decorators)
     participant Handler as CreateEventCommandHandler
     participant Validator as CreateEventDtoValidator
     participant Repo as EventRepository
@@ -46,11 +46,11 @@ sequenceDiagram
     Note over APIMiddleware: 1. ExceptionHandling<br/>2. SecurityHeaders<br/>3. CorrelationId<br/>4. ApiTenantResolution<br/>5. Authentication (JWT)<br/>6. RateLimiting<br/>7. Idempotency Check
 
     APIMiddleware->>Controller: 5. Route to EventLifecycleController.Create(draft)
-    Controller->>MediatR: 6. Send(new CreateEventCommand { EventDto = draft.ToCreateEventDto() })
+    Controller->>Pipeline: 6. ExecuteAsync(new CreateEventCommand { EventDto = draft.ToCreateEventDto() })
 
-    Note over MediatR: PerformanceBehavior (>500ms warning)<br/>AuthorizationBehavior ([AuthorizeResource] check via Cerbos)
+    Note over Pipeline: PerformanceCommandHandlerDecorator (>500ms warning)<br/>AuthorizationCommandHandlerDecorator ([AuthorizeResource] check via Cerbos)
 
-    MediatR->>Handler: 7. Handle(command, cancellationToken)
+    Pipeline->>Handler: 7. ExecuteAsync(command, cancellationToken)
     
     Note over Handler: Handler extracts DTO (command.EventDto)<br/>and instantiates DTO validator with repository references
     Handler->>Validator: 8. Instantiate & validate (new CreateEventDtoValidator(...))
@@ -97,7 +97,7 @@ sequenceDiagram
     participant BFF as Explore.Blazor (BFF)
     participant API as Explore.API (Pipeline)
     participant Controller as EventsController
-    participant MediatR as MediatR Query Pipeline
+    participant Pipeline as CQS Query Pipeline
     participant Handler as GetEventListRequestHandler
     participant Spec as EventQuerySpecification
     participant Cache as HybridCache (L1/L2)
@@ -111,9 +111,9 @@ sequenceDiagram
 
     Note over API: Check OutputCache & ETag middleware
     API->>Controller: 4. EventsController.GetEvents(queryParameters)
-    Controller->>MediatR: 5. Send(new GetEventListRequest(queryParams))
+    Controller->>Pipeline: 5. ExecuteAsync(new GetEventListRequest(queryParams))
 
-    MediatR->>Handler: 6. Handle(query, cancellationToken)
+    Pipeline->>Handler: 6. ExecuteAsync(query, cancellationToken)
     
     Note over Handler: Build Specification & deterministic cache key
     Handler->>Spec: 7. Compose EventQuerySpecification<br/>(Status == Published, DateFilter, AspectFilter)
@@ -197,20 +197,20 @@ This flow details how resource-level permissions are evaluated on every command 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Request as MediatR Request / Handler
-    participant Behavior as AuthorizationBehavior
+    participant Request as CQS Request / Handler
+    participant Decorator as Authorization Decorator
     participant Descriptor as ResourceDescriptors
     participant Resolver as AuthorizationProvider
     participant TenantPDP as Tenant Cerbos PDP (BYO)
     participant InstancePDP as Instance Cerbos PDP
     participant Fallback as FallbackAuthorizationService (Local RBAC)
 
-    Request->>Behavior: 1. Request arrives with [AuthorizeResource(Resource, Action)]
+    Request->>Decorator: 1. Request arrives with [AuthorizeResource(Resource, Action)]
     
-    Behavior->>Descriptor: 2. Extract resource metadata (Kind, Id, TenantId, Attributes)
-    Descriptor-->>Behavior: 3. ResourceDescriptor object
+    Decorator->>Descriptor: 2. Extract resource metadata (Kind, Id, TenantId, Attributes)
+    Descriptor-->>Decorator: 3. ResourceDescriptor object
     
-    Behavior->>Resolver: 4. CheckAccessAsync(principal, descriptor, action)
+    Decorator->>Resolver: 4. CheckAccessAsync(principal, descriptor, action)
 
     alt Tenant has Custom BYO Cerbos PDP configured
         Resolver->>TenantPDP: 5a. Evaluate policy over gRPC
@@ -314,7 +314,7 @@ sequenceDiagram
     Middleware->>TenantContext: 2. Set TenantId, TenantSlug, and IsResolved = true
     Middleware->>Client: 3. Continue down middleware pipeline
 
-    Note over Client: Request reaches Controller & MediatR Handler
+    Note over Client: Request reaches Controller & CQS Handler
 
     Client->>DbFactory: 4. CreateDbContext() from pool
     DbFactory-->>DbContext: 5. Rent pooled DbContext instance

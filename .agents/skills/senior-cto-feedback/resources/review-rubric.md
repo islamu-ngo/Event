@@ -188,7 +188,7 @@ Check:
 Check:
 
 - Behavioral tasks follow Test-First Invariant order (Task N.1: Failing Invariant/Contract Tests $\rightarrow$ Task N.2: Implementation).
-- Tests are specified against public contracts (MediatR requests, API endpoints, ProblemDetails RFC 7807, database state invariants) rather than private implementation details.
+- Tests are specified against public contracts (native CQS requests, API endpoints, ProblemDetails RFC 7807, database state invariants) rather than private implementation details.
 - High-leverage tests are prioritized (concurrency races, state machines, row locking, zero-PII log sinks) over low-value getter/setter mocks.
 - Unit tests cover domain/application logic; integration tests cover persistence/API behavior.
 - Architecture tests enforce conventions; BFF tests cover cookie/token/header behavior.

@@ -76,7 +76,7 @@ namespace Event.Architecture.Tests
             var abstractRecordRequest = typeof(Explore.Application.Features.Promotions.Requests.Commands.PromotionManagementCommandBase<>);
             var inheritedRecordRequest = typeof(Explore.Application.Features.Promotions.Requests.Commands.CreatePromotionDraftCommand);
             var classContracts = DiscoverHandwrittenApplicationClassDtos().ToHashSet(StringComparer.Ordinal);
-            var compiledRequests = DiscoverConcreteCompiledMediatRRequests().ToHashSet();
+            var compiledRequests = DiscoverConcreteCompiledApplicationRequests().ToHashSet();
 
             await Assert.That(Classify(typeof(NativeRegistrationFormDefinitionDto))).IsEqualTo(ContractClassification.Record);
             await Assert.That(IsRecord(genericRecordRequest)).IsTrue();
@@ -171,27 +171,27 @@ namespace Event.Architecture.Tests
         }
 
         [Test]
-        public async Task ConcreteMediatRClassRequestsMatchTheReasonedBaseline()
+        public async Task ConcreteApplicationClassRequestsMatchTheReasonedBaseline()
         {
-            var current = DiscoverConcreteMediatRClassRequests();
+            var current = DiscoverConcreteApplicationClassRequests();
             var allCurrent = DiscoverAllClassDebt();
             var parsed = ReadBaseline(ClassBaselinePath, BaselineKind.Class);
-            var relevantEntries = EntriesClassifiedAs(parsed.Entries, ContractClassification.ConcreteMediatRClassRequest);
+            var relevantEntries = EntriesClassifiedAs(parsed.Entries, ContractClassification.ConcreteApplicationClassRequest);
             var failures = parsed.Failures
                 .Concat(ValidateClassEntries(parsed.Entries, allCurrent))
-                .Concat(CompareExactBaseline(current, relevantEntries, "concrete MediatR class request"))
+                .Concat(CompareExactBaseline(current, relevantEntries, "concrete Application class request"))
                 .Order(StringComparer.Ordinal)
                 .ToArray();
 
-            ReportDebt("concrete MediatR class requests", failures);
+            ReportDebt("concrete Application class requests", failures);
             await Assert.That(failures).IsEmpty()
-                .Because("every compiled concrete MediatR class request must have a reasoned shrinking-baseline disposition");
+                .Because("every compiled concrete Application class request must have a reasoned shrinking-baseline disposition");
         }
 
         [Test]
-        public async Task EveryConcreteCompiledApplicationMediatRRequestIsARecord()
+        public async Task EveryConcreteCompiledApplicationRequestIsARecord()
         {
-            var classRequests = DiscoverConcreteCompiledMediatRRequests()
+            var classRequests = DiscoverConcreteCompiledApplicationRequests()
                 .Where(type => !IsRecord(type))
                 .Select(GetTypeName)
                 .Order(StringComparer.Ordinal)
@@ -286,7 +286,7 @@ namespace Event.Architecture.Tests
             await Assert.That(classBaseline.Entries).IsEmpty();
             await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(10);
             await Assert.That(bodyBaseline.Entries.All(entry => entry.Category == "legitimate-target")).IsTrue();
-            await Assert.That(DiscoverConcreteMediatRClassRequests()).IsEmpty();
+            await Assert.That(DiscoverConcreteApplicationClassRequests()).IsEmpty();
         }
 
         [Test]
@@ -333,19 +333,19 @@ namespace Event.Architecture.Tests
         private static bool HasFailure(IEnumerable<string> failures, string text) =>
             failures.Any(failure => failure.Contains(text, StringComparison.Ordinal));
 
-        private static string[] DiscoverAllClassDebt() => DiscoverConcreteMediatRClassRequests()
+        private static string[] DiscoverAllClassDebt() => DiscoverConcreteApplicationClassRequests()
             .Concat(DiscoverHandwrittenApplicationClassDtos())
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        private static Type[] DiscoverConcreteCompiledMediatRRequests() => ApplicationAssembly
+        private static Type[] DiscoverConcreteCompiledApplicationRequests() => ApplicationAssembly
             .GetTypes()
             .Where(IsCompiledApplicationRequest)
             .OrderBy(GetTypeName, StringComparer.Ordinal)
             .ToArray();
 
-        private static string[] DiscoverConcreteMediatRClassRequests() => DiscoverConcreteCompiledMediatRRequests()
+        private static string[] DiscoverConcreteApplicationClassRequests() => DiscoverConcreteCompiledApplicationRequests()
             .Where(type => !IsRecord(type))
             .Select(GetTypeName)
             .Order(StringComparer.Ordinal)
@@ -420,7 +420,7 @@ namespace Event.Architecture.Tests
             if (IsRecord(type))
                 return ContractClassification.Record;
             if (type is { IsClass: true, IsAbstract: false } && OperationContractDiscovery.IsRequest(type))
-                return ContractClassification.ConcreteMediatRClassRequest;
+                return ContractClassification.ConcreteApplicationClassRequest;
             if (type is { IsClass: true, IsAbstract: false } && IsApplicationContractOwned(type))
                 return ContractClassification.HandwrittenApplicationClassDto;
 
@@ -707,7 +707,7 @@ namespace Event.Architecture.Tests
             if (classRequests.Length == 0)
                 return;
 
-            Console.WriteLine($"Record adoption RED - concrete compiled Application MediatR requests that remain classes ({classRequests.Length}):");
+            Console.WriteLine($"Record adoption RED - concrete compiled Application requests that remain classes ({classRequests.Length}):");
             foreach (var classRequest in classRequests)
                 Console.WriteLine($"  - {classRequest}");
         }
@@ -727,7 +727,7 @@ namespace Event.Architecture.Tests
         private enum ContractClassification
         {
             Record,
-            ConcreteMediatRClassRequest,
+            ConcreteApplicationClassRequest,
             HandwrittenApplicationClassDto,
             Generated,
             Validator,

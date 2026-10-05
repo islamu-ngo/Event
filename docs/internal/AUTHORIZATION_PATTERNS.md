@@ -1,16 +1,15 @@
-> **Scope:** Native operations and remaining MediatR requests; shared authorization facts and provider failure semantics.
+> **Scope:** Native CQS operations; shared authorization facts and provider failure semantics.
 
 # Authorization Patterns
 
-`Explore.Application.Authorization.RequestAuthorization<TRequest>` owns evaluation for native operation decorators and the remaining `AuthorizationBehavior<TRequest,TResponse>` integration.
+`Explore.Application.Authorization.RequestAuthorization<TRequest>` owns evaluation for native operation decorators.
 
 ## Enforcement Point
 
 - Requests are checked before handlers execute.
 - Denials throw `AuthorizationException`.
 - `Explore.API.ExceptionHandling.GlobalExceptionHandler` maps `AuthorizationException` to HTTP `403 Forbidden`.
-- Native order is authorization -> performance -> handler; denial never enters timing.
-- Remaining MediatR order is `PerformanceBehavior` -> `AuthorizationBehavior`.
+- Pipeline order is authorization -> performance -> handler; denial never enters timing.
 - Provider-unavailable decisions throw `AuthorizationProviderUnavailableException`, distinct from ordinary denial.
 - There is no global validation pipeline behavior in current registration; validators are used from handlers/services.
 

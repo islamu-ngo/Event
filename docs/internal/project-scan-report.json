@@ -42,7 +42,7 @@
       "step": "step_3",
       "status": "completed",
       "timestamp": "2026-01-30T12:10:00Z",
-      "summary": "Tech stack: .NET 10, Blazor, PostgreSQL, EF Core, MediatR, Keycloak, YARP BFF, Docker, Coolify"
+      "summary": "Tech stack: .NET 10, Blazor, PostgreSQL, EF Core, Native CQS, Riok.Mapperly, Keycloak, YARP BFF, Docker, Coolify"
     },
     {
       "step": "step_4",
@@ -111,7 +111,7 @@
       "dev/",
       ".repomix/"
     ],
-    "technology_stack": ".NET 10, ASP.NET Core, Blazor Server+WASM, PostgreSQL, EF Core 10, MediatR, Keycloak, YARP BFF",
+    "technology_stack": ".NET 10, ASP.NET Core, Blazor Server+WASM, PostgreSQL, EF Core 10, Native CQS, Riok.Mapperly, Keycloak, YARP BFF",
     "controllers_count": 39,
     "domain_entities_count": 65,
     "blazor_components_count": 85,

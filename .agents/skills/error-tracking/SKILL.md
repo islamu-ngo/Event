@@ -25,13 +25,13 @@ ABOUTME: Read referenced resources before applying.
 - **CorrelationIdMiddleware**: Reads `X-Correlation-ID` or `X-Request-ID` from inbound requests, generates GUID if absent, pushes to `Serilog.LogContext`. Added to response headers.
 - **RequestLoggingMiddleware**: Structured logging with method, path, status, duration, userId, tenantId, correlationId.
 - **BusinessMetrics** (OpenTelemetry): Meter `"Explore.Business"` with counters: `events.created`, `events.published`, `registrations.created`, `organizations.created`, `authorization.decisions`. All tagged with `tenant_id`, `resource_type`.
-- **PerformanceBehavior** (MediatR pipeline): Warning for >500ms, error for >3000ms. Includes handler name and elapsed time.
+- **PerformanceBehavior** (Native operation pipeline): Warning for >500ms, error for >3000ms. Includes handler name and elapsed time.
 - **Rate limiting 429**: Rejection response is RFC 6585 ProblemDetails with `Retry-After` when available plus `X-RateLimit-Limit` and `X-RateLimit-Remaining`.
 
 ## Resources (Read Before Applying)
 - [api-exception-handling.md](resources/api-exception-handling.md)
 - [api-error-responses.md](resources/api-error-responses.md)
-- [mediatr-logging-behavior.md](resources/mediatr-logging-behavior.md)
+- [native-operation-logging.md](resources/native-operation-logging.md)
 - [prometheus-metrics.md](resources/prometheus-metrics.md)
 - [loki-logging.md](resources/loki-logging.md)
 - [blazor-error-boundary.md](resources/blazor-error-boundary.md)

@@ -9,7 +9,7 @@
 The feature owns two `IQuery<TResult>` requests, three
 `ICommand<BaseCommandResponse<Guid>>` writes, and the non-generic
 `RecordEventPublicActionEngagementCommand : ICommand`. Its metrics-only handler
-returns `Task`, not `Unit`. There is no MediatR compatibility contract.
+returns `Task`. There is no legacy compatibility contract.
 
 `EventPublicActionController` injects the six closed handler interfaces and its
 HAL assembler. Its seven invocations comprise list, detail, create, update,

@@ -20,7 +20,7 @@ A disciplined 6-phase protocol for diagnosing defects and regressions. Never ski
 Ways to construct the red command (in priority order):
 1. **Failing TUnit Test**: Author a targeted unit/integration test using `--treenode-filter "/*/*/*<TestClass>/*"`.
 2. **HTTP / Integration Request**: A curl/HTTP call asserting expected status, RFC 7807 ProblemDetails, or HAL `_links`.
-3. **Throwaway Invariant Harness**: A minimal invocation in a test fixture exercising the failing MediatR handler or domain aggregate.
+3. **Throwaway Invariant Harness**: A minimal invocation in a test fixture exercising the failing CQS handler or domain aggregate.
 
 **Phase 1 Gate**: Name the single test command and execute it once, observing the expected red failure.
 
@@ -44,7 +44,7 @@ If you cannot state the falsifiable prediction, the hypothesis is invalid.
 
 ## Phase 5: Fix and Regression Seam Verification
 
-1. Write the regression test at the **correct public seam** (MediatR handler or API route).
+1. Write the regression test at the **correct public seam** (native CQS handler or API route).
 2. **Seam Deficiency Finding**: If no clean public interface exists to test the bug without shallow mocking, that missing seam is an architectural defect. Record it in the diagnosis summary.
 3. Apply the minimal fix to satisfy the failing test.
 4. Watch the test turn **GREEN**.

@@ -941,7 +941,7 @@
     },
     "Application": {
       "project": "{Project}.Application",
-      "description": "Use cases, CQRS handlers, DTOs, interfaces, validation, Specification Pattern (filters/sorts), MediatR pipeline behaviors. Orchestrates domain logic.",
+      "description": "Use cases, CQRS handlers, DTOs, interfaces, validation, Specification Pattern (filters/sorts), native operation pipeline behaviors, and Mapperly mapping. Orchestrates domain logic.",
       "allowedDependencies": ["Domain"]
     },
     "Infrastructure": {

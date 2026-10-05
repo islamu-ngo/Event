@@ -63,7 +63,7 @@ Test Coverage:
 ```
 
 ### Protocol Invariants:
-1. **Zero-Turn Context**: Map the full vertical dependency chain (API Route $\rightarrow$ MediatR Handler $\rightarrow$ Outbox Event $\rightarrow$ DB Repository $\rightarrow$ Tests) on Turn 1 before authoring changes.
+1. **Zero-Turn Context**: Map the full vertical dependency chain (API Route $\rightarrow$ Native CQS Handler $\rightarrow$ Outbox Event $\rightarrow$ DB Repository $\rightarrow$ Tests) on Turn 1 before authoring changes.
 2. **Side-Effect Prevention**: Ensure downstream side effects (Outbox events, cache invalidation, UI links) are captured upfront.
 3. **Context Budget Economy**: Replace multi-step manual file traversal with a single structured graph query.
 

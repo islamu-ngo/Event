@@ -14,7 +14,7 @@ _Add local reviewer notes here. This section is preserved by the generator._
 ## Global Invariants
 
 - Registry catalog visibility is advisory and never grants execution authority.
-- Mutating tools remain proposal-first and require human confirmation before CQRS/MediatR commands execute.
+- Mutating tools remain proposal-first and require human confirmation before native CQS commands execute.
 - UI mutation affordances must be gated by HAL link presence, not local role or claim inspection.
 - MCP adapters must use the same registry contracts and must not write repositories directly.
 

@@ -8,7 +8,7 @@ Use traces to connect HTTP, application, and data-layer behavior.
 ## Trace Pipeline
 
 - Incoming HTTP request span
-- MediatR request span (command/query)
+- Native operation request span (command/query)
 - Database spans for repository calls
 - External dependency spans (storage, auth provider, webhooks)
 

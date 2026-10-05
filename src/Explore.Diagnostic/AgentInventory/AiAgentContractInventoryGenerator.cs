@@ -40,7 +40,7 @@ public sealed class AiAgentContractInventoryGenerator
         builder.AppendLine("## Global Invariants");
         builder.AppendLine();
         builder.AppendLine("- Registry catalog visibility is advisory and never grants execution authority.");
-        builder.AppendLine("- Mutating tools remain proposal-first and require human confirmation before CQRS/MediatR commands execute.");
+        builder.AppendLine("- Mutating tools remain proposal-first and require human confirmation before native CQRS commands execute.");
         builder.AppendLine("- UI mutation affordances must be gated by HAL link presence, not local role or claim inspection.");
         builder.AppendLine("- MCP adapters must use the same registry contracts and must not write repositories directly.");
         builder.AppendLine();

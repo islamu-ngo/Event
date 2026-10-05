@@ -293,7 +293,7 @@ Three-reader non-URL versioning — clients may use any of the following; all th
 
 ## Controller Conventions
 
-1. Controllers are thin: receive request → dispatch MediatR command/query → assemble HATEOAS response → return HTTP result.
+1. Controllers are thin: receive request → invoke native CQS command/query handler → assemble HATEOAS response → return HTTP result.
 2. Business logic belongs in handlers/services, never controllers.
 3. Every endpoint has named routes (via `RouteNames` constants) for HATEOAS link generation.
 4. Endpoints include `[ProducesResponseType]` and XML doc summaries for OpenAPI quality.
@@ -303,7 +303,7 @@ Three-reader non-URL versioning — clients may use any of the following; all th
 7. **Approved Base Classes & Composition**:
    - **Root Base (`EventControllerBase`)**: Exposes request-scoped principal identity (`CurrentUserId`, `RequiredUserId`) and strong ETag/concurrency parsing (`TryParseConcurrencyStamp`).
    - **Domain-Family Base Classes**: Permitted only when two or more split controllers share an exact, multi-step domain protocol or security check (e.g. `RegistrationOrderControllerBase` for guest vs. authenticated checkout; `InstanceSettingsControllerBase` for setup-secret vs. admin).
-   - **Composition Over Inheritance**: Shared mechanics belong in `CommandFailurePolicy`, `IResourceAssembler`, MediatR commands/queries, and extension methods (`ToCommandValidationProblem`, `ToNotFoundProblem`), leaving controller actions explicit, declarative, and independent.
+   - **Composition Over Inheritance**: Shared mechanics belong in `CommandFailurePolicy`, `IResourceAssembler`, CQS commands/queries, and extension methods (`ToCommandValidationProblem`, `ToNotFoundProblem`), leaving controller actions explicit, declarative, and independent.
 
 ### Event Aggregate Deletion
 
@@ -949,7 +949,7 @@ Cross-replica output-cache invalidation is deferred without a dedicated
 distributed output-cache dependency.
 
 ### Layer 2: HybridCache (Application Level — L1 + L2)
-Injected into MediatR handlers, not controllers. Provides in-memory L1 + distributed L2 caching with stampede protection.
+Injected into native CQS handlers, not controllers. Provides in-memory L1 + distributed L2 caching with stampede protection.
 
 | Setting | Value |
 |---|---|
@@ -1016,8 +1016,8 @@ method-specific: `DELETE /api/user`, event reads, and other tenant-scoped
 API actions still fail closed without a resolved tenant. The persona HTTP
 regression verifies these boundaries.
 
-### MediatR Authorization Behavior
-`AuthorizationBehavior` in the pipeline checks:
+### Operation Authorization Decorators
+`AuthorizationCommandHandlerDecorator` and `AuthorizationQueryHandlerDecorator` check:
 1. `IAuthorizedRequest` interface — commands/queries declare required permissions.
 2. `[AuthorizeResource]` attribute — declarative resource-level authorization.
 3. `ISecureRequest` — provides dynamic resource context for permission evaluation.
@@ -1116,8 +1116,8 @@ Organization membership endpoints expose identity, role, and position data for o
 Contract rules:
 
 - `OrganizationMemberDto` is an identity-bearing administrative projection. It includes `tenantId`, `organizationId`, `userId`, `userFullName`, `userEmail`, role, and position fields; it is not a public organization profile DTO.
-- Member list/detail reads require authentication plus MediatR resource authorization for resource kind `islamuevent_organization_member` and action `view`. Regular authenticated users without tenant-admin or organization-admin authority receive `403`.
-- List reads authorize with the resolved tenant id and route organization id. Detail reads authorize by member id, and `AuthorizationBehavior` enriches the resource attributes from the repository before evaluating Cerbos/local fallback policy.
+- Member list/detail reads require authentication plus operation resource authorization for resource kind `islamuevent_organization_member` and action `view`. Regular authenticated users without tenant-admin or organization-admin authority receive `403`.
+- List reads authorize with the resolved tenant id and route organization id. Detail reads authorize by member id, and the authorization decorator enriches the resource attributes from the repository before evaluating Cerbos/local fallback policy.
 - Create and HAL collection affordances carry the resolved tenant id and organization id so tenant-admin and organization-admin checks use the same resource/action context as the API path.
 - Clients must gate member-management UI from HAL `_links` such as collection `create` and item edit/delete links, not from local role or claim inspection.
 
@@ -1500,12 +1500,12 @@ Gates onboarding endpoints behind the setup secret:
 
 ---
 
-## MediatR Pipeline Behaviors
+## Operation Decorators
 
-| Behavior | Purpose |
+| Decorator | Purpose |
 |---|---|
-| `PerformanceBehavior` | Logs requests taking >500ms as warnings |
-| `AuthorizationBehavior` | Checks `IAuthorizedRequest` / `[AuthorizeResource]` attribute; throws `AuthorizationException` on deny. Reflection results cached via `ConcurrentDictionary`. Emits OpenTelemetry activity spans on `Explore.Authorization` source with `resource.kind`, `resource.action`, and `request.type` tags. |
+| `PerformanceCommandHandlerDecorator` / `PerformanceQueryHandlerDecorator` | Logs requests taking >500ms as warnings |
+| `AuthorizationCommandHandlerDecorator` / `AuthorizationQueryHandlerDecorator` | Checks `IAuthorizedRequest` / `[AuthorizeResource]` attribute; throws `AuthorizationException` on deny. Reflection results cached via `ConcurrentDictionary`. Emits OpenTelemetry activity spans on `Explore.Authorization` source with `resource.kind`, `resource.action`, and `request.type` tags. |
 
 ---
 

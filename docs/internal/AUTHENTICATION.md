@@ -197,7 +197,7 @@ authority only after the operator establishes and authenticates that identity.
 
 ## Clean Architecture Flow
 
-Local HTTP requests enter through `LocalAuthController` or the antiforgery-protected BFF endpoints. Controllers create immutable Local authentication commands and dispatch through MediatR:
+Local HTTP requests enter through `LocalAuthController` or the antiforgery-protected BFF endpoints. Controllers create immutable Local authentication commands and dispatch through native CQS handlers:
 
 ```text
 Browser
@@ -540,7 +540,7 @@ replacement authority as ambient platform identity. Ordinary access tokens canno
 authorize this endpoint, and replacement challenges cannot authorize ordinary
 user synchronization.
 
-The controller sends `CompleteLocalCredentialReplacementCommand` through MediatR
+The controller executes `CompleteLocalCredentialReplacementCommand` through its native command handler
 to the existing credential administration port. Closed replacement outcomes map
 to empty 204 success, bounded 400 password validation, 401 invalid authority or
 409 concurrency conflict. Password limits are 12–128 characters; unknown body

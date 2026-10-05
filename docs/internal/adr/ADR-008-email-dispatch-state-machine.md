@@ -9,7 +9,7 @@ ABOUTME: Defines durable-intent ownership, dispatch profiles, and side-effect bo
 
 ## Context
 
-ISLAMU Event needs reliable event-lifecycle email delivery, starting with registration confirmation. The platform already has PostgreSQL, EF Core, CQRS/MediatR, SMTP abstraction, tenant-scoped configuration, a general transactional outbox, and specialized outbox precedent. It also has an optional RabbitMQ transport workstream for EmailDispatch pointers, but RabbitMQ must not become mandatory for self-hosters.
+ISLAMU Event needs reliable event-lifecycle email delivery, starting with registration confirmation. The platform already has PostgreSQL, EF Core, CQS operations, SMTP abstraction, tenant-scoped configuration, a general transactional outbox, and specialized outbox precedent. It also has an optional RabbitMQ transport workstream for EmailDispatch pointers, but RabbitMQ must not become mandatory for self-hosters.
 
 CRMWorx analysis showed that durable side effects become operable when business state, attempts, receipts, retries, dead-letter, parking, and unknown outcomes are persisted before transport is involved. The CTO-approved direction for ISLAMU Event is to adapt that lesson without copying CRMWorx architecture and without centering RabbitMQ.
 

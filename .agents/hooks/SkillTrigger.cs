@@ -35,7 +35,7 @@ try
         suggestions.Add("  Use 'frontend-error-fixer' agent for UI issues.");
 
     // Architecture/Refactoring
-    if (prompt.Contains("refactor") || prompt.Contains("clean arch") || prompt.Contains("mediatr") || prompt.Contains("cqrs"))
+    if (prompt.Contains("refactor") || prompt.Contains("clean arch") || prompt.Contains("cqs") || prompt.Contains("cqrs") || prompt.Contains("mapperly"))
         suggestions.Add("  Use 'code-refactor-master' agent or consult Clean Architecture skills.");
 
     // Build Errors

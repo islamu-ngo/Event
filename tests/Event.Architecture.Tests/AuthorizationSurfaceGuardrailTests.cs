@@ -18,7 +18,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly Assembly ApplicationAssembly = typeof(AuthorizeResourceAttribute).Assembly;
     private static readonly Assembly ApiAssembly = typeof(EndpointClassificationAttribute).Assembly;
 
-    private static readonly InventoryEntry[] NamedMediatRExceptions =
+    private static readonly InventoryEntry[] NamedOperationExceptions =
     [
         new(
             "Explore.Application.Features.Events.Discovery.Commands.ReviewEventDiscoveryAliasCommand",
@@ -161,7 +161,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "handler-contained-user-token-authority",
             "The handler directly resolves the authenticated current user identity via ICurrentUserService and verifies ownership against persisted user authentication tokens before deleting."),
     ];
-    private static readonly string[] NamedMediatRViolations =
+    private static readonly string[] NamedOperationViolations =
     [
         "Explore.Application.Features.Actors.Requests.Commands.CreateActorCommand",
         "Explore.Application.Features.Actors.Requests.Commands.DeleteActorCommand",
@@ -403,10 +403,10 @@ public sealed class AuthorizationSurfaceGuardrailTests
     {
         var requests = AuthorizationSurfaceInventory.DiscoverMutatingRequests(ApplicationAssembly.GetTypes())
             .UnprotectedMutatingRequests.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
-        await Assert.That(NamedMediatRExceptions.Where(entry => !requests.Contains(entry.Id))).IsEmpty();
-        await Assert.That(NamedMediatRExceptions.Select(entry => entry.Id).Distinct().Count())
-            .IsEqualTo(NamedMediatRExceptions.Length);
-        await Assert.That(NamedMediatRExceptions.Where(entry => NamedMediatRViolations.Contains(entry.Id))).IsEmpty();
+        await Assert.That(NamedOperationExceptions.Where(entry => !requests.Contains(entry.Id))).IsEmpty();
+        await Assert.That(NamedOperationExceptions.Select(entry => entry.Id).Distinct().Count())
+            .IsEqualTo(NamedOperationExceptions.Length);
+        await Assert.That(NamedOperationExceptions.Where(entry => NamedOperationViolations.Contains(entry.Id))).IsEmpty();
     }
 
     [Test]
@@ -422,12 +422,12 @@ public sealed class AuthorizationSurfaceGuardrailTests
 
     [Test]
     [Category("AuthorizationSurfaceGuardrail")]
-    [DisplayName("Mutating MediatR requests must be authorization-classified or named in the Phase 0 inventory")]
-    public async Task MutatingMediatRRequests_MustBeAuthorizationClassifiedOrNamed()
+    [DisplayName("Mutating requests must be authorization-classified or named in the Phase 0 inventory")]
+    public async Task MutatingRequests_MustBeAuthorizationClassifiedOrNamed()
     {
         var inventory = AuthorizationSurfaceInventory.Discover(ApplicationAssembly, ApiAssembly);
-        var namedIds = NamedMediatRExceptions.Select(entry => entry.Id)
-            .Concat(NamedMediatRViolations)
+        var namedIds = NamedOperationExceptions.Select(entry => entry.Id)
+            .Concat(NamedOperationViolations)
             .ToHashSet(StringComparer.Ordinal);
 
         var unclassified = inventory.UnprotectedMutatingRequests
@@ -436,7 +436,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
             .ToArray();
 
         await Assert.That(unclassified).IsEmpty()
-            .Because($"every mutating IRequest<T> must carry [AuthorizeResource] or have an exact Phase 0 disposition: {string.Join(", ", unclassified)}");
+            .Because($"every mutating operation request must carry [AuthorizeResource] or have an exact Phase 0 disposition: {string.Join(", ", unclassified)}");
     }
 
     [Test]
@@ -485,15 +485,15 @@ public sealed class AuthorizationSurfaceGuardrailTests
             ApplicationAssembly: ApplicationAssembly.GetName().Name ?? string.Empty,
             ApiAssembly: ApiAssembly.GetName().Name ?? string.Empty,
             ProtectedWrites: inventory.ProtectedMutatingRequests,
-            NamedHandlerOwnedExceptions: NamedMediatRExceptions,
-            MediatRDispositions: [],
+            NamedHandlerOwnedExceptions: NamedOperationExceptions,
+            OperationDispositions: [],
             AnonymousReadOrPublicActions: inventory.AnonymousReadOrPublicActions,
             SignatureGatedActions: inventory.SignatureGatedActions,
             AnonymousMutationExceptions: [.. NamedAnonymousMutationExceptions, .. ReviewedAnonymousEndpointGovernance.LocalLifecycleExceptions],
             Violations: NamedAnonymousMutationViolations,
             UnclassifiedMutatingRequests: inventory.UnprotectedMutatingRequests
-                .Where(item => !NamedMediatRExceptions.Any(entry => entry.Id == item.Id))
-                .Where(item => !NamedMediatRViolations.Contains(item.Id, StringComparer.Ordinal))
+                .Where(item => !NamedOperationExceptions.Any(entry => entry.Id == item.Id))
+                .Where(item => !NamedOperationViolations.Contains(item.Id, StringComparer.Ordinal))
                 .ToArray(),
             UnclassifiedAnonymousMutationSurfaces: inventory.AnonymousMutationSurfaces
                 .Where(item => !item.IsPublicTransactional && !item.IsSetupSecretGated && !item.IsReviewedLocalLifecycle)
@@ -523,7 +523,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
         await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Select(item => item.Id)).Contains(typeof(SyntheticLocalLifecycleCommand).FullName!);
         await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Select(item => item.Id)).Contains(typeof(SyntheticProofPreviewQuery).FullName!);
         await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Where(item =>
-            NamedMediatRExceptions.Any(entry => entry.Id == item.Id) || NamedMediatRViolations.Contains(item.Id))).IsEmpty();
+            NamedOperationExceptions.Any(entry => entry.Id == item.Id) || NamedOperationViolations.Contains(item.Id))).IsEmpty();
         await Assert.That(anonymousMutations.Any(item => item.IsReviewedLocalLifecycle)).IsFalse();
     }
 
@@ -577,7 +577,7 @@ internal static class AuthorizationSurfaceInventory
         var protectedRequests = new List<RequestInventoryItem>();
         var unprotectedRequests = new List<RequestInventoryItem>();
 
-        foreach (var type in requestTypes.Where(IsConcreteMediatRRequest).Where(IsMutatingRequest).OrderBy(type => type.FullName, StringComparer.Ordinal))
+        foreach (var type in requestTypes.Where(IsConcreteOperationRequest).Where(IsMutatingRequest).OrderBy(type => type.FullName, StringComparer.Ordinal))
         {
             var item = new RequestInventoryItem(
                 Id: type.FullName ?? type.Name,
@@ -641,7 +641,7 @@ internal static class AuthorizationSurfaceInventory
             signatureGated.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray());
     }
 
-    private static bool IsConcreteMediatRRequest(Type type) =>
+    private static bool IsConcreteOperationRequest(Type type) =>
         type is { IsAbstract: false, IsInterface: false }
         && (GetResponseType(type) is not null || OperationContractDiscovery.IsNativeRequest(type));
 
@@ -727,7 +727,7 @@ internal static class AuthorizationSurfaceInventory
 
 internal sealed record InventoryEntry(string Id, string Classification, string Reason);
 
-internal sealed record MediatRDispositionEntry(
+internal sealed record OperationDispositionEntry(
     string RequestType,
     string Disposition,
     string Evidence,
@@ -736,7 +736,7 @@ internal sealed record MediatRDispositionEntry(
     string? Action,
     string Scenario);
 
-internal sealed record Phase0MediatRDispositionArtifact(
+internal sealed record Phase0OperationDispositionArtifact(
     int SchemaVersion,
     string GeneratedFrom,
     string RawListSource,
@@ -744,7 +744,7 @@ internal sealed record Phase0MediatRDispositionArtifact(
     int RowCount,
     Dictionary<string, int> CategoryCounts,
     int UnresolvedCount,
-    MediatRDispositionEntry[] Dispositions);
+    OperationDispositionEntry[] Dispositions);
 
 internal sealed record RequestInventoryItem(string Id, string Name, string ResponseType, string ClassificationReason);
 
@@ -781,7 +781,7 @@ internal sealed record AuthorizationSurfaceReport(
     string ApiAssembly,
     RequestInventoryItem[] ProtectedWrites,
     InventoryEntry[] NamedHandlerOwnedExceptions,
-    MediatRDispositionEntry[] MediatRDispositions,
+    OperationDispositionEntry[] OperationDispositions,
     ControllerActionInventoryItem[] AnonymousReadOrPublicActions,
     ControllerActionInventoryItem[] SignatureGatedActions,
     InventoryEntry[] AnonymousMutationExceptions,
@@ -790,5 +790,5 @@ internal sealed record AuthorizationSurfaceReport(
     ControllerActionInventoryItem[] UnclassifiedAnonymousMutationSurfaces);
 
 [JsonSerializable(typeof(AuthorizationSurfaceReport))]
-[JsonSerializable(typeof(Phase0MediatRDispositionArtifact))]
+[JsonSerializable(typeof(Phase0OperationDispositionArtifact))]
 internal sealed partial class ReportJsonContext : JsonSerializerContext;

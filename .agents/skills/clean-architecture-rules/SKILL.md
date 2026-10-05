@@ -17,7 +17,7 @@ priority: critical
 ## Rules
 
 - Domain has no external framework dependency. Entities and lifecycle objects remain classes; small self-contained values may use `readonly record struct`, and reference-bearing immutable value data may use sealed records.
-- Application references Domain only. Concrete MediatR requests default to sealed records, while valid-state command results use their existing named factories.
+- Application references Domain only. Concrete native CQS requests default to sealed records, while valid-state command results use their existing named factories.
 - Persistence maps Domain entities and semantic values without making Domain depend on EF Core. Repositories return entities, never DTOs or `IQueryable`.
 - API and Blazor own transport, HTTP, rendering, and composition. HTTP adapters introduce trusted tenant/user authority; request bodies do not become current authority.
 - Generated browser contract shape remains generator-owned. Do not move generated records into handwritten mirrors or let generated DTO concerns flow into Domain.

@@ -15,7 +15,7 @@ Complete directory map for AI agents and developers. Lists all folders with max 
 
 ## Solution Overview & Scale (2026-09-03 Checkpoint)
 
-The solution implements **Clean Architecture** with CQRS (MediatR), enforced at compile time through 5 separate project assemblies plus presentation hosts:
+The solution implements **Clean Architecture** with native CQS, enforced at compile time through 5 separate project assemblies plus presentation hosts:
 
 - **Backend Production Scale**: **500,837 LOC** (API: 73k, Application: 224k, Domain: 55k, Persistence: 81k, Infrastructure: 67k).
 - **Presentation Scale**: **378,000 LOC** in `Explore.Blazor.Client` (including 182,524 LOC generated in `EventApiClient.g.cs`).
@@ -182,11 +182,11 @@ Explore.Application/
 ├── Services/                     — Application-layer services
 │   ├── EventActorResolver.cs    — Resolves event actor (org/group/personal) with permission checks
 │   └── SlugGenerator.cs         — Static URL slug generation utility
-├── Profiles/                     — AutoMapper profiles (10 domain-specific files)
-│   ├── EventMappingProfile.cs   — Event, EventSeries, EventDay, EventAgendaItem, EventTags, EventCategories, Aspects
-│   ├── OrganizationMappingProfile.cs — Organization, Group, Members, ApprovalStatus, Reviews
-│   ├── CustomPropertyMappingProfile.cs — All custom property definitions, templates, options, values
-│   └── [7 more profiles]        — Tenant, EventSession, User, Registration, ActorFederation, Lookup, Notification
+├── Mappings/                     — Riok.Mapperly compile-time source-generated mappers
+│   ├── EventMapper.cs           — Event, EventSeries, EventDay, EventAgendaItem, Tags, Categories, Aspects
+│   ├── OrganizationMapper.cs    — Organization, Group, Members, ApprovalStatus, Reviews
+│   ├── CustomPropertyMapper.cs  — All custom property definitions, templates, options, values
+│   └── [37 more mappers]        — Tenant, EventSession, User, Registration, ActorFederation, Lookup, Notification, etc.
 ├── Hateoas/                      — HAL resource models
 │   ├── HalResource.cs            — Base HAL envelope
 │   ├── HalLink.cs                — Link representation
@@ -202,9 +202,14 @@ Explore.Application/
 │   ├── IslamicAspectFilter.cs    — Module-conditional Islamic filters
 │   ├── TechAspectFilter.cs       — Module-conditional Tech filters
 │   └── AspectPresenceFilter.cs   — HasIslamicAspect/HasTechAspect presence filters
-├── Behaviors/                    — MediatR pipeline behaviors
-│   ├── PerformanceBehavior.cs    — Logs requests >500ms as warnings
-│   └── AuthorizationBehavior.cs  — Resource-level auth via IAuthorizedRequest/[AuthorizeResource]
+├── Operations/                   — Native CQS pipeline and decorators
+│   ├── Decorators/               — Authorization and performance decorators
+│   │   ├── AuthorizationCommandHandlerDecorator.cs — Resource-level auth for commands
+│   │   ├── AuthorizationQueryHandlerDecorator.cs   — Resource-level auth for queries
+│   │   ├── PerformanceCommandHandlerDecorator.cs   — Performance logging for commands >500ms
+│   │   └── PerformanceQueryHandlerDecorator.cs     — Performance logging for queries >500ms
+│   ├── OperationCompositionValidation.cs — Registration and decorator validation
+│   └── OperationConstructionGuard.cs     — DI construction guard
 ├── Authorization/                — Authorization contracts and attributes
 │   ├── IAuthorizedRequest.cs     — Interface for commands requiring authorization
 │   ├── AuthorizeResourceAttribute.cs — Declarative resource-level auth attribute

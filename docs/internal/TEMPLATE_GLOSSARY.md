@@ -336,7 +336,7 @@ These principles guide all documentation and should be followed when implementin
 | Dependencies flow inward | Domain has no dependencies |
 | Entities are framework-agnostic | No EF Core in Domain |
 | Use cases in Application | Business logic in handlers |
-| Controllers are thin | Only HTTP ↔ MediatR |
+| Controllers are thin | Only HTTP ↔ CQS Handlers |
 
 ### Clean Code
 

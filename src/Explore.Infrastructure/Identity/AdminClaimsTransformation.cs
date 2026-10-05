@@ -98,7 +98,7 @@ public sealed class AdminClaimsTransformation : IClaimsTransformation
         catch (Exception ex)
         {
             // Fail open for claims transformation — log the error but don't block authentication.
-            // The authorization layer (Cerbos/MediatR behavior) provides the hard security boundary.
+            // The authorization layer (Cerbos / native operation pipeline) provides the hard security boundary.
             _logger.LogWarning(ex,
                 "AdminClaimsTransformation: Failed to resolve admin authority. " +
                 "Admin UI will be hidden but server-side authorization remains enforced.");

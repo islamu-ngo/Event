@@ -164,7 +164,7 @@ See [LOCALIZATION.md](LOCALIZATION.md) for full details.
 - `TenantUsageLog`: id, tenant_id, resource_type, delta, recorded_at (for historical tracking and billing).
 
 **Enforcement approach:**
-- MediatR pipeline behavior checks quotas before write commands.
+- Command handler decorator checks quotas before write commands.
 - Soft limits: warn at 80%, block at 100%.
 - Storage quota enforced at upload handler level.
 - Usage counters updated via domain events (eventually consistent).

@@ -20,7 +20,7 @@ All hooks are written in C# and executed via `dotnet` CLI — no Node.js or Bash
 
 Reads the user prompt and suggests relevant agents/skills based on keyword matching.
 
-**Triggers**: auth (401/403/keycloak/cerbos), frontend (blazor/mudblazor/css/razor), architecture (refactor/clean arch/mediatr/cqrs), build errors (error cs/build fail), database (ef core/migration/postgres), testing (tunit/bunit/mock), outbox (dead letter/message dispatch), design system (design token/wrapper/appearance), footer (social links/footer template), accessibility (wcag/aria/a11y), secrets (infisical/vault/encryption).
+**Triggers**: auth (401/403/keycloak/cerbos), frontend (blazor/mudblazor/css/razor), architecture (refactor/clean arch/cqs/cqrs/mapperly), build errors (error cs/build fail), database (ef core/migration/postgres), testing (tunit/bunit/mock), outbox (dead letter/message dispatch), design system (design token/wrapper/appearance), footer (social links/footer template), accessibility (wcag/aria/a11y), secrets (infisical/vault/encryption).
 
 ### 2. ContextTracker.cs (PostToolUse)
 

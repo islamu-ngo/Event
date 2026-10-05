@@ -32,7 +32,7 @@ ISLAMU Event is a self-hostable, multi-tenant event management and discovery pla
                                               ▼                                │
                                ┌─────────────────────────────┐                 │
                                │   Explore.API (Backend)     │◄────────────────┘
-                               │   Middleware + MediatR CQRS │
+                               │   Middleware + Native CQS   │
                                └──────────────┬──────────────┘
                                               │ EF Core (Multi-Tenant)
                                               ▼
@@ -51,7 +51,7 @@ ISLAMU Event is a self-hostable, multi-tenant event management and discovery pla
 ### Core Architecture Concepts
 1. **Clean Architecture with Inward Dependencies**:
    - `Explore.Domain`: Entities and business rules (zero external dependencies).
-   - `Explore.Application`: MediatR commands/queries, handlers, validators, DTOs, and repository interfaces.
+   - `Explore.Application`: Native CQS commands/queries, handlers, validators, DTOs, and repository interfaces.
    - `Explore.Persistence` & `Explore.Infrastructure`: EF Core DbContext, repositories, S3 storage, email delivery, and external integrations.
    - `Explore.API`: The backend host, controllers, middleware pipeline, and composition root.
 2. **Backend-for-Frontend (BFF) Pattern**:
@@ -78,7 +78,7 @@ Depending on what you want to work on, follow these curated paths:
 ### 🅰️ Backend Developer Roadmap
 If you are adding business logic, database entities, background workers, or API endpoints:
 1. **Read Core Architecture**: [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) — understand the Clean Architecture layers and dependency directions.
-2. **Understand Execution Flows**: [REQUEST_FLOWS.md](REQUEST_FLOWS.md) — see how Commands and Queries flow through MediatR and EF Core.
+2. **Understand Execution Flows**: [REQUEST_FLOWS.md](REQUEST_FLOWS.md) — see how Commands and Queries flow through native CQS handlers and EF Core.
 3. **Follow the Blueprints**: [CONTRIBUTOR_RECIPES.md](CONTRIBUTOR_RECIPES.md) — step-by-step recipes for creating entities, CQRS handlers, and API controllers.
 4. **Learn EF Core Invariants**: [CODEBASE_INSIGHTS.md](CODEBASE_INSIGHTS.md#2-dbcontext-pooling-property-injection-and-partial-class-decomposition) — understand pooled DbContext factory, property injection, and named query filters.
 5. **Testing**: [TESTING.md](TESTING.md) — write unit tests with TUnit and integration tests with Testcontainers.

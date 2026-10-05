@@ -10,7 +10,7 @@ ABOUTME: Use this to validate layer references only.
 - **API/Blazor** → all layers (composition root)
 
 ## Quick Checks
-- Domain must not reference EF Core, MediatR, or ASP.NET.
+- Domain must not reference EF Core, external mediator/mapping packages, or ASP.NET.
 - Application must not reference Persistence/Infrastructure.
 
 ## Exceptions

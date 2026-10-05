@@ -129,7 +129,7 @@ public sealed class AiReplayReportGenerator
             return AiReplayScenarioResult.Pass(
                 AiReplayScenarioCodes.McpProposalFirst,
                 "MCP replay validated tool arguments and stopped at proposed-action confirmation.",
-                "Registry validation passed and no executor, repository, or MediatR command was invoked by the replay harness.");
+                "Registry validation passed and no executor, repository, or native CQS command was invoked by the replay harness.");
         }
 
         return AiReplayScenarioResult.Fail(

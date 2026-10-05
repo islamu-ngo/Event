@@ -79,7 +79,7 @@ public sealed class McpArchitectureTests
         }
 
         await Assert.That(violations).IsEmpty()
-            .Because("MCP tools/resources must delegate through MediatR or API services; direct repository access would bypass Application authorization, tenancy, and proposal boundaries.");
+            .Because("MCP tools/resources must delegate through native CQS handlers or API services; direct repository access would bypass Application authorization, tenancy, and proposal boundaries.");
     }
 
     private static void AddModelContextProtocolDependencyViolations(

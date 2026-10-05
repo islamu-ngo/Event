@@ -40,7 +40,7 @@ Use this page when you have a symptom. For planned work, installation, backup, r
 > [!IMPORTANT]
 > **Production & Self-Hosting Operational Triage:**
 > For Docker Compose, standalone containers, Traefik, Keycloak deployment, storage S3/MinIO, and reverse proxy troubleshooting, consult the authoritative **[Troubleshooting & Health Guide (Public Documentation)](../public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md)**.
-> This internal document is strictly scoped to C# development, EF Core migrations, MediatR pipeline debugging, and test suite execution.
+> This internal document is strictly scoped to C# development, EF Core migrations, native CQS pipeline debugging, and test suite execution.
 
 ## Paid Checkout Is Not Offered
 

@@ -34,7 +34,6 @@ BenchmarkDotNet is centrally pinned in `Directory.Packages.props` and the projec
 | EF Core query construction | Tracked query construction, no-tracking query construction, and compiled query invocation. | `Event.Benchmarks/Benchmarks/EfCoreQueryBenchmarks.cs` |
 | Caching collections | Lookup behavior for `FrozenDictionary`, `Dictionary`, and `ConcurrentDictionary`, plus enumeration behavior for `FrozenDictionary` and `Dictionary`, at fixed sizes. | `Event.Benchmarks/Benchmarks/CachingBenchmarks.cs` |
 | Collection processing | List/span/array lookup, LINQ vs manual loops, and `FrozenSet.Contains`. | `Event.Benchmarks/Benchmarks/CollectionBenchmarks.cs` |
-| MediatR pipeline | `PerformanceBehavior<TRequest,TResponse>` overhead compared with direct handler invocation. | `Event.Benchmarks/Benchmarks/MediatRPipelineBenchmarks.cs` |
 | String processing | Substring/span slicing, string concatenation, `StringBuilder`, contains, and GUID formatting. | `Event.Benchmarks/Benchmarks/StringProcessingBenchmarks.cs` |
 
 ## How To Run Runtime Benchmarks

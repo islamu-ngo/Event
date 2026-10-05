@@ -4,8 +4,8 @@ namespace Explore.Domain.Secrets.Events;
 
 /// <summary>
 /// Domain event describing a change to a <see cref="SecretBinding"/>. The event itself is pure — it has
-/// no MediatR dependency (Domain layer has zero outbound dependencies). Application-layer wrappers
-/// translate this event into <c>INotification</c> dispatches for handlers.
+/// no external dispatch dependency (Domain layer has zero outbound dependencies). Application-layer wrappers
+/// translate this event into native notification dispatches for handlers.
 /// </summary>
 public sealed record SecretBindingUpdatedEvent(
     Guid BindingId,

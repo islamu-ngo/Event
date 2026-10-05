@@ -25,7 +25,7 @@ Use structured logs so queries remain reliable and cheap.
 - Log unexpected exceptions at error level with exception object.
 - Keep personally sensitive data out of logs unless explicitly required and protected.
 
-## MediatR Integration
+## Native Operation Pipeline Integration
 
 - Log start/end for command and query handling.
 - Include elapsed time and request type.

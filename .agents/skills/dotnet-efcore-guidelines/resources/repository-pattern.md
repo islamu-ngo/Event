@@ -6,7 +6,7 @@ ABOUTME: Emphasizes entity returns and handler-side mapping.
 ## Rules
 - Repositories live in Persistence; interfaces in Application.
 - Repositories return entities, not DTOs.
-- Handlers map entities → DTOs with AutoMapper.
+- Handlers map entities → DTOs with Mapperly.
 - Do not return `IQueryable` from repositories.
 
 ## Related

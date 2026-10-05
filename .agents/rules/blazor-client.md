@@ -20,6 +20,10 @@ related_intents: [blazor-component-affordance, add-hal-link]
 - `src/Explore.Blazor.Client/**/*.{cs,razor,razor.css}`
 
 ## Path-Specific Constraints
+- **Component Parameters**: Auto-properties only (`public string Value { get; set; } = string.Empty;`). Never mutate or set component parameters imperatively via `@ref`.
+- **Parameter State**: Use `ParameterState<T>` for parameter update flows where applicable to manage reactive state cleanly.
+- **Theming & CssBuilder**: Use `CssBuilder`, scoped CSS (`.razor.css`), and theme variables. Hard-coding inline style attributes or colors is strictly forbidden.
+- **HAL Affordance Gating**: Client action buttons, menus, and controls are gated strictly by checking the presence of HAL `_links` in received DTOs, never by local role/claim checks.
 - **Render Mode**: Default to `InteractiveAuto`. Avoid assumptions about server-only state in shared client components.
 - **MudBlazor v9**: Use MudBlazor v9 APIs exclusively. Prefer repo-standard wrapper components over raw MudBlazor controls.
 - **CSS Isolation (BEM)**: Every `.razor` file should have a matching `.razor.css`. Use BEM naming for scoped classes.

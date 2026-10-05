@@ -22,7 +22,7 @@ priority: high
 - Generated C# contracts change through `eng/tools/Explore.GeneratedContracts` and MSBuild, never by editing `EventApiClient.g.cs`.
 - Stop and re-baseline when impact evidence reveals feature behavior rather than a structural transformation.
 - **The Expand–Contract Protocol for Wide Refactors**:
-  When a mechanical refactor (e.g. renaming a database column, converting an aggregate identity to UUIDv7, modifying a shared MediatR request/result shape) has a blast radius too wide for a single atomic PR:
+  When a mechanical refactor (e.g. renaming a database column, converting an aggregate identity to UUIDv7, modifying a shared CQS request/result shape) has a blast radius too wide for a single atomic PR:
   1. **Phase 1 (Expand)**: Introduce the new model, property, or handler method alongside the existing one without breaking or modifying old call sites. Ensure build and tests stay green.
   2. **Phase 2 (Migrate in Batches)**: Migrate callers and tests in bounded slices (per feature directory or layer), keeping CI green at every batch because the old form remains functional.
   3. **Phase 3 (Contract)**: Delete the obsolete form, remove deprecated fields, and clean up transitional shims once zero callers remain.

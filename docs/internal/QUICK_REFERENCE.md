@@ -48,6 +48,9 @@ ABOUTME: Focuses on non-inferable constraints and project-specific behavior.
     - **Ring 3 (Plan Exit Gate)**: The full 5-database matrix, migrations, and architecture tests run strictly at plan exit before PR creation.
     - **Yak-Shaving Quarantine**: Agents are strictly forbidden from fixing unrelated pre-existing test suite rot or fixture failures encountered during feature tasks. Prove if it reproduces on untouched base, log it in `*-context.md` / `dev/backlog/`, quarantine it, and proceed with the assigned scope.
 34. **Self-Documenting Code & Retirement of ABOUTME on Code**: Source code (`.cs`, `.razor`, `.css`) relies on Clean Architecture naming, directory structure, and standard C# XML doc comments (`/// <summary>`) for discovery. The legacy `ABOUTME:` comment prefix is officially retired for source code; agents must not generate it in new code. Internal documentation in `docs/internal/` and `.agents/` uses natural Markdown metadata blocks (`> **Audience:** ...`) or frontmatter. See [`docs/internal/GOVERNANCE.md`](GOVERNANCE.md#header--file-metadata-policy-natural-metadata--code-retirement).
+35. **No Warning Suppressions to Force Build/Tests**: Never suppress compiler warnings or analyzer diagnostics via `#pragma warning disable` or `[SuppressMessage]` to force a build through. Fix the underlying root cause. If an intentional compiler ratchet is needed, obtain maintainer approval for `Directory.Build.props`.
+36. **Execution Continuity Directive for Approved Tasks**: For tasks within an approved plan, continue implementation and proportional verification end-to-end without routine stage pauses. Pause only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
+37. **Targeted Verification Default & Verification Evidence**: Always target verification against the specific affected project(s) by default using [`PROJECTS.md`](../../PROJECTS.md). Every task completion report must record exact commands executed and their outcomes, plus checks omitted with reasons. Never state or imply a build or test suite passed when it was not physically executed.
 
 ## Multi-Tenancy Reminder
 Browser tenant routing defaults to `/{slug}`. The BFF extracts the first path
@@ -91,8 +94,25 @@ Database defense-in-depth (PostgreSQL):
    - **Ring 1 (< 2s)**: In-memory TUnit slicing (`--treenode-filter`) for subtasks.
    - **Ring 2 (< 15s)**: Single-project, single designated provider run for phase exits.
    - **Ring 3 (Plan Exit)**: Multi-provider matrix and full suites run once at workstream exit.
-3. Use `AGENTS.md` for the exact current project list.
+3. Use [`PROJECTS.md`](../../PROJECTS.md) for solution project roles and targeted verification commands.
 4. Enforce the **Yak-Shaving Quarantine Rule**: quarantine pre-existing test rot outside task scope.
+5. Provide a **Verification Evidence Report** on task completion (commands executed, outcomes, omitted checks with technical rationale).
+
+## Blazor & UI Quick Rules
+1. **Auto-Properties Only**: Component parameters (`[Parameter]`) must be declared as auto-properties only (`public string Value { get; set; } = string.Empty;`).
+2. **No Parameter Mutation via `@ref`**: Never set or mutate component parameters imperatively through `@ref`.
+3. **ParameterState Management**: Use `ParameterState<T>` for parameter update flows where applicable to manage reactive state cleanly.
+4. **CssBuilder & Theming**: Use `CssBuilder`, CSS isolation (`.razor.css`), and theme variables. Hard-coding inline style attributes or colors is strictly forbidden.
+5. **HAL Affordance Gating**: Client buttons/actions (Edit, Delete, Transfer) are gated strictly by checking `_links` presence in received DTOs, never by local claim/role checks.
+6. **Accessibility**: All interactive elements must maintain keyboard navigation, semantic headings, and ARIA accessibility standards.
+
+## Protected Paths & Sensitive Boundaries
+The following paths require explicit maintainer authorization before modification (see [`PROJECTS.md`](../../PROJECTS.md)):
+- `src/Explore.Persistence.Migrations.*/**`: Generated EF Core migrations. Never hand-edit; use `dotnet ef migrations`.
+- `src/Explore.Blazor.Client/Clients/EventApiClient.g.cs`: Pinned NSwag generated client. Never hand-edit.
+- `.ci/**`: CI/CD workflows and deployment pipelines.
+- `eng/release/**`: Release engineering automation.
+- `legal/**`, `docs/legal/**`: Outbound licensing and CLA governance.
 
 ## Common Failure Patterns
 1. DTO changed but NSwag client not regenerated.
@@ -115,7 +135,7 @@ Every new controller action MUST have:
 6. **No container access** — no `HttpContext.RequestServices`; dependencies arrive through the constructor
 7. **No private failure switch** — declare a `CommandFailurePolicy` (or use `MapCommandResponse`) instead of a per-action `switch` over `FailureCode`
 8. **Identity from the principal** — `CurrentUserId` / `RequiredUserId` from `EventControllerBase`, or `identityQuery.ResolveCurrentUserIdAsync(User, ct)` for provider-linked accounts, explicitly injecting `IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>`. Provider bindings take precedence over claims; an unlinked account has no email fallback.
-9. **No generic CRUD or lookup base controllers** — keep controllers concrete and explicit; do not introduce `CrudControllerBase<...>` or `LookupControllerBase<...>`. Controllers are HTTP presentation adapters that dispatch MediatR; reuse mechanics via `EventControllerBase` (identity, concurrency stamps), domain-family bases, or composition (`CommandFailurePolicy`, `IResourceAssembler`, extension methods), keeping action signatures declarative, explicit, and customizable for backlog features.
+9. **No generic CRUD or lookup base controllers** — keep controllers concrete and explicit; do not introduce `CrudControllerBase<...>` or `LookupControllerBase<...>`. Controllers are HTTP presentation adapters that invoke native CQS handlers; reuse mechanics via `EventControllerBase` (identity, concurrency stamps), domain-family bases, or composition (`CommandFailurePolicy`, `IResourceAssembler`, extension methods), keeping action signatures declarative, explicit, and customizable for backlog features.
 
 Enforced through compiled architecture contracts, runtime endpoint metadata,
 and focused HTTP behavior tests. Raw controller-source inventories are not an
@@ -140,7 +160,7 @@ All disabled in `Testing` environment.
 | Output Cache `LookupData` | HTTP response | 1 hour | Controller `[OutputCache]` |
 | Output Cache `ListData` | HTTP response | 30 seconds | Controller `[OutputCache]` |
 | Output Cache `DetailData` | HTTP response | 60 seconds | Controller `[OutputCache]` |
-| HybridCache | Domain entity/DTO | 30 min (5 min local) | MediatR handler |
+| HybridCache | Domain entity/DTO | 30 min (5 min local) | Native CQS handler |
 | ETag | Conditional request | N/A (304 check) | Middleware |
 
 ## Request Timeout Quick Reference
@@ -163,11 +183,11 @@ All disabled in `Testing` environment.
 | 6 | UI action gating | `@if (dto.HasHalLink("edit")) { <AppButton /> }` driven by API `_links` | `@if (authState.User.IsInRole("Admin"))` (local claim check) |
 | 7 | Tenant filter override | `ctx.Events.IgnoreQueryFilters([QueryFilterNames.SoftDelete])` (named filter only) | `ctx.Events.IgnoreQueryFilters()` (drops Tenant filter — security bug) |
 | 8 | Specification builder | `var spec = new EventQuerySpecification().WithTitle(x).WithDate(y);` returns new instances | `spec.Title = x; spec.Date = y;` (mutates existing instance) |
-| 9 | Command response | `Task<BaseCommandResponse<Guid>> Handle(CreateEventCommand cmd, CancellationToken ct)` | `Task<EventDto> Handle(CreateEventCommand cmd)` (missing wrapper + no CT) |
+| 9 | Command response | `Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventCommand cmd, CancellationToken ct)` | `Task<EventDto> ExecuteAsync(CreateEventCommand cmd)` (missing wrapper + no CT) |
 | 10 | HAL link policy | `yield return new LinkDefinition("edit", Url.Link(RouteNames.EditEvent, new { id })!, HttpMethods.Put);` | `links.Add(new LinkDefinition(...))` (list mutation instead of `yield return`) |
 | 11 | Command failure body | `return TicketingFailures.Map(this, response);` (declared `CommandFailurePolicy` → ProblemDetails) | `return BadRequest(response);` (raw command object as the error body) |
 | 12 | HAL registration | `services.AddHalResource<CategoryDto, CategoryListDto, CategoryDetailLinkPolicy, CategoryCollectionLinkPolicy>();` | Three raw `AddScoped` calls, or an empty `CategoryResourceAssembler` subclass that only forwards its constructor |
 | 13 | Periodic worker | Quartz `IJob` doing one pass, registered via `AddSweepJob<TJob>` | `BackgroundService` with `while (!ct.IsCancellationRequested) { …; await Task.Delay(interval, ct); }` |
-| 14 | Controller abstraction | Concrete class inheriting `EventControllerBase` + MediatR dispatch + `CommandFailurePolicy` | `CrudControllerBase<...>` / `LookupControllerBase<...>` (generic action inheritance anti-pattern) |
+| 14 | Controller abstraction | Concrete class inheriting `EventControllerBase` + native CQS handler invocation + `CommandFailurePolicy` | `CrudControllerBase<...>` / `LookupControllerBase<...>` (generic action inheritance anti-pattern) |
 
 These are enforced by `Event.Architecture.Tests` and the `.agents/rules/` path-scoped rule files — see [`.agents/rules/README.md`](../../.agents/rules/README.md).

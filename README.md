@@ -223,7 +223,7 @@ For developers contributing code, architecture reviewers, and AI agents, use the
 | **Global Project Invariants** | [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md) | Single source of truth for architectural constraints and forbidden patterns. |
 | **Clean Architecture** | [`docs/internal/ARCHITECTURE.md`](docs/internal/ARCHITECTURE.md) | Domain $\to$ Application $\to$ Persistence/Infrastructure $\to$ API boundaries. |
 | **System Architecture Diagrams** | [`docs/internal/ARCHITECTURE_OVERVIEW.md`](docs/internal/ARCHITECTURE_OVERVIEW.md) | C4 container diagrams, component relationships, and data flows. |
-| **Coding Patterns & Conventions** | [`docs/internal/GOVERNANCE.md`](docs/internal/GOVERNANCE.md) | MediatR slice patterns, manual validator instantiation, and HAL affordances. |
+| **Coding Patterns & Conventions** | [`docs/internal/GOVERNANCE.md`](docs/internal/GOVERNANCE.md) | Native CQS slice patterns, manual validator instantiation, and HAL affordances. |
 | **Testing Strategy** | [`docs/internal/TESTING.md`](docs/internal/TESTING.md) | TUnit conventions, test slicing (`--treenode-filter`), and Testcontainers lanes. |
 | **Operations & Build Verification** | [`docs/internal/OPERATIONS.md`](docs/internal/OPERATIONS.md) | Verification policies, release gating, and build commands. |
 | **REST & HAL API Contracts** | [`docs/internal/API.md`](docs/internal/API.md) & [`API_COOKBOOK.md`](docs/internal/API_COOKBOOK.md) | Endpoint contracts, ProblemDetails error formats, and curl examples. |
@@ -240,7 +240,7 @@ For developers contributing code, architecture reviewers, and AI agents, use the
 | Layer | Technology |
 |---|---|
 | Runtime | .NET 10 |
-| Architecture | Clean Architecture, CQRS, MediatR |
+| Architecture | Clean Architecture, native CQS, Riok.Mapperly |
 | UI | Blazor WebAssembly, MudBlazor |
 | API | ASP.NET Core, REST/HAL, OpenAPI, Swagger, Scalar |
 | Data | PostgreSQL, SQLite, EF Core |

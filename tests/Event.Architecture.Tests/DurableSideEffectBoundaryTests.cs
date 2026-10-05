@@ -79,7 +79,7 @@ public sealed class DurableSideEffectBoundaryTests
         }
 
         await Assert.That(violations).IsEmpty()
-            .Because("API controllers may dispatch MediatR requests or run safe config checks, but must not perform SMTP sends, broker operations, or scheduler side effects directly.");
+            .Because("API controllers may invoke native CQS operations or run safe config checks, but must not perform SMTP sends, broker operations, or scheduler side effects directly.");
     }
 
     [Test]

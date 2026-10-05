@@ -17,7 +17,7 @@ Expose metrics for API behavior and latency.
 - Request count by route, method, status
 - Active request gauge
 - Database operation duration histogram
-- MediatR request duration by request type
+- Native operation request duration by request type
 
 ## Cardinality Guardrails
 

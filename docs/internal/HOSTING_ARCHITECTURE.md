@@ -36,7 +36,7 @@ graph TD
 ### 1. `Explore.API` (REST / HAL API Server)
 * **Assembly**: `src/Explore.API/`
 * **Entrypoint**: `Program.cs`
-* **Role**: Primary domain and persistence authority. Hosts all MediatR request handlers, Cerbos/Local authorization evaluation, EF Core DbContexts (`ExploreDbContext`, `PrivacyErasureDbContext`), OpenAPI/Scalar endpoints, and webhook ingest/dispatch engines.
+* **Role**: Primary domain and persistence authority. Hosts all native CQS request handlers, Cerbos/Local authorization evaluation, EF Core DbContexts (`ExploreDbContext`, `PrivacyErasureDbContext`), OpenAPI/Scalar endpoints, and webhook ingest/dispatch engines.
 * **Network Exposure**: In production split topologies, `Explore.API` is internal to the container network (`islamu-network`) and communicates with `Explore.Blazor` over private HTTP/gRPC.
 
 ### 2. `Explore.Blazor` (Backend-for-Frontend & UI Host)

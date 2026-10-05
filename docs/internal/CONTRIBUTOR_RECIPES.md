@@ -191,26 +191,24 @@ public class CreateEventSponsorDtoValidator : AbstractValidator<CreateEventSpons
 }
 ```
 
-### Step 2: Create MediatR Command (`Explore.Application/Features/`)
+### Step 2: Create Native CQS Command (`Explore.Application/Features/`)
 
 The command wraps the DTO along with any route identifiers or authenticated caller context:
 ```csharp
 // src/Explore.Application/Features/EventSponsors/Requests/Commands/CreateEventSponsorCommand.cs
-// ABOUTME: MediatR command for creating an event sponsor.
-// ABOUTME: Carries the CreateEventSponsorDto payload and route context.
 
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSponsor;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSponsors.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Update)]
-public class CreateEventSponsorCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public record CreateEventSponsorCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public required Guid EventId { get; init; }
-    public required CreateEventSponsorDto SponsorDto { get; set; }
+    public required CreateEventSponsorDto SponsorDto { get; init; }
 
     string? ISecureRequest.ResourceId => EventId.ToString();
     IDictionary<string, object>? ISecureRequest.ResourceAttributes => null;
@@ -219,44 +217,39 @@ public class CreateEventSponsorCommand : IRequest<BaseCommandResponse<Guid>>, IS
 
 ### Step 3: Create Command Handler (`Explore.Application/Features/`)
 
-The handler receives the command, manually instantiates the DTO validator, validates `request.SponsorDto`, maps it to the entity, and persists via the repository:
+The handler receives the command, manually instantiates the DTO validator, validates `request.SponsorDto`, maps it to the entity via Riok.Mapperly, and persists via the repository:
 ```csharp
 // src/Explore.Application/Features/EventSponsors/Handlers/Commands/CreateEventSponsorCommandHandler.cs
-// ABOUTME: MediatR handler for processing CreateEventSponsorCommand.
-// ABOUTME: Manually validates DTO, maps entity, sets tenant context, and persists via repository.
 
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSponsor.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSponsors.Requests.Commands;
+using Explore.Application.Mappings;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSponsors.Handlers.Commands;
 
-public class CreateEventSponsorCommandHandler : IRequestHandler<CreateEventSponsorCommand, BaseCommandResponse<Guid>>
+public class CreateEventSponsorCommandHandler : ICommandHandler<CreateEventSponsorCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSponsorRepository _sponsorRepository;
     private readonly IEventRepository _eventRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
     public CreateEventSponsorCommandHandler(
         IEventSponsorRepository sponsorRepository,
         IEventRepository eventRepository,
-        ITenantContext tenantContext,
-        IMapper mapper)
+        ITenantContext tenantContext)
     {
         _sponsorRepository = sponsorRepository;
         _eventRepository = eventRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSponsorCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSponsorCommand request, CancellationToken cancellationToken)
     {
         var response = new BaseCommandResponse<Guid>();
 
@@ -278,8 +271,8 @@ public class CreateEventSponsorCommandHandler : IRequestHandler<CreateEventSpons
             throw new NotFoundException(nameof(Event), request.EventId);
         }
 
-        // 3. Map DTO to Domain Entity (Repositories take entities, never DTOs)
-        var sponsor = _mapper.Map<EventSponsor>(request.SponsorDto);
+        // 3. Map DTO to Domain Entity via Riok.Mapperly (Repositories take entities, never DTOs)
+        var sponsor = EventSponsorMapper.ToEntity(request.SponsorDto);
         sponsor.EventId = request.EventId;
         sponsor.TenantId = _tenantContext.TenantId;
 
@@ -300,18 +293,16 @@ public class CreateEventSponsorCommandHandler : IRequestHandler<CreateEventSpons
 ### Step 1: Create Controller in `Explore.API/Controllers/`
 ```csharp
 // src/Explore.API/Controllers/EventSponsorsController.cs
-// ABOUTME: API controller for event sponsor operations.
-// ABOUTME: Exposes HATEOAS HAL endpoints with Cerbos resource authorization.
 
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSponsor;
 using Explore.Application.Features.EventSponsors.Requests.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -328,11 +319,11 @@ public class EventSponsorsController : EventControllerBase
         "Event sponsor validation failed",
         "Event sponsor creation failed.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateEventSponsorCommand, BaseCommandResponse<Guid>> _createHandler;
 
-    public EventSponsorsController(IMediator mediator)
+    public EventSponsorsController(ICommandHandler<CreateEventSponsorCommand, BaseCommandResponse<Guid>> createHandler)
     {
-        _mediator = mediator;
+        _createHandler = createHandler;
     }
 
     [Authorize]
@@ -356,7 +347,7 @@ public class EventSponsorsController : EventControllerBase
             SponsorDto = dto
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.Success)
         {

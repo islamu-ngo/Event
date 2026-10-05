@@ -1,7 +1,7 @@
-ABOUTME: Minimal MediatR logging behavior rules.
+ABOUTME: Minimal native operation logging behavior rules.
 ABOUTME: Centralizes request logging and error capture.
 
-# MediatR Logging Behavior (Lean)
+# Native Operation Logging Behavior (Lean)
 
 ## Rules
 - Log start/end for each request with elapsed time.

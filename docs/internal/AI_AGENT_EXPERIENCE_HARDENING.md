@@ -15,7 +15,7 @@ The allowed control flow is:
 1. Application contracts describe safe context, tool metadata, and proposal previews.
 2. API/HAL responses decide mutating affordance availability.
 3. The assistant or MCP adapter may request a proposed action only when registry validation passes.
-4. Existing confirmation endpoints dispatch CQRS/MediatR commands after user confirmation, idempotency, tenant checks, and authorization checks.
+4. Existing confirmation endpoints dispatch native CQS commands after user confirmation, idempotency, tenant checks, and authorization checks.
 
 Plan previews and catalog visibility never execute commands and never grant execution authority.
 

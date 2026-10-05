@@ -1,13 +1,13 @@
-ABOUTME: HTTP-to-MediatR endpoint rules for this codebase.
+ABOUTME: HTTP-to-Native-CQS endpoint rules for this codebase.
 ABOUTME: Covers status mapping, DTO boundaries, and auth placement.
 
 # API Endpoint Design for CQRS
 
-Use this guide when wiring HTTP endpoints to MediatR commands/queries.
+Use this guide when wiring HTTP endpoints to native CQS commands/queries.
 
 ## Core Rules
 
-- Keep controllers transport-only: parse HTTP input, send request to MediatR, map result to HTTP status code.
+- Keep controllers transport-only: parse HTTP input, invoke native CQS handlers, map result to HTTP status code.
 - Keep handlers application-only: business logic, validation, orchestration, repository usage.
 - Never return domain entities from API endpoints. Return DTOs or response envelopes.
 
@@ -45,9 +45,10 @@ A command whose failure codes map to a single status uses the generic mapper:
 [Authorize]
 public async Task<ActionResult<BaseCommandResponse<Guid>>> Create(
     [FromBody] CreateEntityDto dto,
+    [FromServices] ICommandHandler<CreateEntityCommand, BaseCommandResponse<Guid>> handler,
     CancellationToken cancellationToken)
 {
-    var response = await mediator.Send(new CreateEntityCommand { EntityDto = dto }, cancellationToken);
+    var response = await handler.ExecuteAsync(new CreateEntityCommand { EntityDto = dto }, cancellationToken);
 
     if (!response.Success)
         return this.MapCommandResponse(response);   // ProblemDetails, status from FailureCode

@@ -101,9 +101,9 @@ The following types of contributions are most likely to be accepted:
 
 ### Code Quality and Architecture Compliance
 All contributions must adhere to the project's architectural invariants:
-- **Clean Architecture:** Domain has no external dependencies; Application handles business logic and CQRS/MediatR; Persistence/Infrastructure implement contracts; API and Blazor remain decoupled.
+- **Clean Architecture:** Domain has no external dependencies; Application handles business logic and native CQRS; Persistence/Infrastructure implement contracts; API and Blazor remain decoupled.
 - **HATEOAS / HAL Affordances:** UI affordances (e.g., Edit/Delete buttons) must be gated by the presence of `_links`, never local client-side claim inspection.
-- **Entity Boundaries:** Repositories return domain entities, never DTOs (mapping happens in CQRS handlers).
+- **Entity Boundaries:** Repositories return domain entities, never DTOs (mapping happens in CQRS handlers via Mapperly).
 - **Manual Validators:** FluentValidation validators are instantiated manually within handlers (no DI).
 - **Test-Driven:** All logic changes must be accompanied by focused unit, integration, or architecture tests.
 

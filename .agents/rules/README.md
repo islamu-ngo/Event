@@ -22,7 +22,7 @@ See [`_schema.md`](_schema.md) before adding or editing any rule file.
 |---|---|---|
 | `blazor-server.md` | `src/Explore.Blazor/**/*.cs`, `src/Explore.Blazor/**/*.razor` | BFF, YARP, cookie auth, SSR |
 | `blazor-client.md` | `src/Explore.Blazor.Client/**/*.cs`, `src/Explore.Blazor.Client/**/*.razor`, `src/Explore.Blazor.Client/**/*.razor.css` | MudBlazor v9, BEM, CSS isolation, HAL gating |
-| `application-layer.md` | `src/Explore.Application/**/*.cs` | CQRS, MediatR, handler boundaries |
+| `application-layer.md` | `src/Explore.Application/**/*.cs` | native CQS, handler boundaries, Mapperly |
 | `api-controllers.md` | `src/Explore.API/Controllers/**/*.cs` | route contracts and controller authoring |
 | `api-hateoas.md` | `src/Explore.API/Hateoas/**/*.cs` | HAL policies, route-name alignment, affordances, registration helpers |
 | `api-scheduling.md` | `src/Explore.API/Scheduling/**/*.cs`, `src/Explore.API/BackgroundServices/**/*.cs` | Quartz jobs, sweep registration, operator-visible job contract |

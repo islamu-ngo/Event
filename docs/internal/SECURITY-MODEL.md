@@ -1,5 +1,5 @@
-<!-- ABOUTME: Describes authentication, authorization, and trust boundaries for the platform. -->
-<!-- ABOUTME: Focuses on enforced BFF, MediatR, provider, tenancy, and fallback behavior. -->
+<!-- Describes authentication, authorization, and trust boundaries for the platform. -->
+<!-- Focuses on enforced BFF, native operations, provider, tenancy, and fallback behavior. -->
 
 # Security
 
@@ -190,7 +190,7 @@ least-privilege runtime/migrator roles remain mandatory. SQLite instances use
 separate local files, and MariaDB/MySQL instances use separate databases; all
 three flat-provider families retain the fixed `ie_` prefix.
 
-The process boundary changes, but the trust boundary does not. The bridge is responsible only for translating a BFF session into an API request; API `MultiAuth`, endpoint authorization, MediatR resource authorization, tenant filters, rate limits, and HAL link filtering remain authoritative.
+The process boundary changes, but the trust boundary does not. The bridge is responsible only for translating a BFF session into an API request; API `MultiAuth`, endpoint authorization, operation resource authorization, tenant filters, rate limits, and HAL link filtering remain authoritative.
 
 ### Cookie-to-API token conversion
 
@@ -553,7 +553,7 @@ The control-plane UI is an admin-host shell inside the existing browser BFF, not
 - `Explore.Blazor` authenticates through Keycloak OIDC Authorization Code flow plus PKCE and keeps tokens server-side.
 - The browser receives only the HttpOnly BFF session cookie and display-safe page payloads. It must not receive access tokens, refresh tokens, client secrets, setup secrets, API keys, instance-admin authority claims, or raw OIDC diagnostics.
 - `Bff:AdminHosts` selects the embedded shell, and optional `Bff:AdminHostAllowedIpRanges` restricts those hosts by IP/CIDR. Configured admin hosts are excluded from tenant custom-domain/subdomain resolution.
-- Host classification is routing and shell selection only. `Explore.API` and Application/MediatR authorization remain authoritative for every action.
+- Host classification is routing and shell selection only. `Explore.API` and Application operation authorization remain authoritative for every action.
 - Control-plane services use generated `IEventApiClient` contracts, and UI affordances come from generated HAL `_links`; local claim checks must not unlock actions.
 - Browser-supplied privileged headers are stripped before proxying. Trusted tenant hints, setup-secret forwarding, and support-access forwarding remain server-owned BFF decisions.
 
@@ -565,7 +565,7 @@ Admin support access is a persisted, time-boxed support session, not an imperson
 - The BFF stores only an opaque support-access session reference in server-side distributed cache, keyed to the authenticated user and OIDC `sid`. The browser does not receive access tokens, target-tenant role claims, or support-access authority claims.
 - Runtime support context is explicit-header-only. Ordinary API requests without a BFF/server-injected `X-Support-Access-Session-Id` are treated as inactive even if the actor has a persisted active session.
 - `SupportAccessSessionService` validates the forwarded session against persisted state, actor id, resolved tenant id, expiry, mode, and instance governance settings. Disabled support access, missing sessions, stopped sessions, expired sessions, actor mismatch, tenant mismatch, and write-mode-disabled sessions fail closed.
-- Support access never creates `TenantUserRoleGrant` rows and never replaces tenant membership. Resource authorization must continue through MediatR, the runtime authorization provider, Cerbos/local fallback parity, and HAL link filtering.
+- Support access never creates `TenantUserRoleGrant` rows and never replaces tenant membership. Resource authorization must continue through operation decorators, the runtime authorization provider, Cerbos/local fallback parity, and HAL link filtering.
 - `SupportAccessAuditMiddleware` records bounded API request evidence for active support sessions after authorization. It captures method, route pattern/name, status/outcome, correlation id, trace id, actor, target tenant, and session id, without raw request bodies, cookies, tokens, provider responses, or unbounded reason text.
 - Tenant-facing support-access evidence is read-only. The Blazor tenant settings view resolves the current tenant through the BFF/API status path and renders audit drill-in only from the API/HAL `audit-events` link.
 - Audit persistence failures are warning-level operational events and do not change the original API response; security-sensitive lifecycle events still belong in the support-access command transaction where the command handler creates the session/audit records.
@@ -646,11 +646,11 @@ household, not an account. The boundary is enforced server-side and mirrored, ne
 Event registration reads are self-service by default. Attendee identity is not a generic event-registration read concern.
 
 - Generic registration list, registration detail, and by-session reads require the authenticated current user and return only registration rows owned by that user.
-- `GET /api/eventregistration/by-user/{userId}` is self-only. A route user id that does not match the authenticated current user returns `403 Forbidden` before MediatR dispatch.
+- `GET /api/eventregistration/by-user/{userId}` is self-only. A route user id that does not match the authenticated current user returns `403 Forbidden` before handler invocation.
 - Client/API registration DTOs must not serialize registrant user ids, full names, or email addresses. A server-only `UserId` may remain on Application DTOs only when hidden from JSON and used for internal authorization/HAL context.
 - Organizer or admin attendee-management workflows need a separate resource-authorized management projection before exposing attendee identity. Do not reuse self-read DTOs or anonymous/public event projections for attendee rosters.
 
-Registration-form authoring is an authenticated, event-scoped control plane. All reads are private/no-store, all writes use the authenticated write rate limit and strong quoted concurrency preconditions, and MediatR authorization runs before repository access. The server enriches form authorization from the persisted parent Event; tenant IDs, organizer controller identities, machine status, and event-role assignments are never trusted from request bodies. Cerbos and local fallback both deny community contributors, listing submitters, tenant-only curators, instance administrators, machines, ambiguous organizer state, and unrelated tenant/event assignments.
+Registration-form authoring is an authenticated, event-scoped control plane. All reads are private/no-store, all writes use the authenticated write rate limit and strong quoted concurrency preconditions, and operation authorization runs before repository access. The server enriches form authorization from the persisted parent Event; tenant IDs, organizer controller identities, machine status, and event-role assignments are never trusted from request bodies. Cerbos and local fallback both deny community contributors, listing submitters, tenant-only curators, instance administrators, machines, ambiguous organizer state, and unrelated tenant/event assignments.
 
 Form DTOs may expose field governance, consent purpose code/text version, lifecycle status, provenance, schema hash, and concurrency stamps needed for authoring. They must not expose provider question IDs, registrant answers, PII, provider payloads, claims, roles, or capability booleans. Publication preflight and RFC 7807 failures identify bounded field/rule validation codes only and never echo answer data. Published versions are immutable; publication pins only artifacts generated from the current relational aggregate through the Application publication facade.
 
@@ -782,7 +782,7 @@ Presigned URLs are bearer credentials. API responses containing them must not be
 
 ## Email Dispatch Operator Boundary
 
-EmailDispatch status and delivery controls are operational APIs, not general tenant data reads. `GET /api/admin/email-dispatch/status`, tenant pause/resume, park, and replay all require authentication plus MediatR resource authorization against `islamuevent_email_dispatch`. Status uses `view`, tenant pause/resume uses `manage_tenant`, parking uses `park`, and replay uses `replay`.
+EmailDispatch status and delivery controls are operational APIs, not general tenant data reads. `GET /api/admin/email-dispatch/status`, tenant pause/resume, park, and replay all require authentication plus operation resource authorization against `islamuevent_email_dispatch`. Status uses `view`, tenant pause/resume uses `manage_tenant`, parking uses `park`, and replay uses `replay`.
 
 Only tenant administrators for the resolved tenant and instance administrators should receive these operator decisions from Cerbos or local fallback. Regular authenticated users must receive `403 Forbidden`. The status projection must stay sanitized: no recipient email, subject, plain text or HTML body, reply-to, provider message id, raw SMTP/provider error, object key, token, or secret-derived metadata. HAL `replay` and `park` links are the only client affordance source for row-level controls.
 
@@ -801,7 +801,7 @@ Forwarded-host trust for direct API traffic:
 Server-side enforcement is layered:
 
 1. API endpoint-level attributes (`[AllowAnonymous]`, `[Authorize]`).
-2. Application `RequestAuthorization<TRequest>`, shared by native operation authorization decorators and the remaining MediatR `AuthorizationBehavior`:
+2. Application `RequestAuthorization<TRequest>`, utilized by native operation authorization decorators:
    - Checks `[AuthorizeResource]` for the fixed catalog resource/action; there is no `IAuthorizedRequest` contract.
    - Resolves `ISecureRequest` typed facts, then optional typed enrichment, then authoritative persisted-resource overrides.
    - Native void commands, result commands and queries all resolve behind authorization, outside performance timing. Existing exact public, capability and worker authorities remain owner-enforced.
@@ -984,7 +984,7 @@ Blazor client checks are UX-only:
 - route/menu/button visibility,
 - reduced unauthorized UI paths.
 
-They are not security enforcement. Security enforcement remains server-side through API and MediatR authorization.
+They are not security enforcement. Security enforcement remains server-side through API and operation authorization.
 
 ## Blazor Auth-State Serialization Boundary
 
@@ -1087,7 +1087,7 @@ Non-interactive callers (direct API consumers, integrations, automation) authent
 - Each key holds an explicit `Scopes` set (e.g., `events:read`, `admin:tenant`, `admin:instance`).
 - Scopes are bounded by the owner type (`ExternalApiKeyScopeCeiling`): a `User`-owned key cannot hold `admin:tenant`, a `Tenant`-owned key cannot hold `admin:instance`. Attempts to create or update a key with out-of-ceiling scopes are rejected at validator level.
 - Authorization evaluators apply scope gates before any owner-authority check (see `MachineScopeMapping.ScopesPermit`). A key with `events:read` alone cannot perform mutations regardless of owner authority.
-- MCP scopes are deliberately narrow: `mcp:read` permits generic MCP read discovery, while private event-management MCP reads also require the existing event read scope gate (`events:read`, `events:write`, or tenant/admin equivalent accepted by `MachineScopeMapping`). `mcp:propose` is required for MCP proposal tools/prompts and permits proposal creation without granting event write, event confirmation, or arbitrary user-write authority. SDK authorization filters hide event-management reads from API keys that only have `mcp:read`, hide proposal tools from API keys that lack `mcp:propose`, and MediatR authorization still fail-closes the call path.
+- MCP scopes are deliberately narrow: `mcp:read` permits generic MCP read discovery, while private event-management MCP reads also require the existing event read scope gate (`events:read`, `events:write`, or tenant/admin equivalent accepted by `MachineScopeMapping`). `mcp:propose` is required for MCP proposal tools/prompts and permits proposal creation without granting event write, event confirmation, or arbitrary user-write authority. SDK authorization filters hide event-management reads from API keys that only have `mcp:read`, hide proposal tools from API keys that lack `mcp:propose`, and operation authorization still fail-closes the call path.
 
 ### Machine Principal
 

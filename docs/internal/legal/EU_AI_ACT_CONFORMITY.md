@@ -37,7 +37,7 @@ In accordance with **Article 50(1) & Article 50(2)**:
 In accordance with **Annex IV (Technical documentation referred to in Article 11)**:
 
 ### 3.1. General Description of the AI System
-- **System Architecture**: Orchestrated multi-agent architecture utilizing foundation LLMs via isolated MCP (Model Context Protocol) and MediatR command handlers.
+- **System Architecture**: Orchestrated multi-agent architecture utilizing foundation LLMs via isolated MCP (Model Context Protocol) and native CQS command handlers.
 - **Purpose Limitation**: Developer automation, code quality verification, multi-language localization assistance, and attendee FAQ summarization. The AI system is explicitly forbidden from making autonomous financial settlement, tax determination, or identity revocation decisions.
 
 ### 3.2. Data Governance & Training Data Transparency

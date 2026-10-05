@@ -37,6 +37,8 @@ flowchart TB
 
     subgraph CoreContract["Governing contract & Bootloader"]
         AgentsMD["AGENTS.md (Primary entrypoint)"]
+        ProjectsMD["PROJECTS.md (Project map & bounds)"]
+        AiReviewMD["AI_REVIEW.md (Pre-submission review)"]
         IntentsYaml[".agents/contract/intents.yaml"]
         ContextEng[".agents/CONTEXT_ENGINEERING.md"]
     end
@@ -201,7 +203,7 @@ flowchart TD
 | **Tier 0: Sovereign** | Money, payments, checkout, RSVPs, capacity holds, refund authority | Mandatory `/grill-me` on concurrency, hold expiration, rollback | Exhaustive Knowledge Graph (callers, callees, outbox, DB locks, ADRs) | Invariant-Breaker concurrency tests + real PostgreSQL evidence | Anonymized Epistemic MAD (Weighted Voting) |
 | **Tier 1: Security** | Auth, Cerbos policies, tenant boundaries, migrations, tokens | Mandatory `/grill-me` on threat models, fail-closed auth, tenant spoofing | Exhaustive Graph + Policy filters + Global query filters | Invariant-Breakers + multi-provider DB and fail-closed authorization tests | Anonymized Epistemic MAD (Weighted Voting) |
 | **Tier 2: Privacy** | PII fields, erasure, AI context gateway, export, audit redaction | Mandatory `/grill-me` on erasure authority, anti-resurrection, receipt tokens | Exhaustive Data Flow tracing (`*Pii`, log sinks, vector DBs) | Invariant-Breakers + log sink PII scans + purge verification | Anonymized Epistemic MAD (Weighted Voting) |
-| **Tier 3: Domain State** | Aggregate root domain logic, MediatR command/query handlers | Standard Q&A (only if requirements are ambiguous) | Bounded caller/callee tracing of target aggregate/handler | Behavioral CQRS unit and integration tests | Peer Review (`backend-engineer-agent`) |
+| **Tier 3: Domain State** | Aggregate root domain logic, native CQS command/query handlers | Standard Q&A (only if requirements are ambiguous) | Bounded caller/callee tracing of target aggregate/handler | Behavioral CQRS unit and integration tests | Peer Review (`backend-engineer-agent`) |
 | **Tier 4: Standard UI / Docs** | Blazor client components, CSS isolation, Markdown docs, agent context | Autonomous defaults (zero unnecessary interruptions) | Local surface reading (target razor/css/doc file only) | Affordance & component render tests; Markdown schema checks | Lightweight Self-Check (`presentation-engineer-agent`) |
 
 ---
@@ -241,11 +243,11 @@ flowchart TD
 Current adapter facts:
 
 - OmO auto-loads `.omo/rules`; the contract system routes `.agents/rules`.
-- Root [`CLAUDE.md`](../../CLAUDE.md) and [Copilot instructions](../../.github/copilot-instructions.md) point to `AGENTS.md`; Claude settings currently register graph hooks rather than rule mirrors.
-- `.cursorrules` currently contains graph guidance, not a mirrored rule tree.
-- No additional Claude/Cursor/Copilot/Gemini twin directories are asserted as implemented.
+- Root [`CLAUDE.md`](../../CLAUDE.md), [Copilot instructions](../../.github/copilot-instructions.md), and [`.cursorrules`](../../.cursorrules) are **pure pointers** to `AGENTS.md` with zero divergent or complementary implementations.
+- GitHub Copilot auto-injects path-scoped testing conventions via [`.github/instructions/tests.instructions.md`](../../.github/instructions/tests.instructions.md) using the `applyTo` glob pattern.
+- No additional Claude/Cursor/Copilot/Gemini twin directories are asserted or needed.
 
-Harness injection order does not change repository authority. Root [`AGENTS.md`](../../AGENTS.md) remains controlling: Critical Rules → `docs/QUICK_REFERENCE.md` → `docs/GOVERNANCE.md` → matching path-scoped rules. Adapter convergence remains proposal **#5** below.
+Harness injection order does not change repository authority. Root [`AGENTS.md`](../../AGENTS.md) remains controlling: Critical Rules → `docs/QUICK_REFERENCE.md` → `docs/GOVERNANCE.md` → matching path-scoped rules.
 
 ### The Twin Rules Synchronization Contract
 
@@ -561,11 +563,11 @@ flowchart TD
 
 ### Core Testing Invariants
 
-1. **Pre-Agreed Public Seams**: Tests verify behavior strictly through public interfaces (MediatR requests, HTTP routes, aggregate root methods), never by inspecting private internal state or mocking internal collaborators.
+1. **Pre-Agreed Public Seams**: Tests verify behavior strictly through public interfaces (native CQS operations, HTTP routes, aggregate root methods), never by inspecting private internal state or mocking internal collaborators.
 2. **Compilable Stubs in Red Phase**: In strongly-typed C#/.NET, invariant tests must compile to execute. Agents must author minimal compilable stub types/method signatures (returning default or throwing `NotImplementedException`) alongside the test so that the solution compiles and the test suite executes to produce a genuine behavioral RED failure, never a compile break.
 3. **No Tautological Assertions**: Expected values must originate from an independent known-good literal or specification. Assertions that recompute expected values using the same formula as production code (`Assert.Equal(items.Sum(x => x.Price), result.Total)`) are strictly forbidden.
 4. **No Interface Bypassing**: Tests must verify state transitions through the public interface. A test must not bypass the domain aggregate to assert directly against raw database tables.
-5. **Mock Boundary Rule**: Mock **ONLY** external third-party infrastructure (payment gateways, external email delivery, system clock, random generators). **NEVER mock internal domain entities, aggregate roots, repositories, or MediatR handlers.** Use real domain entities and in-memory or Testcontainers-backed databases.
+5. **Mock Boundary Rule**: Mock **ONLY** external third-party infrastructure (payment gateways, external email delivery, system clock, random generators). **NEVER mock internal domain entities, aggregate roots, repositories, or native CQS handlers.** Use real domain entities and in-memory or Testcontainers-backed databases.
 6. **The 3-Ring Progressive Verification Hierarchy**: Subtasks run fast in-memory sliced tests (< 2s). Phase exits run single-project Release builds + single designated provider tests (< 15s). Multi-database provider matrices, migration checks, and architecture rules run strictly at plan exit.
 7. **The Yak-Shaving Quarantine Rule**: Unrelated pre-existing test suite rot or container flakiness is quarantined and logged under `*-context.md` / `dev/backlog/`, never repaired during unrelated feature work.
 8. **Pure Domain Invariants over Persistence Queries**: 90%+ of algorithmic, normalization, validation, and state-machine checks live in `Event.Domain.UnitTests` without Docker dependencies.
@@ -696,7 +698,7 @@ git worktree remove .worktrees/<task-name>
 > **Enforced Repository Invariants:**
 > - ❌ **NO Ad-hoc Python/Node.js Scripts**: Agents must never generate or run `python`, `python3`, `node`, `npm` scratch scripts. Use native agent tools and POSIX Bash. Persistent dev tools belong in `eng/scripts/` or `eng/tools/` as C# scripts (`dotnet run eng/.../*.cs`).
 > - ❌ **NO Hard-Coded Secrets**: Never put passwords, connection strings, or tokens in source code, `AppHost.cs`, or test fixtures. Secrets originate strictly from **Infisical** or **`.env`**.
-> - ❌ **NO Repositories Returning DTOs**: Repositories return Domain Entities only. DTO mapping belongs strictly in MediatR handlers.
+> - ❌ **NO Repositories Returning DTOs**: Repositories return Domain Entities only. DTO mapping belongs strictly in Application CQS handlers.
 > - ❌ **NO DI for Validators**: FluentValidation validators must be manually instantiated in handlers.
 > - ❌ **NO Hand-Editing EF Migrations**: Migrations are generated artifacts (`dotnet ef migrations add`). Never manually edit migration files or model snapshots.
 > - ❌ **NO UI Authorization Inspection**: Blazor client affordances must be gated strictly by inspecting HAL `_links` presence, never by local role/claim checking.
@@ -735,6 +737,8 @@ The guard never executes Git or mutates repository state.
 ## 11. Related Documentation & Authoritative Anchors
 
 - [`AGENTS.md`](../../AGENTS.md) — Authoritative agent contract and entrypoint.
+- [`PROJECTS.md`](../../PROJECTS.md) — Solution project boundaries, roles, protected paths, and targeted verification commands.
+- [`AI_REVIEW.md`](../../AI_REVIEW.md) — Fast 30-second pre-submission self-review checklist.
 - [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md) — Context budget policy and retrieval limits.
 - [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml) — Machine-readable task and intent registry.
 - [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md) — Global invariant quick reference.

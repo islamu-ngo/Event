@@ -24,7 +24,7 @@ Current repository evidence:
 
 Host the MCP adapter inside `Explore.API` as an optional ASP.NET Core endpoint, mapped by default at `/mcp` unless startup `Mcp:Enabled=false`, using the official `ModelContextProtocol.AspNetCore` package and stateless Streamable HTTP transport.
 
-The adapter is an API presentation adapter over the existing Application registry and MediatR flows:
+The adapter is an API presentation adapter over the existing Application registry and native CQS flows:
 
 1. MCP tool definitions are generated from `IAiToolContractRegistry` definitions.
 2. First-class projected MCP proposal tools use registry JSON schema fields plus only a minimal `conversationId`/`summary` proposal envelope.
@@ -70,7 +70,7 @@ The default answer to compatibility pressure is to keep the current stateless su
 
 - The MCP endpoint is mapped without endpoint-wide authorization so the official SDK authorization filters can list/call explicitly anonymous-safe registry discovery.
 - External MCP clients should use `X-API-Key` machine credentials for scoped operations; bearer tokens remain available only for user-delegated/local smoke where appropriate.
-- Official SDK authorization filters are enabled, and private MCP tool/resource/prompt methods carry `[Authorize]` metadata. These method-level attributes do not replace tenant resolution, registry validation, MediatR authorization, or HAL confirmation.
+- Official SDK authorization filters are enabled, and private MCP tool/resource/prompt methods carry `[Authorize]` metadata. These method-level attributes do not replace tenant resolution, registry validation, operation authorization, or HAL confirmation.
 - Anonymous or invalid-key MCP access is limited to explicitly anonymous-safe capabilities such as registry discovery.
 - Tenant context must be resolved before tenant/private tools/resources/prompts are listed or executed; valid tenant-bound API keys may provide tenant context.
 - Fail closed when required tenant or authenticated principal identity cannot be resolved.

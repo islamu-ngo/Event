@@ -207,7 +207,7 @@ public sealed class HateoasAuthorizationEvaluator : IHateoasAuthorizationEvaluat
     /// <summary>
     /// Rebuilds event authority from the database for the two candidate shapes a link policy cannot
     /// supply itself: registration forms, which only know their parent event id, and event-team links,
-    /// which only know the event they hang off. Both then carry exactly the facts the MediatR resolver
+    /// which only know the event they hang off. Both then carry exactly the facts the native operation resolver
     /// would produce, so an affordance and its endpoint cannot disagree.
     /// <para>
     /// A candidate whose event is missing or belongs to another tenant is dropped, which suppresses the

@@ -314,26 +314,15 @@ Setting keys are string constants in `GovernanceSettingKeys.cs`. They use dot-se
 
 ---
 
-## 12. AutoMapper Profile Organization
+## 12. Riok.Mapperly Compile-Time Mappings
 
-Mappings are split into **10 domain-specific profiles** in `Explore.Application/Profiles/`:
+Mappings are implemented via compile-time source-generated mappers in `Explore.Application/Mappings/` using **Riok.Mapperly** (`[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Both, AutoUserMappings = false)]`):
 
-| Profile | Covers |
-|---|---|
-| `TenantMappingProfile` | Tenant, tenant role grant to current TenantMember DTO bridge, Footer |
-| `EventMappingProfile` | Event, EventSeries, EventDay, EventAgendaItem, Tags, Categories, Aspects |
-| `EventSessionMappingProfile` | EventSession, SessionAgendaItem, SessionSpeaker, SessionLanguage |
-| `CustomPropertyMappingProfile` | All custom property definitions, templates, options, values |
-| `OrganizationMappingProfile` | Organization, Group, Members, ApprovalStatus, Reviews |
-| `UserMappingProfile` | User, UserAuthenticationToken, UserExternalLogin |
-| `RegistrationMappingProfile` | EventRegistration, RegistrationIntent, Scope, Policy |
-| `ActorFederationMappingProfile` | Actor, ActorKeyStore, StorageObject, IndexedDid, SyncState |
-| `LookupMappingProfile` | All lookup tables (Location, Tag, Language, etc.) |
-| `NotificationMappingProfile` | Notification, ProjectionStatus |
+- **Zero Runtime Reflection & Zero DI Overhead**: Mappers are static partial classes with static mapping methods (e.g. `EventMapper.ToDetail(entity)`, `TenantMapper.ToDetail(tenant)`), eliminating runtime profile discovery and DI service lookups.
+- **Strict Compile-Time Safety**: With `RequiredMappingStrategy.Both`, any unmapped source or target property triggers a compiler error unless explicitly ignored via `[MapperIgnoreSource]` or `[MapperIgnoreTarget]`.
+- **Domain-Specific Mappers**: Mappers are organized by domain in `Explore.Application/Mappings/` (e.g. `EventMapper.cs`, `TenantMapper.cs`, `RegistrationMapper.cs`, `OrganizationMapper.cs`, `CustomPropertyMapper.cs`, `LookupMapper.cs`).
 
-`AddAutoMapper(Assembly.GetExecutingAssembly())` auto-discovers all `Profile` subclasses — **no DI changes needed** when adding new profiles.
-
-When adding a new entity/DTO pair, add the mapping to the appropriate domain profile. Watch for namespace clashes: use aliases like `using EventSeriesNS = Explore.Application.DTOs.EventSeries;` and fully-qualified `Domain.EventStatus`, `Domain.Actor` etc. where DTO names collide.
+When adding a new entity/DTO pair, add the mapping method to the appropriate domain mapper. Watch for namespace clashes: use aliases like `using EventSeriesNS = Explore.Application.DTOs.EventSeries;` and fully-qualified `Domain.EventStatus`, `Domain.Actor` etc. where DTO names collide.
 
 ---
 
@@ -454,8 +443,8 @@ Services are registered in multiple places — knowing where to add yours is cri
 | API caching | `Explore.API/Extensions/CachingExtensions.cs` | `AddApiCaching()` |
 | API CORS | `Explore.API/Extensions/CorsExtensions.cs` | `AddApiCors()` |
 | API rate limiting | `Explore.API/Extensions/RateLimitingExtensions.cs` | `AddApiRateLimiting()` |
-| MediatR handlers | Auto-registered via `AddMediatR()` | Assembly scanning |
-| AutoMapper profiles | Auto-registered via `AddAutoMapper()` | Assembly scanning (10 profile files) |
+| Native CQS handlers | Auto-registered via `ConfigureApplicationServices()` | Assembly scanning |
+| Riok.Mapperly mappers | Static compile-time source generators | No DI needed (static partial classes in `Explore.Application/Mappings/`) |
 | Blazor WASM services | `Explore.Blazor.Client/Program.cs` | Direct registration |
 | Blazor Server services | `Explore.Blazor/Program.cs` | Direct registration |
 | Secrets | `Explore.Secrets/Extensions/ServiceCollectionExtensions.cs` | `AddSecrets()` |
@@ -566,7 +555,7 @@ The `EventQuerySpecification` applies these filters sequentially to the `IQuerya
 We use **.NET 9+ HybridCache** for application-level caching, which provides L1 (In-Memory) + L2 (Redis) caching with built-in stampede protection.
 
 ### Usage Pattern
-HybridCache is injected into **MediatR Handlers**, not Controllers.
+HybridCache is injected into **native CQS Handlers**, not Controllers.
 
 **Read-Through (Query Handlers):**
 ```csharp
@@ -877,7 +866,7 @@ Rather than relying on a single generic outbox table for all asynchronous effect
 
 ### Dispatching & Safety
 - **`CompositeOutboxMessageDispatcher`**: Orchestrates sweep jobs across all outboxes in a coordinated pass.
-- **`DurableSideEffectBoundaryTests`**: An architecture test suite that prohibits MediatR command handlers from directly invoking external communication services (SMTP, HTTP clients, or push gateways). All external side effects must be staged transactionally through an outbox in the same database transaction as the domain state change.
+- **`DurableSideEffectBoundaryTests`**: An architecture test suite that prohibits CQS command handlers from directly invoking external communication services (SMTP, HTTP clients, or push gateways). All external side effects must be staged transactionally through an outbox in the same database transaction as the domain state change.
 
 ---
 
@@ -902,10 +891,9 @@ The platform enforces optimistic concurrency control across all mutable state:
 
 ---
 
-## 43. Dependency Licensing Governance & Dual Build Paths
+## 43. Dependency Licensing Governance & Single Build Graph
 
 To ensure clean-room compliance and protect outbound licensing paths (governed by `docs/internal/legal/IP_GOVERNANCE.md` and `docs/internal/legal/CONTRIBUTION_GOVERNANCE.md`), the repository maintains strict dependency licensing controls:
 
-- **AutoMapper MIT Freeze**: Pinned to **AutoMapper 14.0.0** (the last MIT-licensed release, explicitly annotated in `Directory.Packages.props` as security-frozen due to CVE-2026-32933) with an optional commercial-license build path (16.1.1).
-- **MediatR Apache Freeze**: Pinned to **MediatR 12.5.0** (the last Apache 2.0-licensed release).
-- **Central Package Management & Lock Files**: All 150 NuGet dependencies are centrally managed in `Directory.Packages.props`. CI workflows execute with `RestoreLockedMode` against `packages.lock.json` to prevent dependency tampering or unauthorized transitive upgrades.
+- **Compile-Time Mapping & Native Operations**: AutoMapper and MediatR were completely replaced by **Riok.Mapperly** compile-time source generators and repository-native CQS operations (`ICommand`, `IQuery`, `ICommandHandler`, `IQueryHandler`), eliminating runtime reflection overhead, commercial dual-licensing complexity, and supply-chain freeze dependencies.
+- **Central Package Management & Lock Files**: All NuGet dependencies are centrally managed in `Directory.Packages.props`. CI workflows execute with `RestoreLockedMode` against `packages.lock.json` to prevent dependency tampering or unauthorized transitive upgrades.

@@ -59,7 +59,7 @@ The repository uses:
 
 - .NET,
 - Clean Architecture,
-- CQRS with MediatR,
+- CQRS with native operations and Riok.Mapperly,
 - PostgreSQL with EF Core,
 - Blazor BFF + Blazor client,
 - Keycloak for OIDC/OAuth2,
@@ -178,7 +178,7 @@ Plans must include authorization behavior when touching writes, admin flows, set
 Required considerations:
 
 - endpoint-level attributes,
-- MediatR authorization behavior,
+- Native operation authorization behavior,
 - `IAuthorizedRequest`,
 - `[AuthorizeResource]`,
 - `ISecureRequest` where dynamic resource context is needed,

@@ -64,7 +64,7 @@ Set breakpoints in:
 - `Explore.API/Mcp/EventManagementMcpResources.cs` for the scoped `event_management_context` resource template;
 - `Explore.API/Mcp/AiAssistantMcpTools.cs` for generic proposal calls;
 - `Explore.API/Mcp/AiMcpProjectedToolFactory.cs` for projected `propose_*` tools;
-- relevant MediatR handlers such as `ProposeAiToolActionCommandHandler`.
+- relevant native CQS handlers such as `ProposeAiToolActionCommandHandler`.
 
 ## Production Readiness Smoke
 

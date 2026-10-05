@@ -48,7 +48,7 @@ public static class DataBuilder
 
     private static Explore.Domain.Event CreateEvent(EventStatusEnum status) => new(status)
     {
-        Title = null!,
+        Title = string.Empty,
         Actor = null!,
         Tenant = null!,
         VisibilityType = null!,

@@ -634,6 +634,13 @@ Do not add Codecov, SonarCloud, or coverage-percentage badges until the correspo
 
 ### Runtime Test Reliability Policy
 
+The existing database-provider matrix includes the API-key issuance contract as an
+explicit runtime step, not a hidden dependency of the fast required gate. It selects
+at least 14 real-provider cases, retains per-provider TRX evidence and reports the
+step outcome in the provider summary. Its ephemeral cryptographic inputs are
+generated and masked in the step under explicit Environment secret authority.
+Required check names, permissions and runtime-lane promotion policy remain unchanged.
+
 Runtime, stress, and manual visual lanes remain advisory until their known flaky or deferred tests are tracked with owner, first-seen date, evidence source, and promotion/removal criteria in [TEST_RELIABILITY.md](TEST_RELIABILITY.md). This keeps nightly/manual failures actionable instead of silently normalizing noisy failures.
 
 Do not promote stress, security, or runtime lanes to required status while a blocking reliability item lacks an owner or removal condition. When a tracked item is fixed, remove the skip in code and update `TEST_RELIABILITY.md` in the same PR. API-contract-specific skips remain governed by [API_CONTRACT_TEST_DEBT.md](API_CONTRACT_TEST_DEBT.md).

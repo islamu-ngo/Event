@@ -907,6 +907,27 @@ jobs:
           --minimum-expected-tests 2 --no-progress --maximum-parallel-tests 1
           --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.Behavior.trx
 
+      - name: Run API Key Issuance Provider Contract
+        id: api_key_issuance
+        shell: bash
+        env:
+          SECRET_PROVIDER: Environment
+          AUTHENTICATION_PROVIDER: local
+          AUTHORIZATION_PROVIDER: local
+          PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID: ci-issuance
+        run: |
+          set -euo pipefail
+          AUTHENTICATION_LOCAL_JWT_KEY="$(openssl rand -hex 32)"
+          PRIVACY_ERASURE_IDENTITY_FENCE_KEY="$(openssl rand -base64 32)"
+          echo "::add-mask::$AUTHENTICATION_LOCAL_JWT_KEY"
+          echo "::add-mask::$PRIVACY_ERASURE_IDENTITY_FENCE_KEY"
+          export AUTHENTICATION_LOCAL_JWT_KEY PRIVACY_ERASURE_IDENTITY_FENCE_KEY
+          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+            --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/ExternalApiKeyIssuanceProviderTests/*" \
+            --minimum-expected-tests 14 --no-progress --maximum-parallel-tests 1 \
+            --report-trx --report-trx-filename "Event.Persistence.IntegrationTests.${{ matrix.provider }}.Issuance.trx"
+
       - name: Run Secret Binding Provider Contract
         id: secret_binding_contract
         run: >-
@@ -942,6 +963,7 @@ jobs:
           MIGRATION_OUTCOME: ${{ steps.migrations.outcome }}
           RUNTIME_SMOKE_OUTCOME: ${{ steps.runtime_smoke.outcome }}
           BEHAVIOR_OUTCOME: ${{ steps.behavior_contract.outcome }}
+          ISSUANCE_OUTCOME: ${{ steps.api_key_issuance.outcome }}
         run: |
           {
             echo "## Database Provider: ${{ matrix.provider }}"
@@ -952,5 +974,6 @@ jobs:
             echo "- Clean + idempotent migrations: \`${MIGRATION_OUTCOME:-not-run}\`"
             echo "- Runtime smoke: \`${RUNTIME_SMOKE_OUTCOME:-not-run}\`"
             echo "- Behavior contract: \`${BEHAVIOR_OUTCOME:-not-run}\`"
+            echo "- API key issuance contract (at least 14 cases): \`${ISSUANCE_OUTCOME:-not-run}\`"
             echo "- Evidence artifact: \`database-provider-${{ matrix.provider }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

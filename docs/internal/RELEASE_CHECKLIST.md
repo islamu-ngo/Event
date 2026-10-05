@@ -202,6 +202,10 @@ Use `Not applicable` only when the change has no release-impact category. If the
 
 ## CI/CD Evidence Contract
 
+- [ ] API-key issuance changes retain the five provider `Issuance.trx` reports,
+  each with at least 14 executed cases and no failed or skipped issuance cases;
+  general provider smoke results do not substitute for native contention evidence.
+
 - [ ] If citing coverage evidence, identify the commit, included test-suite flags, and any missing runtime lanes, and retain the coverage artifacts. Only combine reports from the same commit; fast-only evidence is not a complete platform report. Codecov project/patch statuses are informational and do not replace required build/test evidence; see [coverage publication operations](OPERATIONS.md#codecov-coverage-publication).
 - [ ] OpenAPI drift artifacts are clean, or generated `openapi.json` / NSwag client changes are reviewed and committed.
 - [ ] `schemas/configuration-manifest-v1alpha2.schema.json` passes the generator `--check` command, is staged with release contract assets, and its exact SHA-256 is included in durable release evidence.

@@ -311,6 +311,16 @@ Architecture tests also prove each non-PostgreSQL application/Data Protection
 migration project owns generated migrations and the expected provider package.
 Generated files are never patched to make a matrix lane pass.
 
+The same five-engine matrix explicitly selects `ExternalApiKeyIssuanceProviderTests`
+with a minimum of 14 executed cases and serial test scheduling. These cases use
+independent real connections to witness writer or exact-row NOWAIT exclusion while
+issuance holds its authorization fence, then execute the normal contender operation.
+They also verify metadata-only replay, revoked authority and lost commit acknowledgement.
+Each lane retains an `Issuance.trx` report; smoke and general behavior results alone
+do not prove these issuance invariants. Environment authority supplies the existing
+database inputs and newly generated, masked, process-local signing and identity-fence
+keys; no plaintext secret is added to source.
+
 ### Unicode Location Search Provider Corpus
 
 After the production migration service has completed twice on a disposable target,

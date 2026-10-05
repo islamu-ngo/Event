@@ -1516,6 +1516,13 @@ Decision path:
 
 Do not remove digest/SBOM/provenance evidence even if Coolify temporarily consumes immutable tags rather than digests.
 
+## API-Key Issuance CI Evidence
+
+For API-key issuance verification, inspect the `database-provider-<Provider>` CI
+artifact's `Issuance.trx` and the provider summary's API-key issuance outcome.
+The matrix runs at least 14 issuance cases on each migrated real engine. A passing
+runtime smoke or general behavior contract is not a substitute for that report.
+
 ## Graceful Shutdown Contract
 
 API and Blazor include shutdown-aware checks for rolling deployments.

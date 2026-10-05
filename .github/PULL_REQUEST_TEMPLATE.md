@@ -17,6 +17,14 @@
 - [ ] Adding new module or service integration
 - [ ] Fixing or updating existing module or service integration
 
+## Pre-Flight Self-Check
+- [ ] One logical change (focused diff, no unrelated refactors or whitespace churn)
+- [ ] Code formatting verified with `dotnet format` on changed files
+- [ ] No warning suppressions (`#pragma warning disable`, `[SuppressMessage]`) introduced
+- [ ] XML `<summary>` doc comments added for new public APIs (Domain / Application layers)
+- [ ] No hardcoded secrets, passwords, tokens, or private credentials committed
+- [ ] Pre-submission check completed against [`AI_REVIEW.md`](AI_REVIEW.md)
+
 ## Preview
 <!-- Screenshot or short video showing your changes in action. Mandatory for new features and UI changes. -->
 - [ ] Not a UI change

@@ -139,7 +139,7 @@ public sealed class CreateApiKeyDialogTests
         foreach (var canary in new[] { NewCanary(), NewCanary() })
         {
             using var fixture = new Fixture();
-            fixture.Transport.CreateReplies.Enqueue((_, _) =>
+            Task<HttpResponseMessage> Reject(RecordedRequest request, CancellationToken cancellationToken)
             {
                 if (status == 0)
                     throw new HttpRequestException(canary, new InvalidOperationException(canary));
@@ -157,7 +157,12 @@ public sealed class CreateApiKeyDialogTests
                         errors = new Dictionary<string, string[]> { ["Name"] = [canary] }
                     });
                 return Task.FromResult(JsonResponse((HttpStatusCode)Math.Abs(status), body));
-            });
+            }
+            using var guidanceFixture = new Fixture();
+            guidanceFixture.Transport.CreateReplies.Enqueue(Reject);
+            var expected = await guidanceFixture.Context.Services.GetRequiredService<IExternalApiKeyService>()
+                .CreateApiKeyAsync(new CreateExternalApiKeyDto(), "guidance-comparison");
+            fixture.Transport.CreateReplies.Enqueue(Reject);
             var (host, _) = await fixture.OpenAsync();
             await FillAsync(host);
 
@@ -169,6 +174,8 @@ public sealed class CreateApiKeyDialogTests
             var errors = host.FindAll("[role='alert'], [aria-live='assertive']")
                 .Where(element => !string.IsNullOrWhiteSpace(element.TextContent)).ToArray();
             await Assert.That(errors.Length > 0).IsTrue();
+            await Assert.That(errors.Any(element =>
+                element.TextContent.Contains(expected!.Message!, StringComparison.Ordinal))).IsTrue();
             visibleErrors.Add(string.Join("\n", errors.Select(element => element.TextContent.Trim())));
         }
 

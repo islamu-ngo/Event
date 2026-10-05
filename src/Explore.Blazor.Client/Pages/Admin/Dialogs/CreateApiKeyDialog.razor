@@ -208,7 +208,9 @@
             }
             else
             {
-                _submitState.Fail("The request did not complete. Retry this operation to check its outcome.");
+                _submitState.Fail(response is { Success: false } && !string.IsNullOrWhiteSpace(response.Message)
+                    ? response.Message
+                    : "The request did not complete. Retry this operation to check its outcome.");
             }
         }
         catch (Exception)

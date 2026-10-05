@@ -114,7 +114,7 @@ public sealed class BaseCommandResponseContractTests
         await Assert.That(CreateDerivedFactoryScenarios().Select(scenario => scenario.ResponseType))
             .IsEquivalentTo(ConcreteDescendantTypes)
             .Because("Every concrete response needs executable success, failure, payload and invalid-state coverage.");
-        await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType))
+        await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType).Distinct())
             .IsEquivalentTo(WireDescendantTypes)
             .Because("Every response declaring JSON construction or generated metadata needs complete wire round-trip coverage.");
     }
@@ -615,6 +615,8 @@ public sealed class BaseCommandResponseContractTests
                 .ToArray();
             string[] expectedFactoryNames = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
                 ? ["Failure", "Issued", "Replayed"]
+                : scenario.ResponseType == typeof(CreateExternalApiKeyCommandResponse)
+                    ? ["Failure", "Issued", "PreviouslyIssued"]
                 : scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult)
                     ? ["Denied", "Issued"]
                     : ConcreteFactoryNames;
@@ -623,6 +625,7 @@ public sealed class BaseCommandResponseContractTests
                 StringComparer.Ordinal)).IsTrue();
 
             string successFactoryName = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
+                || scenario.ResponseType == typeof(CreateExternalApiKeyCommandResponse)
                 || scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult) ? "Issued" : "Success";
             MethodInfo successFactory = declaredFactories.Single(method => method.Name == successFactoryName);
             string[] expectedParameterNames = scenario.Facts.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -847,7 +850,11 @@ public sealed class BaseCommandResponseContractTests
         return
         [
             Wire(typeof(CreateExternalApiKeyCommandResponse), ResultId,
-                ("apiKey", SyntheticReveal), ("keyId", SyntheticKeyId)),
+                ("apiKey", SyntheticReveal), ("keyId", SyntheticKeyId),
+                ("disclosureStatus", ExternalApiKeyDisclosureStatus.Issued)),
+            Wire(typeof(CreateExternalApiKeyCommandResponse), ResultId,
+                ("apiKey", null), ("keyId", SyntheticKeyId),
+                ("disclosureStatus", ExternalApiKeyDisclosureStatus.PreviouslyIssued)),
             Wire(typeof(GuestRegistrationOrderLifecycleResponseDto), ResultId, ("order", guestOrder)),
             Wire(typeof(GuestRegistrationOrderStartDto), ResultId),
             Wire(typeof(RegistrationMaterialChangeChoiceCommandResultDto), ResultId,
@@ -893,7 +900,8 @@ public sealed class BaseCommandResponseContractTests
             Factory(typeof(CreateExternalApiKeyCommandResponse),
                 Facts(("id", ResultId), ("message", "result.created"),
                     ("apiKey", SyntheticReveal), ("keyId", SyntheticKeyId)),
-                ("ApiKey", SyntheticReveal), ("KeyId", SyntheticKeyId)),
+                ("ApiKey", SyntheticReveal), ("KeyId", SyntheticKeyId),
+                ("DisclosureStatus", ExternalApiKeyDisclosureStatus.Issued)),
             Factory(typeof(GuestRegistrationOrderLifecycleResponseDto),
                 Facts(("id", ResultId), ("message", "result.created"), ("order", guestOrder)),
                 ("Order", guestOrder)),
@@ -1268,7 +1276,8 @@ public sealed class BaseCommandResponseContractTests
                 : property.DeclaringType is not null
                     && !(property.DeclaringType.IsGenericType
                         && property.DeclaringType.GetGenericTypeDefinition() == typeof(BaseCommandResponse<>)))
-            .Where(property => includeJsonIgnored || property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+            .Where(property => includeJsonIgnored
+                || property.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition != JsonIgnoreCondition.Always)
             .OrderBy(property => property.Name, StringComparer.Ordinal)
             .ToArray();
 

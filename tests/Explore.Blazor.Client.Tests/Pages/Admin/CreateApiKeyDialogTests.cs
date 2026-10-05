@@ -130,6 +130,7 @@ public sealed class CreateApiKeyDialogTests
     [Arguments(-400)]
     [Arguments(401)]
     [Arguments(403)]
+    [Arguments(404)]
     [Arguments(409)]
     [Arguments(500)]
     public async Task UntrustedFailures_NeverRenderOrLogRawBodiesOrExceptions(int status)

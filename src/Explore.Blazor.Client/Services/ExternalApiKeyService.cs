@@ -79,25 +79,33 @@ public class ExternalApiKeyService : IExternalApiKeyService
         try
         {
             var response = await _apiClient.CreateExternalApiKeyAsync(operationKey, dto);
-            return response?.Success == true ? response : CreationNotAcknowledged();
+            return response?.Success == true ? response : CreationFailure();
         }
         catch (ApiException ex)
         {
-            _logger.LogWarning("API key creation was not acknowledged. StatusCode: {StatusCode}", ex.StatusCode);
-            return CreationNotAcknowledged();
+            _logger.LogWarning("API key creation failed. StatusCode: {StatusCode}", ex.StatusCode);
+            return CreationFailure(ex.StatusCode);
         }
         catch (Exception)
         {
             _logger.LogWarning("API key creation ended without an acknowledged response.");
-            return CreationNotAcknowledged();
+            return CreationFailure();
         }
     }
 
-    private static CreateExternalApiKeyCommandResponse CreationNotAcknowledged() =>
+    private static CreateExternalApiKeyCommandResponse CreationFailure(int? statusCode = null) =>
         new()
         {
             Success = false,
-            Message = "The API key request did not complete. Retry this operation to check its outcome."
+            Message = statusCode switch
+            {
+                400 => "The request was rejected. Cancel and correct the key policy.",
+                401 => "Sign in again before retrying this operation.",
+                403 => "Your current access does not permit this operation. Cancel or restore access before retrying.",
+                404 => "The key or owner is unavailable. Cancel and review your keys before issuing a replacement.",
+                409 => "This operation conflicts with an earlier request. Cancel and review your keys before starting a new operation.",
+                _ => "The API key request did not complete. Retry this operation to check its outcome."
+            }
         };
 
     /// <inheritdoc />

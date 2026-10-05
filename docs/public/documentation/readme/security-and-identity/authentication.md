@@ -382,10 +382,18 @@ The server compares normalized policy, including name/description, owner-type
 and organization/group targets, scopes, expiry, and all credit/rollover fields.
 Changing policy for the same operation returns `409 Conflict`; use a new intent
 only for a deliberate new issuance. Loss of owner authority returns `403`
-without recovery metadata; a missing authenticated platform-user binding
+without recovery metadata; a missing or empty authenticated platform-user binding
 returns `401`. A removed, revoked, expired, or otherwise unusable issued key
 returns `404`. Deleting a credential does not free its old operation key:
 the retained receipt still prevents duplicate issuance.
+
+An acknowledged rejection needs a different response from transport uncertainty.
+For `400`, cancel and correct the requested policy. For `401`, sign in again
+before retrying the same operation. For `403`, restore legitimate access or
+cancel. For `404`, review the key list before deliberately issuing a replacement.
+For `409`, review the earlier operation before starting a new intent. The dialog
+shows fixed guidance for these status classes, not remote response text; repeating
+a rejected frozen request without addressing its cause is not recovery.
 
 #### Deployment, Retention, And Rollback
 

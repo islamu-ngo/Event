@@ -1088,7 +1088,7 @@ explicitly global (`TenantId = null`).
 | First acknowledged creation | `200` | `disclosureStatus = "Issued"`; `apiKey` contains the raw credential |
 | Authorized retry with the same normalized policy | `200` | `disclosureStatus = "PreviouslyIssued"`; `apiKey = null`; stable `id` and `keyId` |
 | Same operation identity, different normalized policy | `409` | Conflict; no new credential |
-| Missing authenticated platform-user binding | `401` | No recovery metadata |
+| Missing or empty authenticated platform-user binding | `401` | No recovery metadata |
 | Current owner authority revoked or unavailable | `403` | No recovery metadata |
 | Issued key removed, revoked, expired, or otherwise unusable | `404` | No recovered credential |
 
@@ -1098,6 +1098,13 @@ scopes, UTC expiry, normalized credit period, credit limit, and rollover limit.
 It excludes current actor and tenant identity; those bind the separate operation
 fingerprint. Recovery of a committed operation does not generate entropy or
 create another credential; an uncommitted attempt can still complete issuance.
+
+The creation service distinguishes definitive `400`/`401`/`403`/`404`/`409`
+rejections from transport errors and `5xx` uncertainty. It renders fixed,
+status-specific cancellation, sign-in, access-restoration, or list-review guidance
+without reflecting the remote body or exception. The dialog keeps the submitted
+policy and operation key frozen; a new intent remains deliberate rather than an
+automatic replacement for a rejected request.
 
 `[SuppressIdempotencyResponseStorage]` bypasses generic replay response capture
 for this action; `[ResponseCache(NoStore = true)]` remains. Recovery comes from

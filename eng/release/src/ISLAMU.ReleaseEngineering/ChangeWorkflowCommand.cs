@@ -6,7 +6,7 @@ namespace ISLAMU.ReleaseEngineering;
 
 public static class ChangeWorkflowCommand
 {
-    private const int MaximumGitOutputCharacters = 1_048_576;
+    private const int MaximumGitOutputCharacters = 4_194_304;
     private const string HookMarker = "# ISLAMU_RELEASE_CHANGE_HOOK";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 

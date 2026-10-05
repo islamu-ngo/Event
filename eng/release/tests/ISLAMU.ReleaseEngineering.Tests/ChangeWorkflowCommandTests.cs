@@ -29,6 +29,22 @@ public sealed class ChangeWorkflowCommandTests
     }
 
     [Test]
+    [Arguments(1_100_000, Program.Success)]
+    [Arguments(4_200_000, Program.ToolchainRejected)]
+    public async Task AllocationReadsLargeHistoryWithinItsBound(int messageLength, int expectedCode)
+    {
+        using var repository = ChangeRepositoryFixture.Create();
+        string messagePath = Path.Combine(repository.Path, "history-message");
+        File.WriteAllText(messagePath, "docs: history record\n\n" + new string('x', messageLength));
+        repository.Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
+            "commit", "--allow-empty", "-F", messagePath);
+
+        (int code, _) = repository.Run("allocate-change-id", "--target", "develop");
+
+        await Assert.That(code).IsEqualTo(expectedCode);
+    }
+
+    [Test]
     public async Task AllocateAndCreateEmitUnusedIdFragmentAndExactFooter()
     {
         using var repository = ChangeRepositoryFixture.Create();

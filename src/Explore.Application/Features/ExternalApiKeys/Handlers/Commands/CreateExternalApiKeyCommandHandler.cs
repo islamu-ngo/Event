@@ -78,6 +78,8 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
             throw new UnauthorizedAccessException("Authentication is required.");
         var currentUserId = await _adminContext.ResolveUserIdAsync(cancellationToken)
             ?? throw new UnauthorizedAccessException("The authenticated application user is unavailable.");
+        if (currentUserId == Guid.Empty)
+            throw new UnauthorizedAccessException("The authenticated application user is unavailable.");
         var dto = request.ExternalApiKeyDto;
         if (dto.Scopes is null || dto.Scopes.Count == 0 || dto.Scopes.Any(string.IsNullOrWhiteSpace))
             return CreateExternalApiKeyCommandResponse.Failure(

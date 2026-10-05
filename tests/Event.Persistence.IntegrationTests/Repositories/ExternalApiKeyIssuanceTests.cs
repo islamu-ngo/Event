@@ -129,6 +129,29 @@ public sealed class ExternalApiKeyIssuanceTests
     public Task IdenticalOperationsOverlapAtTheProviderWriteBoundary(ExternalApiKeyOwnerType owner) =>
         IdenticalRaceAsync(false, owner);
 
+    [Test]
+    public async Task AuthenticatedEmptyPlatformIdentityIsRejectedBeforeIssuance()
+    {
+        await using var fixture = await IssuanceFixture.CreateAsync(false);
+        await using var request = fixture.Open(Guid.Empty);
+        var handler = request.Services.GetRequiredService<
+            ICommandHandler<CreateExternalApiKeyCommand, CreateExternalApiKeyCommandResponse>>();
+        Exception? rejection = null;
+        try
+        {
+            await handler.ExecuteAsync(Command(ExternalApiKeyOwnerType.User), CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            rejection = exception;
+        }
+
+        await Assert.That(rejection is UnauthorizedAccessException).IsTrue();
+        await Assert.That(await request.Context.ExternalApiKeys.IgnoreQueryFilters().AnyAsync()).IsFalse();
+        await Assert.That(await request.Context.Set<ExternalApiKeyIssuanceReceipt>()
+            .IgnoreQueryFilters().AnyAsync()).IsFalse();
+    }
+
     internal static async Task IdenticalRaceAsync(bool runtime, ExternalApiKeyOwnerType owner)
     {
         var boundary = new ProviderBoundary();

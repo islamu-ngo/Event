@@ -7,6 +7,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
+using Explore.Application.Features.Events.Discovery;
 using Explore.Application.Hateoas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -26,19 +27,22 @@ public class PublicExperienceController : ControllerBase
     private readonly IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto> _homeDiscoveryHandler;
     private readonly ILinkPolicy<EventDiscoveryItemDto> _eventDiscoveryLinkPolicy;
     private readonly IHateoasLinkGenerator _linkGenerator;
+    private readonly EventDiscoveryResponseAuthority _discoveryResponseAuthority;
 
     public PublicExperienceController(
         IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto> settingsHandler,
         IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto> shellHandler,
         IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto> homeDiscoveryHandler,
         ILinkPolicy<EventDiscoveryItemDto> eventDiscoveryLinkPolicy,
-        IHateoasLinkGenerator linkGenerator)
+        IHateoasLinkGenerator linkGenerator,
+        EventDiscoveryResponseAuthority discoveryResponseAuthority)
     {
         _settingsHandler = settingsHandler;
         _shellHandler = shellHandler;
         _homeDiscoveryHandler = homeDiscoveryHandler;
         _eventDiscoveryLinkPolicy = eventDiscoveryLinkPolicy;
         _linkGenerator = linkGenerator;
+        _discoveryResponseAuthority = discoveryResponseAuthority;
     }
 
     [HttpGet("settings", Name = RouteNames.GetPublicExperienceSettings)]
@@ -78,14 +82,16 @@ public class PublicExperienceController : ControllerBase
     [EndpointDescription("Returns the tenant-aware event discovery sections for the public home page.")]
     [ProducesResponseType(typeof(HomeDiscoveryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [OutputCache(PolicyName = "PublicHomeDiscovery")]
+    [PrivateNoStore]
     public async Task<ActionResult<HomeDiscoveryDto>> GetHomeDiscovery(
         [FromQuery] Guid? areaId = null,
         [FromQuery] string? mode = null,
         CancellationToken cancellationToken = default)
     {
+        var authority = await _discoveryResponseAuthority.CaptureAsync(cancellationToken, includeUtcDateBoundary: true);
         var home = await _homeDiscoveryHandler.QueryAsync(new GetHomeDiscoveryQuery(areaId, mode), cancellationToken);
         AddSourceLinks(home);
+        await _discoveryResponseAuthority.ValidateAsync(authority, cancellationToken);
         return Ok(home);
     }
 

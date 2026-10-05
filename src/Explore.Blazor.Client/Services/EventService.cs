@@ -8,12 +8,10 @@ namespace Explore.Blazor.Client.Services;
 
 public interface IEventService
 {
-    Task<ICollection<EventListDto>> GetAllEventsAsync();
     Task<ICollection<EventListDto>> GetMyEventsAsync(CancellationToken cancellationToken = default);
-    Task<PaginatedResult<EventListDto>> GetEventsPagedAsync(int pageNumber, int pageSize);
-    Task<PaginatedResult<EventListDto>> GetEventsPagedAsync(
-        int pageNumber,
-        int pageSize,
+    Task<EventDiscoveryTraversalResource> GetEventDiscoveryAsync(
+        string? cursor = null,
+        int pageSize = 20,
         string? searchTerm = null,
         Guid? categoryId = null,
         List<Guid>? includedCategoryIds = null,
@@ -53,6 +51,9 @@ public interface IEventService
         Guid? organizationId = null,
         Guid? groupId = null,
         string? view = null,
+        Guid? areaId = null,
+        List<CustomPropertyFilterCriterion>? customPropertyFilters = null,
+        string? customPropertySearchTerm = null,
         CancellationToken cancellationToken = default);
     Task<PaginatedResult<EventListDto>> GetManagedEventsByActorAsync(
         Guid actorId,
@@ -64,6 +65,7 @@ public interface IEventService
         int pageSize,
         CancellationToken cancellationToken = default);
     Task<EventDto?> GetEventByIdAsync(Guid eventId);
+    Task<EventDto?> GetPublicEventByIdAsync(Guid eventId, CancellationToken cancellationToken = default);
     Task<EventDto?> GetEventBySlugCodeAsync(string slugCode);
     Task<EventCreationContextDto?> GetEventCreationContextAsync(CancellationToken cancellationToken = default);
     Task<EventProgramSummaryDto?> GetEventProgramSummaryAsync(Guid eventId, CancellationToken cancellationToken = default);
@@ -126,37 +128,9 @@ public partial class EventService : IEventService
         }
     }
 
-    public async Task<ICollection<EventListDto>> GetAllEventsAsync()
-    {
-        try
-        {
-            var result = await _apiClient.GetEventsAsync(1, 100);
-            return result?.GetItems() ?? new List<EventListDto>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching all events");
-            return new List<EventListDto>();
-        }
-    }
-
-    public async Task<PaginatedResult<EventListDto>> GetEventsPagedAsync(int pageNumber, int pageSize)
-    {
-        try
-        {
-            var result = await _apiClient.GetEventsAsync(pageNumber, pageSize);
-            return result.ToPaginatedResult();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching paged events (page {PageNumber}, size {PageSize})", pageNumber, pageSize);
-            return PaginatedResult<EventListDto>.Empty(pageNumber, pageSize);
-        }
-    }
-
-    public async Task<PaginatedResult<EventListDto>> GetEventsPagedAsync(
-        int pageNumber,
-        int pageSize,
+    public Task<EventDiscoveryTraversalResource> GetEventDiscoveryAsync(
+        string? cursor = null,
+        int pageSize = 20,
         string? searchTerm = null,
         Guid? categoryId = null,
         List<Guid>? includedCategoryIds = null,
@@ -196,81 +170,61 @@ public partial class EventService : IEventService
         Guid? organizationId = null,
         Guid? groupId = null,
         string? view = null,
+        Guid? areaId = null,
+        List<CustomPropertyFilterCriterion>? customPropertyFilters = null,
+        string? customPropertySearchTerm = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            // Sanitize empty lists to null to prevent NSwag URL builder corruption.
-            var safeIncludedCatIds = includedCategoryIds is { Count: > 0 } ? includedCategoryIds : null;
-            var safeExcludedCatIds = excludedCategoryIds is { Count: > 0 } ? excludedCategoryIds : null;
-            var safeIncludedTagIds = includedTagIds is { Count: > 0 } ? includedTagIds : null;
-            var safeExcludedTagIds = excludedTagIds is { Count: > 0 } ? excludedTagIds : null;
-            var safeFormatIds = formatIds is { Count: > 0 } ? formatIds : null;
-            var safeMadhabIds = madhabIds is { Count: > 0 } ? madhabIds : null;
-            var safeRegistrationModeIds = registrationModeIds is { Count: > 0 } ? registrationModeIds : null;
-            var safeLanguageIds = languageIds is { Count: > 0 } ? languageIds : null;
-            var safeEventTypeIds = eventTypeIds is { Count: > 0 } ? eventTypeIds : null;
-            var safeAudienceGenderIds = audienceGenderIds is { Count: > 0 } ? audienceGenderIds : null;
-            var safeAudienceAgeIds = audienceAgeIds is { Count: > 0 } ? audienceAgeIds : null;
-            var safeEventStatusIds = eventStatusIds is { Count: > 0 } ? eventStatusIds : null;
-            var safeGenderModeIds = genderModeIds is { Count: > 0 } ? genderModeIds : null;
-            var safeReferencePrayerIds = referencePrayerIds is { Count: > 0 } ? referencePrayerIds : null;
-            var safeIslamicPrimaryLanguageIds = islamicPrimaryLanguageIds is { Count: > 0 } ? islamicPrimaryLanguageIds : null;
+        // Sanitize empty lists to null to prevent NSwag URL builder corruption.
+        var safeIncludedCatIds = includedCategoryIds is { Count: > 0 } ? includedCategoryIds : null;
+        var safeExcludedCatIds = excludedCategoryIds is { Count: > 0 } ? excludedCategoryIds : null;
+        var safeIncludedTagIds = includedTagIds is { Count: > 0 } ? includedTagIds : null;
+        var safeExcludedTagIds = excludedTagIds is { Count: > 0 } ? excludedTagIds : null;
 
-            // Only send mode strings when the corresponding ID list is non-empty
-            var safeCatIncMode = safeIncludedCatIds != null ? categoryInclusionMode : null;
-            var safeCatExcMode = safeExcludedCatIds != null ? categoryExclusionMode : null;
-            var safeTagIncMode = safeIncludedTagIds != null ? inclusionMode : null;
-            var safeTagExcMode = safeExcludedTagIds != null ? exclusionMode : null;
-
-            var result = await _apiClient.GetEventsAsync(
-                pageNumber: pageNumber,
-                pageSize: pageSize,
-                searchTerm: searchTerm,
-                actorId: actorId,
-                organizationId: organizationId,
-                groupId: groupId,
-                categoryId: categoryId,
-                includedCategoryIds: safeIncludedCatIds,
-                excludedCategoryIds: safeExcludedCatIds,
-                categoryInclusionMode: safeCatIncMode,
-                categoryExclusionMode: safeCatExcMode,
-                includedTagIds: safeIncludedTagIds,
-                excludedTagIds: safeExcludedTagIds,
-                inclusionMode: safeTagIncMode,
-                exclusionMode: safeTagExcMode,
-                formatIds: safeFormatIds,
-                madhabIds: safeMadhabIds,
-                registrationModeIds: safeRegistrationModeIds,
-                languageIds: safeLanguageIds,
-                dateFrom: dateFrom,
-                dateTo: dateTo,
-                sortBy: sortBy,
-                sortDescending: sortDescending,
-                eventTypeIds: safeEventTypeIds,
-                audienceGenderIds: safeAudienceGenderIds,
-                audienceAgeIds: safeAudienceAgeIds,
-                eventStatusIds: safeEventStatusIds,
-                genderModeIds: safeGenderModeIds,
-                includesQuranRecitation: includesQuranRecitation,
-                referencePrayerIds: safeReferencePrayerIds,
-                islamicPrimaryLanguageIds: safeIslamicPrimaryLanguageIds,
-                hasIslamicAspect: hasIslamicAspect,
-                skillLevelId: skillLevelId,
-                isCodingCompetition: isCodingCompetition,
-                isHackathon: isHackathon,
-                requiresLaptop: requiresLaptop,
-                techStackTag: techStackTag,
-                hasTechAspect: hasTechAspect,
-                view: view,
-                cancellationToken: cancellationToken);
-            return result.ToPaginatedResult();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching filtered paged events (page {PageNumber}, size {PageSize})", pageNumber, pageSize);
-            return PaginatedResult<EventListDto>.Empty(pageNumber, pageSize);
-        }
+        return _apiClient.GetEventsAsync(
+            cursor: cursor,
+            pageSize: pageSize,
+            searchTerm: searchTerm,
+            areaId: areaId,
+            actorId: actorId,
+            organizationId: organizationId,
+            groupId: groupId,
+            categoryId: categoryId,
+            includedCategoryIds: safeIncludedCatIds,
+            excludedCategoryIds: safeExcludedCatIds,
+            categoryInclusionMode: safeIncludedCatIds is not null ? categoryInclusionMode : null,
+            categoryExclusionMode: safeExcludedCatIds is not null ? categoryExclusionMode : null,
+            includedTagIds: safeIncludedTagIds,
+            excludedTagIds: safeExcludedTagIds,
+            inclusionMode: safeIncludedTagIds is not null ? inclusionMode : null,
+            exclusionMode: safeExcludedTagIds is not null ? exclusionMode : null,
+            formatIds: formatIds is { Count: > 0 } ? formatIds : null,
+            madhabIds: madhabIds is { Count: > 0 } ? madhabIds : null,
+            registrationModeIds: registrationModeIds is { Count: > 0 } ? registrationModeIds : null,
+            languageIds: languageIds is { Count: > 0 } ? languageIds : null,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            sortBy: sortBy,
+            sortDescending: sortDescending,
+            eventTypeIds: eventTypeIds is { Count: > 0 } ? eventTypeIds : null,
+            audienceGenderIds: audienceGenderIds is { Count: > 0 } ? audienceGenderIds : null,
+            audienceAgeIds: audienceAgeIds is { Count: > 0 } ? audienceAgeIds : null,
+            eventStatusIds: eventStatusIds is { Count: > 0 } ? eventStatusIds : null,
+            genderModeIds: genderModeIds is { Count: > 0 } ? genderModeIds : null,
+            includesQuranRecitation: includesQuranRecitation,
+            referencePrayerIds: referencePrayerIds is { Count: > 0 } ? referencePrayerIds : null,
+            islamicPrimaryLanguageIds: islamicPrimaryLanguageIds is { Count: > 0 } ? islamicPrimaryLanguageIds : null,
+            hasIslamicAspect: hasIslamicAspect,
+            skillLevelId: skillLevelId,
+            isCodingCompetition: isCodingCompetition,
+            isHackathon: isHackathon,
+            requiresLaptop: requiresLaptop,
+            techStackTag: techStackTag,
+            hasTechAspect: hasTechAspect,
+            view: view,
+            customPropertyFilters: customPropertyFilters is { Count: > 0 } ? customPropertyFilters : null,
+            customPropertySearchTerm: customPropertySearchTerm,
+            cancellationToken: cancellationToken);
     }
 
     public async Task<PaginatedResult<EventListDto>> GetManagedEventsByActorAsync(
@@ -316,6 +270,24 @@ public partial class EventService : IEventService
     }
 
 
+    public async Task<EventDto?> GetPublicEventByIdAsync(Guid eventId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _apiClient.GetEventByIdAsync(eventId, cancellationToken: cancellationToken);
+            return result?.ToDto();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Public event detail unavailable for event {EventId}.", eventId);
+            return null;
+        }
+    }
+
     public async Task<EventDto?> GetEventByIdAsync(Guid eventId)
     {
         try
@@ -351,6 +323,10 @@ public partial class EventService : IEventService
         {
             _logger.LogDebug("Public event detail hidden or missing for slug-code {SlugCode}.", slugCode);
             return null;
+        }
+        catch (ApiException ex) when (ex.StatusCode is 409 or 410 or 503)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -755,7 +731,6 @@ public partial class EventService : IEventService
         try
         {
             var result = await _apiClient.GetEventsAsync(
-                pageNumber: 1,
                 pageSize: 100,
                 actorId: actorId,
                 view: "All");
@@ -801,7 +776,6 @@ public partial class EventService : IEventService
         try
         {
             var result = await _apiClient.GetEventsAsync(
-                pageNumber: 1,
                 pageSize: 100,
                 organizationId: organizationId,
                 view: "All");
@@ -819,7 +793,6 @@ public partial class EventService : IEventService
         try
         {
             var result = await _apiClient.GetEventsAsync(
-                pageNumber: 1,
                 pageSize: 100,
                 groupId: groupId,
                 view: "All");

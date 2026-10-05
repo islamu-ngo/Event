@@ -2165,6 +2165,55 @@ retained audit rows have expired or been purged.
 
 For an IntegrationSync row reported as ambiguous by `/health` under `queue-drains`, establish provider evidence before acting. Use the tenant-authenticated `POST /api/integrations/listmonk/queue/{outboxId}/resolve` endpoint with an opaque incident/evidence reference. `ConfirmAccepted` settles without replay; `RetryDefinitelyNotAccepted` schedules a retry only after proof the provider did not accept the POST; `DeadLetter` preserves the terminal refusal. Never select retry from timeout or response-loss evidence alone.
 
+#### Discovery snapshot retention
+
+Apply the current provider's `EventDiscoveryTraversal` migration, then run normal
+application migration bootstrap before readiness. In addition to membership
+tables, the migration adds persisted title/source ordering keys to local events
+and remote projections. Bootstrap fills them in 256-row ID keysets, including
+suppressed sources. Do not bypass that backfill by starting the updated reader
+against columns populated only with migration defaults.
+
+`event-discovery-snapshot-purge` starts after 60 seconds and runs once per minute
+through Quartz. `DisallowConcurrentExecution` prevents overlapping execution for
+its job key. Its durable payload contains only the last tenant GUID; malformed
+payload resets that cursor without logging the supplied value.
+
+One pass selects at most five retained ownership scopes with expired snapshots,
+including physically deleted directories, and deletes at most ten expired headers
+per owner. Enumeration uses durable reservations, not public Tenant rows.
+The same transaction deletes bounded membership before headers, including on
+SQL Server where generated foreign keys do not cascade. Each tenant transaction takes the native
+snapshot reservation, then an existing revision fence if present, then deletes
+only expired snapshot-owned rows. It never recreates a missing public revision
+or tenant. It acquires no source locks after the epoch fence.
+
+On PostgreSQL, `ExploreDatabaseMigrator.MigrateAsync` installs the narrowly scoped
+`PostgresDiscoverySnapshotMaintenanceContract` after applying the model and RLS.
+Plain `dotnet ef database update` alone does not install this operational contract.
+Its SECURITY DEFINER function returns at most five expired ownership UUIDs.
+Enumeration and PostgreSQL deletion cap the requested expiry cutoff with
+`LEAST(p_now_utc, statement_timestamp())`. A future application clock cannot
+enumerate live-only foreign ownership or remove live membership.
+The NOLOGIN/NOBYPASSRLS owner has only the header ownership/expiry column access
+needed by its owner-only SELECT policy. Membership and public-source tables
+remain protected by FORCE RLS; deletion uses ordinary exact-tenant transactions.
+
+Grant `event_discovery_maintenance_runtime` to the actual runtime login with
+effective inheritance through the approved deployment role authority. Do not
+grant owner or migrator membership, or BYPASSRLS, to that login. Migration
+authority must manage the dedicated roles and application schema. Missing grants
+fail cleanup rather than silently omitting owners; monitor that failure before
+the physical store reaches capacity.
+
+Logical expiry never waits for cleanup. Physical capacity includes expired
+membership and independently bounded headers, so stopped cleanup eventually
+causes `503 discovery_unavailable` rather than unbounded growth. Restore the
+scheduler and allow bounded passes to drain; do not return historical cards.
+Replicas must share the existing Data Protection key ring and application name.
+Missing keys require a new search after restoring authority, never an unprotected
+continuation. See [the public guide](../public/documentation/readme/events-and-ticketing/publication-and-sessions.md#operating-bounded-browsing).
+
 #### Upgrade note — maintenance sweeps moved to the scheduler
 
 The eight maintenance sweeps above previously ran as in-process `BackgroundService` timer loops. They now run as

@@ -9,12 +9,22 @@ namespace Explore.Persistence.Repositories;
 public sealed class ActorReferenceConsolidationRepository(ExploreDbContext dbContext) : IActorReferenceConsolidationRepository
 {
     public async Task<bool> MoveMutableReferencesAsync(Guid sourceActorId, Guid targetActorId, int targetActorTypeId, CancellationToken cancellationToken = default)
+        => await dbContext.ExecuteDisclosureMutationAsync(
+            token => MoveReferencesAsync(sourceActorId, targetActorId, targetActorTypeId, token), cancellationToken);
+
+    private async Task<bool> MoveReferencesAsync(
+        Guid sourceActorId, Guid targetActorId, int targetActorTypeId, CancellationToken cancellationToken)
     {
-        if (sourceActorId == Guid.Empty || targetActorId == Guid.Empty || sourceActorId == targetActorId
-            || await HasCollisionAsync(sourceActorId, targetActorId, cancellationToken).ConfigureAwait(false))
+        if (sourceActorId == Guid.Empty || targetActorId == Guid.Empty || sourceActorId == targetActorId)
         {
             return false;
         }
+
+        // The sole caller retires source Actor after these bulk writes. Acquire both
+        // Actors first, matching review's Actor -> Event order rather than reversing it.
+        await dbContext.DisclosureMutations.EnlistActorsAsync([sourceActorId, targetActorId], cancellationToken);
+        if (await HasCollisionAsync(sourceActorId, targetActorId, cancellationToken).ConfigureAwait(false))
+            return false;
 
         await dbContext.AtprotoIdentities.Where(x => x.ActorId == sourceActorId)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.ActorId, targetActorId), cancellationToken).ConfigureAwait(false);

@@ -91,23 +91,25 @@ public sealed partial class CacheGovernanceTests
     }
 
     [Test]
-    public async Task TenantScopedEventLists_ShouldUseTenantNamespaceAndTenantInvalidationTag()
+    public async Task PublicDiscovery_ShouldNotDependOnHybridCache_AndEventInvalidationTagsRemainTenantScoped()
     {
-        var handler = File.ReadAllText(Path.Combine(
-            SourceRoot,
-            "src",
-            "Explore.Application",
-            "Features",
-            "Events",
-            "Handlers",
-            "Queries",
-            "GetEventListRequestHandler.cs"));
+        Type[] publicReaders =
+        [
+            typeof(Explore.Application.Features.Events.Handlers.Queries.GetEventListRequestHandler),
+            typeof(Explore.Application.Features.Events.Discovery.EventDiscoveryLocalSource),
+            typeof(Explore.Application.Features.Events.Discovery.EventDiscoveryTraversal)
+        ];
+        var cacheDependencies = publicReaders.SelectMany(type => type.GetConstructors())
+            .SelectMany(constructor => constructor.GetParameters())
+            .Where(parameter => typeof(Microsoft.Extensions.Caching.Hybrid.HybridCache)
+                .IsAssignableFrom(parameter.ParameterType)).ToArray();
+        await Assert.That(cacheDependencies).IsEmpty();
 
-        await Assert.That(handler).Contains("events:list:tenant:{tenantCacheKey}");
-        await Assert.That(handler).Contains("CacheTags.EventListByTenant(_tenantContext.TenantId)");
-
-        var cacheTags = File.ReadAllText(Path.Combine(SourceRoot, "src", "Explore.Application", "Caching", "CacheTags.cs"));
-        await Assert.That(cacheTags).Contains("events:list:tenant:{tenantId:N}");
+        Guid tenant = Guid.CreateVersion7();
+        await Assert.That(Explore.Application.Caching.CacheTags.EventListByTenant(tenant))
+            .IsEqualTo($"events:list:tenant:{tenant:N}");
+        await Assert.That(Explore.Application.Caching.CacheTags.EventListByTenant(Guid.CreateVersion7()))
+            .IsNotEqualTo(Explore.Application.Caching.CacheTags.EventListByTenant(tenant));
     }
 
     [Test]

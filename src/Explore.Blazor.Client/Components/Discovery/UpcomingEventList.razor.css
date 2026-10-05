@@ -9,6 +9,7 @@
     display: grid;
     gap: var(--isl-space-4);
     align-content: start;
+    align-self: start;
     min-inline-size: 0;
     padding: var(--isl-space-4);
     background: var(--isl-color-surface);
@@ -97,7 +98,7 @@
 }
 
 .upcoming-event-list__title,
-.upcoming-event-list__metadata,
+.upcoming-event-list__session-title,
 .upcoming-event-list__context {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -112,9 +113,14 @@
 }
 
 .upcoming-event-list__metadata {
+    overflow-wrap: anywhere;
     color: var(--isl-color-text);
     font-size: var(--isl-typography-body2-size);
     line-height: var(--isl-typography-body2-line-height);
+}
+
+.upcoming-event-list__session-title {
+    display: block;
 }
 
 .upcoming-event-list__context {

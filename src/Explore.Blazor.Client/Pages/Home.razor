@@ -385,14 +385,13 @@ else
 
         try
         {
-            var result = await EventService.GetEventsPagedAsync(
-                1,
-                3,
+            var result = await EventService.GetEventDiscoveryAsync(
+                pageSize: 3,
                 sortBy: "date",
                 sortDescending: false,
                 actorId: actorId);
 
-            _featuredEvents = result.Items
+            _featuredEvents = result.GetItems()
                 .Where(evt => evt.Id.HasValue)
                 .Take(3)
                 .ToList();

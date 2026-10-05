@@ -16,6 +16,50 @@ Project islamu_event {
 // Lookup / Reference Tables (int PK, ValueGeneratedNever)
 // ============================================================
 
+Table "event_discovery_snapshot_reservations" {
+  "tenant_id" uuid [pk, not null]
+  Note: 'Dedicated native reservation fence. No public-source foreign key; capture acquires this before source reads.'
+}
+
+Table "event_discovery_snapshots" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null]
+  "criteria_hash" varchar(64) [not null]
+  "identity_epoch" bigint [not null]
+  "disclosure_epoch" bigint [not null]
+  "created_at_utc" timestamptz [not null]
+  "expires_at_utc" timestamptz [not null]
+  "item_count" int [not null]
+  "truncated" boolean [not null]
+  "local_source_complete" boolean [not null]
+  "remote_source_complete" boolean [not null]
+  indexes {
+    (tenant_id, id) [unique]
+    (tenant_id, criteria_hash, identity_epoch, disclosure_epoch, expires_at_utc)
+    (tenant_id, expires_at_utc, id)
+  }
+  Note: 'Count is 0..1000; epochs are nonnegative; expiry follows creation; hash has length 64. Physical quotas count actual rows, not this metadata.'
+}
+
+Table "event_discovery_snapshot_items" {
+  "tenant_id" uuid [not null]
+  "snapshot_id" uuid [not null]
+  "ordinal" bigint [not null]
+  "source_kind" int [not null]
+  "source_id" uuid [not null]
+  "canonical_kind" int [not null]
+  "canonical_id" uuid [not null]
+  "matching_session_id" uuid
+  indexes {
+    (tenant_id, snapshot_id, ordinal) [pk]
+    (tenant_id, snapshot_id, canonical_kind, canonical_id) [unique]
+  }
+  Note: 'Ordered references only: ordinal 0..999, source kind 1/2, canonical kind 1/2/3. No historical card text, private location or viewer state.'
+}
+
+Ref: event_discovery_snapshots.tenant_id > event_discovery_snapshot_reservations.tenant_id [delete: restrict]
+Ref: event_discovery_snapshot_items.(tenant_id, snapshot_id) > event_discovery_snapshots.(tenant_id, id) [delete: cascade]
+
 Table "actor_types" {
   "id" int [pk, not null]
   "full_name" varchar(200) [not null]
@@ -1037,6 +1081,8 @@ Table "atproto_records" {
 Table "atproto_event_projections" {
   "atproto_record_id" uuid [pk, not null]
   "name" varchar(240) [not null]
+  "discovery_title_sort_key" varchar(960) [not null, note: 'Invariant-uppercase UTF-16 hex; portable ordinal ASCII collation']
+  "discovery_source_sort_key" varchar(32) [not null, note: 'Canonical source GUID N encoding; portable ordinal ASCII collation']
   "description" varchar(4000)
   "created_at" timestamptz [not null]
   "starts_at" timestamptz
@@ -4060,6 +4106,8 @@ Table "events" {
   "id" uuid [pk, not null, note: 'uuidv7 app-side']
   "event_type_id" int
   "title" varchar(200) [not null]
+  "discovery_title_sort_key" varchar(800) [not null, note: 'Invariant-uppercase UTF-16 hex; portable ordinal ASCII collation']
+  "discovery_source_sort_key" varchar(32) [not null, note: 'Original Event.Id N encoding, never a federation record ID']
   "subtitle" varchar(200)
   "description" varchar(150)
   "content" varchar(5000)

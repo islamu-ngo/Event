@@ -17,6 +17,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Explore.Persistence.Services;
@@ -1133,9 +1134,14 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         {
             _connection = await SqliteTestDatabaseFactory.CreateOpenIsolatedConnectionAsync();
             _options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(_connection.ConnectionString)
-                .UseSnakeCaseNamingConvention().Options;
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(
+                    EventDiscoveryDisclosureTransactionInterceptor.Instance,
+                    SqliteNamedLockTransactionInterceptor.Instance,
+                    SqliteProjectionLockTransactionInterceptor.Instance).Options;
             await using var schema = new ExploreDbContext(_options);
             await schema.Database.EnsureCreatedAsync();
+            await SqliteDatabaseInitializer.InitializeAsync(schema, CancellationToken.None);
             await LookupTableSeeder.SeedAsync(schema);
             _options = TestDbContextOptions.Create(_options).UseModel(schema.Model).Options;
         }

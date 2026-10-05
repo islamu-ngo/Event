@@ -16,6 +16,7 @@ public static class ScheduledJobNames
     // stable identifiers rather than descriptions: renaming one orphans its persisted trigger.
     public const string IdempotencyCleanup = "idempotency-cleanup";
     public const string AtprotoTransientCleanup = "atproto-transient-cleanup";
+    public const string EventDiscoverySnapshotPurge = "event-discovery-snapshot-purge";
     public const string AiRetentionCleanup = "ai-retention-cleanup";
     public const string EventResourceAuditRetentionCleanup = "event-resource-audit-retention-cleanup";
     public const string EmailDispatchRetentionCleanup = "email-dispatch-retention-cleanup";
@@ -62,6 +63,7 @@ public static class ScheduledJobNames
         TenantMaintenanceScan,
         IdempotencyCleanup,
         AtprotoTransientCleanup,
+        EventDiscoverySnapshotPurge,
         AiRetentionCleanup,
         EventResourceAuditRetentionCleanup,
         EmailDispatchRetentionCleanup,

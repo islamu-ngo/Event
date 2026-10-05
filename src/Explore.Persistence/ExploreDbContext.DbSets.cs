@@ -31,6 +31,7 @@ public partial class ExploreDbContext
     public DbSet<ConfigurationDirectTransferChunk> ConfigurationDirectTransferChunks { get; set; }
 
     // ===== Multi-tenancy =====
+    public DbSet<EventDiscoverySnapshotReservation> EventDiscoverySnapshotReservations { get; set; }
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<TenantUser> TenantUsers { get; set; }
     public DbSet<TenantUserProfile> TenantUserProfiles { get; set; }

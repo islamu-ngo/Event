@@ -45,6 +45,12 @@
     }
     else
     {
+        @if (_discovery.SectionStatuses?.Values.Any(status => status == HomeDiscoverySectionStatus.Failed) == true)
+        {
+            <p class="home-discovery__section-failure">
+                @T("ui.home.discovery.partial", "Some event sections are unavailable. The events shown are only a partial selection.")
+            </p>
+        }
         <div class="home-discovery__hero">
             <HeroCarousel Events="HeroEvents"
                           RightToLeft="@IsRightToLeft"
@@ -164,6 +170,10 @@
             @if (UpcomingEvents.Count > 0)
             {
                 <UpcomingEventList Events="UpcomingEvents"
+                                   ReferenceTimeUtc="_discovery.GeneratedAtUtc"
+                                   TodayLabel="@T("ui.home.discovery.today", "Today")"
+                                   TomorrowLabel="@T("ui.home.discovery.tomorrow", "Tomorrow")"
+                                   OngoingLabel="@T("ui.home.discovery.ongoing", "Ongoing")"
                                    DateToBeAnnouncedLabel="@T("home.discovery.date_tba", "Date to be announced")"
                                    ViewEventLabel="@T("home.discovery.view_event", "View event")" />
             }
@@ -296,37 +306,7 @@
             return;
         }
 
-        if (_loadedRequestKey is null && PersistedDiscoveryMatchesRequest())
-        {
-            _discovery = PersistedDiscovery;
-            _loadedRequestKey = requestKey;
-            _isLoading = false;
-            _pendingAnnouncement = T("home.discovery.loaded", "Events loaded");
-            return;
-        }
-
         await LoadAsync(requestKey);
-    }
-
-    private bool PersistedDiscoveryMatchesRequest()
-    {
-        if (PersistedDiscovery?.Context is not { } context)
-        {
-            return false;
-        }
-
-        if (UrlAreaId.HasValue && context.SelectedAreaId != UrlAreaId)
-        {
-            return false;
-        }
-
-        return UrlMode?.Trim().ToLowerInvariant() switch
-        {
-            "area" => context.Mode == HomeDiscoveryMode.Area,
-            "online" => context.Mode == HomeDiscoveryMode.Online,
-            "all" => context.Mode == HomeDiscoveryMode.All,
-            _ => true
-        };
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -517,9 +497,12 @@
     private void OpenEvent(EventListDto eventItem) =>
         Navigation.NavigateTo(EventUrlHelper.BuildPublicPath(eventItem.Slug, eventItem.PublicCode) ?? "/events");
 
-    private string SectionEmptyMessage(string key) => SectionStatus(key) == HomeDiscoverySectionStatus.Failed
-        ? T("home.discovery.section.failure", "This section is temporarily unavailable. Other event sections are still available.")
-        : T("home.discovery.empty", "No events are available in this section yet.");
+    private string SectionEmptyMessage(string key) => SectionStatus(key) switch
+    {
+        HomeDiscoverySectionStatus.Empty => T("home.discovery.empty", "No events are available in this section yet."),
+        HomeDiscoverySectionStatus.Omitted => T("ui.home.discovery.omitted", "This section is not offered in the current browsing context."),
+        _ => T("home.discovery.section.failure", "This section is temporarily unavailable. Other event sections are still available.")
+    };
 
     private HomeDiscoverySectionStatus? SectionStatus(string key) =>
         _discovery?.SectionStatuses?.TryGetValue(key, out var status) == true ? status : null;

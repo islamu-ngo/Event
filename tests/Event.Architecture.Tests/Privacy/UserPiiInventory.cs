@@ -449,6 +449,8 @@ internal static class UserPiiInventory
             "Preserve shared published content after identity removal", "Shared-content retention horizon"),
         Local("Event.Title", "Event.ActorId -> Actor.UserId", "Event handlers", UserPiiDisposition.Anonymize,
             "Preserve shared published content after identity removal", "Shared-content retention horizon"),
+        Local("Event.DiscoveryTitleSortKey", "Event.ActorId -> Actor.UserId", "Event title setter and discovery rank migration", UserPiiDisposition.Anonymize,
+            "Derived from retained shared title; title anonymization updates the rank key", "Shared-content retention horizon"),
         Local("EventAgendaItem.Title", "Agenda item -> Event.ActorId -> Actor.UserId", "Event agenda handlers", UserPiiDisposition.Anonymize,
             "Preserve shared published content after identity removal", "Shared-content retention horizon"),
         Local("EventCustomPropertyDefinition.AllowedUrlSchemes", "Definition -> Event.ActorId -> Actor.UserId", "Event custom-property handlers", UserPiiDisposition.Anonymize,

@@ -68,6 +68,22 @@ public sealed class OpenApiParityTests
     }
 
     [Test]
+    public async Task NativeDiscoveryIdentityHalUsesThePrimaryCandidateContract()
+    {
+        using var document = await GetOpenApiDocumentAsync(NativeOpenApiEndpoint);
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        var identity = schemas.GetProperty("HalResourceOfEventDiscoveryIdentityDto").GetProperty("properties");
+        await Assert.That(identity.TryGetProperty("expectedRevision", out _)).IsTrue();
+        await Assert.That(identity.TryGetProperty("_links", out _)).IsTrue();
+        foreach (string name in new[] { "EventDuplicateCandidatesDto", "HalResourceOfEventDuplicateCandidatesDto" })
+        {
+            string? reference = schemas.GetProperty(name).GetProperty("properties")
+                .GetProperty("candidates").GetProperty("items").GetProperty("$ref").GetString();
+            await Assert.That(reference).IsEqualTo("#/components/schemas/EventDuplicateCandidateDto");
+        }
+    }
+
+    [Test]
     public async Task NativeAndSwashbuckleDocs_AreReachable()
     {
         using var nativeResponse = await _fixture.Client.GetAsync(NativeOpenApiEndpoint);

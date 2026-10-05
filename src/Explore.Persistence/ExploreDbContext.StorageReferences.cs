@@ -4,6 +4,7 @@ using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence;
 
@@ -66,94 +67,20 @@ public partial class ExploreDbContext
                 || entry.State == EntityState.Added || previous != current;
     }
 
-    private int SaveWithStorageReferences(Func<bool, int> persist, bool acceptAllChangesOnSuccess)
-    {
-        if (Database.IsRelational() && StorageReferenceTransactionFailed)
-            throw StorageReferenceConflict();
-        var carriers = StorageReferenceCarriers();
-        if (carriers.Count == 0 || !Database.IsRelational())
-            return persist(acceptAllChangesOnSuccess);
-        if (Database.CurrentTransaction is not null)
-            return PersistStorageReferences(carriers, () => persist(acceptAllChangesOnSuccess));
-
-        var stamps = CaptureTrackedStorageStamps();
-        Dictionary<Guid, Guid> commitStamps = [];
-        try
-        {
-            int result = Database.CreateExecutionStrategy().ExecuteInTransaction(
-                () =>
-                {
-                    commitStamps = [];
-                    RestoreTrackedStorageStamps(stamps);
-                    int saved = PersistStorageReferences(carriers, () => persist(false));
-                    commitStamps = CaptureStorageCommitStamps();
-                    return saved;
-                },
-                () => commitStamps.Any(stamp => StorageReferenceSources([stamp.Key])
-                    .Any(source => source.ConcurrencyStamp == stamp.Value)));
-            if (acceptAllChangesOnSuccess)
-                ChangeTracker.AcceptAllChanges();
-            return result;
-        }
-        catch
-        {
-            RestoreTrackedStorageStamps(stamps);
-            throw;
-        }
-    }
-
-    private int PersistStorageReferences(
-        List<(EntityEntry Entry, IProperty Property)> carriers, Func<int> persist)
-    {
-        try
-        {
-            if (StorageReferenceTransactionFailed)
-                throw StorageReferenceConflict();
-            var references = new Dictionary<Guid, bool>();
-            foreach (var group in carriers.GroupBy(carrier => carrier.Entry))
-            {
-                PropertyValues? persisted = group.Key.State == EntityState.Added
-                    ? null : group.Key.GetDatabaseValues();
-                foreach (var carrier in group)
-                    CollectStorageReference(references, carrier.Entry, carrier.Property, persisted);
-            }
-            var sources = StorageReferenceSources(references.Keys).ToList();
-            ValidateMissingStorageReferences(references, sources);
-            foreach (var source in sources.OrderBy(item => item.TenantId).ThenBy(item => item.Id))
-            {
-                if (EnrollStorageReferenceFence(source))
-                {
-                    Guid stamp = Guid.CreateVersion7();
-                    if (StorageReferenceSources([source.Id]).Where(item => item.ConcurrencyStamp == source.ConcurrencyStamp)
-                        .ExecuteUpdate(setters => setters.SetProperty(item => item.ConcurrencyStamp, stamp)) != 1)
-                        throw StorageReferenceConflict();
-                    _fencedStorageReferences[source.Id] = stamp;
-                    RefreshStorageReferenceStamp(source.Id, stamp);
-                }
-                if (references[source.Id])
-                    ValidateStorageAttachment(source,
-                        StorageObjectDeletionTombstones.Any(item => item.Id == source.Id));
-            }
-            return persist();
-        }
-        catch
-        {
-            PoisonStorageReferenceTransaction();
-            throw;
-        }
-    }
-
     private async Task<int> SaveWithStorageReferencesAsync(
         Func<bool, Task<int>> persist, bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
     {
         if (Database.IsRelational() && StorageReferenceTransactionFailed)
             throw StorageReferenceConflict();
         var carriers = StorageReferenceCarriers();
-        if (carriers.Count == 0 || !Database.IsRelational())
+        if (!Database.IsRelational())
             return await persist(acceptAllChangesOnSuccess);
         if (Database.CurrentTransaction is not null)
+        {
+            await DisclosureMutations.CaptureAsync(cancellationToken);
             return await PersistStorageReferencesAsync(
                 carriers, () => persist(acceptAllChangesOnSuccess), cancellationToken);
+        }
 
         var stamps = CaptureTrackedStorageStamps();
         Dictionary<Guid, Guid> commitStamps = [];
@@ -165,7 +92,10 @@ public partial class ExploreDbContext
                 {
                     commitStamps = [];
                     RestoreTrackedStorageStamps(stamps);
+                    ResetDisclosureMutations();
+                    await DisclosureMutations.CaptureAsync(token);
                     int saved = await PersistStorageReferencesAsync(carriers, () => persist(false), token);
+                    await FlushDisclosureAsync(token);
                     commitStamps = CaptureStorageCommitStamps();
                     return saved;
                 },
@@ -176,13 +106,14 @@ public partial class ExploreDbContext
                             .AnyAsync(source => source.ConcurrencyStamp == stamp.Value, token))
                             return true;
                     return false;
-                }, cancellationToken);
+                }, System.Data.IsolationLevel.Serializable, cancellationToken);
             if (acceptAllChangesOnSuccess)
                 ChangeTracker.AcceptAllChanges();
             return result;
         }
         catch
         {
+            ResetDisclosureMutations();
             RestoreTrackedStorageStamps(stamps);
             throw;
         }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Pages.Events;
 using Explore.Blazor.Client.Services.Docking;
@@ -94,15 +95,154 @@ public class EventListTests : IDisposable
         _cultureLookupService.GetLanguagesAsync().Returns(new List<LanguageListDto>());
     }
 
-    private static PaginatedResult<EventListDto> CreateResult(int pageNumber, int pageSize, List<EventListDto> items)
+    private static EventDiscoveryTraversalResource CreateResult(int pageNumber, int pageSize, List<EventListDto> items)
     {
-        return new PaginatedResult<EventListDto>
+        return new EventDiscoveryTraversalResource
         {
-            Items = items,
-            PageNumber = pageNumber,
-            PageSize = pageSize,
-            TotalCount = items.Count
+            SnapshotCount = items.Count,
+            _embedded = new HalCollectionEmbeddedOfEventDiscoveryItemDto
+            {
+                Items = items.Select(item => new HalResourceOfEventDiscoveryItemDto
+                {
+                    Source = "local",
+                    Event = item
+                }).ToList()
+            }
         };
+    }
+
+    [Test]
+    public async Task LoadMore_FollowsHalCursorAndKeepsOriginalSearchWithoutRandomPages()
+    {
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var first = CreateResult(1, 20, [new() { Id = firstId, Title = "First identity" }]) with
+        {
+            SnapshotCount = 2,
+            HasMore = true,
+            _links = new Dictionary<string, HalLink>
+            {
+                ["next"] = new() { Href = "/api/Event?cursor=opaque%2Bnext&pageSize=1&searchTerm=community" }
+            }
+        };
+        var second = CreateResult(1, 20, [new() { Id = secondId, Title = "Second identity" }]) with { SnapshotCount = 2 };
+        using var handler = new DiscoveryHttpHandler((200, first), (200, second));
+        using var http = RegisterDiscoveryHttpClient(handler);
+        _ctx.Services.GetRequiredService<NavigationManager>().NavigateTo("/events?q=community");
+        var cut = _ctx.RenderMudComponent<EventList>();
+
+        await cut.FindComponent<Explore.Blazor.Client.Pages.Events.Components.EventListPagination>()
+            .Find("button").ClickAsync(new MouseEventArgs());
+
+        var ids = cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()
+            .Select(card => card.Instance.Event.Id).ToArray();
+        await Assert.That(ids).IsEquivalentTo(new Guid?[] { firstId, secondId });
+        var query = System.Web.HttpUtility.ParseQueryString(handler.Requests[1].Query);
+        await Assert.That(query["cursor"]).IsEqualTo("opaque+next");
+        await Assert.That(query["pageSize"]).IsEqualTo("1");
+        await Assert.That(query["searchTerm"]).IsEqualTo("community");
+        await Assert.That(query["pageNumber"]).IsNull();
+        await Assert.That(cut.FindComponents<MudPagination>().Count).IsEqualTo(0);
+        await Assert.That(cut.FindComponent<Explore.Blazor.Client.Pages.Events.Components.EventListPagination>()
+            .Instance.HasMore).IsFalse();
+    }
+
+    [Test]
+    [Arguments(400, "discovery_cursor_invalid")]
+    [Arguments(410, "discovery_cursor_expired")]
+    [Arguments(409, "discovery_restart_required")]
+    [Arguments(503, "discovery_unavailable")]
+    public async Task RejectedContinuation_OffersExplicitReplacementAndKeepsSearch(int status, string code)
+    {
+        var oldId = Guid.NewGuid();
+        var newId = Guid.NewGuid();
+        var initial = CreateResult(1, 20, [new() { Id = oldId, Title = "Previously loaded identity" }]) with
+        {
+            SnapshotCount = 2,
+            HasMore = true,
+            _links = new Dictionary<string, HalLink>
+            {
+                ["next"] = new() { Href = "/api/Event?cursor=old&pageSize=20&searchTerm=community" }
+            }
+        };
+        var problem = new ProblemDetails
+        {
+            Status = status,
+            AdditionalProperties = new Dictionary<string, object> { ["code"] = code }
+        };
+        var replacement = CreateResult(1, 20, [new() { Id = newId, Title = "Current identity" }]);
+        using var handler = new DiscoveryHttpHandler((200, initial), (status, problem), (200, replacement));
+        using var http = RegisterDiscoveryHttpClient(handler);
+        var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/events?q=community");
+        var cut = _ctx.RenderMudComponent<EventList>();
+
+        await cut.FindComponent<Explore.Blazor.Client.Pages.Events.Components.EventListPagination>()
+            .Find("button").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(cut.FindAll(".event-list__recovery").Count).IsEqualTo(1);
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventListPagination>().Count).IsEqualTo(0);
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()
+            .Select(card => card.Instance.Event.Id)).IsEquivalentTo(new Guid?[] { oldId });
+        await Assert.That(handler.Requests.Count).IsEqualTo(2);
+        await Assert.That(navigation.Uri).Contains("q=community");
+
+        await cut.Find(".event-list__recovery button").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()
+            .Select(card => card.Instance.Event.Id)).IsEquivalentTo(new Guid?[] { newId });
+        var query = System.Web.HttpUtility.ParseQueryString(handler.Requests[2].Query);
+        await Assert.That(query["cursor"]).IsNull();
+        await Assert.That(query["searchTerm"]).IsEqualTo("community");
+        await Assert.That(cut.FindAll(".event-list__recovery").Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task TruncatedEmptyMembership_IsNotAnExhaustiveEmptySearch()
+    {
+        SetupPagedResult(Task.FromResult(CreateResult(1, 20, []) with { Truncated = true }));
+        var cut = _ctx.RenderMudComponent<EventList>();
+        await Assert.That(cut.FindAll(".event-list__truncated").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll(".event-list__truncated + button").Count).IsEqualTo(1);
+        await Assert.That(cut.Markup).DoesNotContain("No events found");
+    }
+
+    [Test]
+    public async Task InitialUnavailable_DoesNotClaimNoMatches()
+    {
+        SetupPagedResult(Task.FromException<EventDiscoveryTraversalResource>(new HttpRequestException("Unavailable")));
+        var cut = _ctx.RenderMudComponent<EventList>();
+        await Assert.That(cut.FindAll(".event-list__recovery").Count).IsEqualTo(1);
+        await Assert.That(cut.Markup).DoesNotContain("No events found");
+    }
+
+    private HttpClient RegisterDiscoveryHttpClient(DiscoveryHttpHandler handler)
+    {
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        _ctx.Services.AddSingleton<IEventService>(new EventService(
+            new EventClient(http),
+            Substitute.For<IEventLifecycleClient>(),
+            Substitute.For<IEventManagementReadClient>(),
+            Substitute.For<IEventParticipationClient>(),
+            Substitute.For<IEventPublicActionClient>(),
+            Substitute.For<ILogger<EventService>>()));
+        return http;
+    }
+
+    private sealed class DiscoveryHttpHandler(params (int Status, object Payload)[] responses) : HttpMessageHandler
+    {
+        private readonly Queue<(int Status, object Payload)> pending = new(responses);
+        public List<Uri> Requests { get; } = [];
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request.RequestUri!);
+            var response = pending.Dequeue();
+            return Task.FromResult(new HttpResponseMessage((System.Net.HttpStatusCode)response.Status)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(response.Payload),
+                    System.Text.Encoding.UTF8, response.Status == 200 ? "application/hal+json" : "application/problem+json")
+            });
+        }
     }
 
     private static DockLayoutSnapshot CreateWorkspaceSnapshot(bool customizeOpen, int customizeWidth)
@@ -145,10 +285,10 @@ public class EventListTests : IDisposable
             PersistState: true);
     }
 
-    private void SetupPagedResult(Task<PaginatedResult<EventListDto>> resultTask)
+    private void SetupPagedResult(Task<EventDiscoveryTraversalResource> resultTask)
     {
-        _eventService.GetEventsPagedAsync(
-            Arg.Any<int>(),                    // pageNumber
+        _eventService.GetEventDiscoveryAsync(
+            Arg.Any<string?>(),                // cursor
             Arg.Any<int>(),                    // pageSize
             Arg.Any<string?>(),                // searchTerm
             Arg.Any<Guid?>(),                  // categoryId
@@ -187,6 +327,9 @@ public class EventListTests : IDisposable
             Arg.Any<Guid?>(),                  // organizationId
             Arg.Any<Guid?>(),                  // groupId
             Arg.Any<string?>(),                // view
+            Arg.Any<Guid?>(),                  // areaId
+            Arg.Any<List<CustomPropertyFilterCriterion>?>(),
+            Arg.Any<string?>(),
             Arg.Any<CancellationToken>())
             .Returns(resultTask);
     }
@@ -250,58 +393,22 @@ public class EventListTests : IDisposable
     }
 
     [Test]
-    public async Task FetchEventsPagedAsync_ForwardsOwnershipQueryStateToService()
+    public async Task Traversal_ForwardsOwnershipQueryStateThroughGeneratedHttp()
     {
         var actorId = Guid.NewGuid();
         var organizationId = Guid.NewGuid();
         var groupId = Guid.NewGuid();
-        SetupPagedResult(Task.FromResult(CreateResult(1, 20, [])));
+        using var handler = new DiscoveryHttpHandler((200, CreateResult(1, 20, [])));
+        using var http = RegisterDiscoveryHttpClient(handler);
         var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo($"/events?actorId={actorId}&organizationId={organizationId}&groupId={groupId}");
 
         var cut = _ctx.RenderMudComponent<EventList>();
 
-        await _eventService.Received().GetEventsPagedAsync(
-            Arg.Any<int>(),
-            Arg.Any<int>(),
-            Arg.Any<string?>(),
-            Arg.Any<Guid?>(),
-            Arg.Any<List<Guid>?>(),
-            Arg.Any<List<Guid>?>(),
-            Arg.Any<string?>(),
-            Arg.Any<string?>(),
-            Arg.Any<List<Guid>?>(),
-            Arg.Any<List<Guid>?>(),
-            Arg.Any<string?>(),
-            Arg.Any<string?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<DateTimeOffset?>(),
-            Arg.Any<DateTimeOffset?>(),
-            Arg.Any<string?>(),
-            Arg.Any<bool?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<bool?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<List<int>?>(),
-            Arg.Any<bool?>(),
-            Arg.Any<int?>(),
-            Arg.Any<bool?>(),
-            Arg.Any<bool?>(),
-            Arg.Any<bool?>(),
-            Arg.Any<string?>(),
-            Arg.Any<bool?>(),
-            actorId,
-            organizationId,
-            groupId,
-            Arg.Any<string?>(),
-            Arg.Any<CancellationToken>());
+        var query = System.Web.HttpUtility.ParseQueryString(handler.Requests.Single().Query);
+        await Assert.That(query["actorId"]).IsEqualTo(actorId.ToString());
+        await Assert.That(query["organizationId"]).IsEqualTo(organizationId.ToString());
+        await Assert.That(query["groupId"]).IsEqualTo(groupId.ToString());
     }
 
     [Test]
@@ -421,7 +528,7 @@ public class EventListTests : IDisposable
     public async Task DoesNotShowEmptyState_BeforeFirstEventsLoadCompletes()
     {
         // Arrange — result stays pending
-        var pendingResult = new TaskCompletionSource<PaginatedResult<EventListDto>>();
+        var pendingResult = new TaskCompletionSource<EventDiscoveryTraversalResource>(TaskCreationOptions.RunContinuationsAsynchronously);
         SetupPagedResult(pendingResult.Task);
 
         // Act
@@ -438,7 +545,7 @@ public class EventListTests : IDisposable
     public async Task ShowsNoEventsState_OnlyAfterInitialLoadCompletesWithEmptyResult()
     {
         // Arrange — start with pending result
-        var pendingResult = new TaskCompletionSource<PaginatedResult<EventListDto>>();
+        var pendingResult = new TaskCompletionSource<EventDiscoveryTraversalResource>(TaskCreationOptions.RunContinuationsAsynchronously);
         SetupPagedResult(pendingResult.Task);
 
         var cut = _ctx.RenderMudComponent<EventList>();
@@ -449,7 +556,7 @@ public class EventListTests : IDisposable
             Assert.That(cut.Markup).DoesNotContain("No events found");
         });
 
-        // Complete the provider already subscribed by the rendered Virtualize component.
+        // Complete the request already subscribed by the rendered component.
         pendingResult.SetResult(CreateResult(1, 20, []));
 
         cut.WaitForAssertion(() =>

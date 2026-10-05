@@ -33,6 +33,38 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
     public void Dispose() => context.Dispose();
 
     [Test]
+    public async Task ServerApprovedOverlapReachesEveryLayoutWithoutBrowserReallocation()
+    {
+        var home = CompleteHome(Guid.CreateVersion7());
+        home = home with
+        {
+            UpcomingInArea = [home.Hero!.Single(), .. home.UpcomingInArea!],
+            RecentlyAdded = [home.Hero.Single(), .. home.RecentlyAdded!]
+        };
+        discoveryService.LoadAsync(null, null, Arg.Any<CancellationToken>()).Returns(home);
+        var cut = context.RenderMudComponent<HomeDiscoveryExperience>();
+        cut.WaitForElement("[data-testid='home-discovery-context']", TimeSpan.FromSeconds(2));
+
+        var rendered = cut.FindComponent<Explore.Blazor.Client.Components.Presentation.HeroCarousel>()
+            .Instance.Events.Select(item => item.Id)
+            .Concat(cut.FindComponent<UpcomingEventList>().Instance.Events.Select(item => item.Id))
+            .Concat(cut.FindComponents<Explore.Blazor.Client.Pages.Events.Components.EventCard>()
+                .Select(card => card.Instance.Event.Id)).ToArray();
+        var assigned = home.Hero!.Concat(home.UpcomingInArea!)
+            .Concat(home.Spotlight!.Items!)
+            .Concat(home.MostViewedInArea!)
+            .Concat(home.MostViewedOnline!)
+            .Concat(home.RecentlyAdded!)
+            .Concat(home.CuratedSections!.SelectMany(section => section.Items!))
+            .Select(item => item.Event!.Id).ToArray();
+
+        await Assert.That(rendered).IsEquivalentTo(assigned);
+        await Assert.That(cut.FindComponent<UpcomingEventList>().Instance.Events
+            .Any(item => item.Id == home.Hero.Single().Event!.Id)).IsTrue();
+        await Assert.That(cut.FindAll("[data-testid='event-rail-skeleton']").Count).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task OneCompositePayloadRendersHeroAndThreeEventLayouts()
     {
         var areaId = Guid.NewGuid();
@@ -252,6 +284,7 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
         await Assert.That(cut.Markup).Contains("This section is temporarily unavailable");
         await Assert.That(cut.Markup).Contains("Most viewed online");
         await Assert.That(cut.Markup).Contains("Recently added");
+        await Assert.That(cut.FindAll(".home-discovery__section-failure").Count).IsGreaterThan(0);
     }
 
     [Test]
@@ -288,7 +321,8 @@ public sealed class HomeDiscoveryExperienceTests : IDisposable
 
         await Assert.That(cut.Markup).Contains("Federated neighborhood iftar");
         await Assert.That(row.HasAttribute("href")).IsFalse();
-        await Assert.That(row.GetAttribute("aria-label")).IsEqualTo("AT Protocol event: Federated neighborhood iftar");
+        await Assert.That(row.GetAttribute("aria-label"))
+            .IsEqualTo($"AT Protocol event: Federated neighborhood iftar. {row.QuerySelector("time")!.TextContent}");
     }
 
     [Test]

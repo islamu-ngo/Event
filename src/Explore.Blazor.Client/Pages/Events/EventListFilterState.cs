@@ -78,16 +78,16 @@ internal sealed record EventListFilterState(
         };
     }
 
-    public Task<PaginatedResult<EventListDto>> FetchPageAsync(
+    public Task<EventDiscoveryTraversalResource> FetchTraversalAsync(
         IEventService eventService,
-        int pageNumber,
+        string? cursor,
         int pageSize,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(eventService);
 
-        return eventService.GetEventsPagedAsync(
-            pageNumber,
+        return eventService.GetEventDiscoveryAsync(
+            cursor,
             pageSize,
             searchTerm: SearchTerm,
             includedCategoryIds: IncludedCategoryIds,

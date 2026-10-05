@@ -321,6 +321,9 @@ public sealed class AdmissionCompositeDispatchTests
             Substitute.For<IEventPublishedNotificationFanoutService>(),
             Substitute.For<IEventModerationNotificationFanoutService>(),
             Substitute.For<IReportProviderSyncDispatcher>(),
+            new EventDiscoveryIdentityCorrectionDispatcher(
+                Substitute.For<IEventDiscoveryIdentityCorrectionNotificationService>(),
+                Substitute.For<ITenantContextAccessor>()),
             new LocationPrivacyCorrectionDispatcher(cache, correctionPlanner, EventLocationPrivacyMetricsFactory.Create()),
             new PrivacyErasureCacheInvalidationDispatcher(cache),
             admissionHandler,

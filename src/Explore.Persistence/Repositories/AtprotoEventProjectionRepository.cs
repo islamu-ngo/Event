@@ -3,7 +3,10 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Persistence.Extensions;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Explore.Domain.Services.Discovery;
 
 namespace Explore.Persistence.Repositories;
 
@@ -13,6 +16,59 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
     public async Task<(IReadOnlyList<AtprotoEventProjection> Items, int TotalCount)> GetPublicWindowAsync(
         AtprotoEventProjectionQuery query,
         CancellationToken cancellationToken)
+    {
+        var filtered = PortableInstants(FilteredQuery(query));
+        int totalCount = await filtered.CountAsync(cancellationToken);
+        IReadOnlyList<AtprotoEventProjection> items = await Order(filtered, query.Sort, query.SortDescending)
+            .Take(query.Take)
+            .ToListAsync(cancellationToken);
+        return (items, totalCount);
+    }
+
+    public async Task<IReadOnlyList<AtprotoEventProjection>> SeekPublicDiscoveryAsync(
+        AtprotoEventProjectionQuery query, EventDiscoverySourceCursor? after, CancellationToken cancellationToken)
+    {
+        RequireDiscoveryTransaction();
+        ArgumentOutOfRangeException.ThrowIfLessThan(query.Take, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(query.Take, 1000);
+        var filtered = FilteredQuery(query);
+        if (after is not null)
+        {
+            var createdAt = new DateTimeOffset(after.CreatedAtUtc, TimeSpan.Zero);
+            string titleKey = EventDiscoveryRank.TitleKey(after.Title);
+            string sourceKey = EventDiscoveryRank.SourceKey(after.Id);
+            filtered = query.Sort switch
+            {
+                AtprotoEventDiscoverySort.Title => filtered.Where(value =>
+                    (query.SortDescending ? value.DiscoveryTitleSortKey.CompareTo(titleKey) < 0 : value.DiscoveryTitleSortKey.CompareTo(titleKey) > 0)
+                    || value.DiscoveryTitleSortKey == titleKey && value.DiscoverySourceSortKey.CompareTo(sourceKey) > 0),
+                AtprotoEventDiscoverySort.CreatedAt => filtered.Where(value =>
+                    (query.SortDescending ? value.CreatedAt < createdAt : value.CreatedAt > createdAt)
+                    || value.CreatedAt == createdAt && value.DiscoverySourceSortKey.CompareTo(sourceKey) > 0),
+                AtprotoEventDiscoverySort.Views => filtered.Where(value => value.DiscoverySourceSortKey.CompareTo(sourceKey) > 0),
+                _ when after.StartsAt is null => query.SortDescending
+                    ? filtered.Where(value => value.StartsAt == null && value.DiscoverySourceSortKey.CompareTo(sourceKey) > 0)
+                    : filtered.Where(value => value.StartsAt != null || value.DiscoverySourceSortKey.CompareTo(sourceKey) > 0),
+                _ => filtered.Where(value =>
+                    (query.SortDescending ? value.StartsAt == null || value.StartsAt < after.StartsAt : value.StartsAt > after.StartsAt)
+                    || value.StartsAt == after.StartsAt && value.DiscoverySourceSortKey.CompareTo(sourceKey) > 0)
+            };
+        }
+        return await Order(PortableInstants(filtered), query.Sort, query.SortDescending)
+            .Take(query.Take).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AtprotoEventProjection>> GetPublicDiscoveryMembersAsync(
+        AtprotoEventProjectionQuery query, IReadOnlyCollection<Guid> recordIds, CancellationToken cancellationToken)
+    {
+        RequireDiscoveryTransaction();
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(recordIds.Count, 100);
+        return await PortableInstants(FilteredQuery(query))
+            .Where(value => recordIds.Contains(value.AtprotoRecordId))
+            .ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<AtprotoEventProjection> FilteredQuery(AtprotoEventProjectionQuery query)
     {
         IQueryable<AtprotoEventProjection> filtered = VisibleQuery();
 
@@ -54,11 +110,7 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
             _ => filtered
         };
 
-        int totalCount = await filtered.CountAsync(cancellationToken);
-        IReadOnlyList<AtprotoEventProjection> items = await Order(filtered, query.Sort, query.SortDescending)
-            .Take(query.Take)
-            .ToListAsync(cancellationToken);
-        return (items, totalCount);
+        return filtered;
     }
 
     public async Task<IReadOnlyList<AtprotoEventProjection>> GetVisibleByRecordIdsAsync(
@@ -82,7 +134,7 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
         VisibleQuery(includeLocalEchoes: true)
             .SingleOrDefaultAsync(value => value.AtprotoRecordId == atprotoRecordId, cancellationToken);
 
-    private IQueryable<AtprotoEventProjection> VisibleQuery(bool includeLocalEchoes = false)
+    internal IQueryable<AtprotoEventProjection> VisibleQuery(bool includeLocalEchoes = false)
     {
         IQueryable<Event> locallyEligibleEvents = dbContext.Events.WherePubliclyEligible(dbContext);
         IQueryable<AtprotoEventProjection> query = dbContext.AtprotoEventProjections
@@ -130,29 +182,19 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
                 && @event.VisibilityTypeId == (int)VisibilityTypeEnum.Public));
     }
 
-    private static IOrderedQueryable<AtprotoEventProjection> Order(
+    private IOrderedQueryable<AtprotoEventProjection> Order(
         IQueryable<AtprotoEventProjection> query,
         AtprotoEventDiscoverySort sort,
-        bool descending) => (sort, descending) switch
-        {
-            (AtprotoEventDiscoverySort.Title, false) => query
-                .OrderBy(value => value.Name)
-                .ThenBy(value => value.AtprotoRecordId),
-            (AtprotoEventDiscoverySort.Title, true) => query
-                .OrderByDescending(value => value.Name)
-                .ThenBy(value => value.AtprotoRecordId),
-            (AtprotoEventDiscoverySort.CreatedAt, false) => query
-                .OrderBy(value => value.CreatedAt)
-                .ThenBy(value => value.AtprotoRecordId),
-            (AtprotoEventDiscoverySort.CreatedAt, true) => query
-                .OrderByDescending(value => value.CreatedAt)
-                .ThenBy(value => value.AtprotoRecordId),
-            (AtprotoEventDiscoverySort.Views, _) => query.OrderBy(value => value.AtprotoRecordId),
-            (_, false) => query
-                .OrderBy(value => value.StartsAt)
-                .ThenBy(value => value.AtprotoRecordId),
-            _ => query
-                .OrderByDescending(value => value.StartsAt)
-                .ThenBy(value => value.AtprotoRecordId)
-        };
+        bool descending) =>
+        AtprotoEventProjectionTemporalQuery.Order(dbContext, query, sort, descending);
+
+    private void RequireDiscoveryTransaction()
+    {
+        if (dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel
+            != System.Data.IsolationLevel.Serializable)
+            throw new InvalidOperationException("Discovery source reads require caller-owned Serializable.");
+    }
+
+    private IQueryable<AtprotoEventProjection> PortableInstants(IQueryable<AtprotoEventProjection> query) =>
+        AtprotoEventProjectionTemporalQuery.PortableInstants(dbContext, query);
 }

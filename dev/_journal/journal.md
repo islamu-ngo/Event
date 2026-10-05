@@ -2742,6 +2742,30 @@ References: `InstanceOnboardingGenerationReader`,
 
 ---
 
+## [2026-10-03 Europe/Brussels] Sort factories can silently break sentinel dispatch
+
+**Context**: Stable public discovery must use the same rank for native source seeks, bounded merging and continuation criteria.
+
+**Symptom / Observation**: Native title/view ordering fell through to occurrence-date ordering even though the request resolved the correct sort specification. Omitted date sorting also differed from the explicit equivalent criteria.
+
+**Root Cause**: `EventSort` is a nominal class without value equality. Its factory properties allocated a new instance on each access, while `EventRepository` selected its native keyset branches by comparing against those properties. Identical expression selectors did not make different instances equal. A default-sort fallback then concealed the failed dispatch rather than reporting an unsupported sort.
+
+**Resolution**: Each immutable `EventSort` property now holds one stable instance, and the local source resolves the default field before applying direction. The SQLite candidate cohort passed 29 cases, including omitted-versus-explicit date criteria and native rank witnesses. Verification command: `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/*EventDiscoveryCandidateReaderTests/*" --minimum-expected-tests 29`. Other provider agreement requires its own executed native lane.
+
+**Why This Matters for Future Work**: Before converting an immutable singleton into a factory, inspect its consumers for reference-based dispatch. An equivalent expression or identical fields do not preserve nominal class identity. Assert selected ordering through a real query; testing only the factory's selector misses a silently chosen fallback.
+
+**References**:
+- `src/Explore.Application/Specifications/Events/EventSort.cs:19`
+- `src/Explore.Application/Features/Events/Discovery/EventDiscoveryLocalSource.cs:402`
+- `src/Explore.Persistence/Repositories/EventRepository.cs:517`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EventDiscoveryCandidateReaderTests.cs:262`
+- `docs/internal/adr/ADR-event-discovery-authority.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the existing native ordering regressions guard this dispatch contract.
+
+---
+
 ## [2026-10-02 Europe/Brussels] Parameterize dynamic admission credential predicates
 
 **Context**: Full-suite verification exposed the PostgreSQL admission check-in latency gate while working on `update-repository-query`.

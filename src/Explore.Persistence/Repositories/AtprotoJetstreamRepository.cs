@@ -146,10 +146,12 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         {
             var consumed = new List<StagedStorageWrite>();
             var retiring = new HashSet<(Guid TenantId, Guid ObjectId)>();
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellationToken);
             try
             {
                 await AcquireConsumerLockAsync(request.Claim.Service, cancellationToken);
+                _dbContext.DisclosureMutations.Enlist(request.Presentations.Select(value => value.TenantId));
                 var state = await _dbContext.AtprotoJetstreamConsumerStates.SingleOrDefaultAsync(value =>
                     value.Id == request.Claim.ConsumerStateId &&
                     value.Service == request.Claim.Service &&
@@ -214,6 +216,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                     return AtprotoPersistenceApplyResult.Rejected;
                 }
 
+                await _dbContext.FlushDisclosureAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return new AtprotoPersistenceApplyResult(true, consumed);
             }
@@ -251,10 +254,12 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             var consumed = new List<StagedStorageWrite>();
             var retiring = new HashSet<(Guid TenantId, Guid ObjectId)>();
 
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellationToken);
             try
             {
                 await AcquireConsumerLockAsync(request.Claim.Service, cancellationToken);
+                _dbContext.DisclosureMutations.Enlist(request.PresentationTenantIds);
                 AtprotoJetstreamConsumerState? state = await _dbContext.AtprotoJetstreamConsumerStates
                     .SingleOrDefaultAsync(value =>
                         value.Id == request.Claim.ConsumerStateId
@@ -469,6 +474,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                     return AtprotoPersistenceApplyResult.Rejected;
                 }
 
+                await _dbContext.FlushDisclosureAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return new AtprotoPersistenceApplyResult(true, consumed);
             }
@@ -691,6 +697,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         finally
         {
             _dbContext.ChangeTracker.Clear();
+            _dbContext.ResetDisclosureMutations();
         }
     }
 
@@ -818,6 +825,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
 
         if (storedRecord.TombstonedAt is not null)
         {
+            await _dbContext.DisclosureMutations.CaptureAsync(cancellationToken);
             await _dbContext.AtprotoRecordTenantPresentations
                 .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoJetstreamGlobalMaterialization)
                 .Where(value => value.AtprotoRecordId == storedRecord.Id)
@@ -1412,6 +1420,22 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
     {
         var events = _dbContext.Events.IgnoreAllFilters(filterBypassReason).AsNoTracking()
             .Where(value => value.AtprotoRecordId != null && recordIds.Contains(value.AtprotoRecordId.Value));
+        var sourceOwners = await events.Select(value => new
+        { value.TenantId, value.ActorId }).ToArrayAsync(cancellationToken);
+        string[] importDids = imports.Select(value => value.Did).Distinct().ToArray();
+        Guid[] importActorIds = await _dbContext.AtprotoIdentities.IgnoreAllFilters(filterBypassReason)
+            .AsNoTracking().Where(value => importDids.Contains(value.Did))
+            .Select(value => value.ActorId).ToArrayAsync(cancellationToken);
+        // Capture would otherwise acquire these source anchors during the first
+        // save, after storage fencing. Keep Actor -> record -> Tenant -> storage
+        // for both existing owners and newly imported tenant enrollments.
+        await _dbContext.DisclosureMutations.EnlistActorsAsync(
+            sourceOwners.Select(value => value.ActorId).Concat(importActorIds).Distinct().ToArray(),
+            cancellationToken);
+        await _dbContext.DisclosureMutations.EnlistRecordsAsync(recordIds, cancellationToken);
+        _dbContext.DisclosureMutations.Enlist(
+            sourceOwners.Select(value => value.TenantId).Concat(imports.Select(value => value.TenantId)));
+        await _dbContext.DisclosureMutations.CaptureAsync(cancellationToken);
         var eventReferences = await events.Select(value => new
         { value.FeaturedImageId, value.BackgroundImageId }).ToArrayAsync(cancellationToken);
         Guid?[] sessionImages = await _dbContext.EventSessions.IgnoreAllFilters(filterBypassReason).AsNoTracking()
@@ -1637,6 +1661,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         }
 
         Guid[] recordIds = [.. records.Select(value => value.Id)];
+        await _dbContext.DisclosureMutations.EnlistRecordsAsync(recordIds, cancellationToken);
         List<AtprotoEventProjection> projections = await _dbContext.AtprotoEventProjections
             .Where(value => recordIds.Contains(value.AtprotoRecordId))
             .ToListAsync(cancellationToken);
@@ -1672,6 +1697,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             return;
         }
 
+        await _dbContext.DisclosureMutations.EnlistRecordsAsync([storedRecord.Id], cancellationToken);
         AtprotoEventProjection? projection = await _dbContext.AtprotoEventProjections
             .SingleOrDefaultAsync(value => value.AtprotoRecordId == storedRecord.Id, cancellationToken);
         if (projection is not null)

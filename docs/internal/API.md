@@ -189,6 +189,16 @@ not add a pipeline bypass or require an already-existing administrator during se
 
 ### Generated C# Client Shape
 
+Public `GetEvents` now returns `EventDiscoveryTraversalResource`.
+`cursor` replaces public `pageNumber`; `pageSize` is 1..100.
+The response carries `snapshotCount`, `truncated`, `expiresAt`, `hasMore`,
+`_embedded.items` and `_links.self`/`_links.next`, without exhaustive totals or
+random-page relations. Follow `next` with the same filters; changing criteria
+invalidates the authenticated continuation. Invalid/expired/changed continuations
+return no-store `400`/`410`/`409` ProblemDetails, and unavailable authority/capacity
+returns `503`. See [the API changelog](API_CHANGELOG.md) and
+[the authority ADR](adr/ADR-event-discovery-authority.md).
+
 The OpenAPI document defines wire shape; repository generation policy defines the checked-in C# shape. Pinned NSwag first emits POCO syntax, then `eng/tools/Explore.GeneratedContracts` converts structurally eligible response/value schemas into nominal records without changing JSON names, requiredness, nullability, HAL relations, operation methods, or wire payloads. Protocol inputs, nested request graphs, HAL resources, inherited schemas, clients, exceptions, file wrappers, and explicitly mutable UI/service contracts remain classes. Generated record properties are init-only except `[JsonExtensionData] AdditionalProperties`, which stays settable for System.Text.Json AOT compatibility.
 
 This is a source-level breaking change for consumers of the generated C# client: use object initializers or `with` copies instead of post-construction mutation. It is not a wire-format compatibility layer, and the pre-v1 repository carries no legacy generated-client variant.

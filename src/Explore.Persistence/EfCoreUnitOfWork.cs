@@ -48,6 +48,11 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
 
     public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default)
     {
+        // MySQL's default RepeatableRead uses a historical snapshot for ordinary
+        // dependency queries even after a current-read row fence. Serializable
+        // gives source fanout current locking reads and whole-attempt replay.
+        if (_dbContext.Database.ProviderName == Database.RelationalNamedLock.MySqlProvider)
+            return await ExecuteSerializableAsync(operation, ct);
         return await ExecuteCoreAsync(operation, isolationLevel: null, ct);
     }
 
@@ -55,7 +60,20 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct = default)
     {
-        return await ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct);
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                return await ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct);
+            }
+            catch (Exception exception) when (attempt < 4 && IsSerializableRetryConflict(exception))
+            {
+                // ExecuteCore has rolled back and cleared operation writes. Transaction-start
+                // conflicts have no writes, but may still have tracked state from the caller.
+                _dbContext.ChangeTracker.Clear();
+            }
+        }
     }
 
     public Task<T> ExecuteBootstrapConvergenceAsync<T>(
@@ -150,6 +168,7 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
                 if (_dbContext.StorageReferenceTransactionFailed)
                     throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                         "The storage reference transaction has failed.");
+                await _dbContext.FlushDisclosureAsync(ct);
                 await transaction.CommitAsync(ct);
                 return result;
             }
@@ -186,6 +205,7 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         finally
         {
             _dbContext.ChangeTracker.Clear();
+            _dbContext.ResetDisclosureMutations();
         }
     }
 
@@ -249,6 +269,22 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             }
         }
 
+        return false;
+    }
+
+    private static bool IsSerializableRetryConflict(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SqliteException { SqliteErrorCode: 5 or 6 }
+                || current is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
+                }
+                || current is MySqlException { Number: 1205 or 1213 }
+                || current is SqlException { Number: 1205 })
+                return true;
+        }
         return false;
     }
 }

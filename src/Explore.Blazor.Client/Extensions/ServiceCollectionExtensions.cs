@@ -82,6 +82,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantShellSettingsService, TenantShellSettingsService>();
         services.AddScoped<IEventResourceGovernanceService, EventResourceGovernanceService>();
         services.AddScoped<IEventService, EventService>();
+        services.AddScoped<IEventDiscoveryIdentityService, EventDiscoveryIdentityService>();
         services.AddScoped<IEventResourceService, EventResourceService>();
         services.AddScoped<IEventSessionService, EventSessionService>();
         services.AddScoped<IEventOrganizerClaimService, EventOrganizerClaimService>();

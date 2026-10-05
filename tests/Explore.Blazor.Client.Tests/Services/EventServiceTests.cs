@@ -15,7 +15,7 @@ namespace Explore.Blazor.Client.Tests.Services;
 /// - Edge cases (null responses, exceptions)
 ///
 /// IMPORTANT: The API client uses HAL resource types:
-/// - GetEventsAsync returns HalCollectionResourceOfEventListDto
+/// - GetEventsAsync returns EventDiscoveryTraversalResource
 /// - GetMyEventsAsync returns HalCollectionResourceOfEventListDto
 /// - GetEventByIdAsync returns HalResourceOfEventDto
 /// The service converts these to plain DTOs using HalResourceExtensions.
@@ -46,6 +46,32 @@ public class EventServiceTests
             _apiClient,
             _apiClient,
             _logger);
+    }
+
+    [Test]
+    [Arguments(409)]
+    [Arguments(410)]
+    [Arguments(503)]
+    public async Task PublicDetail_PreservesDiscoveryFailureInsteadOfReturningMissing(int status)
+    {
+        _apiClient.GetEventByPublicCodeAsync(
+                "program-public000001", Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new ApiException("Discovery unavailable", status, "", new Dictionary<string, IEnumerable<string>>(), null));
+
+        var failure = await Assert.ThrowsAsync<ApiException>(
+            () => _service.GetEventBySlugCodeAsync("program-public000001"));
+
+        await Assert.That(failure.StatusCode).IsEqualTo(status);
+    }
+
+    [Test]
+    public async Task PublicDetail_ConcealedOrMissingSourceStillReturnsNull()
+    {
+        _apiClient.GetEventByPublicCodeAsync(
+                "program-public000001", Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new ApiException("Not found", 404, "", new Dictionary<string, IEnumerable<string>>(), null));
+
+        await Assert.That(await _service.GetEventBySlugCodeAsync("program-public000001")).IsNull();
     }
 
     [Test]
@@ -146,10 +172,35 @@ public class EventServiceTests
         await Assert.That(result).Contains(action);
     }
 
-    #region GetAllEventsAsync Tests
+    #region Public Discovery Tests
 
     [Test]
-    public async Task GetAllEventsAsync_ReturnsEvents_WhenApiSucceeds()
+    public async Task DiscoveryConversion_PreservesOriginalActionTargetsWithoutMutatingSource()
+    {
+        var originalEventId = Guid.NewGuid();
+        var local = new EventListDto { Id = originalEventId, Title = "Original attendee event" };
+        var item = new HalResourceOfEventDiscoveryItemDto
+        {
+            Source = "local",
+            Event = local,
+            _links = new Dictionary<string, HalLink>
+            {
+                ["participation"] = new() { Href = $"/api/Event/{originalEventId}/participation" },
+                ["source"] = new() { Href = $"/api/Event/{originalEventId}" }
+            }
+        };
+
+        var mapped = item.ToEventListDto()!;
+
+        await Assert.That(mapped.Id).IsEqualTo(originalEventId);
+        await Assert.That(mapped.GetHalHref("participation")).IsEqualTo($"/api/Event/{originalEventId}/participation");
+        await Assert.That(mapped.GetHalHref("source")).IsEqualTo($"/api/Event/{originalEventId}");
+        await Assert.That(mapped.HasHalLink("edit")).IsFalse();
+        await Assert.That(local.AdditionalProperties.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task GetEventDiscoveryAsync_PreservesStoredMembershipAndItems()
     {
         // Arrange
         var expectedEvents = ComponentDataBuilder.EventListDto.Generate(3);
@@ -158,77 +209,93 @@ public class EventServiceTests
         _apiClient.GetEventsAsync().ReturnsForAnyArgs(halResponse);
 
         // Act
-        var result = await _service.GetAllEventsAsync();
+        var result = await _service.GetEventDiscoveryAsync();
 
         // Assert
-        await Assert.That(result.Count).IsEqualTo(3);
-        await Assert.That(result.First().Title).IsEqualTo(expectedEvents.First().Title);
-        await Assert.That(result.First().Id).IsEqualTo(expectedEvents.First().Id);
+        await Assert.That(result.GetItems().Count).IsEqualTo(3);
+        await Assert.That(result.GetItems().First().Title).IsEqualTo(expectedEvents.First().Title);
+        await Assert.That(result.GetItems().First().Id).IsEqualTo(expectedEvents.First().Id);
+        await Assert.That(result.SnapshotCount).IsEqualTo(3);
     }
 
     [Test]
-    public async Task GetAllEventsAsync_ReturnsEmptyList_WhenApiReturnsNull()
+    public async Task GetEventDiscoveryAsync_PreservesExpiryFailureInsteadOfEmptyResults()
     {
         // Arrange
-        _apiClient.GetEventsAsync().ReturnsForAnyArgs((HalCollectionResourceOfEventDiscoveryItemDto?)null);
+        _apiClient.GetEventsAsync().ThrowsAsyncForAnyArgs(CreateApiException("Expired", 410));
 
         // Act
-        var result = await _service.GetAllEventsAsync();
+        var exception = await Assert.That(() => _service.GetEventDiscoveryAsync("expired"))
+            .Throws<ApiException>();
 
         // Assert
-        await Assert.That(result).IsEmpty();
+        await Assert.That(exception.StatusCode).IsEqualTo(410);
     }
 
     [Test]
-    public async Task GetAllEventsAsync_ReturnsEmptyList_WhenApiThrowsException()
+    public async Task GetEventDiscoveryAsync_PreservesUnavailableInsteadOfEmptyResults()
     {
         // Arrange
         _apiClient.GetEventsAsync().ThrowsAsyncForAnyArgs(CreateApiException("API Error", 500));
 
         // Act
-        var result = await _service.GetAllEventsAsync();
+        var exception = await Assert.That(() => _service.GetEventDiscoveryAsync())
+            .Throws<ApiException>();
 
         // Assert
-        await Assert.That(result).IsEmpty();
+        await Assert.That(exception.StatusCode).IsEqualTo(500);
     }
 
     [Test]
-    public async Task GetAllEventsAsync_ReturnsEmptyList_WhenEmbeddedIsNull()
+    public async Task GetEventDiscoveryAsync_EmptyMembershipHasNoItems()
     {
         // Arrange
-        var halResponse = new HalCollectionResourceOfEventDiscoveryItemDto
+        var halResponse = new EventDiscoveryTraversalResource
         {
             _embedded = null
         };
         _apiClient.GetEventsAsync().ReturnsForAnyArgs(halResponse);
 
         // Act
-        var result = await _service.GetAllEventsAsync();
+        var result = await _service.GetEventDiscoveryAsync();
 
         // Assert
-        await Assert.That(result).IsEmpty();
+        await Assert.That(result.GetItems()).IsEmpty();
     }
 
     [Test]
-    public async Task GetAllEventsAsync_CallsApiWithCorrectPagination()
+    public async Task GetEventDiscoveryAsync_PreservesBoundedTraversalMetadata()
     {
         // Arrange
-        var halResponse = CreateDiscoveryCollectionResponse([]);
+        var halResponse = CreateDiscoveryCollectionResponse([]) with
+        {
+            SnapshotCount = 1000,
+            Truncated = true,
+            HasMore = true,
+            ExpiresAt = TestTime.UtcNow.AddMinutes(15),
+            _links = new Dictionary<string, HalLink>
+            {
+                ["next"] = new() { Href = "/api/Event?cursor=opaque&pageSize=20" }
+            }
+        };
         _apiClient.GetEventsAsync().ReturnsForAnyArgs(halResponse);
 
         // Act
-        await _service.GetAllEventsAsync();
+        var result = await _service.GetEventDiscoveryAsync();
 
-        // Assert - Service should request page 1 with size 100
-        await _apiClient.Received(1).GetEventsAsync(1, 100);
+        await Assert.That(result.SnapshotCount).IsEqualTo(1000);
+        await Assert.That(result.Truncated).IsTrue();
+        await Assert.That(result.HasMore).IsTrue();
+        await Assert.That(result.ExpiresAt).IsEqualTo(TestTime.UtcNow.AddMinutes(15));
+        await Assert.That(result._links["next"].Href).IsEqualTo("/api/Event?cursor=opaque&pageSize=20");
     }
 
     [Test]
-    public async Task GetAllEventsAsync_MapsFederatedEnvelopeAndPreservesSourceAffordance()
+    public async Task GetEventDiscoveryAsync_MapsFederatedEnvelopeAndPreservesSourceAffordance()
     {
         var recordId = Guid.NewGuid();
         const string sourcePath = "/api/event/federated/source-record/source";
-        _apiClient.GetEventsAsync().ReturnsForAnyArgs(new HalCollectionResourceOfEventDiscoveryItemDto
+        _apiClient.GetEventsAsync().ReturnsForAnyArgs(new EventDiscoveryTraversalResource
         {
             _embedded = new HalCollectionEmbeddedOfEventDiscoveryItemDto
             {
@@ -260,8 +327,8 @@ public class EventServiceTests
             }
         });
 
-        var result = await _service.GetAllEventsAsync();
-        var mapped = result.Single();
+        var result = await _service.GetEventDiscoveryAsync();
+        var mapped = result.GetItems().Single();
 
         await Assert.That(mapped.Title).IsEqualTo("Federated community gathering");
         await Assert.That(mapped.Id).IsNull();
@@ -272,9 +339,9 @@ public class EventServiceTests
     }
 
     [Test]
-    public async Task GetAllEventsAsync_RefreshReplacesTombstonedFederatedResult()
+    public async Task GetEventDiscoveryAsync_NewTraversalReplacesTombstonedFederatedResult()
     {
-        var stale = new HalCollectionResourceOfEventDiscoveryItemDto
+        var stale = new EventDiscoveryTraversalResource
         {
             _embedded = new HalCollectionEmbeddedOfEventDiscoveryItemDto
             {
@@ -288,18 +355,17 @@ public class EventServiceTests
                 ]
             }
         };
-        var refreshed = new HalCollectionResourceOfEventDiscoveryItemDto
+        var refreshed = new EventDiscoveryTraversalResource
         {
             _embedded = new HalCollectionEmbeddedOfEventDiscoveryItemDto { Items = [] }
         };
-        _apiClient.GetEventsAsync(1, 100).Returns(stale, refreshed);
+        _apiClient.GetEventsAsync().ReturnsForAnyArgs(stale, refreshed);
 
-        var first = await _service.GetAllEventsAsync();
-        var second = await _service.GetAllEventsAsync();
+        var first = await _service.GetEventDiscoveryAsync();
+        var second = await _service.GetEventDiscoveryAsync();
 
-        await Assert.That(first.Select(item => item.Title)).Contains("Tombstoned remote event");
-        await Assert.That(second).IsEmpty();
-        await _apiClient.Received(2).GetEventsAsync(1, 100);
+        await Assert.That(first.GetItems().Select(item => item.Title)).Contains("Tombstoned remote event");
+        await Assert.That(second.GetItems()).IsEmpty();
     }
 
     #endregion
@@ -1273,34 +1339,30 @@ public class EventServiceTests
     }
 
     [Test]
-    public async Task GetEventsPagedAsync_ReturnsEmptyPage_WhenApiThrows()
+    public async Task GetEventDiscoveryAsync_PreservesRestartFailure()
     {
         // Arrange
-        _apiClient.GetEventsAsync(Arg.Any<int?>(), Arg.Any<int?>())
-            .ThrowsAsync(CreateApiException("Server Error", 500));
+        _apiClient.GetEventsAsync().ThrowsAsyncForAnyArgs(CreateApiException("Restart", 409));
 
         // Act
-        var result = await _service.GetEventsPagedAsync(pageNumber: 3, pageSize: 25);
+        var exception = await Assert.That(() => _service.GetEventDiscoveryAsync("old", 25))
+            .Throws<ApiException>();
 
         // Assert
-        await Assert.That(result.Items).IsEmpty();
-        await Assert.That(result.PageNumber).IsEqualTo(3);
-        await Assert.That(result.PageSize).IsEqualTo(25);
+        await Assert.That(exception.StatusCode).IsEqualTo(409);
     }
 
     [Test]
-    public async Task GetEventsPagedAsync_CallsApiWithCorrectPagination()
+    public async Task GetEventDiscoveryAsync_DoesNotSwallowCancellation()
     {
         // Arrange
-        var halResponse = CreateDiscoveryCollectionResponse([]);
-        _apiClient.GetEventsAsync(Arg.Any<int?>(), Arg.Any<int?>())
-            .Returns(halResponse);
+        _apiClient.GetEventsAsync().ThrowsAsyncForAnyArgs(new OperationCanceledException());
 
         // Act
-        await _service.GetEventsPagedAsync(pageNumber: 2, pageSize: 15);
+        await Assert.That(() => _service.GetEventDiscoveryAsync())
+            .Throws<OperationCanceledException>();
 
         // Assert
-        await _apiClient.Received(1).GetEventsAsync(2, 15);
     }
 
     [Test]
@@ -1321,7 +1383,6 @@ public class EventServiceTests
 
         // Assert
         await Assert.That(result.Count).IsEqualTo(2);
-        await _apiClient.Received(1).GetEventsAsync(pageNumber: 1, pageSize: 100, actorId: actorId, view: "All");
     }
 
     [Test]
@@ -1346,7 +1407,6 @@ public class EventServiceTests
         await Assert.That(result.Select(evt => evt.Title)).Contains("Managed version");
         await Assert.That(result.Select(evt => evt.Title)).Contains("Moderated");
         await Assert.That(result.Select(evt => evt.Title)).DoesNotContain("Public version");
-        await _apiClient.Received(1).GetEventsAsync(pageNumber: 1, pageSize: 100, actorId: actorId, view: "All");
         await _apiClient.Received(1).GetManagedEventsByActorAsync(
             actorId: actorId,
             pageNumber: 1,
@@ -1372,11 +1432,12 @@ public class EventServiceTests
         };
     }
 
-    private static HalCollectionResourceOfEventDiscoveryItemDto CreateDiscoveryCollectionResponse(
+    private static EventDiscoveryTraversalResource CreateDiscoveryCollectionResponse(
         IList<EventListDto> items)
     {
-        return new HalCollectionResourceOfEventDiscoveryItemDto
+        return new EventDiscoveryTraversalResource
         {
+            SnapshotCount = items.Count,
             _embedded = new HalCollectionEmbeddedOfEventDiscoveryItemDto
             {
                 Items = items.Select(item => new HalResourceOfEventDiscoveryItemDto

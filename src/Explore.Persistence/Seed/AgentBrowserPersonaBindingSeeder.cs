@@ -56,7 +56,10 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
                     && (row.UserId != Organizer.SubjectId || row.OrganizationTenantId != OrganizationTenantId), token)
                 || await database.EventRoleAssignments.AnyAsync(row =>
                     (row.UserId == Organizer.SubjectId || row.UserId == Manager.SubjectId)
-                    && (row.EventId != EventId || row.TenantId != TenantId), token))
+                    && (row.TenantId != TenantId
+                        || (row.EventId != EventId
+                            && !(row.UserId == Organizer.SubjectId && row.RoleId == (int)RoleEnum.EventOwner
+                                && (row.EventId == DiscoverySourceId || row.EventId == DuplicateDiscoverySourceId)))), token))
                 throw Failure("foreign_privilege");
             Guid[] subjects = All.Select(persona => persona.SubjectId).ToArray();
             string[] emails = All.Select(persona => persona.Email).ToArray();
@@ -76,6 +79,34 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
                         && (row.UserId == null || !subjects.Contains(row.UserId.Value)), token)))
                 throw Failure("foreign_identity");
             await ValidateFoundationAsync(marker.Status == InstanceBootstrapStatus.Completed, token);
+            await ValidateDiscoverySourcesAsync(token);
+        }
+        finally { if (restore) database.ClearTenantFilterBypass(); }
+    }
+
+    public async Task SeedDiscoverySourcesAsync(CancellationToken token)
+    {
+        bool restore = !database.IsTenantFilterBypassed;
+        database.EnableTenantFilterBypass(TenantFilterBypassReasons.DatabaseSeeding);
+        try
+        {
+            await ExecuteRetryableAsync(async () =>
+            {
+                if (await ValidateDiscoverySourcesAsync(token)) return;
+                await RequireDiscoveryParentAsync(token);
+                await using var transaction = await database.Database.BeginTransactionAsync(token);
+                DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+                database.Events.AddRange(
+                    Event(DiscoverySourceId, TenantId, OrganizationActorId, DiscoverySourceTitle,
+                        "agent-discovery-source", now, Id(342), "agent0000340", DiscoveryOccurrence),
+                    Event(DuplicateDiscoverySourceId, TenantId, OrganizationActorId, DiscoverySourceTitle,
+                        "agent-discovery-duplicate", now, Id(343), "agent0000341", DiscoveryOccurrence));
+                await database.SaveChangesAsync(token);
+                AddEventRole(Organizer.SubjectId, RoleEnum.EventOwner, Id(344), now, DiscoverySourceId);
+                AddEventRole(Organizer.SubjectId, RoleEnum.EventOwner, Id(345), now, DuplicateDiscoverySourceId);
+                await database.SaveChangesAsync(token);
+                await transaction.CommitAsync(token);
+            });
         }
         finally { if (restore) database.ClearTenantFilterBypass(); }
     }
@@ -297,9 +328,86 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
         return true;
     }
 
-    private void AddEventRole(Guid user, RoleEnum role, Guid id, DateTime now)
+    private async Task RequireDiscoveryParentAsync(CancellationToken token)
     {
-        var assignment = EventRoleAssignment.Create(TenantId, EventId, user, (int)role, EventRoleAssignmentStatus.Active, now, null, Administrator.SubjectId);
+        if (!await database.Tenants.AsNoTracking().AnyAsync(row => row.Id == TenantId
+                && row.TenantStatusId == (int)TenantStatusEnum.Active, token)
+            || !await database.Organizations.AsNoTracking().AnyAsync(row => row.Id == OrganizationId, token)
+            || !await database.Actors.AsNoTracking().AnyAsync(row => row.Id == OrganizationActorId
+                && row.OrganizationId == OrganizationId && row.UserId == null
+                && row.GroupId == null && row.ExternalActorSubjectId == null && row.ServicePrincipalId == null
+                && row.ActorTypeId == (int)ActorTypeEnum.Organization && !row.IsSuspended, token)
+            || !await database.Set<OrganizationTenant>().AsNoTracking().AnyAsync(row =>
+                row.Id == OrganizationTenantId && row.TenantId == TenantId && row.OrganizationId == OrganizationId
+                && row.ApprovalStatusId == (int)ApprovalStatusEnum.Approved
+                && row.IsVisible && row.IsOrganizerEligible && !row.IsSuspended, token)
+            || !await database.OrganizationMembers.AsNoTracking().AnyAsync(row => row.Id == Id(420)
+                && row.OrganizationTenantId == OrganizationTenantId && row.TenantId == TenantId
+                && row.UserId == Organizer.SubjectId && row.RoleId == (int)RoleEnum.OrgAdmin, token))
+            throw Failure("discovery_parent_conflict");
+    }
+
+    private async Task<bool> ValidateDiscoverySourcesAsync(CancellationToken token)
+    {
+        Guid[] sources = [DiscoverySourceId, DuplicateDiscoverySourceId];
+        Guid[] sessions = [Id(342), Id(343)];
+        Guid[] grants = [Id(344), Id(345)];
+        var events = await database.Events.AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .Include(row => row.Sessions).Where(row => sources.Contains(row.Id)
+                || row.PublicCode == "agent0000340" || row.PublicCode == "agent0000341"
+                || row.Slug == "agent-discovery-source" || row.Slug == "agent-discovery-duplicate")
+            .ToListAsync(token);
+        var owners = await database.EventRoleAssignments.AsNoTracking().Where(row => grants.Contains(row.Id)
+            || (sources.Contains(row.EventId) && row.RoleId == (int)RoleEnum.EventOwner)).ToListAsync(token);
+        int sessionCount = await database.EventSessions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .CountAsync(row => sessions.Contains(row.Id) || sources.Contains(row.EventId), token);
+        if (events.Count + owners.Count + sessionCount == 0) return false;
+        await RequireDiscoveryParentAsync(token);
+        if (events.Count != 2 || owners.Count != 2 || sessionCount != 2)
+            throw Failure("discovery_source_conflict");
+        for (int index = 0; index < sources.Length; index++)
+        {
+            var source = events.SingleOrDefault(row => row.Id == sources[index]);
+            var owner = owners.SingleOrDefault(row => row.Id == grants[index]);
+            string slug = index == 0 ? "agent-discovery-source" : "agent-discovery-duplicate";
+            string code = index == 0 ? "agent0000340" : "agent0000341";
+            if (source is null || source.IsDeleted || source.TenantId != TenantId
+                || source.ActorId != OrganizationActorId || source.OrganizerActorId != OrganizationActorId
+                || source.SubmittedByUserId is not null
+                || source.SourcePublisherName is not null || source.ProvenanceSource is not null
+                || source.ProvenanceExternalId is not null
+                || source.EventProvenanceTypeId != (int)EventProvenanceTypeEnum.OrganizerCreated
+                || source.Title != DiscoverySourceTitle || source.Slug != slug || source.PublicCode != code
+                || source.VisibilityTypeId != (int)VisibilityTypeEnum.Public
+                || source.EventStatusId != (int)EventStatusEnum.Published
+                || source.EventTimeZoneId != "UTC" || source.Timezone != "UTC"
+                || source.FirstSessionStartUtc != DiscoveryOccurrence
+                || source.LastSessionEndUtc != DiscoveryOccurrence.AddHours(2) || source.SessionCount != 1
+                || source.Sessions.Count != 1
+                || owner is null || owner.EventId != sources[index] || owner.TenantId != TenantId
+                || owner.UserId != Organizer.SubjectId || owner.RoleId != (int)RoleEnum.EventOwner
+                || owner.CreatedBy != Administrator.SubjectId
+                || owner.ExpiresAtUtc is not null || owner.StartsAtUtc != owner.CreatedAt || owner.Version < 1
+                || (owner.Status != EventRoleAssignmentStatus.Active && owner.Status != EventRoleAssignmentStatus.Revoked)
+                || (owner.Status == EventRoleAssignmentStatus.Active
+                    && (owner.RevokedAtUtc is not null || owner.RevokedByUserId is not null))
+                || (owner.Status == EventRoleAssignmentStatus.Revoked
+                    && (owner.RevokedAtUtc is null || owner.RevokedByUserId is null)))
+                throw Failure("discovery_source_conflict");
+            var session = source.Sessions.Single();
+            if (session.Id != sessions[index] || session.IsDeleted || session.EventId != source.Id
+                || session.TenantId != TenantId || session.Title != DiscoverySourceTitle
+                || session.EventSessionStatusId != (int)EventSessionStatusEnum.Published
+                || session.StartTime != DiscoveryOccurrence || session.EndTime != DiscoveryOccurrence.AddHours(2)
+                || session.EndTimeType != SessionEndTimeType.Fixed)
+                throw Failure("discovery_source_conflict");
+        }
+        return true;
+    }
+
+    private void AddEventRole(Guid user, RoleEnum role, Guid id, DateTime now, Guid? eventId = null)
+    {
+        var assignment = EventRoleAssignment.Create(TenantId, eventId ?? EventId, user, (int)role, EventRoleAssignmentStatus.Active, now, null, Administrator.SubjectId);
         assignment.Id = id;
         assignment.CreatedAt = now;
         database.EventRoleAssignments.Add(assignment);
@@ -328,11 +436,12 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
     private static Organization Organization(Guid id, string name, DateTime now) => new() { Id = id, Pii = new OrganizationPii { FullName = name }, CreatedAt = now };
     private static Actor OrganizationActor(Guid id, Guid organization, string name, DateTime now) => new() { Id = id, OrganizationId = organization, ActorTypeId = (int)ActorTypeEnum.Organization, ActorType = null!, Pii = new ActorPii { DisplayName = name }, CreatedAt = now };
     private static OrganizationTenant Participation(Guid id, Guid tenant, Guid organization, DateTime now) => new() { Id = id, TenantId = tenant, Tenant = null!, OrganizationId = organization, Organization = null!, ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, IsVisible = true, IsOrganizerEligible = true, ApprovedAt = now, CreatedAt = now };
-    private static Explore.Domain.Event Event(Guid id, Guid tenant, Guid actor, string title, string slug, DateTime now)
+    private static Explore.Domain.Event Event(Guid id, Guid tenant, Guid actor, string title, string slug, DateTime now,
+        Guid? sessionId = null, string? publicCode = null, DateTimeOffset? occurrence = null)
     {
-        var entity = new Explore.Domain.Event { Id = id, TenantId = tenant, Tenant = null!, ActorId = actor, Actor = null!, OrganizerActorId = actor, Title = title, Slug = slug, PublicCode = id == EventId ? "agent0000303" : "agent0000302", EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated, VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!, EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, CreatedAt = now, ConcurrencyStamp = Guid.CreateVersion7() };
-        DateTimeOffset start = new(now.Date.AddDays(7), TimeSpan.Zero);
-        var session = new EventSession { Id = id == EventId ? Id(310) : Id(311), EventId = id, Event = entity, TenantId = tenant, Tenant = null!, Title = title, CreatedAt = now, ConcurrencyStamp = Guid.CreateVersion7() };
+        var entity = new Explore.Domain.Event { Id = id, TenantId = tenant, Tenant = null!, ActorId = actor, Actor = null!, OrganizerActorId = actor, Title = title, Slug = slug, PublicCode = publicCode ?? (id == EventId ? "agent0000303" : "agent0000302"), EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated, VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!, EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, CreatedAt = now, ConcurrencyStamp = Guid.CreateVersion7() };
+        DateTimeOffset start = occurrence ?? new DateTimeOffset(now.Date.AddDays(7), TimeSpan.Zero);
+        var session = new EventSession { Id = sessionId ?? (id == EventId ? Id(310) : Id(311)), EventId = id, Event = entity, TenantId = tenant, Tenant = null!, Title = title, CreatedAt = now, ConcurrencyStamp = Guid.CreateVersion7() };
         session.Reschedule(UtcInstantRange.Create(start, start.AddHours(2)), "UTC", new EventScheduleProjectionCalculator());
         entity.Sessions.Add(session);
         entity.ApplyScheduleTimeZone("UTC", new EventScheduleProjectionCalculator());

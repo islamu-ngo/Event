@@ -29,6 +29,17 @@ public static class AuthorizationFactAttributeProjection
         GroupAuthorizationFacts value => Group(value),
         GroupMemberAuthorizationFacts value => GroupMember(value),
         EventAuthorizationFacts value => Event(value),
+        EventDiscoveryIdentityAuthorizationFacts value => new(StringComparer.Ordinal)
+        {
+            ["tenantId"] = value.TenantId.ToString("D"),
+            ["eventId"] = value.EventId.ToString("D"),
+            ["discoveryReviewerUserId"] = value.ReviewerUserId.ToString("D"),
+            ["discoveryAction"] = value.Action,
+            ["discoveryActiveMembership"] = value.ActiveMembership,
+            ["discoveryManagementAuthority"] = value.ManagementAuthority,
+            ["discoveryExplicitGrant"] = value.ExplicitGrant,
+            ["discoveryHasConflict"] = value.HasConflict
+        },
         EventScopedAuthorizationFacts value => EventScoped(value),
         EventOrganizerClaimAuthorizationFacts value => EventOrganizerClaim(value),
         RegistrationOrderAuthorizationFacts value => RegistrationOrder(value),

@@ -11,6 +11,7 @@ public sealed class GetPublicEventDiscoveryRequestValidator : AbstractValidator<
     {
         RuleFor(request => request.Criteria.PageNumber).GreaterThanOrEqualTo(1);
         RuleFor(request => request.Criteria.PageSize).InclusiveBetween(1, 100);
+        RuleFor(request => request.Criteria.AreaId).Must(id => id is null || id != Guid.Empty);
         RuleFor(request => request).Must(FitsBoundedWindow)
             .WithMessage($"The public event discovery window cannot exceed {MaximumWindowSize} items.");
     }

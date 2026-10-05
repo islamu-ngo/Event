@@ -244,6 +244,7 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
         try
         {
             await CreateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken);
+            await _dbContext.FlushDisclosureAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (IsRoomNoOverlapViolation(ex, session.RoomId))
@@ -298,6 +299,7 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
         try
         {
             await UpdateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken);
+            await _dbContext.FlushDisclosureAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (IsRoomNoOverlapViolation(ex, session.RoomId))
@@ -319,6 +321,7 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
             throw new InvalidOperationException("Moving an event session requires an active transaction.");
         }
 
+        _dbContext.DisclosureMutations.Enlist([session.TenantId, eventLocation.TenantId]);
         _dbContext.Entry(session).State = EntityState.Detached;
         int affectedRows = await _dbContext.EventSessions
             .Where(candidate =>

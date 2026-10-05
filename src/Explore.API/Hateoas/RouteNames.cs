@@ -284,6 +284,9 @@ public static class RouteNames
     public const string SubmitEventOrganizerClaim = nameof(SubmitEventOrganizerClaim);
     public const string WithdrawEventOrganizerClaim = nameof(WithdrawEventOrganizerClaim);
     public const string ReviewEventOrganizerClaim = nameof(ReviewEventOrganizerClaim);
+    public const string GetEventDuplicateCandidates = nameof(GetEventDuplicateCandidates);
+    public const string GetEventDiscoveryIdentity = nameof(GetEventDiscoveryIdentity);
+    public const string ReviewEventDiscoveryAlias = nameof(ReviewEventDiscoveryAlias);
     public const string CreateEvent = nameof(CreateEvent);
     public const string ImportEvent = nameof(ImportEvent);
     public const string PublishEvent = nameof(PublishEvent);

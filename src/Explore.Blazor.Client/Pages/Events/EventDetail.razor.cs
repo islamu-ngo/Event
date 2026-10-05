@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Blazouter.Models;
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.EventReporting;
@@ -139,11 +140,19 @@ public partial class EventDetail : ComponentBase, IDisposable
     [Inject] private IEventLocationService EventLocationService { get; set; } = default!;
 
     private Guid EventId { get; set; }
+    private string? _loadedSlugCode;
+    private Task _routeLoadTask = Task.CompletedTask;
+    private long _loadGeneration;
+    private bool _disposed;
 
     private EventDto? _eventDetails;
     private ICollection<EventSessionListDto>? _eventSessions;
     private EventSessionListDto? _primarySession;
     private bool _isLoading = true;
+    private int? _publicReadStatus;
+    private string PublicReadRecoveryMessage => _publicReadStatus == 503
+        ? T("ui.event.detail.recovery.unavailable", "Event details are temporarily unavailable. Try again when ready.")
+        : T("ui.event.detail.recovery.changed", "Event information changed while loading. Reload to see current details.");
     private bool _canDelete = false;
     private bool _canEdit = false;
     private bool _canManageTeam = false;
@@ -219,9 +228,34 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
-        var slugCode = RouterState.GetParam("slugCode");
+        Translation.OnLanguageChanged += HandleLanguageChanged;
         await LoadBrandingAsync();
+        if (_disposed)
+            return;
+        RouterState.OnRouteChanged += HandleRouteChanged;
+        var slugCode = RouterState.GetParam("slugCode");
+        _loadedSlugCode = slugCode;
         await LoadEventDataAsync(slugCode);
+    }
+
+    private void HandleRouteChanged(RouteMatch? route)
+    {
+        var slugCode = RouterState.GetParam("slugCode");
+        if (string.IsNullOrWhiteSpace(slugCode) || slugCode == _loadedSlugCode)
+            return;
+        _loadedSlugCode = slugCode;
+        var generation = ++_loadGeneration;
+        _routeLoadTask = InvokeAsync(async () =>
+        {
+            if (!IsCurrentLoad(generation))
+                return;
+            _eventDetails = null;
+            _isLoading = true;
+            StateHasChanged();
+            await LoadEventDataAsync(slugCode, generation);
+            if (IsCurrentLoad(generation))
+                StateHasChanged();
+        });
     }
 
     private async Task LoadBrandingAsync()
@@ -270,19 +304,37 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// <summary>
     /// Loads event details, sessions, and registration status.
     /// </summary>
-    private async Task LoadEventDataAsync(string? slugCode = null)
+    private bool IsCurrentLoad(long generation) => !_disposed && generation == _loadGeneration;
+
+    private async Task LoadEventDataAsync(string? slugCode = null, long? routeGeneration = null)
     {
+        var generation = routeGeneration ?? ++_loadGeneration;
+        if (!IsCurrentLoad(generation))
+            return;
         _isLoading = true;
         _isCheckingAuth = true;
+        _isProcessingEventAction = false;
         _errorMessage = null;
+        _publicReadStatus = null;
         _imageLoadFailed = false;
+        _showDetailTagCatPopup = false;
+        _eventSessions = null;
+        _primarySession = null;
+        _eventDays = null;
+        _eventAgendaItems = null;
+        _agendaItems = null;
+        _publicLocationView = null;
+        _attendeeLocationView = null;
 
         try
         {
             Logger.LogInformation("Loading event {SlugCode}", slugCode);
-            _eventDetails = string.IsNullOrWhiteSpace(slugCode)
+            var details = string.IsNullOrWhiteSpace(slugCode)
                 ? await EventService.GetEventByIdAsync(EventId)
                 : await EventService.GetEventBySlugCodeAsync(slugCode);
+            if (!IsCurrentLoad(generation))
+                return;
+            _eventDetails = details;
 
             if (_eventDetails != null)
             {
@@ -308,16 +360,21 @@ public partial class EventDetail : ComponentBase, IDisposable
 
                 CheckAuthorizationFromHalLinks();
 
-                await LoadEventLocationDisclosureAsync();
+                await LoadEventLocationDisclosureAsync(generation);
+                if (!IsCurrentLoad(generation))
+                    return;
 
-                _eventSessions = RemovePhysicalLocationData(await EventSessionService.GetSessionsByEventAsync(
+                var sessions = await EventSessionService.GetSessionsByEventAsync(
                     EventId,
-                    includeManagedSessions: CanRequestManagedSessions));
+                    includeManagedSessions: CanRequestManagedSessions);
+                if (!IsCurrentLoad(generation))
+                    return;
+                _eventSessions = RemovePhysicalLocationData(sessions);
                 _primarySession = _eventSessions?.FirstOrDefault();
                 Logger.LogInformation("Loaded {SessionCount} sessions", _eventSessions?.Count ?? 0);
 
                 var aspectsTask = NeedsAspectFallbackLoad()
-                    ? LoadEventAspectsAsync()
+                    ? LoadEventAspectsAsync(generation)
                     : Task.CompletedTask;
                 var daysTask = EventDayService.GetDaysByEventAsync(EventId, CanRequestManagedSessions);
                 var eventAgendaTask = EventAgendaItemService.GetAgendaItemsByEventAsync(EventId);
@@ -325,28 +382,46 @@ public partial class EventDetail : ComponentBase, IDisposable
                     ? AgendaItemService.GetAgendaItemsBySessionAsync(_primarySession.Id.Value)
                     : Task.FromResult<ICollection<EventSessionAgendaItemListDto>>(new List<EventSessionAgendaItemListDto>());
                 await Task.WhenAll(aspectsTask, daysTask, eventAgendaTask, agendaTask);
+                if (!IsCurrentLoad(generation))
+                    return;
                 _agendaItems = RemovePhysicalLocationData(await agendaTask);
                 _eventDays = await daysTask;
                 _eventAgendaItems = await eventAgendaTask;
             }
         }
+        catch (ApiException ex) when (ex.StatusCode is 409 or 410 or 503)
+        {
+            if (!IsCurrentLoad(generation))
+                return;
+            _eventDetails = null;
+            _publicReadStatus = ex.StatusCode;
+            _errorMessage = PublicReadRecoveryMessage;
+            Logger.LogWarning(ex, "Public event details require an explicit reload");
+        }
         catch (Exception ex)
         {
+            if (!IsCurrentLoad(generation))
+                return;
             _errorMessage = $"Failed to load event details: {ex.Message}";
             Logger.LogError(ex, "Failed to load event {EventId}", EventId);
         }
         finally
         {
-            _isLoading = false;
-            _isCheckingAuth = false;
+            if (IsCurrentLoad(generation))
+            {
+                _isLoading = false;
+                _isCheckingAuth = false;
+            }
         }
 
+        if (!IsCurrentLoad(generation))
+            return;
         if (_errorMessage != null)
             await AnnouncerService.AnnounceAssertiveAsync(_errorMessage);
         else if (_eventDetails == null)
             await AnnouncerService.AnnouncePoliteAsync("Event not found");
 
-        if (_eventDetails != null)
+        if (IsCurrentLoad(generation) && _eventDetails != null)
         {
             PersistState();
         }
@@ -388,10 +463,11 @@ public partial class EventDetail : ComponentBase, IDisposable
 
     private async Task RefreshRestoredEventDetailsAsync()
     {
+        var generation = _loadGeneration;
         try
         {
             var refreshedEvent = await EventService.GetEventByIdAsync(EventId);
-            if (refreshedEvent == null)
+            if (!IsCurrentLoad(generation) || refreshedEvent == null)
                 return;
 
             _eventDetails = refreshedEvent;
@@ -487,13 +563,16 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// <summary>
     /// Loads event aspects (Islamic and Tech) for the current event.
     /// </summary>
-    private async Task LoadEventAspectsAsync()
+    private async Task LoadEventAspectsAsync(long generation)
     {
         if (ShouldLoadIslamicAspectFallback())
         {
             try
             {
-                _islamicAspect = await EventAspectService.GetIslamicAspectAsync(EventId, CanRequestManagedSessions);
+                var islamicAspect = await EventAspectService.GetIslamicAspectAsync(EventId, CanRequestManagedSessions);
+                if (!IsCurrentLoad(generation))
+                    return;
+                _islamicAspect = islamicAspect;
             }
             catch (Exception ex)
             {
@@ -501,11 +580,16 @@ public partial class EventDetail : ComponentBase, IDisposable
             }
         }
 
+        if (!IsCurrentLoad(generation))
+            return;
         if (ShouldLoadTechAspectFallback())
         {
             try
             {
-                _techAspect = await EventAspectService.GetTechAspectAsync(EventId, CanRequestManagedSessions);
+                var techAspect = await EventAspectService.GetTechAspectAsync(EventId, CanRequestManagedSessions);
+                if (!IsCurrentLoad(generation))
+                    return;
+                _techAspect = techAspect;
             }
             catch (Exception ex)
             {
@@ -517,13 +601,17 @@ public partial class EventDetail : ComponentBase, IDisposable
             EventId, _islamicAspect != null, _techAspect != null);
     }
 
-    private async Task LoadEventAgendaAsync()
+    private async Task LoadEventAgendaAsync(long generation)
     {
+        if (!IsCurrentLoad(generation))
+            return;
         try
         {
             var daysTask = EventDayService.GetDaysByEventAsync(EventId, CanRequestManagedSessions);
             var itemsTask = EventAgendaItemService.GetAgendaItemsByEventAsync(EventId);
             await Task.WhenAll(daysTask, itemsTask);
+            if (!IsCurrentLoad(generation))
+                return;
             _eventDays = await daysTask;
             _eventAgendaItems = await itemsTask;
         }
@@ -532,7 +620,8 @@ public partial class EventDetail : ComponentBase, IDisposable
             Logger.LogError(ex, "Error reloading event agenda for event {EventId}", EventId);
         }
 
-        StateHasChanged();
+        if (IsCurrentLoad(generation))
+            StateHasChanged();
     }
 
     /// <summary>
@@ -655,18 +744,22 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// read; the attendee projection is layered on top only for a signed-in visitor, and the server —
     /// not this page — decides whether that visitor's registration unlocks anything extra.
     /// </summary>
-    private async Task LoadEventLocationDisclosureAsync()
+    private async Task LoadEventLocationDisclosureAsync(long generation)
     {
         _publicLocationView = null;
         _attendeeLocationView = null;
 
         IReadOnlyList<EventLocationPublicDto> publicLocations =
             await EventLocationService.GetPublicAsync(EventId);
+        if (!IsCurrentLoad(generation))
+            return;
         _publicLocationView = publicLocations
             .Select(EventLocationDisclosureView.FromPublic)
             .FirstOrDefault();
 
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (!IsCurrentLoad(generation))
+            return;
         if (authState.User.Identity?.IsAuthenticated != true)
         {
             return;
@@ -674,6 +767,8 @@ public partial class EventDetail : ComponentBase, IDisposable
 
         IReadOnlyList<EventLocationAttendeeDto> attendeeLocations =
             await EventLocationService.GetMyAccessAsync(EventId);
+        if (!IsCurrentLoad(generation))
+            return;
         _attendeeLocationView = attendeeLocations
             .Select(EventLocationDisclosureView.FromAttendee)
             .FirstOrDefault(view => _publicLocationView is null
@@ -1105,24 +1200,29 @@ public partial class EventDetail : ComponentBase, IDisposable
         if (!_canPublish || _eventDetails is null || _isProcessingEventAction)
             return;
 
-        var selectedSessionsToPublish = await ResolveSessionsToPublishOnEventPublishAsync();
-        if (selectedSessionsToPublish is null)
-            return;
-
+        var generation = _loadGeneration;
+        var eventId = EventId;
         if (_eventDetails.ConcurrencyStamp is not Guid expectedConcurrencyStamp || expectedConcurrencyStamp == Guid.Empty)
         {
             Snackbar.Add("Refresh the event before publishing.", Severity.Warning);
             return;
         }
 
+        var selectedSessionsToPublish = await ResolveSessionsToPublishOnEventPublishAsync(generation);
+        if (!IsCurrentLoad(generation) || selectedSessionsToPublish is null)
+            return;
         _isProcessingEventAction = true;
 
         try
         {
-            var response = await EventService.PublishEventAsync(EventId, expectedConcurrencyStamp);
+            var response = await EventService.PublishEventAsync(eventId, expectedConcurrencyStamp);
+            if (!IsCurrentLoad(generation))
+                return;
             if (response?.Success == true)
             {
-                var sessionPublishResult = await PublishSelectedSessionsAsync(selectedSessionsToPublish);
+                var sessionPublishResult = await PublishSelectedSessionsAsync(selectedSessionsToPublish, generation);
+                if (!IsCurrentLoad(generation))
+                    return;
                 if (sessionPublishResult.FailedCount > 0)
                 {
                     Snackbar.Add(
@@ -1148,21 +1248,26 @@ public partial class EventDetail : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            if (!IsCurrentLoad(generation))
+                return;
             Logger.LogError(ex, "Error publishing event {EventId}", EventId);
             Snackbar.Add("Event could not be published.", Severity.Error);
         }
         finally
         {
-            _isProcessingEventAction = false;
+            if (IsCurrentLoad(generation))
+                _isProcessingEventAction = false;
         }
     }
 
-    private async Task<IReadOnlyList<EventSessionPublishSelectionDialog.EventSessionPublishSelection>?> ResolveSessionsToPublishOnEventPublishAsync()
+    private async Task<IReadOnlyList<EventSessionPublishSelectionDialog.EventSessionPublishSelection>?> ResolveSessionsToPublishOnEventPublishAsync(long generation)
     {
         if (CanRequestManagedSessions)
         {
-            _eventSessions = RemovePhysicalLocationData(
-                await EventSessionService.GetSessionsByEventAsync(EventId, includeManagedSessions: true));
+            var sessionsToPublish = await EventSessionService.GetSessionsByEventAsync(EventId, includeManagedSessions: true);
+            if (!IsCurrentLoad(generation))
+                return null;
+            _eventSessions = RemovePhysicalLocationData(sessionsToPublish);
         }
 
         var sessions = _eventSessions?
@@ -1209,13 +1314,16 @@ public partial class EventDetail : ComponentBase, IDisposable
     }
 
     private async Task<(int PublishedCount, int FailedCount)> PublishSelectedSessionsAsync(
-        IReadOnlyList<EventSessionPublishSelectionDialog.EventSessionPublishSelection> selectedSessions)
+        IReadOnlyList<EventSessionPublishSelectionDialog.EventSessionPublishSelection> selectedSessions,
+        long generation)
     {
         var publishedCount = 0;
         var failedCount = 0;
 
         foreach (var session in selectedSessions)
         {
+            if (!IsCurrentLoad(generation))
+                break;
             var response = await EventSessionService.PublishEventSessionAsync(
                 session.SessionId,
                 session.ExpectedConcurrencyStamp);
@@ -1243,7 +1351,7 @@ public partial class EventDetail : ComponentBase, IDisposable
             $"Cancel \"{_eventDetails?.Title}\"? Registrations and public calls to action will stop being available.",
             "Cancel Event",
             "Event cancelled.",
-            () => EventService.CancelEventAsync(EventId, _eventDetails?.ConcurrencyStamp ?? Guid.Empty, default));
+            (eventId, stamp) => EventService.CancelEventAsync(eventId, stamp, default));
 
     private Task ArchiveEventAsync() =>
         ConfirmAndExecuteLifecycleActionAsync(
@@ -1251,7 +1359,7 @@ public partial class EventDetail : ComponentBase, IDisposable
             $"Archive \"{_eventDetails?.Title}\"? Archived events are removed from public event discovery.",
             "Archive Event",
             "Event archived.",
-            () => EventService.ArchiveEventAsync(EventId, _eventDetails?.ConcurrencyStamp ?? Guid.Empty, default),
+            (eventId, stamp) => EventService.ArchiveEventAsync(eventId, stamp, default),
             navigateToEvents: true);
 
     private async Task ModerateEventAsync()
@@ -1259,6 +1367,8 @@ public partial class EventDetail : ComponentBase, IDisposable
         if (!_canModerateLight || _eventDetails is null || _isProcessingEventAction)
             return;
 
+        var generation = _loadGeneration;
+        var eventId = EventId;
         var dialogResult = await ShowModerationReasonDialogAsync(
             title: "Moderate Event",
             message: $"Moderate \"{_eventDetails.Title}\"? This hides the event from public discovery.",
@@ -1270,14 +1380,16 @@ public partial class EventDetail : ComponentBase, IDisposable
             alertSeverity: Severity.Warning,
             reasonOptions: LightModerationReasonOptions);
 
-        if (dialogResult is null)
+        if (!IsCurrentLoad(generation) || dialogResult is null)
             return;
 
         _isProcessingEventAction = true;
 
         try
         {
-            var response = await EventModerationService.ModerateEventLightAsync(EventId, reasonCode: dialogResult.ReasonCode);
+            var response = await EventModerationService.ModerateEventLightAsync(eventId, reasonCode: dialogResult.ReasonCode);
+            if (!IsCurrentLoad(generation))
+                return;
             if (response?.Success != true)
             {
                 Snackbar.Add(response?.Message ?? "Event could not be moderated.", Severity.Error);
@@ -1289,12 +1401,15 @@ public partial class EventDetail : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            if (!IsCurrentLoad(generation))
+                return;
             Logger.LogError(ex, "Error moderating event {EventId}", EventId);
             Snackbar.Add("Event could not be moderated.", Severity.Error);
         }
         finally
         {
-            _isProcessingEventAction = false;
+            if (IsCurrentLoad(generation))
+                _isProcessingEventAction = false;
         }
     }
 
@@ -1303,6 +1418,8 @@ public partial class EventDetail : ComponentBase, IDisposable
         if (!_canModerateHeavy || _eventDetails is null || _isProcessingEventAction)
             return;
 
+        var generation = _loadGeneration;
+        var eventId = EventId;
         var dialogResult = await ShowModerationReasonDialogAsync(
             title: "Heavy Redact Event",
             message: $"Permanently redact \"{_eventDetails.Title}\" and delete event images?",
@@ -1315,14 +1432,16 @@ public partial class EventDetail : ComponentBase, IDisposable
             reasonOptions: HeavyModerationReasonOptions,
             requiresIrreversibleConfirmation: true);
 
-        if (dialogResult is null)
+        if (!IsCurrentLoad(generation) || dialogResult is null)
             return;
 
         _isProcessingEventAction = true;
 
         try
         {
-            var response = await EventModerationService.ModerateEventHeavyAsync(EventId, reasonCode: dialogResult.ReasonCode);
+            var response = await EventModerationService.ModerateEventHeavyAsync(eventId, reasonCode: dialogResult.ReasonCode);
+            if (!IsCurrentLoad(generation))
+                return;
             if (response?.Success != true)
             {
                 Snackbar.Add(response?.Message ?? "Event could not be heavy moderated.", Severity.Error);
@@ -1334,12 +1453,15 @@ public partial class EventDetail : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            if (!IsCurrentLoad(generation))
+                return;
             Logger.LogError(ex, "Error heavy moderating event {EventId}", EventId);
             Snackbar.Add("Event could not be heavy moderated.", Severity.Error);
         }
         finally
         {
-            _isProcessingEventAction = false;
+            if (IsCurrentLoad(generation))
+                _isProcessingEventAction = false;
         }
     }
 
@@ -1348,6 +1470,8 @@ public partial class EventDetail : ComponentBase, IDisposable
         if (!_canUnmoderate || _eventDetails is null || _isProcessingEventAction)
             return;
 
+        var generation = _loadGeneration;
+        var eventId = EventId;
         var dialogResult = await ShowModerationReasonDialogAsync(
             title: "Unmoderate Event",
             message: $"Restore \"{_eventDetails.Title}\" to published visibility?",
@@ -1359,14 +1483,16 @@ public partial class EventDetail : ComponentBase, IDisposable
             alertSeverity: Severity.Info,
             reasonOptions: UnmoderationReasonOptions);
 
-        if (dialogResult is null)
+        if (!IsCurrentLoad(generation) || dialogResult is null)
             return;
 
         _isProcessingEventAction = true;
 
         try
         {
-            var response = await EventModerationService.UnmoderateEventAsync(EventId, reasonCode: dialogResult.ReasonCode);
+            var response = await EventModerationService.UnmoderateEventAsync(eventId, reasonCode: dialogResult.ReasonCode);
+            if (!IsCurrentLoad(generation))
+                return;
             if (response?.Success != true)
             {
                 Snackbar.Add(response?.Message ?? "Event could not be unmoderated.", Severity.Error);
@@ -1378,12 +1504,15 @@ public partial class EventDetail : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            if (!IsCurrentLoad(generation))
+                return;
             Logger.LogError(ex, "Error unmoderating event {EventId}", EventId);
             Snackbar.Add("Event could not be unmoderated.", Severity.Error);
         }
         finally
         {
-            _isProcessingEventAction = false;
+            if (IsCurrentLoad(generation))
+                _isProcessingEventAction = false;
         }
     }
 
@@ -1440,12 +1569,24 @@ public partial class EventDetail : ComponentBase, IDisposable
             return;
         }
 
-        if (!await IsAuthenticatedForProtectedActionAsync())
+        var generation = _loadGeneration;
+        var eventId = EventId;
+        var eventTitle = _eventDetails.Title;
+        var returnPath = BuildReportReturnPath();
+        var isAuthenticated = await IsAuthenticatedForProtectedActionAsync();
+        if (!IsCurrentLoad(generation))
+            return;
+        if (!isAuthenticated)
         {
             await AccessibilityFocusService.SaveFocusAsync();
+            if (!IsCurrentLoad(generation))
+            {
+                await AccessibilityFocusService.RestoreFocusAsync();
+                return;
+            }
             await LoginPromptDialog.ShowAsync(
                 DialogService,
-                BuildReportReturnPath(),
+                returnPath,
                 ReportLoginPromptMessage,
                 ReportLoginPromptTitle,
                 "Sign in",
@@ -1456,20 +1597,22 @@ public partial class EventDetail : ComponentBase, IDisposable
 
         var parameters = new DialogParameters<ReportEventDialog>
         {
-            { dialog => dialog.EventId, EventId },
-            { dialog => dialog.EventTitle, _eventDetails.Title }
+            { dialog => dialog.EventId, eventId },
+            { dialog => dialog.EventTitle, eventTitle }
         };
 
         await AccessibilityFocusService.SaveFocusAsync();
         try
         {
+            if (!IsCurrentLoad(generation))
+                return;
             var dialog = await ReportEventDialog.ShowAsync(
                 DialogService,
                 "Report Event",
                 parameters,
                 DialogOptionsFactory.Medium());
             var result = await dialog.Result;
-            if (result is { Canceled: false, Data: EventReportSubmissionResult { Success: true } reportResult })
+            if (IsCurrentLoad(generation) && result is { Canceled: false, Data: EventReportSubmissionResult { Success: true } reportResult })
             {
                 Snackbar.Add("Event report submitted.", Severity.Success);
                 if (reportResult.ReportId is not null)
@@ -1486,9 +1629,12 @@ public partial class EventDetail : ComponentBase, IDisposable
 
     private async Task<bool> IsAuthenticatedForProtectedActionAsync()
     {
+        var generation = _loadGeneration;
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        _isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
-        return _isAuthenticated;
+        var isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
+        if (IsCurrentLoad(generation))
+            _isAuthenticated = isAuthenticated;
+        return isAuthenticated;
     }
 
     private async Task TryOpenPendingReportDialogAsync()
@@ -1524,12 +1670,15 @@ public partial class EventDetail : ComponentBase, IDisposable
         string message,
         string yesText,
         string successMessage,
-        Func<Task<BaseCommandResponseOfGuid?>> action,
+        Func<Guid, Guid, Task<BaseCommandResponseOfGuid?>> action,
         bool navigateToEvents = false)
     {
         if (_eventDetails is null || _isProcessingEventAction)
             return;
 
+        var generation = _loadGeneration;
+        var eventId = EventId;
+        var stamp = _eventDetails.ConcurrencyStamp ?? Guid.Empty;
         await AccessibilityFocusService.SaveFocusAsync();
         bool? confirmed;
         try
@@ -1545,14 +1694,16 @@ public partial class EventDetail : ComponentBase, IDisposable
             await AccessibilityFocusService.RestoreFocusAsync();
         }
 
-        if (confirmed != true)
+        if (!IsCurrentLoad(generation) || confirmed != true)
             return;
 
         _isProcessingEventAction = true;
 
         try
         {
-            var response = await action();
+            var response = await action(eventId, stamp);
+            if (!IsCurrentLoad(generation))
+                return;
             if (response?.Success != true)
             {
                 Snackbar.Add(response?.Message ?? "Event action could not be completed.", Severity.Error);
@@ -1570,12 +1721,15 @@ public partial class EventDetail : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            if (!IsCurrentLoad(generation))
+                return;
             Logger.LogError(ex, "Error executing lifecycle action on event {EventId}", EventId);
             Snackbar.Add("Event action could not be completed.", Severity.Error);
         }
         finally
         {
-            _isProcessingEventAction = false;
+            if (IsCurrentLoad(generation))
+                _isProcessingEventAction = false;
         }
     }
 
@@ -1590,6 +1744,7 @@ public partial class EventDetail : ComponentBase, IDisposable
     private async Task OpenDeleteDialog()
     {
         if (_eventDetails == null) return;
+        var generation = _loadGeneration;
 
         var parameters = new DialogParameters
         {
@@ -1608,7 +1763,7 @@ public partial class EventDetail : ComponentBase, IDisposable
         var result = await dialog.Result;
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (result != null && !result.Canceled)
+        if (IsCurrentLoad(generation) && result != null && !result.Canceled)
         {
             // Dialog already handled deletion and snackbar notification.
             // Return to the public event catalog because the legacy My Events page was removed.
@@ -1639,6 +1794,7 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// </summary>
     private async Task OpenIslamicAspectDialogAsync(EventIslamicAspectDto? existingAspect)
     {
+        var generation = _loadGeneration;
         var parameters = new DialogParameters
         {
             { "EventId", EventId },
@@ -1657,7 +1813,7 @@ public partial class EventDetail : ComponentBase, IDisposable
         var result = await dialog.Result;
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (result != null && !result.Canceled)
+        if (IsCurrentLoad(generation) && result != null && !result.Canceled)
         {
             // Reload the aspect to reflect changes
             await ReloadIslamicAspectAsync();
@@ -1685,6 +1841,7 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// </summary>
     private async Task OpenTechAspectDialogAsync(EventTechAspectDto? existingAspect)
     {
+        var generation = _loadGeneration;
         var parameters = new DialogParameters
         {
             { "EventId", EventId },
@@ -1703,7 +1860,7 @@ public partial class EventDetail : ComponentBase, IDisposable
         var result = await dialog.Result;
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (result != null && !result.Canceled)
+        if (IsCurrentLoad(generation) && result != null && !result.Canceled)
         {
             // Reload the aspect to reflect changes
             await ReloadTechAspectAsync();
@@ -1715,6 +1872,7 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// </summary>
     private async Task ConfirmDeleteIslamicAspect()
     {
+        var generation = _loadGeneration;
         await AccessibilityFocusService.SaveFocusAsync();
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Delete Islamic Characteristics",
@@ -1723,11 +1881,13 @@ public partial class EventDetail : ComponentBase, IDisposable
             cancelText: "Cancel");
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (confirmed == true)
+        if (IsCurrentLoad(generation) && confirmed == true)
         {
             try
             {
                 var success = await EventAspectService.DeleteIslamicAspectAsync(EventId);
+                if (!IsCurrentLoad(generation))
+                    return;
                 if (success)
                 {
                     _islamicAspect = null;
@@ -1739,6 +1899,8 @@ public partial class EventDetail : ComponentBase, IDisposable
             }
             catch (Exception ex)
             {
+                if (!IsCurrentLoad(generation))
+                    return;
                 Logger.LogError(ex, "Error deleting Islamic aspect for event {EventId}", EventId);
                 _errorMessage = "An error occurred while removing Islamic characteristics";
             }
@@ -1750,6 +1912,7 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// </summary>
     private async Task ConfirmDeleteTechAspect()
     {
+        var generation = _loadGeneration;
         await AccessibilityFocusService.SaveFocusAsync();
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Delete Tech Characteristics",
@@ -1758,11 +1921,13 @@ public partial class EventDetail : ComponentBase, IDisposable
             cancelText: "Cancel");
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (confirmed == true)
+        if (IsCurrentLoad(generation) && confirmed == true)
         {
             try
             {
                 var success = await EventAspectService.DeleteTechAspectAsync(EventId);
+                if (!IsCurrentLoad(generation))
+                    return;
                 if (success)
                 {
                     _techAspect = null;
@@ -1774,6 +1939,8 @@ public partial class EventDetail : ComponentBase, IDisposable
             }
             catch (Exception ex)
             {
+                if (!IsCurrentLoad(generation))
+                    return;
                 Logger.LogError(ex, "Error deleting Tech aspect for event {EventId}", EventId);
                 _errorMessage = "An error occurred while removing Tech characteristics";
             }
@@ -1785,9 +1952,12 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// </summary>
     private async Task ReloadIslamicAspectAsync()
     {
+        var generation = _loadGeneration;
         try
         {
-            _islamicAspect = await EventAspectService.GetIslamicAspectAsync(EventId, includeManaged: true);
+            var aspect = await EventAspectService.GetIslamicAspectAsync(EventId, includeManaged: true);
+            if (IsCurrentLoad(generation))
+                _islamicAspect = aspect;
         }
         catch (Exception ex)
         {
@@ -1800,9 +1970,12 @@ public partial class EventDetail : ComponentBase, IDisposable
     /// </summary>
     private async Task ReloadTechAspectAsync()
     {
+        var generation = _loadGeneration;
         try
         {
-            _techAspect = await EventAspectService.GetTechAspectAsync(EventId, includeManaged: true);
+            var aspect = await EventAspectService.GetTechAspectAsync(EventId, includeManaged: true);
+            if (IsCurrentLoad(generation))
+                _techAspect = aspect;
         }
         catch (Exception ex)
         {
@@ -1834,15 +2007,17 @@ public partial class EventDetail : ComponentBase, IDisposable
         _showDetailTagCatPopup = true;
     }
 
-    private async Task HandleDetailTagCatSaved(IReadOnlyCollection<Guid> newIds)
+    private async Task HandleDetailTagCatSaved(IReadOnlyCollection<Guid> newIds, long generation)
     {
+        if (!IsCurrentLoad(generation))
+            return;
         var label = _detailTagCatMode == TagCategoryMode.Tags ? "Tag" : "Category";
         Snackbar.Add($"{label} changes saved.", Severity.Success);
 
         try
         {
             var detail = await EventService.GetEventByIdAsync(EventId);
-            if (detail != null)
+            if (IsCurrentLoad(generation) && detail != null)
             {
                 _eventDetails = detail;
                 StateHasChanged();
@@ -1942,8 +2117,14 @@ public partial class EventDetail : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        ++_loadGeneration;
+        Translation.OnLanguageChanged -= HandleLanguageChanged;
+        RouterState.OnRouteChanged -= HandleRouteChanged;
         MainContentAppearanceState.Clear(MainContentAppearanceOwner);
     }
+
+    private void HandleLanguageChanged(string languageCode) => _ = InvokeAsync(StateHasChanged);
 
     private string GetDateMonth() => _eventDetails?.FirstSessionDate?.ToString("MMM") ?? "TBD";
     private string GetDateDay() => _eventDetails?.FirstSessionDate?.ToString("dd") ?? "--";

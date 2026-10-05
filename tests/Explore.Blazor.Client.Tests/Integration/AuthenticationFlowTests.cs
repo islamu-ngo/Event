@@ -455,7 +455,7 @@ public class AuthenticationFlowTests
 
         // AuthenticationFlowTests additionally needs IEventService.
         var eventService = Substitute.For<IEventService>();
-        eventService.GetAllEventsAsync().Returns(new List<EventListDto>());
+        eventService.GetEventDiscoveryAsync().Returns(new EventDiscoveryTraversalResource());
         ctx.Services.AddSingleton(eventService);
 
     }

@@ -5,6 +5,8 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Seed;
 using Explore.Persistence.ValueGenerators;
+using Explore.Persistence.Schema;
+using Explore.Domain.Services.Discovery;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -16,11 +18,23 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
     {
         builder.UseTptMappingStrategy();
 
-        builder.Property(e => e.Id).HasValueGenerator<GuidVersion7ValueGenerator>();
+        builder.Property(e => e.Id).HasValueGenerator<GuidVersion7ValueGenerator>()
+            .UsePropertyAccessMode(PropertyAccessMode.Property);
         builder.HasAlternateKey(e => new { e.TenantId, e.Id });
         builder.Property(e => e.TotalViews).HasDefaultValue(0);
 
-        builder.Property(e => e.Title).HasMaxLength(200).IsRequired();
+        builder.Property(e => e.Title).HasMaxLength(EventDiscoveryRank.EventTitleMaximumLength).IsRequired()
+            .UsePropertyAccessMode(PropertyAccessMode.Property);
+        builder.Property(e => e.DiscoveryTitleSortKey)
+            .HasMaxLength(EventDiscoveryRank.EventTitleKeyMaximumLength).IsRequired().IsUnicode(false)
+            .UsePortableOrdinalAscii();
+        builder.Property(e => e.DiscoverySourceSortKey)
+            .HasMaxLength(EventDiscoveryRank.SourceKeyLength).IsRequired().IsUnicode(false)
+            .UsePortableOrdinalAscii();
+        builder.HasIndex(e => new { e.TenantId, e.DiscoveryTitleSortKey, e.DiscoverySourceSortKey });
+        builder.HasIndex(e => new { e.TenantId, e.TotalViews, e.DiscoverySourceSortKey });
+        builder.HasIndex(e => new { e.TenantId, e.CreatedAt, e.DiscoverySourceSortKey });
+        builder.HasIndex(e => e.DiscoverySourceSortKey);
         builder.Property(e => e.Subtitle).HasMaxLength(200);
         builder.Property(e => e.Description).HasMaxLength(150);
         builder.Property(e => e.Content).HasMaxLength(5000);

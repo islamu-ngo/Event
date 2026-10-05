@@ -15,7 +15,6 @@ public class EventListCustomizationDrawerTests : IDisposable
 
     private static ICollection<EffectiveSettingDto> CreateDefaultSettings() =>
     [
-        new() { Key = "event_list.browse_mode", Value = "pagination" },
         new() { Key = "event_list.page_size", Value = "20" },
         new() { Key = "event_list.default_layout", Value = "DetailedList" },
         new() { Key = "event_list.card.show_date", Value = "true" },
@@ -53,14 +52,13 @@ public class EventListCustomizationDrawerTests : IDisposable
     }
 
     [Test]
-    public async Task Drawer_RendersBrowseModeSection()
+    public async Task Drawer_OffersBatchSizeWithoutRandomPages()
     {
         var cut = _ctx.RenderMudComponent<EventListCustomizationDrawerComponent>(p => p
             .Add(x => x.Settings, CreateDefaultSettings()));
 
-        await Assert.That(cut.Markup).Contains("Browse Mode");
-        await Assert.That(cut.Markup).Contains("Pages");
-        await Assert.That(cut.Markup).Contains("Scroll");
+        await Assert.That(cut.FindComponents<MudBlazor.MudSelect<int>>().Count).IsEqualTo(1);
+        await Assert.That(cut.FindComponents<MudBlazor.MudToggleGroup<string>>().Count).IsEqualTo(1);
     }
 
     [Test]
@@ -109,6 +107,6 @@ public class EventListCustomizationDrawerTests : IDisposable
 
         // Should render without throwing, showing default state
         await Assert.That(cut.Markup).Contains("Customize View");
-        await Assert.That(cut.Markup).Contains("Browse Mode");
+        await Assert.That(cut.FindComponents<MudBlazor.MudSelect<int>>().Count).IsEqualTo(1);
     }
 }

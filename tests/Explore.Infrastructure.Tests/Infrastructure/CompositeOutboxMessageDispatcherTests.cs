@@ -7,6 +7,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Application.Features.Events.Handlers.Commands;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Features.Management.Handlers.Commands;
@@ -445,6 +446,42 @@ public sealed class CompositeOutboxMessageDispatcherTests
     }
 
     [Test]
+    public async Task DispatchAsync_WithDiscoveryIdentityCorrection_RoutesToRealDeliveryService()
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        Guid eventId = Guid.CreateVersion7();
+        var notificationService =
+            Substitute.For<IEventDiscoveryIdentityCorrectionNotificationService>();
+        CompositeOutboxMessageDispatcher dispatcher = CreateDispatcher(
+            Substitute.For<IEventPublishedNotificationFanoutService>(),
+            Substitute.For<IEventModerationNotificationFanoutService>(),
+            correctionNotificationService: notificationService);
+        var request = new EventDiscoveryIdentityCorrectionRequested(
+            tenantId,
+            eventId,
+            Guid.CreateVersion7(),
+            6,
+            "same-offering",
+            "same_program");
+        var message = new OutboxMessage
+        {
+            Id = Guid.CreateVersion7(),
+            AggregateType = nameof(EventDiscoveryIdentity),
+            AggregateId = eventId,
+            EventType = EventDiscoveryIdentityCorrectionRequested.EventType,
+            Payload = JsonSerializer.Serialize(request)
+        };
+
+        await dispatcher.DispatchAsync(message);
+
+        await notificationService.Received(1).DeliverAsync(
+            message.Id,
+            Arg.Is<EventDiscoveryIdentityCorrectionRequested>(value =>
+                value.TenantId == tenantId && value.EventId == eventId),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
     public async Task DispatchAsync_WithPrivacyErasureCacheWork_ClearsUserAndSharedEventCaches()
     {
         var cache = new RecordingHybridCache();
@@ -723,6 +760,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
         IRefundCreator? refundCreator = null,
         IConfigurationManifestEffectDispatcher? manifestEffectDispatcher = null,
         IConfigurationImportEffectDelivery? importEffectDelivery = null,
+        IEventDiscoveryIdentityCorrectionNotificationService? correctionNotificationService = null,
         ILogger<CompositeOutboxMessageDispatcher>? logger = null)
     {
         HybridCache selectedCache = cache ?? new RecordingHybridCache();
@@ -742,6 +780,10 @@ public sealed class CompositeOutboxMessageDispatcherTests
             fanoutService,
             moderationFanoutService,
             reportProviderSyncDispatcher ?? Substitute.For<IReportProviderSyncDispatcher>(),
+            new EventDiscoveryIdentityCorrectionDispatcher(
+                correctionNotificationService
+                    ?? Substitute.For<IEventDiscoveryIdentityCorrectionNotificationService>(),
+                Substitute.For<ITenantContextAccessor>()),
             new LocationPrivacyCorrectionDispatcher(
                 selectedCache,
                 correctionPlanner,

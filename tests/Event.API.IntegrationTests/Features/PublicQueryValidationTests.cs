@@ -12,17 +12,17 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class PublicQueryValidationTests
 {
     [Test]
-    public async Task EventFilterRequest_WhenPaginationIsOutOfRange_IsInvalid()
+    public async Task EventFilterRequest_WhenCursorOrPageSizeIsOutOfRange_IsInvalid()
     {
         var request = new EventFilterRequest
         {
-            PageNumber = 0,
+            Cursor = new string('x', 4097),
             PageSize = 101
         };
 
         var results = Validate(request);
 
-        await Assert.That(results.Any(result => HasMember(result, nameof(EventFilterRequest.PageNumber)))).IsTrue();
+        await Assert.That(results.Any(result => HasMember(result, nameof(EventFilterRequest.Cursor)))).IsTrue();
         await Assert.That(results.Any(result => HasMember(result, nameof(EventFilterRequest.PageSize)))).IsTrue();
     }
 

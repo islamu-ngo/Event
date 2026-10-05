@@ -66,6 +66,18 @@ public sealed class EventQuerySpecification : IQuerySpecification<Event>
     /// </summary>
     public IReadOnlyList<EventSubqueryFilter> SubqueryFilters => _subqueryFilters.AsReadOnly();
 
+    public EventOccurrenceDiscoveryFilter? Occurrence => _subqueryFilters
+        .Where(filter => filter.FilterType == EventSubqueryFilterType.Occurrence)
+        .Select(filter => (EventOccurrenceDiscoveryFilter)filter.Value)
+        .SingleOrDefault();
+
+    /// <summary>Replaces the occurrence window without mutating the existing specification.</summary>
+    public EventQuerySpecification WithOccurrence(EventOccurrenceDiscoveryFilter filter) =>
+        new([.. _filters],
+            [.. _subqueryFilters.Where(item => item.FilterType != EventSubqueryFilterType.Occurrence),
+                EventSubqueryFilter.Occurrence(filter)],
+            [.. _projectionFilters], _sort, _sortDescending);
+
     /// <summary>
     /// Gets the projection filters for custom property discovery (Layer 3).
     /// Applied at the repository level via correlated subqueries against projection tables.

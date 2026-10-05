@@ -474,6 +474,10 @@ public static class QuartzSchedulerExtensions
         ISet<JobKey> desiredRecurringJobs)
     {
         // Retained login rows must expire even after the optional ATProto provider is disabled.
+        AddSweepJob<EventDiscoverySnapshotPurgeJob>(
+            quartz, QuartzSchedulerKeys.EventDiscoverySnapshotPurge,
+            "Removes bounded expired discovery membership without changing logical expiry.",
+            enabled: true, initialDelaySeconds: 60, TimeSpan.FromMinutes(1), desiredRecurringJobs);
         AddSweepJob<AtprotoTransientCleanupJob>(
             quartz,
             QuartzSchedulerKeys.AtprotoTransientCleanup,

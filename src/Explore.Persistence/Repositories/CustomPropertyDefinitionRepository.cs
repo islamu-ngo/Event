@@ -251,7 +251,13 @@ public class CustomPropertyDefinitionRepository : GenericRepository<CustomProper
     }
 
     public async Task<bool> PurgeDefinition(Guid id, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => PurgeDefinitionCoreAsync(id, token), cancellationToken);
+
+    private async Task<bool> PurgeDefinitionCoreAsync(Guid id, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.CustomPropertyDefinitions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+                .Where(value => value.Id == id).Select(value => value.TenantId), cancellationToken);
         var dependencies = await GetPurgeDependencies(id, cancellationToken);
         if (dependencies is null || dependencies.HasBlockingDependencies)
         {

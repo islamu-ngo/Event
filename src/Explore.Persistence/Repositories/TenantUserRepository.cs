@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -43,6 +44,26 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
                 && !x.IsDeleted, cancellationToken);
     }
 
+    public async Task<bool> FenceActiveTenantUserAsync(
+        Guid tenantId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        await RelationalEntityRowFence.AcquireGlobalAsync<User>(_dbContext, userId, cancellationToken);
+        if (!await _dbContext.Users.AsNoTracking()
+                .AnyAsync(user => user.Id == userId && !user.IsDeleted, cancellationToken))
+            return false;
+        var membershipId = await _dbContext.TenantUsers
+            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+            .AsNoTracking()
+            .Where(membership => membership.TenantId == tenantId && membership.UserId == userId)
+            .Select(membership => membership.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (membershipId == Guid.Empty)
+            return false;
+        await RelationalEntityRowFence.AcquireAsync<TenantUser>(
+            _dbContext, tenantId, membership => membership.Id, membershipId, cancellationToken);
+        return await IsActiveTenantUserAsync(tenantId, userId, cancellationToken);
+    }
+
     public async Task<List<TenantUser>> GetActiveTenantsForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.TenantUsers
@@ -62,6 +83,11 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         Guid removedBy,
         DateTime removedAtUtc,
         CancellationToken cancellationToken = default)
+        => await _dbContext.ExecuteDisclosureMutationAsync(
+            token => RemoveMembershipAsync(tenantId, userId, removedBy, removedAtUtc, token), cancellationToken);
+
+    private async Task<bool> RemoveMembershipAsync(
+        Guid tenantId, Guid userId, Guid removedBy, DateTime removedAtUtc, CancellationToken cancellationToken)
     {
         if (tenantId == Guid.Empty || userId == Guid.Empty || removedBy == Guid.Empty)
         {
@@ -87,6 +113,7 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         }
 
         var removedAt = removedAtUtc.ToUniversalTime();
+        _dbContext.DisclosureMutations.Enlist([tenantId]);
         var claimed = await _dbContext.TenantUsers
             .Where(membership => membership.Id == membershipId
                 && membership.TenantId == tenantId

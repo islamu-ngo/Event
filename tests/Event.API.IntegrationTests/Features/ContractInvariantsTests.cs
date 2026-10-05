@@ -435,7 +435,7 @@ public class ContractInvariantsTests
     }
 
     [Test]
-    public async Task OpenApiDocument_EventListResponseReferencesHalCollectionSchema()
+    public async Task OpenApiDocument_EventListResponseReferencesNoStoreTraversalSchema()
     {
         using var document = await GetOpenApiDocumentAsync();
 
@@ -449,23 +449,23 @@ public class ContractInvariantsTests
             .GetProperty("content");
 
         await Assert.That(GetSchemaReference(content.GetProperty("application/hal+json; v=0.1")))
-            .IsEqualTo("#/components/schemas/HalCollectionResourceOfEventDiscoveryItemDto")
-            .Because("The primary HAL event list response must reference the HAL collection wrapper schema.");
+            .IsEqualTo("#/components/schemas/EventDiscoveryTraversalResource")
+            .Because("Public HAL discovery exposes bounded forward traversal rather than offset pagination.");
         await Assert.That(GetSchemaReference(content.GetProperty("application/json; v=0.1")))
-            .IsEqualTo("#/components/schemas/HalCollectionResourceOfEventDiscoveryItemDto")
-            .Because("The versioned JSON event list response must stay aligned with the HAL collection wrapper schema.");
-        await Assert.That(GetStringProperty(operation, "x-output-cache-policy"))
-            .IsEqualTo("EventDiscovery")
-            .Because("Federated ingestion must evict only the dedicated event-discovery cache surface.");
+            .IsEqualTo("#/components/schemas/EventDiscoveryTraversalResource")
+            .Because("Versioned JSON and HAL discovery must describe the same traversal resource.");
+        await Assert.That(operation.TryGetProperty("x-output-cache-policy", out _))
+            .IsFalse()
+            .Because("Current disclosure reads must not advertise a shared output-cache policy.");
     }
 
     [Test]
-    public async Task OpenApiDocument_HalCollectionResourceSchemaHasLinksEmbeddedAndPagination()
+    public async Task OpenApiDocument_TraversalResourceHasBoundedMembershipAndHalWithoutOffsetTotals()
     {
         using var document = await GetOpenApiDocumentAsync();
 
-        var properties = GetSchemaProperties(document, "HalCollectionResourceOfEventDiscoveryItemDto");
-        var expectedProperties = new[] { "_links", "_embedded", "pageNumber", "pageSize", "totalCount", "totalPages" };
+        var properties = GetSchemaProperties(document, "EventDiscoveryTraversalResource");
+        var expectedProperties = new[] { "_links", "_embedded", "snapshotCount", "truncated", "expiresAt", "hasMore" };
 
         var missingProperties = expectedProperties
             .Where(propertyName => !properties.TryGetProperty(propertyName, out _))
@@ -473,7 +473,11 @@ public class ContractInvariantsTests
 
         await Assert.That(missingProperties)
             .IsEmpty()
-            .Because($"The event list HAL collection wrapper must expose pagination plus HAL affordances. Missing: {string.Join(", ", missingProperties)}");
+            .Because($"Discovery must expose bounded membership and forward HAL affordances. Missing: {string.Join(", ", missingProperties)}");
+        foreach (var offsetProperty in new[] { "pageNumber", "pageSize", "totalCount", "totalPages" })
+        {
+            await Assert.That(properties.TryGetProperty(offsetProperty, out _)).IsFalse();
+        }
         await Assert.That(GetReference(properties.GetProperty("_embedded")))
             .IsEqualTo("#/components/schemas/HalCollectionEmbeddedOfEventDiscoveryItemDto")
             .Because("The HAL collection wrapper must reference the typed embedded collection schema.");
@@ -752,7 +756,7 @@ public class ContractInvariantsTests
             .IsEqualTo("string")
             .Because("The API serializes enums with JsonStringEnumConverter, so RoleEnum must not be documented as an integer.");
         await Assert.That(GetEnumValues(roleEnum))
-            .IsEquivalentTo(["Admin", "Moderator", "Member", "TenantAdmin", "TenantModerator", "TenantMember", "OrgAdmin", "OrgModerator", "OrgMember", "GroupAdmin", "GroupModerator", "GroupMember", "EventOwner", "EventManager", "RegistrationManager", "CheckInStaff"])
+            .IsEquivalentTo(["Admin", "Moderator", "Member", "TenantAdmin", "TenantModerator", "TenantMember", "OrgAdmin", "OrgModerator", "OrgMember", "GroupAdmin", "GroupModerator", "GroupMember", "EventOwner", "EventManager", "RegistrationManager", "CheckInStaff", "EventDiscoveryReviewer"])
             .Because("RoleEnum must expose the public string literals clients receive over JSON.");
 
         await Assert.That(GetStringProperty(guestRecoveryPolicyEnum, "type"))

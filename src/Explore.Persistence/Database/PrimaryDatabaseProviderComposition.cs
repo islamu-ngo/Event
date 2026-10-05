@@ -33,6 +33,7 @@ public static class PrimaryDatabaseProviderComposition
             optionsBuilder,
             options,
             PrimaryDatabaseMigrationTarget.Application);
+        optionsBuilder.AddInterceptors(EventDiscoveryDisclosureTransactionInterceptor.Instance);
         switch (options.Provider)
         {
             case PrimaryDatabaseProvider.MariaDb:

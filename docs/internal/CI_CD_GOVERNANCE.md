@@ -671,12 +671,19 @@ This is now a missing-evidence gate for breaking OpenAPI changes, not full autom
 
 ### Generated Migration Duplication
 
-The repository-root `.sonarcloud.properties` lists twelve EF-generated migration
+The repository-root `.sonarcloud.properties` lists twenty EF-generated migration
 files under `sonar.cpd.exclusions`. They repeat provider schema operations by
 design. This exception applies only to copy-paste detection: handwritten code,
 security analysis, migration execution and provider-parity checks remain included.
 No duplication threshold is raised. Keep the list explicit; a new entry requires
 review of its generated provenance, not a blanket directory exclusion.
+
+The eight discovery identity/traversal entries come from normal EF migration
+generation across PostgreSQL, SQLite, SQL Server and MySQL catalogs; MariaDB
+uses the MySQL catalog. Their provider round-trip and pending-model evidence is
+retained with the discovery workstream. The migration files are not hand-edited
+to avoid duplication detection. Discovery source, cancellation semantics,
+security checks and tests remain analyzed.
 
 Sonar automatic analysis supports this separate configuration file, not the
 CI scanner's `sonar-project.properties`. Its application to a pending PR must be

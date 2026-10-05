@@ -7,6 +7,8 @@ using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Explore.Domain.Services.Discovery;
 
 namespace Explore.Persistence.Repositories;
 
@@ -401,15 +403,37 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
 
     /// <inheritdoc />
     public async Task<(List<Event> Items, int TotalCount)> GetEventsWithDetailsPaged(
-        int pageNumber, int pageSize, EventQuerySpecification specification)
+        int pageNumber, int pageSize, EventQuerySpecification specification,
+        CancellationToken cancellationToken = default)
     {
+        if (specification.Occurrence is not null && _dbContext.Database.CurrentTransaction is null)
+        {
+            return await _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable, cancellationToken);
+                var result = await GetEventsWithDetailsPaged(pageNumber, pageSize, specification, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return result;
+            });
+        }
+
         var query = _dbContext.Events
             .AsNoTrackingWithIdentityResolution()
             .AsSplitQuery()
             .IncludeStandardDetails()
             .AsQueryable();
 
-        var now = _timeProvider.GetUtcNow();
+        var now = specification.Occurrence?.Now ?? _timeProvider.GetUtcNow();
+        var occurrences = specification.Occurrence is { } occurrence
+            ? MatchingOccurrences(occurrence)
+            : null;
+        if (occurrences is not null)
+        {
+            query = query.WherePubliclyEligible(_dbContext)
+                .Where(entity => occurrences.Any(session =>
+                    session.EventId == entity.Id && session.TenantId == entity.TenantId));
+        }
         query = ApplySubqueryFilters(query, specification, now);
         query = ApplyProjectionFilters(query, specification);
 
@@ -420,10 +444,20 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
         }
 
         // Apply direct filters and sorting via specification
-        query = specification.Apply(query, now);
+        query = specification.Apply(query, occurrences is null ? now : null);
 
         // If no sort was specified by the specification, default to date descending
-        if (!specification.HasSort)
+        if (occurrences is not null && (!specification.HasSort
+                || specification.Sort == EventSort.Temporal
+                || specification.Sort?.KeySelector.Body is System.Linq.Expressions.UnaryExpression
+                {
+                    Operand: System.Linq.Expressions.MemberExpression { Member.Name: nameof(Event.FirstSessionDate) }
+                }))
+        {
+            query = EventDirectoryTemporalQuery.OrderEventsByOccurrence(
+                _dbContext, query, occurrences, !specification.HasSort || specification.SortDescending);
+        }
+        else if (!specification.HasSort)
         {
             query = query
                 .OrderByDescending(e => e.FirstSessionStartUtc)
@@ -431,16 +465,195 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
         }
         else if (query is IOrderedQueryable<Event> orderedQuery)
         {
-            query = orderedQuery.ThenBy(e => e.Id);
+            query = orderedQuery.ThenBy(e => e.DiscoverySourceSortKey);
         }
 
-        var totalCount = await query.CountAsync();
-        var items = await query
+        var totalCount = await query.CountAsync(cancellationToken);
+        var page = query
             .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+            .Take(pageSize);
+        if (occurrences is not null)
+        {
+            var orderedOccurrences = EventDirectoryTemporalQuery.OrderOccurrences(_dbContext, occurrences);
+            var matches = await page.Select(entity => new
+            {
+                Entity = entity,
+                MatchingSessionId = orderedOccurrences
+                    .Where(session => session.EventId == entity.Id && session.TenantId == entity.TenantId)
+                    .Select(session => session.Id)
+                    .First(),
+                MatchingSessionCount = occurrences.Count(session =>
+                    session.EventId == entity.Id && session.TenantId == entity.TenantId)
+            }).ToListAsync(cancellationToken);
+            var sessionIds = matches.Select(match => match.MatchingSessionId).ToArray();
+            var sessions = await occurrences.Where(session => sessionIds.Contains(session.Id))
+                .AsNoTracking()
+                .ToDictionaryAsync(session => session.Id, cancellationToken);
+            foreach (var match in matches)
+            {
+                match.Entity.SetDiscoveryOccurrence(sessions[match.MatchingSessionId], match.MatchingSessionCount);
+            }
 
+            return (matches.Select(match => match.Entity).ToList(), totalCount);
+        }
+
+        var items = await page.ToListAsync(cancellationToken);
         return (items, totalCount);
+    }
+
+    public async Task<IReadOnlyList<Event>> SeekPublicDiscoveryAsync(
+        EventQuerySpecification specification, EventDiscoverySourceCursor? after, int take,
+        CancellationToken cancellationToken)
+    {
+        RequireDiscoveryTransaction();
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(take, 1000);
+        var occurrences = MatchingOccurrences(specification.Occurrence
+            ?? throw new ArgumentException("Discovery requires a same-session criterion.", nameof(specification)));
+        var query = PublicDiscoveryQuery(specification, occurrences);
+        bool descending = specification.SortDescending;
+        string? sourceKey = after is null ? null : EventDiscoveryRank.SourceKey(after.Id);
+        string? titleKey = after is null ? null : EventDiscoveryRank.TitleKey(after.Title);
+        if (specification.Sort == EventSort.Title)
+        {
+            if (after is not null)
+                query = query.Where(entity => (descending
+                    ? entity.DiscoveryTitleSortKey.CompareTo(titleKey) < 0 : entity.DiscoveryTitleSortKey.CompareTo(titleKey) > 0)
+                    || entity.DiscoveryTitleSortKey == titleKey && entity.DiscoverySourceSortKey.CompareTo(sourceKey) > 0);
+            query = descending
+                ? query.OrderByDescending(entity => entity.DiscoveryTitleSortKey).ThenBy(entity => entity.DiscoverySourceSortKey)
+                : query.OrderBy(entity => entity.DiscoveryTitleSortKey).ThenBy(entity => entity.DiscoverySourceSortKey);
+        }
+        else if (specification.Sort == EventSort.Views)
+        {
+            if (after is not null)
+                query = query.Where(entity => (descending
+                    ? entity.TotalViews < after.Views : entity.TotalViews > after.Views)
+                    || entity.TotalViews == after.Views && entity.DiscoverySourceSortKey.CompareTo(sourceKey) > 0);
+            query = descending
+                ? query.OrderByDescending(entity => entity.TotalViews).ThenBy(entity => entity.DiscoverySourceSortKey)
+                : query.OrderBy(entity => entity.TotalViews).ThenBy(entity => entity.DiscoverySourceSortKey);
+        }
+        else if (specification.Sort == EventSort.CreatedAt)
+        {
+            if (after is not null)
+                query = query.Where(entity => (descending
+                    ? entity.CreatedAt < after.CreatedAtUtc : entity.CreatedAt > after.CreatedAtUtc)
+                    || entity.CreatedAt == after.CreatedAtUtc && entity.DiscoverySourceSortKey.CompareTo(sourceKey) > 0);
+            query = descending
+                ? query.OrderByDescending(entity => entity.CreatedAt).ThenBy(entity => entity.DiscoverySourceSortKey)
+                : query.OrderBy(entity => entity.CreatedAt).ThenBy(entity => entity.DiscoverySourceSortKey);
+        }
+        else
+        {
+            var ordered = EventDirectoryTemporalQuery.OrderOccurrences(_dbContext, occurrences);
+            if (after is not null)
+                query = EventDirectoryTemporalQuery.SeekEventsByOccurrence(
+                    _dbContext, query, ordered, after, sourceKey, descending);
+            query = EventDirectoryTemporalQuery.OrderEventsByOccurrence(_dbContext, query, occurrences, descending);
+        }
+        return await MaterializeDiscoveryAsync(query.Take(take), occurrences, null, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Event>> GetPublicDiscoveryMembersAsync(
+        EventQuerySpecification specification, IReadOnlyDictionary<Guid, Guid> matchingSessions,
+        CancellationToken cancellationToken)
+    {
+        RequireDiscoveryTransaction();
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(matchingSessions.Count, 100);
+        if (matchingSessions.Count == 0)
+            return [];
+        var occurrences = MatchingOccurrences(specification.Occurrence
+            ?? throw new ArgumentException("Discovery requires a same-session criterion.", nameof(specification)));
+        var eventIds = matchingSessions.Keys.ToArray();
+        var sessionIds = matchingSessions.Values.ToArray();
+        var query = PublicDiscoveryQuery(specification, occurrences)
+            .Where(entity => eventIds.Contains(entity.Id)
+                && occurrences.Any(session => session.EventId == entity.Id && sessionIds.Contains(session.Id)));
+        return await MaterializeDiscoveryAsync(query, occurrences, matchingSessions, cancellationToken);
+    }
+
+    private IQueryable<Event> PublicDiscoveryQuery(
+        EventQuerySpecification specification, IQueryable<EventSession> occurrences)
+    {
+        var query = _dbContext.Events.AsNoTracking().WherePubliclyEligible(_dbContext)
+            .Where(entity => occurrences.Any(session =>
+                session.EventId == entity.Id && session.TenantId == entity.TenantId));
+        query = ApplySubqueryFilters(query, specification, specification.Occurrence!.Now);
+        query = ApplyProjectionFilters(query, specification);
+        return specification.Apply(query);
+    }
+
+    private async Task<IReadOnlyList<Event>> MaterializeDiscoveryAsync(
+        IQueryable<Event> query, IQueryable<EventSession> occurrences,
+        IReadOnlyDictionary<Guid, Guid>? matchingSessions, CancellationToken cancellationToken)
+    {
+        var capturedIds = matchingSessions?.Values.ToArray();
+        var selected = capturedIds is null
+            ? occurrences
+            : occurrences.Where(session => capturedIds.Contains(session.Id));
+        var ordered = EventDirectoryTemporalQuery.OrderOccurrences(_dbContext, selected);
+        var matches = await query.Select(entity => new
+        {
+            EventId = entity.Id,
+            SessionId = ordered.Where(session => session.EventId == entity.Id && session.TenantId == entity.TenantId)
+                .Select(session => session.Id).First(),
+            Count = occurrences.Count(session => session.EventId == entity.Id && session.TenantId == entity.TenantId)
+        }).ToListAsync(cancellationToken);
+        // Freeze the bounded source selection before loading its graph. Otherwise
+        // each split include repeats the expensive occurrence selection and count.
+        var eventIds = matches.Select(match => match.EventId).ToArray();
+        var entities = await _dbContext.Events.AsNoTrackingWithIdentityResolution().AsSplitQuery()
+            .IncludeStandardDetails().Where(entity => eventIds.Contains(entity.Id))
+            .ToDictionaryAsync(entity => entity.Id, cancellationToken);
+        var ids = matches.Select(match => match.SessionId).ToArray();
+        var sessions = await selected.AsNoTracking().Include(session => session.EventLocation)
+            .Where(session => ids.Contains(session.Id))
+            .ToDictionaryAsync(session => session.Id, cancellationToken);
+        var result = new List<Event>(matches.Count);
+        foreach (var match in matches)
+        {
+            if (matchingSessions is not null && matchingSessions[match.EventId] != match.SessionId)
+                continue;
+            var entity = entities[match.EventId];
+            entity.SetDiscoveryOccurrence(sessions[match.SessionId], match.Count);
+            result.Add(entity);
+        }
+        return result;
+    }
+
+    private void RequireDiscoveryTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel
+            != System.Data.IsolationLevel.Serializable)
+            throw new InvalidOperationException("Discovery source reads require caller-owned Serializable.");
+    }
+
+    private IQueryable<EventSession> MatchingOccurrences(EventOccurrenceDiscoveryFilter filter)
+    {
+        var query = EventDirectoryTemporalQuery.ApplyOccurrences(_dbContext, _dbContext.EventSessions, filter);
+        if (filter.LocationIds is { } locationIds)
+        {
+            // Necessary query-time coarse disclosure constraints, not an alternate
+            // evaluator. Application still resolves governance and current disclosure.
+            query = query.Where(session =>
+                session.EventLocation != null
+                && session.EventLocation.EventId == session.EventId
+                && session.EventLocation.TenantId == session.TenantId
+                && session.EventLocation.ShowCity
+                && session.EventLocation.ShowCountry
+                && !session.EventLocation.IsToBeAnnounced
+                && !session.EventLocation.NeedsPrivacyReview
+                && session.EventLocation.LocationId == session.LocationId
+                && session.EventLocation.LocationId != null
+                && locationIds.Contains(session.EventLocation.LocationId.Value)
+                && session.EventLocation.Location != null
+                && session.EventLocation.Location.TenantId == session.TenantId
+                && session.EventLocation.Location.LocationPrivacyStateId == (int)LocationPrivacyStateEnum.Active
+                && session.EventLocation.Location.LocationKindId != (int)LocationKindEnum.PrivateHome);
+        }
+
+        return query;
     }
 
     /// <inheritdoc />

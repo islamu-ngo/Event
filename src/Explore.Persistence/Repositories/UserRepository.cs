@@ -81,8 +81,10 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
 
     public async Task<int> ForgetPiiAsync(Guid userId)
     {
-        return await _dbContext.UserPii
-            .Where(p => p.UserId == userId)
-            .ExecuteDeleteAsync();
+        return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            await _dbContext.DisclosureMutations.EnlistUserAsync(userId, token);
+            return await _dbContext.UserPii.Where(p => p.UserId == userId).ExecuteDeleteAsync(token);
+        }, CancellationToken.None);
     }
 }

@@ -9,6 +9,7 @@ using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
 using Explore.Application.Models.PublicExperience;
 using Explore.Application.Responses;
+using Explore.Application.Specifications.Events;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -42,17 +43,19 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         CancellationToken cancellationToken)
     {
         var generatedAt = timeProvider.GetUtcNow();
+        var allocator = new HomeDiscoveryAllocator(generatedAt);
         var context = new HomeDiscoveryContextDto();
         IReadOnlyList<EventDiscoveryItemDto> hero = [];
         IReadOnlyList<EventDiscoveryItemDto> upcomingInArea = [];
         HomeDiscoverySectionDto? spotlight = null;
         IReadOnlyList<EventDiscoveryItemDto> mostViewedInArea = [];
         IReadOnlyList<EventDiscoveryItemDto> mostViewedOnline = [];
-        IReadOnlyList<HomeDiscoverySectionDto> curatedSections = [];
+        var curatedSections = new List<HomeDiscoverySectionDto>();
         IReadOnlyList<EventDiscoveryItemDto> recentlyAdded = [];
         var sectionStatuses = new Dictionary<string, HomeDiscoverySectionStatus>(StringComparer.Ordinal);
-        using var compositeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        compositeCancellation.CancelAfter(CompositeTimeout);
+        using var compositeDeadline = new CancellationTokenSource(CompositeTimeout, timeProvider);
+        using var compositeCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, compositeDeadline.Token);
         var operationToken = compositeCancellation.Token;
 
         HomeDiscoveryDto Snapshot() => new()
@@ -80,7 +83,8 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
             if (heroRequest is not null)
             {
                 hero = await QuerySectionAsync(
-                    "hero", heroRequest, HeroLimit, sectionStatuses, operationToken);
+                    "hero", heroRequest, HeroLimit, allocator, sectionStatuses, operationToken,
+                    HomeDiscoverySectionPolicy.Featured);
             }
             else
             {
@@ -88,19 +92,24 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
             }
 
             var upcomingRequest = ApplyContext(
-                CreateUpcomingRequest(today, "date", sortDescending: false, UpcomingLimit),
+                CreateUpcomingRequest(today, "date", sortDescending: false, UpcomingLimit) with
+                {
+                    DateFrom = null,
+                    View = TemporalView.UpcomingAndOngoing
+                },
                 areaState);
             if (upcomingRequest is not null)
             {
                 upcomingInArea = await QuerySectionAsync(
-                    "upcoming", upcomingRequest, UpcomingLimit, sectionStatuses, operationToken);
+                    "upcoming", upcomingRequest, UpcomingLimit, allocator, sectionStatuses, operationToken,
+                    HomeDiscoverySectionPolicy.Upcoming);
             }
             else
             {
                 sectionStatuses["upcoming"] = HomeDiscoverySectionStatus.Empty;
             }
 
-            spotlight = await BuildSpotlightAsync(areaState, today, sectionStatuses, operationToken);
+            spotlight = await BuildSpotlightAsync(areaState, today, allocator, sectionStatuses, operationToken);
 
             if (areaState.Mode == HomeDiscoveryMode.Area &&
                 areaState.SelectedArea?.LocationIds is { Count: > 0 } areaLocationIds)
@@ -118,6 +127,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
                     "most-viewed-area",
                     mostViewedAreaRequest,
                     StandardLimit,
+                    allocator,
                     sectionStatuses,
                     operationToken);
             }
@@ -138,11 +148,12 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
                 "most-viewed-online",
                 mostViewedOnlineRequest,
                 StandardLimit,
+                allocator,
                 sectionStatuses,
                 operationToken);
 
-            curatedSections = await BuildCuratedSectionsAsync(
-                areaState, today, sectionStatuses, operationToken);
+            await BuildCuratedSectionsAsync(
+                areaState, today, allocator, curatedSections, sectionStatuses, operationToken);
 
             var recentlyAddedRequest = ApplyContext(
                 CreateUpcomingRequest(today, "createdat", sortDescending: true, StandardLimit),
@@ -153,8 +164,10 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
                     "recently-added",
                     recentlyAddedRequest,
                     StandardLimit,
+                    allocator,
                     sectionStatuses,
-                    operationToken);
+                    operationToken,
+                    HomeDiscoverySectionPolicy.RecentlyAdded);
             }
             else
             {
@@ -231,6 +244,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
     private async Task<HomeDiscoverySectionDto?> BuildSpotlightAsync(
         AreaState areaState,
         DateOnly today,
+        HomeDiscoveryAllocator allocator,
         Dictionary<string, HomeDiscoverySectionStatus> statuses,
         CancellationToken cancellationToken)
     {
@@ -287,17 +301,18 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         }
 
         var items = await QuerySectionAsync(
-            "spotlight", spotlightRequest, SpotlightLimit, statuses, cancellationToken);
+            "spotlight", spotlightRequest, SpotlightLimit, allocator, statuses, cancellationToken);
         return new HomeDiscoverySectionDto { Key = "spotlight", Label = label, Items = items };
     }
 
-    private async Task<List<HomeDiscoverySectionDto>> BuildCuratedSectionsAsync(
+    private async Task BuildCuratedSectionsAsync(
         AreaState areaState,
         DateOnly today,
+        HomeDiscoveryAllocator allocator,
+        List<HomeDiscoverySectionDto> sections,
         Dictionary<string, HomeDiscoverySectionStatus> statuses,
         CancellationToken cancellationToken)
     {
-        var sections = new List<HomeDiscoverySectionDto>();
         var presets = await ResolveCuratedPresetsAsync(cancellationToken);
 
         foreach (var preset in presets
@@ -311,7 +326,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
             var key = $"curated:{preset.Id.Trim()}";
             var contextualRequest = ApplyContext(request, areaState);
             var items = contextualRequest is not null
-                ? await QuerySectionAsync(key, contextualRequest, limit, statuses, cancellationToken)
+                ? await QuerySectionAsync(key, contextualRequest, limit, allocator, statuses, cancellationToken)
                 : [];
             if (!statuses.ContainsKey(key))
                 statuses[key] = HomeDiscoverySectionStatus.Empty;
@@ -323,7 +338,6 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
             });
         }
 
-        return sections;
     }
 
     private async Task<IReadOnlyList<PublicEventSectionPresetConfig>> ResolveCuratedPresetsAsync(
@@ -361,32 +375,43 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         string key,
         GetEventListRequest request,
         int limit,
+        HomeDiscoveryAllocator allocator,
         Dictionary<string, HomeDiscoverySectionStatus> statuses,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HomeDiscoverySectionPolicy policy = HomeDiscoverySectionPolicy.Exclusive)
     {
-        request = request with { PageNumber = 1, PageSize = limit };
-
         try
         {
-            using var sectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            sectionCancellation.CancelAfter(SectionTimeout);
-            var page = await eventDiscoveryHandler.QueryAsync(
-                new GetPublicEventDiscoveryRequest(request),
-                sectionCancellation.Token);
-            var items = page.Items
-                .Where(item =>
-                    (item.Event is { Id: var localId } && localId != Guid.Empty)
-                    || (item.FederatedEvent is { Id: var federatedId } && federatedId != Guid.Empty))
-                .Take(limit)
+            using var sectionDeadline = new CancellationTokenSource(SectionTimeout, timeProvider);
+            using var sectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, sectionDeadline.Token);
+            var allocation = await allocator.AllocateAsync(
+                request,
+                limit,
+                (criteria, token) => eventDiscoveryHandler.QueryAsync(
+                    new GetPublicEventDiscoveryRequest(criteria), token),
+                sectionCancellation.Token,
+                policy);
+            var items = allocation.Items
                 .Select(MapDiscoveryItem)
                 .ToList();
-            statuses[key] = items.Count > 0
-                ? HomeDiscoverySectionStatus.Available
-                : HomeDiscoverySectionStatus.Empty;
+            if (allocation.StopReason is HomeDiscoveryAllocationStopReason.CandidateBudgetExceeded
+                or HomeDiscoveryAllocationStopReason.ExhaustionUnproven)
+            {
+                statuses[key] = HomeDiscoverySectionStatus.Failed;
+                LogSectionBound(logger, key, allocation.StopReason, allocation.CandidateCount, allocation.BatchCount);
+            }
+            else
+            {
+                statuses[key] = items.Count > 0
+                    ? HomeDiscoverySectionStatus.Available
+                    : HomeDiscoverySectionStatus.Empty;
+            }
             return items;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            statuses[key] = HomeDiscoverySectionStatus.Failed;
             throw;
         }
         catch (OperationCanceledException)
@@ -444,7 +469,10 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         EventFormatId = source.EventFormatId,
         EventFormatFullName = Bound(source.EventFormatFullName, 80),
         FirstSessionDate = source.FirstSessionDate,
+        MatchingSession = source.MatchingSession,
+        AdditionalSessionCount = source.AdditionalSessionCount,
         FirstSessionStartUtc = source.FirstSessionStartUtc,
+        Timezone = source.Timezone,
         IsPast = source.IsPast,
         CreatedAtUtc = source.CreatedAtUtc,
         AtprotoRecordId = source.AtprotoRecordId,
@@ -610,6 +638,15 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
 
     [LoggerMessage(LogLevel.Warning, "Home discovery composition exceeded its time limit.")]
     private static partial void LogCompositeTimeout(ILogger logger);
+
+    [LoggerMessage(LogLevel.Warning,
+        "Home discovery section {SectionKey} stopped with {StopReason} after {CandidateCount} candidates in {BatchCount} batches.")]
+    private static partial void LogSectionBound(
+        ILogger logger,
+        string sectionKey,
+        HomeDiscoveryAllocationStopReason stopReason,
+        int candidateCount,
+        int batchCount);
 
     private sealed record AreaState(
         HomeDiscoveryMode Mode,

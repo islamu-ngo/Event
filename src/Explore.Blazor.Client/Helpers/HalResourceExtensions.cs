@@ -38,17 +38,6 @@ public static class HalResourceExtensions
         return DeserializeItems<EventTeamMemberDto>(collection._embedded.Items);
     }
 
-    public static ICollection<EventListDto> GetItems(this HalCollectionResourceOfEventDiscoveryItemDto collection)
-    {
-        if (collection._embedded?.Items is not { Count: > 0 } items)
-            return [];
-
-        return items
-            .Select(ToEventListDto)
-            .OfType<EventListDto>()
-            .ToList();
-    }
-
     public static EventListDto? ToEventListDto(this EventDiscoveryItemDto item) =>
         MapDiscoveryItem(
             item.Source,
@@ -56,6 +45,12 @@ public static class HalResourceExtensions
             item.FederatedEvent,
             item.Federation,
             item.AdditionalProperties.TryGetValue("_links", out var links) ? links : null);
+
+    public static ICollection<EventListDto> GetItems(this EventDiscoveryTraversalResource traversal) =>
+        traversal._embedded?.Items?
+            .Select(ToEventListDto)
+            .OfType<EventListDto>()
+            .ToList() ?? [];
 
     public static EventListDto? ToEventListDto(this HalResourceOfEventDiscoveryItemDto item) =>
         MapDiscoveryItem(
@@ -482,20 +477,6 @@ public static class HalResourceExtensions
             PageSize = collection.PageSize ?? 20,
             TotalCount = collection.TotalCount ?? 0,
             Links = ToClientLinks(collection._links)
-        };
-    }
-
-    public static PaginatedResult<EventListDto> ToPaginatedResult(this HalCollectionResourceOfEventDiscoveryItemDto? collection)
-    {
-        if (collection is null)
-            return PaginatedResult<EventListDto>.Empty();
-
-        return new PaginatedResult<EventListDto>
-        {
-            Items = collection.GetItems().ToList(),
-            PageNumber = collection.PageNumber ?? 1,
-            PageSize = collection.PageSize ?? 20,
-            TotalCount = collection.TotalCount ?? 0
         };
     }
 
@@ -1050,6 +1031,10 @@ public static class HalResourceExtensions
         if (result is null)
             return null;
 
+        result = result with
+        {
+            AdditionalProperties = new Dictionary<string, object>(result.AdditionalProperties, StringComparer.Ordinal)
+        };
         result.AdditionalProperties["eventDiscoverySource"] =
             federatedEvent is null ? source ?? "local" : "atproto";
         if (links is not null)

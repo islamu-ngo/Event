@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Explore.Domain;
 using Explore.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -9,6 +10,47 @@ namespace Explore.Persistence.Database;
 
 internal static class RelationalEntityRowFence
 {
+    public static Task AcquireLookupAsync<TEntity>(
+        ExploreDbContext dbContext, IReadOnlyList<int> keys, CancellationToken cancellationToken)
+        where TEntity : class =>
+        AcquirePrimaryKeyAsync<TEntity>(dbContext, keys.Cast<object>().ToArray(), cancellationToken);
+
+    public static Task AcquireGlobalAsync<TEntity>(
+        ExploreDbContext dbContext, Guid key, CancellationToken cancellationToken)
+        where TEntity : class =>
+        AcquirePrimaryKeyAsync<TEntity>(dbContext, [key], cancellationToken);
+
+    private static async Task AcquirePrimaryKeyAsync<TEntity>(
+        ExploreDbContext dbContext, IReadOnlyList<object> keys, CancellationToken cancellationToken)
+        where TEntity : class
+    {
+        if (!dbContext.Database.IsRelational())
+            return;
+        if (dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Authority row fences require an active transaction.");
+        var entity = dbContext.Model.FindEntityType(typeof(TEntity))
+            ?? throw new InvalidOperationException("Authority entity is not mapped.");
+        var primaryKey = entity.FindPrimaryKey()
+            ?? throw new InvalidOperationException("Authority entity has no primary key.");
+        if (primaryKey.Properties.Count != keys.Count
+            || primaryKey.Properties.Where((property, index) => property.ClrType != keys[index].GetType()).Any())
+            throw new ArgumentException("Authority fences require every mapped primary key with its exact type.", nameof(keys));
+        string tableName = entity.GetTableName()
+            ?? throw new InvalidOperationException("Authority entity has no table mapping.");
+        var store = StoreObjectIdentifier.Table(tableName, entity.GetSchema());
+        var sql = dbContext.GetService<ISqlGenerationHelper>();
+        string table = sql.DelimitIdentifier(tableName, entity.GetSchema());
+        var columns = primaryKey.Properties.Select(property => sql.DelimitIdentifier(
+            property.GetColumnName(store)
+            ?? throw new InvalidOperationException("Authority key column is not mapped."))).ToArray();
+        string predicate = string.Join(" AND ", columns.Select((column, index) => $"{column} = {{{index}}}"));
+        // A no-op native write conflicts with ordinary permission/role updates and deletes.
+        // Under PostgreSQL serializable isolation a changed snapshot aborts the whole attempt.
+        await dbContext.Database.ExecuteSqlRawAsync(
+            $"UPDATE {table} SET {columns[0]} = {columns[0]} WHERE {predicate}",
+            keys, cancellationToken);
+    }
+
     public static async Task AcquireAsync<TEntity>(
         ExploreDbContext dbContext,
         Guid tenantId,
@@ -38,6 +80,12 @@ internal static class RelationalEntityRowFence
         IProperty tenantProperty = entityType.FindProperty(nameof(ITenantEntity.TenantId))
             ?? throw new InvalidOperationException(
                 $"Admission authority entity '{typeof(TEntity).Name}' has no tenant property.");
+
+        // Discovery source INSERTs fence Tenant before their implicit Event FK.
+        // Authority callers already hold their Actor anchors; keep their native
+        // order Actor -> Tenant -> Event too, including the later identity fence.
+        if (typeof(TEntity) == typeof(Event))
+            await AcquireGlobalAsync<Tenant>(dbContext, tenantId, cancellationToken);
 
         if (providerName == RelationalNamedLock.SqliteProvider)
         {

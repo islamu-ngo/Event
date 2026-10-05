@@ -33,37 +33,41 @@ public sealed class HomeDiscoveryPrivacyTests
     }
 
     [Test]
-    public async Task PersistedCompositePayloadRestoresBeforeAnyServiceAccess()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PersistedCompositePayloadNeverReplacesCurrentDisclosure(bool unavailable)
     {
-        var expected = new HomeDiscoveryDto
+        var persisted = new HomeDiscoveryDto
         {
             Context = new HomeDiscoveryContextDto
             {
                 Mode = HomeDiscoveryMode.Area,
-                SelectedAreaDisplayName = "Brussels"
+                SelectedAreaDisplayName = "Previously public location"
             }
         };
-        var component = new Explore.Blazor.Client.Components.Discovery.HomeDiscoveryExperience
+        HomeDiscoveryDto? current = unavailable ? null : new HomeDiscoveryDto
         {
-            PersistedDiscovery = expected
+            Context = new HomeDiscoveryContextDto
+            {
+                Mode = HomeDiscoveryMode.Area,
+                SelectedAreaDisplayName = "Current public location"
+            }
         };
-        var translation = Substitute.For<ITranslationService>();
-        translation.T(Arg.Any<string>(), Arg.Any<string?>())
-            .Returns(call => call.ArgAt<string?>(1) ?? call.ArgAt<string>(0));
-        component.GetType().GetProperty(
-                "Translation",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
-            .SetValue(component, translation);
-        var lifecycleMethod = component.GetType().GetMethod(
-            "OnParametersSetAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        using var context = new BlazorTestContext();
+        var discoveryService = Substitute.For<IHomeDiscoveryService>();
+        discoveryService.LoadAsync(null, null, Arg.Any<CancellationToken>()).Returns(Task.FromResult(current));
+        context.Services.AddSingleton(discoveryService);
+        context.Services.AddSingleton(Substitute.For<Explore.Blazor.Client.Contracts.Interop.IHomeDiscoveryGeolocation>());
+        context.ComponentFactories.Add(new PersistedDiscoveryFactory(persisted));
 
-        await (Task)lifecycleMethod.Invoke(component, null)!;
+        var cut = context.RenderMudComponent<Explore.Blazor.Client.Components.Discovery.HomeDiscoveryExperience>();
 
-        var restoredField = component.GetType().GetField(
-            "_discovery",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        await Assert.That(restoredField.GetValue(component)).IsSameReferenceAs(expected);
+        await Assert.That(cut.Markup).DoesNotContain("Previously public location");
+        if (unavailable)
+            await Assert.That(cut.FindAll(".home-discovery__failure").Count).IsEqualTo(1);
+        else
+            await Assert.That(cut.Find("[data-testid='home-discovery-context-trigger']").TextContent)
+                .Contains("Current public location");
     }
 
     [Test]
@@ -79,33 +83,22 @@ public sealed class HomeDiscoveryPrivacyTests
         };
         var discoveryService = Substitute.For<IHomeDiscoveryService>();
         discoveryService.LoadAsync(null, "online", Arg.Any<CancellationToken>()).Returns(expected);
-        var component = new Explore.Blazor.Client.Components.Discovery.HomeDiscoveryExperience
-        {
-            PersistedDiscovery = persisted,
-            UrlMode = "online"
-        };
-        var translation = Substitute.For<ITranslationService>();
-        translation.T(Arg.Any<string>(), Arg.Any<string?>())
-            .Returns(call => call.ArgAt<string?>(1) ?? call.ArgAt<string>(0));
-        component.GetType().GetProperty(
-                "Translation",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
-            .SetValue(component, translation);
-        component.GetType().GetProperty(
-                "HomeDiscoveryService",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
-            .SetValue(component, discoveryService);
-        var lifecycleMethod = component.GetType().GetMethod(
-            "OnParametersSetAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-
-        await (Task)lifecycleMethod.Invoke(component, null)!;
-
-        var restoredField = component.GetType().GetField(
-            "_discovery",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        await Assert.That(restoredField.GetValue(component)).IsSameReferenceAs(expected);
-        await discoveryService.Received(1).LoadAsync(null, "online", Arg.Any<CancellationToken>());
+        using var context = new BlazorTestContext();
+        context.Services.AddSingleton(discoveryService);
+        context.Services.AddSingleton(Substitute.For<Explore.Blazor.Client.Contracts.Interop.IHomeDiscoveryGeolocation>());
+        context.ComponentFactories.Add(new PersistedDiscoveryFactory(persisted));
+        var cut = context.RenderMudComponent<Explore.Blazor.Client.Components.Discovery.HomeDiscoveryExperience>(
+            p => p.Add(x => x.UrlMode, "online"));
+        cut.Find("[data-testid='home-discovery-context-trigger']").Click();
+        await Assert.That(cut.FindAll(".home-discovery__context-option[aria-current='true']").Count).IsEqualTo(1);
     }
 
+    private sealed class PersistedDiscoveryFactory(HomeDiscoveryDto persisted) : Bunit.IComponentFactory
+    {
+        public bool CanCreate(Type componentType) =>
+            componentType == typeof(Explore.Blazor.Client.Components.Discovery.HomeDiscoveryExperience);
+
+        public Microsoft.AspNetCore.Components.IComponent Create(Type componentType) =>
+            new Explore.Blazor.Client.Components.Discovery.HomeDiscoveryExperience { PersistedDiscovery = persisted };
+    }
 }

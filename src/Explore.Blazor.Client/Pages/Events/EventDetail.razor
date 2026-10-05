@@ -12,6 +12,10 @@
 @using Explore.Blazor.Client.Components.Events
 @using Explore.Blazor.Client.Components.Event
 
+@{
+    var renderedGeneration = _loadGeneration;
+}
+
 <PageTitle>@(_eventDetails?.Title ?? "Event Detail")</PageTitle>
 
 @if (_eventDetails != null)
@@ -382,6 +386,11 @@
                         <EventProvenancePanel Event="_eventDetails" />
                     }
 
+                    @if (_eventDetails.HasHalLink("discovery-identity"))
+                    {
+                        <EventDiscoveryIdentityPanel Event="_eventDetails" @key="_eventDetails.Id" />
+                    }
+
                     @* Date & Time Block *@
                     <div class="d-flex align-center gap-4 mb-6">
                         <div class="event-icon-box event-icon-box--calendar">
@@ -733,7 +742,7 @@
                                                  Days="@(_eventDays?.ToList())"
                                                  AgendaItems="@(_eventAgendaItems?.ToList())"
                                                  CanManage="_canEdit"
-                                                 OnDataChanged="LoadEventAgendaAsync" />
+                                                 OnDataChanged="@(() => LoadEventAgendaAsync(renderedGeneration))" />
                         </section>
                     }
                     else if (_eventSessions != null && _eventSessions.Count > 0)
@@ -794,10 +803,10 @@
     @* ── Tag/Category Management Popup ── *@
     <TagCategoryManagerPopup
         Visible="_showDetailTagCatPopup"
-        VisibleChanged="@(v => { _showDetailTagCatPopup = v; StateHasChanged(); })"
+        VisibleChanged="@(v => { if (IsCurrentLoad(renderedGeneration)) { _showDetailTagCatPopup = v; StateHasChanged(); } })"
         Mode="@_detailTagCatMode"
         InitialAppliedIds="@_detailTagCatInitialIds"
-        OnSaved="HandleDetailTagCatSaved" />
+        OnSaved="@(ids => HandleDetailTagCatSaved(ids, renderedGeneration))" />
 }
 else if (_isLoading)
 {
@@ -835,6 +844,24 @@ else if (_isLoading)
             </MudItem>
         </MudGrid>
     </MudContainer>
+}
+else if (_publicReadStatus.HasValue)
+{
+    <section class="d-flex align-center justify-center" style="min-height: 80vh;"
+             data-public-detail-status="@_publicReadStatus.Value">
+        <MudContainer MaxWidth="MaxWidth.Medium" Class="text-center">
+            <MudText Typo="Typo.h3" HtmlTag="h1" Class="mb-4">
+                @T("ui.event.detail.recovery.heading", "Event details need your attention")
+            </MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-8">
+                @PublicReadRecoveryMessage
+            </MudText>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       OnClick="@(() => LoadEventDataAsync(_loadedSlugCode))">
+                @T("ui.event.detail.recovery.reload", "Reload event")
+            </MudButton>
+        </MudContainer>
+    </section>
 }
 else
 {

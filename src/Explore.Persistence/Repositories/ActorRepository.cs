@@ -253,16 +253,18 @@ public class ActorRepository : GenericRepository<Actor, Guid>, IActorRepository
 
     public async Task<int> ForgetPiiAsync(Guid actorId)
     {
-        return await new EfCoreUnitOfWork(_dbContext).ExecuteInTransactionAsync(async cancellationToken =>
+        return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
         {
+            await _dbContext.DisclosureMutations.EnlistActorsAsync([actorId], token);
+            await _dbContext.DisclosureMutations.CaptureAsync(token);
             Guid[] pictureIds = await _dbContext.ActorPii.AsNoTracking()
                 .Where(p => p.ActorId == actorId && p.ProfilePictureStorageObjectId.HasValue)
                 .Select(p => p.ProfilePictureStorageObjectId!.Value)
-                .ToArrayAsync(cancellationToken);
-            await new StorageObjectReferenceRepository(_dbContext).FenceAsync(pictureIds, cancellationToken);
+                .ToArrayAsync(token);
+            await new StorageObjectReferenceRepository(_dbContext).FenceAsync(pictureIds, token);
             return await _dbContext.ActorPii
                 .Where(p => p.ActorId == actorId)
-                .ExecuteDeleteAsync(cancellationToken);
+                .ExecuteDeleteAsync(token);
         }, CancellationToken.None);
     }
 

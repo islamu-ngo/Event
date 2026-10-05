@@ -80,6 +80,9 @@ public sealed class EventDetailLinkPolicy : ILinkPolicy<EventDto>
         var eventSessionPreCreateFacts = new PreCreateAuthorizationFacts(dto.TenantId, dto.Id);
         var eventAuthorizationScope = new AuthorizationScope(TenantId: dto.TenantId.ToString());
 
+        yield return new LinkDefinition("discovery-identity", RouteNames.GetEventDiscoveryIdentity,
+            new { eventId = dto.Id }, "GET", "Discovery identity");
+
         yield return new LinkDefinition(
             LinkRelations.AddSession,
             RouteNames.CreateDraftEventSession,

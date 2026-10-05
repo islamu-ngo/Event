@@ -85,6 +85,21 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
         if (RequiresDedicatedResourceAuthority(request.ResourceKind))
             return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local);
 
+        if (request.ResourceKind == ResourceKinds.Event
+            && (request.Facts is EventDiscoveryIdentityAuthorizationFacts
+                || EventDiscoveryIdentityAuthorizationFacts.IsDecisionAction(request.Action)))
+        {
+            Guid? reviewer = _adminContext.UserId ?? await _adminContext.ResolveUserIdAsync(cancellationToken);
+            bool permitted = !SafeMode && !_machinePrincipalAccessor.IsMachineCaller
+                && reviewer is { } userId
+                && Guid.TryParse(request.ResourceId, out Guid eventId)
+                && request.Facts is EventDiscoveryIdentityAuthorizationFacts facts
+                && facts.Allows(_tenantContext.TenantId, userId, eventId, request.Action);
+            return permitted
+                ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)
+                : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local);
+        }
+
         var resourceAttributes = TrustedAttributes(request);
         resourceAttributes = await AddTenantSettingLockAttributeAsync(request, resourceAttributes, cancellationToken);
 

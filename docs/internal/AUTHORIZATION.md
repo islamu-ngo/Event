@@ -21,6 +21,32 @@ case-insensitive relation guesses do not authorize UI actions. Anonymous public
 settings expose only normalized public facts and never the edit resource,
 concurrency stamp, audit actor, or readiness blocker payload.
 
+## Discovery Identity Authority
+
+Discovery identity status is handler-authorized: public source eligibility is
+independent of management access, and public relationship targets must pass their
+own current eligibility check. Candidate-specific `review` and `reverse` HAL
+relations require current membership, management and explicit action grants
+across both identity groups, without owner/contributor conflicts. The browser
+never derives these actions from claims. These read-side capabilities do not
+replace the command's fresh fenced authority or expected tenant identity epoch.
+`RoleEnum.EventDiscoveryReviewer` (45) is an explicitly assignable event preset
+with `event:view`, `event:update` and the two discovery decision permissions.
+`EventRoleAuthorityCeilingService` retains its same-event subset ceiling; owner
+seed permissions include review/reversal so owners can delegate that preset.
+The typed conflict facts still deny owner, creator and publisher decisions even
+with these permissions. Existing EventManager permissions remain unchanged, and
+lookup seeding creates no reviewer assignment. The normal Team assignment and
+revocation commands own the user grants; HAL remains the UI authority.
+The command protects the undeleted reviewer, membership, actor/event ownership, event-role assignments,
+roles, active permissions and role-permission bindings with native row fences.
+Authority locks precede sorted identity locks and the terminal tenant epoch;
+ordinary updates and deletes therefore participate without adopting advisory
+lock names. PostgreSQL snapshot conflicts replay the complete serializable
+attempt, including authority and provider evaluation, rather than retrying only
+the final save. Grant validity is evaluated again after provider awaits.
+See [identity correction surfaces](EVENT_PUBLICATION_AND_DISCOVERY.md#identity-correction-surfaces).
+
 ## Table of Contents
 
 1.  [Overview](#1-overview)

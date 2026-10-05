@@ -40,6 +40,12 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
             T result = await operation(cancellationToken);
             if (applicationContext?.IdentityFenceTransactionFailed == true)
                 throw new InvalidOperationException("The identity enrollment transaction has failed.");
+            if (applicationEnlistment is not null)
+            {
+                if (applicationContext!.StorageReferenceTransactionFailed)
+                    throw new InvalidOperationException("The storage reference transaction has failed.");
+                await applicationContext.FlushDisclosureAsync(cancellationToken);
+            }
             await transaction.CommitAsync(cancellationToken);
             storage?.HardenCompanionFiles();
             return result;
@@ -47,7 +53,10 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
         catch
         {
             if (applicationEnlistment is not null)
+            {
                 applicationContext!.ChangeTracker.Clear();
+                applicationContext.ResetDisclosureMutations();
+            }
             throw;
         }
         finally

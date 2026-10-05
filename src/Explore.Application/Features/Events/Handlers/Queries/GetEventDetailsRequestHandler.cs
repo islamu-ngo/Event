@@ -1,4 +1,3 @@
-using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -7,7 +6,6 @@ using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
-using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
@@ -15,49 +13,24 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDetailsProjectionService _detailsProjectionService;
-    private readonly HybridCache _cache;
-    private readonly ITenantContext _tenantContext;
     private readonly ITenantLifecycleAccessService _lifecycle;
     private readonly IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> _optionalQuestionnaireHandler;
 
     public GetEventDetailsRequestHandler(
         IEventRepository eventRepository,
         IEventDetailsProjectionService detailsProjectionService,
-        HybridCache cache,
         IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> optionalQuestionnaireHandler,
-        ITenantLifecycleAccessService lifecycle,
-        ITenantContext tenantContext)
+        ITenantLifecycleAccessService lifecycle)
     {
         _eventRepository = eventRepository;
         _detailsProjectionService = detailsProjectionService;
-        _cache = cache;
         _lifecycle = lifecycle;
-        _tenantContext = tenantContext;
         _optionalQuestionnaireHandler = optionalQuestionnaireHandler;
     }
 
     public async Task<EventDto?> QueryAsync(GetEventDetailsRequest request, CancellationToken cancellationToken)
     {
-        var cacheKey = $"event:detail:{_tenantContext.TenantId:D}:{request.Id:D}";
-
-        var eventDto = await _cache.GetOrCreateAsync(
-            cacheKey,
-            async token =>
-            {
-                return await _detailsProjectionService.BuildAsync(request.Id, token);
-            },
-            new HybridCacheEntryOptions
-            {
-                Expiration = TimeSpan.FromMinutes(5),
-                LocalCacheExpiration = TimeSpan.FromMinutes(1)
-            },
-            tags:
-            [
-                CacheTags.Events,
-                CacheTags.EventDetails,
-                CacheTags.Event(request.Id)
-            ],
-            cancellationToken: cancellationToken);
+        var eventDto = await _detailsProjectionService.BuildAsync(request.Id, cancellationToken);
 
         if (eventDto is null || !await _lifecycle.IsPublicAsync(eventDto.TenantId, cancellationToken))
             return null;

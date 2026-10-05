@@ -24,6 +24,7 @@ public static class SettingRegistry
         all.AddRange(EventSettingDefinitions.All);
         all.AddRange(EventResourceSettingDefinitions.All);
         all.AddRange(EventReportingIntakeSettingDefinitions.All);
+        all.AddRange(EventDiscoveryTraversalSettingDefinitions.All);
         all.AddRange(OrganizationSettingDefinitions.All);
         all.AddRange(GroupSettingDefinitions.All);
         all.AddRange(ModuleSettingDefinitions.All);

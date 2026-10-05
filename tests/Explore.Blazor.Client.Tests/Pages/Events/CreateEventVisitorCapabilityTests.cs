@@ -132,6 +132,27 @@ public sealed class CreateEventVisitorCapabilityTests : IDisposable
             .IsEqualTo($"http://localhost/events/{CreationHandler.CreatedId}/edit");
     }
 
+    [Test]
+    public async Task Publish_SendsCompleteInlineOccurrence()
+    {
+        var cut = await RenderAccountRequiredAsync();
+        await cut.InvokeAsync(() => cut.FindComponent<MudDatePicker>().Instance.DateChanged
+            .InvokeAsync(new DateTime(2030, 1, 1)));
+
+        var submission = cut.Find("button.create-event__submit-button").ClickAsync(new MouseEventArgs());
+        var submitted = await _creation.Started.Task.WaitAsync(Timeout);
+        _creation.Response.SetResult(new HttpResponseMessage(HttpStatusCode.Created)
+        {
+            Content = JsonContent.Create(new BaseCommandResponseOfGuid { Id = CreationHandler.CreatedId, Success = true })
+        });
+        await submission.WaitAsync(Timeout);
+
+        await Assert.That(submitted.Sessions!.Single().EndTimeType).IsEqualTo(SessionEndTimeType.Fixed);
+        await Assert.That(submitted.Sessions.Single().EndTime).IsNotNull();
+        await Assert.That(submitted.Sessions.Single().LanguageIds).IsNotNull();
+        await Assert.That(submitted.Sessions.Single().SpeakerActorIds).IsNotNull();
+    }
+
     private async Task<IRenderedComponent<CreateEvent>> RenderAccountRequiredAsync()
     {
         var cut = _ctx.RenderMudComponent<CreateEvent>();

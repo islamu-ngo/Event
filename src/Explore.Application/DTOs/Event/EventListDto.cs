@@ -64,6 +64,8 @@ public sealed record EventListDto
     public string? MadhabFullName { get; init; }
 
     // Session Info
+    public EventMatchingSessionDto? MatchingSession { get; init; }
+    public int? AdditionalSessionCount { get; init; }
     public int? SessionCount { get; init; }
     public DateOnly? FirstSessionDate { get; init; }
     public DateOnly? LastSessionDate { get; init; }

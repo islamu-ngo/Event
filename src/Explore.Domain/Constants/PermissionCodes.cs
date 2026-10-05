@@ -21,6 +21,8 @@ public static class PermissionCodes
     public const string EventManageTickets = "event:manage-tickets";
     public const string EventViewOrganizerClaims = "event:view-organizer-claims";
     public const string EventReviewOrganizerClaim = "event:review-organizer-claim";
+    public const string EventReviewDiscoveryIdentity = "event:review-discovery-identity";
+    public const string EventReverseDiscoveryIdentity = "event:reverse-discovery-identity";
 
     // ===== Event Day =====
     public const string EventDayCreate = "event_day:create";

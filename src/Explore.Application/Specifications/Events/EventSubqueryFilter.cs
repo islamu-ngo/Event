@@ -162,6 +162,9 @@ public sealed class EventSubqueryFilter
     public static EventSubqueryFilter CurrentOrUpcomingPublishedSession() =>
         new(EventSubqueryFilterType.CurrentOrUpcomingPublishedSession, true);
 
+    public static EventSubqueryFilter Occurrence(EventOccurrenceDiscoveryFilter filter) =>
+        new(EventSubqueryFilterType.Occurrence, filter);
+
     /// <summary>
     /// Filters events based on their temporal status relative to Now.
     /// </summary>
@@ -174,6 +177,9 @@ public sealed class EventSubqueryFilter
 /// </summary>
 public enum EventSubqueryFilterType
 {
+    /// <summary>All public occurrence constraints apply to the same session.</summary>
+    Occurrence,
+
     /// <summary>Category filter via EventCategories junction table.</summary>
     Category,
 

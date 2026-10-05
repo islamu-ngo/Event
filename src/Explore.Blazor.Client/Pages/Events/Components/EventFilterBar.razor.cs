@@ -11,6 +11,11 @@ namespace Explore.Blazor.Client.Pages.Events.Components;
 public partial class EventFilterBar : IBrowserViewportObserver, IAsyncDisposable
 {
     [Inject] private IBrowserViewportService BrowserViewportService { get; set; } = null!;
+    [Inject] private Explore.Blazor.Client.Contracts.Services.ITranslationService Translation { get; set; } = default!;
+
+    protected override void OnInitialized() => Translation.OnLanguageChanged += HandleLanguageChanged;
+
+    private void HandleLanguageChanged(string languageCode) => _ = InvokeAsync(StateHasChanged);
 
     // Mobile responsive state
     private bool _isMobile;
@@ -321,6 +326,7 @@ public partial class EventFilterBar : IBrowserViewportObserver, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        Translation.OnLanguageChanged -= HandleLanguageChanged;
         if (_viewportSubscribed)
         {
             await BrowserViewportService.UnsubscribeAsync(this);

@@ -8,6 +8,29 @@ The exhaustive environment-variable reference is maintained in
 `.env.example` is intentionally a curated baseline, not a complete catalogue.
 This document owns configuration architecture, source anchors and invariants.
 
+## Discovery traversal governance
+
+`EventDiscoveryTraversalSettingDefinitions` registers tenant-scoped integer
+settings with explicit allowed values, not arbitrary runtime limits:
+
+| Key | Default / ceiling |
+| --- | ---: |
+| `event_discovery.max_identities` | 1000 |
+| `event_discovery.lifetime_minutes` | 15 |
+| `event_discovery.max_live_snapshots` | 200 |
+| `event_discovery.max_physical_items` | 400000 |
+| `event_discovery.max_examined_rows` | 10000 |
+| `event_discovery.max_source_seeks` | 32 |
+
+Lower selections reduce work or retention; no selection removes a bound.
+`EventDiscoveryTraversalLimits` validates resolved values at the Application
+boundary. Physical rows include expired membership; headers have an independent
+ceiling equal to the physical-row limit. Capture lifetime is shortened by retained
+occurrence and disclosure boundaries. Invalid resolution fails unavailable.
+These settings add no environment variable, key service or publication quota.
+See [retention operations](OPERATIONS.md#discovery-snapshot-retention) and
+[the public guide](../public/documentation/readme/events-and-ticketing/publication-and-sessions.md#operating-bounded-browsing).
+
 ## Retained Identity Erasure Key
 
 `PrivacyIdentityFenceKeyProvider` resolves the dedicated deployment-owned
@@ -396,6 +419,15 @@ the instance base domain to `localhost`, and binds the synthetic tenants to
 the `default` and `agent-negative` subdomains. This allows BFF requests on
 both hosts to resolve the same tenants as direct API requests. Completed
 restarts do not reset operator routing changes.
+
+The opt-in fixture also seeds two published public organization-owned discovery
+sources with the same title and UTC occurrence, identified by
+`AgentBrowserPersonaCatalog.DiscoverySourceId` and `DuplicateDiscoverySourceId`.
+The synthetic organizer receives an explicit EventOwner assignment on each;
+no Discovery Reviewer assignment is seeded. Completed restarts validate the
+owned pair without repairing conflicting records or restoring revoked owner
+assignments. The original browser event and unrelated listings are retained.
+Use ordinary Team administration to delegate independent review on both records.
 
 | Surface or durable unit | Agent profile value |
 |---|---|

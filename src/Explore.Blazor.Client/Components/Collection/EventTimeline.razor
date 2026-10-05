@@ -41,7 +41,10 @@
 
     private DateTime GetEventDate(EventListDto evt)
     {
+        if (evt.MatchingSession is { } session)
+            return session.LocalStartDate.Date;
+
         var sessionDate = IsPast ? evt.LastSessionDate : evt.FirstSessionDate;
-        return (sessionDate ?? DateTimeOffset.UtcNow).LocalDateTime;
+        return (sessionDate ?? DateTimeOffset.UtcNow).Date;
     }
 }

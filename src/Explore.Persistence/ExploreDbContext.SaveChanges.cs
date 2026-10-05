@@ -14,14 +14,8 @@ public partial class ExploreDbContext
 {
     public override int SaveChanges() => SaveChanges(acceptAllChangesOnSuccess: true);
 
-    public override int SaveChanges(bool acceptAllChangesOnSuccess)
-    {
-        return SaveWithStorageReferences(acceptChanges =>
-        {
-            PrepareTrackedEntities();
-            return base.SaveChanges(acceptChanges);
-        }, acceptAllChangesOnSuccess);
-    }
+    public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
+        SaveChangesAsync(acceptAllChangesOnSuccess, CancellationToken.None).GetAwaiter().GetResult();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
@@ -45,6 +39,8 @@ public partial class ExploreDbContext
     private async Task<int> SavePrivacyErasureGraphAsync(
         bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
     {
+        if (Database.IsRelational())
+            await DisclosureMutations.CaptureAsync(cancellationToken);
         PrepareTrackedEntities();
         foreach (var entry in ChangeTracker.Entries()
                      .Where(item => item.State is EntityState.Added or EntityState.Modified))

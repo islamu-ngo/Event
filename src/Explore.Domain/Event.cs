@@ -6,6 +6,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Lifecycle;
 using Explore.Domain.Services.Scheduling;
+using Explore.Domain.Services.Discovery;
 
 namespace Explore.Domain;
 
@@ -13,6 +14,8 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
 {
     private readonly List<EventTicketCatalogVersion> _ticketCatalogVersions = [];
     private readonly List<EventCapacityPool> _capacityPools = [];
+    private Guid _id;
+    private string _title = string.Empty;
 
     public Event()
     {
@@ -24,13 +27,32 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
         EventStatusId = (int)status;
     }
 
-    public Guid Id { get; set; }
+    public Guid Id
+    {
+        get => _id;
+        set
+        {
+            _id = value;
+            DiscoverySourceSortKey = EventDiscoveryRank.SourceKey(value);
+        }
+    }
 
     [ForeignKey("EventType")]
     public int? EventTypeId { get; set; }
     public EventType? EventType { get; set; }
 
-    public required string Title { get; set; }
+    public required string Title
+    {
+        get => _title;
+        set
+        {
+            string rank = EventDiscoveryRank.TitleKey(value);
+            _title = value;
+            DiscoveryTitleSortKey = rank;
+        }
+    }
+    public string DiscoveryTitleSortKey { get; private set; } = string.Empty;
+    public string DiscoverySourceSortKey { get; private set; } = EventDiscoveryRank.SourceKey(Guid.Empty);
     public string? Subtitle { get; set; }
     public string? Description { get; set; }
     public string? Content { get; set; }
@@ -246,6 +268,25 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
         }
 
         RecalculateScheduleSummaryFromSessions();
+    }
+
+    [NotMapped]
+    public int? DiscoveryAdditionalSessionCount { get; private set; }
+
+    /// <summary>
+    /// Retains only the selected occurrence in a read graph, with a count of other eligible matches.
+    /// </summary>
+    public void SetDiscoveryOccurrence(EventSession? matchingSession, int matchingSessionCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(matchingSessionCount);
+        if ((matchingSession is null) != (matchingSessionCount == 0))
+            throw new ArgumentException("A matching occurrence and a positive match count must be supplied together.");
+        if (matchingSession is not null
+            && (matchingSession.EventId != Id || matchingSession.TenantId != TenantId))
+            throw new ArgumentException("The matching occurrence must belong to this event and tenant.", nameof(matchingSession));
+
+        Sessions = matchingSession is null ? [] : [matchingSession];
+        DiscoveryAdditionalSessionCount = matchingSessionCount == 0 ? 0 : matchingSessionCount - 1;
     }
 
     public void RecalculateScheduleSummaryFromSessions()

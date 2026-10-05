@@ -228,6 +228,7 @@
     @* ── Primary Action Row: Search + Filters Toggle + Search Button ── *@
     <div class="filter-bar__primary-row">
         <MudTextField Variant="Variant.Outlined" T="string" @bind-Value="SearchTerm"
+                      Label="@Translation.T("ui.discovery.search_label", "Search events")"
                       Placeholder="Search events..."
                       Margin="Margin.Dense"
                       Adornment="Adornment.Start"

@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -30,6 +31,8 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -706,7 +709,9 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task PdsSnapshotReplacement_FencesWholeTenantSetBeforeSavingOlderStagedTargets()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ThumbnailReplacement_FencesSourcesAndWholeTenantSetBeforeSavingOlderStagedTargets(bool snapshot)
     {
         await fixture.ResetAsync();
         ImportScope firstScope = await SeedScopeAsync("atproto-multi-retirement-a");
@@ -748,18 +753,37 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 StagedThumbnail("multi-new-b", checksum: ReplacementThumbnailChecksum),
                 Guid.Parse("018e4e5c-7f00-7000-8000-000000000022"))
         ];
-        AtprotoPersistenceApplyResult result = await repository.TryReconcileWithResultAsync(
-            new AtprotoPdsSnapshotApplyRequest(claim, [Did],
-                [new AtprotoPdsSnapshot(Did, [new(Collection, RecordKey)], [new(next, projection)])],
-                [firstScope.TenantId, secondScope.TenantId], 2, updatedAt)
+        AtprotoFederatedEventImportPlan[] imports = stages.Select(stage =>
+            ImportPlan(stage.TenantId, next, projection) with
             {
-                EventImports = stages.Select(stage => ImportPlan(stage.TenantId, next, projection) with
-                {
-                    Thumbnail = new AtprotoThumbnailBlobCandidate(Did, ReplacementThumbnailCid, "image/png", 8),
-                    StagedThumbnail = stage
-                }).ToArray()
-            }, CancellationToken.None);
+                Thumbnail = new AtprotoThumbnailBlobCandidate(Did, ReplacementThumbnailCid, "image/png", 8),
+                StagedThumbnail = stage
+            }).ToArray();
+        Guid actorId = await context.Events.Select(value => value.ActorId).Distinct().SingleAsync();
+        Guid recordId = await context.AtprotoRecords.Select(value => value.Id).SingleAsync();
+        var interceptor = new SourcesBeforeStorageInterceptor(actorId, recordId,
+            [firstScope.TenantId, secondScope.TenantId]);
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseNpgsql(fixture.ConnectionString).UseSnakeCaseNamingConvention()
+            .AddInterceptors(interceptor).Options;
+        AtprotoPersistenceApplyResult result;
+        await using (var replacementContext = new ExploreDbContext(options))
+        {
+            replacementContext.EnableTenantFilterBypass("Federation source-before-storage fence test.");
+            var replacementRepository = new AtprotoJetstreamRepository(replacementContext);
+            result = snapshot
+                ? await replacementRepository.TryReconcileWithResultAsync(
+                    new AtprotoPdsSnapshotApplyRequest(claim, [Did],
+                        [new AtprotoPdsSnapshot(Did, [new(Collection, RecordKey)], [new(next, projection)])],
+                        [firstScope.TenantId, secondScope.TenantId], 2, updatedAt)
+                    { EventImports = imports }, CancellationToken.None)
+                : await replacementRepository.TryApplyAndAdvanceWithResultAsync(
+                    ApplyRequest(claim, 1, 2, next, firstScope.TenantId, "Multiple owners",
+                        "https://events.example/multiple", updatedAt) with
+                    { EventImports = imports });
+        }
         context.ChangeTracker.Clear();
+        await Assert.That(interceptor.SawStorageFence).IsTrue();
         await Assert.That(result.Applied).IsTrue();
         await Assert.That(result.ConsumedStagedThumbnails).IsEquivalentTo(stages);
         await Assert.That(await context.StorageObjects.Select(value => value.Id).ToArrayAsync())
@@ -3224,6 +3248,59 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         new(Utc(hour));
 
     private sealed record ImportScope(Guid TenantId, Guid ActorId);
+
+    private sealed class SourcesBeforeStorageInterceptor(
+        Guid actorId, Guid recordId, Guid[] tenantIds) : DbCommandInterceptor
+    {
+        private readonly HashSet<(Type Entity, Guid Id)> _fenced = [];
+        public bool SawStorageFence { get; private set; }
+
+        private void Observe(DbCommand command, CommandEventData eventData)
+        {
+            var context = (ExploreDbContext)eventData.Context!;
+            var sql = context.GetService<ISqlGenerationHelper>();
+            string Table(Type type)
+            {
+                var entity = context.Model.FindEntityType(type)!;
+                return sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+            }
+
+            foreach (Type type in new[] { typeof(Actor), typeof(AtprotoRecord), typeof(Tenant) })
+            {
+                if (!command.CommandText.StartsWith($"UPDATE {Table(type)}", StringComparison.Ordinal))
+                    continue;
+                foreach (DbParameter parameter in command.Parameters)
+                    if (parameter.Value is Guid id)
+                        _fenced.Add((type, id));
+            }
+
+            if (!command.CommandText.StartsWith($"UPDATE {Table(typeof(StorageObject))}", StringComparison.Ordinal)
+                && !command.CommandText.StartsWith($"UPDATE {Table(typeof(StorageProducerOperation))}",
+                    StringComparison.Ordinal))
+                return;
+            SawStorageFence = true;
+            if (!_fenced.Contains((typeof(Actor), actorId))
+                || !_fenced.Contains((typeof(AtprotoRecord), recordId))
+                || tenantIds.Any(id => !_fenced.Contains((typeof(Tenant), id))))
+                throw new InvalidOperationException("Storage fencing preceded its complete discovery source anchors.");
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            Observe(command, eventData);
+            return ValueTask.FromResult(result);
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            Observe(command, eventData);
+            return ValueTask.FromResult(result);
+        }
+    }
 
     private sealed class ExpireConsumerAfterSaveInterceptor(Guid consumerStateId) : SaveChangesInterceptor
     {

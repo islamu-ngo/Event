@@ -3,6 +3,12 @@
   "description": "Resource attributes for event resources. Populated by ResourceDescriptors.Event.",
   "type": "object",
   "properties": {
+    "discoveryReviewerUserId": { "type": "string" },
+    "discoveryAction": { "type": "string", "enum": ["view-management", "review-discovery-identity", "reverse-discovery-identity"] },
+    "discoveryActiveMembership": { "type": "boolean" },
+    "discoveryManagementAuthority": { "type": "boolean" },
+    "discoveryExplicitGrant": { "type": "boolean" },
+    "discoveryHasConflict": { "type": "boolean" },
     "tenantId": {
       "type": "string",
       "description": "Owning tenant identifier. Used by islamuevent_tenant_admin derived role."

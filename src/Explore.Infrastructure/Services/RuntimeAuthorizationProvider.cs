@@ -8,7 +8,9 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Organizations.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Models;
+using Explore.Application.Settings;
 using Explore.Application.Telemetry;
+using Explore.Domain;
 using Explore.Domain.Constants;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -53,6 +55,8 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
     private readonly AuthorizationProviderDeploymentOptions _deploymentOptions;
     private readonly BusinessMetrics? _metrics;
     private readonly IEventResourceCapabilityAuthorizer _eventResourceAuthorizer;
+    private readonly ITenantSettingRepository? _discoveryTenantSettings;
+    private readonly CerbosSettings? _discoveryCerbosSettings;
 
     private const string InstanceModeCacheKey = "AuthorizationProvider_Mode";
     private static readonly TimeSpan InstanceModeCacheDuration = TimeSpan.FromMinutes(1);
@@ -67,7 +71,9 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         IOptions<AuthorizationProviderDeploymentOptions> deploymentOptions,
         IEventResourceCapabilityAuthorizer eventResourceAuthorizer,
         ISupportAccessSessionService? supportAccessSessionService = null,
-        BusinessMetrics? metrics = null)
+        BusinessMetrics? metrics = null,
+        ITenantSettingRepository? discoveryTenantSettings = null,
+        IOptions<CerbosSettings>? discoveryCerbosSettings = null)
     {
         _cerbosProvider = cerbosProvider;
         _localProvider = localProvider;
@@ -79,6 +85,8 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         _deploymentOptions = deploymentOptions.Value;
         _metrics = metrics;
         _eventResourceAuthorizer = eventResourceAuthorizer;
+        _discoveryTenantSettings = discoveryTenantSettings;
+        _discoveryCerbosSettings = discoveryCerbosSettings?.Value;
     }
 
     public async Task<AuthorizationDecision> AuthorizeAsync(
@@ -173,6 +181,28 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
     private async Task<IReadOnlyList<AuthorizationDecision>> EvaluateSelectedBatchAsync(
         IReadOnlyList<AuthorizationRequest> effectiveChecks, CancellationToken cancellationToken)
     {
+        var discoveryPositions = Enumerable.Range(0, effectiveChecks.Count)
+            .Where(index => effectiveChecks[index].ResourceKind == ResourceKinds.Event
+                && (effectiveChecks[index].Facts is EventDiscoveryIdentityAuthorizationFacts
+                    || EventDiscoveryIdentityAuthorizationFacts.IsDecisionAction(effectiveChecks[index].Action)))
+            .ToArray();
+        if (discoveryPositions.Length != 0)
+        {
+            var results = effectiveChecks.Select(_ => AuthorizationDecision.Deny(
+                AuthorizationProviderMetadata.Runtime)).ToArray();
+            foreach (int index in discoveryPositions)
+                results[index] = await EvaluateDiscoveryDecisionAsync(effectiveChecks[index], cancellationToken);
+            var remaining = Enumerable.Range(0, effectiveChecks.Count).Except(discoveryPositions).ToArray();
+            if (remaining.Length != 0)
+            {
+                var generic = await EvaluateSelectedBatchAsync(remaining.Select(index => effectiveChecks[index]).ToArray(),
+                    cancellationToken);
+                for (int index = 0; index < generic.Count; index++)
+                    results[remaining[index]] = generic[index];
+            }
+            return results;
+        }
+
         // Persisted resource sessions cross the generic HTTP surface, not its collection authority.
         // Rebind only server-resolved upload facts to the same native update capability as reservation.
         if (effectiveChecks.Any(check => check.Facts is EventResourceUploadAuthorizationFacts))
@@ -252,6 +282,66 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         // and a tightened Cerbos rule would then have no effect on the capabilities routed around it.
         evaluatedResults = await ExecuteInstanceProviderAsync(effectiveChecks, cancellationToken);
         return evaluatedResults;
+    }
+
+    private async Task<AuthorizationDecision> EvaluateDiscoveryDecisionAsync(
+        AuthorizationRequest check, CancellationToken cancellationToken)
+    {
+        if (_discoveryTenantSettings is null || _discoveryCerbosSettings is null
+            || check.Facts is not EventDiscoveryIdentityAuthorizationFacts facts
+            || !Guid.TryParse(check.ResourceId, out Guid eventId)
+            || !facts.Allows(check.Tenant?.TenantId ?? Guid.Empty,
+                check.Subject?.UserId ?? Guid.Empty, eventId, check.Action))
+            return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Runtime);
+
+        // Identity correction is a fresh transaction-owned authority. Do not enter the generic
+        // cached provider-route resolver or its administrator safe-mode exception.
+        string[] keys =
+        [
+            GovernanceSettingKeys.Security.AuthorizationProvider,
+            GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled,
+            GovernanceSettingKeys.Cerbos.Mode,
+            GovernanceSettingKeys.Cerbos.CustomEndpoint,
+            GovernanceSettingKeys.Cerbos.GrpcEndpoint
+        ];
+        try
+        {
+            var system = new Dictionary<string, SystemSetting>(StringComparer.Ordinal);
+            foreach (string key in keys)
+            {
+                var value = await _systemSettingRepository.GetByKey(key, cancellationToken);
+                if (value is not null) system.Add(key, value);
+            }
+            var tenant = (await _discoveryTenantSettings.GetByTenantAndKeys(
+                facts.TenantId, keys, cancellationToken)).ToDictionary(value => value.SettingKey, StringComparer.Ordinal);
+            string Value(string key) => HierarchicalSettingMerge.Resolve(key, system, tenant)?.Value ?? "";
+            bool customAllowed = JsonSerializer.Deserialize<bool>(Value(GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled));
+            string customMode = SettingValueSerializer.DeserializeString(Value(GovernanceSettingKeys.Cerbos.Mode));
+            if (customAllowed && customMode is not ("instance" or "shared" or "custom_endpoint"))
+                return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Runtime);
+            bool custom = customAllowed && customMode == "custom_endpoint";
+            string mode = _deploymentOptions.GetProvider()
+                ?? SettingValueSerializer.DeserializeString(Value(GovernanceSettingKeys.Security.AuthorizationProvider));
+            if (!custom && mode == AuthorizationProviderDeploymentOptions.LocalProvider)
+                return await _localProvider.AuthorizeAsync(check, cancellationToken);
+            if (!custom && mode != AuthorizationProviderDeploymentOptions.CerbosProvider)
+                return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Runtime);
+            string endpoint = custom
+                ? SettingValueSerializer.DeserializeString(Value(GovernanceSettingKeys.Cerbos.CustomEndpoint))
+                : _deploymentOptions.GetProvider() == AuthorizationProviderDeploymentOptions.CerbosProvider
+                    ? _discoveryCerbosSettings.GrpcEndpoint
+                    : system.TryGetValue(GovernanceSettingKeys.Cerbos.GrpcEndpoint, out var grpc)
+                        ? SettingValueSerializer.DeserializeString(grpc.Value)
+                        : _discoveryCerbosSettings.GrpcEndpoint;
+            var decisions = await _cerbosProvider.AuthorizeBatchWithEndpointAsync(endpoint, [check], cancellationToken);
+            return decisions.Count == 1 ? decisions[0]
+                : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos, AuthorizationDecisionReasonCodes.ProviderError);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Runtime,
+                AuthorizationDecisionReasonCodes.ProviderUnavailable);
+        }
     }
 
     private async Task<IReadOnlyList<AuthorizationDecision>> ExecuteInstanceProviderAsync(

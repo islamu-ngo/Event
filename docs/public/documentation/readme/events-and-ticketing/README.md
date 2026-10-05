@@ -10,6 +10,8 @@ ISLAMU Event keeps event domain content, attendee registration, payment truth, a
 
 ## In this Section
 
+* **[Publication & Sessions](publication-and-sessions.md)** — One program with relevant dates and locations, governed regional discovery, and truthful source attribution.
+
 * **[Modular Event Aspects](modular-event-aspects.md)** — Relational sector models (Islamic-event details, prayer times, speakers, technology tracks) and feature module gating.
 * **[Custom Properties](custom-properties.md)** — Governed custom registration questions, privacy exposure ceilings, property retirement, and GDPR data scrubbing.
 * **[Ticketing & Check-In](ticketing-and-check-in.md)** — Registration vs. admission, cryptographic QR credentials, attendee recovery, and day-of-event check-in gates.

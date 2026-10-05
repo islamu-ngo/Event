@@ -37,6 +37,9 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
     }
 
     public async Task UpdateForValueAsync(Guid valueId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => UpdateValueCoreAsync(valueId, token), cancellationToken);
+
+    private async Task UpdateValueCoreAsync(Guid valueId, CancellationToken cancellationToken)
     {
         var value = await _dbContext.EventSessionCustomPropertyValues
             .Include(v => v.Definition)
@@ -66,6 +69,9 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
     }
 
     public async Task UpdateForDefinitionAsync(Guid definitionId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => UpdateDefinitionCoreAsync(definitionId, token), cancellationToken);
+
+    private async Task UpdateDefinitionCoreAsync(Guid definitionId, CancellationToken cancellationToken)
     {
         var definition = await _dbContext.EventSessionCustomPropertyDefinitions
             .FirstOrDefaultAsync(d => d.Id == definitionId, cancellationToken);
@@ -102,14 +108,26 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
     }
 
     public async Task RemoveForDefinitionAsync(Guid definitionId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => RemoveDefinitionCoreAsync(definitionId, token), cancellationToken);
+
+    private async Task RemoveDefinitionCoreAsync(Guid definitionId, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventSessionCustomPropertyProjections.Where(value => value.EventSessionCustomPropertyDefinitionId == definitionId)
+                .Select(value => value.TenantId), cancellationToken);
         await _dbContext.EventSessionCustomPropertyProjections
             .Where(p => p.EventSessionCustomPropertyDefinitionId == definitionId)
             .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task RefreshForEventSessionAsync(Guid eventSessionId, CancellationToken cancellationToken)
+        => await _dbContext.ExecuteDisclosureMutationAsync(token => RefreshSessionCoreAsync(eventSessionId, token), cancellationToken);
+
+    private async Task RefreshSessionCoreAsync(Guid eventSessionId, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventSessionCustomPropertyProjections.Where(value => value.EventSessionId == eventSessionId)
+                .Select(value => value.TenantId), cancellationToken);
         await _dbContext.EventSessionCustomPropertyProjections
             .Where(p => p.EventSessionId == eventSessionId)
             .ExecuteDeleteAsync(cancellationToken);
@@ -197,6 +215,7 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
                 LastErrorMessage = null,
             }, cancellationToken);
 
+            await _dbContext.FlushDisclosureAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             return new ProjectionRebuildResult(true, rowsProcessed, rowsFailed, drained);
@@ -220,6 +239,7 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
         }
 
         var drained = await DrainPendingScopesAsync(tenantId, batchSize, cancellationToken);
+        await _dbContext.FlushDisclosureAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return drained;
     }
@@ -290,6 +310,9 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
 
     private async Task RemoveProjectionForValueAsync(Guid valueId, CancellationToken cancellationToken)
     {
+        await _dbContext.DisclosureMutations.EnlistQueryAsync(
+            _dbContext.EventSessionCustomPropertyProjections.Where(value => value.EventSessionCustomPropertyValueId == valueId)
+                .Select(value => value.TenantId), cancellationToken);
         await _dbContext.EventSessionCustomPropertyProjections
             .Where(p => p.EventSessionCustomPropertyValueId == valueId)
             .ExecuteDeleteAsync(cancellationToken);

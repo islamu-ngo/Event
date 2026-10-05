@@ -12,11 +12,211 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class AgentBrowserPersonaStartupTests
 {
     [Test]
+    public async Task DuplicateSourcesBootstrapOnceWithoutReviewerGrantsOrChangingExistingListings()
+    {
+        await using var fixture = await AgentBrowserPersonaFixture.CreateAsync();
+        await fixture.RunAsync();
+        await using (var database = fixture.CreateDatabase())
+        {
+            var sources = await database.Events.Include(row => row.Sessions)
+                .Where(row => row.Id == AgentBrowserPersonaCatalog.DiscoverySourceId
+                    || row.Id == AgentBrowserPersonaCatalog.DuplicateDiscoverySourceId)
+                .OrderBy(row => row.PublicCode).ToListAsync();
+            await Assert.That(sources.Count).IsEqualTo(2);
+            await Assert.That(sources[0].Title).IsEqualTo(sources[1].Title);
+            await Assert.That(sources[0].PublicCode).IsNotEqualTo(sources[1].PublicCode);
+            await Assert.That(sources[0].Slug).IsNotEqualTo(sources[1].Slug);
+            foreach (var source in sources)
+            {
+                await Assert.That(source.EventStatusId).IsEqualTo((int)EventStatusEnum.Published);
+                await Assert.That(source.VisibilityTypeId).IsEqualTo((int)VisibilityTypeEnum.Public);
+                await Assert.That(source.EventProvenanceTypeId).IsEqualTo((int)EventProvenanceTypeEnum.OrganizerCreated);
+                await Assert.That(source.Sessions.Single().StartTime)
+                    .IsEqualTo(AgentBrowserPersonaCatalog.DiscoveryOccurrence);
+                await Assert.That(await database.EventRoleAssignments.CountAsync(row => row.EventId == source.Id
+                    && row.UserId == AgentBrowserPersonaCatalog.Organizer.SubjectId
+                    && row.RoleId == (int)RoleEnum.EventOwner)).IsEqualTo(1);
+            }
+            await Assert.That(await database.EventRoleAssignments.AnyAsync(
+                row => row.RoleId == (int)RoleEnum.EventDiscoveryReviewer)).IsFalse();
+        }
+        Guid unrelated = await fixture.CreateSameTenantUnrelatedEventAsync();
+        fixture.RemoveInitializationSecrets();
+        await fixture.RunAsync();
+        await fixture.AssertReadyAsync();
+        await using var replay = fixture.CreateDatabase();
+        await Assert.That(await replay.Events.CountAsync()).IsEqualTo(5);
+        await Assert.That((await replay.Events.SingleAsync(row => row.Id == unrelated)).Title)
+            .IsEqualTo("Another organization's event");
+        var original = await replay.Events.SingleAsync(row => row.Id == AgentBrowserPersonaCatalog.EventId);
+        await Assert.That(original.Title).IsEqualTo("Agent browser event");
+        await Assert.That(original.PublicCode).IsEqualTo("agent0000303");
+        await Assert.That(original.Slug).IsEqualTo("agent-browser");
+        await Assert.That(await replay.EventRoleAssignments.AnyAsync(
+            row => row.RoleId == (int)RoleEnum.EventDiscoveryReviewer)).IsFalse();
+    }
+
+    [Test]
+    [Arguments("tenant")]
+    [Arguments("actor")]
+    [Arguments("organizer")]
+    [Arguments("provenance")]
+    [Arguments("reference")]
+    [Arguments("session")]
+    [Arguments("role")]
+    [Arguments("owner")]
+    [Arguments("grantor")]
+    [Arguments("missing-grant")]
+    [Arguments("parent-actor")]
+    [Arguments("parent-membership")]
+    [Arguments("source-metadata")]
+    [Arguments("grant-status")]
+    [Arguments("occurrence")]
+    public async Task DuplicateFixtureCannotAdoptOrRepairInconsistentSourceAuthority(string fault)
+    {
+        await using var fixture = await AgentBrowserPersonaFixture.CreateAsync();
+        await fixture.RunAsync();
+        await using (var database = fixture.CreateDatabase())
+        {
+            var source = await database.Events.Include(row => row.Sessions).Include(row => row.Days)
+                .SingleAsync(row => row.Id == AgentBrowserPersonaCatalog.DiscoverySourceId);
+            var owner = await database.EventRoleAssignments.SingleAsync(row => row.EventId == source.Id);
+            switch (fault)
+            {
+                case "tenant":
+                    database.EventRoleAssignments.Remove(owner);
+                    await database.SaveChangesAsync();
+                    await database.Database.ExecuteSqlInterpolatedAsync(
+                        $"DELETE FROM islamu_event.events WHERE id = {source.Id}");
+                    database.ChangeTracker.Clear();
+                    source.TenantId = AgentBrowserPersonaCatalog.NegativeTenantId;
+                    source.Tenant = null!;
+                    foreach (var session in source.Sessions)
+                    {
+                        session.TenantId = AgentBrowserPersonaCatalog.NegativeTenantId;
+                        session.Tenant = null!;
+                    }
+                    foreach (var day in source.Days)
+                    {
+                        day.TenantId = AgentBrowserPersonaCatalog.NegativeTenantId;
+                        day.Tenant = null!;
+                    }
+                    owner.TenantId = AgentBrowserPersonaCatalog.NegativeTenantId;
+                    owner.Tenant = null!;
+                    database.Events.Add(source);
+                    database.EventRoleAssignments.Add(owner);
+                    break;
+                case "actor": source.ActorId = AgentBrowserPersonaCatalog.NegativeOrganizationActorId; break;
+                case "organizer": source.OrganizerActorId = AgentBrowserPersonaCatalog.NegativeOrganizationActorId; break;
+                case "provenance": source.EventProvenanceTypeId = (int)EventProvenanceTypeEnum.CommunityReported; break;
+                case "reference": source.PublicCode = "foreign00340"; break;
+                case "session":
+                    var foreignSession = source.Sessions.Single();
+                    await database.Database.ExecuteSqlInterpolatedAsync(
+                        $"DELETE FROM islamu_event.event_sessions WHERE id = {foreignSession.Id}");
+                    database.ChangeTracker.Clear();
+                    foreignSession.TenantId = AgentBrowserPersonaCatalog.NegativeTenantId;
+                    foreignSession.Tenant = null!;
+                    foreignSession.EventId = AgentBrowserPersonaCatalog.NegativeEventId;
+                    foreignSession.Event = null!;
+                    foreignSession.EventDayId = null;
+                    foreignSession.EventDay = null;
+                    database.EventSessions.Add(foreignSession);
+                    break;
+                case "role": owner.RoleId = (int)RoleEnum.EventManager; break;
+                case "owner": owner.UserId = AgentBrowserPersonaCatalog.Manager.SubjectId; break;
+                case "grantor": owner.CreatedBy = AgentBrowserPersonaCatalog.Moderator.SubjectId; break;
+                case "missing-grant": database.EventRoleAssignments.Remove(owner); break;
+                case "parent-actor":
+                    var foreignOrganization = new Organization
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Pii = new OrganizationPii { FullName = "Foreign fixture parent" },
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    database.Organizations.Add(foreignOrganization);
+                    (await database.Actors.SingleAsync(row => row.Id == AgentBrowserPersonaCatalog.OrganizationActorId))
+                        .OrganizationId = foreignOrganization.Id;
+                    break;
+                case "parent-membership":
+                    (await database.OrganizationMembers.SingleAsync(row => row.Id == AgentBrowserPersonaCatalog.Id(420)))
+                        .RoleId = (int)RoleEnum.OrgMember;
+                    break;
+                case "source-metadata": source.ProvenanceExternalId = "foreign-source"; break;
+                case "grant-status": owner.Status = EventRoleAssignmentStatus.Pending; break;
+                case "occurrence":
+                    var shifted = AgentBrowserPersonaCatalog.DiscoveryOccurrence.AddDays(1);
+                    source.Sessions.Single().Reschedule(
+                        Explore.Domain.ValueObjects.UtcInstantRange.Create(shifted, shifted.AddHours(2)), "UTC",
+                        new Explore.Domain.Services.Scheduling.EventScheduleProjectionCalculator());
+                    source.RecalculateScheduleSummaryFromSessions();
+                    break;
+            }
+            await database.SaveChangesAsync();
+        }
+        fixture.RemoveInitializationSecrets();
+        await Assert.That(() => fixture.RunAsync()).Throws<InvalidOperationException>();
+        await using var rejected = fixture.CreateDatabase();
+        await Assert.That(await rejected.EventRoleAssignments.CountAsync())
+            .IsEqualTo(fault == "missing-grant" ? 4 : 5);
+        await Assert.That(await rejected.EventRoleAssignments.AnyAsync(
+            row => row.RoleId == (int)RoleEnum.EventDiscoveryReviewer)).IsFalse();
+    }
+
+    [Test]
+    public async Task DuplicateFixtureReplayDoesNotRestoreRevokedOwnerAuthority()
+    {
+        await using var fixture = await AgentBrowserPersonaFixture.CreateAsync();
+        await fixture.RunAsync();
+        await using (var database = fixture.CreateDatabase())
+        {
+            var owner = await database.EventRoleAssignments.SingleAsync(
+                row => row.EventId == AgentBrowserPersonaCatalog.DiscoverySourceId);
+            owner.Revoke(AgentBrowserPersonaCatalog.Organizer.SubjectId, DateTime.UtcNow);
+            await database.SaveChangesAsync();
+        }
+        fixture.RemoveInitializationSecrets();
+        await fixture.RunAsync();
+        await using var replay = fixture.CreateDatabase();
+        await Assert.That((await replay.EventRoleAssignments.SingleAsync(
+            row => row.EventId == AgentBrowserPersonaCatalog.DiscoverySourceId)).Status)
+            .IsEqualTo(EventRoleAssignmentStatus.Revoked);
+        await Assert.That(await replay.EventRoleAssignments.CountAsync()).IsEqualTo(5);
+    }
+
+    [Test]
+    public async Task ExplicitModeratorReviewerGrantSurvivesFixtureReplayWithoutBeingDuplicated()
+    {
+        await using var fixture = await AgentBrowserPersonaFixture.CreateAsync();
+        await fixture.RunAsync();
+        Guid assignmentId;
+        await using (var database = fixture.CreateDatabase())
+        {
+            DateTime now = DateTime.UtcNow;
+            var assignment = EventRoleAssignment.Create(AgentBrowserPersonaCatalog.TenantId,
+                AgentBrowserPersonaCatalog.DiscoverySourceId, AgentBrowserPersonaCatalog.Moderator.SubjectId,
+                (int)RoleEnum.EventDiscoveryReviewer, EventRoleAssignmentStatus.Active, now, null,
+                AgentBrowserPersonaCatalog.Organizer.SubjectId);
+            assignmentId = assignment.Id;
+            database.EventRoleAssignments.Add(assignment);
+            await database.SaveChangesAsync();
+        }
+        fixture.RemoveInitializationSecrets();
+        await fixture.RunAsync();
+        await using var replay = fixture.CreateDatabase();
+        await Assert.That(await replay.EventRoleAssignments.CountAsync(
+            row => row.RoleId == (int)RoleEnum.EventDiscoveryReviewer)).IsEqualTo(1);
+        await Assert.That((await replay.EventRoleAssignments.SingleAsync(row => row.Id == assignmentId)).CreatedBy)
+            .IsEqualTo(AgentBrowserPersonaCatalog.Organizer.SubjectId);
+    }
+
+    [Test]
     [Arguments("marker")]
     [Arguments("receipt")]
     [Arguments("graph")]
     [Arguments("activation")]
     [Arguments("replacement")]
+    [Arguments("sources")]
     public async Task InterruptedPersistedBoundariesResumeOnlyTheRecordedLifecycle(string boundary)
     {
         await using var fixture = await AgentBrowserPersonaFixture.CreateAsync();

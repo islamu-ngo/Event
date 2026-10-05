@@ -2,6 +2,13 @@ namespace Explore.Persistence.QueryFilters;
 
 public static class TenantFilterBypassReasons
 {
+    public const string DiscoveryRankMigration =
+        "Migration authority backfills bounded exact-tenant source keysets, including suppressed rows, before API readiness.";
+    public const string DiscoverySnapshotRetention =
+        "Trusted discovery maintenance selects bounded tenant pages and removes bounded expired snapshots under an exact tenant predicate.";
+    public const string DiscoveryDisclosureMutation =
+        "Discovery source mutation captures exact old and new dependency tenants, including suppressed rows, before terminal epoch advancement.";
+
     public const string EventResourceAuditRetention =
         "Resource audit maintenance traverses bounded tenant pages and deletes bounded expired rows under an exact tenant predicate.";
 

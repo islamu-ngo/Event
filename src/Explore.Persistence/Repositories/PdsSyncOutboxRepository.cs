@@ -310,9 +310,19 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
         }
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
+        bool firstAttempt = true;
         return await strategy.ExecuteAsync(async () =>
         {
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            if (!firstAttempt)
+            {
+                // The previous native transaction was disposed and rolled back,
+                // but SaveChanges may already have accepted its source/outbox state.
+                _dbContext.ChangeTracker.Clear();
+                _dbContext.ResetDisclosureMutations();
+            }
+            firstAttempt = false;
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellationToken);
             var outbox = await ActiveClaimQuery(claim, settledAt).SingleOrDefaultAsync(cancellationToken);
             if (outbox is null)
             {
@@ -325,6 +335,10 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
                 value.Collection == outbox.Collection &&
                 value.RecordKey == outbox.RecordKey,
                 cancellationToken);
+
+            if (record is not null)
+                await _dbContext.DisclosureMutations.EnlistRecordsAsync([record.Id], cancellationToken);
+            _dbContext.DisclosureMutations.Enlist([outbox.TenantId]);
 
             if (outbox.Operation == PdsSyncOperation.Delete)
             {
@@ -339,6 +353,7 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
                 {
                     CompleteOutbox(outbox, uri, cid, settledAt);
                     await _dbContext.SaveChangesAsync(cancellationToken);
+                    await _dbContext.FlushDisclosureAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     return true;
                 }
@@ -539,6 +554,7 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
             }
             CompleteOutbox(outbox, uri!, cid!, settledAt);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.FlushDisclosureAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return true;
         });

@@ -14,6 +14,10 @@ internal static class ApiProblemCodes
     public const string AnalyticsRelayRejected = "analytics_relay_rejected";
     public const string AuthorizationPolicyPackageUnavailable = "authorization_policy_package_unavailable";
     public const string AdmissionCheckInUnavailable = "admission_check_in_unavailable";
+    public const string EventDiscoveryUnavailable = "discovery_unavailable";
+    public const string EventDiscoveryCursorInvalid = "discovery_cursor_invalid";
+    public const string EventDiscoveryCursorExpired = "discovery_cursor_expired";
+    public const string EventDiscoveryRestartRequired = "discovery_restart_required";
     public const string AuthorizationProviderUnavailable = "authorization_provider_unavailable";
     public const string SetupAlreadyCompleted = "setup_already_completed";
     public const string ProviderGateway = "provider_gateway";

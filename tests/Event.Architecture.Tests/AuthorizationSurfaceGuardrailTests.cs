@@ -21,6 +21,14 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedMediatRExceptions =
     [
         new(
+            "Explore.Application.Features.Events.Discovery.Commands.ReviewEventDiscoveryAliasCommand",
+            "handler-commit-bound-discovery-reviewer",
+            "The handler requires an authenticated active tenant user, fences persisted user/membership and event authority, then reevaluates tenant-bound grants, conflicts of interest and the selected review/reversal action after lock waits for every affected event. Graph mutation, audit, outbox and expected identity revision commit atomically. EventDiscoveryIdentityAuthorityTests covers revocation, spoofed scope, conflicts and stale revisions; native identity and writer cohorts verify persisted transaction ordering."),
+        new(
+            "Explore.Application.Features.Events.Discovery.Commands.PurgeEventDiscoverySnapshotsCommand",
+            "trusted-worker-bounded-expired-retention",
+            "Only the instance-owned Quartz sweep invokes this pointer-only maintenance command; there is no HTTP mutation surface. It enumerates at most five expired ownership scopes and removes at most ten expired snapshots per exact-tenant Serializable transaction, never public source data or live membership. EventDiscoverySnapshotMaintenanceTests verifies tenant/expiry bounds, rollback and orphan cleanup; EventDiscoveryProviderAuthorityTests verifies physical retention separately from logical expiry."),
+        new(
             "Explore.Application.Features.EventResourceProviderActivation.Requests.Commands.BindEventResourceProviderCommand",
             "handler-current-instance-administrator",
             "EventResourceProviderControlPlane checks current persisted instance administrator authority inside the native setting lock and ReadCommitted transaction before binding aliases and closing deployment authority. EventResourceProviderActivationHttpTests verifies authenticated non-admin denial, binding revision conflict and private responses; EventResourceProviderControlPlaneTests verifies atomic binding and fence persistence."),

@@ -21,7 +21,7 @@
                                  @onerror="() => HandleImageError(eventItem)" />
                             <span class="upcoming-event-list__copy">
                                 <span class="upcoming-event-list__title" title="@eventItem.Title">@eventItem.Title</span>
-                                <span class="upcoming-event-list__metadata">@GetScheduleAndFormat(eventItem)</span>
+                                @Schedule(eventItem)
                                 @if (GetContext(eventItem) is { } context)
                                 {
                                     <span class="upcoming-event-list__context">@context</span>
@@ -45,7 +45,7 @@
                                  @onerror="() => HandleImageError(eventItem)" />
                             <span class="upcoming-event-list__copy">
                                 <span class="upcoming-event-list__title" title="@eventItem.Title">@eventItem.Title</span>
-                                <span class="upcoming-event-list__metadata">@GetScheduleAndFormat(eventItem)</span>
+                                @Schedule(eventItem)
                                 @if (GetContext(eventItem) is { } context)
                                 {
                                     <span class="upcoming-event-list__context">@context</span>
@@ -80,6 +80,10 @@
     [Parameter] public IEnumerable<EventListDto> Events { get; set; } = [];
     [Parameter] public string DateToBeAnnouncedLabel { get; set; } = "Date to be announced";
     [Parameter] public string ViewEventLabel { get; set; } = "View event";
+    [Parameter] public DateTimeOffset? ReferenceTimeUtc { get; set; }
+    [Parameter] public string OngoingLabel { get; set; } = "Ongoing";
+    [Parameter] public string TodayLabel { get; set; } = "Today";
+    [Parameter] public string TomorrowLabel { get; set; } = "Tomorrow";
 
     private IEnumerable<EventListDto[]> EventColumns => _events.Chunk(ItemsPerColumn);
 
@@ -109,14 +113,84 @@
 
     private string GetScheduleAndFormat(EventListDto eventItem)
     {
-        var date = eventItem.FirstSessionDate?.ToString("ddd, MMM d") ?? DateToBeAnnouncedLabel;
+        var startDate = eventItem.MatchingSession?.LocalStartDate ?? eventItem.FirstSessionDate;
+        var format = startDate is { } start && ReferenceTimeUtc is { } now && start.Year != now.Year
+            ? "ddd, MMM d, yyyy"
+            : "ddd, MMM d";
+        var date = startDate?.ToString(format) ?? DateToBeAnnouncedLabel;
+        var relativeDay = GetRelativeDay(eventItem);
+        if (relativeDay is not null)
+            date = $"{(relativeDay == "today" ? TodayLabel : TomorrowLabel)} · {date}";
+        if (eventItem.MatchingSession is { } session)
+        {
+            if (session.LocalStartTime is { } time)
+                date += $" · {time:hh\\:mm}";
+            if (session.IsOpenEnded)
+                date += " · Open ended";
+        }
         return string.IsNullOrWhiteSpace(eventItem.EventFormatFullName)
             ? date
             : $"{date} · {eventItem.EventFormatFullName}";
     }
 
+    private RenderFragment Schedule(EventListDto eventItem) => @<span class="upcoming-event-list__metadata">
+        <time datetime="@((eventItem.MatchingSession?.LocalStartDate ?? eventItem.FirstSessionDate)?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))"
+              data-relative-day="@GetRelativeDay(eventItem)">@GetScheduleAndFormat(eventItem)</time>
+        @if (IsOngoing(eventItem))
+        {
+            <span data-occurrence-state="ongoing"> · @OngoingLabel</span>
+        }
+        @if (eventItem.MatchingSession?.Title is { Length: > 0 } title
+            && !string.Equals(title, eventItem.Title, StringComparison.Ordinal))
+        {
+            <span class="upcoming-event-list__session-title">@title</span>
+        }
+        @if (eventItem.AdditionalSessionCount is > 0)
+        {
+            <span data-additional-session-count="@eventItem.AdditionalSessionCount"> · @eventItem.AdditionalSessionCount additional matching sessions</span>
+        }
+    </span>;
+
+    private bool IsOngoing(EventListDto eventItem) =>
+        ReferenceTimeUtc is { } now
+        && eventItem.MatchingSession is { StartsAtUtc: { } start } session
+        && start <= now
+        && (session.IsOpenEnded == true || session.EndsAtUtc is { } end && now < end);
+
+    private string? GetRelativeDay(EventListDto eventItem)
+    {
+        var startDate = eventItem.MatchingSession?.LocalStartDate ?? eventItem.FirstSessionDate;
+        if (startDate is not { } date || ReferenceTimeUtc is not { } now
+            || string.IsNullOrWhiteSpace(eventItem.Timezone))
+            return null;
+
+        try
+        {
+            var today = DateOnly.FromDateTime(DateTimeHelper.ConvertUtcToLocal(now, eventItem.Timezone));
+            return (DateOnly.FromDateTime(date.Date).DayNumber - today.DayNumber) switch
+            {
+                0 => "today",
+                1 => "tomorrow",
+                _ => null
+            };
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return null;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return null;
+        }
+    }
+
     private static string? GetContext(EventListDto eventItem)
     {
+        if (string.Equals(eventItem.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase))
+            return string.IsNullOrWhiteSpace(eventItem.ActorDisplayName)
+                ? "Community reported"
+                : $"Community reported · Contributor: {eventItem.ActorDisplayName}";
+
         if (!string.IsNullOrWhiteSpace(eventItem.ActorDisplayName))
         {
             return eventItem.ActorDisplayName;
@@ -127,18 +201,24 @@
             : eventItem.EventTypeFullName;
     }
 
-    private string GetEventLinkLabel(EventListDto eventItem) => eventItem.IsFederatedDiscoveryEvent()
-        ? eventItem.GetHalHref("source") is null
-            ? $"AT Protocol event: {eventItem.Title}"
-            : $"View AT Protocol source: {eventItem.Title}"
-        : $"{ViewEventLabel}: {eventItem.Title}";
+    private string GetEventLinkLabel(EventListDto eventItem)
+    {
+        var label = eventItem.IsFederatedDiscoveryEvent()
+            ? eventItem.GetHalHref("source") is null
+                ? $"AT Protocol event: {eventItem.Title}"
+                : $"View AT Protocol source: {eventItem.Title}"
+            : $"{ViewEventLabel}: {eventItem.Title}";
+        return $"{label}. {GetScheduleAndFormat(eventItem)}{(IsOngoing(eventItem) ? $" · {OngoingLabel}" : string.Empty)}";
+    }
 
     private static string? GetEventUrl(EventListDto eventItem) => eventItem.IsFederatedDiscoveryEvent()
         ? eventItem.GetHalHref("source")
         : EventUrlHelper.BuildPublicPath(eventItem.Slug, eventItem.PublicCode) ?? "/events";
 
     private static string? GetExternalEventUrl(EventListDto eventItem) =>
-        eventItem.IsFederatedDiscoveryEvent() ? eventItem.GetHalHref("source") : null;
+        eventItem.IsFederatedDiscoveryEvent() ||
+        string.Equals(eventItem.ProvenanceTypeCode, "COMMUNITY_REPORTED", StringComparison.OrdinalIgnoreCase)
+            ? eventItem.GetHalHref("source") : null;
 
     private static string GetExternalEventLinkLabel(EventListDto eventItem) =>
         $"Open {eventItem.Title} on its external platform in a new tab";

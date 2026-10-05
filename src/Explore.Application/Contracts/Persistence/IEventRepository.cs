@@ -7,6 +7,16 @@ public interface IEventRepository : IGenericRepository<Event, Guid>
 {
     const int MaximumAuthorizationTargetBatchSize = 256;
 
+    /// <summary>Requires caller-owned Serializable. No source count; at most take matching entities and one session each.</summary>
+    Task<IReadOnlyList<Event>> SeekPublicDiscoveryAsync(
+        EventQuerySpecification specification, EventDiscoverySourceCursor? after, int take,
+        CancellationToken cancellationToken);
+
+    /// <summary>Reapplies current criteria to the exact stored session of each bounded membership source.</summary>
+    Task<IReadOnlyList<Event>> GetPublicDiscoveryMembersAsync(
+        EventQuerySpecification specification, IReadOnlyDictionary<Guid, Guid> matchingSessions,
+        CancellationToken cancellationToken);
+
     Task<Event?> GetEventWithDetails(Guid id);
     Task<Event?> GetEventWithDetailsAsync(
         Guid id,
@@ -48,9 +58,11 @@ public interface IEventRepository : IGenericRepository<Event, Guid>
     /// <param name="pageNumber">The page number (1-based).</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="specification">The query specification containing filters and sort criteria.</param>
+    /// <param name="cancellationToken">Cancellation for the complete discovery read.</param>
     /// <returns>A tuple containing the items and total count.</returns>
     Task<(List<Event> Items, int TotalCount)> GetEventsWithDetailsPaged(
-        int pageNumber, int pageSize, EventQuerySpecification specification);
+        int pageNumber, int pageSize, EventQuerySpecification specification,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets public, published events eligible for sitemap generation.

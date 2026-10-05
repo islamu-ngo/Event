@@ -45,6 +45,90 @@ public sealed class UpcomingEventListTests : IDisposable
     }
 
     [Test]
+    public async Task MatchingOccurrenceTimePrecedesSecondarySessionTitle()
+    {
+        var item = CreateEvents(1).Single() with
+        {
+            MatchingSession = new()
+            {
+                Id = Guid.CreateVersion7(),
+                Title = new string('x', 200),
+                LocalStartDate = new DateTimeOffset(2026, 10, 4, 0, 0, 0, TimeSpan.Zero),
+                LocalStartTime = TimeSpan.FromHours(9),
+                StartsAtUtc = new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero)
+            }
+        };
+        var cut = context.RenderMudComponent<UpcomingEventList>(parameters => parameters
+            .Add(component => component.Events, [item]));
+
+        var metadata = cut.Find(".upcoming-event-list__metadata");
+        await Assert.That(metadata.FirstElementChild!.TagName).IsEqualTo("TIME");
+        await Assert.That(metadata.QuerySelector("time")!.GetAttribute("datetime")).IsEqualTo("2026-10-04");
+        await Assert.That(metadata.QuerySelector("time")!.TextContent).Contains("09:00");
+        await Assert.That(cut.Find("[data-testid='upcoming-event-row']").GetAttribute("aria-label"))
+            .Contains("09:00");
+    }
+
+    [Test]
+    [Arguments(-1, false, true, false)]
+    [Arguments(0, false, true, true)]
+    [Arguments(3599, false, true, true)]
+    [Arguments(3600, false, true, false)]
+    [Arguments(1, true, false, true)]
+    [Arguments(1, false, false, false)]
+    public async Task OngoingStateUsesResponseInstantAndHalfOpenOccurrence(
+        int secondsAfterStart, bool openEnded, bool hasEnd, bool expectedOngoing)
+    {
+        var start = new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero);
+        var item = CreateEvents(1).Single() with
+        {
+            MatchingSession = new()
+            {
+                Id = Guid.CreateVersion7(),
+                LocalStartDate = start.Date,
+                LocalStartTime = TimeSpan.FromHours(9),
+                StartsAtUtc = start,
+                EndsAtUtc = hasEnd ? start.AddHours(1) : null,
+                IsOpenEnded = openEnded
+            }
+        };
+        var cut = context.RenderMudComponent<UpcomingEventList>(parameters => parameters
+            .Add(component => component.Events, [item])
+            .Add(component => component.ReferenceTimeUtc, start.AddSeconds(secondsAfterStart)));
+
+        await Assert.That(cut.FindAll("[data-occurrence-state='ongoing']").Count)
+            .IsEqualTo(expectedOngoing ? 1 : 0);
+    }
+
+    [Test]
+    [Arguments("Pacific/Kiritimati", "today")]
+    [Arguments("Pacific/Honolulu", "tomorrow")]
+    [Arguments("Etc/UTC", "tomorrow")]
+    [Arguments("unknown-zone", null)]
+    public async Task RelativeDayUsesEventTimezoneRatherThanBrowserOrUtcDate(
+        string timezone, string? expectedDay)
+    {
+        var item = CreateEvents(1).Single() with
+        {
+            Timezone = timezone,
+            MatchingSession = new()
+            {
+                Id = Guid.CreateVersion7(),
+                LocalStartDate = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                LocalStartTime = TimeSpan.FromHours(9),
+                StartsAtUtc = new DateTimeOffset(2026, 5, 31, 19, 0, 0, TimeSpan.Zero)
+            }
+        };
+        var cut = context.RenderMudComponent<UpcomingEventList>(parameters => parameters
+            .Add(component => component.Events, [item])
+            .Add(component => component.ReferenceTimeUtc,
+                new DateTimeOffset(2026, 5, 31, 11, 0, 0, TimeSpan.Zero)));
+
+        await Assert.That(cut.Find(".upcoming-event-list__metadata time")
+            .GetAttribute("data-relative-day")).IsEqualTo(expectedDay);
+    }
+
+    [Test]
     public async Task FederatedEventWithoutSourceAffordanceRendersWithoutLink()
     {
         var federatedEvent = CreateEvents(1).Single();
@@ -56,7 +140,8 @@ public sealed class UpcomingEventListTests : IDisposable
 
         await Assert.That(row.HasAttribute("href")).IsFalse();
         await Assert.That(row.GetAttribute("role")).IsEqualTo("article");
-        await Assert.That(row.GetAttribute("aria-label")).IsEqualTo("AT Protocol event: Upcoming event 1");
+        await Assert.That(row.GetAttribute("aria-label"))
+            .IsEqualTo($"AT Protocol event: {federatedEvent.Title}. {row.QuerySelector("time")!.TextContent}");
     }
 
     [Test]
@@ -77,7 +162,8 @@ public sealed class UpcomingEventListTests : IDisposable
         var externalLink = cut.Find("a.upcoming-event-list__external-link");
 
         await Assert.That(row.GetAttribute("href")).IsEqualTo(sourceHref);
-        await Assert.That(row.GetAttribute("aria-label")).IsEqualTo("View AT Protocol source: Upcoming event 1");
+        await Assert.That(row.GetAttribute("aria-label"))
+            .IsEqualTo($"View AT Protocol source: {federatedEvent.Title}. {row.QuerySelector("time")!.TextContent}");
         await Assert.That(externalLink.GetAttribute("href")).IsEqualTo(sourceHref);
         await Assert.That(externalLink.GetAttribute("target")).IsEqualTo("_blank");
         await Assert.That(externalLink.GetAttribute("rel")).IsEqualTo("noopener noreferrer");

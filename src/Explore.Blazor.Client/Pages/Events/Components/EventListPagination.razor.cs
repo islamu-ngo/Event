@@ -2,39 +2,42 @@ using Microsoft.AspNetCore.Components;
 
 namespace Explore.Blazor.Client.Pages.Events.Components;
 
-public partial class EventListPagination : ComponentBase
+public partial class EventListPagination : ComponentBase, IDisposable
 {
     [Parameter, EditorRequired]
-    public int CurrentPage { get; set; } = 1;
+    public int LoadedCount { get; set; }
 
     [Parameter, EditorRequired]
-    public int TotalPages { get; set; }
+    public int SnapshotCount { get; set; }
 
     [Parameter, EditorRequired]
     public int PageSize { get; set; } = 20;
 
     [Parameter, EditorRequired]
-    public int TotalCount { get; set; }
+    public bool HasMore { get; set; }
 
     [Parameter]
     public bool IsLoading { get; set; }
 
     [Parameter]
-    public EventCallback<int> CurrentPageChanged { get; set; }
+    public EventCallback NextRequested { get; set; }
 
     [Parameter]
     public EventCallback<int> PageSizeChanged { get; set; }
 
-    private int StartItem => TotalCount == 0 ? 0 : ((CurrentPage - 1) * PageSize) + 1;
+    private static readonly int[] PageSizeOptions = [12, 20, 50, 100];
+    private string T(string key, string fallback) => Translation.T(key, fallback);
 
-    private int EndItem => Math.Min(CurrentPage * PageSize, TotalCount);
+    protected override void OnInitialized() => Translation.OnLanguageChanged += HandleLanguageChanged;
 
-    private static readonly int[] PageSizeOptions = [12, 20, 50];
+    private void HandleLanguageChanged(string languageCode) => _ = InvokeAsync(StateHasChanged);
 
-    private async Task HandlePageChanged(int page)
+    public void Dispose() => Translation.OnLanguageChanged -= HandleLanguageChanged;
+
+    private async Task HandleNextRequested()
     {
-        if (page == CurrentPage || IsLoading) return;
-        await CurrentPageChanged.InvokeAsync(page);
+        if (!HasMore || IsLoading) return;
+        await NextRequested.InvokeAsync();
     }
 
     private async Task HandlePageSizeChanged(int size)

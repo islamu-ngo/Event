@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -9,6 +10,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Storage;
@@ -17,6 +19,138 @@ namespace Event.Persistence.IntegrationTests.Storage;
 [NotInParallel]
 public sealed class ManagedStorageRetirementTests(EventResourceFileUploadTests.Database database)
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task TenantDeletionRetiresOnlyOwnedDiscoveryStateAndRollsBackOnCommitFailure(bool failCommit)
+    {
+        await using var fixture = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
+        var scope = await fixture.SeedScopeAsync();
+        Guid tenantId = Guid.CreateVersion7();
+        Guid seriesId = Guid.CreateVersion7();
+        Guid originalStamp;
+        long survivingEpoch;
+        await using (var seed = database.CreateContext())
+        {
+            seed.Tenants.Add(new Tenant
+            {
+                Id = tenantId,
+                FullName = "Discovery retirement",
+                Slug = $"retirement-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            });
+            seed.EventSeries.Add(new EventSeries
+            {
+                Id = seriesId,
+                TenantId = tenantId,
+                Title = "Shared picture",
+                ActorId = scope.ActorId,
+                FeaturedImageId = scope.StorageAId,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!
+            });
+            SeedDiscovery(seed, tenantId);
+            SeedDiscovery(seed, scope.TenantAId);
+            await seed.SaveChangesAsync();
+            originalStamp = await seed.StorageObjects.Where(row => row.Id == scope.StorageAId)
+                .Select(row => row.ConcurrencyStamp).SingleAsync();
+            survivingEpoch = await seed.Set<EventDiscoveryRevision>().Where(row => row.TenantId == scope.TenantAId)
+                .Select(row => row.DisclosureEpoch).SingleAsync();
+        }
+
+        var failure = new TenantRetirementCommitFailure(tenantId);
+        await using (var removing = database.CreateContext(failCommit ? [failure] : []))
+        {
+            // Previously loaded discovery rows must not keep a Restrict relationship
+            // alive in the tracker or be reinserted by the physical tenant save.
+            await removing.Set<EventDiscoveryIdentity>().IgnoreQueryFilters()
+                .Where(row => row.TenantId == tenantId).Include(row => row.Alias).LoadAsync();
+            await removing.Set<EventDiscoveryRevision>().Where(row => row.TenantId == tenantId).LoadAsync();
+            var tenant = await removing.Tenants.SingleAsync(row => row.Id == tenantId);
+            if (failCommit)
+            {
+                var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => new TenantRepository(removing).Delete(tenant));
+                await Assert.That(exception?.Message).IsEqualTo("Injected tenant retirement commit failure.");
+                await Assert.That(failure.ReachedPhysicalDeletion).IsTrue();
+            }
+            else
+                await new TenantRepository(removing).Delete(tenant);
+        }
+
+        await using var verify = database.CreateContext();
+        await Assert.That(await verify.Tenants.AnyAsync(row => row.Id == tenantId)).IsEqualTo(failCommit);
+        await Assert.That(await verify.EventSeries.IgnoreQueryFilters().AnyAsync(row => row.Id == seriesId))
+            .IsEqualTo(failCommit);
+        await AssertDiscoveryAsync(verify, tenantId, failCommit);
+        await AssertDiscoveryAsync(verify, scope.TenantAId, true);
+        await Assert.That(await verify.Set<EventDiscoveryRevision>().Where(row => row.TenantId == scope.TenantAId)
+            .Select(row => row.DisclosureEpoch).SingleAsync()).IsEqualTo(survivingEpoch);
+        var source = await verify.StorageObjects.AsNoTracking().SingleAsync(row => row.Id == scope.StorageAId);
+        await Assert.That(source.ConcurrencyStamp == originalStamp).IsEqualTo(failCommit);
+        await Assert.That(source.TenantId).IsEqualTo(scope.TenantAId);
+        await Assert.That(source.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        await Assert.That(await verify.StorageProviderBindings.AnyAsync(row => row.Id == source.StorageProviderBindingId))
+            .IsTrue();
+        await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == source.Id)).IsFalse();
+    }
+
+    private static void SeedDiscovery(ExploreDbContext context, Guid tenantId)
+    {
+        var member = EventDiscoveryIdentity.Create(tenantId, EventDiscoverySourceKind.AtprotoRecord, "shared-member");
+        var primary = EventDiscoveryIdentity.Create(tenantId, EventDiscoverySourceKind.AtprotoRecord, "shared-primary");
+        member.IsDeleted = true;
+        var now = new DateTime(2040, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        context.AddRange(member, primary, new EventDiscoveryAlias
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            MemberIdentityId = member.Id,
+            PrimaryIdentityId = primary.Id,
+            RelationshipRevision = 1,
+            ReviewerId = Guid.CreateVersion7(),
+            ReasonCode = "same_event",
+            ReviewedAtUtc = now
+        }, new EventDiscoverySnapshotReservation { TenantId = tenantId },
+            EventDiscoverySnapshot.Create(Guid.CreateVersion7(), tenantId, new string('a', 64), 0, 0,
+                now, now.AddMinutes(5), false, true, true,
+                [EventDiscoverySnapshotItem.Create(EventDiscoverySourceKind.AtprotoRecord, Guid.CreateVersion7(),
+                    EventDiscoveryCanonicalKind.ReviewedIdentity, primary.Id, null)], new()));
+    }
+
+    private static async Task AssertDiscoveryAsync(ExploreDbContext context, Guid tenantId, bool retained)
+    {
+        await Assert.That(await context.Set<EventDiscoveryIdentity>().IgnoreQueryFilters()
+            .CountAsync(row => row.TenantId == tenantId)).IsEqualTo(retained ? 2 : 0);
+        await Assert.That(await context.Set<EventDiscoveryAlias>().IgnoreQueryFilters()
+            .CountAsync(row => row.TenantId == tenantId)).IsEqualTo(retained ? 1 : 0);
+        await Assert.That(await context.Set<EventDiscoveryRevision>().IgnoreQueryFilters()
+            .CountAsync(row => row.TenantId == tenantId)).IsEqualTo(retained ? 1 : 0);
+        await Assert.That(await context.Set<EventDiscoverySnapshot>().IgnoreQueryFilters()
+            .CountAsync(row => row.TenantId == tenantId)).IsEqualTo(retained ? 1 : 0);
+        await Assert.That(await context.Set<EventDiscoverySnapshotItem>().IgnoreQueryFilters()
+            .CountAsync(row => row.TenantId == tenantId)).IsEqualTo(retained ? 1 : 0);
+        await Assert.That(await context.Set<EventDiscoverySnapshotReservation>().IgnoreQueryFilters()
+            .CountAsync(row => row.TenantId == tenantId)).IsEqualTo(retained ? 1 : 0);
+    }
+
+    private sealed class TenantRetirementCommitFailure(Guid tenantId) : DbTransactionInterceptor
+    {
+        public bool ReachedPhysicalDeletion { get; private set; }
+
+        public override async ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction, TransactionEventData eventData, InterceptionResult result,
+            CancellationToken cancellationToken = default)
+        {
+            var context = (ExploreDbContext)eventData.Context!;
+            await Assert.That(await context.Tenants.AnyAsync(row => row.Id == tenantId, cancellationToken)).IsFalse();
+            await AssertDiscoveryAsync(context, tenantId, false);
+            ReachedPhysicalDeletion = true;
+            throw new InvalidOperationException("Injected tenant retirement commit failure.");
+        }
+    }
+
     [Test]
     public async Task TenantDeletionFencesUnloadedSeriesPictureWithoutRetiringSharedSource()
     {

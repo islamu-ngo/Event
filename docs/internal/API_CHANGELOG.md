@@ -1,9 +1,24 @@
-ABOUTME: API change log aligned with the current repository state and versioning in source.
-ABOUTME: Keeps release notes short and focused on externally observable API behavior.
+Scope: externally observable API behavior and source-defined versioning.
+Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
 ## 2026-10-04
+
+- **Homepage deadline visibility and supply-aware overlap.** Featured and
+  Upcoming now select independently; carousel inclusion never excludes an
+  otherwise eligible event from its chronological Upcoming position. Recently
+  Added prefers identities absent from both shelves, then Featured-only
+  identities, then Upcoming identities as needed, preserving newest-added
+  display order. Each shelf remains internally unique. Existing limits,
+  disclosure checks, section failures and transport shapes remain authoritative.
+- **Homepage occurrence urgency.** Upcoming uses explicit ongoing-or-future
+  instant eligibility rather than a UTC-calendar date cutoff. Home cards retain
+  their existing public timezone metadata; matching start times wrap before
+  secondary titles, Today/Tomorrow labels use that event timezone and the
+  response timestamp, and Ongoing observes finite half-open or explicit
+  open-ended intervals. English/Arabic labels are shipped without inventing
+  freshness or treating a missing end as indefinite.
 
 - **Fresh registration after ordinary erasure.** External authentication retains
   the combined sign-in/JIT-signup flow. An erased provider identity or released
@@ -17,6 +32,32 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
   are unchanged.
 
 ## 2026-10-02
+
+- **Breaking public discovery traversal.** `GetEvents` accepts opaque `cursor`
+  and `pageSize` instead of public `pageNumber`. The HAL resource exposes
+  `snapshotCount`, `truncated`, `expiresAt`, `hasMore` and forward `next`, without
+  total pages or a global match count. Continuations retain criteria and captured
+  rank but recheck current authority. Invalid, expired and changed traversals
+  return metadata-free no-store `400`, `410` and `409` ProblemDetails; unavailable
+  authority or capacity returns `503`. Private management pagination is separate.
+
+- **Reversible discovery identity surfaces.** Event identity status and bounded
+  duplicate candidates are no-store HAL resources. The status route accepts an
+  optional public candidate and advertises current group-authorized review and
+  reversal actions. Unavailable primaries expose no target or relationship hint.
+  Decisions preserve original event/session/registration targets; stale tenant
+  identity revisions return `409` ProblemDetails, and denied authority returns
+  `403`. Candidate fields remain flattened alongside `_links`.
+
+- **Occurrence-correct discovery.** Public date, temporal and governed-area
+  filters match the same published session. Cards expose `matchingSession`
+  and nullable `additionalSessionCount`, with permitted regional city/country.
+  Unknown or inactive `areaId` values no longer become unfiltered searches.
+- **Current disclosure reads.** Public discovery no longer replays cached DTO
+  pages or shared/conditional-304 responses; public details no longer replay
+  fields removed by committed redaction. Unresolved configuration or
+  regional authority returns no-store `503` with `discovery_unavailable`.
+
 
 - **Breaking: storage provenance versus delivery.** Persisted `StorageObject.Uri`
   is replaced by nullable `SourceUri` foreign-origin provenance. Ordinary storage

@@ -6,7 +6,9 @@ using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
@@ -197,6 +199,60 @@ public sealed class RetainedIdentityFenceTests
         await Assert.That(async () => await enrollment.WaitAsync(TimeSpan.FromSeconds(10), Token))
             .Throws<InvalidOperationException>();
         await Assert.That(await enrolling.Users.CountAsync(Token)).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ColocatedAuthorityCommitsDisclosureOnlyAfterAllApplicationWrites(bool fail)
+    {
+        await using var fixture = await Fixture.CreateAsync(colocated: true);
+        await SqliteDatabaseInitializer.InitializeAsync(fixture.Primary, Token);
+        fixture.Primary.EnableTenantFilterBypass("Colocated identity disclosure regression.");
+        var tenant = new Tenant
+        {
+            Id = Guid.CreateVersion7(),
+            Slug = $"identity-disclosure-{Guid.CreateVersion7():N}",
+            FullName = "Original identity",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
+        };
+        fixture.Primary.Tenants.Add(tenant);
+        fixture.Primary.Set<EventDiscoveryRevision>().Add(new EventDiscoveryRevision
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id
+        });
+        await fixture.Primary.SaveChangesAsync(Token);
+        long before = (await fixture.Primary.Set<EventDiscoveryRevision>()
+            .SingleAsync(row => row.TenantId == tenant.Id, Token)).DisclosureEpoch;
+
+        Task<bool> operation = fixture.Operation.ExecuteEnrollmentAsync(Account(), async token =>
+        {
+            await new EfCoreUnitOfWork(fixture.Primary).ExecuteSerializableAsync(async inner =>
+            {
+                tenant.FullName = "First write";
+                await fixture.Primary.SaveChangesAsync(inner);
+                return true;
+            }, token);
+            tenant.FullName = "Final write";
+            await fixture.Primary.SaveChangesAsync(token);
+            if (fail)
+                throw new InvalidOperationException("injected_application_failure");
+            return true;
+        }, Token);
+        if (fail)
+            await Assert.That(() => operation).Throws<InvalidOperationException>();
+        else
+            await operation;
+
+        await using ExploreDbContext reader = fixture.CreatePrimary();
+        reader.EnableTenantFilterBypass("Colocated identity disclosure regression.");
+        await Assert.That((await reader.Tenants.SingleAsync(row => row.Id == tenant.Id, Token)).FullName)
+            .IsEqualTo(fail ? "Original identity" : "Final write");
+        await Assert.That((await reader.Set<EventDiscoveryRevision>()
+            .SingleAsync(row => row.TenantId == tenant.Id, Token)).DisclosureEpoch)
+            .IsEqualTo(fail ? before : before + 1);
     }
 
     [Test]

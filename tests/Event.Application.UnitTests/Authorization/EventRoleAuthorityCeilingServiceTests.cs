@@ -84,6 +84,46 @@ public class EventRoleAuthorityCeilingServiceTests
     }
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task DiscoveryReviewerAssignment_RequiresTheSameEventReviewPermissionCeiling(bool hasReviewAuthority)
+    {
+        const int reviewerRoleId = (int)RoleEnum.EventDiscoveryReviewer;
+        string[] reviewerPermissions =
+        [
+            "event:view",
+            PermissionCodes.EventUpdate,
+            PermissionCodes.EventReviewDiscoveryIdentity,
+            PermissionCodes.EventReverseDiscoveryIdentity
+        ];
+        _permissionRegistry.GetAllPermissionsAsync().Returns(
+            Task.FromResult(PermissionCodesFor([PermissionCodes.EventManageTeam, .. reviewerPermissions])));
+        var reviewerRole = Role(reviewerRoleId, "event.discovery_reviewer", "Discovery Reviewer");
+        _roleRepository.GetByScopeAsync(RoleScopeEnum.Event).Returns(
+            Task.FromResult<IReadOnlyList<Role>>([reviewerRole]));
+        _roleRepository.GetByIdAsync(reviewerRoleId).Returns(Task.FromResult<Role?>(reviewerRole));
+        _roleRepository.GetPermissionsForRoleAsync(reviewerRoleId).Returns(
+            Task.FromResult(PermissionCodesFor(reviewerPermissions)));
+        ConfigureSnapshot(hasReviewAuthority
+            ? [PermissionCodes.EventManageTeam, .. reviewerPermissions]
+            : [PermissionCodes.EventManageTeam, "event:view", PermissionCodes.EventUpdate]);
+
+        var presets = await _service.GetAssignableRolePresetsAsync(
+            TenantId, EventId, AssignerUserId, CancellationToken.None);
+        var result = await _service.CanAssignRoleAsync(
+            TenantId, EventId, AssignerUserId, reviewerRoleId, CancellationToken.None);
+
+        await Assert.That(presets.Any(preset => preset.RoleId == reviewerRoleId)).IsEqualTo(hasReviewAuthority);
+        await Assert.That(result.IsAllowed).IsEqualTo(hasReviewAuthority);
+        if (!hasReviewAuthority)
+        {
+            await Assert.That(result.FailureCode).IsEqualTo(EventRoleAuthorityFailureCodes.AuthorityCeilingExceeded);
+            await Assert.That(result.MissingPermissionCodes).Contains(PermissionCodes.EventReviewDiscoveryIdentity);
+            await Assert.That(result.MissingPermissionCodes).Contains(PermissionCodes.EventReverseDiscoveryIdentity);
+        }
+    }
+
+    [Test]
     public async Task GetAssignableRolePresetsAsync_WithEventManagerAuthority_ReturnsSubordinatePresetsOnly()
     {
         ConfigureSnapshot(

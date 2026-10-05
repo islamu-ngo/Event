@@ -24,7 +24,7 @@ public static class MockServiceFactory
     public static IEventService CreateEventService()
     {
         var mock = Substitute.For<IEventService>();
-        mock.GetAllEventsAsync().Returns(new List<EventListDto>());
+        mock.GetEventDiscoveryAsync().Returns(new EventDiscoveryTraversalResource());
         mock.GetMyEventsAsync().Returns(new List<EventListDto>());
         return mock;
     }

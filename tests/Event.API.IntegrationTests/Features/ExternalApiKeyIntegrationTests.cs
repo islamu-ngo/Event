@@ -3,24 +3,34 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
+using Event.Api.IntegrationTests.Builders;
 using Explore.Application.DTOs.ExternalApiKey;
+using Explore.Application.Models;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain.Constants;
+using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Secrets.Database;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel("SingleTenantAuthenticatedApiFixture")]
-[ClassDataSource<SingleTenantAuthenticatedApiTestFixture>(Shared = SharedType.PerAssembly)]
+[ClassDataSource<ExternalApiKeyIntegrationFixture>(Shared = SharedType.PerAssembly)]
 public class ExternalApiKeyIntegrationTests
 {
-    private readonly SingleTenantAuthenticatedApiTestFixture _fixture;
+    private readonly ExternalApiKeyIntegrationFixture _fixture;
 
-    public ExternalApiKeyIntegrationTests(SingleTenantAuthenticatedApiTestFixture fixture)
+    /// <summary>Uses the shared authenticated HTTP host and durable privacy authority for issuance-dependent API operations.</summary>
+    public ExternalApiKeyIntegrationTests(ExternalApiKeyIntegrationFixture fixture)
     {
         _fixture = fixture;
     }
@@ -66,6 +76,7 @@ public class ExternalApiKeyIntegrationTests
         await Assert.That(stored.UpdatedAt).IsNotNull();
     }
 
+    /// <summary>Checks owner-visible metadata while rejecting raw credential and hash disclosure after issuance.</summary>
     [Test]
     public async Task GetExternalApiKeyDetails_WithOwnerRequest_ShouldReturnVisibleMetadata()
     {
@@ -90,8 +101,8 @@ public class ExternalApiKeyIntegrationTests
         await Assert.That(body.KeyId.Length).IsEqualTo(16);
         await Assert.That(raw).DoesNotContain("\"apiKey\"");
         await Assert.That(raw).DoesNotContain("\"secretHash\"");
-        await Assert.That(raw).DoesNotContain(issued.ApiKey!);
-        await Assert.That(raw).DoesNotContain(issued.ApiKey!.Split('.', 2)[1]);
+        await Assert.That(raw.Contains(issued.ApiKey!, StringComparison.Ordinal)).IsFalse();
+        await Assert.That(raw.Contains(issued.ApiKey!.Split('.', 2)[1], StringComparison.Ordinal)).IsFalse();
     }
 
     [Test]
@@ -107,6 +118,7 @@ public class ExternalApiKeyIntegrationTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
+    /// <summary>Rejects empty scopes through the HTTP validation contract rather than a success-shaped acknowledgement.</summary>
     [Test]
     public async Task CreateExternalApiKey_WithValidationFailure_ShouldReturnValidationProblemDetails()
     {
@@ -119,6 +131,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -129,10 +142,12 @@ public class ExternalApiKeyIntegrationTests
             "At least one scope is required.");
     }
 
+    /// <summary>Seeds legitimate owner authority before isolating the name control-character validation failure.</summary>
     [Test]
     public async Task CreateExternalApiKey_WithNameControlCharacter_ShouldReturnValidationProblemDetails()
     {
         var userId = Guid.NewGuid();
+        await SeedIssuanceOwnerAsync(userId);
         var payload = new CreateExternalApiKeyDto
         {
             Name = "Invalid\nKey",
@@ -141,6 +156,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -151,10 +167,12 @@ public class ExternalApiKeyIntegrationTests
             "API key name must not contain control characters.");
     }
 
+    /// <summary>Rejects excessive policy text for an otherwise authorized issuer through ValidationProblemDetails.</summary>
     [Test]
     public async Task CreateExternalApiKey_WithDescriptionTooLong_ShouldReturnValidationProblemDetails()
     {
         var userId = Guid.NewGuid();
+        await SeedIssuanceOwnerAsync(userId);
         var payload = new CreateExternalApiKeyDto
         {
             Name = "Description Validation",
@@ -164,6 +182,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -174,6 +193,7 @@ public class ExternalApiKeyIntegrationTests
             "API key description cannot exceed 1000 characters.");
     }
 
+    /// <summary>Checks owner-local name uniqueness after whitespace normalization using a genuinely issued key.</summary>
     [Test]
     public async Task CreateExternalApiKey_WithPaddedDuplicateName_ShouldReturnValidationProblemDetails()
     {
@@ -187,6 +207,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -197,6 +218,7 @@ public class ExternalApiKeyIntegrationTests
             "An API key with the same name already exists for this owner.");
     }
 
+    /// <summary>Requires tenant-admin authority before persistence and verifies denial leaves no credential row.</summary>
     [Test]
     public async Task CreateExternalApiKey_WithTenantOwnerAndNoTenantAdminAuthority_ShouldReturnForbiddenWithoutCreatingKey()
     {
@@ -210,6 +232,7 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
@@ -445,8 +468,36 @@ public class ExternalApiKeyIntegrationTests
         return body.Id;
     }
 
-    private async Task<CreateExternalApiKeyCommandResponse> CreateIssuedExternalApiKeyAsync(Guid userId, string name, List<string> scopes)
+    /// <summary>Persists the platform user and active tenant membership required by fresh issuance authority checks.</summary>
+    private async Task SeedIssuanceOwnerAsync(Guid userId)
     {
+        await using (var seedScope = _fixture.Factory.Services.CreateAsyncScope())
+        {
+            var database = seedScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            if (!await database.Users.AnyAsync(user => user.Id == userId))
+            {
+                var user = new UserBuilder().WithId(userId).Build();
+                database.Users.Add(user);
+                database.TenantUsers.Add(new TenantUser
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = userId,
+                    User = user,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    JoinedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                });
+                await database.SaveChangesAsync();
+            }
+        }
+    }
+
+    /// <summary>Issues through the real HTTP success contract and verifies durable hash storage without redisclosing it.</summary>
+    private async Task<ExternalApiKeyIssuanceDto> CreateIssuedExternalApiKeyAsync(Guid userId, string name, List<string> scopes)
+    {
+        await SeedIssuanceOwnerAsync(userId);
         var payload = new CreateExternalApiKeyDto
         {
             Name = name,
@@ -455,23 +506,85 @@ public class ExternalApiKeyIntegrationTests
         };
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/externalapikey", userId);
+        request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
         request.Content = JsonContent.Create(payload);
 
         var response = await _fixture.Client.SendAsync(request);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
-        var body = await response.Content.ReadFromJsonAsync<CreateExternalApiKeyCommandResponse>();
+        var body = await response.Content.ReadFromJsonAsync<ExternalApiKeyIssuanceDto>();
         await Assert.That(body).IsNotNull();
-        await Assert.That(body!.IsSuccess).IsTrue();
+        await Assert.That(body!.DisclosureStatus).IsEqualTo(ExternalApiKeyDisclosureStatus.Issued);
 
         using var scope = _fixture.Factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var stored = await dbContext.ExternalApiKeys.SingleAsync(x => x.Id == body.Id);
         await Assert.That(stored.CreatedAt).IsNotEqualTo(default(DateTime));
-        await Assert.That(stored.SecretHash).IsNotEqualTo(body.ApiKey);
+        await Assert.That(stored.SecretHash == body.ApiKey).IsFalse();
         await Assert.That(ApiKeyHashing.TryParsePersistedApiKey(body.ApiKey!, out _, out var secret)).IsTrue();
         await Assert.That(stored.SecretHash).IsEqualTo(ApiKeyHashing.ComputeHash(secret));
 
         return body;
+    }
+}
+
+public sealed class ExternalApiKeyIntegrationFixture : IAsyncInitializer, IAsyncDisposable
+{
+    private readonly DirectoryInfo _authorityDirectory =
+        Directory.CreateTempSubdirectory("external-api-key-authority-");
+    private string AuthorityPath => Path.Join(_authorityDirectory.FullName, "authority.db");
+
+    public SingleTenantAuthenticatedWebApplicationFactory Factory { get; private set; } = null!;
+    public HttpClient Client { get; private set; } = null!;
+
+    /// <summary>Starts the authenticated host with active tenancy and migrates its isolated retained privacy authority.</summary>
+    public async Task InitializeAsync()
+    {
+        Factory = new IssuanceFactory(AuthorityPath) { SeedActiveDefaultTenant = true };
+        Factory.AdditionalConfiguration["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite";
+        Factory.AdditionalConfiguration["PrivacyErasureAuthorityEmbedded:Path"] = AuthorityPath;
+        Factory.AdditionalConfiguration["PrivacyErasureAuthorityEmbedded:WriterReplicaCount"] = "1";
+        Client = Factory.CreateClient();
+        await using var scope = Factory.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>()
+            .EnsureReadyAsync();
+        var authority = scope.ServiceProvider.GetRequiredService<EmbeddedPrivacyErasureAuthorityDbContext>();
+        await authority.Database.MigrateAsync();
+    }
+
+    /// <summary>Binds the test principal through the host authentication handler rather than direct request-service substitution.</summary>
+    public HttpRequestMessage CreateAuthenticatedRequest(HttpMethod method, string url, Guid userId)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(userId));
+        return request;
+    }
+
+    /// <summary>Stops the HTTP host before removing its temporary privacy-authority database.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        Client?.Dispose();
+        if (Factory is not null)
+            await Factory.DisposeAsync();
+        if (_authorityDirectory.Exists)
+            _authorityDirectory.Delete(recursive: true);
+    }
+
+    /// <summary>Supplies a real test-owned privacy authority after production secret-authority projection.</summary>
+    private sealed class IssuanceFactory(string authorityPath) : SingleTenantAuthenticatedWebApplicationFactory
+    {
+        /// <summary>Overrides only native embedded storage options; authentication, owner fences and PostgreSQL remain real.</summary>
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.ConfigureTestServices(services =>
+            {
+                var embedded = new EmbeddedPrivacyErasureAuthorityOptions { Path = authorityPath };
+                services.RemoveAll<EmbeddedPrivacyErasureAuthorityOptions>();
+                services.AddSingleton(embedded);
+                services.ConfigureDbContext<EmbeddedPrivacyErasureAuthorityDbContext>(options =>
+                    EmbeddedPrivacyErasureAuthorityDbContextFactory.Configure(options, embedded));
+            });
+        }
     }
 }

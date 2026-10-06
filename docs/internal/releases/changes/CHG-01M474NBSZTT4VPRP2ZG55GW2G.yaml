@@ -1,0 +1,39 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M474NBSZTT4VPRP2ZG55GW2G
+Title: "explain rejected API-key requests without retrying blindly"
+Type: fix
+Scope: access
+Summary: "Distinguish definitive creation rejections from uncertain transport outcomes using fixed status-specific guidance without reflecting remote bodies."
+Group: event-api-security-remediation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: The required operation key and disclosure response contract are unchanged.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Fixed status-class messages preserve the prohibition on reflecting remote response bodies or exception text.
+  Migration:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: not-applicable
+    Detail: No storage or migration changes.
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: No configuration or secret authority changes.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: No route, operation identifier, header or schema changes.
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: >-
+      Cancel and correct validation failures, sign in again for authentication
+      failures, restore legitimate access or cancel after forbidden responses,
+      and review existing keys before deliberate replacements or conflicting
+      new intents. Reserve uncertain-outcome retry guidance for transport and
+      server errors while retaining the original operation key.

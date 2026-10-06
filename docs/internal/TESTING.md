@@ -28,6 +28,38 @@ ABOUTME: Covers 3 host profiles, fixture model, builders/seeds, database lifecyc
 
 ---
 
+## Test execution versus measured coverage
+
+A passing TRX proves test execution, not line or branch coverage. In particular,
+five provider issuance reports with 16 passed cases each and zero skips do not
+establish coverage unless those runs used the collector and produced validated
+Cobertura files for the same commit.
+
+`_build-test.yml` enables the repository's existing MTP `--coverage` arguments
+only when `collect-coverage` is true, using `eng/coverage/product.config` and
+absolute `--coverage-output` paths. Provider smoke, behavior, issuance and
+secret-binding reports use
+`artifacts/coverage/runtime-<provider>-<suite>.cobertura.xml`; unique filenames
+prevent successive selections from overwriting each other. Each provider
+validates attempted selections, retains reports for 30 days and uploads explicit
+files to Codecov without waiting for the broad integration job. Codecov combines
+same-commit provider and fast/runtime reports; test failures are not converted
+into success by publication.
+
+Before broad persistence execution, the runtime lane runs the 33 bounded HTTP
+and signed Dedicated/Combined issuance contracts. It validates, retains and
+publishes their distinct `runtime-IssuanceHttp.cobertura.xml` immediately, so a
+later broad-suite timeout cannot discard completed endpoint measurement.
+The full API integration selection still runs with its existing collector flags. Broad
+runtime cancellation cleanup publishes only the separately retained validated
+artifact when the `coverage-ready` output confirms validation, never raw XML.
+If cleanup cannot finish, publication is skipped and its absent measurement must be
+reported as missing. Migration subprocesses are not instrumented, and persistence
+provider tests do not prove coverage of API HTTP endpoints. Inspect product
+assemblies and covered lines in the actual XML before interpreting PR percentages;
+no test count, local workflow validation or Codecov upload implies that Sonar
+received coverage. See [Coverage Publication Policy](CI_CD_GOVERNANCE.md#coverage-publication-policy).
+
 ## Framework
 
 The project uses [TUnit](https://github.com/thomhurst/TUnit) — a modern, fast, parallel .NET testing framework.
@@ -310,6 +342,24 @@ Every lane must:
 Architecture tests also prove each non-PostgreSQL application/Data Protection
 migration project owns generated migrations and the expected provider package.
 Generated files are never patched to make a matrix lane pass.
+
+The same five-engine matrix explicitly selects `ExternalApiKeyIssuanceProviderTests`
+with a minimum of 14 executed cases and serial test scheduling. These cases use
+independent real connections to witness writer or exact-row NOWAIT exclusion while
+issuance holds its authorization fence, then execute the normal contender operation.
+They also verify metadata-only replay, revoked authority and lost commit acknowledgement.
+Each lane retains an `Issuance.trx` report; smoke and general behavior results alone
+do not prove these issuance invariants. The matrix job explicitly selects Environment
+authority before migration startup, so migration and runtime registration share it.
+Environment authority supplies the existing
+database inputs and newly generated, masked, process-local signing and identity-fence
+keys; no plaintext secret is added to source.
+
+Provider evidence upload uses an unquoted glob inside the YAML block scalar.
+Quotes in that block are literal glob characters, not YAML quoting, and omit
+TRX files while still allowing database diagnostic logs to produce an artifact.
+Verify the downloaded artifact contains the per-provider issuance report rather
+than assuming an upload step's success proves report retention.
 
 ### Unicode Location Search Provider Corpus
 

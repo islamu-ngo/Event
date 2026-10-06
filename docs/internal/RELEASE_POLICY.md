@@ -59,6 +59,16 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
 
 ## Change identity allocation and correction
 
+- Terminal release trailer paragraphs MAY be separated by blank or
+  whitespace-only lines, including CRLF. Whitespace MUST NOT alter an explicit
+  skip decision. Body prose ends the terminal trailer region.
+- A changelog skip MUST have one nonempty reason. Duplicate or conflicting
+  changelog declarations MUST be rejected even across paragraph separators;
+  breaking changes MUST NOT be skipped and retain their required metadata.
+- The active `commit-msg` hook MUST run native `preflight-commit` against the
+  proposed message and indexed provenance before Git records it. Hook installation
+  MUST honor `core.hooksPath`. Local and CI `preflight-range` remain final enforcement.
+
 - New public change identifiers MUST use the release engine's sortable
   ULID-style `CHG-<26 Crockford Base32 characters>` format. Sequential
   `CHG-<year>-<number>` identifiers are immutable historical inputs only and

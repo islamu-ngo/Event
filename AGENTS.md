@@ -162,6 +162,30 @@ dotnet build --configuration Release --verbosity quiet
 - **Todos**: Create immediately for multi-step tasks.
 - **Context**: Follow [`.agents/CONTEXT_ENGINEERING.md`](.agents/CONTEXT_ENGINEERING.md); duplicate unchanged context is a defect.
 
+### Validate commit messages before recording history
+
+Before an authorized commit, confirm Git uses the repository checks:
+`git config --get core.hooksPath` must report `.githooks` (or its absolute path).
+If no custom hook directory is configured, activate it with
+`git config core.hooksPath .githooks`; preserve any other configured checks.
+The `commit-msg` hook runs native `preflight-commit` against the proposed message
+and staged provenance before Git records it. Do not bypass hooks. CI retains
+`preflight-range` as the final enforcement point.
+
+Keep the skip declarations in one message argument:
+
+```bash
+git commit \
+  -m "test(access): isolate committed cancellation observation" \
+  -m "Observe only keys created by this invocation." \
+  -m $'Changelog: skip\nChangelog-Reason: Internal test isolation correction.'
+```
+
+Only stage owned paths first. Native policy also accepts blank lines between
+terminal declarations, but rejects duplicate/conflicting declarations, missing
+skip reasons and invalid release metadata. See
+[the detailed commit workflow](.agents/skills/conventional-commit/SKILL.md#cli-recipe).
+
 ### Readable Technical Communication
 
 This applies to commit messages, PR descriptions, plans, I-VSD reports, progress/completion reports, and feedback or decision requests.

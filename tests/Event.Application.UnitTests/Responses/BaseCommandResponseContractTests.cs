@@ -7,6 +7,7 @@ using System.Text.Json.Serialization.Metadata;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.DTOs.InstanceAdmin;
 using Explore.Application.DTOs.EmailDispatch;
+using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.DTOs.SupportAccess;
@@ -108,13 +109,14 @@ public sealed class BaseCommandResponseContractTests
         ]),
     ];
 
+    /// <summary>Requires native factory coverage for every response and wire scenarios only for explicitly serializable descendants.</summary>
     [Test]
     public async Task EveryDiscoveredDescendantHasExecutableFactoryAndApplicableWireScenarios()
     {
         await Assert.That(CreateDerivedFactoryScenarios().Select(scenario => scenario.ResponseType))
             .IsEquivalentTo(ConcreteDescendantTypes)
             .Because("Every concrete response needs executable success, failure, payload and invalid-state coverage.");
-        await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType))
+        await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType).Distinct())
             .IsEquivalentTo(WireDescendantTypes)
             .Because("Every response declaring JSON construction or generated metadata needs complete wire round-trip coverage.");
     }
@@ -601,6 +603,7 @@ public sealed class BaseCommandResponseContractTests
             .Throws<ArgumentException>();
     }
 
+    /// <summary>Checks declared factory shapes and valid payload states, including success-only issuance wrappers.</summary>
     [Test]
     public async Task EveryConcreteDescendantDeclaresExactSuccessAndFailureFactoriesAndPreservesTheirStates()
     {
@@ -615,6 +618,8 @@ public sealed class BaseCommandResponseContractTests
                 .ToArray();
             string[] expectedFactoryNames = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
                 ? ["Failure", "Issued", "Replayed"]
+                : scenario.ResponseType == typeof(CreateExternalApiKeyCommandResponse)
+                    ? ["Failure", "Issued", "PreviouslyIssued"]
                 : scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult)
                     ? ["Denied", "Issued"]
                     : ConcreteFactoryNames;
@@ -623,6 +628,7 @@ public sealed class BaseCommandResponseContractTests
                 StringComparer.Ordinal)).IsTrue();
 
             string successFactoryName = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
+                || scenario.ResponseType == typeof(CreateExternalApiKeyCommandResponse)
                 || scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult) ? "Issued" : "Success";
             MethodInfo successFactory = declaredFactories.Single(method => method.Name == successFactoryName);
             string[] expectedParameterNames = scenario.Facts.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -833,6 +839,7 @@ public sealed class BaseCommandResponseContractTests
         await Assert.That(missing.Order(StringComparer.Ordinal)).IsEmpty();
     }
 
+    /// <summary>Builds round-trip scenarios for shipped wire responses, excluding native-only operation wrappers.</summary>
     private static DerivedWireScenario[] CreateDerivedWireScenarios()
     {
         RegistrationOrderDto order = CreateOrder();
@@ -846,8 +853,6 @@ public sealed class BaseCommandResponseContractTests
 
         return
         [
-            Wire(typeof(CreateExternalApiKeyCommandResponse), ResultId,
-                ("apiKey", SyntheticReveal), ("keyId", SyntheticKeyId)),
             Wire(typeof(GuestRegistrationOrderLifecycleResponseDto), ResultId, ("order", guestOrder)),
             Wire(typeof(GuestRegistrationOrderStartDto), ResultId),
             Wire(typeof(RegistrationMaterialChangeChoiceCommandResultDto), ResultId,
@@ -869,6 +874,7 @@ public sealed class BaseCommandResponseContractTests
         ];
     }
 
+    /// <summary>Supplies real payload values for exhaustive native factory validation across concrete response families.</summary>
     private static DerivedFactoryScenario[] CreateDerivedFactoryScenarios()
     {
         RegistrationOrderDto order = CreateOrder();
@@ -893,7 +899,7 @@ public sealed class BaseCommandResponseContractTests
             Factory(typeof(CreateExternalApiKeyCommandResponse),
                 Facts(("id", ResultId), ("message", "result.created"),
                     ("apiKey", SyntheticReveal), ("keyId", SyntheticKeyId)),
-                ("ApiKey", SyntheticReveal), ("KeyId", SyntheticKeyId)),
+                ("Issue", ExternalApiKeyIssuanceDto.Issued(ResultId, SyntheticKeyId, SyntheticReveal))),
             Factory(typeof(GuestRegistrationOrderLifecycleResponseDto),
                 Facts(("id", ResultId), ("message", "result.created"), ("order", guestOrder)),
                 ("Order", guestOrder)),
@@ -1260,6 +1266,7 @@ public sealed class BaseCommandResponseContractTests
         return json;
     }
 
+    /// <summary>Finds derived payload properties without confusing inherited envelope state with response-specific data.</summary>
     private static PropertyInfo[] ResponsePayloadProperties(Type responseType, bool includeJsonIgnored = false) =>
         responseType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(property => property.DeclaringType is not null
@@ -1268,7 +1275,8 @@ public sealed class BaseCommandResponseContractTests
                 : property.DeclaringType is not null
                     && !(property.DeclaringType.IsGenericType
                         && property.DeclaringType.GetGenericTypeDefinition() == typeof(BaseCommandResponse<>)))
-            .Where(property => includeJsonIgnored || property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+            .Where(property => includeJsonIgnored
+                || property.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition != JsonIgnoreCondition.Always)
             .OrderBy(property => property.Name, StringComparer.Ordinal)
             .ToArray();
 

@@ -128,6 +128,40 @@ are never rewritten when any authority changes.
 11. Module governance:
    `ModuleDefinition`, `TenantCapability`, plus event aspect entities
 
+## External API Key Issuance Receipts
+
+`ExternalApiKeyIssuanceReceipt` is a sealed, private-setter Domain entity, not a
+value record or cached HTTP response. It retains only a `Guid Id`, a globally
+unique 64-hex `OperationFingerprint`, a separate 64-hex `InputDigest`, nullable
+`TenantId`, `Guid ExternalApiKeyId`, and UTC `CreatedAtUtc`. Construction rejects
+empty identities, malformed SHA-256 hex values, and non-UTC timestamps; digests
+are stored lowercase.
+
+The Domain fingerprint binds operation kind/version
+(`external-api-key-issuance:v1`), resolved platform principal, explicit global
+scope for NULL tenant or the exact tenant, owner type, owner ID, and the
+case-sensitive bounded operation key. It does not bind policy input: the
+Application handler separately computes the digest of all normalized accepted
+fields, so a changed policy conflicts rather than becoming another operation.
+See the [HTTP contract](API.md#bounded-key-issuance-and-metadata-recovery).
+
+The receipt stores no raw key, secret, reconstructible credential, TTL, or
+expiry. It has no foreign key to the credential or user. The EF configuration
+adds a unique fingerprint index and a tenant index to the new receipt table;
+provider migrations remain generated artifacts. Credential deletion must not
+cascade into receipt deletion: the receipt remains a tombstone that prevents
+the same intent from issuing again. Recovery still requires an existing usable
+key and fresh owner authority, so the tombstone cannot recover a deleted,
+revoked, or expired credential.
+
+Receipt and hash-only credential are written atomically under a serializable
+transaction. The [security model](SECURITY-MODEL.md#bounded-issuance-commit-and-recovery-authority)
+describes the surrounding retained-erasure gate, row fences, and uncertain
+commit verification. There is no receipt-expiry cleanup contract. Removing
+receipt evidence would remove the corresponding duplicate-issuance protection,
+not restore raw material. Final provider and migration verification is still
+pending for this bounded remediation.
+
 ## Normalized Lookup Families
 
 Several previously enum-shaped persistence fields are now modeled as lookup/reference rows with stable integer IDs, stable `MasterCode` values, human-readable `FullName`, and optional `Description`. The persisted entity stores the `{LookupName}Id` FK plus a navigation; any enum property that remains on the domain entity is a convenience wrapper ignored by EF, not a database column.

@@ -1003,6 +1003,20 @@ Non-GET responses additionally receive:
 - Privileged operations: role/policy constrained
 - User ID extraction fallback order: `sub` → `nameidentifier` → `sid`.
 
+### Native OpenAPI Authentication Requirements
+
+`KeycloakOpenApiSecurityTransformer` always defines HTTP `Bearer` (JWT) and
+header `ApiKey` (`X-API-Key`) authentication for native documentation generation.
+Operations using default `[Authorize]` metadata advertise these as separate
+alternatives, matching `MultiAuth` provider selection for Local Identity,
+AT Protocol sessions, external JWTs, and API keys. A valid configured Keycloak
+authorization URL or authority additionally exposes the existing Keycloak OAuth
+flow and alternative; absent configuration never invents an OAuth endpoint.
+There is no document-wide security requirement. Anonymous operations, explicit
+specialized authentication schemes, and pre-existing operation requirements
+retain their own contracts. These descriptions do not change runtime token
+validation, tenant binding, scope checks, or resource authorization.
+
 ### Tenantless Local Sign-In On The Admin Host
 `ApiTenantResolutionMiddleware` exempts `POST /api/auth/local/login`,
 authenticated `GET /api/user` for Local-session validation, and authenticated
@@ -1058,12 +1072,84 @@ Non-interactive callers authenticate with long-lived `X-API-Key` credentials in 
 |---|---|---|---|
 | `GET` | `/api/ExternalApiKey` | List keys visible to the caller | HAL collection |
 | `GET` | `/api/ExternalApiKey/{id}` | Key detail (metadata only, no secret) | HAL resource |
-| `POST` | `/api/ExternalApiKey` | Create key — secret revealed **once** in response | HAL resource + secret field |
-| `PUT` | `/api/ExternalApiKey/{id}` | Update policy (scopes, expiry, quotas) | HAL resource |
+| `POST` | `/api/ExternalApiKey` | Issue once or recover metadata with a required operation key | `200` success-only `ExternalApiKeyIssuanceDto` |
+| `PATCH` | `/api/ExternalApiKey/{id}` | Update policy (scopes, expiry, quotas) | Command result |
 | `DELETE` | `/api/ExternalApiKey/{id}` | Revoke key (soft delete, status=Revoked) | `204 No Content` |
 | `GET` | `/api/ExternalApiKey/usage-report` | Tenant admins see their tenant; instance admins see platform-wide | Aggregated report |
 
 Create/revoke/update emit business metrics (`created`, `revoked`, `policy_updated`) tagged with `tenant_id` and `owner_type`.
+
+#### Bounded Key Issuance And Metadata Recovery
+
+`POST /api/ExternalApiKey` requires exactly one `Idempotency-Key` header:
+1..128 ASCII characters matching `[A-Za-z0-9._:-]`. Missing, duplicate,
+comma-combined, whitespace, Unicode, or otherwise invalid values fail `400`.
+The key is case-sensitive. The native `CreateExternalApiKeyCommand` also
+requires `OperationKey` and validates the same Domain grammar, so non-HTTP
+callers cannot bypass this requirement. OpenAPI marks the header as required.
+
+For example, send `Idempotency-Key: key-create-20261005-01` on a single
+creation intent. The generated C# client call is
+`CreateExternalApiKeyAsync(operationKey, dto)`; keep both arguments stable
+after a lost response. The body chooses requested policy and legitimate
+organization/group targets, not the current actor or tenant. The handler
+resolves the platform user through `IAdminContext.ResolveUserIdAsync` and
+takes scope from the trusted tenant context; InstanceAdmin issuance is
+explicitly global (`TenantId = null`).
+
+Unresolved trusted tenancy is a validation failure for User, Tenant,
+Organization and Group issuance: HTTP returns `400` before the clean write-scope
+guard or transaction, without a key or receipt. Global InstanceAdmin issuance
+continues to work without selecting a tenant.
+
+| Outcome | HTTP | Disclosure |
+|---|---|---|
+| First acknowledged creation | `200` | `disclosureStatus = "Issued"`; `apiKey` contains the raw credential |
+| Authorized retry with the same normalized policy | `200` | `disclosureStatus = "PreviouslyIssued"`; `apiKey = null`; stable `id` and `keyId` |
+| Same operation identity, different normalized policy | `409` | Conflict; no new credential |
+| Missing or empty authenticated platform-user binding | `401` | No recovery metadata |
+| Tenant-owned issuance without a resolved trusted tenant | `400` | Validation; no credential or receipt |
+| Current owner authority revoked or unavailable | `403` | No recovery metadata |
+| Issued key removed, revoked, expired, or otherwise unusable | `404` | No recovered credential |
+
+The public success payload requires `id`, `keyId`, `disclosureStatus`, and
+`apiKey`. Its disclosure enum contains exactly `Issued` and `PreviouslyIssued`;
+it cannot be null or represent failure. Recovery explicitly carries null
+`apiKey`. Native commands retain failure metadata in
+`CreateExternalApiKeyCommandResponse` with no `Issue`; the controller publishes
+only the validated success payload or ProblemDetails. The browser validates
+generated success data before accepting it and keeps failure guidance in a
+local result, not a fabricated generated success contract.
+
+The input digest covers every accepted field: trimmed name, normalized optional
+description, owner-type and target IDs, trimmed/lowercased/deduplicated/sorted
+scopes, UTC expiry, normalized credit period, credit limit, and rollover limit.
+It excludes current actor and tenant identity; those bind the separate operation
+fingerprint. Recovery of a committed operation does not generate entropy or
+create another credential; an uncommitted attempt can still complete issuance.
+
+The creation service distinguishes definitive `400`/`401`/`403`/`404`/`409`
+rejections from transport errors and `5xx` uncertainty. It renders fixed,
+status-specific cancellation, sign-in, access-restoration, or list-review guidance
+without reflecting the remote body or exception. The dialog keeps the submitted
+policy and operation key frozen; a new intent remains deliberate rather than an
+automatic replacement for a rejected request.
+
+`[SuppressIdempotencyResponseStorage]` bypasses generic replay response capture
+for this action; `[ResponseCache(NoStore = true)]` remains. Recovery comes from
+a digest-only issuance receipt, never a saved response body. See
+[receipt retention](DOMAIN.md#external-api-key-issuance-receipts),
+[commit authority](SECURITY-MODEL.md#bounded-issuance-commit-and-recovery-authority),
+and the [operator recovery guide](../public/documentation/readme/security-and-identity/authentication.md#api-key-issuance-and-lost-response-recovery).
+
+The exact GET-list and POST-creation route, and DELETE with one aggregate ID,
+may proceed without a tenant only after normal tenant resolution has been
+attempted. This supports global InstanceAdmin issuance and the existing
+revoke/reissue remedy on the administrator host. It grants no owner authority:
+native handlers retain their current ownership checks, and issuance rejects
+tenant-bound owners without a resolved scope. List, revoke, and issuance resolve
+the current provider-to-platform-user binding instead of parsing a provider's
+GUID subject as the platform user ID.
 
 ### Managed Provider Provisioning
 

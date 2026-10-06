@@ -1,3 +1,5 @@
+using Explore.Application.Constants;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
@@ -11,11 +13,13 @@ internal sealed class KeycloakOpenApiSecurityTransformer(IConfiguration configur
 {
     internal const string SecuritySchemeName = "Keycloak";
 
+    /// <summary>Publishes default credential schemes and adds OAuth metadata only for a configured HTTP authority.</summary>
     public Task TransformAsync(
         OpenApiDocument document,
         OpenApiDocumentTransformerContext context,
         CancellationToken cancellationToken)
     {
+        AddDefaultSecuritySchemes(document);
         if (!TryResolveAuthorizationUri(configuration, out Uri? authorizationUri))
         {
             return Task.CompletedTask;
@@ -43,25 +47,28 @@ internal sealed class KeycloakOpenApiSecurityTransformer(IConfiguration configur
         return Task.CompletedTask;
     }
 
+    /// <summary>Derives operation requirements from authorization metadata without protecting anonymous operations.</summary>
     public Task TransformAsync(
         OpenApiOperation operation,
         OpenApiOperationTransformerContext context,
         CancellationToken cancellationToken)
     {
-        if (!TryResolveAuthorizationUri(configuration, out _))
-            return Task.CompletedTask;
-
         ApplyOperationSecurity(
             operation,
             context.Description.ActionDescriptor,
-            context.Document!);
+            context.Document!,
+            includeKeycloak: TryResolveAuthorizationUri(configuration, out _));
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Adds independent default-authentication alternatives while preserving explicit requirements and purpose-bound schemes.
+    /// </summary>
     internal static void ApplyOperationSecurity(
         OpenApiOperation operation,
         Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor actionDescriptor,
-        OpenApiDocument document)
+        OpenApiDocument document,
+        bool includeKeycloak = true)
     {
         if (operation.Security is { Count: > 0 })
         {
@@ -77,13 +84,44 @@ internal sealed class KeycloakOpenApiSecurityTransformer(IConfiguration configur
             return;
         }
 
+        AddDefaultSecuritySchemes(document);
         operation.Security =
         [
             new OpenApiSecurityRequirement
             {
-                [new OpenApiSecuritySchemeReference(SecuritySchemeName, document)] = []
+                [new OpenApiSecuritySchemeReference(JwtBearerDefaults.AuthenticationScheme, document)] = []
+            },
+            new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference(ApiAuthenticationSchemeNames.ApiKey, document)] = []
             }
         ];
+        if (includeKeycloak)
+        {
+            operation.Security.Add(new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference(SecuritySchemeName, document)] = []
+            });
+        }
+    }
+
+    /// <summary>Defines JWT and API-key credentials independently of the configured identity provider.</summary>
+    private static void AddDefaultSecuritySchemes(OpenApiDocument document)
+    {
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>(StringComparer.Ordinal);
+        document.Components.SecuritySchemes.TryAdd(JwtBearerDefaults.AuthenticationScheme, new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        });
+        document.Components.SecuritySchemes.TryAdd(ApiAuthenticationSchemeNames.ApiKey, new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Name = ApiAuthenticationHeaderNames.ApiKey
+        });
     }
 
     internal static bool TryResolveAuthorizationUri(
@@ -117,11 +155,13 @@ internal sealed class KeycloakOpenApiSecurityTransformer(IConfiguration configur
     }
 }
 
-internal sealed class KeycloakSwaggerOpenApiSecurityFilter : IOperationFilter
+internal sealed class KeycloakSwaggerOpenApiSecurityFilter(IConfiguration configuration) : IOperationFilter
 {
+    /// <summary>Applies the same metadata-derived alternatives to the transitional Swagger document.</summary>
     public void Apply(OpenApiOperation operation, OperationFilterContext context) =>
         KeycloakOpenApiSecurityTransformer.ApplyOperationSecurity(
             operation,
             context.ApiDescription.ActionDescriptor,
-            context.Document);
+            context.Document,
+            includeKeycloak: KeycloakOpenApiSecurityTransformer.TryResolveAuthorizationUri(configuration, out _));
 }

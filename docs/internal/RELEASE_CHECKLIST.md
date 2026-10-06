@@ -19,6 +19,12 @@ Do not add or require `.github/workflows/release.yml`, Release Drafter, or autom
 
 ## Prospective Governed Release Contract
 
+Before recording contributor commits, confirm the active message hook invokes
+native `preflight-commit`; before merge, retain successful `preflight-range`
+evidence. Whitespace between terminal trailers is harmless, while conflicting
+declarations and missing release metadata remain invalid. See
+[release policy](RELEASE_POLICY.md#change-identity-allocation-and-correction).
+
 The approved future release architecture is documented in
 [ADR-025](adr/ADR-025-provider-neutral-release-governance.md),
 [RELEASE_POLICY.md](RELEASE_POLICY.md), and [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md).
@@ -201,6 +207,10 @@ Use `Not applicable` only when the change has no release-impact category. If the
 - [ ] Secret scanning, push protection, Dependabot security updates, dependency graph, and CodeQL alerts are enabled or explicitly waived at repository/organization level. Current credential rotation status is documented as restart-based when that is the proven behavior; do not imply live reload or zero-downtime rotation unless it is separately proven.
 
 ## CI/CD Evidence Contract
+
+- [ ] API-key issuance changes retain the five provider `Issuance.trx` reports,
+  each with at least 14 executed cases and no failed or skipped issuance cases;
+  general provider smoke results do not substitute for native contention evidence.
 
 - [ ] If citing coverage evidence, identify the commit, included test-suite flags, and any missing runtime lanes, and retain the coverage artifacts. Only combine reports from the same commit; fast-only evidence is not a complete platform report. Codecov project/patch statuses are informational and do not replace required build/test evidence; see [coverage publication operations](OPERATIONS.md#codecov-coverage-publication).
 - [ ] OpenAPI drift artifacts are clean, or generated `openapi.json` / NSwag client changes are reviewed and committed.

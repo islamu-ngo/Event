@@ -59,9 +59,18 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
   install-change-hooks --target develop
 ```
 
-The installer creates `pre-commit` and `commit-msg` checks. If either hook
+The installer resolves Git's active hook directory, including `core.hooksPath`,
+and creates `pre-commit` and `commit-msg` checks there. If either hook
 already exists, it is preserved as `<hook>.before-islamu-release` and called
 first. An ambiguous overwrite fails closed.
+
+This repository's tracked `.githooks/commit-msg` already invokes native
+`preflight-commit` before recording the proposed message. Enable it with
+`git config core.hooksPath .githooks` when no other hook chain is configured.
+Whitespace between terminal trailer paragraphs is accepted; duplicate/conflicting
+skip declarations, missing reasons, invalid breaking metadata and Change-Id
+provenance remain rejected. The installer must not silently write unused
+`.git/hooks` files when Git is configured to execute a different directory.
 
 Before starting a merge, validate the complete feature range:
 

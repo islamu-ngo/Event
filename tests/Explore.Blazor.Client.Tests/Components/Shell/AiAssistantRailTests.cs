@@ -425,7 +425,8 @@ public sealed class AiAssistantRailTests : IDisposable
 
         cut.WaitForElement("[data-testid='ai-rail-reference-result']");
 
-        await cut.Find("[data-testid='ai-rail-reference-result']").ClickAsync(new MouseEventArgs());
+        await cut.InvokeAsync(async () =>
+            await cut.Find("[data-testid='ai-rail-reference-result']").ClickAsync(new MouseEventArgs()));
         await Assert.That(_conversationState.SelectedReferences.Count).IsEqualTo(1);
         await Assert.That(cut.Find("[data-testid='ai-rail-prompt']").GetAttribute("value")).IsEqualTo("@Community Iftar ");
         await Assert.That(cut.Find("[data-testid='ai-rail-prompt-reference-token']").TextContent).IsEqualTo("@Community Iftar");

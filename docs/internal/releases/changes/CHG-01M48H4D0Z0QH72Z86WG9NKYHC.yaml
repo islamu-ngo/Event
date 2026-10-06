@@ -1,0 +1,32 @@
+Change-Id: CHG-01M48H4D0Z0QH72Z86WG9NKYHC
+Title: "require explicit API-key issuance acknowledgements"
+Type: fix
+Scope: access
+Summary: "Successful API-key creation returns validated identity and disclosure fields; failures remain HTTP errors, and clients reject malformed acknowledgements without replacing an uncertain operation."
+Group: api-key-issuance-acknowledgement
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Deploy API and SDK/browser together. Consume HTTP status and disclosureStatus instead of the former command-response envelope or success Boolean."
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Only acknowledged Issued payloads contain credential material. Recovery retains explicit null, and browser guidance excludes remote bodies and exception text."
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+    Detail: "No additional model or migration change. Preserve the existing issuance receipt table during rollback."
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: "No new configuration or secret authority. JWT and API-key security descriptions remain available without configuring Keycloak."
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Creation requires id, keyId, disclosureStatus and apiKey. Disclosure is Issued or PreviouslyIssued, never null; credential nullability is retained for recovery. Protected operations describe alternative bearer and API-key credentials."
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Coordinate API/SDK/browser deployment. Retain operation keys for uncertain outcomes, retain receipts across rollback, and never revert to raw credential replay."

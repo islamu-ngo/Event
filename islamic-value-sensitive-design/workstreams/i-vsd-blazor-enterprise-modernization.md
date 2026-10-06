@@ -241,6 +241,13 @@ Both publications and actual browser consumers served and decoded the admitted
 352240-byte font with its recorded digest, complete OFL notice, self-only
 typography CSP, ETag and `max-age=3600, must-revalidate`.
 
+Final gate review separately found an incomplete Standalone primary migration
+graph concealed by residual DLLs in a reused output. The correction references
+all three existing primary projects as well as the four auxiliary migrations.
+A never-used output passed manifest, assembly, configuration and admitted-asset
+checks and started on new SQLite storage; its real browser shell decoded the
+same-origin font. Earlier reused-output startup was not clean-publication proof.
+
 Pre-navigation browser observation found no external typography resource.
 The missing-font probe subscribed to `loadingerror` before changing only the
 browser CSSOM's local source. Its HTML fallback failed font decoding; Inter

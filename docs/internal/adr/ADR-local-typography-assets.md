@@ -112,8 +112,9 @@ than typography defects in API or database logic:
    and duplicate-output diagnostics.
 2. A fresh published host lacked the SQLite Data Protection migration assembly.
    `Event.Standalone.csproj` now explicitly references the existing MySQL,
-   SQLite, and SQL Server Data Protection migration projects and embedded
-   SQLite privacy-authority migration project. This replaces incidental
+   SQLite and SQL Server primary database migrations, their three Data
+   Protection migration projects, and embedded SQLite privacy-authority
+   migrations. This replaces incidental
    workspace-binary copying with deterministic SDK dependency publication.
    The regenerated lockfile adds project entries, not new package versions or
    generated migration edits.
@@ -121,6 +122,15 @@ than typography defects in API or database logic:
 These changes make the combined host's existing startup dependencies explicit;
 they do not change migration semantics or certify every provider topology.
 Deploy complete publication output under the selected secret authority.
+
+Verify publication in a previously unused directory and inspect its dependency
+manifest. An earlier reused output contained residual primary migration DLLs
+despite zero primary migration libraries in the manifest; it could start but
+did not prove complete composition. Final review caught that gap. The corrected
+fresh output contains all seven migration libraries and assemblies, matches
+root configuration and admitted assets, and starts on never-used SQLite storage.
+Its actual browser shell decodes the same-origin font. Do not infer clean-output
+success merely from files left by earlier publication attempts.
 
 The shell stylesheet uses existing asset fingerprinting. The canonical WOFF2
 URL is not independently immutable: observed font delivery uses

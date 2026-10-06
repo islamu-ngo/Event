@@ -99,10 +99,13 @@ assemblies and static assets. This resolves `NETSDK1152` through explicit
 composition-root ownership, not by suppressing duplicate-output diagnostics.
 Split publication still retains each independently hosted application's own
 configuration. Secret authority and deployment overrides remain unchanged.
-The combined root also references the existing Data Protection provider migrations
-and embedded privacy-authority migrations directly. SDK build/publish dependency
+The combined root also references the existing primary database migrations,
+Data Protection provider migrations and embedded privacy-authority migrations
+directly. SDK build/publish dependency
 resolution includes those startup assemblies; publication must not depend on
 unrelated projects having already produced binaries in the workspace.
+Verify a new publication directory and its dependency manifest, not just DLL
+presence in an output reused from earlier builds.
 
 Version and boundary invariants stay fixed across both topologies: `Explore.API` continues to own `/api/*` behavior, including route policy and version parsing from the `Accept` media-type parameter, `?api-version=`, or `X-Api-Version`. Standalone does not add URL-version segments or alternate API policy.
 

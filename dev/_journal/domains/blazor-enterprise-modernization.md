@@ -92,8 +92,8 @@ development storage or build artifacts already exist.
 **Resolution**: `Event.Standalone.csproj` filters foreign executable-root
 appsettings publish items while retaining its own configuration, nested
 static files, assemblies, and SDK collision diagnostics. It explicitly
-references the three existing Data Protection migration projects and the
-embedded SQLite privacy-authority migration project. The SDK-regenerated
+references the three primary provider migration projects, three Data Protection
+migration projects and embedded SQLite privacy-authority migrations. The SDK-regenerated
 lockfile adds project entries, not dependency version changes. No migration
 SQL/snapshot or domain/provider behavior was edited.
 
@@ -105,6 +105,14 @@ dotnet publish src/Explore.Blazor/Explore.Blazor.csproj --configuration Release 
 dotnet publish src/Event.Standalone/Event.Standalone.csproj --configuration Release --output "$TMPDIR/blazor-modernization/standalone"
 ```
 
+The first auxiliary-only correction still omitted primary migrations. Final
+review found zero primary libraries in the dependency manifest, although old
+primary DLLs remained in the reused output. Fresh storage alone did not expose
+stale publication contents. After adding all three primary references, a
+never-used publication passed manifest and DLL checks for seven libraries,
+configuration and admitted hashes matched, and its fresh-storage host and actual
+browser shell succeeded.
+
 Complete-output deployment is documented in the existing internal topology
 anchor and public Standalone guide. The published Split host subsequently
 served its actual shell and decoded font with the same admitted bytes, cache
@@ -113,7 +121,9 @@ certifies a multi-provider migration matrix or unrelated application features.
 
 **Why This Matters for Future Work**: Validate the real publication on fresh,
 task-owned storage without mutating inherited databases. Startup dependencies
-belong in the composition root's build graph, not workspace globs. Reproduce
+belong in the composition root's build graph, not workspace globs. Use a new
+output directory and inspect dependency manifests; file presence alone can
+be residue from a failed approach. Reproduce
 failures on an untouched base before assigning them to a resource change;
 fix only related composition prerequisites, and keep unrelated failures
 quarantined.

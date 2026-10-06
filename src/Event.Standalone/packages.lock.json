@@ -820,6 +820,27 @@
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.10, )"
         }
       },
+      "explore.persistence.migrations.mysql": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microting.EntityFrameworkCore.MySql": "[10.0.10, )"
+        }
+      },
+      "explore.persistence.migrations.sqlite": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.10, )"
+        }
+      },
+      "explore.persistence.migrations.sqlserver": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.10, )"
+        }
+      },
       "explore.persistence.privacyerasureauthority.migrations.sqlite": {
         "type": "Project",
         "dependencies": {

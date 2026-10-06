@@ -25,6 +25,9 @@
     <ProjectReference Include="..\Explore.Persistence.DataProtection.Migrations.MySql\Explore.Persistence.DataProtection.Migrations.MySql.csproj" />
     <ProjectReference Include="..\Explore.Persistence.DataProtection.Migrations.Sqlite\Explore.Persistence.DataProtection.Migrations.Sqlite.csproj" />
     <ProjectReference Include="..\Explore.Persistence.DataProtection.Migrations.SqlServer\Explore.Persistence.DataProtection.Migrations.SqlServer.csproj" />
+    <ProjectReference Include="..\Explore.Persistence.Migrations.MySql\Explore.Persistence.Migrations.MySql.csproj" />
+    <ProjectReference Include="..\Explore.Persistence.Migrations.Sqlite\Explore.Persistence.Migrations.Sqlite.csproj" />
+    <ProjectReference Include="..\Explore.Persistence.Migrations.SqlServer\Explore.Persistence.Migrations.SqlServer.csproj" />
     <ProjectReference Include="..\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj" />
   </ItemGroup>
 

@@ -38,7 +38,10 @@ unrelated integration permissions or introduce a new theme service.
 
 Both publication consumers passed. Related Standalone prerequisites retain
 composition-root appsettings and explicitly reference existing startup
-migration projects instead of incidental workspace binaries. Published
+primary, Data Protection and embedded-authority migration projects instead of
+incidental workspace binaries. Final review exposed residual DLLs in the first
+reused output; a corrected never-used publication now proves all seven migration
+libraries in its manifest. Published
 Standalone starts on new SQLite storage with the selected secret authority.
 No generated migration, schema, or provider behavior was changed.
 

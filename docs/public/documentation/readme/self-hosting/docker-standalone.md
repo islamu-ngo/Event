@@ -64,7 +64,8 @@ below and deploy the complete combined-host output, including the UI's static
 assets. Do not overlay Split-host `appsettings` files onto that output.
 Environment and selected secret-authority settings continue to supply deployment
 overrides; this publication boundary introduces no new configuration key.
-The complete distribution includes its startup migration assemblies. Deploy the
+The complete distribution includes its primary database, Data Protection and
+embedded privacy-authority startup migration assemblies. Deploy the
 whole published output or image; do not assemble it by copying migration binaries
 from a separate API or development workspace.
 

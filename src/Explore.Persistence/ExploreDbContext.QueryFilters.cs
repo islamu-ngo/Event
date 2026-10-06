@@ -13,6 +13,9 @@ namespace Explore.Persistence;
 
 public partial class ExploreDbContext
 {
+    /// <summary>
+    /// Applies named tenant and soft-delete filters independently so authorized bypasses cannot implicitly disable both boundaries.
+    /// </summary>
     private void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<SetupTargetEnrollment>()

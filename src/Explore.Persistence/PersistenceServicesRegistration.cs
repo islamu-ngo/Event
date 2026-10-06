@@ -47,6 +47,9 @@ public static class PersistenceServicesRegistration
     //    // Use Aspire's integration
     //    builder.AddNpgsqlDbContext<ExploreDbContext>("ExploreDB");
 
+    /// <summary>
+    /// Composes provider-specific persistence and scoped repositories, binding database and privacy authorities from configured sources.
+    /// </summary>
     public static IServiceCollection ConfigurePersistenceServices(this IServiceCollection services,
         IConfiguration configuration,
         bool skipDbContextRegistration = false,

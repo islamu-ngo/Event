@@ -7,9 +7,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
+/// <summary>
+/// Uses the shared EF Core context to save issuance evidence and keys without owning their transaction.
+/// </summary>
+/// <remarks>
+/// The application caller owns serializable execution, authorization, commit and ambiguous-commit recovery.
+/// Reads are untracked and bypass only the named tenant filter, replacing it with an exact nullable
+/// tenant predicate; other filters remain in effect. Recovery returns entities for metadata mapping,
+/// not credential replay.
+/// </remarks>
+/// <param name="dbContext">The context shared with the caller's issuance unit of work and authority fences.</param>
 public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbContext)
     : IExternalApiKeyIssuanceReceiptRepository
 {
+    /// <inheritdoc />
+    /// <remarks>
+    /// Rejects both ambient System.Transactions ownership and an existing EF transaction, as well as
+    /// any pending tracked change. It does not clear tracked state or open a transaction. For a
+    /// nonnull tenant it also requires the exact active filter with no tenant-filter bypass.
+    /// </remarks>
     public void RequireCleanWriteScope(Guid? tenantId)
     {
         if (System.Transactions.Transaction.Current is not null
@@ -20,6 +36,12 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
             throw new InvalidOperationException("API-key issuance requires the exact active tenant scope.");
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Uses an untracked exact fingerprint-and-tenant lookup, including an explicit null tenant
+    /// for platform evidence. The named filter bypass does not grant authority; callers must
+    /// establish current authority before this read, including during commit-ambiguity recovery.
+    /// </remarks>
     public Task<ExternalApiKeyIssuanceReceipt?> FindAsync(
         string operationFingerprint, Guid? tenantId, CancellationToken cancellationToken) =>
         dbContext.ExternalApiKeyIssuanceReceipts
@@ -28,6 +50,13 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
             .SingleOrDefaultAsync(receipt => receipt.TenantId == tenantId
                 && receipt.OperationFingerprint == operationFingerprint, cancellationToken);
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// First verifies the aggregate, tenant and owner match, then fences the key and its discovered
+    /// status lookup before freshly checking usability and expiry against UTC time. Relational
+    /// fences require the caller's active transaction and are held until it ends. All reads and
+    /// fence operations receive the supplied cancellation token; no credential is reconstructed.
+    /// </remarks>
     public async Task<ExternalApiKey?> GetIssuedKeyAsync(
         Guid keyId, Guid? tenantId, ExternalApiKeyOwnerType ownerType, Guid ownerId,
         CancellationToken cancellationToken)
@@ -52,6 +81,13 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
             cancellationToken);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Adds both entities and calls SaveChangesAsync with the supplied token. SaveChanges flushes
+    /// all pending context changes, so the caller must preserve the clean issuance write scope
+    /// after its entry check. The caller's transaction is not committed here, and save completion
+    /// does not resolve a later commit exception or authorize secret replay.
+    /// </remarks>
     public async Task CreateAsync(
         ExternalApiKeyIssuanceReceipt receipt, ExternalApiKey key, CancellationToken cancellationToken)
     {

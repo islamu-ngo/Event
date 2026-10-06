@@ -24,6 +24,9 @@ public sealed class ApiTenantResolutionMiddleware
         _deploymentSettings = deploymentSettings.Value;
     }
 
+    /// <summary>
+    /// Resolves trusted tenant context before forwarding tenant surfaces, while leaving exact global management routes to owner authorization.
+    /// </summary>
     public async Task InvokeAsync(
         HttpContext context,
         IResolverConfigService resolverConfigService,
@@ -206,6 +209,9 @@ public sealed class ApiTenantResolutionMiddleware
                 StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Recognizes only collection GET/POST and GUID DELETE paths; unresolved tenancy does not exempt unrelated API-key routes.
+    /// </summary>
     internal static bool IsApiKeyManagementRequest(HttpRequest request)
     {
         if (request.Path.Equals(new PathString("/api/externalapikey"), StringComparison.OrdinalIgnoreCase))

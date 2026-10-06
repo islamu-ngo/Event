@@ -37,6 +37,9 @@ public class RevokeExternalApiKeyCommandHandler : ICommandHandler<RevokeExternal
         _logger = logger;
     }
 
+    /// <summary>
+    /// Looks up the exact key across tenant scope, then requires owner-specific management authority before idempotent revocation.
+    /// </summary>
     public async Task<bool> ExecuteAsync(RevokeExternalApiKeyCommand request, CancellationToken cancellationToken)
     {
         if (!_userContext.IsAuthenticated)

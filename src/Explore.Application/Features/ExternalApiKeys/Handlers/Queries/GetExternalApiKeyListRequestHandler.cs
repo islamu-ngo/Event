@@ -31,6 +31,9 @@ public class GetExternalApiKeyListRequestHandler : IQueryHandler<GetExternalApiK
         _userContext = userContext;
     }
 
+    /// <summary>
+    /// Collects tenant-filtered owner metadata and explicitly scoped instance keys only for a nonempty authenticated platform identity.
+    /// </summary>
     public async Task<List<ExternalApiKeyListDto>> QueryAsync(GetExternalApiKeyListRequest request, CancellationToken cancellationToken)
     {
         if (!_userContext.IsAuthenticated)

@@ -1,68 +1,45 @@
+using Explore.Application.DTOs.ExternalApiKey;
+
 namespace Explore.Application.Responses;
 
-[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ExternalApiKeyDisclosureStatus>))]
-public enum ExternalApiKeyDisclosureStatus
-{
-    Issued,
-    PreviouslyIssued
-}
-
+/// <summary>
+/// Separates native failure metadata from the success-only credential disclosure payload.
+/// </summary>
 public sealed record CreateExternalApiKeyCommandResponse : BaseCommandResponse<Guid>
 {
+    /// <summary>Enforces payload presence and aggregate identity for successful native outcomes.</summary>
     private CreateExternalApiKeyCommandResponse(
-        BaseCommandResponse<Guid> state,
-        string? apiKey,
-        string? keyId,
-        ExternalApiKeyDisclosureStatus? disclosureStatus) : base(state, true)
+        BaseCommandResponse<Guid> state, ExternalApiKeyIssuanceDto? issue) : base(state, true)
     {
-        if (state.IsSuccess)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
-            if (disclosureStatus == ExternalApiKeyDisclosureStatus.Issued)
-                ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
-            else if (disclosureStatus != ExternalApiKeyDisclosureStatus.PreviouslyIssued || apiKey is not null)
-                throw new ArgumentException("Successful issuance requires a valid disclosure outcome.");
-        }
-        else if (apiKey is not null || keyId is not null || disclosureStatus is not null)
-        {
-            throw new ArgumentException("Failed issuance cannot contain credential or disclosure state.");
-        }
-
-        ApiKey = apiKey;
-        KeyId = keyId;
-        DisclosureStatus = disclosureStatus;
+        if (state.IsSuccess != (issue is not null) || issue is not null && state.Id != issue.Id)
+            throw new ArgumentException("The native outcome and issuance payload must agree.");
+        Issue = issue;
     }
 
-    [System.Text.Json.Serialization.JsonConstructor]
-    internal CreateExternalApiKeyCommandResponse(
-        Guid id,
-        bool isSuccess,
-        string? message,
-        IReadOnlyList<string>? errors,
-        string? failureCode,
-        QuotaExceededDetails? quotaExceeded,
-        string? apiKey,
-        string? keyId,
-        ExternalApiKeyDisclosureStatus? disclosureStatus)
-        : this(BaseCommandResponse.Restore(id, isSuccess, message, errors, failureCode, quotaExceeded), apiKey, keyId, disclosureStatus)
-    {
-    }
+    /// <summary>Contains a validated success payload, or null for every native failure outcome.</summary>
+    public ExternalApiKeyIssuanceDto? Issue { get; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public string? ApiKey { get; }
-    public string? KeyId { get; }
-    public ExternalApiKeyDisclosureStatus? DisclosureStatus { get; }
-
+    /// <summary>Builds a native success with the one-time disclosure payload.</summary>
     public static CreateExternalApiKeyCommandResponse Issued(
         Guid id,
         string? message,
         string? apiKey,
-        string? keyId) =>
-        new(BaseCommandResponse.Success(id, message), apiKey, keyId, ExternalApiKeyDisclosureStatus.Issued);
+        string? keyId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+        return new(BaseCommandResponse.Success(id, message),
+            ExternalApiKeyIssuanceDto.Issued(id, keyId, apiKey));
+    }
 
+    /// <summary>Builds metadata recovery without inventing a new credential or operation.</summary>
     public static CreateExternalApiKeyCommandResponse PreviouslyIssued(Guid id, string keyId) =>
-        new(BaseCommandResponse.Success(id), null, keyId, ExternalApiKeyDisclosureStatus.PreviouslyIssued);
+        new(BaseCommandResponse.Success(id), ExternalApiKeyIssuanceDto.PreviouslyIssued(id, keyId));
 
+    /// <summary>Preserves native failure metadata while excluding all credential payload.</summary>
     public static CreateExternalApiKeyCommandResponse Failure(BaseCommandResponse<Guid> failure) =>
-        new(BaseCommandResponse.RequireFailure(failure), null, null, null);
+        new(BaseCommandResponse.RequireFailure(failure), null);
+
+    /// <summary>Prevents diagnostic rendering from traversing the secret-bearing payload.</summary>
+    public override string ToString() => nameof(CreateExternalApiKeyCommandResponse);
 }

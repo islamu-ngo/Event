@@ -15,7 +15,7 @@ public interface IExternalApiKeyService
     Task<ExternalApiKeyListDto?> GetApiKeyByIdAsync(Guid id);
 
     /// <summary>Creates or recovers one intended operation; only its acknowledged first creation discloses a secret.</summary>
-    Task<CreateExternalApiKeyCommandResponse?> CreateApiKeyAsync(CreateExternalApiKeyDto dto, string operationKey);
+    Task<ExternalApiKeyCreationResult> CreateApiKeyAsync(CreateExternalApiKeyDto dto, string operationKey);
 
     /// <summary>Updates the name, scopes, or expiry of an existing key.</summary>
     Task<BaseCommandResponseOfGuid?> UpdateApiKeyPolicyAsync(Guid id, UpdateExternalApiKeyPolicyDto dto);
@@ -74,39 +74,31 @@ public class ExternalApiKeyService : IExternalApiKeyService
     }
 
     /// <inheritdoc />
-    public async Task<CreateExternalApiKeyCommandResponse?> CreateApiKeyAsync(CreateExternalApiKeyDto dto, string operationKey)
+    public async Task<ExternalApiKeyCreationResult> CreateApiKeyAsync(CreateExternalApiKeyDto dto, string operationKey)
     {
         try
         {
             var response = await _apiClient.CreateExternalApiKeyAsync(operationKey, dto);
-            return response?.Success == true ? response : CreationFailure();
+            return response is null ? CreationFailure() : ExternalApiKeyCreationResult.Acknowledged(response);
         }
         catch (ApiException ex)
         {
-            _logger.LogWarning("API key creation failed. StatusCode: {StatusCode}", ex.StatusCode);
             return CreationFailure(ex.StatusCode);
         }
         catch (Exception)
         {
-            _logger.LogWarning("API key creation ended without an acknowledged response.");
             return CreationFailure();
         }
     }
 
-    private static CreateExternalApiKeyCommandResponse CreationFailure(int? statusCode = null) =>
-        new()
-        {
-            Success = false,
-            Message = statusCode switch
-            {
-                400 => "The request was rejected. Cancel and correct the key policy.",
-                401 => "Sign in again before retrying this operation.",
-                403 => "Your current access does not permit this operation. Cancel or restore access before retrying.",
-                404 => "The key or owner is unavailable. Cancel and review your keys before issuing a replacement.",
-                409 => "This operation conflicts with an earlier request. Cancel and review your keys before starting a new operation.",
-                _ => "The API key request did not complete. Retry this operation to check its outcome."
-            }
-        };
+    /// <summary>Records only closed failure categories and HTTP status, never exception or response data.</summary>
+    private ExternalApiKeyCreationResult CreationFailure(int? statusCode = null)
+    {
+        string category = statusCode is >= 400 and < 500 ? "rejected" : "unacknowledged";
+        _logger.LogWarning("API key creation ended with {FailureCategory}. StatusCode: {StatusCode}",
+            category, statusCode);
+        return ExternalApiKeyCreationResult.Failure(statusCode);
+    }
 
     /// <inheritdoc />
     public async Task<BaseCommandResponseOfGuid?> UpdateApiKeyPolicyAsync(Guid id, UpdateExternalApiKeyPolicyDto dto)

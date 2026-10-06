@@ -74,10 +74,14 @@ public class ExternalApiKeyController(
         return Ok(key);
     }
 
+    /// <summary>
+    /// Binds one operation header and returns only acknowledged issuance data; failures use ProblemDetails.
+    /// Generic response replay is disabled so it cannot retain or redisclose credential material.
+    /// </summary>
     [HttpPost(Name = RouteNames.CreateExternalApiKey)]
     [EndpointSummary("Create a new external API key")]
     [EndpointDescription("Issue an external API key with a required Idempotency-Key. The acknowledged creation reveals the secret once; authorized retries return metadata only.")]
-    [ProducesResponseType(typeof(CreateExternalApiKeyCommandResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ExternalApiKeyIssuanceDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -87,16 +91,14 @@ public class ExternalApiKeyController(
     [SuppressIdempotencyResponseStorage]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
-    public async Task<ActionResult<CreateExternalApiKeyCommandResponse>> Create([FromBody] CreateExternalApiKeyDto dto, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<ExternalApiKeyIssuanceDto>> Create(
+        [FromBody] CreateExternalApiKeyDto dto,
+        [FromHeader(Name = "Idempotency-Key")] string operationKey,
+        CancellationToken cancellationToken = default)
     {
-        var operationKeys = Request.Headers["Idempotency-Key"];
-        if (operationKeys.Count != 1)
-            return this.ToCommandValidationProblem(
-                BaseCommandResponse.Validation<Guid>(["Exactly one Idempotency-Key is required."]),
-                CreateValidationProblem);
         var command = new CreateExternalApiKeyCommand
         {
-            OperationKey = operationKeys.ToString(),
+            OperationKey = operationKey,
             ExternalApiKeyDto = dto
         };
         var response = await createExternalApiKeyHandler.ExecuteAsync(command, cancellationToken);
@@ -111,7 +113,7 @@ public class ExternalApiKeyController(
             return this.ToCommandValidationProblem(response, CreateValidationProblem);
         }
 
-        return Ok(response);
+        return Ok(response.Issue);
     }
 
     [HttpPatch("{id}", Name = RouteNames.UpdateExternalApiKey)]

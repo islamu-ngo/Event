@@ -1127,6 +1127,19 @@ re-enters privacy and persisted owner authority, then checks a fresh persisted
 receipt. A verified receipt permits metadata-only recovery; absent evidence
 rethrows the original error, and failed verification propagates an error.
 
+Caller cancellation is not converted into an acknowledged success. Cancellation
+before the provider commits leaves neither issuance row; cancellation after a
+real commit leaves the receipt/key pair available for a later authorized,
+metadata-only retry. Tests cancel the caller token at the actual provider
+committing/committed events instead of relying on timing delays.
+
+The API publishes `ExternalApiKeyIssuanceDto` only for acknowledged success,
+with required identity/disclosure fields and exactly two non-null enum values.
+Native failure has no `Issue`; HTTP failure remains ProblemDetails. The
+generated SDK and browser must deploy with the API contract. Rollback must
+retain receipts and response-storage suppression; reverting to generic raw
+credential replay is not a safe rollback.
+
 The creation action suppresses generic idempotency response capture and keeps
 no-store. Its issuance event omits owner IDs, key IDs, and raw material; existing
 bounded creation metric tags remain. Browser creation failures log only safe

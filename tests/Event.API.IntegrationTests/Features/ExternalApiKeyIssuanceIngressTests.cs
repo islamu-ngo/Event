@@ -29,6 +29,11 @@ public sealed class ExternalApiKeyIssuanceIngressTests
 {
     private static CancellationToken CancellationToken => TestContext.Current!.Execution.CancellationToken;
 
+    /// <summary>
+    /// Verifies signed issuance for tenant and instance owners in Dedicated and Combined hosting
+    /// discloses the credential on first creation without storing it in generic idempotency responses
+    /// or allowing response caching.
+    /// </summary>
     [Test]
     [Arguments(false, false)]
     [Arguments(false, true)]
@@ -40,7 +45,6 @@ public sealed class ExternalApiKeyIssuanceIngressTests
         using var response = await host.CreateAsync();
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var body = await ReadAsync(response);
-        await Assert.That(body.RootElement.GetProperty("success").GetBoolean()).IsTrue();
         await Assert.That(body.RootElement.GetProperty("disclosureStatus").GetString()).IsEqualTo("Issued");
         string raw = body.RootElement.GetProperty("apiKey").GetString()!;
         await Assert.That(!string.IsNullOrWhiteSpace(raw)).IsTrue();
@@ -52,6 +56,11 @@ public sealed class ExternalApiKeyIssuanceIngressTests
             record.ResponseBody?.Contains(raw, StringComparison.Ordinal) == true)).IsFalse();
     }
 
+    /// <summary>
+    /// Verifies reusing the signed issuance operation in Dedicated and Combined hosting preserves
+    /// tenant or instance key identity while returning PreviouslyIssued metadata without the credential,
+    /// shared caching, or a generic idempotency replay marker.
+    /// </summary>
     [Test]
     [Arguments(false, false)]
     [Arguments(false, true)]
@@ -79,6 +88,11 @@ public sealed class ExternalApiKeyIssuanceIngressTests
         await Assert.That(replay.Headers.Contains("X-Idempotency-Replay")).IsFalse();
     }
 
+    /// <summary>
+    /// Verifies committed tenant-grant revocation or platform-role removal is checked afresh
+    /// before issuance recovery in either hosting mode, so the unchanged signed token receives
+    /// a non-cacheable forbidden problem response with no credential or key identity disclosure.
+    /// </summary>
     [Test]
     [Arguments(false, false)]
     [Arguments(false, true)]
@@ -119,9 +133,18 @@ public sealed class ExternalApiKeyIssuanceIngressTests
         await Assert.That(replay.Headers.CacheControl?.NoStore).IsTrue();
     }
 
+    /// <summary>
+    /// Parses the actual ingress response stream for disclosure and identity assertions
+    /// using the current test's cancellation token.
+    /// </summary>
     private static Task<JsonDocument> ReadAsync(HttpResponseMessage response) =>
         JsonDocument.ParseAsync(response.Content.ReadAsStream(CancellationToken), cancellationToken: CancellationToken);
 
+    /// <summary>
+    /// Verifies a signed Keycloak subject maps to the persisted local user rather than becoming
+    /// the resource owner: that user can list and revoke the issued key, and recovery of the
+    /// revoked key returns not found.
+    /// </summary>
     [Test]
     public async Task SignedProviderGuidDoesNotReplacePersistedUserIdentityDuringRecovery()
     {
@@ -144,6 +167,12 @@ public sealed class ExternalApiKeyIssuanceIngressTests
         await Assert.That(unavailable.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
+    /// <summary>
+    /// Verifies the MultiTenant global host's nullable tenant context permits instance-owned issuance,
+    /// metadata-only replay, listing, and revocation in either hosting mode but denies tenantless
+    /// user ownership. Revocation retains the receipt and blocks recovery; a new operation can
+    /// deliberately issue a replacement resource.
+    /// </summary>
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -184,6 +213,10 @@ public sealed class ExternalApiKeyIssuanceIngressTests
         await Assert.That(replaced.RootElement.GetProperty("id").GetString()).IsNotEqualTo(originalId);
     }
 
+    /// <summary>
+    /// Owns a signed HTTP client and its hosting resources, with persisted tenant or platform
+    /// authority and a stable issuance operation for first-disclosure and recovery assertions.
+    /// </summary>
     private sealed class IngressHost : IAsyncDisposable
     {
         public LocalAdmissionWebApplicationFactory Native { get; private set; } = null!;
@@ -195,6 +228,12 @@ public sealed class ExternalApiKeyIssuanceIngressTests
         public Guid PrincipalId { get; private set; }
         private readonly string _operationKey = Guid.CreateVersion7().ToString("N");
 
+        /// <summary>
+        /// Seeds persisted tenant-admin or platform-admin authority and signs requests through
+        /// Dedicated or Combined hosting against the native fixture's configuration.
+        /// External-provider subjects are linked to a distinct persisted user; MultiTenant global
+        /// hosting is selected without inventing a tenant for instance-owned operations.
+        /// </summary>
         public static async Task<IngressHost> StartAsync(
             bool combined, bool tenant, bool multiTenant = false,
             AuthenticationProviderKind provider = AuthenticationProviderKind.Local)
@@ -326,6 +365,10 @@ public sealed class ExternalApiKeyIssuanceIngressTests
             }
         }
 
+        /// <summary>
+        /// Sends signed issuance with the fixture's stable idempotency key and tenant or instance
+        /// ownership default; overrides exercise user ownership or a deliberately new issuance operation.
+        /// </summary>
         public async Task<HttpResponseMessage> CreateAsync(
             ExternalApiKeyOwnerType? owner = null, string? operationKey = null, string? name = null)
         {
@@ -343,12 +386,24 @@ public sealed class ExternalApiKeyIssuanceIngressTests
             return await _client!.SendAsync(request, CancellationToken);
         }
 
+        /// <summary>
+        /// Lists key metadata through the same signed principal used for issuance, allowing
+        /// assertions about persisted ownership and absence of credential disclosure.
+        /// </summary>
         public Task<HttpResponseMessage> ListAsync() =>
             _client!.GetAsync("/api/ExternalApiKey", CancellationToken);
 
+        /// <summary>
+        /// Requests revocation of an issued resource through its signed owner context so subsequent
+        /// recovery assertions exercise the revoked key rather than a changed principal.
+        /// </summary>
         public Task<HttpResponseMessage> RevokeAsync(string id) =>
             _client!.DeleteAsync($"/api/ExternalApiKey/{id}", CancellationToken);
 
+        /// <summary>
+        /// Releases the signed client and every factory owned by this fixture, including
+        /// partially initialized hosting resources when startup fails.
+        /// </summary>
         public async ValueTask DisposeAsync()
         {
             _client?.Dispose();
@@ -358,9 +413,18 @@ public sealed class ExternalApiKeyIssuanceIngressTests
         }
     }
 
+    /// <summary>
+    /// Runs the Standalone Combined host with the native fixture's database and identity configuration
+    /// so signed ingress is exercised through the alternate hosting composition.
+    /// </summary>
     private sealed class CombinedIngressFactory(IConfiguration nativeConfiguration, bool multiTenant)
         : WebApplicationFactory<StandaloneMarker>
     {
+        /// <summary>
+        /// Reuses native database, authentication, secret-provider, and operator-identity settings
+        /// in Testing, optionally selects MultiTenant mode, and substitutes an in-memory cache
+        /// while disabling unrelated hosted services, authority warmup, and rate limiting.
+        /// </summary>
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");

@@ -1003,6 +1003,20 @@ Non-GET responses additionally receive:
 - Privileged operations: role/policy constrained
 - User ID extraction fallback order: `sub` → `nameidentifier` → `sid`.
 
+### Native OpenAPI Authentication Requirements
+
+`KeycloakOpenApiSecurityTransformer` always defines HTTP `Bearer` (JWT) and
+header `ApiKey` (`X-API-Key`) authentication for native documentation generation.
+Operations using default `[Authorize]` metadata advertise these as separate
+alternatives, matching `MultiAuth` provider selection for Local Identity,
+AT Protocol sessions, external JWTs, and API keys. A valid configured Keycloak
+authorization URL or authority additionally exposes the existing Keycloak OAuth
+flow and alternative; absent configuration never invents an OAuth endpoint.
+There is no document-wide security requirement. Anonymous operations, explicit
+specialized authentication schemes, and pre-existing operation requirements
+retain their own contracts. These descriptions do not change runtime token
+validation, tenant binding, scope checks, or resource authorization.
+
 ### Tenantless Local Sign-In On The Admin Host
 `ApiTenantResolutionMiddleware` exempts `POST /api/auth/local/login`,
 authenticated `GET /api/user` for Local-session validation, and authenticated
@@ -1058,7 +1072,7 @@ Non-interactive callers authenticate with long-lived `X-API-Key` credentials in 
 |---|---|---|---|
 | `GET` | `/api/ExternalApiKey` | List keys visible to the caller | HAL collection |
 | `GET` | `/api/ExternalApiKey/{id}` | Key detail (metadata only, no secret) | HAL resource |
-| `POST` | `/api/ExternalApiKey` | Issue once or recover metadata with a required operation key | `200` command result with `disclosureStatus` |
+| `POST` | `/api/ExternalApiKey` | Issue once or recover metadata with a required operation key | `200` success-only `ExternalApiKeyIssuanceDto` |
 | `PATCH` | `/api/ExternalApiKey/{id}` | Update policy (scopes, expiry, quotas) | Command result |
 | `DELETE` | `/api/ExternalApiKey/{id}` | Revoke key (soft delete, status=Revoked) | `204 No Content` |
 | `GET` | `/api/ExternalApiKey/usage-report` | Tenant admins see their tenant; instance admins see platform-wide | Aggregated report |
@@ -1091,6 +1105,15 @@ explicitly global (`TenantId = null`).
 | Missing or empty authenticated platform-user binding | `401` | No recovery metadata |
 | Current owner authority revoked or unavailable | `403` | No recovery metadata |
 | Issued key removed, revoked, expired, or otherwise unusable | `404` | No recovered credential |
+
+The public success payload requires `id`, `keyId`, `disclosureStatus`, and
+`apiKey`. Its disclosure enum contains exactly `Issued` and `PreviouslyIssued`;
+it cannot be null or represent failure. Recovery explicitly carries null
+`apiKey`. Native commands retain failure metadata in
+`CreateExternalApiKeyCommandResponse` with no `Issue`; the controller publishes
+only the validated success payload or ProblemDetails. The browser validates
+generated success data before accepting it and keeps failure guidance in a
+local result, not a fabricated generated success contract.
 
 The input digest covers every accepted field: trimmed name, normalized optional
 description, owner-type and target IDs, trimmed/lowercased/deduplicated/sorted

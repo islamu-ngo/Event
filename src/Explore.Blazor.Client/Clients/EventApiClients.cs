@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Explore.Blazor.Client.Clients;
 
@@ -119,10 +120,30 @@ public partial class StudioRegistrationOrderPaymentClient
 
 public static class EventApiJsonSerializerSettings
 {
+    /// <summary>Preserves native protocol enum tokens and required issuance fields at generated-client ingestion.</summary>
     public static JsonSerializerOptions Configure(JsonSerializerOptions settings)
     {
         settings.Converters.Add(new SetupEnrollmentScopeJsonConverter());
+        settings.Converters.Add(new JsonStringEnumConverter<ExternalApiKeyDisclosureStatus>(allowIntegerValues: false));
         settings.Converters.Add(new JsonStringEnumConverter());
+        settings.TypeInfoResolver = (settings.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver())
+            .WithAddedModifier(typeInfo =>
+            {
+                if (typeInfo.Type != typeof(ExternalApiKeyIssuanceDto))
+                    return;
+                // NSwag does not emit JsonRequired for nonnullable enums, so an absent
+                // status otherwise defaults to Issued. Presence and valid-state checks
+                // are separate: explicit null apiKey is required for metadata recovery.
+                foreach (var property in typeInfo.Properties)
+                {
+                    if (property.Name is "id" or "keyId" or "disclosureStatus" or "apiKey")
+                        property.IsRequired = true;
+                    // Generated property converters take precedence over options converters.
+                    if (property.Name == "disclosureStatus")
+                        property.CustomConverter = new JsonStringEnumConverter<ExternalApiKeyDisclosureStatus>(
+                            allowIntegerValues: false);
+                }
+            });
         return settings;
     }
 

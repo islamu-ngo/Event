@@ -23,6 +23,19 @@ for the five supported states.
 
 ---
 
+## Authentication In Native API Documentation
+
+Protected operations in the native OpenAPI document advertise JWT bearer
+authentication (`Authorization: Bearer <token>`) or an external API key
+(`X-API-Key`) as alternatives, including when Keycloak is not configured.
+Bearer tokens can come from the deployment's supported identity providers;
+the documentation does not imply that Local Identity requires a Keycloak server.
+Configured Keycloak authorization metadata adds the existing OAuth option.
+Anonymous operations remain public, while purpose-bound credentials such as
+erasure receipts and admission-scanner capabilities keep their separate schemes.
+An advertised credential does not bypass tenant, scope, or resource permission
+checks.
+
 ## Account Matching and Recovery
 
 Accepting a sign-in provider does not automatically trust it to attach a new
@@ -359,6 +372,11 @@ approved secret store before leaving the creation dialog. The service persists
 only the secret hash and a digest-only receipt, not a recoverable response.
 There is no endpoint that can show that secret again.
 
+Successful responses contain `id`, `keyId`, `disclosureStatus`, and `apiKey`.
+The disclosure status is always `Issued` or `PreviouslyIssued`, never null.
+Rejected requests use an HTTP error with ProblemDetails, not a successful
+issuance response with a failure or null disclosure status.
+
 If a connection fails or a response is lost:
 
 1. Retry with the same operation key and unchanged policy. Do not generate a
@@ -396,6 +414,18 @@ shows fixed guidance for these status classes, not remote response text; repeati
 a rejected frozen request without addressing its cause is not recovery.
 
 #### Deployment, Retention, And Rollback
+
+Deploy the API and generated SDK/browser together: creation now returns the
+success-only payload rather than a generic command-response envelope. Update
+automation to branch on HTTP status and then `disclosureStatus`; do not expect
+a `success` Boolean. A malformed acknowledgement is an uncertain outcome:
+retain the original operation key and policy for recovery, rather than minting
+a replacement automatically.
+
+Rollback must preserve the receipt table and the secret-free recovery
+boundary. Stop issuance while replacing a mixed API/browser deployment, then
+resume only with a matched version that supports these response semantics.
+Do not roll back to a version that stores or replays raw credential responses.
 
 The new executable requires the generated issuance-receipt table migration.
 Receipt rows have no expiry and do not cascade away with key/user deletion;

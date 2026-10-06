@@ -40,8 +40,10 @@ using Microsoft.IO;
 
 namespace Event.Api.IntegrationTests.Features;
 
+/// <summary>Exercises real MVC issuance against native persistence without generic credential-response replay.</summary>
 public sealed class ExternalApiKeyIssuanceHttpTests
 {
+    /// <summary>Ensures first disclosure is not stored in either generic replay bodies or the credential hash.</summary>
     [Test]
     public async Task Create_WithOperationKey_DoesNotPersistRecoverableCredential()
     {
@@ -49,7 +51,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         string operationKey = Guid.CreateVersion7().ToString("N");
         using var response = await host.CreateAsync(operationKey);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var issued = await response.Content.ReadFromJsonAsync<CreateExternalApiKeyCommandResponse>();
+        var issued = await response.Content.ReadFromJsonAsync<ExternalApiKeyIssuanceDto>();
         await Assert.That(issued?.ApiKey is not null).IsTrue();
 
         await using var scope = host.App.Services.CreateAsyncScope();
@@ -57,11 +59,12 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         var records = await context.IdempotencyRecords.AsNoTracking().ToListAsync();
         // Assert a boolean so a failing Red run cannot print credential-bearing replay bodies.
         await Assert.That(records.Any(record =>
-            record.ResponseBody?.Contains(issued!.ApiKey!, StringComparison.Ordinal) == true)).IsFalse();
+            record.ResponseBody?.Contains(issued!.ApiKey!, StringComparison.Ordinal) is true)).IsFalse();
         var key = await context.ExternalApiKeys.IgnoreQueryFilters().AsNoTracking().SingleAsync();
         await Assert.That(key.SecretHash.Contains(issued!.ApiKey!, StringComparison.Ordinal)).IsFalse();
     }
 
+    /// <summary>Authorized retry returns the same durable aggregate identity with explicit null credential material.</summary>
     [Test]
     public async Task Create_WhenResponseIsRetried_ReturnsMetadataWithoutCredential()
     {
@@ -69,14 +72,15 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         string operationKey = Guid.CreateVersion7().ToString("N");
         using var first = await host.CreateAsync(operationKey);
         await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var issued = await first.Content.ReadFromJsonAsync<CreateExternalApiKeyCommandResponse>();
+        var issued = await first.Content.ReadFromJsonAsync<ExternalApiKeyIssuanceDto>();
         using var replay = await host.CreateAsync(operationKey);
         await Assert.That(replay.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var recovered = await replay.Content.ReadFromJsonAsync<CreateExternalApiKeyCommandResponse>();
+        var recovered = await replay.Content.ReadFromJsonAsync<ExternalApiKeyIssuanceDto>();
         await Assert.That(recovered?.Id).IsEqualTo(issued!.Id);
         await Assert.That(recovered?.ApiKey is null).IsTrue();
     }
 
+    /// <summary>A committed owner revocation prevents receipt lookup from exposing prior issuance metadata.</summary>
     [Test]
     public async Task Create_AfterCommittedOwnerRevocation_DeniesReplayWithoutMetadata()
     {
@@ -84,7 +88,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         string operationKey = Guid.CreateVersion7().ToString("N");
         using var first = await host.CreateAsync(operationKey);
         await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var issued = await first.Content.ReadFromJsonAsync<CreateExternalApiKeyCommandResponse>();
+        var issued = await first.Content.ReadFromJsonAsync<ExternalApiKeyIssuanceDto>();
         await using (var scope = host.App.Services.CreateAsyncScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -100,12 +104,16 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(body.Contains(issued.Id.ToString(), StringComparison.Ordinal)).IsFalse();
     }
 
+    /// <summary>Rejects missing, whitespace and combined operation values before creating any credential.</summary>
     [Test]
     [Arguments(null)]
     [Arguments("")]
     [Arguments(" ")]
     [Arguments("invalid key")]
     [Arguments("invalid,key")]
+    [Arguments("invalid,")]
+    [Arguments(",invalid")]
+    [Arguments("invalid,,key")]
     [Arguments("invalid\tkey")]
     public async Task Create_WithInvalidOperationKey_RejectsBeforeIssuance(string? operationKey)
     {
@@ -117,6 +125,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(await context.ExternalApiKeys.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
     }
 
+    /// <summary>Rejects separate duplicate header values instead of selecting the first operation identity.</summary>
     [Test]
     public async Task Create_WithMultipleOperationKeys_RejectsBeforeIssuance()
     {
@@ -125,6 +134,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
     }
 
+    /// <summary>Enforces the Domain operation-key upper bound through the actual HTTP binding boundary.</summary>
     [Test]
     public async Task Create_With129CharacterOperationKey_RejectsBeforeIssuance()
     {
@@ -133,6 +143,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
     }
 
+    /// <summary>Admits the maximum valid operation-key length without transport truncation.</summary>
     [Test]
     public async Task Create_With128CharacterOperationKey_IssuesSuccessfully()
     {
@@ -141,6 +152,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
     }
 
+    /// <summary>Returns conflict when a retained operation identity is reused with a different accepted scope set.</summary>
     [Test]
     public async Task Create_WithSameOperationAndChangedPolicy_ReturnsConflict()
     {
@@ -157,6 +169,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(changed.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
     }
 
+    /// <summary>Rechecks committed status and expiry rather than treating a surviving receipt as usable-key authority.</summary>
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -166,7 +179,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         string operationKey = Guid.CreateVersion7().ToString("N");
         using var first = await host.CreateAsync(operationKey);
         await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var issued = await first.Content.ReadFromJsonAsync<CreateExternalApiKeyCommandResponse>();
+        var issued = await first.Content.ReadFromJsonAsync<ExternalApiKeyIssuanceDto>();
         await using (var scope = host.App.Services.CreateAsyncScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -185,6 +198,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(body.Contains(issued!.ApiKey!, StringComparison.Ordinal)).IsFalse();
     }
 
+    /// <summary>Owns the TestServer, in-memory credential connection and task-private retained-authority files.</summary>
     private sealed class IssuanceHost(
         WebApplication app,
         HttpClient client,
@@ -195,6 +209,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         public WebApplication App { get; } = app;
         public Guid UserId { get; } = userId;
 
+        /// <summary>Sends one intended payload while retaining malformed or duplicate headers for ingress rejection tests.</summary>
         public async Task<HttpResponseMessage> CreateAsync(
             string? operationKey,
             CreateExternalApiKeyDto? payload = null,
@@ -216,6 +231,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
             return await client.SendAsync(request);
         }
 
+        /// <summary>Transfers resource ownership only after successful native authority/database initialization and host startup.</summary>
         public static async Task<IssuanceHost> StartAsync()
         {
             Guid userId = Guid.CreateVersion7();
@@ -224,135 +240,161 @@ public sealed class ExternalApiKeyIssuanceHttpTests
             {
                 DataSource = ":memory:"
             }.ToString());
-            await connection.OpenAsync();
             string authorityPath = Path.Combine(
                 Environment.GetEnvironmentVariable("TMPDIR") ?? Path.GetTempPath(),
                 $"issuance-http-authority-{Guid.CreateVersion7():N}.db");
             string authorityConnection = new SqliteConnectionStringBuilder { DataSource = authorityPath }.ToString();
-            var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
-            builder.WebHost.UseTestServer();
-            builder.Logging.ClearProviders();
-            builder.Services.AddHttpContextAccessor();
-            builder.Services.AddAuthorization();
-            builder.Services.AddApiExceptionHandling();
-            builder.Services.AddApiRateLimiting(builder.Configuration, builder.Environment);
-            builder.Services.AddDataProtection();
-            builder.Services.AddMetrics();
-            builder.Services.AddSingleton<BusinessMetrics>();
-            builder.Services.AddSingleton<RecyclableMemoryStreamManager>();
-            builder.Services.AddSingleton<ITenantContext>(new FixedTenantContext(tenantId));
-            builder.Services.AddDbContext<ExploreDbContext>(options =>
-                options.UseSqlite(connection).UseSnakeCaseNamingConvention());
-            builder.Services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>(options =>
-                options.UseSqlite(authorityConnection).UseSnakeCaseNamingConvention());
-            builder.Services.AddScoped<IPrivacyIdentityFenceAuthority>(services =>
-                new EmbeddedPrivacyErasureAuthorityRepository(
-                    services.GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>(),
-                    TimeProvider.System, Options.Create(new PrivacyErasureOptions())));
-            builder.Services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
-            builder.Services.AddScoped<IExternalApiKeyIssuanceReceiptRepository, ExternalApiKeyIssuanceReceiptRepository>();
-            builder.Services.AddScoped<IExternalApiKeyIssuanceAuthority, ExternalApiKeyIssuanceAuthority>();
-            builder.Services.AddScoped<IUserContext, UserContext>();
-            builder.Services.AddScoped<IAdminContext, AdminContext>();
-            builder.Services.AddScoped<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
-            builder.Services.AddScoped<ITenantUserRoleGrantRepository, TenantUserRoleGrantRepository>();
-            builder.Services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
-            builder.Services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
-            builder.Services.AddScoped<IExternalApiKeyQuotaRepository, ExternalApiKeyQuotaRepository>();
-            builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
-            builder.Services.AddScoped<IOrganizationMemberRepository, OrganizationMemberRepository>();
-            builder.Services.AddScoped<IGroupRepository, GroupRepository>();
-            builder.Services.AddScoped<IGroupMemberRepository, GroupMemberRepository>();
-            builder.Services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
-            builder.Services.AddScoped<ICommandHandler<CreateExternalApiKeyCommand, CreateExternalApiKeyCommandResponse>, CreateExternalApiKeyCommandHandler>();
-            builder.Services.AddScoped<ICommandHandler<UpdateExternalApiKeyPolicyCommand, BaseCommandResponse<Guid>>, UpdateExternalApiKeyPolicyCommandHandler>();
-            builder.Services.AddScoped<ICommandHandler<RevokeExternalApiKeyCommand, bool>, RevokeExternalApiKeyCommandHandler>();
-            builder.Services.AddScoped<IQueryHandler<GetExternalApiKeyListRequest, List<ExternalApiKeyListDto>>, GetExternalApiKeyListRequestHandler>();
-            builder.Services.AddScoped<IQueryHandler<GetExternalApiKeyDetailsRequest, ExternalApiKeyListDto?>, GetExternalApiKeyDetailsRequestHandler>();
-            builder.Services.AddScoped<IQueryHandler<GetExternalApiKeyUsageReportRequest, List<ExternalApiKeyUsageReportDto>>, GetExternalApiKeyUsageReportRequestHandler>();
-            builder.Services.AddControllers().AddApplicationPart(typeof(ExternalApiKeyController).Assembly)
-                .ConfigureApplicationPartManager(manager =>
-                    manager.FeatureProviders.Add(new IssuanceControllerFeatureProvider()));
-
-            var app = builder.Build();
-            await using (var authority = await app.Services
-                .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>().CreateDbContextAsync())
-                await authority.Database.EnsureCreatedAsync();
-            await using (var scope = app.Services.CreateAsyncScope())
+            WebApplication? app = null;
+            bool ownershipTransferred = false;
+            try
             {
-                var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-                context.TenantContext = new FixedTenantContext(tenantId);
-                await context.Database.EnsureCreatedAsync();
-                var platform = new RoleScope { Id = 0, MasterCode = "PLATFORM", FullName = "Platform" };
-                var role = new Role { Id = 1, MasterCode = "platform.admin", FullName = "Administrator", RoleScope = platform };
-                var user = new User
+                await connection.OpenAsync();
+                var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+                builder.WebHost.UseTestServer();
+                builder.Logging.ClearProviders();
+                builder.Services.AddHttpContextAccessor();
+                builder.Services.AddAuthorization();
+                builder.Services.AddApiExceptionHandling();
+                builder.Services.AddApiRateLimiting(builder.Configuration, builder.Environment);
+                builder.Services.AddDataProtection();
+                builder.Services.AddMetrics();
+                builder.Services.AddSingleton<BusinessMetrics>();
+                builder.Services.AddSingleton<RecyclableMemoryStreamManager>();
+                builder.Services.AddSingleton<ITenantContext>(new FixedTenantContext(tenantId));
+                builder.Services.AddDbContext<ExploreDbContext>(options =>
+                    options.UseSqlite(connection).UseSnakeCaseNamingConvention());
+                builder.Services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>(options =>
+                    options.UseSqlite(authorityConnection).UseSnakeCaseNamingConvention());
+                builder.Services.AddScoped<IPrivacyIdentityFenceAuthority>(services =>
+                    new EmbeddedPrivacyErasureAuthorityRepository(
+                        services.GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>(),
+                        TimeProvider.System, Options.Create(new PrivacyErasureOptions())));
+                builder.Services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+                builder.Services.AddScoped<IExternalApiKeyIssuanceReceiptRepository, ExternalApiKeyIssuanceReceiptRepository>();
+                builder.Services.AddScoped<IExternalApiKeyIssuanceAuthority, ExternalApiKeyIssuanceAuthority>();
+                builder.Services.AddScoped<IUserContext, UserContext>();
+                builder.Services.AddScoped<IAdminContext, AdminContext>();
+                builder.Services.AddScoped<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
+                builder.Services.AddScoped<ITenantUserRoleGrantRepository, TenantUserRoleGrantRepository>();
+                builder.Services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
+                builder.Services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
+                builder.Services.AddScoped<IExternalApiKeyQuotaRepository, ExternalApiKeyQuotaRepository>();
+                builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+                builder.Services.AddScoped<IOrganizationMemberRepository, OrganizationMemberRepository>();
+                builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+                builder.Services.AddScoped<IGroupMemberRepository, GroupMemberRepository>();
+                builder.Services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
+                builder.Services.AddScoped<ICommandHandler<CreateExternalApiKeyCommand, CreateExternalApiKeyCommandResponse>, CreateExternalApiKeyCommandHandler>();
+                builder.Services.AddScoped<ICommandHandler<UpdateExternalApiKeyPolicyCommand, BaseCommandResponse<Guid>>, UpdateExternalApiKeyPolicyCommandHandler>();
+                builder.Services.AddScoped<ICommandHandler<RevokeExternalApiKeyCommand, bool>, RevokeExternalApiKeyCommandHandler>();
+                builder.Services.AddScoped<IQueryHandler<GetExternalApiKeyListRequest, List<ExternalApiKeyListDto>>, GetExternalApiKeyListRequestHandler>();
+                builder.Services.AddScoped<IQueryHandler<GetExternalApiKeyDetailsRequest, ExternalApiKeyListDto?>, GetExternalApiKeyDetailsRequestHandler>();
+                builder.Services.AddScoped<IQueryHandler<GetExternalApiKeyUsageReportRequest, List<ExternalApiKeyUsageReportDto>>, GetExternalApiKeyUsageReportRequestHandler>();
+                builder.Services.AddControllers().AddApplicationPart(typeof(ExternalApiKeyController).Assembly)
+                    .ConfigureApplicationPartManager(manager =>
+                        manager.FeatureProviders.Add(new IssuanceControllerFeatureProvider()));
+
+                app = builder.Build();
+                await using (var authority = await app.Services
+                    .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>().CreateDbContextAsync())
+                    await authority.Database.EnsureCreatedAsync();
+                await using (var scope = app.Services.CreateAsyncScope())
                 {
-                    Id = userId,
-                    Pii = new UserPii { Email = "", FirstName = "", LastName = "" }
-                };
-                context.PlatformUserRoles.Add(new PlatformUserRole
+                    var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+                    context.TenantContext = new FixedTenantContext(tenantId);
+                    await context.Database.EnsureCreatedAsync();
+                    var platform = new RoleScope { Id = 0, MasterCode = "PLATFORM", FullName = "Platform" };
+                    var role = new Role { Id = 1, MasterCode = "platform.admin", FullName = "Administrator", RoleScope = platform };
+                    var user = new User
+                    {
+                        Id = userId,
+                        Pii = new UserPii { Email = "", FirstName = "", LastName = "" }
+                    };
+                    context.PlatformUserRoles.Add(new PlatformUserRole
+                    {
+                        Id = Guid.CreateVersion7(),
+                        User = user,
+                        UserId = userId,
+                        Role = role,
+                        RoleId = role.Id,
+                        GrantedAt = DateTime.UtcNow
+                    });
+                    context.Tenants.Add(new Tenant
+                    {
+                        Id = tenantId,
+                        FullName = "Issuance tests",
+                        Slug = "issuance-tests",
+                        TenantStatus = new TenantStatus { Id = 1, MasterCode = "ACTIVE", FullName = "Active" }
+                    });
+                    context.ExternalApiKeyOwnerTypes.Add(new ExternalApiKeyOwnerTypeLookup
+                    {
+                        Id = (int)ExternalApiKeyOwnerType.InstanceAdmin,
+                        MasterCode = "INSTANCE_ADMIN",
+                        FullName = "Instance administrator"
+                    });
+                    context.ExternalApiKeyStatuses.Add(new ExternalApiKeyStatus
+                    {
+                        Id = (int)ExternalApiKeyStatusEnum.Active,
+                        MasterCode = "ACTIVE",
+                        FullName = "Active",
+                        IsUsable = true
+                    });
+                    context.ExternalApiKeyStatuses.Add(new ExternalApiKeyStatus
+                    {
+                        Id = (int)ExternalApiKeyStatusEnum.Revoked,
+                        MasterCode = "REVOKED",
+                        FullName = "Revoked",
+                        IsUsable = false
+                    });
+                    context.ExternalApiKeyCreditPeriods.Add(new ExternalApiKeyCreditPeriod
+                    {
+                        Id = (int)ExternalApiKeyCreditPeriodEnum.None,
+                        MasterCode = "NONE",
+                        FullName = "None"
+                    });
+                    await context.SaveChangesAsync();
+                }
+
+                app.UseApiExceptionHandling();
+                app.UseRouting();
+                app.Use(async (context, next) =>
                 {
-                    Id = Guid.CreateVersion7(),
-                    User = user,
-                    UserId = userId,
-                    Role = role,
-                    RoleId = role.Id,
-                    GrantedAt = DateTime.UtcNow
+                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim("sub", userId.ToString())], "BoundaryPrincipal"));
+                    context.RequestServices.GetRequiredService<ExploreDbContext>().TenantContext =
+                        context.RequestServices.GetRequiredService<ITenantContext>();
+                    await next(context);
                 });
-                context.Tenants.Add(new Tenant
-                {
-                    Id = tenantId,
-                    FullName = "Issuance tests",
-                    Slug = "issuance-tests",
-                    TenantStatus = new TenantStatus { Id = 1, MasterCode = "ACTIVE", FullName = "Active" }
-                });
-                context.ExternalApiKeyOwnerTypes.Add(new ExternalApiKeyOwnerTypeLookup
-                {
-                    Id = (int)ExternalApiKeyOwnerType.InstanceAdmin,
-                    MasterCode = "INSTANCE_ADMIN",
-                    FullName = "Instance administrator"
-                });
-                context.ExternalApiKeyStatuses.Add(new ExternalApiKeyStatus
-                {
-                    Id = (int)ExternalApiKeyStatusEnum.Active,
-                    MasterCode = "ACTIVE",
-                    FullName = "Active",
-                    IsUsable = true
-                });
-                context.ExternalApiKeyStatuses.Add(new ExternalApiKeyStatus
-                {
-                    Id = (int)ExternalApiKeyStatusEnum.Revoked,
-                    MasterCode = "REVOKED",
-                    FullName = "Revoked",
-                    IsUsable = false
-                });
-                context.ExternalApiKeyCreditPeriods.Add(new ExternalApiKeyCreditPeriod
-                {
-                    Id = (int)ExternalApiKeyCreditPeriodEnum.None,
-                    MasterCode = "NONE",
-                    FullName = "None"
-                });
-                await context.SaveChangesAsync();
+                app.UseAuthorization();
+                app.UseRateLimiter();
+                app.UseMiddleware<IdempotencyMiddleware>();
+                app.MapControllers();
+                await app.StartAsync();
+                var host = new IssuanceHost(app, app.GetTestClient(), connection, authorityPath, userId);
+                ownershipTransferred = true;
+                return host;
             }
-
-            app.UseApiExceptionHandling();
-            app.UseRouting();
-            app.Use(async (context, next) =>
+            finally
             {
-                context.User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("sub", userId.ToString())], "BoundaryPrincipal"));
-                context.RequestServices.GetRequiredService<ExploreDbContext>().TenantContext =
-                    context.RequestServices.GetRequiredService<ITenantContext>();
-                await next(context);
-            });
-            app.UseAuthorization();
-            app.UseRateLimiter();
-            app.UseMiddleware<IdempotencyMiddleware>();
-            app.MapControllers();
-            await app.StartAsync();
-            return new IssuanceHost(app, app.GetTestClient(), connection, authorityPath, userId);
+                if (!ownershipTransferred)
+                {
+                    try
+                    {
+                        if (app is not null)
+                            await app.DisposeAsync();
+                    }
+                    finally
+                    {
+                        await connection.DisposeAsync();
+                        File.Delete(authorityPath);
+                        File.Delete(authorityPath + "-wal");
+                        File.Delete(authorityPath + "-shm");
+                    }
+                }
+            }
         }
 
+        /// <summary>Disposes successful-host resources and removes only this fixture's private authority files.</summary>
         public async ValueTask DisposeAsync()
         {
             client.Dispose();
@@ -371,11 +413,12 @@ public sealed class ExternalApiKeyIssuanceHttpTests
 
     private sealed class IssuanceControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>
     {
+        /// <summary>Filters discovered controllers before mutating MVC's collection so only the real issuance surface is hosted.</summary>
         public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature)
         {
-            foreach (var controller in feature.Controllers.ToArray())
-                if (controller.AsType() != typeof(ExternalApiKeyController))
-                    feature.Controllers.Remove(controller);
+            foreach (var controller in feature.Controllers
+                .Where(controller => controller.AsType() != typeof(ExternalApiKeyController)).ToArray())
+                feature.Controllers.Remove(controller);
         }
     }
 }

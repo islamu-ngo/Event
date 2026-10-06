@@ -110,7 +110,7 @@
         {
             <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" OnClick="Cancel" Disabled="_submitState.IsSubmitting">Cancel</MudButton>
             <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_submitState.IsSubmitting || !_selectedScopes.Any())">
-                @(_submitState.IsSubmitting ? "Checking..." : _pendingRequest is not null ? "Retry this operation" : "Create API Key")
+                @SubmitLabel
             </MudButton>
         }
         else
@@ -140,11 +140,24 @@
     private readonly HashSet<string> _selectedScopes = new(StringComparer.OrdinalIgnoreCase);
     private DateTime? _expiresAt;
 
+    /// <summary>Distinguishes active submission from retrying an already frozen operation.</summary>
+    private string SubmitLabel
+    {
+        get
+        {
+            if (_submitState.IsSubmitting)
+                return "Checking...";
+            return _pendingRequest is not null ? "Retry this operation" : "Create API Key";
+        }
+    }
+
+    /// <summary>Creates the editable policy context before the first submission freezes operation input.</summary>
     protected override void OnInitialized()
     {
         _editContext = new EditContext(_dto);
     }
 
+    /// <summary>Allows scope edits only before a pending operation has fixed its canonical policy.</summary>
     private void ToggleScope(string scope, bool selected)
     {
         if (_pendingRequest is not null)
@@ -155,6 +168,9 @@
             _selectedScopes.Remove(scope);
     }
 
+    /// <summary>
+    /// Freezes policy on first submission and reuses its operation key on retries, revealing material only for a validated Issued acknowledgement.
+    /// </summary>
     private async Task Submit()
     {
         if (_submitState.IsSubmitting || _created) return;
@@ -193,24 +209,21 @@
             _submitState.Start();
 
             var response = await ApiKeyService.CreateApiKeyAsync(_pendingRequest, _operationKey);
+            var issue = response.Issue;
 
-            if (response?.Success == true && response.DisclosureStatus == ExternalApiKeyDisclosureStatus.Issued
-                && !string.IsNullOrWhiteSpace(response.ApiKey))
+            if (issue?.DisclosureStatus == ExternalApiKeyDisclosureStatus.Issued)
             {
-                _createdSecret = response.ApiKey;
+                _createdSecret = issue.ApiKey;
                 _created = true;
             }
-            else if (response?.Success == true && response.DisclosureStatus == ExternalApiKeyDisclosureStatus.PreviouslyIssued
-                && response.ApiKey is null && !string.IsNullOrWhiteSpace(response.KeyId))
+            else if (issue?.DisclosureStatus == ExternalApiKeyDisclosureStatus.PreviouslyIssued)
             {
-                _createdKeyId = response.KeyId;
+                _createdKeyId = issue.KeyId;
                 _created = true;
             }
             else
             {
-                _submitState.Fail(response is { Success: false } && !string.IsNullOrWhiteSpace(response.Message)
-                    ? response.Message
-                    : "The request did not complete. Retry this operation to check its outcome.");
+                _submitState.Fail(response.ErrorMessage);
             }
         }
         catch (Exception)

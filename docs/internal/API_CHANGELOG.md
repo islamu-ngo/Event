@@ -3,6 +3,23 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-06
+
+- **Breaking: success-only external API key disclosure.** Creation HTTP `200`
+  now publishes `ExternalApiKeyIssuanceDto`, not a generic command-response
+  envelope. Required fields are `id`, `keyId`, `disclosureStatus`, and `apiKey`.
+  Disclosure is exactly `Issued` or `PreviouslyIssued`, never null; recovery
+  requires explicit null `apiKey`. Failures remain HTTP errors with ProblemDetails.
+- The regenerated SDK and browser enforce field presence before accepting an
+  acknowledgement. Missing, null, unknown or numeric disclosure tokens cannot
+  silently default to first issuance. Fixed local failure guidance and logging
+  do not reflect credential-bearing response bodies or exceptions.
+- **Coordinated deployment:** update the API, generated SDK and browser together.
+  Automation must branch on HTTP status and then disclosure, rather than a
+  `success` Boolean. Preserve the original operation key and policy after an
+  uncertain acknowledgement. Rollback must retain receipts and secret-free
+  recovery; reverting to raw credential replay is not a safe rollback.
+
 ## 2026-10-05
 
 - **Breaking: bounded external API key issuance.** `POST /api/ExternalApiKey`

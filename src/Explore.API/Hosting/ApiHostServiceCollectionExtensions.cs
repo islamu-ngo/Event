@@ -81,6 +81,9 @@ public static class ApiHostServiceCollectionExtensions
         }
     }
 
+    /// <summary>
+    /// Composes shared API hosting, native operation validation and OpenAPI transformers for runtime and build-time generation.
+    /// </summary>
     public static ApiHostCompositionState AddApiHostServices(
         this WebApplicationBuilder builder,
         Func<bool> isShuttingDown,
@@ -337,6 +340,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddDocumentTransformer<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<HalDtoSchemaTransformer>();
+            options.AddSchemaTransformer<ExternalApiKeyIssuanceSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
             options.AddDocumentTransformer<OpenApiStringEnumDocumentTransformer>();
             options.AddDocumentTransformer<OperatorIdentityManifestSchemaTransformer>();

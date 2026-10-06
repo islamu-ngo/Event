@@ -37,8 +37,8 @@ public sealed class OpenApiParityTests
         new(new("/api/management/tenants/provision", "post"), [ApiAuthenticationSchemeNames.ManagedControlPlane]),
         new(new("/api/management/tenant-provisioning/{operationId}", "get"), [ApiAuthenticationSchemeNames.ManagedControlPlane]),
         new(new("/api/management/tenant-provisioning/{operationId}/cancel", "post"), [ApiAuthenticationSchemeNames.ManagedControlPlane]),
-        new(new("/api/management/registration", "post"), ["Keycloak"]),
-        new(new("/api/event", "post"), ["Keycloak"])
+        new(new("/api/management/registration", "post"), ["Bearer", ApiAuthenticationSchemeNames.ApiKey, "Keycloak"]),
+        new(new("/api/event", "post"), ["Bearer", ApiAuthenticationSchemeNames.ApiKey, "Keycloak"])
     ];
 
     private static readonly OperationSelector UnrelatedAnonymousOperation = new("/api/event", "get");
@@ -141,6 +141,77 @@ public sealed class OpenApiParityTests
             .Because("native build-time generation must never reference an unavailable runtime authority");
         await Assert.That(UndefinedSecuritySchemeReferences(swashbuckleDocument)).IsEmpty()
             .Because("Swashbuckle build-time generation must never emit dangling security references");
+    }
+
+    /// <summary>Verifies default credentials, OR semantics and specialized exceptions in both generators with and without Keycloak.</summary>
+    [Test]
+    [Arguments(null, null, false, NativeOpenApiEndpoint)]
+    [Arguments("https://auth.example.com/realms/ISLAMU", null, true, NativeOpenApiEndpoint)]
+    [Arguments(null, KeycloakAuthorizationUrl, true, NativeOpenApiEndpoint)]
+    [Arguments(null, null, false, SwashbuckleOpenApiEndpoint)]
+    [Arguments("https://auth.example.com/realms/ISLAMU", null, true, SwashbuckleOpenApiEndpoint)]
+    [Arguments(null, KeycloakAuthorizationUrl, true, SwashbuckleOpenApiEndpoint)]
+    public async Task NativeDocs_DescribeDefaultAuthenticationIndependentlyOfKeycloakConfiguration(
+        string? authority,
+        string? authorizationUrl,
+        bool expectKeycloak,
+        string endpoint)
+    {
+        await using var app = _fixture.Factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) =>
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Keycloak:Authority"] = authority,
+                    ["Keycloak:AuthorizationUrl"] = authorizationUrl
+                })));
+        using var client = app.CreateClient();
+        using var document = await GetOpenApiDocumentAsync(client, endpoint);
+
+        JsonElement schemes = document.RootElement.GetProperty("components").GetProperty("securitySchemes");
+        JsonElement bearer = schemes.GetProperty("Bearer");
+        await Assert.That(GetStringProperty(bearer, "type")).IsEqualTo("http");
+        await Assert.That(GetStringProperty(bearer, "scheme")).IsEqualTo("bearer");
+        await Assert.That(GetStringProperty(bearer, "bearerFormat")).IsEqualTo("JWT");
+        await Assert.That(bearer.TryGetProperty("flows", out _)).IsFalse();
+        JsonElement apiKey = schemes.GetProperty(ApiAuthenticationSchemeNames.ApiKey);
+        await Assert.That(GetStringProperty(apiKey, "type")).IsEqualTo("apiKey");
+        await Assert.That(GetStringProperty(apiKey, "in")).IsEqualTo("header");
+        await Assert.That(GetStringProperty(apiKey, "name")).IsEqualTo(ApiAuthenticationHeaderNames.ApiKey);
+        await Assert.That(HasKeycloakSecurityScheme(document)).IsEqualTo(expectKeycloak);
+        await Assert.That(GetDocumentSecurityRequirementSchemeNames(document)).IsEmpty();
+        await Assert.That(UndefinedSecuritySchemeReferences(document)).IsEmpty();
+
+        string[] expectedSchemes = expectKeycloak
+            ? ["Bearer", ApiAuthenticationSchemeNames.ApiKey, "Keycloak"]
+            : ["Bearer", ApiAuthenticationSchemeNames.ApiKey];
+        foreach (string method in new[] { "get", "post" })
+        {
+            JsonElement security = GetOperation(document, new("/api/externalapikey", method))
+                .GetProperty("security");
+            await Assert.That(GetSecurityRequirementSchemeNames(security).SetEquals(expectedSchemes)).IsTrue();
+            await Assert.That(security.GetArrayLength()).IsEqualTo(expectedSchemes.Length);
+            foreach (JsonElement alternative in security.EnumerateArray())
+            {
+                await Assert.That(alternative.EnumerateObject().Count()).IsEqualTo(1);
+                await Assert.That(alternative.EnumerateObject().Single().Value.GetArrayLength()).IsEqualTo(0);
+            }
+        }
+
+        await Assert.That(GetEffectiveSecurityRequirementSchemeNames(document, UnrelatedAnonymousOperation)).IsEmpty();
+        await Assert.That(GetEffectiveSecurityRequirementSchemeNames(
+            document, new("/api/management/capabilities", "get"))).IsEmpty();
+        OperationSecurityExpectation[] specializedOperations =
+        [
+            new(new("/api/management/tenants/preflight", "post"), [ApiAuthenticationSchemeNames.ManagedControlPlane]),
+            PrivacyErasureStatusSecurityExpectation,
+            new(new("/api/auth/local/credential-replacement", "post"), [ApiAuthenticationSchemeNames.LocalCredentialReplacement]),
+            new(new("/api/admission/scanner/check-ins", "post"), [ApiAuthenticationSchemeNames.AdmissionScanner])
+        ];
+        foreach (OperationSecurityExpectation expectation in specializedOperations)
+        {
+            await Assert.That(GetEffectiveSecurityRequirementSchemeNames(document, expectation.Selector)
+                .SetEquals(expectation.ExpectedSchemes)).IsTrue();
+        }
     }
 
     [Test]

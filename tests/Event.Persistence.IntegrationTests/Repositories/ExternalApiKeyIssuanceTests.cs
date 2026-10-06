@@ -522,7 +522,8 @@ public sealed class ExternalApiKeyIssuanceTests
         if (afterCommit)
         {
             await using var observer = fixture.Open();
-            Guid durableId = await observer.Context.ExternalApiKeys.IgnoreQueryFilters()
+            Guid durableId = await observer.Context.ExternalApiKeys.IgnoreQueryFilters().AsNoTracking()
+                .Where(key => key.CreatedBy == fixture.UserId)
                 .Select(key => key.Id).SingleAsync();
             await AssertRecoveredAsync(replay, durableId);
         }

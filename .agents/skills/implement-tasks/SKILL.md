@@ -4,6 +4,7 @@ description: "Load when executing or resuming an approved plan from `dev/active/
 type: workflow
 enforcement: suggest
 priority: high
+---
 ## Must-Read Docs
 - [../../../AGENTS.md](../../../AGENTS.md)
 - [../../../.agents/CONTEXT_ENGINEERING.md](../../../.agents/CONTEXT_ENGINEERING.md)

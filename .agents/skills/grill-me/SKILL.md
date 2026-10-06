@@ -4,6 +4,7 @@ description: "Load when the user asks to be grilled or stress-tested on a plan, 
 type: workflow
 enforcement: suggest
 priority: medium
+---
 # Grill-Me & Proactive Criticality Intake
 
 ## Rules

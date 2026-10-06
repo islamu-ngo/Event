@@ -4,6 +4,7 @@ description: "Load for Senior CTO critique, architectural audit, risk review, se
 type: workflow
 enforcement: suggest
 priority: high
+---
 ## Resources
 - [../../../AGENTS.md](../../../AGENTS.md)
 - [resources/output-template.md](resources/output-template.md) — load for the chat reporting template and high-signal summary structure.

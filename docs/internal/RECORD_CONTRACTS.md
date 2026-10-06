@@ -73,6 +73,31 @@ authorization, authentication, conflict, or quota outcomes instead of setting
 properties after construction. API mapping continues through the shared RFC
 7807 command-response mapper.
 
+### External API Key Issuance Contracts
+
+`CreateExternalApiKeyCommand` is a sealed native `ICommand` record with required
+`OperationKey` and `ExternalApiKeyDto`. It contains no current-user or
+current-tenant body authority. HTTP supplies the operation key from the required
+header; the handler validates the Domain grammar and resolves platform identity
+through `IAdminContext.ResolveUserIdAsync`.
+
+`CreateExternalApiKeyCommandResponse` is an immutable result record whose named
+factories enforce disclosure state. `Issued` requires a raw `ApiKey` and stable
+`KeyId`; `PreviouslyIssued` requires `KeyId` and a null `ApiKey`. Failure has no
+credential or disclosure state. The string-valued JSON `disclosureStatus` is
+`"Issued"` or `"PreviouslyIssued"` on success, not an invitation to replay a
+secret-bearing response. SDK callers must branch on this field, not treat every
+successful response as newly disclosed material.
+
+`ExternalApiKeyIssuanceReceipt` remains a sealed private-setter entity class:
+persisted identity, a global uniqueness constraint, and retention independent
+of the key row are lifecycle concerns, not record value equality. Its digests
+are not credential containers. See [receipt shape and retention](DOMAIN.md#external-api-key-issuance-receipts)
+and [the HTTP retry contract](API.md#bounded-key-issuance-and-metadata-recovery).
+The browser's mutable dialog state holds a frozen DTO snapshot and stable
+operation key after the first submission; retries do not rebuild input from an
+edited form.
+
 ### Published Collections
 
 Records are shallowly immutable. A handwritten immutable contract must copy a

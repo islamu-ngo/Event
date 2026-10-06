@@ -12,6 +12,9 @@ namespace Explore.API.Middleware;
 /// <summary>Fresh lifecycle enforcement after trusted binding, before response replay and output caching.</summary>
 public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
 {
+    /// <summary>
+    /// Rechecks lifecycle before replay or caching, preserving no-store global management and authorized private-session exceptions.
+    /// </summary>
     public async Task InvokeAsync(HttpContext context, ITenantContextAccessor tenantContext,
         ITenantLifecycleAccessService lifecycle, IProblemDetailsService problems,
         IOptions<McpAdapterSettings> mcpOptions)
@@ -29,6 +32,12 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
                 && context.Request.Path.StartsWithSegments(mcp.EndpointPath, StringComparison.OrdinalIgnoreCase);
         bool privateSessionRead = IsPrivateAdministratorSessionRead(context.GetEndpoint());
         if (privateSessionRead && !tenantContext.IsResolved)
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            await next(context);
+            return;
+        }
+        if (!tenantContext.IsResolved && ApiTenantResolutionMiddleware.IsApiKeyManagementRequest(context.Request))
         {
             context.Response.Headers.CacheControl = "no-store";
             await next(context);

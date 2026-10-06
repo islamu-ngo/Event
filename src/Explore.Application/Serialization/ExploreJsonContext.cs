@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.ActorType;
 using Explore.Application.DTOs.Ai;
@@ -74,7 +75,7 @@ namespace Explore.Application.Serialization;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     WriteIndented = false,
     Converters = [typeof(JsonStringEnumConverter)])]
-[JsonSerializable(typeof(CreateExternalApiKeyCommandResponse))]
+[JsonSerializable(typeof(ExternalApiKeyIssuanceDto))]
 [JsonSerializable(typeof(GuestRegistrationOrderLifecycleResponseDto))]
 [JsonSerializable(typeof(GuestRegistrationOrderStartDto))]
 [JsonSerializable(typeof(RegistrationMaterialChangeChoiceCommandResultDto))]

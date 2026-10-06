@@ -285,27 +285,35 @@ public sealed class ReleasePolicy
         return (changeId, invalid);
     }
 
+    /// <summary>Reads terminal trailer paragraphs across whitespace, stopping at body prose or the subject.</summary>
     private string[] ReadFooterBlock(string[] lines)
     {
         int lastLine = lines.Length - 1;
-        while (lastLine > 0 && lines[lastLine].Length == 0)
+        while (lastLine > 0 && string.IsNullOrWhiteSpace(lines[lastLine]))
         {
             lastLine--;
         }
 
-        int lastBlankLine = Array.FindLastIndex(lines, lastLine, string.IsNullOrWhiteSpace);
-        if (lastBlankLine < 1 || lastBlankLine == lastLine)
+        int footerStart = lastLine + 1;
+        int blockEnd = lastLine;
+        while (blockEnd > 0)
         {
-            return [];
+            int lastBlankLine = Array.FindLastIndex(lines, blockEnd, string.IsNullOrWhiteSpace);
+            int blockStart = lastBlankLine + 1;
+            if (lastBlankLine < 1 || !TryReadTrailerHeader(lines[blockStart], out _))
+            {
+                break;
+            }
+
+            footerStart = blockStart;
+            blockEnd = lastBlankLine - 1;
+            while (blockEnd > 0 && string.IsNullOrWhiteSpace(lines[blockEnd]))
+            {
+                blockEnd--;
+            }
         }
 
-        string[] footerLines = lines[(lastBlankLine + 1)..(lastLine + 1)];
-        if (!TryReadTrailerHeader(footerLines[0], out _))
-        {
-            return [];
-        }
-
-        return footerLines;
+        return lines[footerStart..(lastLine + 1)];
     }
 
     private bool TryReadTrailerHeader(string line, out string name)

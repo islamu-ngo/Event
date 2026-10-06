@@ -1,0 +1,49 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M466NT4YV673M3AZM9JJXJWY
+Title: "Disclose each issued API key only once"
+Type: fix
+Scope: access
+Summary: "Recover issuance metadata under current owner authority without retaining or redisclosing the credential."
+Group: event-api-security-remediation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Key creation requires one bounded Idempotency-Key. Authorized retries return
+      PreviouslyIssued with null apiKey, not a recoverable credential. Native callers
+      and regenerated clients must supply the operation key.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: >-
+      Suppress generic response storage. Atomically persist hash-only keys and
+      digest-only receipts; fence current identity, owner and key authority through
+      commit and recovery. Historical contaminated storage needs separately
+      authorized inventory, purge and credential rotation.
+  Migration:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: documented
+    Detail: >-
+      Apply generated ExternalApiKeyIssuanceReceipts migration from the selected
+      provider catalog before hosting the new API. Retain receipts independently
+      of keys and users. Rolling back to raw-response replay reintroduces exposure.
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: No deployment secret or environment setting is added.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Preserve route and operationId; require Idempotency-Key and publish explicit
+      disclosureStatus plus nullable apiKey and 400/401/403/404/409 outcomes.
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: >-
+      Retry the same intended policy with its original operation key after response
+      loss. Metadata recovery cannot restore the secret; deliberately revoke and
+      issue a replacement with a new operation key when the first disclosure is lost.

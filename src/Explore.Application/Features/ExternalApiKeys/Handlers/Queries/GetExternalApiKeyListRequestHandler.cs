@@ -31,9 +31,16 @@ public class GetExternalApiKeyListRequestHandler : IQueryHandler<GetExternalApiK
         _userContext = userContext;
     }
 
+    /// <summary>
+    /// Collects tenant-filtered owner metadata and explicitly scoped instance keys only for a nonempty authenticated platform identity.
+    /// </summary>
     public async Task<List<ExternalApiKeyListDto>> QueryAsync(GetExternalApiKeyListRequest request, CancellationToken cancellationToken)
     {
-        var currentUserId = _userContext.GetRequiredUserId();
+        if (!_userContext.IsAuthenticated)
+            return [];
+        var resolvedUserId = await _adminContext.ResolveUserIdAsync(cancellationToken);
+        if (resolvedUserId is not Guid currentUserId || currentUserId == Guid.Empty)
+            return [];
         var visibleKeys = new List<Explore.Domain.ExternalApiKey>();
 
         visibleKeys.AddRange(await _externalApiKeyRepository.GetByOwner(ExternalApiKeyOwnerType.User, currentUserId, cancellationToken));

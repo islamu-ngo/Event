@@ -74,6 +74,7 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(ExternalApiKeyDisclosureStatus),
         typeof(EventResourceKindEnum),
         typeof(EventResourceDeliveryTypeEnum),
         typeof(EventResourceDisclosureModeEnum),

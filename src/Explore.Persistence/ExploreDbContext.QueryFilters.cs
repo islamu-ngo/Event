@@ -13,6 +13,9 @@ namespace Explore.Persistence;
 
 public partial class ExploreDbContext
 {
+    /// <summary>
+    /// Applies named tenant and soft-delete filters independently so authorized bypasses cannot implicitly disable both boundaries.
+    /// </summary>
     private void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<SetupTargetEnrollment>()
@@ -793,6 +796,8 @@ public partial class ExploreDbContext
 
         // ===== User-Related Tenant Entities =====
         modelBuilder.Entity<ExternalApiKey>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || (e.TenantId != null && e.TenantId == TenantFilterTenantId));
+        modelBuilder.Entity<ExternalApiKeyIssuanceReceipt>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || (e.TenantId != null && e.TenantId == TenantFilterTenantId));
         modelBuilder.Entity<ExternalApiKeyQuota>()
             .HasQueryFilter(QueryFilterNames.Tenant,

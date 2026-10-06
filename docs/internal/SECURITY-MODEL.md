@@ -1072,10 +1072,92 @@ Non-interactive callers (direct API consumers, integrations, automation) authent
 - Business metrics (`explore.external_api_keys.authentication_attempts`) tag `tenant_id`, `owner_type`, and `outcome`, but never the credential.
 - Correlation IDs and request logs redact the `Authorization`/`X-API-Key` headers before emission.
 
+### Bounded Issuance Commit And Recovery Authority
+
+The native creation handler derives the platform actor through
+`IAdminContext.ResolveUserIdAsync`; an authenticated but unbound identity fails
+`401`. Neither actor nor current tenant is chosen by the DTO. Before issuance
+work, `RequireCleanWriteScope` rejects pending tracked writes, an existing
+EF transaction, and an ambient `System.Transactions` transaction. It requires the exact tenant filter scope without bypass for
+tenant-bound issuance. This ownership boundary lets the handler control its
+commit rather than join an unrelated caller's write set.
+
+Both creation and receipt recovery enter `IPrivacyIdentityFenceAuthority`
+serialization, check retained-erasure fencing for the resolved user, and execute
+under `IUnitOfWork.ExecuteSerializableAsync`. Local users are included; the
+privacy boundary surrounds the outer commit, including a co-located authority
+transaction. The receipt and hash-only credential are saved atomically.
+`ExternalApiKeyIssuanceAuthority` fences the actual persisted rows and rechecks
+them with fresh `AsNoTracking` reads, rather than accepting tracked state or
+stale admin claims:
+
+- Provider-bound principals additionally require the exact authenticated
+  provider account's `UserExternalLogin` binding to remain attached to the
+  resolved platform user. The binding row is fenced and freshly rechecked
+  inside the issuance transaction; a removed or reassigned binding cannot
+  reuse an earlier resolution for creation or receipt recovery.
+- All cases require an existing, nondeleted user. Tenant-linked cases fence
+  the tenant and its lookup status and require `TenantStatus.IsActiveState`.
+- User-owned tenant keys require the same user and an active, nondeleted
+  `TenantUser`. This fail-closed rule also applies to recovery.
+- Tenant-owned keys additionally require an unrevoked tenant-admin grant with
+  matching tenant membership and tenant-scoped role.
+- Organization/group cases fence the owner, nondeleted and unsuspended placement, nondeleted
+  member, role, role-permission mapping, and permission. They require positive
+  persisted `organization:manage` or `group:manage` authority through the
+  corresponding `PermissionCodes` constant, with active permission and matching
+  role scope. Empty permission mappings never grant management.
+- Global InstanceAdmin keys require owner equal to the platform actor, NULL
+  tenant, and a persisted platform-scoped `platform.admin` assignment and role.
+- Recovery additionally fences the matching key and its status row, requires
+  usable status and nonexpired material, and checks exact tenant/owner binding.
+
+The [receipt fingerprint](DOMAIN.md#external-api-key-issuance-receipts) separates
+operation identity from normalized policy digest. Authority is reacquired
+before comparing that digest or disclosing metadata. Revoked owner authority
+returns `403` without recovery metadata; changed normalized input returns
+`409`; a removed, revoked, expired, or otherwise unusable key returns `404`.
+Authorized same-policy recovery returns `"PreviouslyIssued"` and null `apiKey`,
+without fresh entropy or another credential.
+
+Aggregate ID, receipt ID, and creation time are chosen once per invocation.
+Key identifier and secret generation are lazy-once, so transaction retries
+reuse them. A commit exception is not evidence of rollback: the handler
+re-enters privacy and persisted owner authority, then checks a fresh persisted
+receipt. A verified receipt permits metadata-only recovery; absent evidence
+rethrows the original error, and failed verification propagates an error.
+
+Caller cancellation is not converted into an acknowledged success. Cancellation
+before the provider commits leaves neither issuance row; cancellation after a
+real commit leaves the receipt/key pair available for a later authorized,
+metadata-only retry. Tests cancel the caller token at the actual provider
+committing/committed events instead of relying on timing delays.
+
+The API publishes `ExternalApiKeyIssuanceDto` only for acknowledged success,
+with required identity/disclosure fields and exactly two non-null enum values.
+Native failure has no `Issue`; HTTP failure remains ProblemDetails. The
+generated SDK and browser must deploy with the API contract. Rollback must
+retain receipts and response-storage suppression; reverting to generic raw
+credential replay is not a safe rollback.
+
+The creation action suppresses generic idempotency response capture and keeps
+no-store. Its issuance event omits owner IDs, key IDs, and raw material; existing
+bounded creation metric tags remain. Browser creation failures log only safe
+status/category information, never response bodies or exception text, and show
+generic retry guidance. `CreateApiKeyDialog` retains a frozen canonical DTO and
+one operation key per intent, distinguishes disclosure from metadata recovery,
+and refreshes its parent on Done. Replacement uses the existing list's HAL-gated
+revoke action and a deliberate new intent, not an automatic retry with a new key.
+See the [operator guide](../public/documentation/readme/security-and-identity/authentication.md#api-key-issuance-and-lost-response-recovery).
+
+This describes only the bounded key issuance remediation. Final provider and
+migration proof is pending, and the other 25 remediation phases remain launch
+blockers; these invariants do not establish broad release security readiness.
+
 ### Tenant Isolation
 
 - API key rows are tenant-scoped (`TenantId` FK) except for `InstanceAdmin` keys, whose credential row is nullable because it belongs to the platform operator rather than one tenant. Every non-auth query applies the `Tenant` query filter.
-- API-key auth lookups are the **only API-key path** permitted to bypass the tenant filter — narrowly scoped to `GetByKeyIdForAuthentication` via `IgnoreTenantFilter`.
+- API-key auth lookup uses `GetByKeyIdForAuthentication` with its narrow tenant-filter bypass. Issuance receipt/key recovery also uses the explicit platform-management bypass reason, always with exact tenant and operation/key predicates; tenant-bound entry and commit authority reject an already-bypassed tenant scope.
 - `ApiTenantPostAuthenticationMiddleware` enforces that the API-key `TenantId` matches the resolved request tenant. Mismatches return `404 Not Found` (not `401` — to avoid leaking tenant existence).
 - `InstanceAdmin` API keys do not implicitly make tenant-scoped API/MCP execution tenantless. If the request carries an explicit tenant hint, post-auth middleware binds that tenant for the request. If a tenant-scoped API or MCP request has no resolved tenant, it fails closed with `404` and `code=tenant_required`. Only explicit host-administration API routes may continue without tenant context.
 - Tenant user authority is rooted in `TenantUserRoleGrant`, which must reference a matching `(TenantId, TenantUserId)` pair and a tenant-scoped role. Effective tenant-admin checks also require the linked `TenantUser` to be active and not soft-deleted.

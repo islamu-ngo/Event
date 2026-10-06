@@ -1,0 +1,32 @@
+Change-Id: CHG-01M4761D251BD1Z6TB3DPDEM6C
+Title: "render safe API-key rejection guidance in the dialog"
+Type: fix
+Scope: access
+Summary: "Preserve fixed service guidance through the dialog without displaying remote response bodies."
+Group: event-api-security-remediation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: No API shape or success contract changes.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Only fixed locally authored service failure messages reach the alert; remote bodies remain excluded.
+  Migration:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: not-applicable
+    Detail: No database change.
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: No configuration or secret-authority change.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: No generated contract change.
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: The dialog now renders the documented status-specific actions rather than replacing them with generic retry guidance.

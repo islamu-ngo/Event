@@ -1,0 +1,32 @@
+Change-Id: CHG-01M49643H0BVJRD74Y3SZERRKP
+Title: "reject unresolved tenant API-key issuance"
+Type: fix
+Scope: access
+Summary: "Tenant-owned key creation without a resolved trusted tenant returns validation guidance instead of a server error; global administrator issuance remains available without selecting a tenant."
+Group: api-key-issuance-tenant-validation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: "Invalid tenant-owned requests return HTTP 400 instead of HTTP 500. Successful issuance, recovery and acknowledgement fields retain their existing contracts."
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Reject unresolved tenant ownership before the write-scope guard or transaction, without a key or receipt. Resolved owners still require fresh persisted authority; global administrator ownership remains explicitly tenant-independent."
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: "No entity, constraint or migration changes. Existing receipts and keys are retained."
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: "No new configuration, tenant fallback or secret authority. Tenant identity continues to come from the trusted host context."
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: "Validation uses the existing HTTP 400 ProblemDetails contract; no schema or generated client shape changes."
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: "Select the correct tenant for personal, tenant, organization and group keys. Global instance-administrator keys continue to work without selecting a tenant."

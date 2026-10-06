@@ -6,6 +6,7 @@ namespace Explore.API.Extensions;
 
 internal static class ServiceCollectionExtensions
 {
+    /// <summary>Mirrors native operation credentials without inventing an unavailable OAuth authority.</summary>
     internal static IServiceCollection AddSwaggerGenWithAuth(
         this IServiceCollection services, IConfiguration configuration)
     {
@@ -32,6 +33,7 @@ internal static class ServiceCollectionExtensions
             options.OperationFilter<PrivacyErasureReceiptOpenApiSecurityTransformer>();
             options.OperationFilter<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.OperationFilter<AdmissionScannerOpenApiSecurityTransformer>();
+            options.OperationFilter<KeycloakSwaggerOpenApiSecurityFilter>();
             options.AddSecurityDefinition(
                 ApiAuthenticationSchemeNames.ManagedControlPlane,
                 ManagedControlPlaneOpenApiSecurityTransformer.CreateSecurityScheme());
@@ -45,9 +47,8 @@ internal static class ServiceCollectionExtensions
                 ApiAuthenticationSchemeNames.AdmissionScanner,
                 AdmissionScannerOpenApiSecurityTransformer.CreateSecurityScheme());
 
-            // Resolve from an explicit endpoint or the configured authority. If neither is available,
-            // omit both the definition and its requirements so build-time generation cannot emit
-            // dangling Keycloak references.
+            // JWT and API-key requirements remain available without an OAuth authority.
+            // Only add the OAuth alternative when its endpoint can be resolved.
             if (KeycloakOpenApiSecurityTransformer.TryResolveAuthorizationUri(
                     configuration,
                     out Uri? keycloakAuthorizationUri))
@@ -68,8 +69,6 @@ internal static class ServiceCollectionExtensions
                         }
                     }
                 });
-
-                options.OperationFilter<KeycloakSwaggerOpenApiSecurityFilter>();
             }
         });
 

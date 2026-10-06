@@ -13906,6 +13906,51 @@ namespace Explore.Persistence.Migrations
                     b.ToTable("external_api_key_credit_periods", "islamu_event");
                 });
 
+            modelBuilder.Entity("Explore.Domain.ExternalApiKeyIssuanceReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("ExternalApiKeyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("external_api_key_id");
+
+                    b.Property<string>("InputDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_digest");
+
+                    b.Property<string>("OperationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("operation_fingerprint");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_external_api_key_issuance_receipts");
+
+                    b.HasIndex("OperationFingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_external_api_key_issuance_receipts_operation_fingerprint");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_external_api_key_issuance_receipts_tenant_id");
+
+                    b.ToTable("external_api_key_issuance_receipts", "islamu_event");
+                });
+
             modelBuilder.Entity("Explore.Domain.ExternalApiKeyOwnerTypeLookup", b =>
                 {
                     b.Property<int>("Id")

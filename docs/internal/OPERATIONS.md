@@ -229,6 +229,7 @@ Reconciliation claims at most 50 rows in stable `next_attempt_at/created_at/id` 
 | Validate release readiness | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | A change affects migrations, configuration, secrets, security, upgrade paths, or operator docs. |
 | Prepare, attest, tag, or re-verify a governed release | [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md) | You are running `prepare`, `verify-candidate`, `verify-tag`, `verify-main`, `verify-baseline`, opening or deleting a maintenance line, or checking an existing release from its tag alone. |
 | Prevent or repair Change-Id collisions | [Release Engineering](../../eng/release/README.md#collision-proof-change-workflow) | You are creating a public change, preflighting a feature range, installing commit hooks, or binding an immutable colliding footer to a replacement fragment. |
+| Validate a proposed commit before recording it | [Commit workflow](../../.agents/skills/conventional-commit/SKILL.md#cli-recipe) | You need to confirm the active message hook, validate release declarations and staged provenance, or compose a skip reason without depending on paragraph formatting. |
 | Review privacy-erasure workflow | [PRIVACY_ERASURE.md](PRIVACY_ERASURE.md) | You need the current authority-first erasure flow, replay gate, receipt/status behavior, provider-work fences, cleanup, or operator gaps. |
 
 ## Admission Check-In Operations (Phase 21)
@@ -1515,6 +1516,13 @@ Decision path:
 3. Temporary risk: mutable tags remain convenience aliases and must not be used as the release source of truth while live Coolify digest/tag consumption proof is being collected.
 
 Do not remove digest/SBOM/provenance evidence even if Coolify temporarily consumes immutable tags rather than digests.
+
+## API-Key Issuance CI Evidence
+
+For API-key issuance verification, inspect the `database-provider-<Provider>` CI
+artifact's `Issuance.trx` and the provider summary's API-key issuance outcome.
+The matrix runs at least 14 issuance cases on each migrated real engine. A passing
+runtime smoke or general behavior contract is not a substitute for that report.
 
 ## Graceful Shutdown Contract
 

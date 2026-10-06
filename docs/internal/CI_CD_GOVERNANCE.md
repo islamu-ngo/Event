@@ -639,9 +639,10 @@ remain failures even when their valid measurements are published.
 
 The broad runtime lane attempts validation during cancellation cleanup and keeps
 raw `coverage-runtime` evidence separately from `coverage-runtime-validated`.
-Only the validated artifact is eligible for publication. The upload job also runs
-after cancellation, when job outputs may be unavailable; a missing validated
-artifact fails rather than uploading raw reports or claiming complete coverage.
+Only the validated artifact is eligible for publication. The upload job requires
+the explicit `coverage-ready` output; cancellation alone cannot establish that
+validation completed or that an artifact exists. Missing output skips publication
+rather than attempting to download an absent artifact or uploading raw reports.
 A hard runner termination can prevent cleanup entirely. Independently published
 provider reports survive that loss, but unexecuted API/runtime suites remain
 unmeasured. The integration lane therefore runs bounded issuance HTTP and signed

@@ -52,7 +52,8 @@ publishes their distinct `runtime-IssuanceHttp.cobertura.xml` immediately, so a
 later broad-suite timeout cannot discard completed endpoint measurement.
 The full API integration selection still runs with its existing collector flags. Broad
 runtime cancellation cleanup publishes only the separately retained validated
-artifact, never raw XML. If cleanup cannot finish, its absent measurement must be
+artifact when the `coverage-ready` output confirms validation, never raw XML.
+If cleanup cannot finish, publication is skipped and its absent measurement must be
 reported as missing. Migration subprocesses are not instrumented, and persistence
 provider tests do not prove coverage of API HTTP endpoints. Inspect product
 assemblies and covered lines in the actual XML before interpreting PR percentages;

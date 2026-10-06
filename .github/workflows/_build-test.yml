@@ -737,7 +737,7 @@ jobs:
       CODECOV_TOKEN: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
 
   upload-runtime-coverage:
-    if: ${{ always() && inputs.collect-coverage && (needs.integration-tests.outputs.coverage-ready == 'true' || needs.integration-tests.result == 'cancelled') }}
+    if: ${{ always() && inputs.collect-coverage && needs.integration-tests.outputs.coverage-ready == 'true' }}
     needs: integration-tests
     uses: ./.github/workflows/_coverage-upload.yml
     with:

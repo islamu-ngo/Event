@@ -647,6 +647,8 @@ explicit runtime step, not a hidden dependency of the fast required gate. It sel
 at least 14 real-provider cases, retains per-provider TRX evidence and reports the
 step outcome in the provider summary. Its ephemeral cryptographic inputs are
 generated and masked in the step under explicit Environment secret authority.
+That authority is selected at matrix job scope, before migration startup; selecting
+it only in the later issuance step leaves migrations unable to bind their secrets.
 Required check names, permissions and runtime-lane promotion policy remain unchanged.
 
 Runtime, stress, and manual visual lanes remain advisory until their known flaky or deferred tests are tracked with owner, first-seen date, evidence source, and promotion/removal criteria in [TEST_RELIABILITY.md](TEST_RELIABILITY.md). This keeps nightly/manual failures actionable instead of silently normalizing noisy failures.

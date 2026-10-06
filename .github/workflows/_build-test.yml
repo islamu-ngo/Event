@@ -782,6 +782,7 @@ jobs:
     env:
       DOTNET_CONFIGURATION: ${{ inputs.configuration }}
       DOTNET_ENVIRONMENT: Production
+      SecretProvider__Provider: Environment
       Database__Provider: ${{ matrix.provider }}
       Database__Host: ${{ matrix.provider != 'Sqlite' && 'localhost' || '' }}
       Database__Port: ${{ matrix.port }}
@@ -911,7 +912,6 @@ jobs:
         id: api_key_issuance
         shell: bash
         env:
-          SECRET_PROVIDER: Environment
           AUTHENTICATION_PROVIDER: local
           AUTHORIZATION_PROVIDER: local
           PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID: ci-issuance

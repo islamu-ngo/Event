@@ -317,7 +317,9 @@ independent real connections to witness writer or exact-row NOWAIT exclusion whi
 issuance holds its authorization fence, then execute the normal contender operation.
 They also verify metadata-only replay, revoked authority and lost commit acknowledgement.
 Each lane retains an `Issuance.trx` report; smoke and general behavior results alone
-do not prove these issuance invariants. Environment authority supplies the existing
+do not prove these issuance invariants. The matrix job explicitly selects Environment
+authority before migration startup, so migration and runtime registration share it.
+Environment authority supplies the existing
 database inputs and newly generated, masked, process-local signing and identity-fence
 keys; no plaintext secret is added to source.
 

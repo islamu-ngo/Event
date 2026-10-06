@@ -22,6 +22,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Explore.API\Explore.API.csproj" />
     <ProjectReference Include="..\Explore.Blazor\Explore.Blazor.csproj" />
+    <ProjectReference Include="..\Explore.Persistence.DataProtection.Migrations.MySql\Explore.Persistence.DataProtection.Migrations.MySql.csproj" />
+    <ProjectReference Include="..\Explore.Persistence.DataProtection.Migrations.Sqlite\Explore.Persistence.DataProtection.Migrations.Sqlite.csproj" />
+    <ProjectReference Include="..\Explore.Persistence.DataProtection.Migrations.SqlServer\Explore.Persistence.DataProtection.Migrations.SqlServer.csproj" />
+    <ProjectReference Include="..\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,20 +33,6 @@
          only project that may reference the dashboard. -->
     <PackageReference Include="Quartz.Dashboard" />
   </ItemGroup>
-
-  <Target Name="CopyProviderMigrationsToOutput" AfterTargets="Build">
-    <ItemGroup>
-      <ProviderMigrationAssembly Include="$(MSBuildProjectDirectory)/../Explore.Persistence*.Migrations.*/bin/$(Configuration)/$(TargetFramework)/Explore.Persistence*.Migrations.*.dll" />
-    </ItemGroup>
-    <Copy SourceFiles="@(ProviderMigrationAssembly)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CopyProviderMigrationsToPublish" AfterTargets="Publish">
-    <ItemGroup>
-      <ProviderMigrationPublishAssembly Include="$(MSBuildProjectDirectory)/../Explore.Persistence*.Migrations.*/bin/$(Configuration)/$(TargetFramework)/Explore.Persistence*.Migrations.*.dll" />
-    </ItemGroup>
-    <Copy SourceFiles="@(ProviderMigrationPublishAssembly)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
-  </Target>
 
   <Target Name="PublishStandaloneConfiguration" AfterTargets="ComputeResolvedFilesToPublishList">
     <PropertyGroup>

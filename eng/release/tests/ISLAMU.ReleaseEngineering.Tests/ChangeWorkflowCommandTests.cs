@@ -4,9 +4,15 @@ using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
+/// <summary>
+/// Exercises identifier allocation, collision rejection, exact-commit corrections, and hook
+/// preservation against isolated Git repositories using the shipped release policy.
+/// </summary>
 [NotInParallel]
 public sealed class ChangeWorkflowCommandTests
 {
+    private const string TargetOption = "--target";
+    private const string TargetBranch = "develop";
     private static readonly Regex GeneratedId = new(
         "^CHG-[0-9A-HJKMNP-TV-Z]{26}$",
         RegexOptions.CultureInvariant,
@@ -28,6 +34,10 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(ChangeIdPolicy.IsGenerated("CHG-2026-0014")).IsFalse();
     }
 
+    /// <summary>
+    /// Verifies allocation accepts large commit messages within its Git output bound and
+    /// rejects history exceeding that bound rather than silently scanning a truncated history.
+    /// </summary>
     [Test]
     [Arguments(1_100_000, Program.Success)]
     [Arguments(4_200_000, Program.ToolchainRejected)]
@@ -35,25 +45,26 @@ public sealed class ChangeWorkflowCommandTests
     {
         using var repository = ChangeRepositoryFixture.Create();
         string messagePath = Path.Combine(repository.Path, "history-message");
-        File.WriteAllText(messagePath, "docs: history record\n\n" + new string('x', messageLength));
+        await File.WriteAllTextAsync(messagePath, "docs: history record\n\n" + new string('x', messageLength));
         repository.Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
             "commit", "--allow-empty", "-F", messagePath);
 
-        (int code, _) = repository.Run("allocate-change-id", "--target", "develop");
+        (int code, _) = repository.Run("allocate-change-id", TargetOption, TargetBranch);
 
         await Assert.That(code).IsEqualTo(expectedCode);
     }
 
+    /// <summary>Exercises allocation, real fragment creation and indexed commit validation against an isolated Git repository.</summary>
     [Test]
     public async Task AllocateAndCreateEmitUnusedIdFragmentAndExactFooter()
     {
         using var repository = ChangeRepositoryFixture.Create();
 
-        (int allocationCode, string allocationOutput) = repository.Run("allocate-change-id", "--target", "develop");
+        (int allocationCode, string allocationOutput) = repository.Run("allocate-change-id", TargetOption, TargetBranch);
         string allocated = allocationOutput.Trim().Split(' ').Last();
         (int createCode, string createOutput) = repository.Run(
             "create-change",
-            "--target", "develop",
+            TargetOption, TargetBranch,
             "--type", "feat",
             "--scope", "registration",
             "--title", "Attendee correction window",
@@ -64,11 +75,11 @@ public sealed class ChangeWorkflowCommandTests
         string fragmentPath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", created + ".yaml");
         repository.Git("add", Path.GetRelativePath(repository.Path, fragmentPath));
         string messagePath = Path.Combine(repository.Path, "COMMIT_EDITMSG");
-        File.WriteAllText(
+        await File.WriteAllTextAsync(
             messagePath,
             $"feat(registration): add attendee correction window\n\nChange-Id: {created}\n");
         (int preflightCode, string preflightOutput) = repository.Run(
-            "preflight-commit", messagePath, "--target", "develop");
+            "preflight-commit", messagePath, TargetOption, TargetBranch);
 
         await Assert.That(allocationCode).IsEqualTo(Program.Success);
         await Assert.That(GeneratedId.IsMatch(allocated)).IsTrue();
@@ -83,17 +94,18 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(preflightOutput).Contains($"change_commit_verified: change-id={created}");
     }
 
+    /// <summary>Rejects identifier reuse both before commit and in a completed feature range that collides with its target.</summary>
     [Test]
     public async Task CommitAndRangePreflightRejectTargetCollisionsBeforeHistoryChanges()
     {
         using var repository = ChangeRepositoryFixture.Create();
         string collision = "CHG-2026-0011";
         string messagePath = Path.Combine(repository.Path, "COMMIT_EDITMSG");
-        File.WriteAllText(messagePath, $"feat(registration): add another correction flow\n\nChange-Id: {collision}\n");
+        await File.WriteAllTextAsync(messagePath, $"feat(registration): add another correction flow\n\nChange-Id: {collision}\n");
         repository.WriteFragment(collision);
 
         (int commitCode, string commitOutput) = repository.Run(
-            "preflight-commit", messagePath, "--target", "develop");
+            "preflight-commit", messagePath, TargetOption, TargetBranch);
 
         repository.CreateBranch("feature");
         repository.Commit(
@@ -101,7 +113,7 @@ public sealed class ChangeWorkflowCommandTests
             "feature\n",
             $"feat(registration): add another correction flow\n\nChange-Id: {collision}");
         (int rangeCode, string rangeOutput) = repository.Run(
-            "preflight-range", "--target", "develop", "--head", "HEAD");
+            "preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
 
         await Assert.That(commitCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(commitOutput).Contains($"change_preflight_failed: change_id_already_reachable:{collision}");
@@ -109,6 +121,7 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(rangeOutput).Contains($"change_preflight_failed: change_id_target_collision:{collision}");
     }
 
+    /// <summary>Corrects effective provenance through an exact-commit record while preserving the immutable original footer.</summary>
     [Test]
     public async Task ExactCommitRenameMakesRangeValidWithoutRewritingFooter()
     {
@@ -132,7 +145,7 @@ public sealed class ChangeWorkflowCommandTests
         repository.Git("add", "docs/internal/releases");
         repository.CommitStaged("chore(release): bind collision correction");
         (int rangeCode, string rangeOutput) = repository.Run(
-            "preflight-range", "--target", "develop", "--head", "HEAD");
+            "preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
         string message = repository.Git("show", "-s", "--format=%B", commit);
         string renamePath = Path.Combine(
             repository.Path,
@@ -177,6 +190,7 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(result.Context?.Changes.Single().Oid).IsEqualTo(oid);
     }
 
+    /// <summary>Preserves existing hooks on initial installation and rejects a later unmanaged replacement.</summary>
     [Test]
     public async Task HookInstallerChainsExistingCheckAndRefusesAmbiguousOverwrite()
     {
@@ -188,13 +202,13 @@ public sealed class ChangeWorkflowCommandTests
             "--git-common-dir").Trim();
         string preCommit = Path.Combine(gitDirectory, "hooks", "pre-commit");
         string commitMessage = Path.Combine(gitDirectory, "hooks", "commit-msg");
-        File.WriteAllText(preCommit, "#!/bin/sh\nexit 0\n");
-        (int firstCode, string firstOutput) = repository.Run("install-change-hooks", "--target", "develop");
-        (int secondCode, _) = repository.Run("install-change-hooks", "--target", "develop");
+        await File.WriteAllTextAsync(preCommit, "#!/bin/sh\nexit 0\n");
+        (int firstCode, string firstOutput) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
+        (int secondCode, _) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
         string backup = preCommit + ".before-islamu-release";
         string managedPreCommit = File.ReadAllText(preCommit);
-        File.WriteAllText(preCommit, "#!/bin/sh\nexit 7\n");
-        (int thirdCode, string thirdOutput) = repository.Run("install-change-hooks", "--target", "develop");
+        await File.WriteAllTextAsync(preCommit, "#!/bin/sh\nexit 7\n");
+        (int thirdCode, string thirdOutput) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
 
         await Assert.That(firstCode).IsEqualTo(Program.Success);
         await Assert.That(firstOutput).Contains("change_hooks_installed:");
@@ -267,12 +281,13 @@ public sealed class ChangeWorkflowCommandTests
 
         public string Path { get; }
 
+        /// <summary>Creates an isolated repository with real release policy and target-owned collision provenance.</summary>
         public static ChangeRepositoryFixture Create()
         {
             string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"islamu-change-workflow-{Guid.NewGuid():N}");
             Directory.CreateDirectory(path);
             var fixture = new ChangeRepositoryFixture(path);
-            fixture.Git("init", "--initial-branch=develop");
+            fixture.Git("init", $"--initial-branch={TargetBranch}");
             Directory.CreateDirectory(System.IO.Path.Combine(path, "docs", "internal", "releases", "changes"));
             Directory.CreateDirectory(System.IO.Path.Combine(path, "eng", "release", "policy"));
             File.WriteAllText(

@@ -4,12 +4,22 @@ using System.Text;
 
 namespace ISLAMU.ReleaseEngineering;
 
+/// <summary>
+/// Allocates public change identifiers and checks their Git ownership before commits or merges,
+/// including exact-commit collision corrections and optional local preflight hooks.
+/// </summary>
 public static class ChangeWorkflowCommand
 {
     private const int MaximumGitOutputCharacters = 4_194_304;
+    private const string TargetOption = "--target";
+    private const string DefaultTarget = "develop";
     private const string HookMarker = "# ISLAMU_RELEASE_CHANGE_HOOK";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
+    /// <summary>
+    /// Dispatches a change workflow against the resolved Git repository and reports policy
+    /// rejection diagnostics as release-engine exit codes within the supplied Git timeout.
+    /// </summary>
     public static int Run(string[] args, TextWriter output, string repositoryRoot, TimeSpan timeout)
     {
         if (args.Length == 0)
@@ -48,23 +58,25 @@ public static class ChangeWorkflowCommand
         }
     }
 
+    /// <summary>Verifies the target ref and allocates an identifier absent from repository provenance.</summary>
     private static int Allocate(string[] args, TextWriter output, string root, TimeSpan timeout)
     {
-        Options options = ParseOptions(args, 1, ["--target"]);
-        string target = options.Get("--target") ?? "develop";
+        Options options = ParseOptions(args, 1, [TargetOption]);
+        string target = options.Get(TargetOption) ?? DefaultTarget;
         ResolveCommit(root, target, timeout);
         string id = AllocateUnused(root, timeout);
         output.WriteLine($"change_id_allocated: {id}");
         return Program.Success;
     }
 
+    /// <summary>Validates public change metadata and atomically creates a new fragment with its exact commit footer.</summary>
     private static int Create(string[] args, TextWriter output, string root, TimeSpan timeout)
     {
         Options options = ParseOptions(
             args,
             1,
-            ["--target", "--type", "--scope", "--title", "--summary", "--group"]);
-        string target = options.Get("--target") ?? "develop";
+            [TargetOption, "--type", "--scope", "--title", "--summary", "--group"]);
+        string target = options.Get(TargetOption) ?? DefaultTarget;
         ResolveCommit(root, target, timeout);
         string type = options.Require("--type");
         string scope = options.Require("--scope");
@@ -93,6 +105,7 @@ public static class ChangeWorkflowCommand
         return Program.Success;
     }
 
+    /// <summary>Rejects invalid commit policy, reachable identifier reuse and missing indexed provenance before commit.</summary>
     private static int PreflightCommit(string[] args, TextWriter output, string root, TimeSpan timeout)
     {
         if (args.Length < 2 || args[1].StartsWith("--", StringComparison.Ordinal))
@@ -100,8 +113,8 @@ public static class ChangeWorkflowCommand
             throw new ChangeWorkflowException("preflight_commit_message_path_required");
         }
 
-        Options options = ParseOptions(args, 2, ["--target"]);
-        string target = options.Get("--target") ?? "develop";
+        Options options = ParseOptions(args, 2, [TargetOption]);
+        string target = options.Get(TargetOption) ?? DefaultTarget;
         ResolveCommit(root, target, timeout);
         string messagePath = Path.GetFullPath(args[1]);
         if (!File.Exists(messagePath) || IsLink(messagePath))
@@ -138,10 +151,11 @@ public static class ChangeWorkflowCommand
         return Program.Success;
     }
 
+    /// <summary>Rejects committed fragment mutation and validates staged identifier ownership without changing history.</summary>
     private static int PreflightStaged(string[] args, TextWriter output, string root, TimeSpan timeout)
     {
-        Options options = ParseOptions(args, 1, ["--target"]);
-        string target = options.Get("--target") ?? "develop";
+        Options options = ParseOptions(args, 1, [TargetOption]);
+        string target = options.Get(TargetOption) ?? DefaultTarget;
         ResolveCommit(root, target, timeout);
         string[] staged = RunGit(
                 root,
@@ -195,10 +209,11 @@ public static class ChangeWorkflowCommand
         return Program.Success;
     }
 
+    /// <summary>Checks clean release inputs, effective identifier uniqueness and committed fragments across the target range.</summary>
     private static int PreflightRange(string[] args, TextWriter output, string root, TimeSpan timeout)
     {
-        Options options = ParseOptions(args, 1, ["--target", "--head"]);
-        string target = options.Get("--target") ?? "develop";
+        Options options = ParseOptions(args, 1, [TargetOption, "--head"]);
+        string target = options.Get(TargetOption) ?? DefaultTarget;
         string head = options.Get("--head") ?? "HEAD";
         ResolveCommit(root, target, timeout);
         ResolveCommit(root, head, timeout);
@@ -314,10 +329,11 @@ public static class ChangeWorkflowCommand
         return Program.Success;
     }
 
+    /// <summary>Installs shared Git preflight hooks while preserving existing checks and refusing ambiguous overwrites.</summary>
     private static int InstallHooks(string[] args, TextWriter output, string root, TimeSpan timeout)
     {
-        Options options = ParseOptions(args, 1, ["--target"]);
-        string target = ValidateToken(options.Get("--target") ?? "develop", "change_hook_target_invalid");
+        Options options = ParseOptions(args, 1, [TargetOption]);
+        string target = ValidateToken(options.Get(TargetOption) ?? DefaultTarget, "change_hook_target_invalid");
         ResolveCommit(root, target, timeout);
         string gitDirectory = RunGit(
             root,
@@ -331,11 +347,11 @@ public static class ChangeWorkflowCommand
         InstallManagedHook(
             Path.Combine(hooks, "pre-commit"),
             project,
-            $"preflight-staged --target {ShellQuote(target)}");
+            $"preflight-staged {TargetOption} {ShellQuote(target)}");
         InstallManagedHook(
             Path.Combine(hooks, "commit-msg"),
             project,
-            $"preflight-commit \"$1\" --target {ShellQuote(target)}");
+            $"preflight-commit \"$1\" {TargetOption} {ShellQuote(target)}");
         output.WriteLine($"change_hooks_installed: target={target} hooks={Relative(root, hooks)}");
         return Program.Success;
     }
@@ -704,6 +720,10 @@ public static class ChangeWorkflowCommand
         return new string(buffer);
     }
 
+    /// <summary>
+    /// Renders the allocated identifier and reviewed change text with all six required impact
+    /// categories defaulted to not-applicable for the author to review before sharing the commit.
+    /// </summary>
     private static string Fragment(
         string id,
         string title,
@@ -714,8 +734,6 @@ public static class ChangeWorkflowCommand
     {
         string groupLine = group is null ? string.Empty : $"Group: {group}\n";
         return
-            "# ABOUTME: Public change fragment generated with its collision-resistant commit footer.\n" +
-            "# ABOUTME: Records release impact defaults for review before the owning commit is shared.\n" +
             $"Change-Id: {id}\n" +
             $"Title: {YamlQuote(title)}\n" +
             $"Type: {type}\n" +

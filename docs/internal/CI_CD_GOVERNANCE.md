@@ -634,6 +634,14 @@ Do not add Codecov, SonarCloud, or coverage-percentage badges until the correspo
 
 ### Runtime Test Reliability Policy
 
+The required `Build & Test` job has a bounded 45-minute budget. PR #71 run
+`37390746175` exhausted the former 30-minute job deadline during Standalone Host
+Tests after the preceding suites passed, which cancelled the required gate and
+skipped dependent integration/provider verification. This budget adjustment
+retains every selection, assertion and per-test deadline; it does not treat
+cancellation as success. Confirm completion on the fresh run rather than
+counting the cancelled run or its skipped downstream jobs as evidence.
+
 The existing database-provider matrix includes the API-key issuance contract as an
 explicit runtime step, not a hidden dependency of the fast required gate. It selects
 at least 14 real-provider cases, retains per-provider TRX evidence and reports the

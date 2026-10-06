@@ -181,7 +181,7 @@ public class BffNoKeycloakResilienceTests : IAsyncDisposable
         await Assert.That(csp).Contains("script-src 'self' 'wasm-unsafe-eval'");
         await Assert.That(csp).Contains("img-src 'self' data: https: blob:");
         await Assert.That(csp).Contains("connect-src 'self' https: http: ws: wss:");
-        await Assert.That(csp).Contains("font-src 'self' https://fonts.gstatic.com");
+        await Assert.That(csp).Contains("font-src 'self';");
         await Assert.That(csp).Contains("frame-ancestors 'none'");
         await Assert.That(csp).Contains("base-uri 'self'");
         await Assert.That(csp).Contains("object-src 'none'");

@@ -31,7 +31,7 @@
 |---|---|---|
 | `src/Explore.API/Explore.API.csproj` | HTTP controllers (`EventControllerBase`), HAL link policies, RFC 7807 problem details error mapping, rate limiting, and output caching. Thin controllers invoking native CQS handlers. | `Explore.Application`, `Explore.Persistence`, `Explore.Infrastructure` |
 | `src/Event.Web.BffHosting/Event.Web.BffHosting.csproj` | Backend-for-Frontend (BFF) server hosting, YARP reverse proxy, cookie session management, and tenant route rewriting (`/{slug}`). | `Explore.Diagnostic` |
-| `src/Event.Standalone/Event.Standalone.csproj` | Standalone single-container hosting entrypoint. | `Explore.API`, `Explore.Blazor` |
+| `src/Event.Standalone/Event.Standalone.csproj` | Standalone single-container hosting entrypoint. | `Explore.API`, `Explore.Blazor`, existing startup migration artifacts for primary data, Data Protection, and embedded privacy authority |
 | `src/Event.MigrationService/Event.MigrationService.csproj` | Database migration runner and initial seed orchestrator (Aspire resource). | `Explore.Persistence` |
 | `src/Explore.AppHost/Explore.AppHost.csproj` | .NET Aspire orchestration host (Development/Testing only). | Aspire hosting packages |
 

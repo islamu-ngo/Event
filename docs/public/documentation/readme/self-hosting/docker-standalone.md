@@ -58,6 +58,17 @@ on an abandoned lock. This does not change the one-replica requirement.
 
 ## 2. Quick Run & Production Deployment
 
+Standalone's published configuration belongs to `Event.Standalone`, not to the
+separate API or Blazor executables. Use the Standalone environment projection
+below and deploy the complete combined-host output, including the UI's static
+assets. Do not overlay Split-host `appsettings` files onto that output.
+Environment and selected secret-authority settings continue to supply deployment
+overrides; this publication boundary introduces no new configuration key.
+The complete distribution includes its primary database, Data Protection and
+embedded privacy-authority startup migration assemblies. Deploy the
+whole published output or image; do not assemble it by copying migration binaries
+from a separate API or development workspace.
+
 ### Step 1: Create a Persistent Volume
 
 ISLAMU Event Standalone requires persistent storage mounted at `/app/data` to retain the primary database, privacy-erasure authority, Data Protection keys, and uploaded media:

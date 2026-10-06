@@ -17,13 +17,13 @@ public static class MiddlewareExtensions
     private const string ContentSecurityPolicyPrefix =
         "default-src 'self'; " +
         "img-src 'self' data: https: blob:; " +
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "style-src 'self' 'unsafe-inline'; " +
         "script-src 'self' 'wasm-unsafe-eval' 'unsafe-hashes' 'sha256-qnHnQs7NjQNHHNYv/I9cW+I62HzDJjbnyS/OFzqlix0=' ";
 
     private const string ContentSecurityPolicySuffix =
         "; " +
         "connect-src 'self' https: http: ws: wss:; " +
-        "font-src 'self' https://fonts.gstatic.com; " +
+        "font-src 'self'; " +
         "frame-ancestors 'none'; " +
         "base-uri 'self'; " +
         "object-src 'none'; " +

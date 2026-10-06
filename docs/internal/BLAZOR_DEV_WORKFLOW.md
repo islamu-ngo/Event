@@ -232,7 +232,41 @@ After the site is up, inspect the affected page in a browser at the relevant des
 
 ---
 
-## 5. Cross-References
+## 5. Host-Owned Typography
+
+`Explore.Blazor/Components/App.razor` owns the font stylesheet link. The
+stylesheet defines the admitted roman variable Inter face at weights 300-800
+with `font-display: swap`. Its font URL is relative to the stylesheet, preserving
+the host's base path. Existing `tokens.css` font stacks own local system and
+unsupported-glyph fallback; do not introduce a parallel typography service or
+tenant configuration key.
+
+The BFF CSP permits fonts only from the instance and removes the obsolete
+Google stylesheet exception. Preserve its nonce/script protections and unrelated
+integration rules. HTTP tests inspect the emitted document base before resolving
+stylesheet URLs and compare the complete origin, including scheme and port.
+
+Both Split and `Event.Standalone` publish the shared host's static assets.
+Validate the actual published stylesheet and WOFF2 responses, including content
+type, admitted bytes, CSP, and cache headers. A project reference or a successful
+development request does not prove publication. Fingerprinted stylesheet links
+use the existing `Assets` collection. The canonical font URL must not be treated
+as immutable unless its own delivery is fingerprinted.
+
+`TypographyAssetContractTests` exercises the rendered shell and real HTTP asset
+responses using the in-process BFF seam. Build its executable before running
+`dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --no-build --treenode-filter "/*/*/TypographyAssetContractTests/*" --minimum-expected-tests 1`.
+Final browser capture begins before navigation to detect delayed CSS imports or
+font requests that shell assertions cannot see. Observe `document.fonts.ready`,
+verify the required modes/cultures/viewport matrix, then repeat with unavailable
+fonts to prove usable text and no third-party recovery request.
+
+The [Inter admission record](legal/dependencies/inter.md) binds the release,
+checksums, license, distribution obligations, and unmodified-asset boundary.
+Restore an admitted local version or use the existing system stack for recovery.
+Typography independence is not an application-wide offline guarantee.
+
+## 6. Cross-References
 
 - Component / render-mode conventions → [`docs/BLAZOR.md`](BLAZOR.md)
 - BFF auth / YARP / token forwarding → [`docs/SECURITY-MODEL.md`](SECURITY-MODEL.md), [`blazor-bff-patterns`](../../.agents/skills/blazor-bff-patterns/SKILL.md)

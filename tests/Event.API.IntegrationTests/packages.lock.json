@@ -1415,6 +1415,13 @@
         "dependencies": {
           "Explore.API": "[1.0.0, )",
           "Explore.Blazor": "[1.0.0, )",
+          "Explore.Persistence.DataProtection.Migrations.MySql": "[1.0.0, )",
+          "Explore.Persistence.DataProtection.Migrations.SqlServer": "[1.0.0, )",
+          "Explore.Persistence.DataProtection.Migrations.Sqlite": "[1.0.0, )",
+          "Explore.Persistence.Migrations.MySql": "[1.0.0, )",
+          "Explore.Persistence.Migrations.SqlServer": "[1.0.0, )",
+          "Explore.Persistence.Migrations.Sqlite": "[1.0.0, )",
+          "Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite": "[1.0.0, )",
           "Quartz.Dashboard": "[3.19.1, )"
         }
       },
@@ -1598,6 +1605,48 @@
           "Microting.EntityFrameworkCore.MySql": "[10.0.10, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, )"
+        }
+      },
+      "explore.persistence.dataprotection.migrations.mysql": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microting.EntityFrameworkCore.MySql": "[10.0.10, )"
+        }
+      },
+      "explore.persistence.dataprotection.migrations.sqlite": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.10, )"
+        }
+      },
+      "explore.persistence.dataprotection.migrations.sqlserver": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.10, )"
+        }
+      },
+      "explore.persistence.migrations.mysql": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microting.EntityFrameworkCore.MySql": "[10.0.10, )"
+        }
+      },
+      "explore.persistence.migrations.sqlite": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.10, )"
+        }
+      },
+      "explore.persistence.migrations.sqlserver": {
+        "type": "Project",
+        "dependencies": {
+          "Explore.Persistence": "[1.0.0, )",
+          "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.10, )"
         }
       },
       "explore.persistence.privacyerasureauthority.migrations.sqlite": {

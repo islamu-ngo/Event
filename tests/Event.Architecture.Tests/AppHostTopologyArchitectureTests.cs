@@ -137,7 +137,7 @@ public sealed class AppHostTopologyArchitectureTests
     }
 
     [Test]
-    public async Task EventStandalone_CompositionRoot_MustNotReferenceLowerLayersOrExpandBlazorClientDependencies()
+    public async Task EventStandalone_CompositionRoot_MustReferenceOnlyHostsAndStartupMigrationsWithoutExpandingBlazorClientDependencies()
     {
         var projectXml = await File.ReadAllTextAsync(StandaloneProjectPath);
 
@@ -149,7 +149,14 @@ public sealed class AppHostTopologyArchitectureTests
 
         await Assert.That(standaloneReferences).IsEquivalentTo([
             "..\\Explore.API\\Explore.API.csproj",
-            "..\\Explore.Blazor\\Explore.Blazor.csproj"
+            "..\\Explore.Blazor\\Explore.Blazor.csproj",
+            "..\\Explore.Persistence.DataProtection.Migrations.MySql\\Explore.Persistence.DataProtection.Migrations.MySql.csproj",
+            "..\\Explore.Persistence.DataProtection.Migrations.Sqlite\\Explore.Persistence.DataProtection.Migrations.Sqlite.csproj",
+            "..\\Explore.Persistence.DataProtection.Migrations.SqlServer\\Explore.Persistence.DataProtection.Migrations.SqlServer.csproj",
+            "..\\Explore.Persistence.Migrations.MySql\\Explore.Persistence.Migrations.MySql.csproj",
+            "..\\Explore.Persistence.Migrations.Sqlite\\Explore.Persistence.Migrations.Sqlite.csproj",
+            "..\\Explore.Persistence.Migrations.SqlServer\\Explore.Persistence.Migrations.SqlServer.csproj",
+            "..\\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite\\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj"
         ]);
         await Assert.That(projectXml).Contains("<ProjectReference Include=\"..\\Explore.API\\Explore.API.csproj\" />");
         await Assert.That(projectXml).Contains("<ProjectReference Include=\"..\\Explore.Blazor\\Explore.Blazor.csproj\" />");

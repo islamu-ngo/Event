@@ -54,6 +54,32 @@ uncertain initialization into a successful response or resets saved branding.
 
 ---
 
+## Locally Hosted Typography
+
+The application serves its default Inter font and font stylesheet from your
+instance. Typography does not require Google Fonts connectivity or send visitors'
+font requests to a third-party host. This applies to both Split and Standalone
+hosting; it does not make authentication or the rest of the application offline.
+The browser security policy also restricts font loading to your instance.
+
+Deploy the complete published output, including its font assets and license.
+Preserve the application base path when placing the instance behind a reverse
+proxy. Existing branding and typography tokens remain the presentation controls;
+no additional font-service setting is required.
+
+Text uses the existing local system-font stack when the font is unavailable or
+does not contain a language's glyphs. Verify representative language text,
+right-to-left pages, light/dark themes, mobile layouts, and browser zoom after
+changing branding. Inter is not a universal glyph-coverage guarantee.
+
+If typography resources fail, restore the admitted local assets or use the
+existing system stack while repairing publication or routing. Do not recover by
+adding an external font CDN. Distributors must retain the bundled Inter
+copyright and SIL Open Font License; the font keeps its own license independently
+of the application.
+
+---
+
 ## Related Guides & Next Steps
 
 * **[Administration Web Walkthrough](admin-guide.md)** — Step-by-step branding customization in the UI.

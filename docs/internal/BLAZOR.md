@@ -92,6 +92,21 @@ Use [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) when changing record eligibility,
 
 The Standalone topology keeps one API endpoint graph: controller routes, API versioning, authentication schemes, authorization, rate limits, and API middleware remain API-owned. The Blazor `Combined` profile omits only Split transport concerns (YARP and remote-API readiness); it retains the BFF, OIDC session, Razor/static assets, SignalR, render policy, antiforgery issuance, and BFF endpoint graph.
 
+`Event.Standalone` owns the combined host's runtime `appsettings*.json` files.
+Its publication excludes the referenced API and Blazor executable-root
+configuration files before SDK conflict resolution, while retaining their
+assemblies and static assets. This resolves `NETSDK1152` through explicit
+composition-root ownership, not by suppressing duplicate-output diagnostics.
+Split publication still retains each independently hosted application's own
+configuration. Secret authority and deployment overrides remain unchanged.
+The combined root also references the existing primary database migrations,
+Data Protection provider migrations and embedded privacy-authority migrations
+directly. SDK build/publish dependency
+resolution includes those startup assemblies; publication must not depend on
+unrelated projects having already produced binaries in the workspace.
+Verify a new publication directory and its dependency manifest, not just DLL
+presence in an output reused from earlier builds.
+
 Version and boundary invariants stay fixed across both topologies: `Explore.API` continues to own `/api/*` behavior, including route policy and version parsing from the `Accept` media-type parameter, `?api-version=`, or `X-Api-Version`. Standalone does not add URL-version segments or alternate API policy.
 
 Operationally, AppHost selects Standalone for local topology runs; direct `Event.Standalone` launch profiles remain available for development. `docker-compose.yml` remains Split-only, and no standalone Docker descriptor exists yet; a Standalone topology selection does not set the primary provider to SQLite.

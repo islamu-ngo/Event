@@ -523,6 +523,52 @@ jobs:
         if: ${{ inputs.collect-coverage }}
         run: mkdir -p artifacts/coverage
 
+      - name: Run bounded issuance HTTP and signed ingress contracts
+        id: issuance_http
+        shell: bash
+        run: |
+          set -euo pipefail
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-IssuanceHttp.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj \
+            --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/ExternalApiKeyIssuance*Tests/*" \
+            --minimum-expected-tests 33 --no-progress --maximum-parallel-tests 1 \
+            --report-trx --report-trx-filename Event.API.IntegrationTests.Issuance.trx "${coverage_args[@]}"
+
+      - name: Validate bounded HTTP coverage
+        id: issuance_http_coverage
+        if: ${{ always() && inputs.collect-coverage && contains(fromJSON('["success","failure"]'), steps.issuance_http.outcome) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/coverage/runtime-IssuanceHttp.cobertura.xml
+          dotnet run eng/coverage/validate-reports.cs -- artifacts/coverage
+
+      - name: Retain bounded HTTP coverage before broad integration
+        id: retain_issuance_http_coverage
+        if: ${{ always() && inputs.collect-coverage && contains(fromJSON('["success","failure"]'), steps.issuance_http.outcome) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-runtime-IssuanceHttp
+          path: artifacts/coverage/runtime-IssuanceHttp.cobertura.xml
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish bounded HTTP coverage before broad integration
+        if: ${{ always() && inputs.collect-coverage && steps.issuance_http_coverage.outcome == 'success' && steps.retain_issuance_http_coverage.outcome == 'success' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
+          files: artifacts/coverage/runtime-IssuanceHttp.cobertura.xml
+          disable_search: true
+          flags: runtime
+          name: runtime-IssuanceHttp
+          override_commit: ${{ github.event.pull_request.head.sha || github.sha }}
+          fail_ci_if_error: true
+
       - name: Persistence Integration Tests
         id: test_persistence_integration
         run: |
@@ -593,7 +639,7 @@ jobs:
       - name: Validate runtime coverage reports
         id: coverage_reports
         if: >-
-          ${{ always() && !cancelled() && inputs.collect-coverage &&
+          ${{ always() && inputs.collect-coverage &&
             (contains(fromJSON('["success","failure"]'), steps.test_persistence_integration.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.test_api_integration.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.test_infrastructure_email.outcome) ||
@@ -609,6 +655,15 @@ jobs:
             echo "Artifact: coverage-runtime; Codecov flag: runtime"
             echo "Persistence fixtures can require multiple database providers; matrix migration processes are not instrumented."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain validated runtime coverage
+        if: ${{ always() && inputs.collect-coverage && steps.coverage_reports.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-runtime-validated
+          path: artifacts/coverage/*.cobertura.xml
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Retain runtime coverage
         if: ${{ always() && inputs.collect-coverage }}
@@ -682,12 +737,12 @@ jobs:
       CODECOV_TOKEN: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
 
   upload-runtime-coverage:
-    if: ${{ always() && inputs.collect-coverage && needs.integration-tests.outputs.coverage-ready == 'true' }}
+    if: ${{ always() && inputs.collect-coverage && (needs.integration-tests.outputs.coverage-ready == 'true' || needs.integration-tests.result == 'cancelled') }}
     needs: integration-tests
     uses: ./.github/workflows/_coverage-upload.yml
     with:
       flag: runtime
-      artifact: coverage-runtime
+      artifact: coverage-runtime-validated
     secrets:
       CODECOV_TOKEN: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
 
@@ -782,6 +837,7 @@ jobs:
     env:
       DOTNET_CONFIGURATION: ${{ inputs.configuration }}
       DOTNET_ENVIRONMENT: Production
+      COLLECT_COVERAGE: ${{ inputs.collect-coverage }}
       SecretProvider__Provider: Environment
       Database__Provider: ${{ matrix.provider }}
       Database__Host: ${{ matrix.provider != 'Sqlite' && 'localhost' || '' }}
@@ -892,21 +948,35 @@ jobs:
 
       - name: Run Provider Runtime Smoke
         id: runtime_smoke
-        run: >-
-          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj
-          --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal --
-          --treenode-filter "/*/*/PrimaryDatabaseRuntimeSmokeTests/*"
-          --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1
-          --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.Smoke.trx
+        shell: bash
+        run: |
+          set -euo pipefail
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            mkdir -p artifacts/coverage
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-${{ matrix.provider }}-Smoke.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+            --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/PrimaryDatabaseRuntimeSmokeTests/*" \
+            --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1 \
+            --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.Smoke.trx "${coverage_args[@]}"
 
       - name: Run Provider Behavior Contract
         id: behavior_contract
-        run: >-
-          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj
-          --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal --
-          --treenode-filter "/*/*/PrimaryDatabaseProviderBehaviorContractTests/*"
-          --minimum-expected-tests 2 --no-progress --maximum-parallel-tests 1
-          --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.Behavior.trx
+        shell: bash
+        run: |
+          set -euo pipefail
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            mkdir -p artifacts/coverage
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-${{ matrix.provider }}-Behavior.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+            --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/PrimaryDatabaseProviderBehaviorContractTests/*" \
+            --minimum-expected-tests 2 --no-progress --maximum-parallel-tests 1 \
+            --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.Behavior.trx "${coverage_args[@]}"
 
       - name: Run API Key Issuance Provider Contract
         id: api_key_issuance
@@ -922,20 +992,86 @@ jobs:
           echo "::add-mask::$AUTHENTICATION_LOCAL_JWT_KEY"
           echo "::add-mask::$PRIVACY_ERASURE_IDENTITY_FENCE_KEY"
           export AUTHENTICATION_LOCAL_JWT_KEY PRIVACY_ERASURE_IDENTITY_FENCE_KEY
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            mkdir -p artifacts/coverage
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-${{ matrix.provider }}-Issuance.cobertura.xml" --coverage-output-format cobertura)
+          fi
           dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
             --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
             --treenode-filter "/*/*/ExternalApiKeyIssuanceProviderTests/*" \
-            --minimum-expected-tests 14 --no-progress --maximum-parallel-tests 1 \
-            --report-trx --report-trx-filename "Event.Persistence.IntegrationTests.${{ matrix.provider }}.Issuance.trx"
+            --minimum-expected-tests 16 --no-progress --maximum-parallel-tests 1 \
+            --report-trx --report-trx-filename "Event.Persistence.IntegrationTests.${{ matrix.provider }}.Issuance.trx" "${coverage_args[@]}"
 
       - name: Run Secret Binding Provider Contract
         id: secret_binding_contract
-        run: >-
-          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj
-          --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal --
-          --treenode-filter "/*/*/SecretBindingProviderContractTests/*"
-          --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1
-          --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.SecretBinding.trx
+        shell: bash
+        run: |
+          set -euo pipefail
+          coverage_args=()
+          if [[ "$COLLECT_COVERAGE" == true ]]; then
+            mkdir -p artifacts/coverage
+            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/runtime-${{ matrix.provider }}-SecretBinding.cobertura.xml" --coverage-output-format cobertura)
+          fi
+          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+            --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/SecretBindingProviderContractTests/*" \
+            --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1 \
+            --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.SecretBinding.trx "${coverage_args[@]}"
+
+      - name: Validate provider coverage reports
+        id: provider_coverage
+        if: >-
+          ${{ always() && inputs.collect-coverage &&
+            (contains(fromJSON('["success","failure"]'), steps.runtime_smoke.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.behavior_contract.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.api_key_issuance.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.secret_binding_contract.outcome)) }}
+        shell: bash
+        env:
+          SMOKE_OUTCOME: ${{ steps.runtime_smoke.outcome }}
+          BEHAVIOR_OUTCOME: ${{ steps.behavior_contract.outcome }}
+          ISSUANCE_OUTCOME: ${{ steps.api_key_issuance.outcome }}
+          SECRET_BINDING_OUTCOME: ${{ steps.secret_binding_contract.outcome }}
+        run: |
+          set -euo pipefail
+          for suite in Smoke Behavior Issuance SecretBinding; do
+            case "$suite" in
+              Smoke) outcome="$SMOKE_OUTCOME" ;;
+              Behavior) outcome="$BEHAVIOR_OUTCOME" ;;
+              Issuance) outcome="$ISSUANCE_OUTCOME" ;;
+              SecretBinding) outcome="$SECRET_BINDING_OUTCOME" ;;
+            esac
+            if [[ "$outcome" == success || "$outcome" == failure ]]; then
+              test -s "artifacts/coverage/runtime-${{ matrix.provider }}-${suite}.cobertura.xml"
+            fi
+          done
+          dotnet run eng/coverage/validate-reports.cs -- artifacts/coverage
+          reports=(artifacts/coverage/*.cobertura.xml)
+          printf -v report_list '%s,' "${reports[@]}"
+          printf 'files=%s\n' "${report_list%,}" >> "$GITHUB_OUTPUT"
+
+      - name: Retain provider coverage
+        id: retain_provider_coverage
+        if: ${{ always() && inputs.collect-coverage && steps.runtime_smoke.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-runtime-${{ matrix.provider }}
+          path: artifacts/coverage/*.cobertura.xml
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish provider coverage
+        if: ${{ always() && inputs.collect-coverage && steps.provider_coverage.outcome == 'success' && steps.retain_provider_coverage.outcome == 'success' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || github.event.pull_request.head.repo.full_name == github.repository && secrets.CODECOV_TOKEN || '' }}
+          files: ${{ steps.provider_coverage.outputs.files }}
+          disable_search: true
+          flags: runtime
+          name: runtime-${{ matrix.provider }}
+          override_commit: ${{ github.event.pull_request.head.sha || github.sha }}
+          fail_ci_if_error: true
 
       - name: Capture Database Service Diagnostics
         if: ${{ always() && matrix.provider != 'Sqlite' }}
@@ -964,6 +1100,7 @@ jobs:
           RUNTIME_SMOKE_OUTCOME: ${{ steps.runtime_smoke.outcome }}
           BEHAVIOR_OUTCOME: ${{ steps.behavior_contract.outcome }}
           ISSUANCE_OUTCOME: ${{ steps.api_key_issuance.outcome }}
+          COVERAGE_OUTCOME: ${{ steps.provider_coverage.outcome }}
         run: |
           {
             echo "## Database Provider: ${{ matrix.provider }}"
@@ -976,4 +1113,6 @@ jobs:
             echo "- Behavior contract: \`${BEHAVIOR_OUTCOME:-not-run}\`"
             echo "- API key issuance contract (at least 14 cases): \`${ISSUANCE_OUTCOME:-not-run}\`"
             echo "- Evidence artifact: \`database-provider-${{ matrix.provider }}\`"
+            echo "- Coverage validation: \`${COVERAGE_OUTCOME:-not-run}\`; artifact: \`coverage-runtime-${{ matrix.provider }}\` (30 days)"
+            echo "- Coverage reports measure executed product lines; passing TRX alone is not coverage. Migration processes are not instrumented."
           } >> "$GITHUB_STEP_SUMMARY"

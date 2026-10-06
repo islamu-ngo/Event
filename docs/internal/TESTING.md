@@ -28,6 +28,37 @@ ABOUTME: Covers 3 host profiles, fixture model, builders/seeds, database lifecyc
 
 ---
 
+## Test execution versus measured coverage
+
+A passing TRX proves test execution, not line or branch coverage. In particular,
+five provider issuance reports with 16 passed cases each and zero skips do not
+establish coverage unless those runs used the collector and produced validated
+Cobertura files for the same commit.
+
+`_build-test.yml` enables the repository's existing MTP `--coverage` arguments
+only when `collect-coverage` is true, using `eng/coverage/product.config` and
+absolute `--coverage-output` paths. Provider smoke, behavior, issuance and
+secret-binding reports use
+`artifacts/coverage/runtime-<provider>-<suite>.cobertura.xml`; unique filenames
+prevent successive selections from overwriting each other. Each provider
+validates attempted selections, retains reports for 30 days and uploads explicit
+files to Codecov without waiting for the broad integration job. Codecov combines
+same-commit provider and fast/runtime reports; test failures are not converted
+into success by publication.
+
+Before broad persistence execution, the runtime lane runs the 33 bounded HTTP
+and signed Dedicated/Combined issuance contracts. It validates, retains and
+publishes their distinct `runtime-IssuanceHttp.cobertura.xml` immediately, so a
+later broad-suite timeout cannot discard completed endpoint measurement.
+The full API integration selection still runs with its existing collector flags. Broad
+runtime cancellation cleanup publishes only the separately retained validated
+artifact, never raw XML. If cleanup cannot finish, its absent measurement must be
+reported as missing. Migration subprocesses are not instrumented, and persistence
+provider tests do not prove coverage of API HTTP endpoints. Inspect product
+assemblies and covered lines in the actual XML before interpreting PR percentages;
+no test count, local workflow validation or Codecov upload implies that Sonar
+received coverage. See [Coverage Publication Policy](CI_CD_GOVERNANCE.md#coverage-publication-policy).
+
 ## Framework
 
 The project uses [TUnit](https://github.com/thomhurst/TUnit) — a modern, fast, parallel .NET testing framework.

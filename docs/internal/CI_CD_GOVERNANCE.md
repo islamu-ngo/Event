@@ -618,7 +618,7 @@ license distribution.
 
 Coverage publication targets shipped ISLAMU Event C# code: Domain and Application logic, Infrastructure and Secrets, Persistence and API, ATProto transport, Blazor and shared BFF hosting, wire contracts and diagnostics, standalone hosting, and shipped setup libraries and frontends. Development AppHost, repository engineering tools, benchmarks, mutation wrappers, test fixtures, generated clients/code, and generated migrations are outside the product percentage. Coverage does not measure browser JavaScript, CSS, or native desktop behavior.
 
-Collect Cobertura reports from the test projects that exercise those products, not from one Domain-only run. Coverage arguments are explicit in `_build-test.yml`; `eng/coverage/product.config` supplies shared exclusions without intercepting shell commands. Each suite has a distinct report filename. One upload per lane groups those files under the `fast` or `runtime` flag. Fast suites retain their existing selections; API, Persistence, and infrastructure runtime reports follow their established integration lanes. Do not turn the full database-provider matrix into an every-PR prerequisite for coverage.
+Collect Cobertura reports from the test projects that exercise those products, not from one Domain-only run. Coverage arguments are explicit in `_build-test.yml`; `eng/coverage/product.config` supplies shared exclusions without intercepting shell commands. Each suite has a distinct report filename. Fast and broad runtime uploads group their reports under the `fast` or `runtime` flag; each provider publishes independently under `runtime`. Fast suites retain their existing selections; API, Persistence, and infrastructure runtime reports follow their established integration lanes. Do not turn the full database-provider matrix into an every-PR prerequisite for coverage.
 
 `eng/coverage/validate-reports.cs` rejects empty reports, assemblies outside the shipped `src` projects, and excluded generated/test/tooling sources before upload. It lists product assemblies absent from the current lane's reports so missing measurement is visible. Module exclusions must match assembly filenames, not parent test-output paths: production DLLs also reside under test directories. Architecture and engineering-tooling tests remain executable gates but do not contribute product coverage.
 
@@ -626,7 +626,34 @@ Collection uses Microsoft's working default instrumentation on the Linux x64 CI 
 
 Codecov combines reports for the same commit. A PR with only fast-lane uploads has partial platform evidence, even if its informational checks pass. Do not carry forward older integration coverage or combine different commits to describe a current PR as fully covered. The percentage reflects code exercised and reported by included suites; an omitted or unexercised assembly is not evidence of coverage.
 
-The pinned Codecov v5 action authenticates with the organization or repository Actions secret `CODECOV_TOKEN`. Public fork pull requests use Codecov's tokenless fork support; never use `pull_request_target` to expose that secret to fork code. Workflows keep `contents: read` permissions. `.github/codecov.yml` makes project and patch statuses informational and requires both base and head reports before posting PR comments. Push uploads supply the base-branch comparison data.
+When collection is requested, each database-provider job instruments its existing
+smoke, behavior, API-key issuance and secret-binding selections with the same MTP
+collector and product exclusions. Reports have distinct provider/suite filenames.
+Every completed selection, including a failed selection, must produce a nonempty
+report before product-report validation can pass. Each provider retains
+`coverage-runtime-<provider>` for 30 days and publishes its validated files directly
+with the `runtime` flag and the current head commit. Publication is independent of
+the broad `Integration Tests` job and its `upload-runtime-coverage` job; cancellation
+of that sibling cannot suppress completed provider measurements. Failed tests
+remain failures even when their valid measurements are published.
+
+The broad runtime lane attempts validation during cancellation cleanup and keeps
+raw `coverage-runtime` evidence separately from `coverage-runtime-validated`.
+Only the validated artifact is eligible for publication. The upload job also runs
+after cancellation, when job outputs may be unavailable; a missing validated
+artifact fails rather than uploading raw reports or claiming complete coverage.
+A hard runner termination can prevent cleanup entirely. Independently published
+provider reports survive that loss, but unexecuted API/runtime suites remain
+unmeasured. The integration lane therefore runs bounded issuance HTTP and signed
+ingress contracts before broad persistence execution, validates their separate
+`runtime-IssuanceHttp.cobertura.xml`, retains `coverage-runtime-IssuanceHttp` for
+30 days, and publishes the report immediately under the current commit's
+`runtime` flag. A later timeout cannot remove this completed HTTP measurement.
+Existing fast API selections already collect their own Cobertura
+reports. Provider issuance TRX is not a substitute for API HTTP measurement, and
+these Codecov uploads do not supply Sonar analysis coverage.
+
+The pinned Codecov action authenticates with the organization or repository Actions secret `CODECOV_TOKEN`. Public fork pull requests use Codecov's tokenless fork support; never use `pull_request_target` to expose that secret to fork code. Workflows keep `contents: read` permissions. `.github/codecov.yml` makes project and patch statuses informational and requires both base and head reports before posting PR comments. Push uploads supply the base-branch comparison data.
 
 Repository maintainers own coverage publication and triage. Missing reports, failed tests, and upload errors fail the advisory workflow rather than silently passing. Do not make `Coverage Evidence` or Codecov statuses required branch-protection checks until scope and enforcement thresholds have been reviewed. Live publication and GitHub comments/checks must be confirmed after the first branch upload and subsequent PR upload; local validation does not prove GitHub App access or secret availability. Setup and troubleshooting are documented in [Operations](OPERATIONS.md#codecov-coverage-publication).
 

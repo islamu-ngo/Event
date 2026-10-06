@@ -1097,12 +1097,18 @@ resolves the platform user through `IAdminContext.ResolveUserIdAsync` and
 takes scope from the trusted tenant context; InstanceAdmin issuance is
 explicitly global (`TenantId = null`).
 
+Unresolved trusted tenancy is a validation failure for User, Tenant,
+Organization and Group issuance: HTTP returns `400` before the clean write-scope
+guard or transaction, without a key or receipt. Global InstanceAdmin issuance
+continues to work without selecting a tenant.
+
 | Outcome | HTTP | Disclosure |
 |---|---|---|
 | First acknowledged creation | `200` | `disclosureStatus = "Issued"`; `apiKey` contains the raw credential |
 | Authorized retry with the same normalized policy | `200` | `disclosureStatus = "PreviouslyIssued"`; `apiKey = null`; stable `id` and `keyId` |
 | Same operation identity, different normalized policy | `409` | Conflict; no new credential |
 | Missing or empty authenticated platform-user binding | `401` | No recovery metadata |
+| Tenant-owned issuance without a resolved trusted tenant | `400` | Validation; no credential or receipt |
 | Current owner authority revoked or unavailable | `403` | No recovery metadata |
 | Issued key removed, revoked, expired, or otherwise unusable | `404` | No recovered credential |
 

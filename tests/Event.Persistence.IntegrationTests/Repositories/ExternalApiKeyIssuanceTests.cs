@@ -54,6 +54,36 @@ public sealed class ExternalApiKeyIssuanceTests
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(30);
     private static readonly AsyncLocal<Guid?> Invocation = new();
 
+    /// <summary>Unresolved tenant ownership is validation failure, never an unhandled write-scope error or issuance.</summary>
+    [Test]
+    [Arguments(ExternalApiKeyOwnerType.User)]
+    [Arguments(ExternalApiKeyOwnerType.Tenant)]
+    [Arguments(ExternalApiKeyOwnerType.Organization)]
+    [Arguments(ExternalApiKeyOwnerType.Group)]
+    public async Task UnresolvedTenantRejectsOwnedIssuanceBeforeWriteScope(ExternalApiKeyOwnerType owner)
+    {
+        await using var fixture = await IssuanceFixture.CreateAsync(false);
+        await using var request = fixture.Open(tenantId: Guid.Empty);
+        var response = await request.Services.GetRequiredService<
+            ICommandHandler<CreateExternalApiKeyCommand, CreateExternalApiKeyCommandResponse>>()
+            .ExecuteAsync(Command(owner), CancellationToken.None);
+
+        await Assert.That(response.IsSuccess).IsFalse();
+        await Assert.That(response.Errors is { Count: 1 }).IsTrue();
+        await Assert.That(response.Issue is null && response.Id == Guid.Empty).IsTrue();
+        await fixture.AssertPairCountAsync(0);
+    }
+
+    /// <summary>Global instance-admin issuance remains valid without selecting a tenant.</summary>
+    [Test]
+    public async Task UnresolvedTenantStillAllowsAuthorizedGlobalIssuance()
+    {
+        await using var fixture = await IssuanceFixture.CreateAsync(false);
+        await using var request = fixture.Open(tenantId: Guid.Empty);
+        await AssertIssuedAsync(await request.ExecuteAsync(Command(ExternalApiKeyOwnerType.InstanceAdmin)));
+        await fixture.AssertPairCountAsync(1);
+    }
+
     /// <summary>
     /// Replays one operation for each supported ownership kind and requires the committed identity,
     /// not a second credential or a second durable key/receipt pair.
@@ -1020,7 +1050,7 @@ public sealed class ExternalApiKeyIssuanceTests
             var authorityOptions = TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>()
                 .UseSqlite(new SqliteConnectionStringBuilder
                 {
-                    DataSource = Path.Combine(fixture._authorityDirectory.FullName, "authority.db"),
+                    DataSource = Path.Join(fixture._authorityDirectory.FullName, "authority.db"),
                     Pooling = false
                 }.ToString())
                 .UseSnakeCaseNamingConvention()

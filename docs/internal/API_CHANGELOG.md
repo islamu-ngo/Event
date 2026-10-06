@@ -5,6 +5,9 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-06
 
+- Tenant-owned external API-key creation without a resolved trusted tenant now
+  returns HTTP `400` validation ProblemDetails instead of a server error, without
+  a key or receipt. Global instance-administrator issuance remains tenant-independent.
 - **Breaking: success-only external API key disclosure.** Creation HTTP `200`
   now publishes `ExternalApiKeyIssuanceDto`, not a generic command-response
   envelope. Required fields are `id`, `keyId`, `disclosureStatus`, and `apiKey`.

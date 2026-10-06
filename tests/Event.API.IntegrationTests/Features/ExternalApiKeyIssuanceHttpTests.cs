@@ -43,6 +43,41 @@ namespace Event.Api.IntegrationTests.Features;
 /// <summary>Exercises real MVC issuance against native persistence without generic credential-response replay.</summary>
 public sealed class ExternalApiKeyIssuanceHttpTests
 {
+    /// <summary>Missing trusted tenant scope returns definitive validation guidance without a key or receipt.</summary>
+    [Test]
+    [Arguments(ExternalApiKeyOwnerType.User)]
+    [Arguments(ExternalApiKeyOwnerType.Tenant)]
+    [Arguments(ExternalApiKeyOwnerType.Organization)]
+    [Arguments(ExternalApiKeyOwnerType.Group)]
+    public async Task Create_WithUnresolvedTenant_RejectsTenantOwnedIssuance(ExternalApiKeyOwnerType owner)
+    {
+        await using var host = await IssuanceHost.StartAsync(unresolvedTenant: true);
+        using var response = await host.CreateAsync(Guid.CreateVersion7().ToString("N"), new()
+        {
+            Name = "Unresolved tenant issuance",
+            ExternalApiKeyOwnerTypeId = (int)owner,
+            Scopes = ["events:read"]
+        });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
+        await using var scope = host.App.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await Assert.That(await context.ExternalApiKeys.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.ExternalApiKeyIssuanceReceipts.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
+    }
+
+    /// <summary>Global owner issuance does not inherit the unresolved-tenant rejection.</summary>
+    [Test]
+    public async Task Create_WithUnresolvedTenant_AllowsGlobalAdministratorIssuance()
+    {
+        await using var host = await IssuanceHost.StartAsync(unresolvedTenant: true);
+        using var response = await host.CreateAsync(Guid.CreateVersion7().ToString("N"));
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var issued = await response.Content.ReadFromJsonAsync<ExternalApiKeyIssuanceDto>();
+        await Assert.That(issued?.ApiKey is not null).IsTrue();
+    }
+
     /// <summary>Ensures first disclosure is not stored in either generic replay bodies or the credential hash.</summary>
     [Test]
     public async Task Create_WithOperationKey_DoesNotPersistRecoverableCredential()
@@ -232,7 +267,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         }
 
         /// <summary>Transfers resource ownership only after successful native authority/database initialization and host startup.</summary>
-        public static async Task<IssuanceHost> StartAsync()
+        public static async Task<IssuanceHost> StartAsync(bool unresolvedTenant = false)
         {
             Guid userId = Guid.CreateVersion7();
             Guid tenantId = Guid.CreateVersion7();
@@ -260,7 +295,8 @@ public sealed class ExternalApiKeyIssuanceHttpTests
                 builder.Services.AddMetrics();
                 builder.Services.AddSingleton<BusinessMetrics>();
                 builder.Services.AddSingleton<RecyclableMemoryStreamManager>();
-                builder.Services.AddSingleton<ITenantContext>(new FixedTenantContext(tenantId));
+                builder.Services.AddSingleton<ITenantContext>(
+                    new FixedTenantContext(unresolvedTenant ? Guid.Empty : tenantId));
                 builder.Services.AddDbContext<ExploreDbContext>(options =>
                     options.UseSqlite(connection).UseSnakeCaseNamingConvention());
                 builder.Services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>(options =>

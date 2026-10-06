@@ -366,6 +366,11 @@ administrator host without selecting a tenant. Tenant, personal, organization,
 and group issuance still requires the correct resolved tenant; the server never
 invents one from the creation body.
 
+If no trusted tenant is resolved, personal, tenant, organization and group key
+creation returns HTTP `400` without issuing a credential. Select the correct
+tenant before retrying. Global instance-administrator keys do not require a
+selected tenant.
+
 The first acknowledged creation returns HTTP `200` with
 `disclosureStatus = "Issued"` and the raw `apiKey`. Save it directly in your
 approved secret store before leaving the creation dialog. The service persists

@@ -98,6 +98,10 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
 
         var tenantId = ResolveTenantScope(ownerType);
 
+        if (tenantId == Guid.Empty)
+            return CreateExternalApiKeyCommandResponse.Failure(
+                BaseCommandResponse.Validation<Guid>(["A resolved tenant is required for tenant-owned API-key issuance."]));
+
         var validator = new CreateExternalApiKeyDtoValidator(
             _externalApiKeyRepository,
             _organizationRepository,

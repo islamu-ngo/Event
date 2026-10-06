@@ -19,6 +19,12 @@ Do not add or require `.github/workflows/release.yml`, Release Drafter, or autom
 
 ## Prospective Governed Release Contract
 
+Before recording contributor commits, confirm the active message hook invokes
+native `preflight-commit`; before merge, retain successful `preflight-range`
+evidence. Whitespace between terminal trailers is harmless, while conflicting
+declarations and missing release metadata remain invalid. See
+[release policy](RELEASE_POLICY.md#change-identity-allocation-and-correction).
+
 The approved future release architecture is documented in
 [ADR-025](adr/ADR-025-provider-neutral-release-governance.md),
 [RELEASE_POLICY.md](RELEASE_POLICY.md), and [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md).

@@ -335,13 +335,13 @@ public static class ChangeWorkflowCommand
         Options options = ParseOptions(args, 1, [TargetOption]);
         string target = ValidateToken(options.Get(TargetOption) ?? DefaultTarget, "change_hook_target_invalid");
         ResolveCommit(root, target, timeout);
-        string gitDirectory = RunGit(
+        string hooks = RunGit(
             root,
             timeout,
             "rev-parse",
             "--path-format=absolute",
-            "--git-common-dir").Trim();
-        string hooks = Path.Combine(gitDirectory, "hooks");
+            "--git-path",
+            "hooks").Trim();
         Directory.CreateDirectory(hooks);
         string project = Path.Combine(root, "eng", "release", "src", "ISLAMU.ReleaseEngineering", "ISLAMU.ReleaseEngineering.csproj");
         InstallManagedHook(
@@ -664,8 +664,12 @@ public static class ChangeWorkflowCommand
         process.StartInfo.Environment["GIT_NO_REPLACE_OBJECTS"] = "1";
         process.StartInfo.Environment["GIT_NO_LAZY_FETCH"] = "1";
         process.StartInfo.ArgumentList.Add("--no-replace-objects");
-        process.StartInfo.ArgumentList.Add("-c");
-        process.StartInfo.ArgumentList.Add($"core.hooksPath={NullDevice}");
+        // rev-parse cannot execute hooks and must observe the real hooksPath configuration.
+        if (arguments[0] != "rev-parse")
+        {
+            process.StartInfo.ArgumentList.Add("-c");
+            process.StartInfo.ArgumentList.Add($"core.hooksPath={NullDevice}");
+        }
         foreach (string argument in arguments)
         {
             process.StartInfo.ArgumentList.Add(argument);

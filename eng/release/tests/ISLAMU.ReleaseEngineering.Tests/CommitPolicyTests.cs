@@ -103,6 +103,73 @@ public sealed class CommitPolicyTests
         await Assert.That(result.SkipReason).IsEqualTo("release metadata commit");
     }
 
+    /// <summary>Paragraph separators do not change an explicit terminal release decision.</summary>
+    [Test]
+    [Arguments("\n")]
+    [Arguments("\n\n")]
+    [Arguments("\n \t\n\n")]
+    [Arguments("\r\n\r\n")]
+    public async Task ExplainedSkipAcceptsWhitespaceBetweenTerminalDeclarations(string separator)
+    {
+        foreach (string trailers in new[]
+        {
+            $"Changelog: skip{separator}Changelog-Reason: Internal test isolation correction.",
+            $"Changelog-Reason: Internal test isolation correction.{separator}Changelog: skip",
+        })
+        {
+            CommitPolicyResult result = Policy.EvaluateCommit(
+                "test(access): isolate committed cancellation observation\n\n" +
+                "Observe only keys created by this invocation.\n\n" +
+                trailers + separator + "Refs: #71\n \t\n");
+
+            await Assert.That(result.IsValid).IsTrue();
+            await Assert.That(result.ReleaseVisibility).IsEqualTo(ReleaseVisibility.Skipped);
+            await Assert.That(result.SkipReason).IsEqualTo("Internal test isolation correction.");
+        }
+    }
+
+    /// <summary>Blank paragraphs cannot hide duplicate, conflicting, missing or forbidden release declarations.</summary>
+    [Test]
+    [Arguments("Changelog: skip\n\nChangelog: skip\n\nChangelog-Reason: Internal correction.", "invalid_changelog_trailer")]
+    [Arguments("Changelog: keep\n\nChangelog: skip\n\nChangelog-Reason: Internal correction.", "invalid_changelog_trailer")]
+    [Arguments("Changelog: skip\n\nChangelog-Reason: First reason.\n\nChangelog-Reason: Second reason.", "invalid_changelog_trailer")]
+    [Arguments("Changelog: skip\n \t\n", "changelog_skip_requires_reason")]
+    [Arguments("Changelog: skip\n\nChangelog-Reason:  \n", "changelog_skip_requires_reason")]
+    [Arguments("Changelog-Reason: Internal correction.\n", "changelog_reason_without_skip")]
+    public async Task SeparatedInvalidReleaseDeclarationsFailClosed(string trailers, string diagnostic)
+    {
+        CommitPolicyResult result = Policy.EvaluateCommit("test(access): guard issuance recovery\n\n" + trailers);
+
+        await Assert.That(result.IsValid).IsFalse();
+        await Assert.That(result.Diagnostics).Contains(diagnostic);
+    }
+
+    /// <summary>Whitespace tolerance retains the prohibition on hiding a breaking change.</summary>
+    [Test]
+    public async Task SeparatedSkipCannotHideBreakingReleaseMetadata()
+    {
+        CommitPolicyResult result = Policy.EvaluateCommit(
+            "feat(access)!: require acknowledged issuance\n\n" +
+            "BREAKING CHANGE: Upgrade issuance consumers together.\n\n" +
+            "Changelog: skip\n\nChangelog-Reason: Internal correction.");
+
+        await Assert.That(result.IsValid).IsFalse();
+        await Assert.That(result.Diagnostics).Contains("breaking_change_cannot_be_skipped");
+    }
+
+    /// <summary>Intervening body prose terminates the trailer region even when earlier paragraphs resemble metadata.</summary>
+    [Test]
+    public async Task TerminalTrailerScanDoesNotCrossInterveningBodyProse()
+    {
+        CommitPolicyResult result = Policy.EvaluateCommit(
+            "feat(access): expose issuance metadata\n\nChangelog: skip\n\n" +
+            "This paragraph discusses the decision but does not declare a skip.\n\n" +
+            "Changelog-Reason: Internal correction.");
+
+        await Assert.That(result.IsValid).IsFalse();
+        await Assert.That(result.Diagnostics).Contains("changelog_reason_without_skip");
+    }
+
     [Test]
     public async Task TerminalChangeIdTrailerIsOptionalAndValidated()
     {

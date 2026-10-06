@@ -73,17 +73,39 @@ Changelog-Reason: concise explanation of why commit is excluded from public rele
 
 ### CLI Recipe
 
+Confirm `git config --get core.hooksPath` resolves to the repository `.githooks`
+directory. If unset, use `git config core.hooksPath .githooks`; do not discard
+an existing custom hook chain. The tracked `commit-msg` hook runs the native
+`preflight-commit` command before Git records the commit. It validates the proposed
+message and indexed Change-Id provenance with the policy used by range validation.
+Never use `--no-verify` or override hooks to bypass this gate.
+
 ```bash
 git status --short
 git diff --cached --name-only
 git add -- path/to/OwnedChange.cs path/to/OwnedChangeTests.cs
-git commit --only -m "fix(registration): reject expired holds before confirming attendance" \
-  -m "An expired reservation must not become a confirmed registration. Check the hold expiry before changing registration state." \
+git commit --only -m "test(access): isolate committed cancellation observation" \
+  -m "Observe only keys created by this invocation." \
+  -m $'Changelog: skip\nChangelog-Reason: Internal test isolation correction.' \
   -- path/to/OwnedChange.cs path/to/OwnedChangeTests.cs
 git show --name-only --format=fuller HEAD
 ```
 
 Use literal owned paths. Path-limited commits isolate files, not another contributor's hunks inside a shared file. Add the required changelog/breaking-change trailers for the classified change.
+
+Use one `-m` argument for both skip declarations. Separate `-m` arguments introduce
+blank paragraphs; native policy tolerates whitespace between terminal trailer
+paragraphs, but keeps duplicates, conflicting values, missing reasons and breaking
+metadata violations invalid. Ordinary body prose stops the terminal trailer scan.
+For a saved proposed message, run the same gate explicitly before committing:
+
+```bash
+dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj \
+  --configuration Release -- preflight-commit /absolute/path/to/proposed-message.txt --target develop
+```
+
+Keep `preflight-range --target develop --head HEAD` as the final local/CI check;
+successful hook validation does not replace complete-range validation.
 
 ## Resources
 

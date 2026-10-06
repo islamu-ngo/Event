@@ -70,6 +70,12 @@ disabled.
 
 ## Prospective Provider-Neutral Release Governance
 
+Local message validation uses the same native release policy as range validation:
+the active `.githooks/commit-msg` runs `preflight-commit` before recording history.
+Blank trailer separators are accepted; substantive policy violations remain
+failures. CI retains complete-range enforcement. See
+[release policy](RELEASE_POLICY.md#change-identity-allocation-and-correction).
+
 The current production release process remains the manual SemVer-tag and manually
 authored GitHub Release process in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 No release-engine workflow, trusted bundle, signer set, or provider adapter is active

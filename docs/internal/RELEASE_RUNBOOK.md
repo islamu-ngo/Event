@@ -37,7 +37,11 @@ dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-
      --title "<title>" --summary "<summary>"
    ```
 
-   Install the local checks with `install-change-hooks --target develop`.
+   Confirm `git config --get core.hooksPath` first. The tracked `.githooks`
+   message hook invokes native `preflight-commit`; enable it with
+   `git config core.hooksPath .githooks` if no custom chain is configured.
+   Install a managed chain with `install-change-hooks --target develop` when needed;
+   the installer resolves Git's active hook directory.
    Existing hooks are preserved and chained. Immediately before merge or
    conflict resolution, run:
 

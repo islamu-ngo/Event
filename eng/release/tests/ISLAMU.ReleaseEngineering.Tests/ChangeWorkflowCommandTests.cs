@@ -223,6 +223,65 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(thirdOutput).Contains("change_hooks_failed: existing_hook_not_managed:pre-commit");
     }
 
+    /// <summary>Installation targets the hook directory Git actually executes, including core.hooksPath overrides.</summary>
+    [Test]
+    public async Task HookInstallerUsesConfiguredHooksPath()
+    {
+        using var repository = ChangeRepositoryFixture.Create();
+        repository.Git("config", "core.hooksPath", ".configured-hooks");
+
+        (int code, _) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
+
+        await Assert.That(code).IsEqualTo(Program.Success);
+        await Assert.That(File.Exists(Path.Combine(repository.Path, ".configured-hooks", "commit-msg"))).IsTrue();
+        await Assert.That(File.Exists(Path.Combine(repository.Path, ".configured-hooks", "pre-commit"))).IsTrue();
+        await Assert.That(File.Exists(Path.Combine(repository.Path, ".git", "hooks", "commit-msg"))).IsFalse();
+    }
+
+    /// <summary>The configured repository hook rejects native policy violations before Git changes HEAD.</summary>
+    [Test]
+    [Arguments("Changelog: skip\n\nChangelog: skip\n\nChangelog-Reason: Internal correction.", "invalid_changelog_trailer")]
+    [Arguments("Changelog: skip\n\nChangelog-Reason: First reason.\n\nChangelog-Reason: Second reason.", "invalid_changelog_trailer")]
+    [Arguments("Changelog: skip\nChangelog-Reason: Internal correction.\nChange-Id: CHG-2026-0011", "change_id_already_reachable")]
+    public async Task ConfiguredMessageHookRejectsInvalidCommitBeforeRecordingIt(string trailers, string diagnostic)
+    {
+        using var repository = ChangeRepositoryFixture.Create();
+        repository.Git("config", "core.hooksPath", Path.Combine(RepositoryRoot.Find(), ".githooks"));
+        string before = repository.Git("rev-parse", "HEAD").Trim();
+        InvalidOperationException? rejection = null;
+        try
+        {
+            repository.CommitStaged("test(access): guard issuance recovery\n\n" + trailers);
+        }
+        catch (InvalidOperationException exception)
+        {
+            rejection = exception;
+        }
+
+        await Assert.That(rejection).IsNotNull();
+        await Assert.That(rejection?.Message).Contains(diagnostic);
+        await Assert.That(repository.Git("rev-parse", "HEAD").Trim()).IsEqualTo(before);
+    }
+
+    /// <summary>Agent-style separate message arguments pass the actual hook and retain native range validity.</summary>
+    [Test]
+    public async Task ConfiguredMessageHookAcceptsWhitespaceSeparatedAgentTrailers()
+    {
+        using var repository = ChangeRepositoryFixture.Create();
+        repository.CreateBranch("feature");
+        repository.Git("config", "core.hooksPath", Path.Combine(RepositoryRoot.Find(), ".githooks"));
+        repository.Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
+            "commit", "--allow-empty",
+            "-m", "test(access): isolate committed cancellation observation",
+            "-m", "Observe only keys created by this invocation.",
+            "-m", "Changelog: skip",
+            "-m", "Changelog-Reason: Internal test isolation correction.");
+
+        (int code, _) = repository.Run("preflight-range", TargetOption, TargetBranch, "--head", "HEAD");
+
+        await Assert.That(code).IsEqualTo(Program.Success);
+    }
+
     private static string ReleaseYaml() =>
         """
         Version: 1.1.0
@@ -331,7 +390,7 @@ public sealed class ChangeWorkflowCommandTests
             Git(
                 "-c", "user.name=Release Test",
                 "-c", "user.email=release@example.invalid",
-                "commit", "-m", message);
+                "commit", "--allow-empty", "-m", message);
             return Git("rev-parse", "HEAD").Trim();
         }
 
@@ -349,12 +408,23 @@ public sealed class ChangeWorkflowCommandTests
             };
             foreach (string arg in args) process.StartInfo.ArgumentList.Add(arg);
             process.Start();
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+            try
+            {
+                process.WaitForExitAsync(timeout.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                process.Kill(entireProcessTree: true);
+                throw;
+            }
+            string output = stdout.GetAwaiter().GetResult();
+            string error = stderr.GetAwaiter().GetResult();
             return process.ExitCode == 0
                 ? output
-                : throw new InvalidOperationException($"git_failed:{string.Join(' ', args)}:{error}");
+                : throw new InvalidOperationException($"git_failed:{string.Join(' ', args)}:{output}:{error}");
         }
 
         public void Dispose()

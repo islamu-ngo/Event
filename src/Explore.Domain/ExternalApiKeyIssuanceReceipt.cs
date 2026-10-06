@@ -10,6 +10,7 @@ namespace Explore.Domain;
 /// </summary>
 public sealed class ExternalApiKeyIssuanceReceipt
 {
+    /// <summary>Allows persistence materialization while requiring new domain receipts to use the validating factory.</summary>
     private ExternalApiKeyIssuanceReceipt()
     {
     }
@@ -58,10 +59,8 @@ public sealed class ExternalApiKeyIssuanceReceipt
     {
         if (operationKey is null || operationKey.Length is < 1 or > 128)
             return false;
-        foreach (char character in operationKey)
-            if (!char.IsAsciiLetterOrDigit(character) && character is not '.' and not '_' and not ':' and not '-')
-                return false;
-        return true;
+        return operationKey.All(character =>
+            char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or ':' or '-');
     }
 
     /// <summary>

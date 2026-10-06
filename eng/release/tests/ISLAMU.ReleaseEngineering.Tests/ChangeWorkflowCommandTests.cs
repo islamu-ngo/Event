@@ -240,7 +240,7 @@ public sealed class ChangeWorkflowCommandTests
         await Assert.That(code).IsEqualTo(Program.Success);
         await Assert.That(File.Exists(Path.Join(repository.Path, ".configured-hooks", "commit-msg"))).IsTrue();
         await Assert.That(File.Exists(Path.Join(repository.Path, ".configured-hooks", "pre-commit"))).IsTrue();
-        await Assert.That(File.Exists(Path.Combine(repository.Path, ".git", "hooks", "commit-msg"))).IsFalse();
+        await Assert.That(File.Exists(Path.Join(repository.Path, ".git", "hooks", "commit-msg"))).IsFalse();
     }
 
     /// <summary>The configured repository hook rejects native policy violations before Git changes HEAD.</summary>
@@ -251,7 +251,7 @@ public sealed class ChangeWorkflowCommandTests
     public async Task ConfiguredMessageHookRejectsInvalidCommitBeforeRecordingIt(string trailers, string diagnostic)
     {
         using var repository = ChangeRepositoryFixture.Create();
-        repository.Git("config", "core.hooksPath", Path.Combine(RepositoryRoot.Find(), ".githooks"));
+        repository.Git("config", "core.hooksPath", Path.Join(RepositoryRoot.Find(), ".githooks"));
         string before = repository.Git(GitRevisionCommand, "HEAD").Trim();
         InvalidOperationException? rejection = null;
         try
@@ -274,7 +274,7 @@ public sealed class ChangeWorkflowCommandTests
     {
         using var repository = ChangeRepositoryFixture.Create();
         repository.CreateBranch("feature");
-        repository.Git("config", "core.hooksPath", Path.Combine(RepositoryRoot.Find(), ".githooks"));
+        repository.Git("config", "core.hooksPath", Path.Join(RepositoryRoot.Find(), ".githooks"));
         repository.Git("-c", GitUserName, "-c", GitUserEmail,
             GitCommitCommand, "--allow-empty",
             "-m", "test(access): isolate committed cancellation observation",

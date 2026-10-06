@@ -44,4 +44,17 @@
     <Copy SourceFiles="@(ProviderMigrationPublishAssembly)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
   </Target>
 
+  <Target Name="PublishStandaloneConfiguration" AfterTargets="ComputeResolvedFilesToPublishList">
+    <PropertyGroup>
+      <StandaloneConfigurationDirectory>$([MSBuild]::EnsureTrailingSlash('$(MSBuildProjectDirectory)'))</StandaloneConfigurationDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(ResolvedFileToPublish.Extension)' == '.json' And
+                                        '%(ResolvedFileToPublish.RelativePath)' == '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' And
+                                        $([System.String]::Copy('%(ResolvedFileToPublish.Filename)').StartsWith('appsettings')) And
+                                        '%(ResolvedFileToPublish.RootDir)%(ResolvedFileToPublish.Directory)' != '$(StandaloneConfigurationDirectory)'" />
+    </ItemGroup>
+  </Target>
+
 </Project>

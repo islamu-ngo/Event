@@ -111,17 +111,15 @@ public sealed class CommitPolicyTests
     [Arguments("\r\n\r\n")]
     public async Task ExplainedSkipAcceptsWhitespaceBetweenTerminalDeclarations(string separator)
     {
-        foreach (string trailers in new[]
+        foreach (CommitPolicyResult result in new[]
         {
             $"Changelog: skip{separator}Changelog-Reason: Internal test isolation correction.",
             $"Changelog-Reason: Internal test isolation correction.{separator}Changelog: skip",
-        })
+        }.Select(trailers => Policy.EvaluateCommit(
+            "test(access): isolate committed cancellation observation\n\n" +
+            "Observe only keys created by this invocation.\n\n" +
+            trailers + separator + "Refs: #71\n \t\n")))
         {
-            CommitPolicyResult result = Policy.EvaluateCommit(
-                "test(access): isolate committed cancellation observation\n\n" +
-                "Observe only keys created by this invocation.\n\n" +
-                trailers + separator + "Refs: #71\n \t\n");
-
             await Assert.That(result.IsValid).IsTrue();
             await Assert.That(result.ReleaseVisibility).IsEqualTo(ReleaseVisibility.Skipped);
             await Assert.That(result.SkipReason).IsEqualTo("Internal test isolation correction.");

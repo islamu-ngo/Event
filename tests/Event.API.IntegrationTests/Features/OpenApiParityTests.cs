@@ -184,9 +184,10 @@ public sealed class OpenApiParityTests
         string[] expectedSchemes = expectKeycloak
             ? ["Bearer", ApiAuthenticationSchemeNames.ApiKey, "Keycloak"]
             : ["Bearer", ApiAuthenticationSchemeNames.ApiKey];
-        foreach (string method in new[] { "get", "post" })
+        foreach (OperationSelector selector in new[] { "get", "post" }
+            .Select(method => new OperationSelector("/api/externalapikey", method)))
         {
-            JsonElement security = GetOperation(document, new("/api/externalapikey", method))
+            JsonElement security = GetOperation(document, selector)
                 .GetProperty("security");
             await Assert.That(GetSecurityRequirementSchemeNames(security).SetEquals(expectedSchemes)).IsTrue();
             await Assert.That(security.GetArrayLength()).IsEqualTo(expectedSchemes.Length);

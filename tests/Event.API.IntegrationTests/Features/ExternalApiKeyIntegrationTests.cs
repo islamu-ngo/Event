@@ -532,7 +532,7 @@ public sealed class ExternalApiKeyIntegrationFixture : IAsyncInitializer, IAsync
 {
     private readonly DirectoryInfo _authorityDirectory =
         Directory.CreateTempSubdirectory("external-api-key-authority-");
-    private string AuthorityPath => Path.Combine(_authorityDirectory.FullName, "authority.db");
+    private string AuthorityPath => Path.Join(_authorityDirectory.FullName, "authority.db");
 
     public SingleTenantAuthenticatedWebApplicationFactory Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;

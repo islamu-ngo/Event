@@ -13,6 +13,11 @@ public sealed class ChangeWorkflowCommandTests
 {
     private const string TargetOption = "--target";
     private const string TargetBranch = "develop";
+    private const string GitUserName = "user.name=Release Test";
+    private const string GitUserEmail = "user.email=release@example.invalid";
+    private const string GitCommitCommand = "commit";
+    private const string GitRevisionCommand = "rev-parse";
+    private const string HookInstallCommand = "install-change-hooks";
     private static readonly Regex GeneratedId = new(
         "^CHG-[0-9A-HJKMNP-TV-Z]{26}$",
         RegexOptions.CultureInvariant,
@@ -44,10 +49,10 @@ public sealed class ChangeWorkflowCommandTests
     public async Task AllocationReadsLargeHistoryWithinItsBound(int messageLength, int expectedCode)
     {
         using var repository = ChangeRepositoryFixture.Create();
-        string messagePath = Path.Combine(repository.Path, "history-message");
+        string messagePath = Path.Join(repository.Path, "history-message");
         await File.WriteAllTextAsync(messagePath, "docs: history record\n\n" + new string('x', messageLength));
-        repository.Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
-            "commit", "--allow-empty", "-F", messagePath);
+        repository.Git("-c", GitUserName, "-c", GitUserEmail,
+            GitCommitCommand, "--allow-empty", "-F", messagePath);
 
         (int code, _) = repository.Run("allocate-change-id", TargetOption, TargetBranch);
 
@@ -197,18 +202,18 @@ public sealed class ChangeWorkflowCommandTests
         using var repository = ChangeRepositoryFixture.Create();
 
         string gitDirectory = repository.Git(
-            "rev-parse",
+            GitRevisionCommand,
             "--path-format=absolute",
             "--git-common-dir").Trim();
         string preCommit = Path.Combine(gitDirectory, "hooks", "pre-commit");
         string commitMessage = Path.Combine(gitDirectory, "hooks", "commit-msg");
         await File.WriteAllTextAsync(preCommit, "#!/bin/sh\nexit 0\n");
-        (int firstCode, string firstOutput) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
-        (int secondCode, _) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
+        (int firstCode, string firstOutput) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
+        (int secondCode, _) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
         string backup = preCommit + ".before-islamu-release";
         string managedPreCommit = File.ReadAllText(preCommit);
         await File.WriteAllTextAsync(preCommit, "#!/bin/sh\nexit 7\n");
-        (int thirdCode, string thirdOutput) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
+        (int thirdCode, string thirdOutput) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
 
         await Assert.That(firstCode).IsEqualTo(Program.Success);
         await Assert.That(firstOutput).Contains("change_hooks_installed:");
@@ -230,11 +235,11 @@ public sealed class ChangeWorkflowCommandTests
         using var repository = ChangeRepositoryFixture.Create();
         repository.Git("config", "core.hooksPath", ".configured-hooks");
 
-        (int code, _) = repository.Run("install-change-hooks", TargetOption, TargetBranch);
+        (int code, _) = repository.Run(HookInstallCommand, TargetOption, TargetBranch);
 
         await Assert.That(code).IsEqualTo(Program.Success);
-        await Assert.That(File.Exists(Path.Combine(repository.Path, ".configured-hooks", "commit-msg"))).IsTrue();
-        await Assert.That(File.Exists(Path.Combine(repository.Path, ".configured-hooks", "pre-commit"))).IsTrue();
+        await Assert.That(File.Exists(Path.Join(repository.Path, ".configured-hooks", "commit-msg"))).IsTrue();
+        await Assert.That(File.Exists(Path.Join(repository.Path, ".configured-hooks", "pre-commit"))).IsTrue();
         await Assert.That(File.Exists(Path.Combine(repository.Path, ".git", "hooks", "commit-msg"))).IsFalse();
     }
 
@@ -247,7 +252,7 @@ public sealed class ChangeWorkflowCommandTests
     {
         using var repository = ChangeRepositoryFixture.Create();
         repository.Git("config", "core.hooksPath", Path.Combine(RepositoryRoot.Find(), ".githooks"));
-        string before = repository.Git("rev-parse", "HEAD").Trim();
+        string before = repository.Git(GitRevisionCommand, "HEAD").Trim();
         InvalidOperationException? rejection = null;
         try
         {
@@ -260,7 +265,7 @@ public sealed class ChangeWorkflowCommandTests
 
         await Assert.That(rejection).IsNotNull();
         await Assert.That(rejection?.Message).Contains(diagnostic);
-        await Assert.That(repository.Git("rev-parse", "HEAD").Trim()).IsEqualTo(before);
+        await Assert.That(repository.Git(GitRevisionCommand, "HEAD").Trim()).IsEqualTo(before);
     }
 
     /// <summary>Agent-style separate message arguments pass the actual hook and retain native range validity.</summary>
@@ -270,8 +275,8 @@ public sealed class ChangeWorkflowCommandTests
         using var repository = ChangeRepositoryFixture.Create();
         repository.CreateBranch("feature");
         repository.Git("config", "core.hooksPath", Path.Combine(RepositoryRoot.Find(), ".githooks"));
-        repository.Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
-            "commit", "--allow-empty",
+        repository.Git("-c", GitUserName, "-c", GitUserEmail,
+            GitCommitCommand, "--allow-empty",
             "-m", "test(access): isolate committed cancellation observation",
             "-m", "Observe only keys created by this invocation.",
             "-m", "Changelog: skip",
@@ -381,17 +386,17 @@ public sealed class ChangeWorkflowCommandTests
         {
             File.WriteAllText(System.IO.Path.Combine(Path, file), content);
             Git("add", ".");
-            Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-m", message);
-            return Git("rev-parse", "HEAD").Trim();
+            Git("-c", GitUserName, "-c", GitUserEmail, GitCommitCommand, "-m", message);
+            return Git(GitRevisionCommand, "HEAD").Trim();
         }
 
         public string CommitStaged(string message)
         {
             Git(
-                "-c", "user.name=Release Test",
-                "-c", "user.email=release@example.invalid",
-                "commit", "--allow-empty", "-m", message);
-            return Git("rev-parse", "HEAD").Trim();
+                "-c", GitUserName,
+                "-c", GitUserEmail,
+                GitCommitCommand, "--allow-empty", "-m", message);
+            return Git(GitRevisionCommand, "HEAD").Trim();
         }
 
         public string Git(params string[] args)

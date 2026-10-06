@@ -13,6 +13,7 @@ public static class ChangeWorkflowCommand
     private const int MaximumGitOutputCharacters = 4_194_304;
     private const string TargetOption = "--target";
     private const string DefaultTarget = "develop";
+    private const string GitRevisionCommand = "rev-parse";
     private const string HookMarker = "# ISLAMU_RELEASE_CHANGE_HOOK";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
@@ -338,7 +339,7 @@ public static class ChangeWorkflowCommand
         string hooks = RunGit(
             root,
             timeout,
-            "rev-parse",
+            GitRevisionCommand,
             "--path-format=absolute",
             "--git-path",
             "hooks").Trim();
@@ -608,7 +609,7 @@ public static class ChangeWorkflowCommand
             throw new ChangeWorkflowException("change_repository_invalid");
         }
 
-        string observed = RunGit(root, timeout, "rev-parse", "--show-toplevel").Trim();
+        string observed = RunGit(root, timeout, GitRevisionCommand, "--show-toplevel").Trim();
         if (!string.Equals(observed, root, PathComparison))
         {
             throw new ChangeWorkflowException("change_repository_root_invalid");
@@ -624,7 +625,7 @@ public static class ChangeWorkflowCommand
             throw new ChangeWorkflowException("change_revision_invalid");
         }
 
-        string oid = RunGit(root, timeout, "rev-parse", "--verify", $"{revision}^{{commit}}").Trim();
+        string oid = RunGit(root, timeout, GitRevisionCommand, "--verify", $"{revision}^{{commit}}").Trim();
         if (!IsFullOid(oid))
         {
             throw new ChangeWorkflowException($"change_revision_missing:{revision}");
@@ -665,7 +666,7 @@ public static class ChangeWorkflowCommand
         process.StartInfo.Environment["GIT_NO_LAZY_FETCH"] = "1";
         process.StartInfo.ArgumentList.Add("--no-replace-objects");
         // rev-parse cannot execute hooks and must observe the real hooksPath configuration.
-        if (arguments[0] != "rev-parse")
+        if (arguments[0] != GitRevisionCommand)
         {
             process.StartInfo.ArgumentList.Add("-c");
             process.StartInfo.ArgumentList.Add($"core.hooksPath={NullDevice}");

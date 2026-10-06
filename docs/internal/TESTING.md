@@ -323,6 +323,12 @@ Environment authority supplies the existing
 database inputs and newly generated, masked, process-local signing and identity-fence
 keys; no plaintext secret is added to source.
 
+Provider evidence upload uses an unquoted glob inside the YAML block scalar.
+Quotes in that block are literal glob characters, not YAML quoting, and omit
+TRX files while still allowing database diagnostic logs to produce an artifact.
+Verify the downloaded artifact contains the per-provider issuance report rather
+than assuming an upload step's success proves report retention.
+
 ### Unicode Location Search Provider Corpus
 
 After the production migration service has completed twice on a disposable target,

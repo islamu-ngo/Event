@@ -952,7 +952,7 @@ jobs:
         with:
           name: database-provider-${{ matrix.provider }}
           path: |
-            '**/TestResults/**/*.trx'
+            **/TestResults/**/*.trx
             artifacts/database/${{ matrix.provider }}/**
           if-no-files-found: error
           retention-days: 14

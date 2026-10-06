@@ -67,10 +67,9 @@ public sealed partial class TypographyAssetContractTests : IAsyncDisposable
         await Assert.That(resources.Any(resource =>
             resource.AbsolutePath.StartsWith("/css/fonts", StringComparison.Ordinal)
             && resource.Host == _client.BaseAddress!.Host)).IsTrue();
-        foreach (Match stylesheet in StylesheetLink().Matches(document))
+        foreach (var stylesheetUri in StylesheetLink().Matches(document)
+                     .Select(stylesheet => new Uri(_client.BaseAddress!, WebUtility.HtmlDecode(stylesheet.Groups[1].Value))))
         {
-            var stylesheetUri = new Uri(_client.BaseAddress!,
-                WebUtility.HtmlDecode(stylesheet.Groups[1].Value));
             await Assert.That(stylesheetUri.GetLeftPart(UriPartial.Authority))
                 .IsEqualTo(_client.BaseAddress!.GetLeftPart(UriPartial.Authority));
         }
@@ -215,6 +214,9 @@ public sealed partial class TypographyAssetContractTests : IAsyncDisposable
 
     private sealed class UnavailableApiHandler : HttpMessageHandler
     {
+        /// <summary>
+        /// Returns a fresh response owned and disposed by the calling HttpClient consumer.
+        /// </summary>
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)

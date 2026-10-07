@@ -76,8 +76,7 @@ public sealed class SetupSecretDurableRevocationTests
         Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()
         {
             GoogleSsoEnabled = true,
-            GoogleClientId = "client-id",
-            GoogleClientSecret = "client-secret"
+            GoogleClientId = "client-id"
         })
     };
 

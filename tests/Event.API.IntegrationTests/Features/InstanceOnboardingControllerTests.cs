@@ -1,12 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
 using Explore.API.Extensions;
+using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Persistence;
@@ -30,6 +32,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -823,7 +826,223 @@ public class InstanceOnboardingControllerTests
     }
 
     [Test]
-    public async Task GetAuthProviderConfigurationInternal_WithSetupSecret_ShouldReturnSecretsWhileAdminEndpointRedacts()
+    [Arguments("persisted-settings")]
+    [Arguments("internal-read")]
+    public async Task GoogleRuntimeCredentialCannotEnterApplicationCustody(string surface)
+    {
+        string canary = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        using var factory = CreateFactoryWithSetupSecret();
+        using var client = factory.CreateClient();
+        if (surface == "internal-read")
+        {
+            using (var scope = factory.Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+                // Model pre-cutover contamination, not a newly authorized product write.
+                Guid settingId = Guid.CreateVersion7();
+                string key = InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret;
+                string value = JsonSerializer.Serialize(canary);
+                DateTime createdAt = DateTime.UtcNow;
+                await context.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO ie_system_settings
+                        (id, setting_key, value, setting_value_type_id, is_locked, display_order, created_at)
+                    VALUES ({settingId}, {key}, {value}, {0}, {true}, {0}, {createdAt})
+                    """);
+            }
+
+            using var internalRequest = new HttpRequestMessage(
+                HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
+            internalRequest.Headers.Add("X-Setup-Secret", SetupSecret);
+            using var internalResponse = await client.SendAsync(internalRequest);
+            await Assert.That(await internalResponse.Content.ReadAsStringAsync()).DoesNotContain(canary);
+            await Assert.That(internalResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+            return;
+        }
+
+        Guid userId = Guid.CreateVersion7();
+        await EnsureUserExistsAsync(factory, userId);
+        await EnsureInstanceAdminRoleAsync(factory, userId);
+        await EnsureUserExternalLoginAsync(factory, userId, "google", $"google-{userId:N}");
+        using var updateRequest = CreateInstanceAdminRequest(
+            HttpMethod.Patch, $"{SettingsBaseUrl}/auth-provider", userId,
+            new
+            {
+                Configuration = new
+                {
+                    HasValue = true,
+                    Value = new
+                    {
+                        PrimaryProviderId = (int)AuthenticationProviderKind.Local,
+                        KeycloakAuthority = string.Empty,
+                        KeycloakClientId = string.Empty,
+                        AtprotoLoginEnabled = false,
+                        AtprotoPublicUrl = string.Empty,
+                        GoogleSsoEnabled = true,
+                        GoogleClientId = "custody-test-client",
+                        GoogleClientSecret = canary,
+                        LockAtprotoLoginEnabled = false,
+                        LockGoogleSsoEnabled = false
+                    }
+                }
+            },
+            includeSetupSecret: false);
+        using var updateResponse = await client.SendAsync(updateRequest);
+
+        using var persistedScope = factory.Services.CreateScope();
+        var persistedSettings = persistedScope.ServiceProvider.GetRequiredService<ISystemSettingRepository>();
+        SystemSetting? stored = await persistedSettings.GetByKey(
+            InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret);
+        await Assert.That(stored?.Value ?? string.Empty).DoesNotContain(canary);
+        await Assert.That(updateResponse.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    [Arguments("public-read")]
+    [Arguments("export")]
+    [Arguments("replay")]
+    [Arguments("diagnostics")]
+    public async Task GoogleCredentialIsAbsentFromNonCustodySurfaces(string surface)
+    {
+        string canary = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string correlationId = Guid.CreateVersion7().ToString("N");
+        using var logs = new CredentialLogs(canary, RouteNames.UpdateInstanceAuthProviderConfiguration, correlationId);
+        using var factory = new CredentialObservationFactory(logs) { SeedActiveDefaultTenant = true };
+        factory.AdditionalConfiguration["Authorization:Provider"] = "local";
+        factory.AdditionalConfiguration["Keycloak:Authority"] = string.Empty;
+        factory.AdditionalConfiguration["Keycloak:MetadataAddress"] = string.Empty;
+        using var client = factory.CreateClient();
+        if (surface == "export")
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            db.Set<PaidEventPolicyVersion>().Add(PaidEventPolicyVersion.CreateDefaultInstance());
+            await db.SaveChangesAsync();
+        }
+        Guid userId = Guid.CreateVersion7();
+        await EnsureUserExistsAsync(factory, userId);
+        await EnsureInstanceAdminRoleAsync(factory, userId);
+        await EnsureUserExternalLoginAsync(factory, userId, "google", $"google-{userId:N}");
+        string replayKey = Guid.CreateVersion7().ToString("N");
+        object input = new
+        {
+            Configuration = new
+            {
+                HasValue = true,
+                Value = new
+                {
+                    PrimaryProviderId = (int)AuthenticationProviderKind.Local,
+                    GoogleSsoEnabled = true,
+                    GoogleClientId = "custody-observation-client",
+                    GoogleClientSecret = canary
+                }
+            }
+        };
+        Task finished = logs.RequestFinished.Task;
+        using var update = CreateInstanceAdminRequest(HttpMethod.Patch,
+            $"{SettingsBaseUrl}/auth-provider", userId, input, includeSetupSecret: false);
+        update.Headers.Add("X-Correlation-ID", correlationId);
+        if (surface == "replay") update.Headers.Add("Idempotency-Key", replayKey);
+        using var updateResponse = await client.SendAsync(update);
+        await Assert.That(updateResponse.StatusCode is HttpStatusCode.OK or HttpStatusCode.BadRequest).IsTrue();
+
+        if (surface == "diagnostics")
+        {
+            await finished.WaitAsync(TimeSpan.FromSeconds(10));
+            await Assert.That(logs.ContainsCanary).IsFalse()
+                .Because($"Credential material must not enter diagnostics; observed category: {logs.CanaryCategory ?? "none"}.");
+            return;
+        }
+
+        string path = surface == "export"
+            ? "/api/admin/instance/configuration-manifest/export"
+            : $"{SettingsBaseUrl}/auth-provider";
+        using var observation = CreateInstanceAdminRequest(
+            surface == "replay" ? HttpMethod.Patch : HttpMethod.Get,
+            path, userId, surface == "replay" ? input : null, includeSetupSecret: false);
+        if (surface == "replay") observation.Headers.Add("Idempotency-Key", replayKey);
+        using var response = await client.SendAsync(observation);
+        await Assert.That(response.StatusCode).IsEqualTo(
+            surface == "replay" ? updateResponse.StatusCode : HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync();
+        await Assert.That(body).DoesNotContain(canary);
+        if (surface == "public-read")
+        {
+            using var document = JsonDocument.Parse(body);
+            await Assert.That(document.RootElement.TryGetProperty("googleClientSecret", out _) ||
+                document.RootElement.TryGetProperty("keycloakClientSecret", out _)).IsFalse();
+        }
+        if (surface == "replay")
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var records = await db.Set<IdempotencyRecord>().IgnoreQueryFilters()
+                .AsNoTracking().Where(record => record.Key == replayKey).ToListAsync();
+            if (updateResponse.StatusCode == HttpStatusCode.OK)
+                await Assert.That(records.Count).IsEqualTo(1);
+            else
+                await Assert.That(records.Count).IsLessThanOrEqualTo(1);
+            await Assert.That(records.All(record =>
+                !(record.ResponseBody ?? string.Empty).Contains(canary, StringComparison.Ordinal))).IsTrue();
+        }
+    }
+
+    private sealed class CredentialObservationFactory(CredentialLogs logs) : OnboardingWebApplicationFactory
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ILoggerFactory>();
+                services.AddSingleton<ILoggerFactory>(_ => LoggerFactory.Create(logging =>
+                    logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs)));
+            });
+        }
+    }
+
+    private sealed class CredentialLogs(string canary, string mutationPath, string correlationId) : ILoggerProvider
+    {
+        private readonly string _canary = canary;
+        private readonly string _mutationPath = mutationPath;
+        private readonly string _correlationId = correlationId;
+        private int _containsCanary;
+        private string? _canaryCategory;
+        public bool ContainsCanary => Volatile.Read(ref _containsCanary) != 0;
+        public string? CanaryCategory => Volatile.Read(ref _canaryCategory);
+        public TaskCompletionSource RequestFinished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ILogger CreateLogger(string categoryName) => new CredentialLogger(this, categoryName);
+        public void Dispose() { }
+
+        private sealed class CredentialLogger(CredentialLogs owner, string category) : ILogger
+        {
+            public bool IsEnabled(LogLevel logLevel) => true;
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+                Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                if ((formatter(state, exception) + exception).Contains(owner._canary, StringComparison.Ordinal))
+                {
+                    Interlocked.CompareExchange(ref owner._canaryCategory, category, null);
+                    Interlocked.Exchange(ref owner._containsCanary, 1);
+                }
+                if (category == "Explore.API.Middleware.RequestLoggingMiddleware" &&
+                    state is IEnumerable<KeyValuePair<string, object?>> fields)
+                {
+                    var properties = fields.ToDictionary(field => field.Key, field => field.Value, StringComparer.Ordinal);
+                    if (properties.TryGetValue("Path", out var path) &&
+                        string.Equals(path as string, owner._mutationPath, StringComparison.Ordinal) &&
+                        properties.TryGetValue("Method", out var method) &&
+                        string.Equals(method as string, "PATCH", StringComparison.Ordinal) &&
+                        properties.TryGetValue("CorrelationId", out var correlation) &&
+                        string.Equals(correlation as string, owner._correlationId, StringComparison.Ordinal))
+                        owner.RequestFinished.TrySetResult();
+                }
+            }
+        }
+    }
+
+    [Test]
+    public async Task RetiredInternalCredentialRouteHasNoReadbackWhileAdminReadsMetadata()
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
@@ -836,18 +1055,12 @@ public class InstanceOnboardingControllerTests
 
         using var internalWithoutSecretRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
         var internalWithoutSecretResponse = await client.SendAsync(internalWithoutSecretRequest);
-        await Assert.That(internalWithoutSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(internalWithoutSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
 
         using var internalWithSecretRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
         internalWithSecretRequest.Headers.Add("X-Setup-Secret", SetupSecret);
         var internalWithSecretResponse = await client.SendAsync(internalWithSecretRequest);
-        await Assert.That(internalWithSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-
-        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
-        await Assert.That(internalConfig).IsNotNull();
-        await Assert.That(internalConfig!.GoogleSsoEnabled).IsTrue();
-        await Assert.That(internalConfig.GoogleClientSecret).IsEqualTo(
-            CreateGoogleOnlyAuthProviderConfiguration().GoogleClientSecret);
+        await Assert.That(internalWithSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
 
         var userId = Guid.CreateVersion7();
         await EnsureInstanceAdminRoleAsync(factory, userId);
@@ -858,13 +1071,14 @@ public class InstanceOnboardingControllerTests
         await Assert.That(adminResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var adminConfig = await adminResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(adminConfig).IsNotNull();
-        await Assert.That(adminConfig!.GoogleClientSecret).IsEqualTo(string.Empty);
+        await Assert.That(adminConfig!.GoogleClientSecretOwnership.Editable).IsFalse();
+        await Assert.That(adminConfig.GoogleClientSecretOwnership.Mode).IsEqualTo("deployment-managed");
 
         using var closedSetupRequest = new HttpRequestMessage(
             HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
         closedSetupRequest.Headers.Add("X-Setup-Secret", SetupSecret);
         var closedSetupResponse = await client.SendAsync(closedSetupRequest);
-        await Assert.That(closedSetupResponse.StatusCode).IsEqualTo(HttpStatusCode.Gone);
+        await Assert.That(closedSetupResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
     [Test]
@@ -1269,7 +1483,7 @@ public class InstanceOnboardingControllerTests
         await Assert.That(configuration.KeycloakDetectedFromEnvironment).IsTrue();
         await Assert.That(configuration.KeycloakAuthority).IsEqualTo(authority);
         await Assert.That(configuration.KeycloakClientId).IsEqualTo(clientId);
-        await Assert.That(configuration.KeycloakClientSecret).IsEqualTo(string.Empty);
+        await Assert.That(configuration.KeycloakClientSecretOwnership.Editable).IsFalse();
     }
 
     private static AuthProviderConfigurationDto CreateGoogleOnlyAuthProviderConfiguration()
@@ -1278,12 +1492,10 @@ public class InstanceOnboardingControllerTests
         {
             KeycloakAuthority = string.Empty,
             KeycloakClientId = string.Empty,
-            KeycloakClientSecret = string.Empty,
             AtprotoLoginEnabled = false,
             AtprotoPublicUrl = string.Empty,
             GoogleSsoEnabled = true,
             GoogleClientId = "google-client-id",
-            GoogleClientSecret = "google-client-secret",
             LockAtprotoLoginEnabled = false,
             LockGoogleSsoEnabled = false
         };
@@ -1303,7 +1515,6 @@ public class InstanceOnboardingControllerTests
                 AtprotoPublicUrl = configuration.AtprotoPublicUrl,
                 GoogleSsoEnabled = configuration.GoogleSsoEnabled,
                 GoogleClientId = configuration.GoogleClientId,
-                GoogleClientSecret = configuration.GoogleClientSecret,
                 LockAtprotoLoginEnabled = configuration.LockAtprotoLoginEnabled,
                 LockGoogleSsoEnabled = configuration.LockGoogleSsoEnabled
             })

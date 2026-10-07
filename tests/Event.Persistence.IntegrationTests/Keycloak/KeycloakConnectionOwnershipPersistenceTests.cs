@@ -13,6 +13,7 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace Event.Persistence.IntegrationTests.Keycloak;
 
@@ -58,7 +59,8 @@ public sealed class KeycloakConnectionOwnershipPersistenceTests
         AuthProviderConfigurationDto result = await service.ReadConfigurationAsync();
 
         await Assert.That(result.KeycloakClientSecretOwnership.Configured).IsTrue();
-        await Assert.That(result.KeycloakClientSecret).IsEmpty();
+        string metadata = JsonSerializer.Serialize(result);
+        await Assert.That(metadata.Contains(secretCanary, StringComparison.Ordinal)).IsFalse();
         await Assert.That(result.ToString()).DoesNotContain(secretCanary);
     }
 
@@ -82,6 +84,7 @@ public sealed class KeycloakConnectionOwnershipPersistenceTests
             mutationLock,
             writer,
             new KeycloakConnectionResolver(secretResolver, configuration),
+            secretResolver,
             fixture.Services.GetServices<INotificationHandler<SettingChangedNotification>>());
     }
 

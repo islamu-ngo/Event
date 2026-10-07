@@ -7,6 +7,7 @@ using Explore.Application.Features.InstanceAdmin.Handlers.Queries;
 using Explore.Application.Features.InstanceAdmin.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Secrets;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using TUnit.Assertions;
@@ -17,7 +18,12 @@ namespace Event.Application.UnitTests.Features.InstanceAdmin.Queries;
 public sealed class GetInstanceOverviewQueryHandlerTests
 {
     [Test]
-    public async Task ConfiguredLocalAuthenticationIsReportedAsTheSelectedProvider()
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task ConfiguredLocalAuthenticationIsReportedAsTheSelectedProvider(
+        bool bootstrapCompleted, bool profileAvailable)
     {
         var deployment = Substitute.For<IDeploymentModeProvider>();
         var tenants = Substitute.For<ITenantRepository>();
@@ -56,9 +62,23 @@ public sealed class GetInstanceOverviewQueryHandlerTests
         secrets.ReadAsync(Arg.Any<CancellationToken>())
             .Returns(new SecretAuthorityStatusSnapshot("Environment", "configured", string.Empty));
 
+        var profileReader = Substitute.For<IAuthenticationCredentialProfileReader>();
+        Guid profileRevision = Guid.CreateVersion7();
+        if (profileAvailable)
+            profileReader.ReadCurrent().Returns(new AuthenticationCredentialProfile(
+                AuthenticationCredentialCutover.CredentialAuthority.Environment, profileRevision));
+        else
+            profileReader.ReadCurrent().Returns(_ =>
+                throw new InvalidOperationException("authentication_credential_profile_unavailable"));
+        var bootstrapStates = Substitute.For<IInstanceBootstrapStateRepository>();
+        DateTime now = new(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc);
+        var bootstrap = InstanceBootstrapState.CreateInteractivePending(Guid.CreateVersion7(), DeploymentMode.MultiTenant, now);
+        if (bootstrapCompleted)
+            bootstrap.CompleteInteractive(Guid.CreateVersion7(), now);
+        bootstrapStates.GetCurrent(Arg.Any<CancellationToken>()).Returns(bootstrap);
         var handler = new GetInstanceOverviewQueryHandler(
             deployment, tenants, governance, authentication, authorization,
-            storage, smtp, secrets, new ConfigurationBuilder().Build());
+            storage, smtp, secrets, new ConfigurationBuilder().Build(), profileReader, bootstrapStates);
 
         var overview = await handler.QueryAsync(new GetInstanceOverviewQuery(), CancellationToken.None);
         var provider = overview.ProviderSummaries.Single(summary => summary.Key == "authentication");
@@ -67,5 +87,9 @@ public sealed class GetInstanceOverviewQueryHandlerTests
         await Assert.That(provider.Message).IsEqualTo(nameof(AuthenticationProviderKind.Local));
         await Assert.That(overview.Warnings.Select(warning => warning.Code))
             .DoesNotContain("authentication_provider_missing");
+        await Assert.That(overview.AuthenticationCredentialProfileRevision)
+            .IsEqualTo(bootstrapCompleted && profileAvailable ? profileRevision : (Guid?)null);
+        await Assert.That(overview.AuthenticationCredentialAuthority)
+            .IsEqualTo(bootstrapCompleted && profileAvailable ? "Environment" : null);
     }
 }

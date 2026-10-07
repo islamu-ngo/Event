@@ -382,24 +382,6 @@ public class InstanceOnboardingController : EventControllerBase
     [SetupSecretRequired]
     [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
     [EndpointClassification(EndpointClass.Admin)]
-    [PrivateNoStore]
-    [HttpGet("auth-provider-configuration/internal", Name = RouteNames.GetInstanceOnboardingAuthProviderConfigurationInternal)]
-    [EndpointSummary("Get Auth Provider Configuration (Internal)")]
-    [EndpointDescription("Returns auth provider configuration including secrets. For BFF internal use only. Protected by setup secret.")]
-    [ProducesResponseType(typeof(AuthProviderConfigurationDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
-    public async Task<ActionResult<AuthProviderConfigurationDto>> GetAuthProviderConfigurationInternal(CancellationToken cancellationToken = default)
-    {
-        var configuration = await _authProviderConfigurationService.ReadConfigurationWithSecretsAsync();
-        return Ok(configuration);
-    }
-
-    [AllowAnonymous]
-    [SetupSecretRequired]
-    [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
-    [EndpointClassification(EndpointClass.Admin)]
     [HttpGet("authz-provider-configuration/internal", Name = RouteNames.GetInstanceOnboardingAuthorizationProviderConfigurationInternal)]
     [EndpointSummary("Get Authorization Provider Configuration (Internal)")]
     [EndpointDescription("Returns authorization provider configuration for setup flow. Protected by setup secret.")]

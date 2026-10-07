@@ -66,7 +66,8 @@ public static class ConfigurationExtensions
     /// </summary>
     public static void AddSecretAuthorityConfiguration(
         this IConfigurationBuilder configBuilder,
-        string environmentName)
+        string environmentName,
+        AuthenticationCredentialAcquisitionReceipts? receipts = null)
     {
         var bootstrapConfig = configBuilder.Build();
         string? configuredProvider = bootstrapConfig["SecretProvider:Provider"]
@@ -97,7 +98,8 @@ public static class ConfigurationExtensions
             ApplyBlazorMapping(
                 configBuilder,
                 new ConfigurationBuilder().AddEnvironmentVariables().Build(),
-                fromInfisical: false);
+                fromInfisical: false, receipts,
+                AuthenticationCredentialAcquisitionReceipts.Authority.Environment);
             return;
         }
 
@@ -113,7 +115,8 @@ public static class ConfigurationExtensions
                 new ConfigurationBuilder()
                     .AddUserSecrets("event-shared-secrets", reloadOnChange: false)
                     .Build(),
-                fromInfisical: false);
+                fromInfisical: false, receipts,
+                AuthenticationCredentialAcquisitionReceipts.Authority.UserSecrets);
             return;
         }
 
@@ -127,10 +130,11 @@ public static class ConfigurationExtensions
         authorityBuilder.AddInfisical(bootstrapConfig, source =>
         {
             source.Paths.Clear();
-            source.Paths.AddRange(["/keycloak", "/blazor", "/atproto"]);
-            source.ThrowOnFirstLoadFailure = true;
+            source.Paths.AddRange(
+                ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"]);
         }, environmentName);
-        ApplyBlazorMapping(configBuilder, authorityBuilder.Build(), fromInfisical: true);
+        ApplyBlazorMapping(configBuilder, authorityBuilder.Build(), fromInfisical: true, receipts,
+            AuthenticationCredentialAcquisitionReceipts.Authority.Infisical);
     }
 
     /// <summary>
@@ -138,19 +142,22 @@ public static class ConfigurationExtensions
     /// </summary>
     /// <remarks>
     /// Standard Infisical keys:
-    ///   /keycloak: KEYCLOAK_ENDPOINT, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID, KEYCLOAK_BLAZOR_CLIENT_SECRET
-    ///   /blazor:   API_ENDPOINT, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+    ///   /runtime/bff/oidc/keycloak: Keycloak confidential-client configuration.
+    ///   /runtime/bff/oidc/google: Google confidential-client configuration.
+    ///   /runtime/bff/atproto/oauth: ATProto frontend signing key only.
     /// </remarks>
     private static void ApplyBlazorMapping(
         IConfigurationBuilder configBuilder,
         IConfiguration config,
-        bool fromInfisical)
+        bool fromInfisical,
+        AuthenticationCredentialAcquisitionReceipts? receipts,
+        AuthenticationCredentialAcquisitionReceipts.Authority authority)
     {
         var rawRealm = config[fromInfisical ? "Keycloak:Realm" : "KEYCLOAK_REALM"];
         var rawKeycloakClientId = config[fromInfisical ? "Keycloak:ClientId" : "KEYCLOAK_CLIENT_ID"];
         var rawClientSecret = config[fromInfisical ? "Keycloak:BlazorClientSecret" : "KEYCLOAK_BLAZOR_CLIENT_SECRET"];
-        var rawGoogleClientId = config[fromInfisical ? "Blazor:GoogleClientId" : "GOOGLE_CLIENT_ID"];
-        var rawGoogleClientSecret = config[fromInfisical ? "Blazor:GoogleClientSecret" : "GOOGLE_CLIENT_SECRET"];
+        var rawGoogleClientId = config[fromInfisical ? "Google:ClientId" : "GOOGLE_CLIENT_ID"];
+        var rawGoogleClientSecret = config[fromInfisical ? "Google:ClientSecret" : "GOOGLE_CLIENT_SECRET"];
         var rawApiUrl = config[fromInfisical ? "Blazor:ApiEndpoint" : "API_ENDPOINT"];
         var rawAuthProvider = config[fromInfisical ? "Blazor:AuthenticationProvider" : "AUTHENTICATION_PROVIDER"]
             ?? config["AUTHENTICATION_PROVIDER"]
@@ -195,9 +202,10 @@ public static class ConfigurationExtensions
             mappedConfig[AtprotoClientKeyProvider.ConfigurationKey] = rawAtprotoOAuthClientPrivateJwks;
         }
 
-        static void TrySet(IDictionary<string, string?> dict, IConfiguration root, string key, string? value)
+        void TrySet(IDictionary<string, string?> dict, IConfiguration root, string key, string? value)
         {
-            if (string.IsNullOrWhiteSpace(value) || !string.IsNullOrEmpty(root[key]))
+            if (string.IsNullOrWhiteSpace(value)
+                || (!fromInfisical && !string.IsNullOrEmpty(root[key])))
                 return;
             dict[key] = value;
         }
@@ -225,6 +233,10 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Authentication:Provider", rawAuthProvider);
 
         configBuilder.AddInMemoryCollection(mappedConfig);
+        if (!string.IsNullOrWhiteSpace(rawClientSecret))
+            receipts?.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, authority);
+        if (!string.IsNullOrWhiteSpace(rawGoogleClientSecret))
+            receipts?.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, authority);
     }
 
     private static string? ReadBootstrapValue(

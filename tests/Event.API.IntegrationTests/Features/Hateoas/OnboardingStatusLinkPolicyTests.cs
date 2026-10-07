@@ -44,7 +44,7 @@ public sealed class OnboardingStatusLinkPolicyTests
         var complete = links.Single(link => link.Rel == "complete");
 
         await Assert.That(authentication.RouteName)
-            .IsEqualTo(RouteNames.GetInstanceOnboardingAuthProviderConfigurationInternal);
+            .IsEqualTo(RouteNames.GetInstanceOnboardingAuthProviderConfiguration);
         await Assert.That(authentication.Method).IsEqualTo("GET");
         await Assert.That(authentication.RequiresAuth).IsFalse();
         await Assert.That(authentication.PermissionAction).IsNull();

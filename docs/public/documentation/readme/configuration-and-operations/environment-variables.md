@@ -404,6 +404,9 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `DATABASE_MIGRATOR_PASSWORD` | database | sensitive | None | required | process |
 | `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |
 | `AUTHENTICATION_PROVIDER` | platform | public | None | optional | process |
+| `AUTHENTICATION_CREDENTIAL_PROFILE_REVISION` | security | public | None | optional | process |
+| `GOOGLE_CLIENT_ID` | identity | public | None | optional | process |
+| `GOOGLE_CLIENT_SECRET` | identity | secret | None (secret) | optional | process |
 | `IDENTITYCORRELATION__TRUSTEDISSUERS__0` | identity | public | None | optional | process |
 | `ATPROTO_LOGIN_ENABLED` | platform | public | None | optional | process |
 | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | identity | public | None | required | process |

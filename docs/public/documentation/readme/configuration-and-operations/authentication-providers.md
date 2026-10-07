@@ -244,6 +244,57 @@ key ring. Store that key ring through the selected secret authority. It signs
 OAuth client assertions; it is not a user password and is never sent to the
 browser.
 
+## Google and Keycloak Credential Ownership
+
+Provision confidential-client credentials through the deployment's explicitly
+selected secret authority, not the authentication settings form. With Infisical,
+the BFF reads Google at `/runtime/bff/oidc/google` and Keycloak at
+`/runtime/bff/oidc/keycloak`; with Environment or Development/Testing User Secrets,
+use the corresponding documented deployment inputs. There is no fallback to
+another authority when the selected one fails.
+
+Settings and onboarding show deployment-owned readiness metadata rather than a
+password field. The API never returns client-secret values, and submitting a
+removed secret field to ordinary authentication PATCH is rejected. The retired
+internal credential-readback route is no longer available. The BFF obtains
+credentials from its own authority at process startup; metadata refresh does not
+copy credentials from the API.
+
+Configured status means the selected reference resolved, not that sign-in or all
+replicas have been verified. If it is unconfigured, unavailable, unauthorized or
+invalid, repair that selected authority/reference, restart affected processes,
+reload the settings and verify a fresh sign-in. Do not broaden machine-identity
+access or copy the credential into application settings as a workaround. Existing
+legacy settings/bindings are not deleted by this configuration change; retain
+them until the controlled maintenance cutover authorizes exact cleanup.
+
+During a coordinated replacement, verify fresh sign-in and provider-token refresh
+on every replacement replica. Stop each retired process through the deployment
+manager, let its in-flight requests drain and confirm that its exact process
+instance has terminated. A healthy replacement or a shutdown message does not
+prove the old process is gone. Submit the old-process, writer and session fence
+only after that inventory has been independently checked; legacy cleanup is a
+separate authorized maintenance operation.
+
+Once replacement membership and all three fences are accepted, follow the
+receipt's `inspect-authentication-credential-cleanup` link. Its inventory lists
+only legacy row IDs and logical keys, not credential contents or provider paths.
+Review it before following `cleanup-authentication-credentials`. Supply the
+operation and deployment IDs, both inspected stamps, and complete
+`approvedSettingIds` and `approvedBindingIds` arrays; use an empty array when that
+inventory is empty. Do not add IDs from another operation or settings screen.
+Changed, missing or extra rows conflict without cleanup; inspect again rather
+than widening the request.
+
+Cleanup atomically removes only approved legacy settings and noncanonical
+unqualified instance bindings, then retains exact row counts. Valid runtime
+references, tenant/qualified bindings and infrastructure secrets are preserved.
+Cancellation restores the rows and receipt together. Recover a lost response by
+retrying the same operation: a committed receipt returns counts without another
+deletion. Cleanup never rotates or deletes external secrets. Application writes
+of retired credentials are rejected, but this does not revoke raw database
+privileges or stop an obsolete executable; verify those fences independently.
+
 ## Runtime Behavior
 
 The browser receives an encrypted HttpOnly BFF cookie. Provider access tokens,

@@ -194,6 +194,8 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IAtprotoSessionRefreshLock, RelationalAtprotoSessionRefreshLock>();
         services.AddScoped<ISetupLiveRepository, SetupLiveRepository>();
         services.AddScoped<IKeycloakOperationRepository, KeycloakOperationRepository>();
+        services.AddScoped<IAuthenticationCredentialCutoverRepository, AuthenticationCredentialCutoverRepository>();
+        services.AddScoped<IAuthenticationCredentialCutoverCoordinator, RelationalAuthenticationCredentialCutoverCoordinator>();
         services.AddScoped<IKeycloakOperationCoordinator, RelationalKeycloakOperationCoordinator>();
         services.AddScoped<ISetupSecretBindingOperationCoordinator,
             RelationalSetupSecretBindingOperationCoordinator>();
@@ -258,6 +260,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
         services.AddScoped<IExternalApiKeyIssuanceReceiptRepository, ExternalApiKeyIssuanceReceiptRepository>();
         services.AddScoped<IExternalApiKeyIssuanceAuthority, ExternalApiKeyIssuanceAuthority>();
+        services.AddScoped<IInstanceAdministratorCommitAuthority, ExternalApiKeyIssuanceAuthority>();
         services.AddScoped<IManagedControlPlaneRegistrationRepository, ManagedControlPlaneRegistrationRepository>();
         services.AddScoped<IManagedTenantProvisioningOperationRepository, ManagedTenantProvisioningOperationRepository>();
         services.AddScoped<IConfigurationManifestOperationRepository, ConfigurationManifestOperationRepository>();

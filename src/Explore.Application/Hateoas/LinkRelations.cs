@@ -20,6 +20,12 @@ public static class LinkRelations
     public const string LocalIdentities = "local-identities";
     public const string CreateLocalIdentity = "create-local-identity";
     public const string IssueTemporaryCredential = "issue-temporary-credential";
+    public const string AuthenticationCredentialCutovers = "authentication-credential-cutovers";
+    public const string PrepareAuthenticationCredentialCutover = "prepare-authentication-credential-cutover";
+    public const string ReportAuthenticationCredentialActivation = "report-authentication-credential-activation";
+    public const string AttestAuthenticationCredentialFence = "attest-authentication-credential-fence";
+    public const string InspectAuthenticationCredentialCleanup = "inspect-authentication-credential-cleanup";
+    public const string CleanupAuthenticationCredentials = "cleanup-authentication-credentials";
 
     public const string CreateConfigurationImportSession =
         "create-configuration-import-session";

@@ -33,12 +33,10 @@ public class AuthProviderConfigurationDtoValidator : AbstractValidator<AuthProvi
                 .NotEmpty()
                 .WithMessage("Keycloak client ID is required when Keycloak is enabled.");
 
-            RuleFor(x => x.KeycloakClientSecret)
-                .NotEmpty()
-                .When(configuration => !CanReuseConfiguredKeycloakSecret(
-                    authoritativeCurrentConfiguration,
-                    configuration))
-                .WithMessage("Keycloak client secret is required when Keycloak is enabled and no secret is configured for the requested client.");
+            RuleFor(x => x.KeycloakClientSecretOwnership)
+                .Must((configuration, _) => CanReuseConfiguredKeycloakSecret(
+                    authoritativeCurrentConfiguration, configuration))
+                .WithMessage("The selected deployment authority must have a configured Keycloak credential for the requested client.");
         });
 
         When(x => x.AtprotoLoginEnabled, () =>
@@ -59,9 +57,9 @@ public class AuthProviderConfigurationDtoValidator : AbstractValidator<AuthProvi
                 .NotEmpty()
                 .WithMessage("Google client ID is required when Google SSO is enabled.");
 
-            RuleFor(x => x.GoogleClientSecret)
-                .NotEmpty()
-                .WithMessage("Google client secret is required when Google SSO is enabled.");
+            RuleFor(x => x.GoogleClientSecretOwnership)
+                .Must(_ => authoritativeCurrentConfiguration?.GoogleClientSecretOwnership.Configured == true)
+                .WithMessage("The selected deployment authority must have a configured Google credential.");
         });
     }
 

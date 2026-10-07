@@ -493,6 +493,7 @@ public sealed class VisitorAccessSettingsWriterTests
         return new AuthProviderConfigurationService(new SystemSettingRepository(fixture.Context, mutationLock), configuration,
             unitOfWork, mutationLock, writer,
             new KeycloakConnectionResolver(fixture.Services.GetRequiredService<ISecretResolver>(), configuration),
+            fixture.Services.GetRequiredService<ISecretResolver>(),
             fixture.Services.GetServices<Explore.Application.Contracts.Operations.INotificationHandler<Explore.Application.Notifications.SettingChangedNotification>>());
     }
 

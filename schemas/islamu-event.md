@@ -8273,6 +8273,41 @@ Ref: "event_resource_audit_entries".("tenant_id", "event_resource_id") > "event_
 // Keycloak Operator Safety Receipts
 // ============================================================
 
+Table "authentication_credential_cutover_receipts" {
+  "id" uuid [pk, not null]
+  "instance_id" uuid [not null]
+  "created_by" uuid [not null]
+  "created_at" timestamptz [not null]
+  "deadline" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "deployment_revision" uuid [not null]
+  "authority" varchar(32) [not null, note: 'Environment, Infisical, or UserSecrets.']
+  "authority_profile_revision" uuid [not null]
+  "concurrency_stamp" uuid [not null, note: 'Application-generated optimistic mutation fence.']
+  "state" varchar(32) [not null, note: 'Prepared, Collecting, ReadyForCleanup, Cleaned, Failed, Expired, Superseded.']
+  "required_replacements" text [not null, note: 'Owned JSON snapshot: exact replica, previous/new process boot, consumer and opaque generation membership.']
+  "activations" text [not null, note: 'Value-free JSON activation evidence; no credential digests or provider coordinates.']
+  "fence" text [note: 'Exact deployment/operator attestation of old process, writer and session fencing.']
+  "cleaned_setting_count" int [note: 'Null before cleanup; nonnegative committed count afterward.']
+  "cleaned_binding_count" int [note: 'Null before cleanup; nonnegative committed count afterward.']
+
+  indexes {
+    (instance_id, id) [unique, name: 'ak_authentication_credential_cutover_receipts_instance_id_id']
+  }
+
+  Note: 'Retained instance-owned coordinated-restart evidence. A failed or expired operation cannot be reopened by late callbacks. Readiness alone does not prove cleanup. Authorized exact legacy row deletion and nonsecret terminal counts commit atomically; canonical, tenant, qualified and infrastructure references remain intact. Terminal recovery returns counts without repeating deletion.'
+}
+
+Table "authentication_credential_cutover_heads" {
+  "instance_id" uuid [pk, not null]
+  "current_operation_id" uuid [not null]
+  "concurrency_stamp" uuid [not null]
+
+  Note: 'One current operation per instance. Every evidence/replacement/cleanup decision must first flush a conditional head update and retain it through the owning transaction.'
+}
+
+Ref: "authentication_credential_cutover_heads".(instance_id, current_operation_id) > "authentication_credential_cutover_receipts".(instance_id, id) [delete: restrict]
+
 Table "keycloak_operation_receipts" {
   "id" uuid [pk, not null, note: 'Application-generated UUIDv7 operation identity.']
   "change_set" varchar(4096) [not null, note: 'Typed application-owned JSON containing only allowlisted step projections, target identifiers, preconditions and fingerprints.']

@@ -285,6 +285,28 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
             return SecretResolutionResult.Invalid;
         }
 
+        if (binding.SettingKey is SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret
+            or SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret
+            or SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks)
+        {
+            SecretDefinition definition = SecretDefinitionRegistry.GetRequired(binding.SettingKey);
+            bool canonical = binding.Scope == SecretScope.Instance && binding.ScopeId is null
+                && string.IsNullOrEmpty(binding.Qualifier)
+                && (binding.SourceType == SecretSourceType.EnvironmentVariable
+                    ? string.Equals(binding.EnvironmentVariableName,
+                        definition.DefaultEnvironmentVariableName, StringComparison.Ordinal)
+                    : !string.IsNullOrWhiteSpace(_infisicalEnvironment)
+                        && string.Equals(binding.InfisicalEnvironment, _infisicalEnvironment, StringComparison.Ordinal)
+                        && string.Equals(binding.InfisicalPath, definition.DefaultInfisicalPath, StringComparison.Ordinal)
+                        && string.Equals(binding.InfisicalKey, definition.DefaultInfisicalKey, StringComparison.Ordinal));
+            if (!canonical)
+            {
+                _logger.LogError("authentication_runtime_reference_invalid");
+                _metrics.RecordError(binding.SourceType, SecretResolutionStatus.Invalid);
+                return SecretResolutionResult.Invalid;
+            }
+        }
+
         var logicalCacheKey = BuildCacheKey(binding.SettingKey, binding.Scope, binding.ScopeId, binding.Qualifier);
         var cacheKey = $"{logicalCacheKey}::{binding.SourceType}::{binding.Id:N}";
         if (useCache && _cache.TryGetValue<ResolvedSecret>(cacheKey, out var cached) && cached is not null)

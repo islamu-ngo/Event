@@ -33,6 +33,57 @@ public sealed class SecretResolverBindingTests : IDisposable
     }
 
     [Test]
+    [Arguments(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks)]
+    public async Task RuntimeCredentialReferenceMutationCannotReuseWarmCredential(string settingKey)
+    {
+        SecretDefinition definition = SecretDefinitionRegistry.GetRequired(settingKey);
+        SecretBinding binding = SecretBinding.CreateEnvironmentVariable(
+            settingKey, SecretScope.Instance, null, definition.DefaultEnvironmentVariableName);
+        binding.Id = Guid.CreateVersion7();
+        var source = new RecordingSecretSource(SecretSourceType.EnvironmentVariable);
+        var resolver = new SecretResolver(new FakeSecretBindingRepository([binding]), [source],
+            _cache, _metrics, NullLogger<SecretResolver>.Instance,
+            Options.Create(new SecretProviderOptions { Provider = SecretProviderType.Environment }));
+        SecretResolutionResult initial = await resolver.ResolveAsync(settingKey, null);
+        await Assert.That(initial.IsResolved).IsTrue();
+
+        binding.EnvironmentVariableName = "UNRELATED_BACKEND_CREDENTIAL";
+        SecretResolutionResult changed = await resolver.ResolveAsync(settingKey, null);
+
+        await Assert.That(changed.Status).IsEqualTo(SecretResolutionStatus.Invalid);
+        await Assert.That(changed.Value).IsNull();
+        await Assert.That(source.CallCount).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks)]
+    public async Task RuntimeCredentialLegacyFolderCannotReachSelectedAuthority(string settingKey)
+    {
+        SecretDefinition definition = SecretDefinitionRegistry.GetRequired(settingKey);
+        SecretBinding binding = SecretBinding.CreateInfisical(settingKey, SecretScope.Instance,
+            null, "staging", "/legacy/shared", definition.DefaultInfisicalKey);
+        binding.Id = Guid.CreateVersion7();
+        var source = new RecordingSecretSource(SecretSourceType.Infisical);
+        var resolver = new SecretResolver(new FakeSecretBindingRepository([binding]), [source],
+            _cache, _metrics, NullLogger<SecretResolver>.Instance,
+            Options.Create(new SecretProviderOptions
+            {
+                Provider = SecretProviderType.Infisical,
+                Infisical = new InfisicalOptions { Environment = "staging" }
+            }));
+
+        SecretResolutionResult result = await resolver.ResolveAsync(settingKey, null);
+
+        await Assert.That(result.Status).IsEqualTo(SecretResolutionStatus.Invalid);
+        await Assert.That(result.Value).IsNull();
+        await Assert.That(source.LastBinding).IsNull();
+    }
+
+    [Test]
     public async Task ISecretResolver_RequiresExplicitQualifiedResolutionImplementation()
     {
         var method = typeof(ISecretResolver).GetMethod(nameof(ISecretResolver.ResolveQualifiedAsync));

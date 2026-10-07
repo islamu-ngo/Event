@@ -29852,6 +29852,122 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.ToTable("ie_secret_validation_statuses", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.Secrets.AuthenticationCredentialCutover", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Activations")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("activations");
+
+                    b.Property<string>("Authority")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authority");
+
+                    b.Property<Guid>("AuthorityProfileRevision")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authority_profile_revision");
+
+                    b.Property<int?>("CleanedBindingCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("cleaned_binding_count");
+
+                    b.Property<int?>("CleanedSettingCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("cleaned_setting_count");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset>("Deadline")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("deadline");
+
+                    b.Property<Guid>("DeploymentRevision")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("deployment_revision");
+
+                    b.Property<string>("Fence")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("fence");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instance_id");
+
+                    b.Property<string>("RequiredReplacements")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("required_replacements");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_authentication_credential_cutover_receipts");
+
+                    b.HasAlternateKey("InstanceId", "Id")
+                        .HasName("ak_authentication_credential_cutover_receipts_instance_id_id");
+
+                    b.ToTable("ie_authentication_credential_cutover_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AuthenticationCutover_Authority", "authority IN ('Environment','Infisical','UserSecrets')")
+                                .HasName("ck_authenticationcutover_authority");
+
+                            t.HasCheckConstraint("CK_AuthenticationCutover_Counts", "(cleaned_setting_count IS NULL OR cleaned_setting_count >= 0) AND (cleaned_binding_count IS NULL OR cleaned_binding_count >= 0)")
+                                .HasName("ck_authenticationcutover_counts");
+
+                            t.HasCheckConstraint("CK_AuthenticationCutover_State", "state IN ('Prepared','Collecting','ReadyForCleanup','Cleaned','Failed','Expired','Superseded')")
+                                .HasName("ck_authenticationcutover_state");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.Secrets.AuthenticationCredentialCutoverHead", b =>
+                {
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instance_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid>("CurrentOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("current_operation_id");
+
+                    b.HasKey("InstanceId")
+                        .HasName("pk_ie_authentication_credential_cutover_heads");
+
+                    b.HasIndex("InstanceId", "CurrentOperationId")
+                        .HasDatabaseName("ix_authentication_credential_cutover_heads_instance_id_current_operation_id");
+
+                    b.ToTable("ie_authentication_credential_cutover_heads", (string)null);
+                });
+
             modelBuilder.Entity("Explore.Domain.Secrets.SecretBinding", b =>
                 {
                     b.Property<Guid>("Id")
@@ -47960,6 +48076,17 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Secrets.AuthenticationCredentialCutoverHead", b =>
+                {
+                    b.HasOne("Explore.Domain.Secrets.AuthenticationCredentialCutover", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId", "CurrentOperationId")
+                        .HasPrincipalKey("InstanceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_authentication_credential_cutover_heads_authentication_credential_cutover_receipts_instance_id_current_operation_id");
                 });
 
             modelBuilder.Entity("Explore.Domain.Secrets.SecretBinding", b =>

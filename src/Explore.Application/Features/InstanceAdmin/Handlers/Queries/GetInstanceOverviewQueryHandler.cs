@@ -21,7 +21,9 @@ public sealed class GetInstanceOverviewQueryHandler(
     IInstanceStorageSettingService storageSettingService,
     IInstanceSmtpSettingService smtpSettingService,
     ISecretAuthorityStatusReader secretAuthorityStatusReader,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    IAuthenticationCredentialProfileReader authenticationCredentialProfileReader,
+    IInstanceBootstrapStateRepository bootstrapStates)
     : IQueryHandler<GetInstanceOverviewQuery, InstanceOverviewDto>
 {
     public async Task<InstanceOverviewDto> QueryAsync(
@@ -40,6 +42,19 @@ public sealed class GetInstanceOverviewQueryHandler(
         var storageSettings = await storageSettingService.ReadSettingsAsync(cancellationToken);
         var smtpSettings = await smtpSettingService.ReadSettingsAsync();
         var secretAuthority = await secretAuthorityStatusReader.ReadAsync(cancellationToken);
+        AuthenticationCredentialProfile? credentialProfile = null;
+        if ((await bootstrapStates.GetCurrent(cancellationToken))?.Status == InstanceBootstrapStatus.Completed)
+        {
+            try
+            {
+                credentialProfile = authenticationCredentialProfileReader.ReadCurrent();
+            }
+            catch (InvalidOperationException exception) when (exception.Message is
+                "authentication_credential_profile_unavailable" or "authentication_credential_profile_authority_invalid")
+            {
+                // Maintenance is unavailable until the operator supplies a valid deployment profile.
+            }
+        }
 
         var statusCounts = BuildTenantStatusCounts(tenants);
         var publicOrigin = FirstConfiguredValue(
@@ -57,6 +72,8 @@ public sealed class GetInstanceOverviewQueryHandler(
             PublicOrigin = publicOrigin,
             AdminOrigin = adminOrigin,
             InstanceBaseDomain = NullIfWhiteSpace(governanceSettings.Domains.InstanceBaseDomain),
+            AuthenticationCredentialAuthority = credentialProfile?.Authority.ToString(),
+            AuthenticationCredentialProfileRevision = credentialProfile?.Revision,
             TotalTenantCount = tenants.Count,
             ActiveTenantCount = statusCounts.Single(status => status.Status == nameof(TenantStatusEnum.Active)).Count,
             TenantStatusCounts = statusCounts,

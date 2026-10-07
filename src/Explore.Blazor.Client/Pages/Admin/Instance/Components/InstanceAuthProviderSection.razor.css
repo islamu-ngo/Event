@@ -1,6 +1,7 @@
 
 .instance-auth-provider__visitor-onboarding {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--isl-space-3);
     margin-block: var(--isl-space-3);
     padding: var(--isl-space-4);

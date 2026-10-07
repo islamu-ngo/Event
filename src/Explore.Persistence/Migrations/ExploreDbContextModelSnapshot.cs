@@ -29931,6 +29931,122 @@ namespace Explore.Persistence.Migrations
                     b.ToTable("secret_validation_statuses", "islamu_event");
                 });
 
+            modelBuilder.Entity("Explore.Domain.Secrets.AuthenticationCredentialCutover", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Activations")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("activations");
+
+                    b.Property<string>("Authority")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("authority");
+
+                    b.Property<Guid>("AuthorityProfileRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_profile_revision");
+
+                    b.Property<int?>("CleanedBindingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("cleaned_binding_count");
+
+                    b.Property<int?>("CleanedSettingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("cleaned_setting_count");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset>("Deadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deadline");
+
+                    b.Property<Guid>("DeploymentRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deployment_revision");
+
+                    b.Property<string>("Fence")
+                        .HasColumnType("text")
+                        .HasColumnName("fence");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instance_id");
+
+                    b.Property<string>("RequiredReplacements")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("required_replacements");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_authentication_credential_cutover_receipts");
+
+                    b.HasAlternateKey("InstanceId", "Id")
+                        .HasName("ak_authentication_credential_cutover_receipts_instance_id_id");
+
+                    b.ToTable("authentication_credential_cutover_receipts", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("CK_AuthenticationCutover_Authority", "authority IN ('Environment','Infisical','UserSecrets')")
+                                .HasName("ck_authenticationcutover_authority");
+
+                            t.HasCheckConstraint("CK_AuthenticationCutover_Counts", "(cleaned_setting_count IS NULL OR cleaned_setting_count >= 0) AND (cleaned_binding_count IS NULL OR cleaned_binding_count >= 0)")
+                                .HasName("ck_authenticationcutover_counts");
+
+                            t.HasCheckConstraint("CK_AuthenticationCutover_State", "state IN ('Prepared','Collecting','ReadyForCleanup','Cleaned','Failed','Expired','Superseded')")
+                                .HasName("ck_authenticationcutover_state");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.Secrets.AuthenticationCredentialCutoverHead", b =>
+                {
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instance_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid>("CurrentOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_operation_id");
+
+                    b.HasKey("InstanceId")
+                        .HasName("pk_authentication_credential_cutover_heads");
+
+                    b.HasIndex("InstanceId", "CurrentOperationId")
+                        .HasDatabaseName("ix_authentication_credential_cutover_heads_instanc_ef2fabeb7905");
+
+                    b.ToTable("authentication_credential_cutover_heads", "islamu_event");
+                });
+
             modelBuilder.Entity("Explore.Domain.Secrets.SecretBinding", b =>
                 {
                     b.Property<Guid>("Id")
@@ -48059,6 +48175,17 @@ namespace Explore.Persistence.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Secrets.AuthenticationCredentialCutoverHead", b =>
+                {
+                    b.HasOne("Explore.Domain.Secrets.AuthenticationCredentialCutover", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId", "CurrentOperationId")
+                        .HasPrincipalKey("InstanceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_authentication_credential_cutover_heads_authent_6202fed73daa");
                 });
 
             modelBuilder.Entity("Explore.Domain.Secrets.SecretBinding", b =>

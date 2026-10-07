@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Secrets;
@@ -79,6 +80,27 @@ public partial class ExploreDbContext
 
         foreach (var entry in ChangeTracker.Entries())
         {
+            if (entry.Entity is SystemSetting credentialSetting
+                && entry.State is EntityState.Added or EntityState.Modified
+                && (credentialSetting.SettingKey is InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret
+                    or InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret
+                    || entry.Property(nameof(SystemSetting.SettingKey)).OriginalValue is
+                        InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret
+                        or InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret))
+            {
+                throw new InvalidOperationException("authentication_credential_setting_retired");
+            }
+
+            if (entry.Entity is SecretBinding credentialBinding
+                && entry.State is EntityState.Added or EntityState.Modified
+                && (AuthenticationCredentialCustodyPolicy.IsRuntimeCredentialKey(credentialBinding.SettingKey)
+                    || entry.Property(nameof(SecretBinding.SettingKey)).OriginalValue is string originalKey
+                        && AuthenticationCredentialCustodyPolicy.IsRuntimeCredentialKey(originalKey))
+                && !AuthenticationCredentialCustodyPolicy.HasCanonicalRuntimeReference(credentialBinding))
+            {
+                throw new InvalidOperationException("authentication_runtime_reference_invalid");
+            }
+
             if (entry.Entity is Explore.Domain.WebhookAuditEvent
                 && entry.State is EntityState.Modified or EntityState.Deleted)
             {

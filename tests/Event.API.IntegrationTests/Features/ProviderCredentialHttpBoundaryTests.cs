@@ -231,10 +231,10 @@ public sealed class ProviderCredentialHttpBoundaryTests
     }
 
     [Test]
-    [Arguments(false, false, HttpStatusCode.OK)]
-    [Arguments(true, false, HttpStatusCode.Forbidden)]
-    [Arguments(false, true, HttpStatusCode.Gone)]
-    public async Task InternalAuthConfigurationGetIsPrivateNoStore(bool missingSecret, bool completed, HttpStatusCode expected)
+    [Arguments(false, false, HttpStatusCode.NotFound)]
+    [Arguments(true, false, HttpStatusCode.NotFound)]
+    [Arguments(false, true, HttpStatusCode.NotFound)]
+    public async Task RetiredAuthConfigurationGetRemainsUnavailable(bool missingSecret, bool completed, HttpStatusCode expected)
     {
         await using var fixture = await Fixture.CreateAsync();
         if (completed) fixture.Setup.Lock();
@@ -243,9 +243,10 @@ public sealed class ProviderCredentialHttpBoundaryTests
         request.Headers.Add("Idempotency-Key", Canary());
         using var response = await fixture.Client.SendAsync(request);
         await Assert.That(response.StatusCode).IsEqualTo(expected);
+        string body = await response.Content.ReadAsStringAsync();
+        await Assert.That(body.Contains(fixture.Setup.Secret, StringComparison.Ordinal)).IsFalse();
         await Assert.That(response.Headers.Contains("X-Idempotency-Replay")).IsFalse();
         await Assert.That(await fixture.RecordCountAsync()).IsEqualTo(0);
-        await AssertPrivateAsync(response);
     }
 
     [Test]
@@ -635,17 +636,10 @@ public sealed class ProviderCredentialHttpBoundaryTests
             KeycloakAuthority =
                 ExternalApiPhase0WebApplicationFactory.TestIssuer,
             KeycloakClientId = "boundary-bff",
-            KeycloakClientSecret = Canary()
+            KeycloakClientSecretOwnership = new() { Configured = true, Editable = false }
         };
         public Task<AuthProviderConfigurationDto>
             ReadConfigurationAsync() =>
-            Task.FromResult(
-                _configuration with
-                {
-                    KeycloakClientSecret = string.Empty
-                });
-        public Task<AuthProviderConfigurationDto>
-            ReadConfigurationWithSecretsAsync() =>
             Task.FromResult(_configuration with { });
         public Task<bool> IsConfiguredAsync() => Task.FromResult(true);
         public Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration, IReadOnlySet<string>? suppliedKeys = null, CancellationToken cancellationToken = default)

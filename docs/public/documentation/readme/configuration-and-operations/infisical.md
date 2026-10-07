@@ -27,7 +27,7 @@ ISLAMU Event authenticates with **Universal Auth** only.
 
 1. Create a Machine Identity in the organization.
 2. Attach a **Universal Auth** authentication method and generate a Client ID and Client Secret.
-3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity must be limited to `/keycloak`, `/blazor` and `/atproto` frontend values, not `/`, `/database` or `/api`. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
+3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity reads the exact `/runtime/bff/oidc/keycloak` and `/runtime/bff/oidc/google` roots, plus the separate `/runtime/bff/atproto/oauth` signing-key root. Do not grant it `/`, legacy `/keycloak`, `/blazor`, `/atproto`, `/database` or `/api` access. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
 4. Copy the project UUID from the project settings page.
 
 These four values plus the environment slug are *secret zero*: they live in the deployment environment, never inside Infisical itself.
@@ -70,9 +70,12 @@ Before upgrading:
    Supply such values through the provisioning/container environment only to the
    backend service that owns them. BFF loading now rejects backend/root paths and
    database configuration placed inside frontend folders.
-3. Retain the actual `secretPath` in recursive Infisical responses. Custom proxies
-   must not strip it: missing or out-of-scope provenance fails startup. Child
-   folders keep their own namespace and cannot overwrite parent database values.
+3. Provision BFF values in the dedicated runtime roots below before replacing the
+   BFF processes. Reads are nonrecursive and do not expand secret references;
+   custom proxies must retain the exact `secretPath`. Missing or mismatched
+   provenance, unresolved references and unrelated keys fail startup. Child
+   folders are not accepted. Keep the prior deployment available until the
+   replacement is verified; changing these paths does not delete legacy values.
 4. Keep the same five bootstrap inputs and explicit provider selection. Startup
    and runtime provider binding now use the same validated authority and path set;
    there is no implicit runtime root-folder read.
@@ -185,14 +188,77 @@ Do not remove unrelated provider credentials or change the selected secret autho
 
 ### `/blazor`
 
-Read by the `Explore.Blazor` BFF.
+This legacy folder is not acquired by the BFF. Supply nonsecret `API_ENDPOINT`
+and `BFF_ADMIN_HOSTS` through deployment configuration. Provision Google
+credentials at `/runtime/bff/oidc/google` instead.
 
 | Key | Purpose |
 |---|---|
 | `API_ENDPOINT` | Absolute base URL the BFF uses to reach `Explore.API`. |
 | `BFF_ADMIN_HOSTS` | Optional comma-separated list of dedicated admin hostnames (e.g. `admin.example.org`). |
-| `GOOGLE_CLIENT_ID` | Optional Google SSO client identifier. |
-| `GOOGLE_CLIENT_SECRET` | Optional Google SSO client secret. |
+
+### BFF runtime roots
+
+| Exact root | Accepted keys |
+|---|---|
+| `/runtime/bff/oidc/keycloak` | `KEYCLOAK_ENDPOINT`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_BLAZOR_CLIENT_SECRET` |
+| `/runtime/bff/oidc/google` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| `/runtime/bff/atproto/oauth` | `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` only |
+
+The ATProto root is a separate signing-key consumer, not a third OIDC provider.
+Do not place session-encryption or session-JWT signing material in any BFF root.
+
+For Google/Keycloak credential replacement, use a coordinated maintenance
+restart. Provision the selected authority, start replacement BFF processes, and
+independently verify every expected replica before retiring any old reader.
+Set `AUTHENTICATION_CREDENTIAL_PROFILE_REVISION` to a new nonempty UUID identifying
+the approved provisioning profile, and inject it into every owning API/BFF process.
+Change it whenever that profile changes. It is public deployment metadata, not a
+credential and not a vault-returned key. Forward it explicitly through Compose
+service overrides. Missing or invalid metadata blocks credential maintenance.
+When Environment is selected instead of Infisical, inject the optional
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` inputs into the owning BFF process.
+Keep the credential out of application settings and provide explicit Compose
+service overrides rather than assuming `.env` entries are automatically forwarded.
+An authentication metadata refresh reuses the process's acquired credential;
+it does not refresh Infisical credential contents.
+
+Each process has a fresh boot identity and each acquired consumer has a random
+generation identity. These identify the process and acquisition, not the
+credential value. Freeze exact replacement membership only after the processes
+have started and been independently associated with the intended deployment.
+One healthy replica, successful provider discovery, or an opaque generation
+identity cannot prove fleet convergence.
+
+Before any separately authorized legacy cleanup or rotation, verify termination
+of every old process and fencing of its writers and sessions. Retain interrupted
+cutover history; restore approved external provisioning and restart replacements
+when recovery is needed, rather than returning credentials to application
+settings or deleting evidence.
+
+The administrator workflow uses
+`/api/admin/instance/authentication-credential-cutovers`. Read GET `current`
+before writing; an empty current operation returns 204. POST the collection to
+approve the exact replacement deployment/replica/boot/consumer/generation
+inventory, then POST `activations` for independently checked acquisitions and
+POST `fence` for the three verified old-process/writer/session fences. Keep the
+returned operation ID and current head/operation stamps. Preparation assigns
+the current instance, actor, selected profile and 15-minute deadline server-side;
+these are not caller-selected privileges.
+
+Inspect each replacement BFF directly through authenticated GET
+`/bff/auth/credential-acquisition-receipts`. Inspection checks fresh API-issued
+administrator capability and matching deployment profile. An installed flag
+means the process installed that acquisition into its named OIDC scheme, not
+that all replicas or provider credentials have been verified. Never treat an
+opaque generation as proof of credential contents.
+
+After a lost reply or conflict, reauthorize and read GET `current` or GET
+`{operationId}` to recover the retained receipt before deciding the next action.
+Do not blindly resubmit stale stamps. `ReadyForCleanup` is evidence readiness,
+not completed retirement: counts remain uncommitted until the separately
+authorized exact cleanup succeeds. Superseded and expired receipts remain
+history, not permission to mutate the replacement deployment.
 
 ### `/keycloak`
 
@@ -389,7 +455,7 @@ Required only when AT Protocol login is enabled.
 
 | Key | Purpose |
 |---|---|
-| `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | OAuth client private key set used by the BFF. |
+| `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | BFF value belongs at `/runtime/bff/atproto/oauth`, not this backend folder. |
 | `ATPROTO_SESSION_ENCRYPTION_KEYRING` | Session-envelope encryption keyring. |
 | `ATPROTO_SESSION_JWT_PRIVATE_JWKS` | First-party session JWT signing key set. |
 
@@ -466,11 +532,11 @@ Each host reads a bounded folder list at startup. A key placed outside the folde
 | Host | Folders read at startup |
 |---|---|
 | `Explore.API` | `/keycloak`, `/database`, `/database/erasure`, `/database/identity`, `/api` (including subfolders `/api/controlplane`, `/api/operator-identity`, `/api/bootstrap`, `/api/webpush`, `/api/ratelimiting`), `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
-| `Explore.Blazor` (BFF) | `/keycloak`, `/blazor`, `/atproto` |
+| `Explore.Blazor` (BFF) | Exact `/runtime/bff/oidc/keycloak`, `/runtime/bff/oidc/google`, `/runtime/bff/atproto/oauth`; no recursion or reference expansion |
 | `Explore.AppHost` (Aspire) | `/keycloak`, `/database`, `/database/erasure`, `/api`, `/blazor`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
 | Migration and design-time factories | `/database`, `/database/erasure`, `/database/identity` |
 
-Folder reads are recursive, so a request for `/database` also returns the secrets stored under `/database/erasure` and `/database/identity`, and a request for `/api` also returns its subfolders (`/api/controlplane`, `/api/operator-identity`, `/api/bootstrap`, `/api/webpush`, `/api/ratelimiting`). This is why subfolder key names must stay distinct from their parent's key names.
+Backend folder reads are recursive, so a request for `/database` also returns the secrets stored under `/database/erasure` and `/database/identity`, and a request for `/api` also returns its subfolders (`/api/controlplane`, `/api/operator-identity`, `/api/bootstrap`, `/api/webpush`, `/api/ratelimiting`). This is why subfolder key names must stay distinct from their parent's key names. The BFF uses exact, nonrecursive reads instead.
 
 ---
 

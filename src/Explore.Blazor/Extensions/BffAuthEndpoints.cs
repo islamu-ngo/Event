@@ -1131,10 +1131,8 @@ public static class BffAuthEndpoints
         ctx.Response.Headers.CacheControl = "no-store, no-cache";
         ctx.Response.Headers.Pragma = "no-cache";
 
-        var setupSecretResolution = ctx.RequestServices.GetRequiredService<ISetupSecretResolver>().Resolve(ctx);
-        var setupSecret = setupSecretResolution.Found ? setupSecretResolution.Secret : null;
         var schemeManager = ctx.RequestServices.GetRequiredService<IDynamicAuthSchemeManager>();
-        await schemeManager.RefreshSchemesAsync(setupSecret);
+        await schemeManager.RefreshSchemesAsync();
 
         var registered = await schemeManager.GetRegisteredProviderSchemesAsync();
         await ctx.Response.WriteAsJsonAsync(new { refreshed = true, providers = registered });

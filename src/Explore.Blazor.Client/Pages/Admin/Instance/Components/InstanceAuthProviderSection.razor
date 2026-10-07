@@ -212,7 +212,16 @@
                         @if (Model.GoogleSsoEnabled == true)
                         {
                             <MudTextField Variant="Variant.Outlined" T="string" Label="Client ID" @bind-Value="Model.GoogleClientId" />
-                            <MudTextField Variant="Variant.Outlined" T="string" Label="Client Secret" InputType="InputType.Password" @bind-Value="Model.GoogleClientSecret" />
+                            <MudAlert Severity="@(Model.GoogleClientSecretOwnership?.Configured == true ? Severity.Info : Severity.Warning)" Dense="true">
+                                <MudText Typo="Typo.body2">
+                                    @(Model.GoogleClientSecretOwnership?.Configured == true
+                                        ? "The Google client secret is configured by deployment."
+                                        : "The Google client secret is not confirmed configured by deployment.")
+                                </MudText>
+                                <MudText Typo="Typo.body2">
+                                    Configure or rotate it in Google and the selected secret authority, restart affected replicas, then reload this page and verify sign-in. This page cannot edit the client secret.
+                                </MudText>
+                            </MudAlert>
                         }
 
                         <section class="instance-auth-provider__visitor-onboarding"
@@ -297,8 +306,8 @@
 
                 <MudPaper Outlined="true" Class="pa-4" Style="@GetAuthorizationCardStyle(CerbosProvider)">
                     <MudStack Spacing="2">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2" Wrap="Wrap.Wrap">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Wrap="Wrap.Wrap">
                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">Cerbos (External PDP)</MudText>
                                 <MudTooltip Text="Route protected authorization checks to Cerbos. When selected, authorized requests are denied if Cerbos is unavailable.">
                                     <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
@@ -523,13 +532,12 @@
         if (providerId == KeycloakProviderId
             && (string.IsNullOrWhiteSpace(Model.KeycloakAuthority)
                 || string.IsNullOrWhiteSpace(Model.KeycloakClientId)
-                || (string.IsNullOrWhiteSpace(Model.KeycloakClientSecret)
-                    && Model.KeycloakClientSecretOwnership?.Configured != true)))
+                || Model.KeycloakClientSecretOwnership?.Configured != true))
         {
             await DialogService.ShowMessageBoxAsync(new MessageBoxOptions
             {
                 Title = "Prepare Keycloak first",
-                Message = "Enter the Keycloak authority, client ID, and client secret, then verify the target realm before switching.",
+                Message = "Enter the Keycloak authority and client ID, configure the client secret through the selected deployment secret authority, restart affected replicas, then reload and verify the target realm before switching.",
                 YesText = "OK"
             }, DialogOptionsFactory.Confirmation());
             return;
@@ -605,7 +613,6 @@
         {
             Model.AtprotoLoginEnabled = true;
             Model.GoogleSsoEnabled = false;
-            Model.GoogleClientSecret = string.Empty;
         }
     }
 

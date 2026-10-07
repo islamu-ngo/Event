@@ -13,7 +13,8 @@ namespace Explore.Persistence.Services;
 /// Holds the actual user, ownership, membership and permission rows through the issuance commit.
 /// </summary>
 public sealed class ExternalApiKeyIssuanceAuthority(
-    ExploreDbContext dbContext, IHttpContextAccessor httpContextAccessor) : IExternalApiKeyIssuanceAuthority
+    ExploreDbContext dbContext, IHttpContextAccessor httpContextAccessor)
+    : IExternalApiKeyIssuanceAuthority, IInstanceAdministratorCommitAuthority
 {
     /// <summary>
     /// Reacquires persisted issuance authority in the caller-owned transaction before creation
@@ -26,10 +27,10 @@ public sealed class ExternalApiKeyIssuanceAuthority(
     {
         if (!HasValidIssuanceScope(principalId, tenantId, ownerType, ownerId))
             return false;
+        if (ownerType == ExternalApiKeyOwnerType.InstanceAdmin)
+            return await IsInstanceAdministratorForCommitAsync(principalId, cancellationToken);
         if (!await FencePrincipalAsync(principalId, cancellationToken))
             return false;
-        if (ownerType == ExternalApiKeyOwnerType.InstanceAdmin)
-            return await FencePlatformAdministratorAsync(principalId, cancellationToken);
 
         Guid scope = tenantId!.Value;
         if (!await FenceActiveTenantAsync(scope, cancellationToken))
@@ -46,6 +47,12 @@ public sealed class ExternalApiKeyIssuanceAuthority(
             _ => false
         };
     }
+
+    public async Task<bool> IsInstanceAdministratorForCommitAsync(
+        Guid principalId, CancellationToken cancellationToken) =>
+        principalId != Guid.Empty
+        && await FencePrincipalAsync(principalId, cancellationToken)
+        && await FencePlatformAdministratorAsync(principalId, cancellationToken);
 
     /// <summary>
     /// Rejects invalid owner identities before any fence. Global ownership requires the principal

@@ -17,11 +17,7 @@ public interface IDynamicAuthSchemeManager
     /// Re-reads auth provider configuration from the API and updates registered schemes.
     /// Called after auth config is saved during setup or from admin settings.
     /// </summary>
-    /// <param name="setupSecret">
-    /// Optional setup secret to include in the API request. When provided, the internal
-    /// endpoint is called which returns credentials (client secrets) needed for OIDC scheme registration.
-    /// </param>
-    Task RefreshSchemesAsync(string? setupSecret = null);
+    Task RefreshSchemesAsync();
 
     /// <summary>
     /// Returns the scheme names of all currently registered dynamic auth providers.

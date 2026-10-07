@@ -374,7 +374,7 @@ public class InstanceOnboardingServiceTests
     #region AuthProviderConfigurationAsync
 
     [Test]
-    public async Task GetAuthProviderConfigurationAsync_UsesPublicRedactedEndpoint()
+    public async Task GetAuthProviderConfigurationAsync_UsesPublicCredentialMetadataEndpoint()
     {
         // Arrange
         Uri? requestUri = null;
@@ -383,7 +383,7 @@ public class InstanceOnboardingServiceTests
             PrimaryProviderId = KeycloakProviderId,
             KeycloakAuthority = "https://keycloak.example.com/auth/realms/ISLAMU",
             KeycloakClientId = "islamu-event-blazor",
-            KeycloakClientSecret = string.Empty,
+            KeycloakClientSecretOwnership = new() { Configured = true, Editable = false },
             KeycloakDetectedFromEnvironment = true,
             _links = new Dictionary<string, HalLink> { ["verify-email"] = new() { Href = "/api/auth/local/email-verifications" } }
         };
@@ -400,7 +400,8 @@ public class InstanceOnboardingServiceTests
         await Assert.That(requestUri).IsNotNull();
         await Assert.That(requestUri!.AbsolutePath).IsEqualTo("/api/instanceonboarding/auth-provider-configuration");
         await Assert.That(result.KeycloakDetectedFromEnvironment).IsTrue();
-        await Assert.That(result.KeycloakClientSecret).IsEmpty();
+        await Assert.That(result.KeycloakClientSecretOwnership?.Configured).IsTrue();
+        await Assert.That(result.KeycloakClientSecretOwnership?.Editable).IsFalse();
         var links = (JsonElement)result.AdditionalProperties["_links"];
         await Assert.That(links.GetProperty("verify-email").GetProperty("href").GetString()).IsEqualTo("/api/auth/local/email-verifications");
     }

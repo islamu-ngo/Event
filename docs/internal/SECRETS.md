@@ -25,6 +25,32 @@ update Keycloak and the selected environment/Infisical authority, restart all
 affected replicas, run read-only inspection, then verify a fresh user sign-in.
 Event provides this guidance but performs no live rotation or fallback copy.
 
+## Authentication Configuration Is Not Credential Custody
+
+`AuthProviderConfigurationDto` returns nonsecret provider configuration and
+deployment-owned credential metadata only. It has no Google or Keycloak
+client-secret value member. Google ownership comes from the instance-only
+`ISecretResolver` outcome; Keycloak ownership uses the existing bounded connection
+resolution. `ResolutionStatus` distinguishes resolved, unconfigured, unavailable,
+unauthorized and invalid outcomes without provider diagnostics or values. Other
+ownership capabilities may omit this optional status.
+
+Ordinary authentication PATCH cannot accept a Google credential. Its write
+contract rejects unmapped members and the configuration service no longer writes
+`auth.google_client_secret` into SystemSetting. The retired internal credential
+readback endpoint and service method are removed; onboarding HAL points to the
+public metadata endpoint. The BFF reads that metadata at startup and refresh,
+using only its own selected-authority credential projection. It has no
+last-known-secret fallback or setup-secret-triggered credential reader.
+
+Runtime Google, Keycloak BFF and ATProto frontend bindings must use the registry's
+exact instance coordinates and selected environment. Admission happens before
+the credential cache or source dispatch, so a mutated reference cannot recover
+an older cached value. This does not delete legacy settings/bindings: removal
+requires the maintenance cutover and exact cleanup transaction. A resolved
+credential proves acquisition, not a successful user sign-in or completed
+multi-process convergence.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as
@@ -332,15 +358,143 @@ the intended authority is not a migration. Follow the existing privacy-erasure
 backup/restore/reset policy before intentionally changing topology. This repair
 performs no automatic authority migration or database schema change.
 
-The isolated Blazor Infisical provider admits only `/keycloak`, `/blazor` and
-`/atproto` roots and their frontend subpaths. Backend/root paths and database
-configuration keys (including `KEYCLOAK_DB_PASSWORD`) fail closed, even when placed
-in a frontend folder. Restrict the BFF machine identity independently of the API
-and provisioning identities. Supply database/container credentials only to their
-backend consumers; do not expose them through a BFF-readable folder. Nested
-secrets use their actual folder namespace rather than a global flat alias.
+The isolated Blazor Infisical provider validates exact requested roots before
+authenticating: `/runtime/bff/oidc/keycloak`, `/runtime/bff/oidc/google`, and the
+separate ATProto consumer `/runtime/bff/atproto/oauth`. Descendants and legacy
+`/keycloak`, `/blazor`, `/atproto` requests are rejected. Every acquisition sets
+`recursive=false` and `expandSecretReferences=false`. Returned `secretPath` must
+equal the requested root; missing provenance, unresolved `${...}` references,
+duplicate configuration keys and keys outside the consumer's closed mapping
+fail startup. There is no load-failure suppression mode.
+
+The Keycloak mapping permits endpoint, realm, client ID and the BFF client secret;
+Google permits its client ID and secret; ATProto permits only
+`ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS`. Restrict the BFF machine identity to these
+exact roots independently of API/provisioning identities. Supply database,
+session-encryption and session-JWT credentials only to their owning backend.
+Nonsecret API routing and provider selection remain deployment configuration.
 This is provider admission enforcement, not a claim that process environment
 variables or a standalone host's shared backend configuration are scrubbed.
+
+### Authentication coordinated-restart evidence
+
+`InstanceAuthenticationCredentialCutoversController` exposes the metadata-only
+native operations under `/api/admin/instance/authentication-credential-cutovers`:
+GET `current`, GET `{operationId}`, POST the collection to prepare, POST
+`activations`, POST `fence`, GET `{operationId}/cleanup-targets`, and POST `cleanup`.
+Secure requests use the instance-setting
+permission boundary and current persisted administrator authority. Inputs cannot
+select the current instance, actor, authority profile or clock. Preparation
+snapshots the explicitly approved replacement inventory with a server-owned
+15-minute deadline. Reads recover retained exact receipts; an empty current
+operation returns 204. Every response is private/no-store, and mutations suppress
+generic idempotency response storage so cached transport replies cannot replace
+current authorization or feature-owned recovery.
+
+The BFF GET `/bff/auth/credential-acquisition-receipts` requires authentication and
+a fresh generated instance-overview GET capability. It compares local acquisition
+authority/profile metadata with the independently selected API profile before
+returning fixed value-free local receipts. It does not consult local role claims,
+enroll replicas, write cutover state or attest credential contents. Missing
+capability denies inspection; mismatched or absent local acquisition rejects it.
+Overview capabilities are absent until bootstrap completes and the deployment
+profile is valid. Metadata refresh does not establish fleet convergence.
+
+`AUTHENTICATION_CREDENTIAL_PROFILE_REVISION` is an optional, nonsecret
+deployment-owned UUID. It must be nonempty and valid before credential maintenance
+is allowed. Change it whenever the approved provisioning or binding profile changes,
+and restart every owning API/BFF process. Compose operators explicitly forward it
+through their service overrides; it is not a secret or an Infisical-returned key.
+`AuthenticationCredentialProfileReader` reads that explicit process environment
+input and the validated selected provider locally, without credential acquisition
+or health HTTP. Transaction owners must compare both fields with the persisted
+approved operation; a request field cannot substitute for this independent read.
+For the Environment authority, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+are optional BFF runtime inputs. The catalogue classifies the client ID as public
+and the credential as Secret; its secret-binding projection includes the actual
+Google registry definition. Explicitly forward only to the owning processes.
+
+`AuthenticationCredentialAcquisitionReceipts` records successful BFF acquisition
+with a fresh process boot identity and a random identity for each acquired
+Google/Keycloak consumer. Named OIDC installation is recorded separately:
+an existing options-cache or scheme entry is not proof that the newly acquired
+credential was installed. Metadata refresh reuses the process acquisition;
+it does not obtain a new credential or invent a new generation.
+Receipts contain no credential values, credential digests or provider coordinates.
+They are correlation evidence, not cryptographic proof of credential contents.
+
+Start replacement processes before approving exact boot/generation membership.
+The operator independently verifies which instance, deployment and replica each
+directly inspected process represents. Approval freezes that inventory; later
+activation cannot enroll another process or consumer.
+
+The native provider tests exercise actual authorization-code and refresh-token
+exchanges against disposable Keycloak, including rejection of a retired client
+credential. `BffAuthenticationCredentialReplicaCutoverTests` separately launches
+two production BFF OS processes, holds a real proxied request through SIGTERM,
+releases it and requires the old PID to exit successfully while its replacement
+remains usable. Factory disposal, scheme installation and a shutdown log alone
+are not termination evidence. These tests do not attest a deployed fleet: the
+operator must verify its exact process inventory and termination before fencing.
+
+`RelationalAuthenticationCredentialCutoverCoordinator` retains receipts and one
+current-operation head per instance. A same-instance composite foreign key
+prevents a head from referencing another instance's receipt. Each transaction
+flushes an optimistic head update before inspecting evidence, then commits
+evidence or predecessor supersession with that update. A competing replacement
+or stale callback cannot commit using the old head stamp. Actual expiry is
+persisted even when the invocation returns an expiry error; already-terminal
+callbacks roll back without changing the head. No remote provider work runs
+inside these transactions.
+
+The coordinator resolves the authenticated actor through `IAdminContext`, then
+holds the current completed bootstrap and real principal/provider-identity/admin
+grant/role row fences in its own serializable context through commit.
+`IInstanceAdministratorCommitAuthority` exposes the existing issuance fence
+without duplicating administrator semantics. Revocation uses ordinary updates
+or deletes of those same rows; an earlier boolean admin check is insufficient.
+Preparation cannot forge its creator, and fence submission cannot forge its
+attesting actor. Every attempt reads the independent selected profile again;
+callers no longer supply an allegedly authoritative profile revision.
+
+`ReadyForCleanup` requires all approved consumer/process acquisitions and the
+explicit old-process, old-writer and old-session fence. It is not a completed
+cleanup result. Keep retained operation history through rollback/replacement;
+do not drop receipt tables to recover an interrupted cutover. Authorization,
+fleet verification and exact legacy deletion remain separate owning boundaries.
+
+Inspection returns only exact row IDs, logical keys and current operation/head
+stamps. The coordinator rechecks the completed current bootstrap, persisted
+administrator and selected authority profile inside a serializable transaction.
+It projects no settings values, provider coordinates or validation diagnostics.
+Settings targets are only `auth.google_client_secret` and
+`auth.keycloak_client_secret`. Binding targets are only noncanonical, unqualified
+instance references under `auth.google_client_secret` and
+`keycloak.blazor_client_secret`. Canonical references, tenants, qualified rows and
+infrastructure credentials remain untouched. Ordinal post-filtering prevents a
+provider's permissive SQL collation from expanding those exact logical keys.
+
+Cleanup approval supplies `operationId`, `deploymentRevision`,
+`expectedHeadStamp`, `expectedOperationStamp`, `approvedSettingIds` and
+`approvedBindingIds`. Both ID arrays are required, contain at most two unique
+nonempty IDs each, and must match the complete current inspected inventory.
+Missing, extra or changed targets conflict without deleting anything. The
+coordinator flushes the head compare-and-swap before reading active evidence,
+holds bootstrap/administrator/profile fences, deletes approved IDs and saves
+`Cleaned` with nonsecret row counts in the same transaction. Cancellation after a
+physical delete rolls back the rows, receipt and head together. No remote
+acquisition, verification or provider deletion runs inside that transaction.
+
+A committed-cleanup retry reauthorizes the current operator and verifies the
+operation's deployment revision, then returns retained counts. It never applies
+the retry's row IDs, reopens cleanup after expiry or deletes again after a later
+replacement/profile change. Generic idempotency response storage is suppressed.
+
+Tracked persistence permanently rejects writes or renames involving either
+retired settings key and rejects noncanonical runtime binding writes. This is not
+a database privilege fence for raw SQL or an obsolete executable: their
+termination and revoked write authority remain part of the independently
+verified operator fence before cleanup.
 
 For full local runs, keep `SECRET_PROVIDER=Environment` and leave `INFISICAL_*` blank
 so local structured `DATABASE_*`, Keycloak, Cerbos, and storage values remain
@@ -446,12 +600,13 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 
 | Infisical Path + Key | .NET Configuration Key |
 |---|---|
-| `/atproto/ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | `auth.atproto.oauth_client_private_jwks`; resolves to BFF `Atproto:OAuthClientPrivateJwks` |
+| `/runtime/bff/atproto/oauth/ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | `auth.atproto.oauth_client_private_jwks`; resolves to BFF `Atproto:OAuthClientPrivateJwks` |
 | `/atproto/ATPROTO_SESSION_ENCRYPTION_KEYRING` | `auth.atproto.session_encryption_keyring`; consumed by Infrastructure session-envelope protection |
 | `/atproto/ATPROTO_SESSION_JWT_PRIVATE_JWKS` | `auth.atproto.session_jwt_private_jwks`; consumed by API first-party session JWT signing/validation |
 | `/keycloak/REALM_NAME` | `Keycloak:RealmName` |
 | `/keycloak/KEYCLOAK_CLIENT_ID` | Nonsecret browser/BFF client metadata mapped to `Keycloak:ClientId` for API onboarding detection. |
-| `/keycloak/KEYCLOAK_BLAZOR_CLIENT_SECRET` | Deployment-owned Blazor BFF runtime credential resolved through the selected authority; Event never persists or rotates it |
+| `/runtime/bff/oidc/keycloak/KEYCLOAK_BLAZOR_CLIENT_SECRET` | Deployment-owned Blazor BFF runtime credential resolved through the selected authority; Event never persists or rotates it |
+| `/runtime/bff/oidc/google/GOOGLE_CLIENT_SECRET` | `auth.google_client_secret`; instance-only deployment-owned Google BFF runtime binding |
 | `/api/CONTROL_PLANE_REGISTRATION_CREDENTIALS` | `management.control_plane_registration_credentials` | Directional managed control-plane registration credentials. This key is instance-only and its binding stores only deployment-owned source metadata. |
 | `/api` or `/cerbos` + `AUTHORIZATION_PROVIDER` | Non-secret `Authorization:Provider` deployment intent. Blank keeps manual Local-first onboarding; `local` or `cerbos` makes the provider deployment-owned and skips the choice page. |
 | root or AI path + `AI_TOOL_PROPOSALS_ENABLED` | `AiProvider:ToolProposalsEnabled` |

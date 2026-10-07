@@ -3,6 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Notifications;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Models;
@@ -23,6 +24,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
     private readonly ISettingMutationLock _mutationLock;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
     private readonly KeycloakConnectionResolver _keycloakConnectionResolver;
+    private readonly ISecretResolver _secretResolver;
     private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
     public AuthProviderConfigurationService(
@@ -32,6 +34,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         ISettingMutationLock mutationLock,
         IVisitorAccessSettingsWriter visitorSettings,
         KeycloakConnectionResolver keycloakConnectionResolver,
+        ISecretResolver secretResolver,
         IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
     {
         _systemSettingRepository = systemSettingRepository;
@@ -40,6 +43,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         _mutationLock = mutationLock;
         _visitorSettings = visitorSettings;
         _keycloakConnectionResolver = keycloakConnectionResolver;
+        _secretResolver = secretResolver;
         _notificationHandlers = notificationHandlers;
     }
 
@@ -123,6 +127,8 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         var atprotoPublicUrl = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.AtprotoPublicUrl);
         var googleSsoEnabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled);
         var googleClientId = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GoogleClientId);
+        SecretResolutionResult googleCredential = await _secretResolver.ResolveAsync(
+            SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret, tenantId: null);
         return new AuthProviderConfigurationDto
         {
             PrimaryProviderId = (int)primaryProvider,
@@ -132,21 +138,27 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                                   || primaryProviderSetting?.IsLocked == true,
             KeycloakAuthority = keycloak.Authority,
             KeycloakClientId = keycloak.ClientId,
-            KeycloakClientSecret = string.Empty, // Never return secrets on read
             KeycloakDetectedFromEnvironment = keycloak.DetectedFromEnvironment,
             KeycloakClientSecretOwnership = CreateOwnershipMetadata(
                 deploymentManaged: true,
                 configured: connection.Status == KeycloakConnectionStatus.Resolved,
                 bootstrapAvailable: false,
                 applicationManagedDescription: "Keycloak runtime credentials must be bound through the selected deployment secret authority.",
-                deploymentManagedDescription: "Keycloak client credentials are deployment-owned. Event never stores or rotates an existing client secret."),
+                deploymentManagedDescription: "Keycloak client credentials are deployment-owned. Event never stores or rotates an existing client secret.")
+                with { ResolutionStatus = connection.Status.ToString() },
             AtprotoLoginEnabled = primaryProvider == AuthenticationProviderKind.Atproto
                                   || DeserializeBoolean(atprotoLoginEnabled?.Value, false),
             AtprotoPublicUrl = DeserializeString(atprotoPublicUrl?.Value, string.Empty),
             GoogleSsoEnabled = primaryProvider != AuthenticationProviderKind.Atproto
                 && DeserializeBoolean(googleSsoEnabled?.Value, false),
             GoogleClientId = DeserializeString(googleClientId?.Value, string.Empty),
-            GoogleClientSecret = string.Empty, // Never return secrets on read
+            GoogleClientSecretOwnership = CreateOwnershipMetadata(
+                deploymentManaged: true,
+                configured: googleCredential.IsResolved,
+                bootstrapAvailable: false,
+                applicationManagedDescription: "Google runtime credentials must be bound through the selected deployment secret authority.",
+                deploymentManagedDescription: "Google client credentials are deployment-owned. Configure and rotate them through the selected secret authority.")
+                with { ResolutionStatus = googleCredential.Status.ToString() },
             LockAtprotoLoginEnabled = atprotoLoginEnabled?.IsLocked == true,
             LockGoogleSsoEnabled = googleSsoEnabled?.IsLocked == true,
             KeycloakPublicOnboardingPolicy = ReadOnboardingPolicy((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy))?.Value),
@@ -275,19 +287,6 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             "Google OAuth client ID",
             cancellationToken);
 
-        if (!string.IsNullOrEmpty(configuration.GoogleClientSecret))
-        {
-            await UpsertSettingAsync(
-                InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret,
-                JsonSerializer.Serialize(configuration.GoogleClientSecret),
-                SettingValueType.String,
-                true,
-                "Authentication",
-                9,
-                "Google OAuth client secret",
-                cancellationToken);
-        }
-
         foreach (var (key, value) in new[] {
             (GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy, configuration.KeycloakPublicOnboardingPolicy.ToString()),
             (GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl, configuration.KeycloakPublicSignupUrl),
@@ -322,26 +321,6 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                || keycloak.Enabled
                || DeserializeBoolean(atprotoEnabled?.Value, false)
                || DeserializeBoolean(googleEnabled?.Value, false);
-    }
-
-    public async Task<AuthProviderConfigurationDto> ReadConfigurationWithSecretsAsync()
-    {
-        KeycloakConnectionResolution connection =
-            await _keycloakConnectionResolver.ResolveRuntimeAsync();
-        var dto = await ReadConfigurationCoreAsync(connection);
-        var googleSecret = await _systemSettingRepository.GetByKey(InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret);
-        if (connection.Status == KeycloakConnectionStatus.Resolved)
-        {
-            dto = dto with
-            {
-                KeycloakAuthority = connection.Authority!.AbsoluteUri.TrimEnd('/'),
-                KeycloakClientId = connection.BlazorClientId!
-            };
-            dto.KeycloakClientSecret = connection.ClientSecret!;
-        }
-        dto.GoogleClientSecret = DeserializeString(googleSecret?.Value, string.Empty);
-
-        return dto;
     }
 
     private async Task<(bool Enabled, string Authority, string ClientId, bool DetectedFromEnvironment)>

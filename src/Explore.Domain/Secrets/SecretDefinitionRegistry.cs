@@ -129,6 +129,7 @@ public static class SecretDefinitionRegistry
 
         public static class Authentication
         {
+            public const string GoogleClientSecret = InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret;
             public const string LocalJwtKey = "authentication.local.jwt_key";
             public const string LocalBootstrapPassword = "authentication.local.bootstrap_password";
             public const string AgentBrowserPersonaPassword = "authentication.local.agent_browser_persona_password";
@@ -435,11 +436,22 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Keycloak.BlazorClientSecret,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/bff/oidc/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_BLAZOR_CLIENT_SECRET",
                 DefaultEnvironmentVariableName = "KEYCLOAK_BLAZOR_CLIENT_SECRET",
                 IsBootstrapSecret = false,
                 Description = "Keycloak OIDC client secret for the Blazor Server BFF (confidential client).",
+            },
+            new()
+            {
+                Key = Keys.Authentication.GoogleClientSecret,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/runtime/bff/oidc/google",
+                DefaultInfisicalKey = "GOOGLE_CLIENT_SECRET",
+                DefaultEnvironmentVariableName = "GOOGLE_CLIENT_SECRET",
+                IsBootstrapSecret = false,
+                Description = "Deployment-owned Google OAuth confidential-client credential for the Blazor BFF.",
             },
             new()
             {
@@ -592,7 +604,7 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Atproto.OAuthClientPrivateJwks,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/atproto",
+                DefaultInfisicalPath = "/runtime/bff/atproto/oauth",
                 DefaultInfisicalKey = "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS",
                 DefaultEnvironmentVariableName = "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS",
                 IsBootstrapSecret = false,

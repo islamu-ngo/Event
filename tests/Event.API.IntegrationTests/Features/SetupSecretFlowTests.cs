@@ -217,7 +217,7 @@ public class SetupSecretFlowTests
     }
 
     [Test]
-    public async Task SetupProtectedInternalEndpoint_AfterBootstrapComplete_ShouldReturn410Gone()
+    public async Task RetiredSecretReadbackEndpoint_AfterBootstrapComplete_ShouldReturnNotFound()
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
@@ -238,7 +238,7 @@ public class SetupSecretFlowTests
 
         var response = await client.SendAsync(internalRequest);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Gone);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
     #region Helpers
@@ -407,6 +407,8 @@ public class SetupSecretFlowTests
 
 internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFactory
 {
+    protected override bool UsesPostgreSqlContainer => false;
+
     internal const string Issuer = "https://auth.example.com";
     internal static string SetupSecret { get; } = RequireSecret("SETUP_SECRET");
     private readonly string _databasePath = Path.Combine(
@@ -421,6 +423,9 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
 
     public OnboardingWebApplicationFactory()
     {
+        AdditionalConfiguration["Database:Provider"] = "Sqlite";
+        AdditionalConfiguration["Database:Database"] = _databasePath;
+        AdditionalConfiguration["Database:Runtime:Database"] = _databasePath;
         AdditionalConfiguration["SETUP_SECRET"] = SetupSecret;
         AdditionalConfiguration["Authorization:Provider"] = "local";
         AdditionalConfiguration["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite";

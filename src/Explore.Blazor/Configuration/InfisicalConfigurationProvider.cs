@@ -9,7 +9,8 @@ using Microsoft.Extensions.Configuration;
 public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource source)
     : ConfigurationProvider
 {
-    private static readonly string[] FrontendRoots = ["/keycloak", "/blazor", "/atproto"];
+    private static readonly string[] FrontendRoots =
+        ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"];
 
     public override void Load()
     {
@@ -25,15 +26,9 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
         }
         catch (Exception)
         {
-            if (source.ThrowOnFirstLoadFailure)
-            {
-                throw new InvalidOperationException(
-                    "secret_authority_unavailable: Blazor startup loading failed. "
-                    + "Verify the deployment-owned authority and retry.");
-            }
-
-            Console.Error.WriteLine(
-                "[Infisical] secret_authority_unavailable; verify authority configuration and retry.");
+            throw new InvalidOperationException(
+                "secret_authority_unavailable: Blazor startup loading failed. "
+                + "Verify the deployment-owned authority and retry.");
         }
     }
 
@@ -83,14 +78,16 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
             throw new InvalidOperationException("bff_secret_scope_invalid");
         }
 
-        using var handler = CreateIpv4Handler();
+        using var handler = source.MessageHandlerFactory is { } factory
+            ? factory()
+            : CreateIpv4Handler();
         using var http = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(15),
         };
 
         var baseUrl = source.Url.TrimEnd('/');
-        var loginResponse = http.PostAsJsonAsync(
+        using var loginResponse = http.PostAsJsonAsync(
                 $"{baseUrl}/api/v1/auth/universal-auth/login",
                 new { clientId = source.ClientId, clientSecret = source.ClientSecret })
             .GetAwaiter()
@@ -122,9 +119,9 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
                 + $"?workspaceId={Uri.EscapeDataString(source.ProjectId)}"
                 + $"&environment={Uri.EscapeDataString(source.Environment)}"
                 + $"&secretPath={Uri.EscapeDataString(path)}"
-                + "&expandSecretReferences=true&recursive=true";
+                + "&expandSecretReferences=false&recursive=false";
 
-            var response = http.GetAsync(requestUrl).GetAwaiter().GetResult();
+            using var response = http.GetAsync(requestUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
             {
                 throw ProviderFailure(response.StatusCode);
@@ -135,11 +132,14 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
                 .GetAwaiter()
                 .GetResult();
 
-            foreach (var secret in payload?.Secrets ?? [])
+            if (payload?.Secrets is null)
+                throw new InvalidOperationException("secret_authority_invalid");
+
+            foreach (var secret in payload.Secrets)
             {
                 if (string.IsNullOrEmpty(secret.SecretKey))
                 {
-                    continue;
+                    throw new InvalidOperationException("secret_authority_invalid");
                 }
 
                 var secretPath = ValidateSecretPath(secret.SecretPath, path);
@@ -147,11 +147,12 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
                 {
                     throw new InvalidOperationException("bff_database_configuration_forbidden");
                 }
-                data[ConvertToConfigurationKey(secret.SecretKey, secretPath)] = secret.SecretValue ?? string.Empty;
-                if (secretPath.Equals(path.TrimEnd('/'), StringComparison.Ordinal))
-                {
-                    data[secret.SecretKey] = secret.SecretValue ?? string.Empty;
-                }
+                if (secret.SecretValue is null || secret.SecretValue.Contains("${", StringComparison.Ordinal))
+                    throw new InvalidOperationException("secret_authority_invalid");
+
+                string configurationKey = ConvertToConfigurationKey(secret.SecretKey, secretPath);
+                if (!data.TryAdd(configurationKey, secret.SecretValue))
+                    throw new InvalidOperationException("secret_authority_invalid");
             }
         }
 
@@ -160,11 +161,7 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
 
     private static bool IsFrontendPath(string path)
     {
-        var normalized = path.TrimEnd('/');
-        return !path.Split('/').Any(segment => segment is "." or "..")
-            && !ContainsDatabaseConfiguration(path)
-            && FrontendRoots.Any(root =>
-                normalized == root || normalized.StartsWith(root + "/", StringComparison.Ordinal));
+        return FrontendRoots.Contains(path, StringComparer.Ordinal);
     }
 
     private static bool ContainsDatabaseConfiguration(string key) =>
@@ -179,15 +176,11 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
 
     private static string ValidateSecretPath(string? secretPath, string requestedPath)
     {
-        var path = secretPath?.TrimEnd('/');
-        var root = requestedPath.TrimEnd('/');
-        if (secretPath is null || !secretPath.StartsWith('/')
-            || secretPath.Split('/').Any(segment => segment is "." or "..")
-            || !(path == root || path!.StartsWith(root + "/", StringComparison.Ordinal)))
+        if (!string.Equals(secretPath, requestedPath, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("secret_authority_invalid");
         }
-        return path!;
+        return secretPath!;
     }
 
     private static InvalidOperationException ProviderFailure(HttpStatusCode statusCode) =>
@@ -202,29 +195,17 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
         "bff_secret_scope_invalid" or
         "bff_database_configuration_forbidden";
 
-    private static string ConvertToConfigurationKey(string secretKey, string path)
+    private static string ConvertToConfigurationKey(string secretKey, string path) => (path, secretKey) switch
     {
-        if (secretKey.Equals("AI_TOOL_PROPOSALS_ENABLED", StringComparison.OrdinalIgnoreCase))
-        {
-            return "AiProvider:ToolProposalsEnabled";
-        }
-
-        var pathSegments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var section = string.Join(":", pathSegments.Select(ToPascalCase)) + ":";
-        var sectionPrefix = section.TrimEnd(':').Replace(":", "_", StringComparison.Ordinal).ToUpperInvariant();
-        var key = !string.IsNullOrEmpty(sectionPrefix)
-            && secretKey.StartsWith(sectionPrefix + "_", StringComparison.OrdinalIgnoreCase)
-                ? secretKey[(sectionPrefix.Length + 1)..]
-                : secretKey;
-
-        return section + string.Join(
-            ":",
-            key.Split("__", StringSplitOptions.RemoveEmptyEntries).Select(ToPascalCase));
-    }
-
-    private static string ToPascalCase(string value) => string.Concat(
-        value.Split('_', StringSplitOptions.RemoveEmptyEntries)
-            .Select(static part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+        ("/runtime/bff/oidc/keycloak", "KEYCLOAK_ENDPOINT") => "Keycloak:Endpoint",
+        ("/runtime/bff/oidc/keycloak", "KEYCLOAK_REALM") => "Keycloak:Realm",
+        ("/runtime/bff/oidc/keycloak", "KEYCLOAK_CLIENT_ID") => "Keycloak:ClientId",
+        ("/runtime/bff/oidc/keycloak", "KEYCLOAK_BLAZOR_CLIENT_SECRET") => "Keycloak:BlazorClientSecret",
+        ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID") => "Google:ClientId",
+        ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET") => "Google:ClientSecret",
+        ("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS") => "Atproto:OauthClientPrivateJwks",
+        _ => throw new InvalidOperationException("secret_authority_invalid"),
+    };
 
     private sealed record InfisicalLoginResponse(
         [property: JsonPropertyName("accessToken")] string? AccessToken);

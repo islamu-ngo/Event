@@ -9,7 +9,7 @@ public interface IAuthProviderConfigurationService
 {
     /// <summary>
     /// Reads current auth provider configuration from SystemSetting records.
-    /// Secrets are not returned (write-only).
+    /// Runtime credential readiness is returned without credential material.
     /// </summary>
     Task<AuthProviderConfigurationDto> ReadConfigurationAsync();
 
@@ -25,9 +25,4 @@ public interface IAuthProviderConfigurationService
     /// </summary>
     Task<bool> IsConfiguredAsync();
 
-    /// <summary>
-    /// Reads full auth provider configuration including secrets.
-    /// For internal use by dynamic auth scheme registration only — never expose via API.
-    /// </summary>
-    Task<AuthProviderConfigurationDto> ReadConfigurationWithSecretsAsync();
 }

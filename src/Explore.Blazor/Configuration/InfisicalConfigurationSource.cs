@@ -16,7 +16,10 @@ public sealed class InfisicalConfigurationSource : IConfigurationSource
 
     public List<string> Paths { get; } = ["/"];
 
-    public bool ThrowOnFirstLoadFailure { get; set; } = true;
+    /// <summary>
+    /// Supplies an owned authority transport; omission uses the normal IPv4 handler.
+    /// </summary>
+    public Func<HttpMessageHandler>? MessageHandlerFactory { get; init; }
 
     public IConfigurationProvider Build(IConfigurationBuilder builder) =>
         new InfisicalConfigurationProvider(this);

@@ -205,7 +205,7 @@ public sealed class DynamicAuthInitializationProbe(IServiceScopeFactory scopeFac
         _ = await apiClient.GetEventTypesAsync(cancellationToken: CancellationToken.None);
     }
 
-    public Task RefreshSchemesAsync(string? setupSecret = null) => Task.CompletedTask;
+    public Task RefreshSchemesAsync() => Task.CompletedTask;
 
     public Task<IReadOnlyList<string>> GetRegisteredProviderSchemesAsync() =>
         Task.FromResult<IReadOnlyList<string>>([]);

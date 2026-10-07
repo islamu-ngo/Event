@@ -2,6 +2,7 @@ using Blazouter.Extensions;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Extensions;
 using Explore.Blazor.Client.Extensions;
+using Explore.Blazor.Configuration;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Services;
@@ -85,7 +86,11 @@ public static class BlazorHostServiceCollectionExtensions
                 ["SecretProvider:Provider"] = "Environment"
             });
         }
-        builder.Configuration.AddSecretAuthorityConfiguration(builder.Environment.EnvironmentName);
+        var acquisitionReceipts = new AuthenticationCredentialAcquisitionReceipts(
+            Guid.TryParse(Environment.GetEnvironmentVariable("AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"),
+                out Guid profileRevision) && profileRevision != Guid.Empty ? profileRevision : null);
+        builder.Configuration.AddSecretAuthorityConfiguration(builder.Environment.EnvironmentName, acquisitionReceipts);
+        builder.Services.AddSingleton(acquisitionReceipts);
 
         builder.Services.AddMudServices(config =>
         {

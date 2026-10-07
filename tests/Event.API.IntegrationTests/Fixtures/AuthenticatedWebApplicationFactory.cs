@@ -47,9 +47,12 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
     /// </summary>
     public Dictionary<string, string?> AdditionalConfiguration { get; } = [];
 
+    protected virtual bool UsesPostgreSqlContainer => true;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        _database.StartAsync().GetAwaiter().GetResult();
+        if (UsesPostgreSqlContainer)
+            _database.StartAsync().GetAwaiter().GetResult();
         builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((context, config) =>
@@ -83,7 +86,8 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
                 {"Instance:OperatorIdentity:PrivacyUrl", "https://instance.example.test/privacy"}
             };
 
-            TestDatabaseConfiguration.AddPostgreSql(inMemoryConfig, _database.GetConnectionString());
+            if (UsesPostgreSqlContainer)
+                TestDatabaseConfiguration.AddPostgreSql(inMemoryConfig, _database.GetConnectionString());
             foreach (var pair in AdditionalConfiguration)
             {
                 inMemoryConfig[pair.Key] = pair.Value;
@@ -94,23 +98,26 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            services.RemoveExploreDbContextRegistrations();
+            if (UsesPostgreSqlContainer)
+            {
+                services.RemoveExploreDbContextRegistrations();
 
-            var options = new DbContextOptionsBuilder<ExploreDbContext>();
-            ConfigureDatabase(options);
-            using (var database = new ExploreDbContext(options.Options))
-            {
-                database.Database.Migrate();
+                var options = new DbContextOptionsBuilder<ExploreDbContext>();
+                ConfigureDatabase(options);
+                using (var database = new ExploreDbContext(options.Options))
+                {
+                    database.Database.Migrate();
+                }
+                services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+                services.AddScoped(provider =>
+                {
+                    var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+                    database.ClearTenantFilterBypass();
+                    database.TenantContext = provider.GetRequiredService<ITenantContext>();
+                    database.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
+                    return database;
+                });
             }
-            services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
-            services.AddScoped(provider =>
-            {
-                var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
-                database.ClearTenantFilterBypass();
-                database.TenantContext = provider.GetRequiredService<ITenantContext>();
-                database.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
-                return database;
-            });
 
             // Override Redis with in-memory distributed cache for tests
             services.RemoveAll<IDistributedCache>();
@@ -179,8 +186,11 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
         }
         finally
         {
-            using var connection = new NpgsqlConnection(_database.GetConnectionString());
-            NpgsqlConnection.ClearPool(connection);
+            if (UsesPostgreSqlContainer)
+            {
+                using var connection = new NpgsqlConnection(_database.GetConnectionString());
+                NpgsqlConnection.ClearPool(connection);
+            }
             await _database.DisposeAsync();
         }
     }

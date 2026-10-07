@@ -1101,6 +1101,13 @@ public static class RouteNames
     public const string InterruptSchedulerJob = nameof(InterruptSchedulerJob);
 
     public const string GetInstanceAdminOverview = nameof(GetInstanceAdminOverview);
+    public const string GetCurrentAuthenticationCredentialCutover = nameof(GetCurrentAuthenticationCredentialCutover);
+    public const string GetAuthenticationCredentialCutover = nameof(GetAuthenticationCredentialCutover);
+    public const string PrepareAuthenticationCredentialCutover = nameof(PrepareAuthenticationCredentialCutover);
+    public const string ReportAuthenticationCredentialActivation = nameof(ReportAuthenticationCredentialActivation);
+    public const string AttestAuthenticationCredentialFence = nameof(AttestAuthenticationCredentialFence);
+    public const string InspectAuthenticationCredentialCleanup = nameof(InspectAuthenticationCredentialCleanup);
+    public const string CleanupAuthenticationCredentials = nameof(CleanupAuthenticationCredentials);
     public const string CreateInstanceConfigurationImportSession = nameof(CreateInstanceConfigurationImportSession);
     public const string PreviewInstanceConfigurationImportSession = nameof(PreviewInstanceConfigurationImportSession);
     public const string RefreshInstanceConfigurationImportSession = nameof(RefreshInstanceConfigurationImportSession);
@@ -1236,7 +1243,6 @@ public static class RouteNames
     public const string CompleteLocalInstanceOnboarding = nameof(CompleteLocalInstanceOnboarding);
     public const string ValidateInstanceSetupSecret = nameof(ValidateInstanceSetupSecret);
     public const string GetInstanceOnboardingAuthProviderConfiguration = nameof(GetInstanceOnboardingAuthProviderConfiguration);
-    public const string GetInstanceOnboardingAuthProviderConfigurationInternal = nameof(GetInstanceOnboardingAuthProviderConfigurationInternal);
     public const string GetInstanceOnboardingAuthorizationProviderConfigurationInternal = nameof(GetInstanceOnboardingAuthorizationProviderConfigurationInternal);
     public const string VerifyInstanceOnboardingAuthorizationProviderEndpoint = nameof(VerifyInstanceOnboardingAuthorizationProviderEndpoint);
     public const string SyncInstanceOnboardingAuthorizationPolicyPackage = nameof(SyncInstanceOnboardingAuthorizationPolicyPackage);

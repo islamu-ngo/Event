@@ -21,6 +21,8 @@ public partial class ExploreDbContext
 {
     public DbSet<SetupTargetEnrollment> SetupTargetEnrollments { get; set; }
     public DbSet<KeycloakOperation> KeycloakOperations { get; set; }
+    public DbSet<AuthenticationCredentialCutover> AuthenticationCredentialCutovers { get; set; }
+    public DbSet<AuthenticationCredentialCutoverHead> AuthenticationCredentialCutoverHeads { get; set; }
     public DbSet<SetupEnrollmentIssuanceClaim> SetupEnrollmentIssuanceClaims { get; set; }
     public DbSet<SetupSecretBindingOperation> SetupSecretBindingOperations { get; set; }
 

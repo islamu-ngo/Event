@@ -53,7 +53,7 @@ both catalogs as well.
   trusted route-derived header takes precedence over host matching.
 - Adding a Razor page, client route, BFF endpoint, or shipped static asset root
   requires reserving its first segment. Automated route-inventory coverage is deferred to
-  [`reserved-slug-page-directive-guardrail.md`](../../../dev/backlog/reserved-slug-page-directive-guardrail.md).
+  [`reserved-slug-page-directive-guardrail.md`](../../../islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md#r4-unified-programme-revalidation).
 - A future `/{language}/{slug}` shape requires an explicit localization/routing
   design; it must not overload the current matcher implicitly.
 - Social anti-squatting and allocation governance remain distinct from the

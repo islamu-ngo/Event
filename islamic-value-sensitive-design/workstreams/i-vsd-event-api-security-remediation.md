@@ -1,28 +1,28 @@
 # Event API Security Remediation - Planning Assessment
 
-Last Updated: 2026-10-05
+Last Updated: 2026-10-07
 
 ## Review Metadata
 
 - Mode: planning
-- Subject: complete pre-release API security remediation and prevention; bounded R3 one-time issuance delivery
+- Subject: complete pre-release API security remediation and prevention; unified phased programme with delivered one-time issuance baseline
 - Workstream: event-api-security-remediation
 - Report kind: planning-assessment
 - Report status: current
 - Disposition: plan-aligned
-- Evidence cutoff: 2026-10-05
-- Reviewed input: `event-api-security-remediation-r3`, exact plan/tasks/context and shared-root mandatory backlog identities in Evidence Reviewed; worktree HEAD `7de34469786d368728c8db6f7211cefcd383d35f`. This is design revalidation, not a refreshed product-source audit. R1/R2 source evidence retains its historical revision limits.
+- Evidence cutoff: 2026-10-07
+- Reviewed input: `event-api-security-remediation-r5-cto-20261007`; exact triad hashes in R5 Revalidation Evidence. Read-only source snapshot `0d4ab8d5a62e74ebcd9476a1b47eddda7ea270e1`; prior R1-R4 and PC-CTO-r2 claims retain their historical limits.
 - Supersedes: none; the maintained consultation remains the source assessment
 
 ## Executive Summary
 
-The R3 split is **current / plan-aligned for the bounded one-time API-key issuance slice**. It makes the shown-once promise explicit: one transaction commits a digest-only key and its operation receipt, only the winning invocation may disclose the raw credential from memory, and subsequent authorized retries return metadata rather than another copy of the key. Separating operation identity from the input digest prevents a changed request from disguising itself as a new issuance. Serializing the final authority decision against owner revocation addresses the more serious case where an old permission check otherwise permits issuance or recovery after authority has ended.
+The complete API-security programme is **current / plan-aligned to event-api-security-remediation-r5-cto-20261007 for planning**, not implemented, independently security-reviewed or release-certified. The user requested one authoritative phase-ordered triad rather than scattered mandatory backlog. All 31 API finding/mitigation pairs, 209 reference assignments, 53 families, S01–S50 and 22 bug/vulnerability classes remain; provider-credential findings keep a qualified namespace. API-key one-time disclosure is now a delivered baseline from merged PR71, not a pending history rewrite. Broader authority, privacy, custody, resource consumption and operational findings remain open for their actual evidence.
 
-This design protects key owners and the people whose resources their keys can access, but deliberately gives up raw-key recovery after a lost response. The client must explain that loss honestly, keep the original operation key during uncertainty, and require deliberate authorized revocation and a new issuance rather than silently creating another credential. Minimal anti-replay retention is justified for that security purpose; neither a recoverable secret archive nor unrestricted identity history is justified. A hash is not a claim of anonymity.
+The consolidated contract protects affected users/operators by retaining current persisted authority, least privilege, non-recoverable credential receipts, explicit external authority and honest recovery. Ordinary settings are reference-only; only explicitly approved writable provider capabilities may use narrow write-only selected-Infisical operations. Non-writable authorities require truthful operator injection, not fallback. Consumer replacement, no-resurrection fences and replica drain precede exact cleanup/rotation; Cerbos publication readiness precedes retirement of runtime administration. These restrictions preserve the original provider-duty decisions rather than using consolidation to silently expand write or operator authority.
 
-All 31 finding/mitigation pairs, 209 reference records, 53 families, ten API categories, 22 user classes and 50 scenarios remain inherited obligations. Five active tasks belong to issuance; the other 127 tasks across 25 phases remain mandatory launch blockers. Satisfying this slice cannot close general resource authorization, business recovery, public identity policy, external key custody or operational release evidence.
+Revalidation reviewed the complete triad, original API assessment, provider-credential assessment, 11 fully absorbed briefs and current read-only 25-phase source inventory. It checked every inherited mapping, 19 provider task aliases, 28 supplementary scenarios, distinct namespace ownership, release admission, recovery and unknowns. Relocation cannot turn source-only risk hypotheses into reproduced defects or passed controls. Resource/browser/operational proof remains actual candidate admission input; privacy/keyring defaults remain authored recommendations for user review. No new religious-legal conclusion, consented product expansion, blanket administrator power, identified browsing audit or risk waiver is authorized.
 
-The user's explicit 2026-10-05 instruction supplies implementation authorization in the named worktree; older triad statements awaiting approval are historical. It does not approve deferred publication/identity defaults, keyring recommendations, destructive cleanup, deployment or release. No new material provider-policy decision prevents this bounded design alignment. Exact owner-fence integration and actual endpoint, transaction, provider and client proof remain implementation gates. The mandatory backlog was absent from the worktree at review intake; its complete task ledger was located in the shared root, with ownership and required mappings reviewed and bound below. The lead must reconcile that local working-memory dependency without treating it as a waived programme.
+Technical/CTO refinements are Applied & Aligned for r5. The user's explicit 2026-10-07 instruction authorizes full programme execution, not deployment, destructive cleanup or release. Scoped revalidation is required if provider authority, retention, disclosure, defaults, lifetime, roots, role claims or required evidence changes. Independent operator/scholarly/legal evidence stays with its qualified owner.
 
 ## Scope
 
@@ -173,6 +173,50 @@ The split reduces review size without reducing provider responsibility. General 
 
 The shared-root backlog contains 25 phase headings and 127 task entries; the active ledger contains five. The plan retains the complete scenario/reference/class mapping, including all four R2-owned finding pairs. Its source observation that merged identity/discovery foundations exist is not a substitute for the still-open field policy, retention, restore or current-runtime assurance. Publication/identity defaults remain recommendations, not approved decisions inferred from implementation authorization.
 
+
+### R4 Unified Programme Revalidation
+
+The split was a document/topology choice, not permission to defer harm prevention. Reunification keeps one accountable owner for all mandatory controls while preserving bounded reviewable releases. Existing API IVSD-F015/016/023/025/026/027 and provider PC:IVSD-F001–F006 retain their substantive duties: no recoverable runtime secret store; request-scoped human credentials; consumer-isolated acquisition before fetch; current resource authority and minimum-purpose retention; usable operator/manual recovery; and no inflated publication/release claim. Missing or historical proof remains missing/historical.
+
+The provider-specific write-only capability is narrower than ordinary configuration: it requires a Ready explicitly writable selected binding and owning server operation authority. A routine settings PATCH is reference-only. Non-writable authority cannot justify silent fallback. This reconciles the existing security D02 recommendation with ADR-031/PC-CTO-r2 without authorizing arbitrary external writes. Exact cleanup preserves unrelated tenant state; the replacement BFF consumer and old-writer/reader fences precede deletion/retirement. D4/D5 policy ownership and administrator removal share one safe deployment boundary.
+
+Plan Section 9.6 assigns qualified provider F001/M001 to Phases 2/5/8; F002/M002 to Phases 2/10; F003/M003 to Phase 2; F004/M004 to Phases 6/8; F005/M005 to Phases 2/5/8; F006/M006 to Phases 2/5/6/8/10. Original scenarios and PC/KC/CB/DP aliases remain explicit. Supplementary resource, route, uniqueness and retry invariants have dedicated observable scenarios/tasks. Future MFA, scanner selection, certificates, identified browsing audits and remote-control-plane products are not implied by this security closure.
+
+### R4 Revalidation Evidence
+
+- Exact unified plan SHA256: `83db2c6408529f149ab4ff40f788f5b2c76a61b96b6a1244e77654e57297abbe`
+- Exact unified tasks SHA256: `204bb9d46402d18732b375066d8d7c899e7fe08cba975cb265b234e47039d0ba`
+- Exact unified context SHA256: `6c8c1fcd824978b8369f177d68e6a1ac5f2bf86dbb1d80588a1bb7affe75ab63`
+- Read-only current source: `0d4ab8d5a62e74ebcd9476a1b47eddda7ea270e1`; source/class/project inventory covers 25/25 legacy outstanding phases, with implemented/source-confirmed/hypothesis/proposed distinctions, no new executed product proof.
+- Backlog intake: 44/44 files classified; 11 complete directly relevant contracts absorbed, 33 mixed/unrelated/optional/quarantined briefs retained. Historical source names and qualifications remain in the triad's consolidation ledger.
+- Delivered baseline: PR71 merge `ed0b26dfa688ae2dd0f84c6e9ab35a2e0f505858`, head `3f5b5212bb6a27eb88dcd9da6fe3011d83e6dd3e`; no old history-rewrite blocker.
+- Reviewed primary/secondary sources: maintained API consultation/assessment, provider-credential assessment and ADR-031, R3 delivered contract, inherited matrices and all absorbed brief acceptance/exclusions/recovery. No external product/source research or scholarly/legal determination was performed.
+
+### R5 Revision-Bound Revalidation - 2026-10-07
+
+**Disposition: current / plan-aligned for `event-api-security-remediation-r5-cto-20261007` planning, not implemented-security or release certification.** The complete sole triad and existing assessment were reviewed. Comparison with the initial read snapshots confirmed that subsequent execution-status updates changed no behavior, mitigation, default or design.
+
+R5 strengthens the existing provider duties without replacing findings. IVSD-M023 distinguishes retained expired decryption keys from revoked/deleted keys and separately enforces capability expiry and monotonic restore/revocation authority. Proposed ring bounds cannot discard material needed by live protected values. This preserves usable recovery without turning key rotation into a false revocation promise. IVSD-M024 freezes EF and database lease identity together and requires actual ordinary-role isolation proof, protecting tenants from inherited connection authority.
+
+IVSD-M017/M027 prohibit reopening potentially committed work after response failure, cancellation, abort, serialization failure or oversize output. Later feature recovery must preserve that rejection fact. Credential consumer replacement and replica drain precede exact cleanup: task 2.6 executes before 2.5. Cerbos publication readiness precedes coordinated runtime-administrator/publisher retirement: 8.4 before 8.5, within one safe release boundary. These orders prevent a custody improvement from disabling legitimate service or creating duplicate effects.
+
+All 31 API finding/mitigation pairs retain scenario and executable ownership through the current-to-legacy alias mapping. Provider `PC:` and resource `RESOURCE:` identifiers remain distinct. The single triad preserves 29 phases, 158 outstanding records, five delivered historical records, all 209 reference assignments, 53 families, S01-S50 and all 22 BUG/VULN obligations. No finding closes through relocation.
+
+Binding CTO corrections and plan Sections 4/7.2 govern inherited final-only gate wording: each bounded delivery requires its actual affected boundary Green before its security claim. Programme-exit evidence aggregates that proof; it cannot retroactively certify an earlier delivery. Independent outcomes require complete owned source/test/generated/migration/operator-documentation packets.
+
+The user's explicit 2026-10-07 instruction satisfies programme execution authorization. No new material provider-policy decision or I-VSD design blocker was identified. Authored defaults remain recommendations rather than fabricated answered choices; changes to authority, defaults, retention, lifetime, cutover or evidence requirements trigger focused revalidation. Deployment, destructive cleanup/rotation and release authority remain distinct. Actual operational and independent release evidence remains open.
+
+### R5 Revalidation Evidence
+
+| Reviewed artifact | SHA-256 |
+| --- | --- |
+| Sole plan | `3e79079f47df83d9e9ab45c976bdf24993b555341b2a8a69cc34f5033f62afe8` |
+| Sole tasks | `d64ec9d857bb1d98ad04de4f7ed68af364a387323e3150bc9f1d8efd187145d4` |
+| Sole context | `bcb53b7c93e0441c24730a16999e48480184a2258c424c878e823b71260ea8fe` |
+| Existing assessment, unchanged review input | `845ce0d82265e4beb6665d7580d784e81473193293b5c64cf0cd83567fd33cdb` |
+
+Evidence level: revision-bound design validation with supplied implementation traceability. The independent read-only assessment performed no product build/test, provider operation, deployment or runtime security verification. The 42-test baseline is lead-executed evidence, not an independently rerun assessment result. Subsequent status/packet-only synchronization does not change the reviewed behavior contracts.
+
 ## Recommendations
 
 1. Preserve all stable finding and reference IDs in a candidate-bound, machine-consumed security evidence register. A green check with no executed tests is not closure evidence.
@@ -273,14 +317,14 @@ The historical shared evidence packet includes parent investigation plus three b
 ## Planning Handoff
 
 - Workstream: event-api-security-remediation
-- Status: current
-- Reviewed input: event-api-security-remediation-r3, bound to R3-E01 through R3-E07
-- Findings and mitigations: inherited IVSD-F001 through IVSD-F027 plus qualified workstream IVSD-F028 through IVSD-F031, each linked to its corresponding IVSD-M identifier
-- Required plan mappings: Sections 9 and 9.5 bind all 31 qualified finding/mitigation pairs; Sections 9.3-9.4 independently bind all 22 user classes; S01-S50 and task IDs across 26 phases define observable outcomes. Section 9.1 still assigns all 209 reference records and 53 families; ten API categories retain their Section 9.2 responsibilities. Only 3.1-3.5 resolve to active issuance; all other 127 tasks resolve to R3-E04's mandatory 25-phase programme. Issuance-specific M025/M027 duties are additive, not transfers of the broader phase 19/21 obligations.
-- Revalidation result: **current / plan-aligned for the bounded R3 issuance design and split**. Non-recoverable receipts, input/operation separation, minimal non-reopening retention, truthful lost-disclosure recovery and serialized current authority address the affected provider responsibilities. All inherited/R2 findings and obligations remain accepted for remediation or assurance, not implemented, resolved, risk-accepted or release-approved.
-- Authority and local handoff: user implementation authorization is supplied by R3-E07, not by this report or CTO review. The lead owns triad status synchronization and restoring/binding the locally missing programme ledger; this report's exact reviewed hashes remain the evidence identity.
-- Escalations required before: Green for exact shared fence and owner-path reconciliation; any material retention/erasure/authority change for focused revalidation; promotion of deferred defaults for the necessary user decision; release for all mandatory programme and actual operator/security evidence. No new material decision blocks this bounded design review.
-- Refresh triggers: scope, identity disclosure, credential custody, tenancy, topology, provider origin, budgets, replay semantics or release-claim changes; also receipt field/retention/erasure changes, loss-recovery behavior, the shared revocation ordering contract, or a moved/dropped mitigation owner. Status-only synchronization and an identical backlog copy do not themselves invalidate alignment.
+- Status: current; disposition plan-aligned for r5 design, not runtime/security/release certification
+- Reviewed input: event-api-security-remediation-r5-cto-20261007, complete plan/tasks/context and existing assessment; exact hashes in R5 Revalidation Evidence
+- Findings and mitigations: API IVSD-F001–F031 / IVSD-M001–M031 retained with original qualified lifecycle; provider `PC:IVSD-F001–F006` / `PC:IVSD-M001–M006` retain their original assessment identity, not renumbered as API findings
+- Required plan mappings: plan Sections 3/9 retain every original scenario, reference/family and BUG/VULN row; Section 6 maps each legacy phase to current execution order; tasks retains all 127 outstanding and five delivered original records plus 31 additive records, with 19 provider aliases and 28 supplementary scenarios. No mapping points to a deleted brief or requires another active plan.
+- Revalidation result: current / plan-aligned for the unified design and custody/publication reconciliation; no finding is technically closed by relocation. The API-key disclosure aspect is delivered in merged PR71; broader current-resource authority/business recovery/operator evidence remain open.
+- User/technical authority: full programme execution explicitly instructed on 2026-10-07; CTO refinements Applied & Aligned. Historical pending-implementation wording does not renew an approval request. The old R3/PC handoff's per-follow-up triad topology is superseded, not its provider duties or actual proof requirements.
+- Escalations: focused review before materially changing retention/erasure/disclosure/provider defaults or roots; real version-bound role/worker/socket/SDK/process/host proof before corresponding claims; actual supported-profile/operator/independent evidence before release. Authored privacy/keyring recommendations are not a claimed user answer.
+- Refresh triggers: changed authority, lifetime, roots, purpose, output, default, cleanup/restore ordering, publication ownership, identity disclosure, profile budgets, scenario ownership or evidence requirements. Merely renumbering/retargeting unchanged ownership cannot certify implementation.
 
 ## Review Lifecycle
 
@@ -290,3 +334,6 @@ The historical shared evidence packet includes parent investigation plus three b
 | 2026-10-01 | draft | current | Completed triad revalidated with explicit recommended defaults | 27 mitigation mappings, 34 scenarios, 24 phases, 209 reference assignments and candidate-bound operational admission; disposition plan-aligned, not release approval |
 | 2026-10-02 | current | current | User added all ten bug and twelve vulnerability classes; R2 triad revalidated | 26 phases, 50 scenarios, 132 tasks, unchanged 209-reference coverage, 31 qualified finding mappings and all 22 distinct class obligations; plan-aligned, not implemented or release-approved |
 | 2026-10-05 | current for R2; stale for R3 | current | Substantive planning-mode revalidation of R3 split, minimal receipt retention, lost-disclosure remedy, shared revocation ordering and ownership | R3-E01-R3-E07; five active issuance tasks and 127 mandatory deferred tasks; current / plan-aligned design only, no runtime closure or deferred-default approval |
+
+| 2026-10-06 | current for bounded R3 | current | Substantive r4-unified revalidation after user-directed programme reunification and delivered PR71 baseline | Complete triad hashes above; all original and qualified provider mappings retained; 29 outstanding phases, 158 records; plan-aligned design only |
+| 2026-10-07 | current for r4; stale for r5 | current | Complete r5 revalidation of key lifecycle, lease identity, non-reopening recovery, safe cutover order, all 31 mappings and bounded delivery admission | Exact r5 triad hashes; plan-aligned design only; execution authorization separate from operational/release approval |

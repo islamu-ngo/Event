@@ -42,11 +42,11 @@ Packet K records this decision, unchanged review evidence and follow-up contract
 
 | Deferred delivery | Durable owner packet | Original IDs |
 | --- | --- | --- |
-| PR 2 external auth authority, BFF and cleanup | [Runtime authority](../../../dev/backlog/provider-credential-runtime-authority.md) | D1 `PC-101` through `PC-104`; auth-only D6 `DP-401` / `DP-402` |
-| PR 3 complete one-time Keycloak contracts/UI | [Keycloak administration](../../../dev/backlog/provider-credential-keycloak-admin.md) | D2 `KC-201` through `KC-203` |
-| PR 4 dedicated lifecycle identity | [Keycloak lifecycle](../../../dev/backlog/provider-credential-keycloak-lifecycle.md) | D3 `KC-204` through `KC-206` |
-| PR 5 coupled one-time Cerbos/publication cutover | [Cerbos publication](../../../dev/backlog/provider-credential-cerbos-publication.md) | D4 `CB-301` through `CB-303`; D5 `CB-304` through `CB-306` |
-| PR 6 remaining deployment isolation | [Deployment isolation](../../../dev/backlog/provider-credential-deployment-isolation.md) | remaining D6 `DP-401` through `DP-403` |
+| PR 2 external auth authority, BFF and cleanup | [Runtime authority](../../../islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md#r4-unified-programme-revalidation) | D1 `PC-101` through `PC-104`; auth-only D6 `DP-401` / `DP-402` |
+| PR 3 complete one-time Keycloak contracts/UI | [Keycloak administration](../../../islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md#r4-unified-programme-revalidation) | D2 `KC-201` through `KC-203` |
+| PR 4 dedicated lifecycle identity | [Keycloak lifecycle](../../../islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md#r4-unified-programme-revalidation) | D3 `KC-204` through `KC-206` |
+| PR 5 coupled one-time Cerbos/publication cutover | [Cerbos publication](../../../islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md#r4-unified-programme-revalidation) | D4 `CB-301` through `CB-303`; D5 `CB-304` through `CB-306` |
+| PR 6 remaining deployment isolation | [Deployment isolation](../../../islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md#r4-unified-programme-revalidation) | remaining D6 `DP-401` through `DP-403` |
 | Outside credential program | [Custom-role parity](../../../dev/backlog/cerbos-custom-role-parity.md) | original `KG-601` |
 
 Each implementing agent owns a fresh active triad, exact atomic commit contracts, current revision-bound I-VSD/CTO review and proportional runtime verification before implementing its packet. Program approval does not waive these gates. Original umbrella phase commits are withdrawn.

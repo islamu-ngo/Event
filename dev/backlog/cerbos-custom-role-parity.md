@@ -19,7 +19,7 @@ These observations establish why republishing the same files cannot be evidence 
 
 Create a separately approved security workstream. Inventory supported custom-role create/update/delete, effective tenant/event authority, permission-to-action mapping, runtime principal construction, cache invalidation and Local/Cerbos decision paths. Bind findings to exact policy/application revisions and preserve tenant/server authority and HAL-only UI affordances.
 
-[Credential publication PR 5](provider-credential-cerbos-publication.md) may remove no-op role publication independently. Its removal is neither a parity fix nor a prerequisite to discover this gap. Coordinate shared files if both tasks execute concurrently; do not broaden that PR to absorb this issue.
+[Credential publication PR 5](../active/event-api-security-remediation/event-api-security-remediation-plan.md#import-4) may remove no-op role publication independently. Its removal is neither a parity fix nor a prerequisite to discover this gap. Coordinate shared files if both tasks execute concurrently; do not broaden that PR to absorb this issue.
 
 ## Exclusions
 

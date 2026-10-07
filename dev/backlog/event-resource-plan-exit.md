@@ -9,7 +9,7 @@
 
 | Unchecked ledger item | What landed | Remaining work |
 | --- | --- | --- |
-| Protected destinations: attack specification | Scope-bound protection, hostile-input denial, provider registration, native HTTP tests and Split BFF cases landed in #54. | [Controlled-origin transport and keyring assurance](event-resource-delivery-security-verification.md); real browser navigation in [browser acceptance](event-resource-browser-acceptance.md). |
+| Protected destinations: attack specification | Scope-bound protection, hostile-input denial, provider registration, native HTTP tests and Split BFF cases landed in #54. | [Controlled-origin transport and keyring assurance](../active/event-api-security-remediation/event-api-security-remediation-plan.md#import-3); real browser navigation in [browser acceptance](event-resource-browser-acceptance.md). |
 | Protected destinations: native write and redirect | Encrypted write-only destinations, safe-origin projection, current-authority redirect and operator guidance landed in #54. | Prove the unexercised multi-hop/real-browser conditions in the two linked acceptance entries; do not reimplement the shipped endpoint. |
 | Protected destinations: full verification | Targeted redirect, protector, telemetry, keyring restore and Release checks passed; the broad API suite did not yield a classified green result. | [Release verification and formatter repair](event-resource-release-verification.md) and controlled-origin transport assurance. |
 | Protected destinations: path-limited commit packet | #54 merged with its verified published tree and original commit ancestry. | None; this is a stale checkbox, not uncommitted code. |
@@ -17,7 +17,7 @@
 | Browser phase: full verification | Focused component/API slices, Blazor Integration and the five-engine resource provider matrix passed; #55's exact tree passed Release build. | [Browser acceptance](event-resource-browser-acceptance.md) and [release verification](event-resource-release-verification.md); do not claim WCAG certification or broad-suite success. |
 | Browser phase: ordered commit packets | #55 merged with the expected published tree and all earlier heads preserved in `develop` ancestry. | None; this is a stale checkbox, not a missing commit. |
 
-The eight Partial scenarios are **S02, S05, S12, S17, S18, S22, S31 and S34**; each has an explicit real-surface acceptance step in [browser acceptance](event-resource-browser-acceptance.md). The separate [availability database constraint](event-resource-availability-order-constraint.md) records a valid post-publication review finding, not an eighth unimplemented phase.
+The eight Partial scenarios are **S02, S05, S12, S17, S18, S22, S31 and S34**; each has an explicit real-surface acceptance step in [browser acceptance](event-resource-browser-acceptance.md). The separate [availability database constraint](../active/event-api-security-remediation/event-api-security-remediation-plan.md#import-2) records a valid post-publication review finding, not an eighth unimplemented phase.
 
 ## Deferred features already present in the develop backlog
 

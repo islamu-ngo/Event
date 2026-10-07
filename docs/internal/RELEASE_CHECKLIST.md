@@ -81,6 +81,17 @@ success do not establish activation. Use the
 
 ## Release Evidence Bundle
 
+Before candidate verification, retain the selected security workflow's
+`security-execution.v1.json` and every referenced report/log under
+`docs/internal/releases/<version>/`, preserving relative paths. The packet must
+name exact candidate B and both nonzero completed lanes; a no-op or another
+revision's passing run cannot satisfy this gate. Do not commit a sidecar that
+contains its own candidate identity. Archive it with replay evidence.
+The generated candidate manifest binds its exact validated packet digest.
+This first execution gate does not replace supported-provider, non-Testing,
+operator/browser or authenticated-provenance assurance. See
+[Security Verification](SECURITY_VERIFICATION.md).
+
 Before publishing a GitHub Release, download the retained CI/CD artifacts listed in this checklist into a local evidence directory. For governed release-mode bundles, the artifact tree must contain exactly one final authoritative manifest from `verify-tag`:
 
 ```text

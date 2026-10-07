@@ -6,6 +6,8 @@ public static class SecurityChangeSelection
     [
         "cerbos/",
         "docker/keycloak/",
+        "eng/security/",
+        "eng/release/",
         "src/Explore.Application/Authorization/",
         "src/Explore.API/Extensions/",
         "src/Explore.API/Hosting/",
@@ -16,6 +18,9 @@ public static class SecurityChangeSelection
         "src/Explore.Blazor/Services/",
         "src/Explore.Blazor/Yarp/",
         "tests/Event.API.IntegrationTests/Fixtures/",
+        "tests/Event.API.IntegrationTests/Hosting/",
+        "tests/Event.Standalone.IntegrationTests/",
+        "tests/Explore.Blazor.IntegrationTests/Hosting/",
         "tests/Event.API.IntegrationTests/Features/Security",
         "tests/Event.API.IntegrationTests/Features/Cerbos",
         "tests/Event.API.IntegrationTests/Features/Token",
@@ -27,6 +32,7 @@ public static class SecurityChangeSelection
     [
         "src/Explore.API/Program.cs",
         "src/Explore.Blazor/Program.cs",
+        "src/Explore.ServiceDefaults/Diagnostics/EndpointSecurityInventory.cs",
         "src/Explore.Infrastructure/Services/CerbosAuthorizationService.cs",
         "src/Explore.Infrastructure/Services/CerbosPrincipalBuilder.cs",
         "src/Explore.Infrastructure/Services/RuntimeAuthorizationProvider.cs",

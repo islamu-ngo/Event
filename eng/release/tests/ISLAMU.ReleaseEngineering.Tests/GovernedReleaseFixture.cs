@@ -245,6 +245,22 @@ internal sealed class GovernedReleaseFixture : IDisposable
         RunProcess("git", clonePath, "init", $"--object-format={ObjectFormat}", "--initial-branch=placeholder");
         RunProcess("git", clonePath, "fetch", "--no-tags", RepositoryPath, "refs/tags/*:refs/tags/*");
         RunProcess("git", clonePath, "-c", "advice.detachedHead=false", "switch", "--detach", $"refs/tags/{tagName}");
+        string releaseRelativePath = Path.Combine("docs", "internal", "releases", tagName[1..]);
+        string sourceRelease = Path.Combine(RepositoryPath, releaseRelativePath);
+        string sourcePacket = Path.Combine(sourceRelease, SecurityExecutionEvidenceFixture.PacketFileName);
+        if (File.Exists(sourcePacket))
+        {
+            string cloneRelease = Path.Combine(clonePath, releaseRelativePath);
+            Directory.CreateDirectory(cloneRelease);
+            File.Copy(sourcePacket, Path.Combine(cloneRelease, SecurityExecutionEvidenceFixture.PacketFileName));
+            string cloneReports = Path.Combine(cloneRelease, "security-execution-reports");
+            Directory.CreateDirectory(cloneReports);
+            foreach (string report in Directory.EnumerateFiles(Path.Combine(sourceRelease, "security-execution-reports")))
+            {
+                File.Copy(report, Path.Combine(cloneReports, Path.GetFileName(report)));
+            }
+        }
+
         clonePaths.Add(clonePath);
         return clonePath;
     }
@@ -347,7 +363,12 @@ internal sealed class GovernedReleaseFixture : IDisposable
             CommandTimeout));
         if (exitCode != Program.Success) throw new InvalidOperationException($"prepare_{version}: {output}");
 
-        return Commit($"docs(release): prepare {version}\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
+        string candidateOid = Commit($"docs(release): prepare {version}\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
+        SecurityExecutionEvidenceFixture.Write(
+            Path.Combine(RepositoryPath, "docs", "internal", "releases", version),
+            candidateOid,
+            repositoryPath: RepositoryPath);
+        return candidateOid;
     }
 
     private static string LineLabelFor(string version)

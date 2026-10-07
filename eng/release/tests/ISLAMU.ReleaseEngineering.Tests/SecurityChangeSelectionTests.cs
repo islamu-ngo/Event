@@ -1,5 +1,3 @@
-using ISLAMU.ReleaseEngineering;
-
 namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class SecurityChangeSelectionTests
@@ -9,6 +7,12 @@ public sealed class SecurityChangeSelectionTests
     [Arguments("src/Explore.API/Authentication/DynamicJwtBearerPostConfigureOptions.cs")]
     [Arguments("src/Event.Standalone/Hosting/StandaloneHostApplicationExtensions.cs")]
     [Arguments("src/Event.Web.BffHosting/Security/BffProxyHeaderSanitizer.cs")]
+    [Arguments("eng/security/security-control-register.json")]
+    [Arguments("eng/release/src/ISLAMU.ReleaseEngineering/SecurityExecutionEvidence.cs")]
+    [Arguments("src/Explore.ServiceDefaults/Diagnostics/EndpointSecurityInventory.cs")]
+    [Arguments("tests/Event.API.IntegrationTests/Hosting/ApiEndpointApplicabilityTests.cs")]
+    [Arguments("tests/Event.Standalone.IntegrationTests/HostedWorkerActivationTests.cs")]
+    [Arguments("tests/Explore.Blazor.IntegrationTests/Hosting/BffEndpointApplicabilityTests.cs")]
     public async Task AuthorityOnlyChangeSelectsRealExecution(string path)
     {
         await Assert.That(SecurityChangeSelection.RequiresExecution([path])).IsTrue();

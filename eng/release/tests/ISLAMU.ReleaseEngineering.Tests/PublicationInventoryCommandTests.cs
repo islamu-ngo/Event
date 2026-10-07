@@ -206,6 +206,7 @@ public sealed class PublicationInventoryCommandTests
         Git(fixture, "-c", "user.name=Release Test", "-c", "user.email=release@example.invalid",
             "commit", "-m", "docs(release): prepare 2.0.0\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
         string target = fixture.ResolveRef("HEAD");
+        SecurityExecutionEvidenceFixture.Write(release, target, repositoryPath: fixture.RepositoryPath);
         Require(fixture.VerifyCandidate("2.0.0", target));
         string tag = fixture.CreateSignedTag("v2.0.0", target, fixture.GenerateTagMessage("2.0.0"));
         Require(fixture.VerifyTag("2.0.0", target, tag));

@@ -230,7 +230,19 @@ fragments; category headings cannot replace it.
 
 After the reviewed preparation commit `B` is created, run the promoted bundle verifier
 against that exact full commit object. No branch has to point at `B`, and the command
-works identically in a clone that fetched only `refs/tags/*`:
+works identically in a clone that fetched only `refs/tags/*` when its retained
+execution sidecar and referenced reports have also been supplied:
+
+1. Retrieve `security-test-evidence` from successful selected execution of both
+   required lanes at **exact B**. A PR merge SHA or unrelated no-op is not B's
+   evidence.
+2. Copy `security-execution.v1.json` and its referenced artifact paths into
+   `docs/internal/releases/<version>/`, preserving the uploaded relative layout.
+   These are post-commit inputs; do not create a circular B identity by committing
+   the sidecar into B.
+3. Keep these exact bytes for replay and tag-only clones. Missing, stale,
+   duplicated, skipped, zero-test or digest-inconsistent evidence rejects
+   candidate verification before a manifest is written.
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
@@ -246,6 +258,12 @@ and requires `B`'s terminal footers to be exactly
 release context through `B`, rerenders the notes with the separately promoted trusted
 bundle, and compares both committed generated artifacts byte-for-byte. It then writes
 or verifies `docs/internal/releases/<version>/release-candidate.v1.json`.
+
+It also validates the fixed security execution sidecar against actual TRX counts
+and artifact digests, then records `securityExecutionSha256`. Changing packet
+bytes invalidates an existing manifest. See [Security Verification](SECURITY_VERIFICATION.md)
+for protocol limits and the full provider/operational/provenance admission work
+that this initial gate does not certify.
 
 `release-candidate.v1.json` is pre-tag evidence only. It records schema/object format,
 full `B` and range commit IDs, version/line-label/date, base and previous tag commit

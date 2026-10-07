@@ -1532,6 +1532,15 @@ evidence. The selection decision itself proves neither executed tests nor
 security closure. Unrelated-path no-ops remain explicitly distinguishable from
 executed security checks.
 
+Selected security CI now produces `artifacts/security-tests/security-execution.v1.json`
+from actual nonzero TRX outcomes. The native producer rejects missing,
+ambiguous, skipped, failed or inconsistent reports; its context is Testing
+test-host execution, not ordinary-role or production proof. Preserve the
+packet's referenced file layout when retaining it with a release candidate.
+Candidate verification requires the exact tested revision, not a renamed PR
+merge SHA. [Security Verification](SECURITY_VERIFICATION.md) defines the packet,
+CLI and remaining operational admission obligations.
+
 For API-key issuance verification, inspect the `database-provider-<Provider>` CI
 artifact's `Issuance.trx` and the provider summary's API-key issuance outcome.
 The matrix runs at least 14 issuance cases on each migrated real engine. A passing

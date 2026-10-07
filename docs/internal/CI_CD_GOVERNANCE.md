@@ -676,9 +676,20 @@ or empty changed-file evidence selects execution fail-safe; unrelated changes
 retain an explicitly reported no-op.
 
 The workflow sets up .NET and builds the classifier before making that decision.
+It also validates the complete source catalogue with the same native release
+engine. Catalogue or release-engine changes select execution rather than an
+unrelated-path no-op. Initial source dispositions remain separate from runtime
+assurance.
 Selected API security and Cerbos lanes retain their nonzero expected test count,
 TRX artifacts and separate outcomes. A classifier pass or unrelated no-op is not
 a passing security test run and does not establish candidate admission.
+
+After both selected lanes succeed, `produce-security-execution` validates their
+actual TRX, retains reports/logs and emits `security-execution.v1.json` for the
+exact tested GitHub SHA and invocation. No-op or failed execution emits no
+admissible packet. The upload retains diagnostic output on failure; human step
+summaries are not evidence receipts. See [Security Verification](SECURITY_VERIFICATION.md)
+for sidecar admission and the separate final provider/operational/provenance gate.
 
 The required `Build & Test` job has a bounded 45-minute budget. PR #71 run
 `37390746175` exhausted the former 30-minute job deadline during Standalone Host

@@ -10,6 +10,36 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class ReleaseCandidateVerificationTests
 {
     [Test]
+    [Arguments("missing")]
+    [Arguments("duplicate-lane")]
+    [Arguments("stale-candidate")]
+    [Arguments("zero-tests")]
+    public async Task VerifyCandidateRejectsSecurityExecutionEvidence(string failure)
+    {
+        using var fixture = CandidateFixture.Create();
+        string packetPath = Path.Combine(fixture.ReleaseDirectory, SecurityExecutionEvidenceFixture.PacketFileName);
+        File.Delete(fixture.CandidateManifestPath);
+
+        if (string.Equals(failure, "missing", StringComparison.Ordinal))
+        {
+            File.Delete(packetPath);
+        }
+        else
+        {
+            string evidenceOid = string.Equals(failure, "stale-candidate", StringComparison.Ordinal)
+                ? fixture.A
+                : fixture.B;
+            SecurityExecutionEvidenceFixture.Write(fixture.ReleaseDirectory, evidenceOid, failure);
+        }
+
+        (int exitCode, string output) = fixture.Verify(fixture.B);
+
+        await Assert.That(exitCode).IsNotEqualTo(Program.Success);
+        await Assert.That(output).Contains("candidate_security_execution_");
+        await Assert.That(File.Exists(fixture.CandidateManifestPath)).IsFalse();
+    }
+
+    [Test]
     public async Task VerifyCandidateAcceptsExactBAndWritesDeterministicManifestTwice()
     {
         if (OperatingSystem.IsWindows()) return;
@@ -227,6 +257,7 @@ public sealed class ReleaseCandidateVerificationTests
             Prepare();
             Git("add", "docs/internal/releases/1.1.0");
             B = Commit("docs(release): prepare 1.1.0\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
+            SecurityExecutionEvidenceFixture.Write(ReleaseDirectory, B, repositoryPath: RepositoryPath);
         }
 
         public string Root { get; }

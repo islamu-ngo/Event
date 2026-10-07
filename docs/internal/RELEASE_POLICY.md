@@ -46,6 +46,15 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
 
 ## Release sources and exact identity
 
+- Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
+  selected execution at exactly B, together with its contained report/log
+  artifacts. Both required lanes MUST be nonzero, completed and passing.
+  Initial source dispositions and unrelated CI no-ops MUST NOT satisfy this
+  gate. The candidate manifest binds the exact validated packet SHA-256.
+  The sidecar is post-commit execution input, not self-referential content of B.
+  Full provider/host/operator/browser and authenticated-provenance assurance
+  remains separately required; a digest is not producer authentication.
+
 - `release.yaml` MUST contain the selected version, release line, fixed release date,
   range/base references, compatibility references, and impact dispositions.
 - `summary.md` MUST be the sole maintainer-owned public narrative.

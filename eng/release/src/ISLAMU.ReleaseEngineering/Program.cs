@@ -38,6 +38,11 @@ public static class Program
             return WriteUsage(output);
         }
 
+        if (string.Equals(args[0], "select-security-changes", StringComparison.Ordinal))
+        {
+            return SecurityChangeSelection.Run(args, output);
+        }
+
         if (string.Equals(args[0], "run-promoted", StringComparison.Ordinal))
         {
             return PromotedReleaseCommand.Run(args, output, Environment.CurrentDirectory);

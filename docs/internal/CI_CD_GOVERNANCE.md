@@ -668,6 +668,18 @@ Do not add Codecov, SonarCloud, or coverage-percentage badges until the correspo
 
 ### Runtime Test Reliability Policy
 
+`Security Integration Tests` uses the native release-engine
+`select-security-changes` command instead of a second inline path predicate.
+Dedicated API hosting/authentication, Standalone and shared BFF ingress changes
+select actual execution. Existing security selections remain included. Missing
+or empty changed-file evidence selects execution fail-safe; unrelated changes
+retain an explicitly reported no-op.
+
+The workflow sets up .NET and builds the classifier before making that decision.
+Selected API security and Cerbos lanes retain their nonzero expected test count,
+TRX artifacts and separate outcomes. A classifier pass or unrelated no-op is not
+a passing security test run and does not establish candidate admission.
+
 The required `Build & Test` job has a bounded 45-minute budget. PR #71 run
 `37390746175` exhausted the former 30-minute job deadline during Standalone Host
 Tests after the preceding suites passed, which cancelled the required gate and

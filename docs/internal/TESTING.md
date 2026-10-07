@@ -123,6 +123,19 @@ Each project has a specific role. Run individually — never use solution-level 
 
 ### Run Commands
 
+The release-engine `SecurityChangeSelectionTests` exercise the actual native
+predicate consumed by `security-tests.yml`. They preserve existing selections
+and unrelated no-ops while covering API hosting/authentication,
+Standalone/shared BFF ingress, empty detection and inaccessible input.
+Run the in-memory selection slice with:
+
+```bash
+dotnet test --project eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*SecurityChangeSelectionTests/*" --minimum-expected-tests 17 --no-progress
+```
+
+This tooling slice does not replace the selected API security/Cerbos runs or
+candidate-bound provider, host and operational evidence.
+
 Host-lifetime regressions in `ApiHostLifetimeTests` and
 `GracefulShutdownLifetimeTests` distinguish stopped/never-started host disposal
 from process-global callback retention using non-inlined helpers and weak

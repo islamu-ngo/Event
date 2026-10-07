@@ -31,6 +31,18 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Build Security Selection
+        run: |
+          dotnet restore eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --locked-mode
+          dotnet build eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release --no-restore --verbosity quiet --nologo
+
       - name: Detect Security-Relevant Changes
         id: changes
         shell: bash
@@ -76,29 +88,22 @@ jobs:
             exit 0
           fi
 
-          relevant_files=""
-          while IFS= read -r changed_file; do
-            [[ -z "$changed_file" ]] && continue
-            case "$changed_file" in
-              cerbos/*|docker/keycloak/*|src/Explore.Application/Authorization/*|src/Explore.API/Program.cs|src/Explore.API/Extensions/*|src/Explore.API/Middleware/*|src/Explore.Blazor/Program.cs|src/Explore.Blazor/Services/*|src/Explore.Blazor/Yarp/*|src/Explore.Infrastructure/Services/CerbosAuthorizationService.cs|src/Explore.Infrastructure/Services/CerbosPrincipalBuilder.cs|src/Explore.Infrastructure/Services/RuntimeAuthorizationProvider.cs|src/Explore.Infrastructure/Services/LocalAuthorizationProvider.cs|docs/SECURITY-MODEL.md|docs/AUTHORIZATION.md|tests/Event.API.IntegrationTests/Fixtures/*|tests/Event.API.IntegrationTests/Features/Security*|tests/Event.API.IntegrationTests/Features/Cerbos*|tests/Event.API.IntegrationTests/Features/Token*|tests/Event.API.IntegrationTests/Features/Authorization*|tests/Event.API.IntegrationTests/Features/Cloud*|.github/workflows/security-tests.yml)
-                relevant_files="${relevant_files}${changed_file}"$'\n'
-                ;;
-            esac
-          done <<< "$changed_files"
+          changed_paths="$RUNNER_TEMP/security-changed-paths.txt"
+          printf '%s\n' "$changed_files" > "$changed_paths"
+          selection="$(dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll select-security-changes "$changed_paths")"
+          printf '%s\n' "$selection" >> "$GITHUB_OUTPUT"
 
-          if [[ -n "$relevant_files" ]]; then
-            echo "run-tests=true" >> "$GITHUB_OUTPUT"
+          if [[ "$selection" == "run-tests=true" ]]; then
             {
               echo "## Security Integration Tests"
               echo
               echo "Security-relevant files changed; running security integration tests."
               echo
               echo '```text'
-              printf '%s' "$relevant_files"
+              printf '%s\n' "$changed_files"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "run-tests=false" >> "$GITHUB_OUTPUT"
             {
               echo "## Security Integration Tests"
               echo
@@ -110,14 +115,6 @@ jobs:
         if: ${{ steps.changes.outputs.run-tests != 'true' }}
         run: |
           echo "Security Integration Tests no-op: no security-relevant changes detected."
-
-      - name: Setup .NET
-        if: ${{ steps.changes.outputs.run-tests == 'true' }}
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-          cache: true
-          cache-dependency-path: "**/packages.lock.json"
 
       - name: Restore
         if: ${{ steps.changes.outputs.run-tests == 'true' }}

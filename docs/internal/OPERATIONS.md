@@ -1519,6 +1519,19 @@ Do not remove digest/SBOM/provenance evidence even if Coolify temporarily consum
 
 ## API-Key Issuance CI Evidence
 
+Security selection is owned by
+`eng/release/src/ISLAMU.ReleaseEngineering/SecurityChangeSelection.cs`.
+The `select-security-changes` command reads a newline-separated changed-paths
+file and emits `run-tests=true` or `run-tests=false`. An inaccessible or empty
+file selects execution, so missing classification input cannot grant a no-op.
+API hosting/authentication and both Standalone/shared BFF ingress select the
+same security workflow as the existing authorization paths.
+
+Inspect the selected lane's actual outcome and TRX counts before treating it as
+evidence. The selection decision itself proves neither executed tests nor
+security closure. Unrelated-path no-ops remain explicitly distinguishable from
+executed security checks.
+
 For API-key issuance verification, inspect the `database-provider-<Provider>` CI
 artifact's `Issuance.trx` and the provider summary's API-key issuance outcome.
 The matrix runs at least 14 issuance cases on each migrated real engine. A passing

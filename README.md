@@ -345,6 +345,17 @@ Special thanks to the organizations providing free tooling, infrastructure, and 
 
 > If your organization would like to support ISLAMU Event with in-kind tooling, infrastructure, or software licenses, please reach out to us at [contact@openislamu.org][contact-email].
 
+## 🧰 Public-Repository Tools
+
+We appreciate these generally available public-repository tools. They are not project-specific sponsorships.
+
+- [CodeRabbit][coderabbit-link]: AI code reviews for pull requests.
+- [Codecov][codecov-link]: Test coverage reporting.
+- [Socket.dev][socket-link]: Dependency security analysis.
+- [Imgbot][imgbot-link]: Automated image optimization.
+- [Coverity][coverity-scan-link]: Static analysis code scanning you can trust.
+- [SonarQube Cloud][sonarqube-cloud-link]: Code quality and security analysis.
+
 ## ISLAMU Solutions
 
 - [ISLAMU Event][github-repo-link]: Event Platform & Management System.
@@ -364,10 +375,30 @@ Special thanks to the organizations providing free tooling, infrastructure, and 
 - [Coolify][coolify-link]: An Open Source Platform as a Service, alternative to Vercel, Heroku, Netlify, and Railway for easy deploying to your own servers.
 - [Weblate][weblate-link]: An Open Source Translation Management Platform.
 - [Kener][kener-link]: An Open Source Status Page.
+- [SQLite][sqlite-link]: The database used by the standalone deployment.
+- [PostgreSQL][postgresql-link]: An optional database for larger deployments.
+- [Redis][redis-link]: Optional distributed caching.
+- [RabbitMQ][rabbitmq-link]: Optional messaging for email dispatch.
+- [MinIO][minio-link]: Optional S3-compatible object storage.
+- [Formbricks][formbricks-link]: Optional surveys and feedback collection.
 
 ### Open-Source Libraries & Dependencies
 
 Our codebase is enriched by dozens of community-crafted .NET libraries. For the complete, centrally managed dependency list and version pins, see [`Directory.Packages.props`](Directory.Packages.props).
+
+- [.NET][dotnet-link]: The application runtime.
+- [ASP.NET Core][aspnet-core-link]: The web and API framework.
+- [Entity Framework Core][ef-core-link]: Data access and persistence.
+- [CarpaNet][carpanet-link]: AT Protocol integration.
+- [Quartz.NET][quartz-link]: Scheduled background work.
+- [YARP][yarp-link]: Reverse proxy for the Blazor backend-for-frontend.
+- [Ical.Net][ical-net-link]: Calendar data and iCalendar support.
+- [MailKit][mailkit-link]: SMTP email delivery.
+- [OpenTelemetry][opentelemetry-link]: Tracing and metrics.
+- [Serilog][serilog-link]: Structured logging.
+- [TUnit][tunit-link]: Automated .NET tests.
+- [bUnit][bunit-link]: Blazor component tests.
+
 *A heartfelt thank you to every open-source author and maintainer whose work (direct or transitive) helps make this project possible.*
 
 ## Inspiration (UI/...)
@@ -488,6 +519,29 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [hi.events-link]: https://hi.events/
 [gitbook-link]: https://www.gitbook.com/
 [sonar-gitar-link]: https://gitar.ai/
+[coderabbit-link]: https://www.coderabbit.ai/
+[codecov-link]: https://about.codecov.io/
+[socket-link]: https://socket.dev/
+[imgbot-link]: https://imgbot.net/
+[sonarqube-cloud-link]: https://www.sonarsource.com/products/sonarqube/cloud/
+[dotnet-link]: https://dotnet.microsoft.com/
+[aspnet-core-link]: https://dotnet.microsoft.com/apps/aspnet
+[ef-core-link]: https://learn.microsoft.com/ef/core/
+[carpanet-link]: https://github.com/drasticactions/CarpaNet
+[quartz-link]: https://www.quartz-scheduler.net/
+[yarp-link]: https://microsoft.github.io/reverse-proxy/
+[ical-net-link]: https://github.com/ical-org/ical.net
+[mailkit-link]: https://github.com/jstedfast/MailKit
+[opentelemetry-link]: https://opentelemetry.io/
+[serilog-link]: https://serilog.net/
+[tunit-link]: https://tunit.dev/
+[bunit-link]: https://bunit.dev/
+[sqlite-link]: https://www.sqlite.org/
+[postgresql-link]: https://www.postgresql.org/
+[redis-link]: https://redis.io/
+[rabbitmq-link]: https://www.rabbitmq.com/
+[minio-link]: https://github.com/minio/minio
+[formbricks-link]: https://formbricks.com/
 [stripe-monthly-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201
 [stripe-oneoff-link]: https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200
 [stripe-donation-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201

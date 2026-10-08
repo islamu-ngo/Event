@@ -26,6 +26,17 @@
 
 ## 1. Headless Instance Onboarding Invariant
 
+Offline preparation is moving to the external
+[Configurator repository](https://github.com/ISLAMU/Configurator), with
+Event-owned data definitions and the deployed-origin route
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf`. This handoff is not live
+administration or an Event runtime launch button. Event retains bootstrap,
+tenant, secret, identity and legal semantic authority, its existing source tools,
+and its manifest-schema generator until the parent cutover. Bounded reference
+round-trips do not establish generic renderer equivalence for specialized flows.
+See [the exporter contract](SETUP_ASSISTANT_ARCHITECTURE.md#external-definition-handoff)
+and [public preparation guidance](../public/self-hosting/setup-assistant.md#external-configurator-handoff).
+
 Interactive setup establishes the effective BFF request address internally during
 authorized save/completion, without a URL field or confirmation. `PUBLIC_BASE_URL`
 overrides automatic resolution for deployment-specific needs. An explicit base

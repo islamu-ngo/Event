@@ -1,0 +1,16 @@
+{
+  "operatorId": "0198e2a4-5340-7f89-8abc-b8bdf43e0ea8",
+  "revision": "0198e2a4-5340-7f89-8abc-b8bdf43e0ea9",
+  "publicName": "Independent Operator",
+  "legalName": "Example Organization",
+  "operatorKindCode": "registered_organization",
+  "jurisdictionCountryCode": "BE",
+  "registrationIdentifier": null,
+  "publicContactEmail": null,
+  "websiteUrl": "https://example.test",
+  "legalNoticeUrl": null,
+  "termsUrl": null,
+  "privacyUrl": null,
+  "isOfficialInstance": false,
+  "officialOrigin": null
+}

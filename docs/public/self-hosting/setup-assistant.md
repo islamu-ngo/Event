@@ -15,6 +15,38 @@ instance administration surface.
 Run `event-setup` or `event-setup --help` to list the available commands; neither
 starts the interactive Terminal UI.
 
+## External Configurator handoff
+
+[ISLAMU Configurator](https://github.com/ISLAMU/Configurator) is the independent
+offline preparation utility. Event exports one safe metadata definition for
+native and public clients, provenance and host-parser reference vectors. The examples
+contain data only; Configurator does not receive Event code or permission to
+apply configuration.
+
+On the origin where you deploy Configurator, open
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf`. This stable Event family GUID
+selects installed public metadata without contacting your Event instance.
+Optional `appVersion`, `entry`, `locale` and `digest` query selectors must match
+that installed definition. Native and browser use the same revision and digest;
+the browser restricts answer controls instead of changing metadata identity.
+No deployed public origin is prescribed here.
+
+The browser transfers only declared public enum/boolean choices. Keep secrets,
+environment files, manifests, tenant packages, operator identities and legal
+drafts in the native/host workflow. Event still validates and authorizes all
+imports. Legal preparation never publishes a document, and identity preparation
+never replaces the target's revision precondition.
+
+Event's existing tools and the instructions below remain available until the
+extraction cutover. The five reference workflows round-trip through Event's
+actual parsers. For different tenant/document shapes, export a new bounded
+definition revision with `--export INPUT_DIRECTORY NEW_OUTPUT_DIRECTORY`.
+The profile can declare 1-128 canonical trusted issuer fields with
+`trustedIssuerCount`. `--prepare-identity DOCUMENT NEW_MANIFEST` uses Event's
+wire-owned integrity hashes and preserves the supplied revision precondition.
+Legal edits remain drafts for host review. Backend acceptance is always required;
+this handoff adds no live administration or Event URL setting.
+
 ## Choose a release target
 
 | Host | Runtime identifier | Release executable | File export |

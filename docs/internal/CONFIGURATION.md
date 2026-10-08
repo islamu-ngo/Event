@@ -8,6 +8,24 @@ The exhaustive environment-variable reference is maintained in
 `.env.example` is intentionally a curated baseline, not a complete catalogue.
 This document owns configuration architecture, source anchors and invariants.
 
+## External configuration preparation
+
+[Configurator](https://github.com/ISLAMU/Configurator) receives declarative
+Event-owned definitions from `eng/configurator/DefinitionExporter`, not Event
+configuration handlers or semantic apply authority. The stable family GUID is
+`a4bcfaa6-9979-43e5-b1f5-00d552618cdf`; a deployed Configurator origin can serve
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` for public choices only.
+This contract introduces no Event URL key or runtime launch feature.
+
+The exporter reads the existing environment metadata and portable schema,
+admits native/public JSON through Configurator Core, and validates composed
+reference artifacts through Event's parsers. Event still owns issuer
+normalization, setting scope, identity integrity and concurrency, legal lifecycle
+and backend validation. Existing source tools remain available until the parent
+cutover; generic rendering is not equivalent to every specialized Event workflow.
+See [the architectural boundary](SETUP_ASSISTANT_ARCHITECTURE.md#external-definition-handoff)
+and [operator guidance](../public/self-hosting/setup-assistant.md#external-configurator-handoff).
+
 ## Discovery traversal governance
 
 `EventDiscoveryTraversalSettingDefinitions` registers tenant-scoped integer

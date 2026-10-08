@@ -5,6 +5,17 @@ database backup. They contain legal names and public contact details, so treat t
 files as sensitive even though the machine CLI output contains only metadata.
 They do not include users, tenant identities, credentials, or payment history.
 
+The external [Configurator](https://github.com/ISLAMU/Configurator) receives
+Event-owned declarative reference data, not identity API or apply authority.
+Its deployed-origin `/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` page accepts
+public choices only; never upload identity manifests or personal details there.
+The native reference vector preserves content-digest and server-revision
+integrity, but does not establish generic renderer equivalence for this complete
+export/import workflow. Continue using Event's source tools and authenticated
+backend below until the parent cutover. The target revision precondition and
+administrator authorization remain Event-owned.
+See [the external handoff](setup-assistant.md#external-configurator-handoff).
+
 ## Export
 
 Use an authenticated **instance administrator** HTTP client to download

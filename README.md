@@ -97,6 +97,14 @@ ISLAMU Event is architected for sovereign self-hosting across diverse hardware r
 
 For hardware sizing recommendations, reference architecture blueprints, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
 
+[ISLAMU Configurator](https://github.com/ISLAMU/Configurator) is the external
+offline configuration preparation utility. Event publishes its own declarative
+definitions and public workflow choices; on a deployed Configurator origin,
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` selects this target without contacting
+Event. The browser accepts public choices only, not secrets or administration.
+Event's existing source tools and backend validation remain authoritative until
+the parent extraction cutover. See the [handoff and limitations](docs/public/self-hosting/setup-assistant.md#external-configurator-handoff).
+
 ---
 
 ## 🎨 Branding & Customization

@@ -7,6 +7,8 @@
     * [Architecture & Request Flows](readme/getting-started/architecture-and-request-flows.md)
   * [Self-Hosting](readme/self-hosting/README.md)
     * [Setup Assistant](../self-hosting/setup-assistant.md)
+    * [External Configurator Handoff](../self-hosting/setup-assistant.md#external-configurator-handoff)
+    * [Operator Identity Portability](../self-hosting/operator-identity-portability.md)
     * [Deployment Tiers & Sizing](readme/self-hosting/deployment-tiers.md)
     * [Docker Standalone](readme/self-hosting/docker-standalone.md)
     * [Docker Compose](readme/self-hosting/docker-compose.md)

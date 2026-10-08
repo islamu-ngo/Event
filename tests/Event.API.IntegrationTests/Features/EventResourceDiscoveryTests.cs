@@ -8,7 +8,10 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,9 +25,12 @@ public sealed partial class EventResourceDiscoveryTests
     private static CancellationToken Token => TestContext.Current?.Execution.CancellationToken ?? CancellationToken.None;
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task AudienceReadsConcealPrivateMetadataAndReauthorizeEveryContinuation(bool revokeDuringHal)
+    [Arguments(false, null)]
+    [Arguments(true, null)]
+    [Arguments(false, "detail")]
+    [Arguments(false, "collection")]
+    public async Task AudienceReadsConcealPrivateMetadataAndReauthorizeEveryContinuation(
+        bool revokeDuringHal, string? revokeBeforeResult)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
@@ -108,12 +114,19 @@ public sealed partial class EventResourceDiscoveryTests
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.StatusId, (int)TenantUserStatusEnum.Suspended), Token);
             revokedDuringAssembly = true;
         }
-        using var intercepted = revokeDuringHal ? factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        using var intercepted = revokeDuringHal || revokeBeforeResult is not null
+            ? factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<IEventResourceAuthorizationProvider>();
-            services.AddScoped<IEventResourceAuthorizationProvider>(provider => new RevokingAudienceProvider(
-                ActivatorUtilities.CreateInstance<Explore.Infrastructure.Services.EventResourceAuthorizationProvider>(provider),
-                hiddenId, RevokeAsync));
+            if (revokeDuringHal)
+            {
+                services.RemoveAll<IEventResourceAuthorizationProvider>();
+                services.AddScoped<IEventResourceAuthorizationProvider>(provider => new RevokingAudienceProvider(
+                    ActivatorUtilities.CreateInstance<Explore.Infrastructure.Services.EventResourceAuthorizationProvider>(provider),
+                    hiddenId, RevokeAsync));
+            }
+            if (revokeBeforeResult is not null)
+                services.Configure<MvcOptions>(options => options.Filters.Add(
+                    new BeforeAudienceRepresentation(hiddenId, eventId, revokeBeforeResult, RevokeAsync)));
         })) : null;
         using var client = (intercepted ?? factory).CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -175,7 +188,7 @@ public sealed partial class EventResourceDiscoveryTests
             await Assert.That(wrongSubjectCursor.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         using (var entitled = await client.GetAsync($"/api/eventresource/{hiddenId:D}", Token))
         {
-            if (revokeDuringHal)
+            if (revokeDuringHal || revokeBeforeResult == "detail")
             {
                 await Assert.That(revokedDuringAssembly).IsTrue();
                 await Assert.That(entitled.StatusCode).IsEqualTo(HttpStatusCode.NotFound).Because(await entitled.Content.ReadAsStringAsync(Token));
@@ -189,6 +202,18 @@ public sealed partial class EventResourceDiscoveryTests
             using var body = await JsonDocument.ParseAsync(await entitled.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
             await Assert.That(body.RootElement.GetProperty("title").GetString()).IsEqualTo(privateTitle);
             await Assert.That(body.RootElement.TryGetProperty("sensitiveNotes", out _)).IsFalse();
+        }
+        if (revokeBeforeResult == "collection")
+        {
+            using var revokedPage = await client.GetAsync($"/api/event/{eventId:D}/resources", Token);
+            await Assert.That(revokedDuringAssembly).IsTrue();
+            await Assert.That(revokedPage.StatusCode).IsEqualTo(HttpStatusCode.NotFound)
+                .Because(await revokedPage.Content.ReadAsStringAsync(Token));
+            await PrivateAsync(revokedPage);
+            var deniedPage = await revokedPage.Content.ReadAsStringAsync(Token);
+            await Assert.That(deniedPage).DoesNotContain(privateTitle);
+            await Assert.That(deniedPage).DoesNotContain(privateNotes);
+            return;
         }
         await RevokeAsync();
         client.DefaultRequestHeaders.IfNoneMatch.Add(EntityTagHeaderValue.Any);
@@ -248,6 +273,25 @@ public sealed partial class EventResourceDiscoveryTests
     {
         await Assert.That(response.Headers.CacheControl?.Private).IsTrue();
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+    }
+
+    private sealed class BeforeAudienceRepresentation(
+        Guid resourceId, Guid eventId, string surface, Func<Task> revoke) : IAsyncResultFilter
+    {
+        private bool _revoked;
+
+        public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
+        {
+            string path = surface == "detail" ? $"/api/eventresource/{resourceId:D}" : $"/api/event/{eventId:D}/resources";
+            if (!_revoked && context.HttpContext.User.Identity?.IsAuthenticated == true
+                && context.HttpContext.Request.Path == path
+                && context.Result is not ObjectResult { StatusCode: not StatusCodes.Status200OK })
+            {
+                _revoked = true;
+                await revoke();
+            }
+            await next();
+        }
     }
 
     private sealed class RevokingAudienceProvider(

@@ -202,11 +202,27 @@ private content or destination. Cancellation and the original deadline remain
 binding through the single-use handoff. The gate does not replay external
 provider work inside that transaction.
 
-This closes stale native authority at the private preparation handoff, not the
-whole moderation consumer contract. Audience, management, audit and export DTOs
-still need terminal projection ownership, and machine callers need their exact
-native principal coordinates. Those gaps preclude a complete `ReadResource`
-registration or profile activation.
+Audience detail and collection queries return `EventResourceReadProjection<T>`,
+not a publicly readable DTO. Its single-use ownership also applies to native CQS
+callers. Representation preparation can build HAL privately, but delivery runs
+only after fresh scope, row, alternative-resource and continuation qualification.
+Original and terminal cancellation tokens remain binding. The HTTP
+`EventResourceProjectionResult<T>` executes this protocol after result filters,
+immediately before invoking the prepared serializer. Serializing a native result
+cannot disclose the private payload.
+
+Native audience query consumers must replace direct `Value` access with
+`Projection.DiscloseAsync(prepare, deliver, cancellationToken)`. Preparation
+constructs a private representation; only `deliver` may serialize or transfer it.
+The terminal outcome, not the initial query's preparation status, determines
+whether delivery occurred. A consumed, refused or cancelled projection cannot
+be replayed. This is a native source-contract change; HTTP DTOs and routes retain
+their existing shapes.
+
+These boundaries do not close the whole moderation consumer contract.
+Management, audit and export DTOs still need terminal projection ownership, and
+machine callers need their exact native principal coordinates. Those gaps
+preclude a complete `ReadResource` registration or profile activation.
 
 ## Verification and activation boundary
 

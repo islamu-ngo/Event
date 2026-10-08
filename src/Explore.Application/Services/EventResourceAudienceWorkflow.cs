@@ -58,8 +58,8 @@ public sealed class EventResourceAudienceWorkflow(
         var accepted = Accepted(rows, checks, decisions);
         var proofChecks = new List<EventResourceAuthorityRequest>();
         var dto = Project(resource, accepted, proofChecks, prepared.File);
-        return new(EventResourceAudienceFailure.None, dto,
-            new(Scope(resource.EventId), null, proofChecks));
+        var proof = new EventResourceAudienceDisclosureProof(Scope(resource.EventId), null, proofChecks);
+        return new(EventResourceAudienceFailure.None, Projection(dto, proof, cancellationToken), proof);
     }
 
     private async Task<EventResourceAudiencePageResult> ReadPageAsync(Guid eventId, int pageSize,
@@ -136,10 +136,20 @@ public sealed class EventResourceAudienceWorkflow(
             next = cursors.Protect(scope, new(last.SortOrder, last.Id));
         }
         var proof = new EventResourceAudienceDisclosureProof(scope, parentBinding, proofChecks);
-        var final = await AuthorizeDisclosureAsync(proof, cancellationToken);
-        return final == EventResourceAudienceFailure.None
-            ? new(final, new(items, next), proof) : new(final);
+        return new(EventResourceAudienceFailure.None,
+            Projection(new EventResourcePageDto(items, next), proof, cancellationToken), proof);
     }
+
+    private EventResourceReadProjection<T> Projection<T>(T value,
+        EventResourceAudienceDisclosureProof proof, CancellationToken cancellationToken) where T : class =>
+        new(value, async token => (await AuthorizeDisclosureAsync(proof, token)) switch
+        {
+            EventResourceAudienceFailure.None => EventResourceAuthorityOutcome.Allowed,
+            EventResourceAudienceFailure.AuthenticationRequired => EventResourceAuthorityOutcome.AuthenticationRequired,
+            EventResourceAudienceFailure.Forbidden => EventResourceAuthorityOutcome.Forbidden,
+            EventResourceAudienceFailure.NotFound => EventResourceAuthorityOutcome.NotFound,
+            _ => EventResourceAuthorityOutcome.Unavailable
+        }, cancellationToken);
 
     public async Task<EventResourceAudienceFailure> AuthorizeDisclosureAsync(
         EventResourceAudienceDisclosureProof proof, CancellationToken cancellationToken)

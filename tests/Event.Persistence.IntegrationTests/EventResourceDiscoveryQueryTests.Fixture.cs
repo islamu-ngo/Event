@@ -103,6 +103,19 @@ public sealed partial class EventResourceDiscoveryQueryTests
         await context.SaveChangesAsync();
     }
 
+    private static async Task<T> DiscloseAsync<T>(EventResourceReadProjection<T>? projection) where T : class
+    {
+        await Assert.That(projection).IsNotNull();
+        T? released = null;
+        var outcome = await projection!.DiscloseAsync((value, _) => Task.FromResult(value), (value, _) =>
+        {
+            released = value;
+            return Task.CompletedTask;
+        });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        return released!;
+    }
+
     private EventResourceAudienceWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid? subject,
         Provider? provider = null, bool isMachine = false, string[]? origins = null)
     {

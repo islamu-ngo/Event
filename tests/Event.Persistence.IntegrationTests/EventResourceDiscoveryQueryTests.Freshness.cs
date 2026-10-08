@@ -21,10 +21,10 @@ public sealed partial class EventResourceDiscoveryQueryTests
         var workflow = Workflow(context, scope.TenantAId, publisher);
         var detail = await workflow.GetAsync(resource.Id, default);
         await Assert.That(detail.Failure).IsEqualTo(EventResourceAudienceFailure.Unavailable);
-        await Assert.That(detail.Value).IsNull();
+        await Assert.That(detail.Projection).IsNull();
         var page = await workflow.ListAsync(scope.EventAId, 20, null, default);
         await Assert.That(page.Failure).IsEqualTo(EventResourceAudienceFailure.Unavailable);
-        await Assert.That(page.Value).IsNull();
+        await Assert.That(page.Projection).IsNull();
     }
 
     private sealed class MetadataReadFailure : DbCommandInterceptor
@@ -87,8 +87,7 @@ public sealed partial class EventResourceDiscoveryQueryTests
         await Assert.That((await workflow.GetAsync(resource.Id, default)).Failure).IsEqualTo(EventResourceAudienceFailure.None);
         var page = await workflow.ListAsync(scope.EventAId, 20, null, default);
         await Assert.That(page.Failure).IsEqualTo(EventResourceAudienceFailure.None);
-        await Assert.That(page.Value!.Items.Single().Id).IsEqualTo(resource.Id);
-        await Assert.That(await workflow.AuthorizeDisclosureAsync(page.Proof!, default)).IsEqualTo(EventResourceAudienceFailure.None);
+        await Assert.That((await DiscloseAsync(page.Projection)).Items.Single().Id).IsEqualTo(resource.Id);
     }
 
     [Test]
@@ -117,10 +116,11 @@ public sealed partial class EventResourceDiscoveryQueryTests
         };
         var detail = await Workflow(context, scope.TenantAId, subject, provider).GetAsync(resource.Id, default);
         await Assert.That(detail.Failure).IsEqualTo(EventResourceAudienceFailure.None);
-        await Assert.That(detail.Value!.IsTeaser).IsTrue();
-        await Assert.That(detail.Value.Title).IsEqualTo(resource.PublicTitle);
-        await Assert.That(detail.Value.Description).IsNull();
-        await Assert.That(privateInputs.SequenceEqual([true, false])).IsTrue();
+        var projected = await DiscloseAsync(detail.Projection);
+        await Assert.That(projected.IsTeaser).IsTrue();
+        await Assert.That(projected.Title).IsEqualTo(resource.PublicTitle);
+        await Assert.That(projected.Description).IsNull();
+        await Assert.That(privateInputs.SequenceEqual([true, false, false])).IsTrue();
         await Assert.That(tracked.StatusId).IsEqualTo((int)TenantUserStatusEnum.Active);
     }
 
@@ -135,13 +135,18 @@ public sealed partial class EventResourceDiscoveryQueryTests
         var provider = new Provider();
         var workflow = Workflow(context, scope.TenantAId, publisher, provider);
         var page = await workflow.ListAsync(scope.EventAId, 1, null, default);
-        await Assert.That(page.Value!.NextCursor).IsNotNull();
         await Assert.That(await Workflow(context, scope.TenantAId, null).AuthorizeDisclosureAsync(page.Proof!, default))
             .IsEqualTo(EventResourceAudienceFailure.NotFound);
-        provider.Decide = input => input.Resource.Id == rows[1].Id
-            ? EventResourceProviderDecision.Deny : EventResourceProviderDecision.Allow;
-        await Assert.That(await workflow.AuthorizeDisclosureAsync(page.Proof!, default))
-            .IsEqualTo(EventResourceAudienceFailure.Forbidden);
+        bool released = false;
+        var outcome = await page.Projection!.DiscloseAsync(async (value, _) =>
+        {
+            await Assert.That(value.NextCursor).IsNotNull();
+            provider.Decide = input => input.Resource.Id == rows[1].Id
+                ? EventResourceProviderDecision.Deny : EventResourceProviderDecision.Allow;
+            return value;
+        }, (_, _) => { released = true; return Task.CompletedTask; });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+        await Assert.That(released).IsFalse();
     }
 
     [Test]
@@ -153,7 +158,7 @@ public sealed partial class EventResourceDiscoveryQueryTests
         await using var context = database.CreateContext();
         var result = await Workflow(context, scope.TenantAId, publisher).ListAsync(scope.EventAId, 20, null, default);
         await Assert.That(result.Failure).IsEqualTo(EventResourceAudienceFailure.Unavailable);
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
     }
 
     [Test]
@@ -165,6 +170,6 @@ public sealed partial class EventResourceDiscoveryQueryTests
         await using var context = database.CreateContext();
         var result = await Workflow(context, scope.TenantAId, publisher).ListAsync(scope.EventAId, pageSize, null, default);
         await Assert.That(result.Failure).IsEqualTo(EventResourceAudienceFailure.InvalidRequest);
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
     }
 }

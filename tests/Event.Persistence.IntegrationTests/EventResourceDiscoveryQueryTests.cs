@@ -35,8 +35,9 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         var workflow = Workflow(context, scope.TenantAId, user, provider);
         var result = await new ListEventResourcesQueryHandler(workflow).QueryAsync(new(scope.EventAId));
         await Assert.That(result.Failure).IsEqualTo(EventResourceAudienceFailure.None);
-        await Assert.That(result.Value!.Items.Select(item => item.Id).SequenceEqual([rows[^1].Id])).IsTrue();
-        await Assert.That(result.Value.NextCursor).IsNull();
+        var page = await DiscloseAsync(result.Projection);
+        await Assert.That(page.Items.Select(item => item.Id).SequenceEqual([rows[^1].Id])).IsTrue();
+        await Assert.That(page.NextCursor).IsNull();
         await Assert.That(provider.Sizes.Contains(500)).IsTrue();
         await Assert.That(provider.Sizes.Count).IsLessThanOrEqualTo(4);
         await Assert.That(recorder.Commands.Count).IsLessThanOrEqualTo(150);
@@ -66,19 +67,23 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         await using var context = database.CreateContext();
         var workflow = Workflow(context, scope.TenantAId, user, provider);
         var first = await workflow.ListAsync(scope.EventAId, 1, null, default);
-        await Assert.That(first.Value!.Items.Single().Id).IsEqualTo(rows[0].Id);
-        await Assert.That(_cursors.TryUnprotect(first.Value.NextCursor!, new(scope.TenantAId, scope.EventAId, user, false), out var decoded)).IsTrue();
+        var firstPage = await DiscloseAsync(first.Projection);
+        await Assert.That(firstPage.Items.Single().Id).IsEqualTo(rows[0].Id);
+        await Assert.That(_cursors.TryUnprotect(firstPage.NextCursor!, new(scope.TenantAId, scope.EventAId, user, false), out var decoded)).IsTrue();
         await Assert.That(decoded!.ResourceId).IsEqualTo(rows[0].Id);
-        var second = await workflow.ListAsync(scope.EventAId, 1, first.Value.NextCursor, default);
-        await Assert.That(second.Value!.Items.Single().Id).IsEqualTo(rows[2].Id);
-        var last = await workflow.ListAsync(scope.EventAId, 1, second.Value.NextCursor, default);
-        await Assert.That(last.Value!.Items.Single().Id).IsEqualTo(rows[4].Id);
-        await Assert.That(last.Value.NextCursor).IsNull();
+        var second = await workflow.ListAsync(scope.EventAId, 1, firstPage.NextCursor, default);
+        var secondPage = await DiscloseAsync(second.Projection);
+        await Assert.That(secondPage.Items.Single().Id).IsEqualTo(rows[2].Id);
+        var last = await workflow.ListAsync(scope.EventAId, 1, secondPage.NextCursor, default);
+        var lastPage = await DiscloseAsync(last.Projection);
+        await Assert.That(lastPage.Items.Single().Id).IsEqualTo(rows[4].Id);
+        await Assert.That(lastPage.NextCursor).IsNull();
         provider.Decide = input => input.Resource.Id == scope.EventAId
             ? EventResourceProviderDecision.Allow : EventResourceProviderDecision.Deny;
-        var revoked = await workflow.ListAsync(scope.EventAId, 1, first.Value.NextCursor, default);
-        await Assert.That(revoked.Value!.Items.Length).IsEqualTo(0);
-        await Assert.That(revoked.Value.NextCursor).IsNull();
+        var revoked = await workflow.ListAsync(scope.EventAId, 1, firstPage.NextCursor, default);
+        var revokedPage = await DiscloseAsync(revoked.Projection);
+        await Assert.That(revokedPage.Items.Length).IsEqualTo(0);
+        await Assert.That(revokedPage.NextCursor).IsNull();
     }
 
     [Test]
@@ -94,28 +99,33 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
             origins: ["https://resources.example.test"]);
         var detail = await new GetEventResourceAudienceDetailQueryHandler(workflow).QueryAsync(new(resource.Id));
         await Assert.That(detail.Failure).IsEqualTo(EventResourceAudienceFailure.None);
-        await Assert.That(detail.Value!.Title).IsEqualTo(resource.Title);
-        await Assert.That(detail.Value.IsTeaser).IsFalse();
-        await Assert.That(detail.Value.ExternalDestinationSafeOrigin).IsEqualTo("https://resources.example.test");
+        await Assert.That(JsonSerializer.Serialize(detail).Contains(resource.Title, StringComparison.Ordinal)).IsFalse();
         var before = resource.ConcurrencyStamp;
-        await using (var writer = database.CreateIndependentContext())
+        bool released = false;
+        var final = await detail.Projection!.DiscloseAsync(async (value, _) =>
         {
+            await Assert.That(value.Title).IsEqualTo(resource.Title);
+            await Assert.That(value.IsTeaser).IsFalse();
+            await Assert.That(value.ExternalDestinationSafeOrigin).IsEqualTo("https://resources.example.test");
+            await using var writer = database.CreateIndependentContext();
             await writer.TenantUsers.Where(member => member.UserId == subject)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(member => member.StatusId, (int)TenantUserStatusEnum.Suspended));
-        }
-        var final = await new AuthorizeEventResourceAudienceDisclosureQueryHandler(workflow).QueryAsync(new(detail.Proof!));
-        await Assert.That(final).IsEqualTo(EventResourceAudienceFailure.Forbidden);
+            return value;
+        }, (_, _) => { released = true; return Task.CompletedTask; });
+        await Assert.That(final).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+        await Assert.That(released).IsFalse();
         await Assert.That((await context.EventResources.AsNoTracking().SingleAsync(row => row.Id == resource.Id)).ConcurrencyStamp).IsEqualTo(before);
         var teaser = await workflow.GetAsync(resource.Id, default);
         await Assert.That(teaser.Failure).IsEqualTo(EventResourceAudienceFailure.None);
-        await Assert.That(teaser.Value!.Title).IsEqualTo(resource.PublicTitle);
-        await Assert.That(teaser.Value.IsTeaser).IsTrue();
-        await Assert.That(teaser.Value.ExternalDestinationSafeOrigin).IsNull();
-        await Assert.That(teaser.Value.Description).IsNull();
-        await Assert.That(teaser.Value.AccessibilityNote).IsNull();
-        await Assert.That(teaser.Value.LanguageCode).IsNull();
-        await Assert.That(teaser.Value.AccessibleAlternativeEventResourceId).IsNull();
-        var names = JsonSerializer.SerializeToElement(teaser.Value).EnumerateObject().Select(property => property.Name).ToHashSet();
+        var teaserValue = await DiscloseAsync(teaser.Projection);
+        await Assert.That(teaserValue.Title).IsEqualTo(resource.PublicTitle);
+        await Assert.That(teaserValue.IsTeaser).IsTrue();
+        await Assert.That(teaserValue.ExternalDestinationSafeOrigin).IsNull();
+        await Assert.That(teaserValue.Description).IsNull();
+        await Assert.That(teaserValue.AccessibilityNote).IsNull();
+        await Assert.That(teaserValue.LanguageCode).IsNull();
+        await Assert.That(teaserValue.AccessibleAlternativeEventResourceId).IsNull();
+        var names = JsonSerializer.SerializeToElement(teaserValue).EnumerateObject().Select(property => property.Name).ToHashSet();
         await Assert.That(names.Overlaps(["SensitiveNotes", "AudienceRules", "StorageObjectId", "ExternalDestinationCiphertext",
             "ExternalDestinationSafeOrigin", "Version", "TotalCount", "TotalPages"])).IsFalse();
     }
@@ -130,14 +140,20 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         await using var context = database.CreateContext();
         var anonymous = Workflow(context, scope.TenantAId, null);
         var detail = await anonymous.GetAsync(visible.Id, default);
-        await Assert.That(detail.Value!.AccessibleAlternativeEventResourceId).IsNull();
+        await Assert.That((await DiscloseAsync(detail.Projection)).AccessibleAlternativeEventResourceId).IsNull();
         var member = Workflow(context, scope.TenantAId, user);
         var eligible = await member.GetAsync(visible.Id, default);
-        await Assert.That(eligible.Value!.AccessibleAlternativeEventResourceId).IsEqualTo(hidden.Id);
-        await using (var writer = database.CreateIndependentContext())
+        bool released = false;
+        var outcome = await eligible.Projection!.DiscloseAsync(async (value, _) =>
+        {
+            await Assert.That(value.AccessibleAlternativeEventResourceId).IsEqualTo(hidden.Id);
+            await using var writer = database.CreateIndependentContext();
             await writer.TenantUsers.Where(value => value.UserId == user)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.StatusId, (int)TenantUserStatusEnum.Suspended));
-        await Assert.That(await member.AuthorizeDisclosureAsync(eligible.Proof!, default)).IsEqualTo(EventResourceAudienceFailure.NotFound);
+            return value;
+        }, (_, _) => { released = true; return Task.CompletedTask; });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(released).IsFalse();
     }
 
     [Test]
@@ -152,7 +168,7 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         {
             var result = await Workflow(context, scope.TenantAId, null).GetAsync(id, default);
             await Assert.That(result.Failure).IsEqualTo(EventResourceAudienceFailure.NotFound);
-            await Assert.That(result.Value).IsNull();
+            await Assert.That(result.Projection).IsNull();
             await Assert.That(result.Proof).IsNull();
         }
         var machine = await Workflow(context, scope.TenantAId, user, isMachine: true).GetAsync(hidden.Id, default);
@@ -175,10 +191,10 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         var workflow = Workflow(context, scope.TenantAId, user, provider);
         var detail = await workflow.GetAsync(resource.Id, default);
         await Assert.That(detail.Failure).IsEqualTo(EventResourceAudienceFailure.Unavailable);
-        await Assert.That(detail.Value).IsNull();
+        await Assert.That(detail.Projection).IsNull();
         var list = await workflow.ListAsync(scope.EventAId, 20, null, default);
         await Assert.That(list.Failure).IsEqualTo(EventResourceAudienceFailure.Unavailable);
-        await Assert.That(list.Value).IsNull();
+        await Assert.That(list.Projection).IsNull();
     }
 
     [Test]
@@ -194,15 +210,15 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         {
             var workflow = Workflow(context, scope.TenantAId, machine ? user : null, provider, machine);
             var detail = await workflow.GetAsync(resource.Id, default);
-            await Assert.That(detail.Value!.IsTeaser).IsTrue();
+            await Assert.That((await DiscloseAsync(detail.Projection)).IsTeaser).IsTrue();
             var list = await workflow.ListAsync(scope.EventAId, 20, null, default);
-            await Assert.That(list.Value!.Items.Single().Id).IsEqualTo(resource.Id);
+            await Assert.That((await DiscloseAsync(list.Projection)).Items.Single().Id).IsEqualTo(resource.Id);
             foreach (var invalid in new[] { "", "malformed", new string('A', 2049),
                 _cursors.Protect(new(scope.TenantBId, scope.EventAId, null, false), new(0, resource.Id)) })
             {
                 var result = await workflow.ListAsync(scope.EventAId, 20, invalid, default);
                 await Assert.That(result.Failure).IsEqualTo(EventResourceAudienceFailure.InvalidRequest);
-                await Assert.That(result.Value).IsNull();
+                await Assert.That(result.Projection).IsNull();
             }
         }
         await Assert.That(provider.Sizes.Count).IsEqualTo(0);
@@ -216,13 +232,19 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
             EventResourceAudienceKindEnum.AuthenticatedTenantMember)).ToArray());
         var small = new SqlRecorder();
         await using (var context = database.CreateContext(small))
-            await Assert.That((await Workflow(context, scope.TenantAId, user).ListAsync(scope.EventAId, 20, null, default)).Value!.Items.Length).IsEqualTo(5);
+        {
+            var result = await Workflow(context, scope.TenantAId, user).ListAsync(scope.EventAId, 20, null, default);
+            await Assert.That((await DiscloseAsync(result.Projection)).Items.Length).IsEqualTo(5);
+        }
         await SaveAsync(Enumerable.Range(5, 495).Select(index => Resource(scope, user, index,
             EventResourceAudienceKindEnum.AuthenticatedTenantMember)).ToArray());
         var large = new SqlRecorder();
         var provider = new Provider();
         await using (var context = database.CreateContext(large))
-            await Assert.That((await Workflow(context, scope.TenantAId, user, provider).ListAsync(scope.EventAId, 20, null, default)).Value!.Items.Length).IsEqualTo(20);
+        {
+            var result = await Workflow(context, scope.TenantAId, user, provider).ListAsync(scope.EventAId, 20, null, default);
+            await Assert.That((await DiscloseAsync(result.Projection)).Items.Length).IsEqualTo(20);
+        }
         await Assert.That(large.Commands.Count).IsLessThanOrEqualTo(small.Commands.Count + 2);
         await Assert.That(provider.Sizes.Contains(500)).IsTrue();
         Console.WriteLine($"Audience SQL growth: five={small.Commands.Count}, five hundred={large.Commands.Count}");

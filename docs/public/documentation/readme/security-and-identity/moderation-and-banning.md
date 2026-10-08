@@ -74,9 +74,17 @@ not register an enforcement consumer or enable a moderation profile.
 Private resource downloads and redirects recheck current native authority
 immediately before releasing their prepared content or destination. If authority
 or the attachment changes, the preparation is discarded rather than disclosed
-using an earlier permission check. This additional check does not enable a
-moderation profile: other resource projections still require complete terminal
-enforcement.
+using an earlier permission check. Audience detail and collection responses also
+retain their metadata privately until a fresh check at response execution,
+including revocation after links were prepared. A stale private representation
+is refused rather than serialized. These checks do not enable a moderation
+profile: management, audit and export projections and exact machine identity
+still require complete terminal enforcement.
+
+Embedded native integrations must consume audience query `Projection` through
+`DiscloseAsync` instead of reading `Value`. Build the representation privately
+and transfer it only in the delivery callback; check the terminal outcome.
+Existing HTTP routes and response shapes remain the same.
 
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners

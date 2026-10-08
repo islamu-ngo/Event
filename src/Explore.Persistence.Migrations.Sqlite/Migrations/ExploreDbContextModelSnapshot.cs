@@ -18097,6 +18097,50 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationHostBinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("InstallationSlot")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1)
+                        .HasColumnName("installation_slot");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instance_id");
+
+                    b.Property<Guid>("MaintenanceServicePrincipalId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("maintenance_service_principal_id");
+
+                    b.Property<Guid>("SolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("solution_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_host_bindings");
+
+                    b.HasIndex("InstallationSlot")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_host_bindings_installation_slot");
+
+                    b.HasIndex("MaintenanceServicePrincipalId")
+                        .HasDatabaseName("ix_moderation_host_bindings_maintenance_service_principal_id");
+
+                    b.ToTable("ie_moderation_host_bindings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_host_binding_slot", "installation_slot = 1");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -18177,6 +18221,41 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                             t.HasCheckConstraint("ck_moderation_receipt_revision", "result_revision > 0 AND policy_revision > 0 AND qualification_revision > 0");
 
                             t.HasCheckConstraint("ck_moderation_receipt_scope", "scope_kind BETWEEN 1 AND 6 AND subject_kind BETWEEN 1 AND 4");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationEpoch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_qualification_epochs");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_qualification_epochs_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_qualification_epochs_host_binding_id_tenant_id");
+
+                    b.ToTable("ie_moderation_qualification_epochs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_qualification_revision", "revision > 0");
                         });
                 });
 
@@ -43870,6 +43949,16 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasConstraintName("fk_moderation_effect_intents_moderation_sanctions_superseded_sanction_id");
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationHostBinding", b =>
+                {
+                    b.HasOne("Explore.Domain.ServicePrincipal", null)
+                        .WithMany()
+                        .HasForeignKey("MaintenanceServicePrincipalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_host_bindings_service_principals_maintenance_service_principal_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>
                 {
                     b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
@@ -43878,6 +43967,23 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_moderation_operation_receipts_moderation_decisions_decision_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationEpoch", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_epochs_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_epochs_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Explore.Domain.Modules.TenantCapability", b =>

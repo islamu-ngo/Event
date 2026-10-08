@@ -18,6 +18,32 @@ Project islamu_event {
 
 // Canonical qualified moderation ledger; separate from legacy Event reporting.
 // Scope and subject-origin ancestry are scalar, checked shapes, not tenant aliases.
+Table "moderation_host_bindings" {
+  "id" uuid [pk, not null]
+  "trust_domain_id" uuid [not null]
+  "solution_id" uuid [not null]
+  "instance_id" uuid [not null]
+  "maintenance_service_principal_id" uuid [not null, ref: > service_principals.id]
+  "installation_slot" int [not null, default: 1]
+  indexes {
+    installation_slot [unique]
+    maintenance_service_principal_id
+  }
+  Note: 'Installation-owned immutable ancestry. Checked installation_slot = 1 and uniqueness prevent multiple bindings in one primary store. The selected existing service is provenance, not permission or activation.'
+}
+
+Table "moderation_qualification_epochs" {
+  "id" uuid [pk, not null]
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "revision" bigint [not null]
+  indexes {
+    (host_binding_id, tenant_id) [unique]
+    tenant_id
+  }
+  Note: 'One positive application-managed source revision per binding and actual tenant. Native expected-revision writes reject stale updates; the epoch is not itself permission.'
+}
+
 Table "moderation_cases" {
   "id" uuid [pk, not null]
   "subject_kind" int [not null]

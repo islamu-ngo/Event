@@ -14,9 +14,13 @@ public partial class ExploreDbContext
     public DbSet<ModerationProtectiveMeasure> ModerationProtectiveMeasures => Set<ModerationProtectiveMeasure>();
     public DbSet<ModerationOperationReceipt> ModerationOperationReceipts => Set<ModerationOperationReceipt>();
     public DbSet<ModerationEffectIntent> ModerationEffectIntents => Set<ModerationEffectIntent>();
+    public DbSet<ModerationHostBinding> ModerationHostBindings => Set<ModerationHostBinding>();
+    public DbSet<ModerationQualificationEpoch> ModerationQualificationEpochs => Set<ModerationQualificationEpoch>();
 
     private void ApplyModerationQueryFilters(ModelBuilder builder)
     {
+        builder.Entity<ModerationQualificationEpoch>().HasQueryFilter("ModerationQualification",
+            entity => entity.TenantId == TenantFilterTenantId);
         builder.Entity<ModerationCase>().HasQueryFilter("ModerationAuthority",
             entity => ModerationTrustDomainId != null && entity.ScopeTrustDomainId == ModerationTrustDomainId
                 && (entity.ScopeTenantId == null || entity.ScopeTenantId == TenantFilterTenantId));

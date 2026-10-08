@@ -59,6 +59,23 @@ real-provider final gate.
 
 ## Writer and fence ownership
 
+### Native authority source ownership
+
+`ModerationHostBinding` records installation-established trust-domain, solution,
+instance and selected existing maintenance-principal identities. It is not the
+bootstrap timestamp or a request-derived trust root. A checked singleton slot
+and unique index prevent another binding from silently reparenting the primary
+store; the selected principal has a restrictive foreign key.
+
+`ModerationQualificationEpoch` has one owner per binding and actual tenant,
+restrictive parent foreign keys, a positive revision check and an
+application-managed concurrency token. A stale writer cannot overwrite the
+committed generation. Primary-context queries also require the current tenant
+filter. Neither row initializes permission or publishes an active policy:
+installation, current native qualification and adopted policy remain separate
+positive operations. Qualification must still join the actual source-row fences
+described below rather than treating the epoch label as permission.
+
 Acquire privacy serialization first when identity changes. Within the primary
 moderation transaction, acquire jurisdiction and qualification sources before
 subject and policy sources, then owning Event dependencies. Sort peers by their

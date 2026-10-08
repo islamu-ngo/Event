@@ -23,6 +23,11 @@ The current programme is building the authoritative ledger and native
 integration. Installing its schema does not enable a policy, replace existing
 actor protection or certify a deployment as protected.
 
+Installation identity is recorded separately from tenant qualification. Changing
+request coordinates or repeating setup cannot silently replace the recorded
+trust ancestry. The selected maintenance principal must already exist; creating
+the binding or a qualification revision does not grant it permission.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

@@ -24,7 +24,7 @@ var project = provider switch
     PrimaryDatabaseProvider.SqlServer => "src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj",
     PrimaryDatabaseProvider.MySql or PrimaryDatabaseProvider.MariaDb =>
         "src/Explore.Persistence.Migrations.MySql/Explore.Persistence.Migrations.MySql.csproj",
-    _ => throw new ArgumentOutOfRangeException(nameof(provider))
+    _ => throw new InvalidOperationException("The selected primary provider has no migration project.")
 };
 if (!File.Exists(Path.Combine(root, project)))
 {

@@ -8,6 +8,10 @@ public interface IModerationAuthorityContext
     /// <remarks>
     /// Intent fields are not proof. AcceptFinding must qualify finding/case ownership; Approve must qualify
     /// the canonical human and all native conflicts. Protected remedies still require owned subject or reviewer proof.
+    /// Propose must positively qualify the open case and adopted rule/profile, including the requested quorum and terms.
+    /// Supersede must qualify correction permission over both the specifically requested old contribution and replacement.
+    /// Reconcile must qualify permission for that exact decision/contribution; scheduled activation additionally rechecks
+    /// current finding, adopted policy and independent reviewers through QualifyActivationAsync.
     /// </remarks>
     Task<ModerationAuthorityResolution> ResolveAsync(
         IModerationSession session, ModerationOperation operation, CancellationToken cancellationToken);

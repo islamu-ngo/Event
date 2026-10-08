@@ -61,6 +61,37 @@ public sealed class ModerationOperationService(
 
             var decision = await session.FindDecisionAsync(
                 operation.DecisionId, operation.Subject, operation.Target, token);
+            if (operation.Kind == ModerationOperationKind.Propose && operation.Proposal is { } proposal)
+            {
+                if (decision is not null)
+                {
+                    return ModerationOperationResult.Conflict();
+                }
+
+                var moderationCase = await session.FindCaseAsync(proposal.CaseId, operation.Subject, operation.Target, token);
+                if (moderationCase is null)
+                {
+                    return ModerationOperationResult.NotFound();
+                }
+
+                if (moderationCase.Id != proposal.CaseId || moderationCase.Subject != operation.Subject
+                    || moderationCase.Scope != operation.Target)
+                {
+                    return ModerationOperationResult.Denied();
+                }
+
+                now = clock.GetUtcNow();
+                if (moderationCase.State != ModerationCaseState.Open || moderationCase.Revision != operation.ExpectedRevision
+                    || now < moderationCase.UpdatedAt || (proposal.EndsAt is not null && now >= proposal.EndsAt))
+                {
+                    return ModerationOperationResult.Conflict();
+                }
+
+                decision = ModerationDecision.Propose(operation.DecisionId, moderationCase.Id, operation.Subject,
+                    grant.Principal, grant.Scope, operation.Target, proposal.Rule, proposal.Capabilities,
+                    proposal.StartsAt, proposal.EndsAt, proposal.ReviewAt, proposal.RequiredApprovals, now);
+            }
+
             if (decision is null)
             {
                 return ModerationOperationResult.NotFound();
@@ -73,14 +104,18 @@ public sealed class ModerationOperationService(
 
             now = clock.GetUtcNow();
             if (now < decision.UpdatedAt
-                || (operation.Kind != ModerationOperationKind.Revoke && decision.Revision != operation.ExpectedRevision))
+                || (operation.Kind is not (ModerationOperationKind.Revoke or ModerationOperationKind.Propose)
+                    && decision.Revision != operation.ExpectedRevision))
             {
                 return ModerationOperationResult.Conflict();
             }
 
             ModerationSanction? sanction = null;
+            ModerationSanction? supersededSanction = null;
             switch (operation.Kind)
             {
+                case ModerationOperationKind.Propose:
+                    break;
                 case ModerationOperationKind.RecordResponse:
                     if (decision.State != ModerationDecisionState.Proposed)
                     {
@@ -113,7 +148,42 @@ public sealed class ModerationOperationService(
                     decision.Approve(grant.Principal, grant.Scope, operation.ExpectedRevision, now);
                     break;
                 case ModerationOperationKind.Activate:
+                case ModerationOperationKind.Supersede:
                     if (decision.State != ModerationDecisionState.Approved || (decision.EndsAt is not null && now >= decision.EndsAt))
+                    {
+                        return ModerationOperationResult.Conflict();
+                    }
+
+                    if (operation.Kind == ModerationOperationKind.Supersede)
+                    {
+                        if (operation.SupersededScope is not { } oldScope || !grant.Scope.Contains(oldScope)
+                            || !oldScope.Contains(decision.Scope))
+                        {
+                            return ModerationOperationResult.Denied();
+                        }
+
+                        supersededSanction = await session.FindSanctionAsync(
+                            operation.SupersededSanctionId, operation.Subject, oldScope, token);
+                        if (supersededSanction is null)
+                        {
+                            return ModerationOperationResult.NotFound();
+                        }
+
+                        if (supersededSanction.Id != operation.SupersededSanctionId
+                            || supersededSanction.Subject != decision.Subject || supersededSanction.Scope != oldScope
+                            || supersededSanction.DecisionId == decision.Id)
+                        {
+                            return ModerationOperationResult.Denied();
+                        }
+
+                        if (supersededSanction.Revision != operation.ExpectedSanctionRevision
+                            || supersededSanction.State is ModerationSanctionState.Revoked or ModerationSanctionState.Superseded)
+                        {
+                            return ModerationOperationResult.Conflict();
+                        }
+                    }
+
+                    if (await session.FindSanctionAsync(operation.ReferenceId, operation.Subject, operation.Target, token) is not null)
                     {
                         return ModerationOperationResult.Conflict();
                     }
@@ -124,12 +194,14 @@ public sealed class ModerationOperationService(
                     }
 
                     now = clock.GetUtcNow();
-                    if (decision.EndsAt is not null && now >= decision.EndsAt)
+                    if (now < decision.UpdatedAt || (supersededSanction is not null && now < supersededSanction.UpdatedAt)
+                        || (decision.EndsAt is not null && now >= decision.EndsAt))
                     {
                         return ModerationOperationResult.Conflict();
                     }
 
                     sanction = decision.Activate(operation.ReferenceId, operation.ExpectedRevision, now);
+                    supersededSanction?.Supersede(decision.Id, operation.ExpectedSanctionRevision, now);
                     break;
                 case ModerationOperationKind.Reject:
                 case ModerationOperationKind.Withdraw:
@@ -150,6 +222,7 @@ public sealed class ModerationOperationService(
 
                     break;
                 case ModerationOperationKind.Revoke:
+                case ModerationOperationKind.Reconcile:
                     sanction = await session.FindSanctionAsync(operation.ReferenceId, operation.Subject, operation.Target, token);
                     if (sanction is null)
                     {
@@ -162,31 +235,64 @@ public sealed class ModerationOperationService(
                         return ModerationOperationResult.Denied();
                     }
 
-                    if (sanction.Revision != operation.ExpectedRevision || now < sanction.UpdatedAt
+                    now = clock.GetUtcNow();
+                    var sanctionRevision = operation.Kind == ModerationOperationKind.Reconcile
+                        ? operation.ExpectedSanctionRevision : operation.ExpectedRevision;
+                    if (sanction.Revision != sanctionRevision || now < sanction.UpdatedAt || now < decision.UpdatedAt
                         || sanction.State is ModerationSanctionState.Revoked or ModerationSanctionState.Superseded)
                     {
                         return ModerationOperationResult.Conflict();
                     }
 
-                    sanction.Revoke(operation.ExpectedRevision, now);
+                    if (operation.Kind == ModerationOperationKind.Reconcile)
+                    {
+                        if (decision.State is not (ModerationDecisionState.Scheduled or ModerationDecisionState.Active))
+                        {
+                            return ModerationOperationResult.Conflict();
+                        }
+
+                        if (sanction.State == ModerationSanctionState.Scheduled && now >= sanction.StartsAt
+                            && (sanction.EndsAt is null || now < sanction.EndsAt))
+                        {
+                            if (await authority.QualifyActivationAsync(session, decision, grant, token) != ModerationAuthorityState.Known)
+                            {
+                                return ModerationOperationResult.Unavailable();
+                            }
+
+                            now = clock.GetUtcNow();
+                        }
+
+                        if (now < sanction.UpdatedAt || now < decision.UpdatedAt || !sanction.Reconcile(sanctionRevision, now))
+                        {
+                            return ModerationOperationResult.Conflict();
+                        }
+                    }
+                    else
+                    {
+                        sanction.Revoke(sanctionRevision, now);
+                    }
+
                     break;
                 default:
                     return ModerationOperationResult.Unavailable();
             }
 
-            var effect = effects.Plan(operation, decision, sanction);
+            var effect = effects.Plan(operation, decision, sanction, supersededSanction);
             if (effect.Id != operation.EffectId || effect.OperationId != operation.OperationId
                 || effect.DecisionId != decision.Id || effect.DecisionRevision != decision.Revision
                 || effect.SanctionId != sanction?.Id || effect.SanctionRevision != sanction?.Revision
+                || effect.SupersededSanctionId != supersededSanction?.Id
+                || effect.SupersededSanctionRevision != supersededSanction?.Revision
                 || effect.Subject != decision.Subject || effect.Scope != decision.Scope || effect.Kind != operation.Kind)
             {
                 return ModerationOperationResult.Unavailable();
             }
 
-            await session.SaveAsync(decision, sanction, grant, effect, token);
+            await session.SaveAsync(decision, sanction, supersededSanction, grant, effect, token);
             return ModerationOperationResult.Applied(
                 decision.Id, sanction?.Id,
-                operation.Kind == ModerationOperationKind.Revoke && sanction is not null ? sanction.Revision : decision.Revision);
+                operation.Kind is ModerationOperationKind.Revoke or ModerationOperationKind.Reconcile && sanction is not null
+                    ? sanction.Revision : decision.Revision);
         }, cancellationToken);
     }
 }

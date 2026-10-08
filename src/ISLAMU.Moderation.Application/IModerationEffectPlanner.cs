@@ -6,5 +6,6 @@ namespace ISLAMU.Moderation.Application;
 public interface IModerationEffectPlanner
 {
     ModerationPlannedEffect Plan(
-        ModerationOperation operation, ModerationDecision decision, ModerationSanction? sanction);
+        ModerationOperation operation, ModerationDecision decision, ModerationSanction? sanction,
+        ModerationSanction? supersededSanction);
 }

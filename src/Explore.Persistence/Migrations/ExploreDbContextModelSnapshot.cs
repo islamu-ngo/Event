@@ -18048,6 +18048,196 @@ namespace Explore.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationEffectIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decision_id");
+
+                    b.Property<long>("DecisionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decision_revision");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<int>("OperationKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("operation_kind");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid?>("SanctionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sanction_id");
+
+                    b.Property<long?>("SanctionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sanction_revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid?>("SupersededSanctionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("superseded_sanction_id");
+
+                    b.Property<long?>("SupersededSanctionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("superseded_sanction_revision");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_effect_intents");
+
+                    b.HasIndex("DecisionId")
+                        .HasDatabaseName("ix_moderation_effect_intents_decision_id");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_effect_intents_operation_id");
+
+                    b.HasIndex("SupersededSanctionId")
+                        .HasDatabaseName("ix_moderation_effect_intents_superseded_sanction_id");
+
+                    b.HasIndex("CompletedAt", "CreatedAt")
+                        .HasDatabaseName("ix_moderation_effect_intents_completed_at_created_at");
+
+                    b.ToTable("moderation_effect_intents", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_effect_qualification", "policy_revision > 0 AND qualification_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_effect_revision", "revision > 0 AND decision_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_effect_sanction_pair", "(sanction_id IS NULL AND sanction_revision IS NULL) OR (sanction_id IS NOT NULL AND sanction_revision IS NOT NULL AND sanction_revision > 0)");
+
+                            t.HasCheckConstraint("ck_moderation_effect_supersession", "(operation_kind <> 10 AND superseded_sanction_id IS NULL AND superseded_sanction_revision IS NULL) OR (operation_kind = 10 AND sanction_id IS NOT NULL AND superseded_sanction_id IS NOT NULL AND superseded_sanction_revision IS NOT NULL AND superseded_sanction_revision > 0 AND superseded_sanction_id <> sanction_id)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decision_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<string>("PrincipalDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("principal_digest");
+
+                    b.Property<Guid>("PrincipalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("principal_id");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_digest");
+
+                    b.Property<long>("ResultRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("result_revision");
+
+                    b.Property<Guid?>("SanctionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sanction_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_operation_receipts");
+
+                    b.HasIndex("DecisionId")
+                        .HasDatabaseName("ix_moderation_operation_receipts_decision_id");
+
+                    b.HasIndex("TrustDomainId", "ScopeKind", "ScopeId", "SubjectKind", "SubjectId")
+                        .HasDatabaseName("ix_moderation_operation_receipts_trust_domain_id_s_d7b61e6843c0");
+
+                    b.ToTable("moderation_operation_receipts", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_receipt_revision", "result_revision > 0 AND policy_revision > 0 AND qualification_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_receipt_scope", "scope_kind BETWEEN 1 AND 6 AND subject_kind BETWEEN 1 AND 4");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.Modules.ModuleDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -38362,6 +38552,836 @@ namespace Explore.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("occurrence_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid?>("ScopeCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_instance_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid?>("ScopeResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_resource_id");
+
+                    b.Property<Guid?>("ScopeSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_solution_id");
+
+                    b.Property<Guid?>("ScopeTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_tenant_id");
+
+                    b.Property<Guid>("ScopeTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_trust_domain_id");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid?>("SubjectOriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_community_id");
+
+                    b.Property<Guid?>("SubjectOriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_instance_id");
+
+                    b.Property<int>("SubjectOriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_origin_kind");
+
+                    b.Property<Guid?>("SubjectOriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_resource_id");
+
+                    b.Property<Guid?>("SubjectOriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_solution_id");
+
+                    b.Property<Guid?>("SubjectOriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_tenant_id");
+
+                    b.Property<Guid>("SubjectOriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_cases");
+
+                    b.HasIndex("ScopeTrustDomainId", "ScopeTenantId", "OccurrenceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_cases_scope_trust_domain_id_scope_te_f8fb806fdc5e");
+
+                    b.HasIndex("ScopeTrustDomainId", "SubjectKind", "SubjectId", "ScopeTenantId")
+                        .HasDatabaseName("ix_moderation_cases_scope_trust_domain_id_subject__0dad6ff50ef7");
+
+                    b.ToTable("moderation_cases", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_case_state", "state IN (1, 2)");
+
+                            t.HasCheckConstraint("ck_moderation_cases_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_cases_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_cases_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_cases_subject_subject", "subject_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_cases_subject_trust", "subject_origin_trust_domain_id = scope_trust_domain_id");
+                        });
+                });
+
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("Approval1Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval1_id");
+
+                    b.Property<int?>("Approval1Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("approval1_kind");
+
+                    b.Property<Guid?>("Approval1OriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval1_origin_community_id");
+
+                    b.Property<Guid?>("Approval1OriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval1_origin_instance_id");
+
+                    b.Property<int?>("Approval1OriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("approval1_origin_kind");
+
+                    b.Property<Guid?>("Approval1OriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval1_origin_resource_id");
+
+                    b.Property<Guid?>("Approval1OriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval1_origin_solution_id");
+
+                    b.Property<Guid?>("Approval1OriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval1_origin_tenant_id");
+
+                    b.Property<Guid?>("Approval1OriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval1_origin_trust_domain_id");
+
+                    b.Property<Guid?>("Approval2Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval2_id");
+
+                    b.Property<int?>("Approval2Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("approval2_kind");
+
+                    b.Property<Guid?>("Approval2OriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval2_origin_community_id");
+
+                    b.Property<Guid?>("Approval2OriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval2_origin_instance_id");
+
+                    b.Property<int?>("Approval2OriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("approval2_origin_kind");
+
+                    b.Property<Guid?>("Approval2OriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval2_origin_resource_id");
+
+                    b.Property<Guid?>("Approval2OriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval2_origin_solution_id");
+
+                    b.Property<Guid?>("Approval2OriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval2_origin_tenant_id");
+
+                    b.Property<Guid?>("Approval2OriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval2_origin_trust_domain_id");
+
+                    b.Property<int>("CapabilityMask")
+                        .HasColumnType("integer")
+                        .HasColumnName("capability_mask");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("case_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<Guid?>("FindingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("finding_id");
+
+                    b.Property<Guid>("IssuerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuer_id");
+
+                    b.Property<int>("IssuerKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("issuer_kind");
+
+                    b.Property<Guid?>("IssuerOriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuer_origin_community_id");
+
+                    b.Property<Guid?>("IssuerOriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuer_origin_instance_id");
+
+                    b.Property<int>("IssuerOriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("issuer_origin_kind");
+
+                    b.Property<Guid?>("IssuerOriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuer_origin_resource_id");
+
+                    b.Property<Guid?>("IssuerOriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuer_origin_solution_id");
+
+                    b.Property<Guid?>("IssuerOriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuer_origin_tenant_id");
+
+                    b.Property<Guid>("IssuerOriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuer_origin_trust_domain_id");
+
+                    b.Property<Guid?>("IssuingScopeCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_community_id");
+
+                    b.Property<Guid?>("IssuingScopeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_instance_id");
+
+                    b.Property<int>("IssuingScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("issuing_scope_kind");
+
+                    b.Property<Guid?>("IssuingScopeResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_resource_id");
+
+                    b.Property<Guid?>("IssuingScopeSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_solution_id");
+
+                    b.Property<Guid?>("IssuingScopeTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_tenant_id");
+
+                    b.Property<Guid>("IssuingScopeTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_trust_domain_id");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_approvals");
+
+                    b.Property<DateTimeOffset?>("ReviewAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("review_at");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("rule_code");
+
+                    b.Property<Guid>("RuleOwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_owner_id");
+
+                    b.Property<long>("RuleRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rule_revision");
+
+                    b.Property<Guid?>("ScopeCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_instance_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid?>("ScopeResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_resource_id");
+
+                    b.Property<Guid?>("ScopeSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_solution_id");
+
+                    b.Property<Guid?>("ScopeTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_tenant_id");
+
+                    b.Property<Guid>("ScopeTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid?>("SubjectOriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_community_id");
+
+                    b.Property<Guid?>("SubjectOriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_instance_id");
+
+                    b.Property<int>("SubjectOriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_origin_kind");
+
+                    b.Property<Guid?>("SubjectOriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_resource_id");
+
+                    b.Property<Guid?>("SubjectOriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_solution_id");
+
+                    b.Property<Guid?>("SubjectOriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_tenant_id");
+
+                    b.Property<Guid>("SubjectOriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_decisions");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_decisions_case_id");
+
+                    b.HasIndex("ScopeTrustDomainId", "SubjectKind", "SubjectId", "ScopeTenantId")
+                        .HasDatabaseName("ix_moderation_decisions_scope_trust_domain_id_subj_2384d72d14d8");
+
+                    b.ToTable("moderation_decisions", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_decision_approval_independence", "(approval1_id IS NULL OR (approval1_kind = 1 AND approval1_id <> issuer_id AND approval1_id <> subject_id)) AND (approval2_id IS NULL OR (approval2_kind = 1 AND approval2_id <> issuer_id AND approval2_id <> subject_id))");
+
+                            t.HasCheckConstraint("ck_moderation_decision_approval_order", "approval2_id IS NULL OR (approval1_id IS NOT NULL AND approval2_id <> approval1_id)");
+
+                            t.HasCheckConstraint("ck_moderation_decision_capability_mask", "capability_mask > 0 AND (capability_mask & 511) = capability_mask AND (capability_mask & 1) = 0");
+
+                            t.HasCheckConstraint("ck_moderation_decision_interval", "(ends_at IS NULL OR ends_at > starts_at) AND (ends_at IS NOT NULL OR review_at IS NOT NULL) AND (review_at IS NULL OR (review_at > starts_at AND (ends_at IS NULL OR review_at <= ends_at)))");
+
+                            t.HasCheckConstraint("ck_moderation_decision_quorum", "required_approvals IN (1, 2) AND (scope_kind NOT IN (1, 2) OR required_approvals = 2) AND (ends_at IS NOT NULL OR required_approvals = 2)");
+
+                            t.HasCheckConstraint("ck_moderation_decision_rule_revision", "rule_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_decision_state", "state BETWEEN 1 AND 8");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_approval1_origin_scope", "(approval1_origin_kind IS NULL AND approval1_origin_trust_domain_id IS NULL AND approval1_origin_solution_id IS NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind IS NOT NULL AND ((approval1_origin_kind = 1 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 2 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 3 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 4 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 5 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_community_id IS NOT NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 6 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_resource_id IS NOT NULL)))");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_approval1_subject", "(approval1_kind IS NULL AND approval1_id IS NULL AND approval1_origin_kind IS NULL) OR (approval1_kind IS NOT NULL AND approval1_kind BETWEEN 1 AND 4 AND approval1_id IS NOT NULL AND approval1_origin_kind IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_approval2_origin_scope", "(approval2_origin_kind IS NULL AND approval2_origin_trust_domain_id IS NULL AND approval2_origin_solution_id IS NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind IS NOT NULL AND ((approval2_origin_kind = 1 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 2 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 3 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 4 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 5 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_community_id IS NOT NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 6 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_resource_id IS NOT NULL)))");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_approval2_subject", "(approval2_kind IS NULL AND approval2_id IS NULL AND approval2_origin_kind IS NULL) OR (approval2_kind IS NOT NULL AND approval2_kind BETWEEN 1 AND 4 AND approval2_id IS NOT NULL AND approval2_origin_kind IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_issuer_origin_scope", "issuer_origin_kind IS NOT NULL AND ((issuer_origin_kind = 1 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NULL AND issuer_origin_instance_id IS NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 2 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 3 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 4 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 5 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_community_id IS NOT NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 6 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_issuer_subject", "issuer_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_issuing_scope_scope", "issuing_scope_kind IS NOT NULL AND ((issuing_scope_kind = 1 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 2 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 3 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 4 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 5 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NOT NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 6 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_subject_subject", "subject_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_decisions_subject_trust", "subject_origin_trust_domain_id = scope_trust_domain_id");
+                        });
+                });
+
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationProtectiveMeasure", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CapabilityMask")
+                        .HasColumnType("integer")
+                        .HasColumnName("capability_mask");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<string>("Grounds")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("grounds");
+
+                    b.Property<Guid?>("IssuingScopeCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_community_id");
+
+                    b.Property<Guid?>("IssuingScopeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_instance_id");
+
+                    b.Property<int>("IssuingScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("issuing_scope_kind");
+
+                    b.Property<Guid?>("IssuingScopeResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_resource_id");
+
+                    b.Property<Guid?>("IssuingScopeSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_solution_id");
+
+                    b.Property<Guid?>("IssuingScopeTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_tenant_id");
+
+                    b.Property<Guid>("IssuingScopeTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issuing_scope_trust_domain_id");
+
+                    b.Property<Guid>("ProtectorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protector_id");
+
+                    b.Property<int>("ProtectorKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("protector_kind");
+
+                    b.Property<Guid?>("ProtectorOriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protector_origin_community_id");
+
+                    b.Property<Guid?>("ProtectorOriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protector_origin_instance_id");
+
+                    b.Property<int>("ProtectorOriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("protector_origin_kind");
+
+                    b.Property<Guid?>("ProtectorOriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protector_origin_resource_id");
+
+                    b.Property<Guid?>("ProtectorOriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protector_origin_solution_id");
+
+                    b.Property<Guid?>("ProtectorOriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protector_origin_tenant_id");
+
+                    b.Property<Guid>("ProtectorOriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protector_origin_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ReviewAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("review_at");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_id");
+
+                    b.Property<int?>("ReviewerKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("reviewer_kind");
+
+                    b.Property<Guid?>("ReviewerOriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_origin_community_id");
+
+                    b.Property<Guid?>("ReviewerOriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_origin_instance_id");
+
+                    b.Property<int?>("ReviewerOriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("reviewer_origin_kind");
+
+                    b.Property<Guid?>("ReviewerOriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_origin_resource_id");
+
+                    b.Property<Guid?>("ReviewerOriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_origin_solution_id");
+
+                    b.Property<Guid?>("ReviewerOriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_origin_tenant_id");
+
+                    b.Property<Guid?>("ReviewerOriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_origin_trust_domain_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("ScopeCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_instance_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid?>("ScopeResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_resource_id");
+
+                    b.Property<Guid?>("ScopeSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_solution_id");
+
+                    b.Property<Guid?>("ScopeTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_tenant_id");
+
+                    b.Property<Guid>("ScopeTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid?>("SubjectOriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_community_id");
+
+                    b.Property<Guid?>("SubjectOriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_instance_id");
+
+                    b.Property<int>("SubjectOriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_origin_kind");
+
+                    b.Property<Guid?>("SubjectOriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_resource_id");
+
+                    b.Property<Guid?>("SubjectOriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_solution_id");
+
+                    b.Property<Guid?>("SubjectOriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_tenant_id");
+
+                    b.Property<Guid>("SubjectOriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_protective_measures");
+
+                    b.HasIndex("ScopeTrustDomainId", "SubjectKind", "SubjectId", "ScopeTenantId")
+                        .HasDatabaseName("ix_moderation_protective_measures_scope_trust_doma_72116ddc1a93");
+
+                    b.ToTable("moderation_protective_measures", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_protection_capability_mask", "capability_mask > 0 AND (capability_mask & 511) = capability_mask AND (capability_mask & 1) = 0");
+
+                            t.HasCheckConstraint("ck_moderation_protection_interval", "ends_at > starts_at AND review_at > starts_at AND review_at <= ends_at AND ((reviewed_at IS NULL AND reviewer_id IS NULL) OR (reviewed_at IS NOT NULL AND reviewer_id IS NOT NULL AND reviewed_at >= starts_at AND reviewed_at < ends_at))");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_issuing_scope_scope", "issuing_scope_kind IS NOT NULL AND ((issuing_scope_kind = 1 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 2 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 3 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 4 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 5 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NOT NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 6 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_protector_origin_scope", "protector_origin_kind IS NOT NULL AND ((protector_origin_kind = 1 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NULL AND protector_origin_instance_id IS NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 2 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 3 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 4 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 5 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_community_id IS NOT NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 6 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_protector_subject", "protector_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_reviewer_origin_scope", "(reviewer_origin_kind IS NULL AND reviewer_origin_trust_domain_id IS NULL AND reviewer_origin_solution_id IS NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind IS NOT NULL AND ((reviewer_origin_kind = 1 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 2 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 3 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 4 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 5 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_community_id IS NOT NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 6 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_resource_id IS NOT NULL)))");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_reviewer_subject", "(reviewer_kind IS NULL AND reviewer_id IS NULL AND reviewer_origin_kind IS NULL) OR (reviewer_kind IS NOT NULL AND reviewer_kind BETWEEN 1 AND 4 AND reviewer_id IS NOT NULL AND reviewer_origin_kind IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_subject_subject", "subject_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_protective_measures_subject_trust", "subject_origin_trust_domain_id = scope_trust_domain_id");
+                        });
+                });
+
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationSanction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CapabilityMask")
+                        .HasColumnType("integer")
+                        .HasColumnName("capability_mask");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decision_id");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<DateTimeOffset?>("ReviewAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("review_at");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("rule_code");
+
+                    b.Property<Guid>("RuleOwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_owner_id");
+
+                    b.Property<long>("RuleRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rule_revision");
+
+                    b.Property<Guid?>("ScopeCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_instance_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid?>("ScopeResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_resource_id");
+
+                    b.Property<Guid?>("ScopeSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_solution_id");
+
+                    b.Property<Guid?>("ScopeTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_tenant_id");
+
+                    b.Property<Guid>("ScopeTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid?>("SubjectOriginCommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_community_id");
+
+                    b.Property<Guid?>("SubjectOriginInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_instance_id");
+
+                    b.Property<int>("SubjectOriginKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_origin_kind");
+
+                    b.Property<Guid?>("SubjectOriginResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_resource_id");
+
+                    b.Property<Guid?>("SubjectOriginSolutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_solution_id");
+
+                    b.Property<Guid?>("SubjectOriginTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_tenant_id");
+
+                    b.Property<Guid>("SubjectOriginTrustDomainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_origin_trust_domain_id");
+
+                    b.Property<Guid?>("SupersedingDecisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("superseding_decision_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_sanctions");
+
+                    b.HasIndex("DecisionId")
+                        .HasDatabaseName("ix_moderation_sanctions_decision_id");
+
+                    b.HasIndex("ScopeTrustDomainId", "SubjectKind", "SubjectId", "ScopeTenantId")
+                        .HasDatabaseName("ix_moderation_sanctions_scope_trust_domain_id_subj_c1fb875d86e0");
+
+                    b.ToTable("moderation_sanctions", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_sanction_capability_mask", "capability_mask > 0 AND (capability_mask & 511) = capability_mask AND (capability_mask & 1) = 0");
+
+                            t.HasCheckConstraint("ck_moderation_sanction_interval", "(ends_at IS NULL OR ends_at > starts_at) AND (ends_at IS NOT NULL OR review_at IS NOT NULL) AND (review_at IS NULL OR (review_at > starts_at AND (ends_at IS NULL OR review_at <= ends_at)))");
+
+                            t.HasCheckConstraint("ck_moderation_sanction_rule_revision", "rule_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_sanction_state", "state BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_moderation_sanction_supersession", "(state = 5 AND superseding_decision_id IS NOT NULL AND superseding_decision_id <> decision_id) OR (state <> 5 AND superseding_decision_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_sanctions_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_sanctions_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_sanctions_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_sanctions_subject_subject", "subject_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_sanctions_subject_trust", "subject_origin_trust_domain_id = scope_trust_domain_id");
+                        });
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -42927,6 +43947,39 @@ namespace Explore.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_managed_control_plane_registrations_secret_bind_2f0c229c25fb");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEffectIntent", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
+                        .WithMany()
+                        .HasForeignKey("DecisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_effect_intents_moderation_decisions_decision_id");
+
+                    b.HasOne("Explore.Domain.ModerationOperationReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_effect_intents_moderation_operation__56eca49b0f83");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationSanction", null)
+                        .WithMany()
+                        .HasForeignKey("SupersededSanctionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_effect_intents_moderation_sanctions__6aa69d727ae9");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
+                        .WithMany()
+                        .HasForeignKey("DecisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_operation_receipts_moderation_decisi_bd47276d4b35");
                 });
 
             modelBuilder.Entity("Explore.Domain.Modules.TenantCapability", b =>
@@ -50700,6 +51753,26 @@ namespace Explore.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_anonymous_challenge_tenant_quotas_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationDecision", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_decisions_moderation_cases_case_id");
+                });
+
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationSanction", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
+                        .WithMany()
+                        .HasForeignKey("DecisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_sanctions_moderation_decisions_decision_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

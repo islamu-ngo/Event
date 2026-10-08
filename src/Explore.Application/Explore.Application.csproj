@@ -38,6 +38,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Event.Wire.Contracts\Event.Wire.Contracts.csproj" />
     <ProjectReference Include="..\Explore.Domain\Explore.Domain.csproj" />
+    <ProjectReference Include="..\ISLAMU.Moderation.Application\ISLAMU.Moderation.Application.csproj" />
+    <ProjectReference Include="..\ISLAMU.Moderation.Domain\ISLAMU.Moderation.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

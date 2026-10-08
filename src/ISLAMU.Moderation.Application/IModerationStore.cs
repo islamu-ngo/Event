@@ -19,6 +19,9 @@ public interface IModerationStore
 /// <summary>Entity access within the store-owned authority fence; never an unfenced or lasting authorization permit.</summary>
 public interface IModerationSession
 {
+    Task<ModerationCase?> FindCaseAsync(
+        Guid caseId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken);
+
     Task<ModerationDecision?> FindDecisionAsync(
         Guid decisionId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken);
 
@@ -28,8 +31,14 @@ public interface IModerationSession
     Task<IReadOnlyList<ModerationSanction>> ReadSanctionsAsync(SubjectReference subject, CancellationToken cancellationToken);
     Task<IReadOnlyList<ModerationProtectiveMeasure>> ReadProtectionAsync(SubjectReference subject, CancellationToken cancellationToken);
 
-    /// <summary>Stages entity changes and the exact effect with the authority generations that must remain current at commit.</summary>
+    /// <summary>Stages the decision, optional contribution and optional specifically superseded contribution as one atomic unit.</summary>
+    /// <remarks>
+    /// The host fences the exact case/decision/contribution reads, checks insertion identity uniqueness, and persists only
+    /// changed entities with their original revisions. The exact effect and authority generations remain current through commit.
+    /// Canonical receipts bind every proposal term and both contribution coordinates and revisions, not only the operation ID.
+    /// </remarks>
     Task SaveAsync(
-        ModerationDecision decision, ModerationSanction? sanction, ModerationAuthorityGrant grant,
+        ModerationDecision decision, ModerationSanction? sanction, ModerationSanction? supersededSanction,
+        ModerationAuthorityGrant grant,
         ModerationPlannedEffect effect, CancellationToken cancellationToken);
 }

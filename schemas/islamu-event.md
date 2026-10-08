@@ -16,6 +16,258 @@ Project islamu_event {
 // Lookup / Reference Tables (int PK, ValueGeneratedNever)
 // ============================================================
 
+// Canonical qualified moderation ledger; separate from legacy Event reporting.
+// Scope and subject-origin ancestry are scalar, checked shapes, not tenant aliases.
+Table "moderation_cases" {
+  "id" uuid [pk, not null]
+  "subject_kind" int [not null]
+  "subject_id" uuid [not null]
+  "subject_origin_kind" int [not null]
+  "subject_origin_trust_domain_id" uuid [not null]
+  "subject_origin_solution_id" uuid
+  "subject_origin_instance_id" uuid
+  "subject_origin_tenant_id" uuid
+  "subject_origin_community_id" uuid
+  "subject_origin_resource_id" uuid
+  "scope_kind" int [not null]
+  "scope_trust_domain_id" uuid [not null]
+  "scope_solution_id" uuid
+  "scope_instance_id" uuid
+  "scope_tenant_id" uuid
+  "scope_community_id" uuid
+  "scope_resource_id" uuid
+  "occurrence_id" uuid [not null]
+  "created_at" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "state" int [not null]
+  "revision" bigint [not null]
+  indexes {
+    (scope_trust_domain_id, scope_tenant_id, occurrence_id) [unique]
+    (scope_trust_domain_id, subject_kind, subject_id, scope_tenant_id)
+  }
+  Note: 'Qualified allegation only; open/closed state and positive application-managed revision. Native checks reject partial ancestry and mismatched subject/scope trust domains. A case is not a restriction or accepted finding.'
+}
+
+Table "moderation_decisions" {
+  "id" uuid [pk, not null]
+  "case_id" uuid [not null, ref: > moderation_cases.id]
+  "subject_kind" int [not null]
+  "subject_id" uuid [not null]
+  "subject_origin_kind" int [not null]
+  "subject_origin_trust_domain_id" uuid [not null]
+  "subject_origin_solution_id" uuid
+  "subject_origin_instance_id" uuid
+  "subject_origin_tenant_id" uuid
+  "subject_origin_community_id" uuid
+  "subject_origin_resource_id" uuid
+  "issuer_kind" int [not null]
+  "issuer_id" uuid [not null]
+  "issuer_origin_kind" int [not null]
+  "issuer_origin_trust_domain_id" uuid [not null]
+  "issuer_origin_solution_id" uuid
+  "issuer_origin_instance_id" uuid
+  "issuer_origin_tenant_id" uuid
+  "issuer_origin_community_id" uuid
+  "issuer_origin_resource_id" uuid
+  "issuing_scope_kind" int [not null]
+  "issuing_scope_trust_domain_id" uuid [not null]
+  "issuing_scope_solution_id" uuid
+  "issuing_scope_instance_id" uuid
+  "issuing_scope_tenant_id" uuid
+  "issuing_scope_community_id" uuid
+  "issuing_scope_resource_id" uuid
+  "scope_kind" int [not null]
+  "scope_trust_domain_id" uuid [not null]
+  "scope_solution_id" uuid
+  "scope_instance_id" uuid
+  "scope_tenant_id" uuid
+  "scope_community_id" uuid
+  "scope_resource_id" uuid
+  "rule_owner_id" uuid [not null]
+  "rule_code" varchar(100) [not null]
+  "rule_revision" bigint [not null]
+  "capability_mask" int [not null]
+  "approval1_kind" int
+  "approval1_id" uuid
+  "approval1_origin_kind" int
+  "approval1_origin_trust_domain_id" uuid
+  "approval1_origin_solution_id" uuid
+  "approval1_origin_instance_id" uuid
+  "approval1_origin_tenant_id" uuid
+  "approval1_origin_community_id" uuid
+  "approval1_origin_resource_id" uuid
+  "approval2_kind" int
+  "approval2_id" uuid
+  "approval2_origin_kind" int
+  "approval2_origin_trust_domain_id" uuid
+  "approval2_origin_solution_id" uuid
+  "approval2_origin_instance_id" uuid
+  "approval2_origin_tenant_id" uuid
+  "approval2_origin_community_id" uuid
+  "approval2_origin_resource_id" uuid
+  "starts_at" timestamptz [not null]
+  "ends_at" timestamptz
+  "review_at" timestamptz
+  "required_approvals" int [not null]
+  "created_at" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "finding_id" uuid
+  "state" int [not null]
+  "revision" bigint [not null]
+  indexes {
+    case_id
+    (scope_trust_domain_id, subject_kind, subject_id, scope_tenant_id)
+  }
+  Note: 'Checked response/finding/independent-quorum lifecycle. Approval slots reject partial identities, issuer/subject conflicts and duplicates. Broad or open-ended decisions require two approvals. Review deadlines do not fabricate punitive expiry.'
+}
+
+Table "moderation_sanctions" {
+  "id" uuid [pk, not null]
+  "decision_id" uuid [not null, ref: > moderation_decisions.id]
+  "subject_kind" int [not null]
+  "subject_id" uuid [not null]
+  "subject_origin_kind" int [not null]
+  "subject_origin_trust_domain_id" uuid [not null]
+  "subject_origin_solution_id" uuid
+  "subject_origin_instance_id" uuid
+  "subject_origin_tenant_id" uuid
+  "subject_origin_community_id" uuid
+  "subject_origin_resource_id" uuid
+  "scope_kind" int [not null]
+  "scope_trust_domain_id" uuid [not null]
+  "scope_solution_id" uuid
+  "scope_instance_id" uuid
+  "scope_tenant_id" uuid
+  "scope_community_id" uuid
+  "scope_resource_id" uuid
+  "rule_owner_id" uuid [not null]
+  "rule_code" varchar(100) [not null]
+  "rule_revision" bigint [not null]
+  "capability_mask" int [not null]
+  "starts_at" timestamptz [not null]
+  "ends_at" timestamptz
+  "review_at" timestamptz
+  "created_at" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "superseding_decision_id" uuid
+  "state" int [not null]
+  "revision" bigint [not null]
+  indexes {
+    decision_id
+    (scope_trust_domain_id, subject_kind, subject_id, scope_tenant_id)
+  }
+  Note: 'Independent capability contribution with half-open effectiveness. Revoking or superseding one does not remove another. Checked supersession pairs a terminal state with its distinct replacement decision.'
+}
+
+Table "moderation_protective_measures" {
+  "id" uuid [pk, not null]
+  "subject_kind" int [not null]
+  "subject_id" uuid [not null]
+  "subject_origin_kind" int [not null]
+  "subject_origin_trust_domain_id" uuid [not null]
+  "subject_origin_solution_id" uuid
+  "subject_origin_instance_id" uuid
+  "subject_origin_tenant_id" uuid
+  "subject_origin_community_id" uuid
+  "subject_origin_resource_id" uuid
+  "protector_kind" int [not null]
+  "protector_id" uuid [not null]
+  "protector_origin_kind" int [not null]
+  "protector_origin_trust_domain_id" uuid [not null]
+  "protector_origin_solution_id" uuid
+  "protector_origin_instance_id" uuid
+  "protector_origin_tenant_id" uuid
+  "protector_origin_community_id" uuid
+  "protector_origin_resource_id" uuid
+  "issuing_scope_kind" int [not null]
+  "issuing_scope_trust_domain_id" uuid [not null]
+  "issuing_scope_solution_id" uuid
+  "issuing_scope_instance_id" uuid
+  "issuing_scope_tenant_id" uuid
+  "issuing_scope_community_id" uuid
+  "issuing_scope_resource_id" uuid
+  "scope_kind" int [not null]
+  "scope_trust_domain_id" uuid [not null]
+  "scope_solution_id" uuid
+  "scope_instance_id" uuid
+  "scope_tenant_id" uuid
+  "scope_community_id" uuid
+  "scope_resource_id" uuid
+  "reviewer_kind" int
+  "reviewer_id" uuid
+  "reviewer_origin_kind" int
+  "reviewer_origin_trust_domain_id" uuid
+  "reviewer_origin_solution_id" uuid
+  "reviewer_origin_instance_id" uuid
+  "reviewer_origin_tenant_id" uuid
+  "reviewer_origin_community_id" uuid
+  "reviewer_origin_resource_id" uuid
+  "capability_mask" int [not null]
+  "grounds" varchar(100) [not null]
+  "starts_at" timestamptz [not null]
+  "ends_at" timestamptz [not null]
+  "review_at" timestamptz [not null]
+  "reviewed_at" timestamptz
+  "revoked_at" timestamptz
+  "revision" bigint [not null]
+  indexes {
+    (scope_trust_domain_id, subject_kind, subject_id, scope_tenant_id)
+  }
+  Note: 'Bounded temporary protection, not a finding or permanent sanction. Native checks require a real end and review window and reject partial reviewer ancestry.'
+}
+
+Table "moderation_operation_receipts" {
+  "id" uuid [pk, not null]
+  "request_digest" varchar(64) [not null]
+  "trust_domain_id" uuid [not null]
+  "scope_kind" int [not null]
+  "scope_id" uuid [not null]
+  "subject_kind" int [not null]
+  "subject_id" uuid [not null]
+  "principal_id" uuid [not null]
+  "principal_digest" varchar(64) [not null]
+  "decision_id" uuid [not null, ref: > moderation_decisions.id]
+  "sanction_id" uuid
+  "result_revision" bigint [not null]
+  "policy_revision" bigint [not null]
+  "qualification_revision" bigint [not null]
+  "completed_at" timestamptz [not null]
+  indexes {
+    decision_id
+    (trust_domain_id, scope_kind, scope_id, subject_kind, subject_id)
+  }
+  Note: 'Exact operation identity binds canonical request, qualified principal and accepted result. Identical retries reuse the result; changed content conflicts. No raw evidence or credentials.'
+}
+
+Table "moderation_effect_intents" {
+  "id" uuid [pk, not null]
+  "operation_id" uuid [not null, ref: > moderation_operation_receipts.id]
+  "decision_id" uuid [not null, ref: > moderation_decisions.id]
+  "decision_revision" bigint [not null]
+  "sanction_id" uuid
+  "sanction_revision" bigint
+  "superseded_sanction_id" uuid [ref: > moderation_sanctions.id]
+  "superseded_sanction_revision" bigint
+  "trust_domain_id" uuid [not null]
+  "scope_kind" int [not null]
+  "scope_id" uuid [not null]
+  "subject_kind" int [not null]
+  "subject_id" uuid [not null]
+  "operation_kind" int [not null]
+  "policy_revision" bigint [not null]
+  "qualification_revision" bigint [not null]
+  "created_at" timestamptz [not null]
+  "completed_at" timestamptz
+  "revision" bigint [not null]
+  indexes {
+    operation_id [unique]
+    decision_id
+    superseded_sanction_id
+    (completed_at, created_at)
+  }
+  Note: 'Minimized committed change pointer. Exact nullable contribution/revision pairs and supersession checks preserve atomic correction. External delivery does not execute inside transaction replay.'
+}
+
 Table "external_api_key_issuance_receipts" {
   "id" uuid [pk, not null]
   "operation_fingerprint" varchar(64) [not null, unique]

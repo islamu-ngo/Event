@@ -21,6 +21,7 @@ public partial class ExploreDbContext : DbContext
         set
         {
             _tenantContext = value;
+            ModerationTrustDomainId = null;
             if (value is not null)
             {
                 ClearTenantFilterBypass();
@@ -108,5 +109,6 @@ public partial class ExploreDbContext : DbContext
 
         MySqlModelIdentifierPolicy.Apply(modelBuilder, Database.ProviderName);
         ApplyGlobalQueryFilters(modelBuilder);
+        ApplyModerationQueryFilters(modelBuilder);
     }
 }

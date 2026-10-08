@@ -28,6 +28,7 @@ using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Explore.Secrets.Bootstrap;
 using Explore.Secrets.Database;
+using ISLAMU.Moderation.Application;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
@@ -187,6 +188,10 @@ public static class PersistenceServicesRegistration
 
         // Unit of Work (wraps EF Core transactions)
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+        services.AddScoped<IModerationStore>(provider => new ModerationStore(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<IModerationAuthorityParticipant>(),
+            provider.GetRequiredService<TimeProvider>()));
         services.AddScoped<Explore.Application.Contracts.Services.Registration.IAnonymousRegistrationChallengeQuota,
             AnonymousRegistrationChallengeQuota>();
         services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();

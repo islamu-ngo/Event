@@ -556,6 +556,8 @@
           "Event.Wire.Contracts": "[1.0.0, )",
           "Explore.Domain": "[1.0.0, )",
           "FluentValidation.DependencyInjectionExtensions": "[12.1.1, )",
+          "ISLAMU.Moderation.Application": "[1.0.0, )",
+          "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.Extensions.Caching.Hybrid": "[10.8.0, )",
           "Microsoft.Extensions.Configuration.Abstractions": "[10.0.10, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.10, )",
@@ -576,6 +578,8 @@
           "EFCore.NamingConventions": "[10.0.1, )",
           "Explore.Application": "[1.0.0, )",
           "Explore.Secrets": "[1.0.0, )",
+          "ISLAMU.Moderation.Application": "[1.0.0, )",
+          "ISLAMU.Moderation.Domain": "[1.0.0, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore": "[10.0.10, )",
@@ -601,6 +605,15 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, )"
         }
+      },
+      "islamu.moderation.application": {
+        "type": "Project",
+        "dependencies": {
+          "ISLAMU.Moderation.Domain": "[1.0.0, )"
+        }
+      },
+      "islamu.moderation.domain": {
+        "type": "Project"
       },
       "Azure.Identity": {
         "type": "CentralTransitive",

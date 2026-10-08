@@ -18270,6 +18270,151 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssertedByHumanId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("asserted_by_human_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("case_id");
+
+                    b.Property<int?>("ConflictState")
+                        .HasColumnType("int")
+                        .HasColumnName("conflict_state");
+
+                    b.Property<Guid?>("ControllerHumanId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("controller_human_id");
+
+                    b.Property<string>("Justification")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)")
+                        .HasColumnName("justification");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int")
+                        .HasColumnName("purpose");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid?>("ReviewerHumanId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid?>("SubjectHumanId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("subject_human_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_qualification_evidence");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_qualification_evidence_case_id");
+
+                    b.HasIndex("TrustDomainId", "TenantId", "CaseId", "Purpose")
+                        .HasDatabaseName("ix_moderation_qualification_evidence_trust_domain_id_tenant_id_case_id_purpose");
+
+                    b.ToTable("moderation_qualification_evidence", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_qualification_evidence_assessor", "purpose = 1 OR (valid_until > recorded_at AND (reviewer_human_id IS NULL OR asserted_by_human_id <> reviewer_human_id) AND (controller_human_id IS NULL OR asserted_by_human_id <> controller_human_id) AND (subject_human_id IS NULL OR asserted_by_human_id <> subject_human_id))");
+
+                            t.HasCheckConstraint("ck_moderation_qualification_evidence_revision", "revision = 1");
+
+                            t.HasCheckConstraint("ck_moderation_qualification_evidence_shape", "(purpose = 1 AND subject_human_id IS NOT NULL AND asserted_by_human_id = subject_human_id AND reviewer_human_id IS NULL AND controller_human_id IS NULL AND conflict_state IS NULL AND valid_until IS NULL) OR (purpose = 2 AND subject_human_id IS NULL AND reviewer_human_id IS NOT NULL AND controller_human_id IS NOT NULL AND conflict_state IS NULL AND valid_until IS NOT NULL) OR (purpose = 3 AND subject_human_id IS NULL AND reviewer_human_id IS NOT NULL AND controller_human_id IS NOT NULL AND conflict_state IS NOT NULL AND conflict_state IN (2, 3) AND valid_until IS NOT NULL) OR (purpose = 4 AND reviewer_human_id IS NULL AND controller_human_id IS NULL AND conflict_state IS NULL AND valid_until IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationMutationReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("PrincipalId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("principal_id");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("request_digest");
+
+                    b.Property<long>("ResultRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("result_revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("SourceKind")
+                        .HasColumnType("int")
+                        .HasColumnName("source_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_moderation_qualification_mutation_receipts");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_qualification_mutation_receipts_host_binding_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_qualification_mutation_receipts_tenant_id");
+
+                    b.HasIndex("TrustDomainId", "TenantId", "SourceKind", "SourceId")
+                        .HasDatabaseName("ix_moderation_qualification_mutation_receipts_trust_domain_id_tenant_id_source_kind_source_id");
+
+                    b.ToTable("moderation_qualification_mutation_receipts", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_qualification_receipt_result", "source_kind BETWEEN 1 AND 5 AND result_revision > 0 AND qualification_revision > 0");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.Modules.ModuleDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -44529,6 +44674,33 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_moderation_qualification_epochs_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationEvidence", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_evidence_moderation_cases_case_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationMutationReceipt", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_mutation_receipts_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_mutation_receipts_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Explore.Domain.Modules.TenantCapability", b =>

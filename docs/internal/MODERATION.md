@@ -135,6 +135,40 @@ native concurrency rejects stale qualification writes. Applying the schema
 neither records evidence truth nor installs the checked source mutation writers
 or an active enforcement profile.
 
+Native qualification writes use `IModerationQualificationRepository`, the
+manually validated `ApplyModerationQualificationCommandHandler` and the scoped
+`ModerationQualificationRepository`. A request names authorable targets and
+expected revisions, never supplied permission or activation evidence.
+`ModerationQualificationAuthority` resolves the current human through
+`IAdminContext`, rejects machine-principal privilege inheritance, fences actual
+users, login bindings, administrative grants, memberships and role definitions,
+then rereads persisted host, tenant and qualification ancestry on the owning
+serializable transaction connection. Peer identities are acquired in native
+key order before subordinate source rows. Subject-authored responses require
+actual case ownership; they do not require administrative privilege or an active
+tenant membership.
+
+`moderation_qualification_evidence` retains immutable response, controller,
+conflict and finite urgency assertions with their actual case and native
+assessor. Qualification ceilings come from the current adopted policy rather
+than an unrestricted caller expiry. Finding finalization checks the current
+reviewer, retained controller/conflict evidence and their native administrative
+assessors before accepting an adopted rule and response or unexpired urgency.
+Reversal appends the existing finding's accountable audit. Policy adoption
+preserves previously adopted rule meaning and resets publication to inactive;
+it never manufactures consumer or prerequisite evidence.
+
+Each accepted source mutation advances its tenant qualification epoch and
+inserts `moderation_qualification_mutation_receipts` in the same commit. The
+retained receipt binds the exact request digest, current principal, host,
+tenant, source kind/identity, resulting source revision and accepted generation.
+An identical authorized retry returns that retained outcome before rejecting
+its now-stale expected generation. Changed request reuse conflicts, and
+uncertain commit acknowledgement is reconciled only against the exact receipt
+under newly acquired current native authority. No external effect runs inside
+the execution strategy. Evidence and command diagnostics omit private text;
+receipt contents contain no statement or justification.
+
 Acquire privacy serialization first when identity changes. Within the primary
 moderation transaction, acquire jurisdiction and qualification sources before
 subject and policy sources, then owning Event dependencies. Sort peers by their

@@ -207,6 +207,48 @@ Table "moderation_policy_rules" {
   Note: 'Scalar immutable adopted meanings and ceilings, hydrated as native child rows. Enabled capability mask is an explicit supported subset; complete profiles require their entire consumer set. Parent authority filters bound child reads.'
 }
 
+Table "moderation_qualification_evidence" {
+  "id" uuid [pk, not null]
+  "purpose" int [not null]
+  "case_id" uuid [not null, ref: > moderation_cases.id]
+  "trust_domain_id" uuid [not null]
+  "tenant_id" uuid [not null]
+  "subject_human_id" uuid
+  "reviewer_human_id" uuid
+  "controller_human_id" uuid
+  "asserted_by_human_id" uuid [not null]
+  "justification" varchar(4000) [not null]
+  "valid_until" timestamptz
+  "recorded_at" timestamptz [not null]
+  "conflict_state" int
+  "revision" bigint [not null]
+  indexes {
+    (trust_domain_id, tenant_id, case_id, purpose)
+    case_id
+  }
+  Note: 'Immutable actual-case response, controller, conflict or urgency assertion. Revision is exactly one; purpose-specific shapes, subject authorship, independent assessor and future finite attestation validity are checked. Evidence truth and current policy ceilings remain native writer responsibilities.'
+}
+
+Table "moderation_qualification_mutation_receipts" {
+  "id" uuid [pk, not null]
+  "request_digest" varchar(64) [not null]
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "trust_domain_id" uuid [not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "source_kind" int [not null]
+  "source_id" uuid [not null]
+  "principal_id" uuid [not null]
+  "result_revision" bigint [not null]
+  "qualification_revision" bigint [not null]
+  "completed_at" timestamptz [not null]
+  indexes {
+    (trust_domain_id, tenant_id, source_kind, source_id)
+    host_binding_id
+    tenant_id
+  }
+  Note: 'Exact retained native source mutation outcome, committed atomically with source change and qualification advancement. Current-authority replay binds digest, principal, host, tenant, source coordinates and accepted revisions; no private statement or reusable grant is retained here.'
+}
+
 Table "moderation_decisions" {
   "id" uuid [pk, not null]
   "case_id" uuid [not null, ref: > moderation_cases.id]

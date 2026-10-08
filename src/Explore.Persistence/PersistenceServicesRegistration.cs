@@ -189,6 +189,7 @@ public static class PersistenceServicesRegistration
         // Unit of Work (wraps EF Core transactions)
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
         services.AddScoped<IModerationAuthoritySourceRepository, ModerationAuthoritySourceRepository>();
+        services.AddScoped<IModerationQualificationRepository, ModerationQualificationRepository>();
         services.AddScoped<IModerationStore>(provider => new ModerationStore(
             provider.GetRequiredService<ExploreDbContext>(),
             provider.GetRequiredService<IModerationAuthorityParticipant>(),

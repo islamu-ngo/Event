@@ -56,6 +56,21 @@ revision checks reject malformed or stale qualification updates. Applying these
 migrations does not adopt live evidence, register enforcement consumers or
 activate a moderation profile.
 
+Native source changes retain accountable case-specific evidence and an exact
+operation receipt. They check the current human's actual administrative
+assignment rather than a claimed role, and user-owned API keys cannot borrow
+that privilege. A subject records their own response without an administrator
+fabricating it; administrative privilege and active membership are not response
+prerequisites. Controller and conflict qualification must be current and
+independent, with validity bounded by the adopted policy.
+
+The source update, qualification revision and receipt commit together. An
+identical retry by a currently authorized human returns the original result;
+reusing the operation identity for different content does not create another
+update. Policy replacement retains adopted rule meaning and remains inactive
+until complete activation qualification succeeds. These source operations do
+not register an enforcement consumer or enable a moderation profile.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

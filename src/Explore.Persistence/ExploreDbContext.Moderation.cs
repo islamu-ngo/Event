@@ -20,11 +20,19 @@ public partial class ExploreDbContext
     public DbSet<ModerationEffectIntent> ModerationEffectIntents => Set<ModerationEffectIntent>();
     public DbSet<ModerationHostBinding> ModerationHostBindings => Set<ModerationHostBinding>();
     public DbSet<ModerationQualificationEpoch> ModerationQualificationEpochs => Set<ModerationQualificationEpoch>();
+    public DbSet<ModerationQualificationEvidence> ModerationQualificationEvidence => Set<ModerationQualificationEvidence>();
+    public DbSet<ModerationQualificationMutationReceipt> ModerationQualificationMutationReceipts => Set<ModerationQualificationMutationReceipt>();
 
     private void ApplyModerationQueryFilters(ModelBuilder builder)
     {
         builder.Entity<ModerationQualificationEpoch>().HasQueryFilter("ModerationQualification",
             entity => entity.TenantId == TenantFilterTenantId);
+        builder.Entity<ModerationQualificationEvidence>().HasQueryFilter("ModerationAuthority",
+            entity => ModerationTrustDomainId != null && entity.TrustDomainId == ModerationTrustDomainId
+                && entity.TenantId == TenantFilterTenantId);
+        builder.Entity<ModerationQualificationMutationReceipt>().HasQueryFilter("ModerationAuthority",
+            entity => ModerationTrustDomainId != null && entity.TrustDomainId == ModerationTrustDomainId
+                && entity.TenantId == TenantFilterTenantId);
         builder.Entity<ModerationCase>().HasQueryFilter("ModerationAuthority",
             entity => ModerationTrustDomainId != null && entity.ScopeTrustDomainId == ModerationTrustDomainId
                 && (entity.ScopeTenantId == null || entity.ScopeTenantId == TenantFilterTenantId));

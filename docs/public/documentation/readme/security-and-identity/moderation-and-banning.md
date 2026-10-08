@@ -34,6 +34,11 @@ User-owned API keys cannot borrow their owner's administrator privilege.
 An identical repeat preserves the established identities and current revision;
 conflicting coordinates do not overwrite historical ancestry.
 
+A final finding is tied to the actual case and rule revision, with a response
+or qualified urgent-protection reference. Reversal preserves the original
+record and adds its accountable correction. These checked foundations do not
+by themselves enable the new moderation runtime.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

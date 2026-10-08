@@ -91,6 +91,15 @@ human's instance-installation privilege. This is separate from later explicitly
 qualified maintenance operations. The installer establishes source provenance,
 not an adopted policy or active enforcement.
 
+The permanent qualification foundations are in the shared Domain assembly.
+`ModerationFinding` binds a final finding to an actual open case revision,
+owner-qualified rule, adjudicator and response or qualified-urgency reference;
+reversal preserves original ancestry and appends its exact audit.
+These Domain checks validate source structure, not the truth of evidence
+references. Native source writers and lifecycle participants must establish
+those facts under the primary transaction's current writer fences. The Domain
+foundation alone neither registers an enforcement path nor activates a profile.
+
 Acquire privacy serialization first when identity changes. Within the primary
 moderation transaction, acquire jurisdiction and qualification sources before
 subject and policy sources, then owning Event dependencies. Sort peers by their

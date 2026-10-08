@@ -1,10 +1,10 @@
-namespace Event.SetupAssistant.Tests;
+namespace Explore.Blazor.Client.Tests.SetupLive;
 
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
-using ISLAMU.Event.SetupAssistant.SetupLive;
+using Explore.Blazor.Client.Services.SetupLive;
 using Wire = ISLAMU.Wire.Contracts.SetupLive;
 
 public sealed class SetupLiveAdapterApplyTests

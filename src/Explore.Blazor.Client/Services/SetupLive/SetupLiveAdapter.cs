@@ -1,4 +1,4 @@
-namespace ISLAMU.Event.SetupAssistant.SetupLive;
+namespace Explore.Blazor.Client.Services.SetupLive;
 
 using System.Net.Http.Headers;
 using Generated = Explore.Blazor.Client.Clients;

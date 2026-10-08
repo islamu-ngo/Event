@@ -1,12 +1,14 @@
-namespace Event.SetupAssistant.Tests;
+namespace Explore.Blazor.Client.Tests.SetupLive;
 
 using System.Net;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text;
 using System.Text.Json;
-using ISLAMU.Event.SetupAssistant.SetupLive;
+using Explore.Blazor.Client.Services.SetupLive;
 using ISLAMU.Wire.Contracts.SetupLive;
+using SetupEnrollmentScope = ISLAMU.Wire.Contracts.SetupLive.SetupEnrollmentScope;
+using SetupEnrollmentState = ISLAMU.Wire.Contracts.SetupLive.SetupEnrollmentState;
 
 public sealed class SetupLiveAdapterSecurityTests
 {

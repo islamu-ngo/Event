@@ -17,7 +17,6 @@
   <Folder Name="/Product/Setup Assistant/">
     <Project Path="src/Event.Setup.Artifacts/Event.Setup.Artifacts.csproj" />
     <Project Path="src/Event.SetupAssistant/Event.SetupAssistant.csproj" />
-    <Project Path="src/Event.SetupAssistant/SetupLive/Event.SetupAssistant.SetupLive.csproj" />
     <Project Path="src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj" />
     <Project Path="src/Event.SetupAssistant.Terminal/Event.SetupAssistant.Terminal.csproj" />
   </Folder>

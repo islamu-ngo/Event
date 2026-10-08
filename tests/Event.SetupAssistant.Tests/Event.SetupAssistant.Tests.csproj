@@ -10,7 +10,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Event.SetupAssistant\Event.SetupAssistant.csproj" />
-    <ProjectReference Include="..\..\src\Event.SetupAssistant\SetupLive\Event.SetupAssistant.SetupLive.csproj" />
   </ItemGroup>
 
   <ItemGroup>

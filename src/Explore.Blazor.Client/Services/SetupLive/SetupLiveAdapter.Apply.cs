@@ -1,4 +1,4 @@
-namespace ISLAMU.Event.SetupAssistant.SetupLive;
+namespace Explore.Blazor.Client.Services.SetupLive;
 
 using System.Collections.Immutable;
 using System.Security.Cryptography;

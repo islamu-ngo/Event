@@ -1296,6 +1296,15 @@
           "Explore.Application": "[1.0.0, )"
         }
       },
+      "islamu.moderation.application": {
+        "type": "Project",
+        "dependencies": {
+          "ISLAMU.Moderation.Domain": "[1.0.0, )"
+        }
+      },
+      "islamu.moderation.domain": {
+        "type": "Project"
+      },
       "Asp.Versioning.Mvc": {
         "type": "CentralTransitive",
         "requested": "[10.0.1, )",

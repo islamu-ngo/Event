@@ -74,6 +74,139 @@ Table "moderation_cases" {
   Note: 'Qualified allegation only; open/closed state and positive application-managed revision. Native checks reject partial ancestry and mismatched subject/scope trust domains. A case is not a restriction or accepted finding.'
 }
 
+Table "moderation_findings" {
+  "id" uuid [pk, not null]
+  "case_id" uuid [not null, ref: > moderation_cases.id]
+  "case_occurrence_id" uuid [not null]
+  "case_revision" bigint [not null]
+  "case_created_at" timestamptz [not null]
+  "subject_kind" int [not null]
+  "subject_id" uuid [not null]
+  "subject_origin_kind" int [not null]
+  "subject_origin_trust_domain_id" uuid [not null]
+  "subject_origin_solution_id" uuid
+  "subject_origin_instance_id" uuid
+  "subject_origin_tenant_id" uuid
+  "subject_origin_community_id" uuid
+  "subject_origin_resource_id" uuid
+  "scope_kind" int [not null]
+  "scope_trust_domain_id" uuid [not null]
+  "scope_solution_id" uuid
+  "scope_instance_id" uuid
+  "scope_tenant_id" uuid
+  "scope_community_id" uuid
+  "scope_resource_id" uuid
+  "rule_owner_id" uuid [not null]
+  "rule_code" varchar(100) [not null]
+  "rule_revision" bigint [not null]
+  "adjudicator_kind" int [not null]
+  "adjudicator_id" uuid [not null]
+  "adjudicator_origin_kind" int [not null]
+  "adjudicator_origin_trust_domain_id" uuid [not null]
+  "adjudicator_origin_solution_id" uuid
+  "adjudicator_origin_instance_id" uuid
+  "adjudicator_origin_tenant_id" uuid
+  "adjudicator_origin_community_id" uuid
+  "adjudicator_origin_resource_id" uuid
+  "evidence_purpose" int [not null]
+  "evidence_reference_id" uuid [not null]
+  "urgency_qualification_id" uuid
+  "evidence_recorded_at" timestamptz [not null]
+  "justification" varchar(4000) [not null]
+  "finalized_at" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "state" int [not null]
+  "revision" bigint [not null]
+  "reversal_reference_id" uuid
+  "reversed_by_kind" int
+  "reversed_by_id" uuid
+  "reversed_by_origin_kind" int
+  "reversed_by_origin_trust_domain_id" uuid
+  "reversed_by_origin_solution_id" uuid
+  "reversed_by_origin_instance_id" uuid
+  "reversed_by_origin_tenant_id" uuid
+  "reversed_by_origin_community_id" uuid
+  "reversed_by_origin_resource_id" uuid
+  "reversal_justification" varchar(4000)
+  "reversed_at" timestamptz
+  indexes {
+    (case_id, rule_owner_id, rule_code, rule_revision) [unique]
+    (scope_trust_domain_id, subject_kind, subject_id, scope_tenant_id)
+  }
+  Note: 'Permanent case-bound final/reversed authority. Native constraints bind revision/state, response or urgency evidence and canonical human attribution; references still require current fenced source qualification.'
+}
+
+Table "moderation_reviewer_assignments" {
+  "id" uuid [pk, not null]
+  "case_id" uuid [not null, ref: > moderation_cases.id]
+  "trust_domain_id" uuid [not null]
+  "case_tenant_id" uuid
+  "reviewer_human_id" uuid [not null]
+  "subject_human_id" uuid
+  "assigned_by_human_id" uuid [not null]
+  "controller_human_id" uuid
+  "identity_evidence_id" uuid
+  "qualified_by_human_id" uuid
+  "qualified_until" timestamptz
+  "conflict_state" int [not null]
+  "conflict_evidence_id" uuid
+  "assessed_by_human_id" uuid
+  "withdrawn_by_human_id" uuid
+  "withdrawn_at" timestamptz
+  "created_at" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "revision" bigint [not null]
+  indexes {
+    (trust_domain_id, case_tenant_id, case_id, reviewer_human_id)
+    case_id
+  }
+  Note: 'Actual case tenant is preserved for filtering. Positive concurrent revision, controller/evidence consistency and independent conflict assessment are checked; unresolved, expired or withdrawn assignment is not current permission.'
+}
+
+Table "moderation_policies" {
+  "id" uuid [pk, not null]
+  "revision" bigint [not null]
+  "jurisdiction_kind" int [not null]
+  "jurisdiction_id" uuid [not null]
+  "jurisdiction_trust_domain_id" uuid [not null]
+  "jurisdiction_solution_id" uuid
+  "jurisdiction_instance_id" uuid
+  "jurisdiction_tenant_id" uuid
+  "jurisdiction_community_id" uuid
+  "jurisdiction_resource_id" uuid
+  "created_at" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "publication_id" uuid [not null]
+  "rule_count" int [not null]
+  indexes {
+    (jurisdiction_kind, jurisdiction_id) [unique]
+  }
+  Note: 'One current policy head per actual jurisdiction, with checked ancestry/leaf identity and positive application-managed revision. Adoption may be inactive; source evidence is independently qualified.'
+}
+
+Table "moderation_policy_rules" {
+  "policy_id" uuid [not null, ref: > moderation_policies.id]
+  "id" uuid [not null]
+  "policy_revision" bigint [not null]
+  "rule_owner_id" uuid [not null]
+  "rule_code" varchar(100) [not null]
+  "rule_revision" bigint [not null]
+  "meaning" varchar(4000) [not null]
+  "purpose_mask" int [not null]
+  "capability_mask" int [not null]
+  "active_capability_mask" int [not null]
+  "maximum_finite_duration_ticks" bigint [not null]
+  "allows_indefinite" boolean [not null]
+  "maximum_review_delay_ticks" bigint [not null]
+  "minimum_approvals" int [not null]
+  "maximum_approvals" int [not null]
+  indexes {
+    (policy_id, id) [pk]
+    (policy_id, rule_owner_id, rule_code, rule_revision) [unique]
+  }
+  Note: 'Scalar immutable adopted meanings and ceilings, hydrated as native child rows. Enabled capability mask is an explicit supported subset; complete profiles require their entire consumer set. Parent authority filters bound child reads.'
+}
+
 Table "moderation_decisions" {
   "id" uuid [pk, not null]
   "case_id" uuid [not null, ref: > moderation_cases.id]

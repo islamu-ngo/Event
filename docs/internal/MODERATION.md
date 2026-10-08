@@ -118,6 +118,23 @@ ongoing freshness of native evidence. Publication and lifecycle writers must
 qualify that evidence under their current fences; adopted identifiers alone
 neither grant permission nor activate runtime enforcement.
 
+Native qualification persistence uses `moderation_findings`,
+`moderation_reviewer_assignments`, `moderation_policies` and
+`moderation_policy_rules`. Scalar finding and reviewer rows retain restrictive
+case parents; policy children retain their actual policy owner and revision.
+One unique `(jurisdiction_kind, jurisdiction_id)` owns the current policy head
+on every provider, avoiding nullable-ancestry uniqueness differences. The leaf
+identifier is checked against its tagged ancestry, while reviewer rows preserve
+the actual case tenant for direct filtering. Child policy reads inherit current
+parent trust-domain and tenant filters.
+
+Native EF scaffolds own the provider schemas. Hydration restores scalar/child
+state without rerunning publication, then validates the complete Domain state.
+Database checks reject partial controller/conflict proof and invalid revisions;
+native concurrency rejects stale qualification writes. Applying the schema
+neither records evidence truth nor installs the checked source mutation writers
+or an active enforcement profile.
+
 Acquire privacy serialization first when identity changes. Within the primary
 moderation transaction, acquire jurisdiction and qualification sources before
 subject and policy sources, then owning Event dependencies. Sort peers by their

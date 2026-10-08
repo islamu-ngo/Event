@@ -134,6 +134,7 @@ public sealed class ModerationPolicy
     public Guid Id { get; private set; }
     public long Revision { get; private set; }
     public ModerationScopeKind JurisdictionKind { get; private set; }
+    public Guid JurisdictionId { get; private set; }
     public Guid JurisdictionTrustDomainId { get; private set; }
     public Guid? JurisdictionSolutionId { get; private set; }
     public Guid? JurisdictionInstanceId { get; private set; }
@@ -150,8 +151,12 @@ public sealed class ModerationPolicy
     {
         get => AuthorityScope.FromCoordinates(JurisdictionKind, JurisdictionTrustDomainId, JurisdictionSolutionId,
             JurisdictionInstanceId, JurisdictionTenantId, JurisdictionCommunityId, JurisdictionResourceId);
-        private set => (JurisdictionKind, JurisdictionTrustDomainId, JurisdictionSolutionId,
-            JurisdictionInstanceId, JurisdictionTenantId, JurisdictionCommunityId, JurisdictionResourceId) = value.Coordinates;
+        private set
+        {
+            JurisdictionId = value.Id;
+            (JurisdictionKind, JurisdictionTrustDomainId, JurisdictionSolutionId,
+                JurisdictionInstanceId, JurisdictionTenantId, JurisdictionCommunityId, JurisdictionResourceId) = value.Coordinates;
+        }
     }
 
     /// <summary>Adopts immutable meaning in an explicitly inactive snapshot; no effect evidence is inferred.</summary>
@@ -240,7 +245,7 @@ public sealed class ModerationPolicy
         RequireVersion7(Id, nameof(Id));
         RequireVersion7(PublicationId, nameof(PublicationId));
         var jurisdiction = Jurisdiction;
-        if (Revision < 1 || UpdatedAt < CreatedAt || (Revision == 1 && UpdatedAt != CreatedAt)
+        if (JurisdictionId != jurisdiction.Id || Revision < 1 || UpdatedAt < CreatedAt || (Revision == 1 && UpdatedAt != CreatedAt)
             || RuleCount < 1 || _rules.Count != RuleCount
             || _rules.Any(rule => rule is null)
             || _rules.Select(rule => rule.Id).Distinct().Count() != RuleCount

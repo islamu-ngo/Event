@@ -365,6 +365,7 @@ public class ModerationPolicyPublicationInvariantTests
         foreach (var (property, value) in new (string, object?)[]
         {
             ("Id", Guid.Empty), ("Revision", 0L), ("PublicationId", Guid.Empty), ("RuleCount", 2),
+            ("JurisdictionId", Id(99)),
             ("JurisdictionSolutionId", null), ("JurisdictionKind", ModerationScopeKind.TrustDomain),
             ("UpdatedAt", Now.AddTicks(-1))
         })

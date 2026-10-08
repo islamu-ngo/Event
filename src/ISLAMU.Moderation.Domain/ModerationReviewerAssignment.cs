@@ -20,6 +20,7 @@ public sealed class ModerationReviewerAssignment
     public Guid Id { get; private set; }
     public Guid CaseId { get; private set; }
     public Guid TrustDomainId { get; private set; }
+    public Guid? CaseTenantId { get; private set; }
     public Guid ReviewerHumanId { get; private set; }
     public Guid? SubjectHumanId { get; private set; }
     public Guid AssignedByHumanId { get; private set; }
@@ -57,6 +58,7 @@ public sealed class ModerationReviewerAssignment
             Id = id,
             CaseId = moderationCase.Id,
             TrustDomainId = moderationCase.Scope.TrustDomainId,
+            CaseTenantId = moderationCase.ScopeTenantId,
             SubjectHumanId = moderationCase.Subject.Kind == ModerationSubjectKind.Human
                 ? moderationCase.Subject.Id : null,
             ReviewerHumanId = reviewerHumanId,
@@ -151,7 +153,7 @@ public sealed class ModerationReviewerAssignment
         var hasController = ControllerHumanId is not null;
         var hasAssessment = ConflictState != ModerationReviewerConflictState.Unresolved;
         if (Id == Guid.Empty || Id.Version != 7 || Id.Variant is < 8 or > 11
-            || CaseId == Guid.Empty || TrustDomainId == Guid.Empty || ReviewerHumanId == Guid.Empty
+            || CaseId == Guid.Empty || TrustDomainId == Guid.Empty || CaseTenantId == Guid.Empty || ReviewerHumanId == Guid.Empty
             || AssignedByHumanId == Guid.Empty || SubjectHumanId == Guid.Empty
             || ReviewerHumanId == SubjectHumanId || Revision < 1 || UpdatedAt < CreatedAt
             || !Enum.IsDefined(ConflictState)

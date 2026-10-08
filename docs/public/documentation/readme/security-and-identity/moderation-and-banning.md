@@ -50,6 +50,12 @@ effects; an identifier or administrator role alone is insufficient. Published
 meaning is retained across replacement revisions, and incomplete profiles do
 not become active by omitting unsupported effects.
 
+Qualification schemas preserve case ownership, reviewer tenant boundaries and
+one current policy head per jurisdiction. Database constraints and concurrent
+revision checks reject malformed or stale qualification updates. Applying these
+migrations does not adopt live evidence, register enforcement consumers or
+activate a moderation profile.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

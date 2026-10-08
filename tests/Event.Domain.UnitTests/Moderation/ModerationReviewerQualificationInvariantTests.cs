@@ -7,6 +7,21 @@ public class ModerationReviewerQualificationInvariantTests
     private static readonly DateTimeOffset Now = new(2026, 10, 8, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task AssignmentPreservesTheActualCaseTenantForNativeFiltering()
+    {
+        var scope = AuthorityScope.Tenant(AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()),
+                Guid.CreateVersion7()), Guid.CreateVersion7()), Guid.CreateVersion7());
+        var moderationCase = ModerationCase.Open(Guid.CreateVersion7(),
+            SubjectReference.Create(ModerationSubjectKind.Human, Guid.CreateVersion7(), scope),
+            scope, Guid.CreateVersion7(), Now);
+        var assignment = Assign(moderationCase);
+        await Assert.That(assignment.CaseTenantId).IsEqualTo(scope.Id);
+        await Assert.That(assignment.TrustDomainId).IsEqualTo(scope.TrustDomainId);
+        assignment.ValidatePersistedState();
+    }
+
+    [Test]
     public async Task AssignmentAndControllerIdentityDoNotByThemselvesQualifyReview()
     {
         var assignment = Assign(Case());

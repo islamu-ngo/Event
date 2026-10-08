@@ -9,6 +9,10 @@ public partial class ExploreDbContext
     internal Guid? ModerationTrustDomainId { get; set; }
 
     public DbSet<ModerationCase> ModerationCases => Set<ModerationCase>();
+    public DbSet<ModerationFinding> ModerationFindings => Set<ModerationFinding>();
+    public DbSet<ModerationReviewerAssignment> ModerationReviewerAssignments => Set<ModerationReviewerAssignment>();
+    public DbSet<ModerationPolicy> ModerationPolicies => Set<ModerationPolicy>();
+    public DbSet<ModerationPolicyRule> ModerationPolicyRules => Set<ModerationPolicyRule>();
     public DbSet<ModerationDecision> ModerationDecisions => Set<ModerationDecision>();
     public DbSet<ModerationSanction> ModerationSanctions => Set<ModerationSanction>();
     public DbSet<ModerationProtectiveMeasure> ModerationProtectiveMeasures => Set<ModerationProtectiveMeasure>();
@@ -24,6 +28,17 @@ public partial class ExploreDbContext
         builder.Entity<ModerationCase>().HasQueryFilter("ModerationAuthority",
             entity => ModerationTrustDomainId != null && entity.ScopeTrustDomainId == ModerationTrustDomainId
                 && (entity.ScopeTenantId == null || entity.ScopeTenantId == TenantFilterTenantId));
+        builder.Entity<ModerationFinding>().HasQueryFilter("ModerationAuthority",
+            entity => ModerationTrustDomainId != null && entity.ScopeTrustDomainId == ModerationTrustDomainId
+                && (entity.ScopeTenantId == null || entity.ScopeTenantId == TenantFilterTenantId));
+        builder.Entity<ModerationReviewerAssignment>().HasQueryFilter("ModerationAuthority",
+            entity => ModerationTrustDomainId != null && entity.TrustDomainId == ModerationTrustDomainId
+                && (entity.CaseTenantId == null || entity.CaseTenantId == TenantFilterTenantId));
+        builder.Entity<ModerationPolicy>().HasQueryFilter("ModerationAuthority",
+            entity => ModerationTrustDomainId != null && entity.JurisdictionTrustDomainId == ModerationTrustDomainId
+                && (entity.JurisdictionTenantId == null || entity.JurisdictionTenantId == TenantFilterTenantId));
+        builder.Entity<ModerationPolicyRule>().HasQueryFilter("ModerationAuthority",
+            entity => ModerationPolicies.Any(policy => policy.Id == entity.PolicyId));
         builder.Entity<ModerationDecision>().HasQueryFilter("ModerationAuthority",
             entity => ModerationTrustDomainId != null && entity.ScopeTrustDomainId == ModerationTrustDomainId
                 && (entity.ScopeTenantId == null || entity.ScopeTenantId == TenantFilterTenantId));

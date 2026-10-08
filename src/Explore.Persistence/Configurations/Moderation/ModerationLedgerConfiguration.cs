@@ -105,7 +105,7 @@ public sealed class ModerationLedgerConfiguration :
             "(reviewed_at IS NOT NULL AND reviewer_id IS NOT NULL AND reviewed_at >= starts_at AND reviewed_at < ends_at))"));
     }
 
-    private static void ConfigureOwner<TEntity>(EntityTypeBuilder<TEntity> builder, string tableName) where TEntity : class
+    internal static void ConfigureOwner<TEntity>(EntityTypeBuilder<TEntity> builder, string tableName) where TEntity : class
     {
         builder.ToTable(tableName);
         builder.HasKey("Id");
@@ -140,7 +140,7 @@ public sealed class ModerationLedgerConfiguration :
         builder.ToTable(table => table.HasCheckConstraint($"ck_{name}_capability_mask",
             "capability_mask > 0 AND (capability_mask & 511) = capability_mask AND (capability_mask & 1) = 0"));
 
-    private static void ConfigureSubject<TEntity>(
+    internal static void ConfigureSubject<TEntity>(
         EntityTypeBuilder<TEntity> builder, string columnPrefix, bool optional = false) where TEntity : class
     {
         ConfigureScope(builder, $"{columnPrefix}_origin", optional);
@@ -155,7 +155,7 @@ public sealed class ModerationLedgerConfiguration :
             $"ck_{builder.Metadata.GetTableName()}_{columnPrefix}_subject", expression));
     }
 
-    private static void ConfigureScope<TEntity>(
+    internal static void ConfigureScope<TEntity>(
         EntityTypeBuilder<TEntity> builder, string columnPrefix, bool optional = false) where TEntity : class
     {
         var kind = $"{columnPrefix}_kind";

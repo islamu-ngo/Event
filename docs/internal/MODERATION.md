@@ -191,6 +191,23 @@ Disposal must not recover that connection from a committed `DbTransaction`,
 whose `Connection` may be null. SQLite uses the repository's documented
 single-instance coordination; it does not acquire distributed guarantees.
 
+## Event-resource final disclosure
+
+Private file and redirect preparations remain owned by their resource-authority
+lease until `CompleteHeadersAsync` requalifies native facts in a fresh
+serializable transaction. The final gate compares the current resource,
+attachment, governance, disclosure and provider input with the accepted snapshot.
+A changed or unavailable source releases no preparation; failure disposes the
+private content or destination. Cancellation and the original deadline remain
+binding through the single-use handoff. The gate does not replay external
+provider work inside that transaction.
+
+This closes stale native authority at the private preparation handoff, not the
+whole moderation consumer contract. Audience, management, audit and export DTOs
+still need terminal projection ownership, and machine callers need their exact
+native principal coordinates. Those gaps preclude a complete `ReadResource`
+registration or profile activation.
+
 ## Verification and activation boundary
 
 The PostgreSQL race witnesses hold the native qualification row through the

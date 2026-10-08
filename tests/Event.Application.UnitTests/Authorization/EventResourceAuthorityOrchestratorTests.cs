@@ -360,7 +360,8 @@ public class EventResourceAuthorityOrchestratorTests
         var released = await f.Service.CompleteHeadersAsync(lease!);
         await Assert.That(released.Preparation).IsEqualTo(preparation);
         await Assert.That(released.Disclosure!.CanAccess).IsTrue();
-        await Assert.That(f.Clock.Samples - before).IsEqualTo(1);
+        await Assert.That(f.Clock.Samples - before).IsEqualTo(3);
+        await Assert.That(f.UnitOfWork.CommittedReads).IsEqualTo(3);
         await Assert.That((await f.Service.CompleteHeadersAsync(lease!)).Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
     }
 
@@ -380,6 +381,80 @@ public class EventResourceAuthorityOrchestratorTests
         await Assert.That(f.Inputs.Single().Principal.HasEventUpdate).IsTrue();
         await Assert.That(f.Inputs.Single().Resource.PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Published);
         await Assert.That((await f.Service.CompleteHeadersAsync(lease!)).Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+    }
+
+    [Test]
+    [Arguments("resource")]
+    [Arguments("route")]
+    [Arguments("attachment")]
+    [Arguments("audience")]
+    public async Task Terminal_revocation_after_lease_creation_never_releases_private_preparation(string changedSource)
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.AuthenticatedTenantMember);
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+
+        switch (changedSource)
+        {
+            case "resource":
+                f.Facts = null;
+                break;
+            case "route":
+                f.Route = null;
+                break;
+            case "attachment":
+                f.Facts = f.Capture(generation: "generation-2");
+                break;
+            case "audience":
+                f.Facts = f.Capture(access: new(Tenant, Subject, false,
+                    f.Access.Parent, [], true, f.Access.GovernancePolicy));
+                break;
+        }
+
+        var released = await f.Service.CompleteHeadersAsync(result.Lease!);
+        await Assert.That(released.Outcome).IsNotEqualTo(EventResourceAuthorityOutcome.Allowed);
+        await Assert.That(released.Preparation).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
+        await Assert.That((await f.Service.CompleteHeadersAsync(result.Lease!)).Outcome)
+            .IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Terminal_requalification_retains_private_preparation_until_current_read_finishes(bool failure)
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.AuthenticatedTenantMember);
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        var entered = Signal();
+        var resume = Signal();
+        f.OnRead = async (_, ct) =>
+        {
+            entered.SetResult();
+            await resume.Task.WaitAsync(Timeout, ct);
+            if (failure) throw new InvalidOperationException("private terminal persistence failure");
+        };
+
+        var pending = f.Service.CompleteHeadersAsync(result.Lease!);
+        var first = await Task.WhenAny(entered.Task, pending).WaitAsync(Timeout);
+        try
+        {
+            await Assert.That(first).IsEqualTo(entered.Task);
+            await Assert.That(preparation.Disposed).IsFalse();
+            f.Facts = null;
+        }
+        finally
+        {
+            resume.TrySetResult();
+        }
+        var released = await pending.WaitAsync(Timeout);
+        await Assert.That(released.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(released.Preparation).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
     }
 
     [Test]
@@ -441,7 +516,7 @@ public class EventResourceAuthorityOrchestratorTests
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
         await Assert.That(first.Disposed).IsTrue();
         await Assert.That((await f.Service.CompleteHeadersAsync(lease!)).Preparation).IsEqualTo(second);
-        await Assert.That(f.UnitOfWork.CommittedReads).IsEqualTo(4);
+        await Assert.That(f.UnitOfWork.CommittedReads).IsEqualTo(5);
     }
 
     [Test]

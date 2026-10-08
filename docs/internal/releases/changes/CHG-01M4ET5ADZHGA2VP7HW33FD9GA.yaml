@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4ET5ADZHGA2VP7HW33FD9GA
+Title: "Recheck resource authority before releasing private preparations"
+Type: fix
+Scope: access
+Summary: "Recheck current native resource and attachment authority in a fresh transaction before releasing prepared file content or redirect destinations. Discard private preparations after revocation, changed provider input or failed qualification; retain cancellation, deadlines and single-use ownership without activating incomplete moderation coverage."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

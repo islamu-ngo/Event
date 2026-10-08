@@ -94,7 +94,10 @@ public sealed partial class EventResourceAuthorityOrchestrator(
         }
     }
 
-    /// <summary>Single-use ownership transfer immediately before headers; emits neither bytes nor Location.</summary>
+    /// <summary>
+    /// Requalifies native authority in a fresh transaction before the single-use header handoff.
+    /// The preparation stays private throughout requalification; this emits neither bytes nor Location.
+    /// </summary>
     public async Task<EventResourceHeaderResult> CompleteHeadersAsync(EventResourceAuthorityLease lease,
         CancellationToken cancellationToken = default)
     {
@@ -112,6 +115,28 @@ public sealed partial class EventResourceAuthorityOrchestrator(
                 if (!current.Allowed || current.ProviderInput != lease.Snapshot.Evaluation.ProviderInput
                     || current.Disclosure != lease.Snapshot.Evaluation.Disclosure)
                     return new(EventResourceAuthorityOutcome.Forbidden);
+                using var deadline = lease.Request.DeadlineUtc is { } end
+                    ? new CancellationTokenSource(end - now, timeProvider) : null;
+                using var linked = deadline is null
+                    ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lease.CallerCancellation)
+                    : CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken, lease.CallerCancellation, deadline.Token);
+                var latest = await unitOfWork.ExecuteSerializableAsync(
+                    token => ReadAsync(lease.Request, timeProvider.GetUtcNow(), token), linked.Token);
+                linked.Token.ThrowIfCancellationRequested();
+                var denial = Denial(lease.Request, latest);
+                bool conceal = ConcealsFailure(lease.Request, lease.Snapshot);
+                if (denial.HasValue)
+                    return new(denial.Value == EventResourceAuthorityOutcome.Unavailable && conceal
+                        ? EventResourceAuthorityOutcome.NotFound : denial.Value);
+                if (!SameAuthority(lease.Snapshot, latest!))
+                    return new(conceal ? EventResourceAuthorityOutcome.NotFound : EventResourceAuthorityOutcome.Forbidden);
+                now = timeProvider.GetUtcNow();
+                if (now >= lease.Request.DeadlineUtc) return new(EventResourceAuthorityOutcome.Expired);
+                current = latest!.Facts.Evaluate(lease.Request, latest.Route, now);
+                if (!current.Allowed || current.ProviderInput != latest.Evaluation.ProviderInput
+                    || current.Disclosure != latest.Evaluation.Disclosure)
+                    return new(EventResourceAuthorityOutcome.Forbidden);
                 var released = preparation;
                 preparation = null;
                 return new(EventResourceAuthorityOutcome.Allowed, current.Disclosure, released);
@@ -121,8 +146,18 @@ public sealed partial class EventResourceAuthorityOrchestrator(
                 if (preparation is not null) await preparation.DisposeAsync();
             }
         }
-        catch (OperationCanceledException) { return new(EventResourceAuthorityOutcome.Cancelled); }
-        catch (Exception) { return new(EventResourceAuthorityOutcome.Unavailable); }
+        catch (OperationCanceledException)
+        {
+            return new(cancellationToken.IsCancellationRequested || lease.CallerCancellation.IsCancellationRequested
+                ? EventResourceAuthorityOutcome.Cancelled
+                : lease.Request.DeadlineUtc.HasValue ? EventResourceAuthorityOutcome.Expired
+                    : EventResourceAuthorityOutcome.Unavailable);
+        }
+        catch (Exception)
+        {
+            return new(ConcealsFailure(lease.Request, lease.Snapshot)
+                ? EventResourceAuthorityOutcome.NotFound : EventResourceAuthorityOutcome.Unavailable);
+        }
     }
 
     /// <summary>

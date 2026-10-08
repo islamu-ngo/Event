@@ -71,6 +71,13 @@ update. Policy replacement retains adopted rule meaning and remains inactive
 until complete activation qualification succeeds. These source operations do
 not register an enforcement consumer or enable a moderation profile.
 
+Private resource downloads and redirects recheck current native authority
+immediately before releasing their prepared content or destination. If authority
+or the attachment changes, the preparation is discarded rather than disclosed
+using an earlier permission check. This additional check does not enable a
+moderation profile: other resource projections still require complete terminal
+enforcement.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

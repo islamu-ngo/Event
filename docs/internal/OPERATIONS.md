@@ -911,6 +911,29 @@ unapplied development migration with `dotnet ef migrations remove`, then
 regenerate with `dotnet ef migrations add`. Never patch generated migration,
 designer, or snapshot files.
 
+### Add an application migration with the selected secret authority
+
+When Infisical or shared User Secrets owns the structured database settings,
+plain environment overrides do not necessarily replace its provider selection.
+The repository-native C# scaffolder reads that selected authority, chooses the
+provider model, and injects its credentials only into the native EF child process:
+
+```bash
+DOTNET_ENVIRONMENT=Development dotnet run eng/tools/ScaffoldPrimaryMigration.cs -- SqlServer <MigrationName>
+DOTNET_ENVIRONMENT=Development dotnet run eng/tools/ScaffoldPrimaryMigration.cs -- MySql <MigrationName>
+```
+
+Run from the repository root. The tool also accepts `PostgreSql` and `Sqlite`;
+SQLite uses a task-local `.artifacts/islamu-event-migrations.db` model path.
+It never prints credentials, writes a dotenv file, changes the selected shared
+secret authority, or connects to, migrates or resets a database. The requested
+migration and its snapshot remain native EF-generated artifacts.
+
+MySQL and MariaDB share the owning migration project. Generate each migration
+once with the MySQL model, then verify its behavior on both supported engines.
+This tool targets only the application catalog, not Data Protection or the
+separate erasure authority.
+
 ### Full development migration reset and regeneration
 
 Run these commands from the repository root. They use the current `src/`

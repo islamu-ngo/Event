@@ -117,11 +117,20 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Explore.Diagnostic.UnitTests` | Diagnostic tooling | Doctor exit codes, bounded command evidence, and redaction | No |
 | `ISLAMU.AgentWorkflow.Tests` | Repository tooling | Intents YAML syntax and literal-file commit guard | No |
 | `Event.Standalone.IntegrationTests` | Standalone host | In-process transport, combined host graph, configuration, and API parity | No |
-| `Event.SetupAssistant.Terminal.Tests` | Setup terminal | Terminal.Gui adapter, authoritative Core output parity, localization, and secret-boundary invariants | No |
+| External `Configurator.Terminal.Tests` | Offline terminal (Configurator repository) | Definition workspace, localization and native secret/protected-save boundaries | No |
 | `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
 ### Run Commands
+
+The seven bundled Event setup test roots are removed. Portable engine and
+packaging coverage belongs to Configurator. Event retains client adapter tests under
+`Explore.Blazor.Client.Tests/SetupLive/`, wire/generated-contract guards,
+bootstrap architecture tests and the serial 35-case
+`SetupLiveAuthoritySecurityTests` API lane with its TRX and optional coverage.
+Exporter checks are scoped to `--check-local` and `--check-environment`; they need
+no sibling runtime assembly. This cutover does not call for a broad suite or
+database-provider matrix; final workstream checks remain parent-owned.
 
 The release-engine `SecurityChangeSelectionTests` exercise the actual native
 predicate consumed by `security-tests.yml`. They preserve existing selections
@@ -158,7 +167,6 @@ dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.
 dotnet test --project tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj --configuration Release --verbosity quiet
-dotnet test --project tests/Event.SetupAssistant.Terminal.Tests/Event.SetupAssistant.Terminal.Tests.csproj --configuration Release --verbosity quiet
 dotnet test --project eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/ISLAMU.AgentWorkflow.Tests.csproj --configuration Release --verbosity quiet
 
 # Release engineering (no infrastructure needed — builds disposable Git repositories)

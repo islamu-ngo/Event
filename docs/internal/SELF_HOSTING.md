@@ -31,8 +31,10 @@ Offline preparation is moving to the external
 Event-owned data definitions and the deployed-origin route
 `/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf`. This handoff is not live
 administration or an Event runtime launch button. Event retains bootstrap,
-tenant, secret, identity and legal semantic authority, its existing source tools,
-and its manifest-schema generator until the parent cutover. Bounded reference
+tenant, secret, identity and legal semantic authority and its manifest-schema
+generator after the cutover. Install Configurator separately and supply the local
+Event definition; bundled offline projects are removed and old commands are not
+aliases. Bounded reference
 round-trips do not establish generic renderer equivalence for specialized flows.
 See [the exporter contract](SETUP_ASSISTANT_ARCHITECTURE.md#external-definition-handoff)
 and [public preparation guidance](../public/self-hosting/setup-assistant.md#external-configurator-handoff).

@@ -55,43 +55,6 @@ on:
         default: "Release"
 
 jobs:
-  setup-unproved-hosts:
-    name: Setup restricted-save refusal (${{ matrix.os }})
-    if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-      - name: Verify refusal without claiming native protection
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet restore tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj --locked-mode
-          dotnet restore tests/Event.SetupAssistant.Cli.Tests/Event.SetupAssistant.Cli.Tests.csproj --locked-mode
-          dotnet test --project tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj \
-            --configuration Release --no-restore --verbosity quiet -- \
-            --treenode-filter "/*/*/*ProtectedArtifactWriterTests/(HostAvailabilityDoesNotInferWindowsOrMacProtection|RestrictedAndUnknownBytesNeverReachPublicStreams)" \
-            --minimum-expected-tests 2
-          dotnet test --project tests/Event.SetupAssistant.Cli.Tests/Event.SetupAssistant.Cli.Tests.csproj \
-            --configuration Release --no-restore --verbosity quiet -- \
-            --treenode-filter "/*/*/*SetupCliProgramTests/*" --minimum-expected-tests 8
-          {
-            echo "## Setup protected output remains disabled on this host"
-            echo "These checks prove refusal, not Windows DACL or macOS protected-write support."
-            echo "Do not advertise restricted Save until native permission, race and cleanup proofs replace this gate."
-          } >> "$GITHUB_STEP_SUMMARY"
-
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -119,15 +82,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Select Isolated .NET Installation
-        if: ${{ inputs.run-fast-tests }}
-        shell: bash
-        run: |
-          {
-            echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/audited-dotnet"
-            echo "DOTNET_ROOT=$RUNNER_TEMP/audited-dotnet"
-          } >> "$GITHUB_ENV"
-
       - name: Setup .NET
         if: ${{ inputs.run-fast-tests }}
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -136,50 +90,20 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
-      - name: Keep the SDK-Bundled Compiler Runtime
-        if: ${{ inputs.run-fast-tests }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(realpath "$DOTNET_ROOT")" = "$(realpath "$RUNNER_TEMP")/audited-dotnet"
-          sdk_version="$(jq -er '.sdk.version' global.json)"
-          runtime_version="$(jq -er '.runtimeOptions.framework.version' "$DOTNET_ROOT/sdk/$sdk_version/dotnet.runtimeconfig.json")"
-          runtime_root="$DOTNET_ROOT/shared/Microsoft.NETCore.App"
-          test -d "$runtime_root/$runtime_version"
-          holding="$(mktemp -d "$RUNNER_TEMP/audited-extra-runtimes.XXXXXX")"
-          for runtime_path in "$runtime_root"/*; do
-            if [ "$runtime_path" != "$runtime_root/$runtime_version" ]; then
-              mv -- "$runtime_path" "$holding/"
-            fi
-          done
-          dotnet --list-runtimes
-
       - name: Restore
         if: ${{ inputs.run-fast-tests }}
         run: dotnet restore --locked-mode
 
-      - name: Restore Dependency Audit Probes
-        if: ${{ inputs.run-fast-tests }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          for project in \
-            eng/setup-assistant/probes/*/*.csproj \
-            eng/release/dependencies/terminal-gui/probe/TerminalGuiClosure.csproj
-          do
-            dotnet restore "$project" --locked-mode
-          done
-
-      - name: Check Setup Assistant Ratchets
-        if: ${{ inputs.run-fast-tests }}
-        run: |
-          dotnet run eng/setup-assistant/GenerateSetupAssistantRatchets.cs -- --check
-          dotnet run --project eng/setup-assistant/EnvironmentCatalogueGenerator/EnvironmentCatalogueGenerator.csproj --configuration "$DOTNET_CONFIGURATION" --no-restore -- --check
-          dotnet run --project eng/setup-assistant/SetupCliCommandSchemaGenerator/SetupCliCommandSchemaGenerator.csproj --configuration "$DOTNET_CONFIGURATION" --no-restore -- --check
-
       - name: Restore .NET Tools
         if: ${{ inputs.run-fast-tests }}
         run: dotnet tool restore
+
+      - name: Check Event-owned Configurator definitions
+        if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
+        run: |
+          dotnet restore eng/configurator/DefinitionExporter/DefinitionExporter.csproj --locked-mode
+          dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration "$DOTNET_CONFIGURATION" --no-restore -- --check-local
+          dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration "$DOTNET_CONFIGURATION" --no-restore -- --check-environment
 
       - name: NuGet Security Audit
         if: ${{ inputs.run-fast-tests }}
@@ -199,14 +123,6 @@ jobs:
           rm -f .ci/scripts/packages.lock.json
           dotnet run .ci/scripts/validate-dependency-license-policy.cs -- .
 
-      - name: Audited Terminal.Gui Package Gate
-        if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
-        env:
-          RestorePackagesWithLockFile: "false"
-        run: |
-          dotnet --info
-          bash eng/release/dependencies/terminal-gui/BuildTerminalGuiPackage.sh --check
-
       - name: Linting Check
         if: ${{ inputs.run-fast-tests }}
         run: dotnet format whitespace --verify-no-changes --verbosity minimal
@@ -222,56 +138,22 @@ jobs:
         if: ${{ inputs.run-fast-tests && inputs.collect-coverage }}
         run: mkdir -p artifacts/coverage
 
-      - name: Setup Project Gates
+      - name: Event SetupLive authority security gate
         if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
         id: test_setup
         shell: bash
         run: |
           set -euo pipefail
-          for project in \
-            tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj \
-            tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj \
-            tests/Event.SetupAssistant.Tests/Event.SetupAssistant.Tests.csproj \
-            tests/Event.SetupAssistant.Browser.Tests/Event.SetupAssistant.Browser.Tests.csproj \
-            tests/Event.SetupAssistant.Desktop.Tests/Event.SetupAssistant.Desktop.Tests.csproj \
-            tests/Event.SetupAssistant.Cli.Tests/Event.SetupAssistant.Cli.Tests.csproj \
-            tests/Event.SetupAssistant.Terminal.Tests/Event.SetupAssistant.Terminal.Tests.csproj
-          do
-            dotnet build "$project" --configuration "$DOTNET_CONFIGURATION" --no-restore --verbosity minimal
-            coverage_args=()
-            test_filters=()
-            if [[ "$COLLECT_COVERAGE" == true ]]; then
-              coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-$(basename "$project" .csproj).cobertura.xml" --coverage-output-format cobertura)
-              if [[ "$project" == tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj ]]; then
-                dotnet test --project "$project" --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
-                  --treenode-filter "/*/*/*/*[Category=Architecture]" --minimum-expected-tests 1 --no-progress
-                test_filters=(--treenode-filter "/*/*/*/*[Category!=Architecture]")
-              fi
-            fi
-            echo "started=true" >> "$GITHUB_OUTPUT"
-            dotnet test --project "$project" --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --minimum-expected-tests 1 --no-progress "${coverage_args[@]}" "${test_filters[@]}"
-          done
           coverage_args=()
           if [[ "$COLLECT_COVERAGE" == true ]]; then
             coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-SetupLiveAuthoritySecurityTests.cobertura.xml" --coverage-output-format cobertura)
           fi
+          echo "started=true" >> "$GITHUB_OUTPUT"
           dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj \
             --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
             --treenode-filter "/*/*/*SetupLiveAuthoritySecurityTests/*" \
             --minimum-expected-tests 35 --maximum-parallel-tests 1 --no-progress \
             --report-trx --report-trx-filename SetupLiveAuthoritySecurityTests.trx "${coverage_args[@]}"
-
-      - name: Publish public Setup Assistant browser
-        if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
-            -target:PublishSetupAssistantBrowser \
-            -property:SetupAssistantOutputRoot="$RUNNER_TEMP/setup-assistant"
-          test -f "$RUNNER_TEMP/setup-assistant/browser/wwwroot/index.html"
-          test -d "$RUNNER_TEMP/setup-assistant/browser/wwwroot/_framework"
-          dotnet run eng/setup-assistant/GenerateSetupAssistantRatchets.cs -- --check
 
       - name: Unit Tests — Application
         if: ${{ inputs.run-fast-tests && inputs.run-app-tests }}

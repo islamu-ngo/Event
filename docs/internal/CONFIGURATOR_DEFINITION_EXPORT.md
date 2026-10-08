@@ -1,6 +1,21 @@
 # Event-owned Configurator definition export
 
-Status: exporter, immutable identity, environment ownership and reference vectors verified. Source cutover and whole-workstream readiness remain separate parent gates.
+Status: exporter, immutable identity, environment ownership and reference vectors verified; destination readiness confirmed and bundled Event sources removed. Final Event build/architecture verification is parent-owned.
+
+## Event-only CI gate
+
+`DefinitionExporter --check-local` compares all Event-owned generated definitions,
+answer vectors, receipts and expected artifacts without opening a sibling
+Configurator checkout. `--check-environment` separately checks the retained
+environment catalogue. CI restores the exporter in locked mode and invokes both
+read-only checks when `eng/configurator/` or `configurator/definitions/` changes.
+The exporter owns `generatedBy` metadata; nothing in this lane depends on the
+obsolete `eng/setup-assistant/` generators.
+
+```bash
+dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration Release -- --check-local
+dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration Release -- --check-environment
+```
 
 ## Ownership and immutable identity
 
@@ -67,4 +82,4 @@ Environment registry/Compose/template/document parity moved to the new exporter 
 
 Executed: exporter Release build exited 0 with zero warnings/errors; environment write/check succeeded for 361 definitions; declaration write/check and actual CLI admission succeeded. Five actual CLI-generated artifacts passed Event host verification. The final wire slice passed 13 cases with zero failures in 6.848 seconds. Generic external-data conformance passed six cases, including exact independent expected bytes and one native/browser registry identity. Browser rendering tests passed 56 cases, including the real external bundle and public-only controls. Native layout and workstream checks are recorded in the parent ledger, not implied by this exporter evidence.
 
-No database/provider suite, backend apply, deployment or signing activation belongs to these checks. JSON/Razor language-server tooling is unavailable and some C# diagnostics timed out; actual compilation and runtime tests are the decisive evidence. Whole-solution cutover remains gated on destination readiness and retained Event architecture checks.
+No database/provider suite, backend apply, deployment or signing activation belongs to these checks. JSON/Razor language-server tooling is unavailable and some C# diagnostics timed out; actual compilation and runtime tests are the decisive evidence. The parent confirmed destination packaging/runtime readiness before Event source removal and owns final Event build/architecture checks.

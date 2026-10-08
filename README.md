@@ -102,8 +102,12 @@ offline configuration preparation utility. Event publishes its own declarative
 definitions and public workflow choices; on a deployed Configurator origin,
 `/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` selects this target without contacting
 Event. The browser accepts public choices only, not secrets or administration.
-Event's existing source tools and backend validation remain authoritative until
-the parent extraction cutover. See the [handoff and limitations](docs/public/self-hosting/setup-assistant.md#external-configurator-handoff).
+Install Configurator separately and supply the matching
+`configurator/definitions/islamu-event/definition.json`; Event backend validation
+and authorization remain authoritative. The generic CLI has no `event-setup`
+aliases and prepares answer workspaces with explicit artifact IDs. Bundled offline
+sources, test projects and release targets are removed from Event. See the
+[handoff and command migration](docs/public/self-hosting/setup-assistant.md#external-configurator-handoff).
 
 ---
 

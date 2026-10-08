@@ -59,16 +59,20 @@
 | `src/Explore.Persistence.DataProtection.Migrations.*/...` | Data Protection key repository provider migrations |
 | `src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/...` | Privacy erasure authority audit store migrations |
 
-### Setup Assistant Ecosystem
-| Project Path | Interface Type |
+### External Configurator boundary
+
+Offline CLI, browser, desktop, terminal, presentation and protected-save
+implementation belong to [ISLAMU Configurator](https://github.com/ISLAMU/Configurator).
+Install it separately and supply Event's local definition. The bundled offline
+projects and their focused test/release owners are removed from this solution.
+
+| Retained Event owner | Responsibility |
 |---|---|
-| `src/Event.Setup.Core/Event.Setup.Core.csproj` | Setup domain logic, configuration manifest parsing, and validation |
-| `src/Event.Setup.Artifacts/Event.Setup.Artifacts.csproj` | Setup artifact extraction and bundling |
-| `src/Event.SetupAssistant/Event.SetupAssistant.csproj` | Shared Setup Assistant component library |
-| `src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj` | Headless CLI setup tool (`event-setup`) |
-| `src/Event.SetupAssistant.Terminal/Event.SetupAssistant.Terminal.csproj` | Terminal GUI setup tool (Terminal.Gui v2) |
-| `src/Event.SetupAssistant.Browser/Event.SetupAssistant.Browser.csproj` | Web-based setup assistant |
-| `src/Event.SetupAssistant.Desktop/Event.SetupAssistant.Desktop.csproj` | Desktop (Photino) setup assistant |
+| `eng/configurator/DefinitionExporter/DefinitionExporter.csproj` | Event metadata, host-wire reference vectors, `--check-local` and `--check-environment` gates |
+| `configurator/definitions/islamu-event/` | Data-only definition, identity receipt and parser reference artifacts |
+| `src/Explore.Blazor.Client/Services/SetupLive/` | Generated API transport and server-issued capability handling |
+| `tests/Explore.Blazor.Client.Tests/SetupLive/` | Relocated adapter security and apply tests |
+| `tests/Event.API.IntegrationTests/Features/SetupLiveAuthoritySecurityTests.cs` | Retained serial 35-case backend authority lane, TRX and optional coverage |
 
 ---
 

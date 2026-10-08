@@ -1,10 +1,16 @@
 # ADR-035: Offline Setup Assistant Artifact Boundaries
 
-> **Status:** Accepted
+> **Status:** Superseded ownership by [external Configurator extraction](ADR-configurator-extraction.md); retained as historical artifact-boundary rationale
 > **Date:** 2026-09-30
 > **Scope:** Setup Core, native artifact output and the four operator surfaces
 
 ## Context
+
+The bundled project/test identifiers below describe the accepted September
+implementation, not current build or invocation instructions. Those owners are
+removed from Event; the external Configurator repository owns offline runtime,
+protected-save and package evidence. Event retains backend authority and the
+data-only definition exporter. See the superseding ADR for current paths.
 
 The approved Setup Assistant workstream prepares local configuration and
 identity drafts without connecting to an Event instance. CLI, terminal,

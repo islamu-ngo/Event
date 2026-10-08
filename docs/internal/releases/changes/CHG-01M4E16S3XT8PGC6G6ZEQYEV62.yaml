@@ -1,0 +1,31 @@
+Change-Id: CHG-01M4E16S3XT8PGC6G6ZEQYEV62
+Title: "use Configurator instead of bundled setup tools"
+Type: feat
+Scope: self-hosting
+Summary: "Install ISLAMU Configurator and supply the Event definition; bundled event-setup sources and commands are removed while Event backend configuration authority remains unchanged."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: "Bundled event-setup executables and source projects are removed. Install standalone ISLAMU Configurator, select the Event-owned definition, and use its generic artifact commands; prepared files still require Event host validation and authorized application."
+  Security:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: "Event authentication, enrollment, tenant isolation and backend apply authority are unchanged; live transport remains in the Event client."
+  Migration:
+    Reference: docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md
+    Disposition: documented
+    Detail: "Repository and operator tooling extraction only, not a database migration. Replace bundled event-setup invocations with Configurator artifact commands and provide the exported Event definition explicitly."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: "Event environment keys, configuration authority and runtime configuration contracts remain unchanged."
+  OpenAPI:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: "No Event backend route or API wire contract is added or changed by the offline tooling extraction."
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: "Install Configurator separately, load the Event definition by exact revision and digest, and prepare restricted output with a native client. Browser launch supports public partial templates only and grants no live administration."

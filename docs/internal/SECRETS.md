@@ -563,27 +563,24 @@ See [SELF_HOSTING.md](SELF_HOSTING.md#first-run-setup-secret) for the operator f
 
 ### Terminal Assistant Secret Boundary
 
-The sole human terminal target is `Event.SetupAssistant.Terminal`; the machine
-CLI has no interactive or secret-entry mode. The Terminal.Gui target accepts no
-secret arguments, environment transport, redirected standard streams, clipboard
-paste, history, or alternate console renderer. It owns one bounded mutable
-buffer, masks the visible field, clears state across every terminal path, and
-returns only diagnostic code, readiness counts, and artifact digest.
+The external [Configurator terminal](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/terminal.md)
+owns the offline UI and protected writer. Event retains runtime secret binding
+and bootstrap authority. The bundled terminal is removed. Native protected-save
+support follows Configurator's own package/host evidence; currently restricted
+publication is Linux-only and fails closed on unsupported hosts or filesystems.
+Never substitute plaintext stdout or ordinary file writes when protection is
+unavailable.
 
-The Terminal.Gui field stores bullet count only; the real input never enters
-its `Text` or undo history. Terminal composition sends a nonsecret placeholder
-through the authoritative string-based Core workflow, then replaces it with
-clearable URL-safe UTF-8 bytes. Mutable secret buffers are zeroed after the
-write attempt. .NET, the operating system, and storage hardware still cannot
-guarantee physical erasure of every runtime, kernel, or device-level copy; do
-not treat this process as resistant to a compromised local account, debugger,
-memory dumper, or crash-dump collector.
+Configurator keeps private answer input masked, blocks private clipboard/history
+surfaces and clears private state on cancellation/disposal. Its general Core
+handoff can still create immutable .NET strings; runtime, kernel and storage
+erasure are not guaranteed. Do not treat local preparation as resistant to a
+compromised account, debugger, memory dumper or crash collector.
 
-On Linux, macOS, and FreeBSD it writes a new owner-only `0600` file with
-create-new/no-overwrite semantics. Unsupported protected-write platforms fail
-closed. The generated file is deployment input: move its values into the
-selected deployment secret authority, then remove the local file when it is no
-longer required.
+The protected, create-only output is deployment input, not a runtime secret
+authority. Move values into the selected deployment authority and remove the
+local artifact when no longer required. Event's readiness API remains value-free;
+external preparation does not authorize secret readback.
 
 
 ## Ownership Model
@@ -703,8 +700,9 @@ appsettings, another provider, or stored coordinates.
 The enrollment capability, raw value, and target-local Infisical coordinates
 are never saved in a profile, database row, portable artifact, log, trace,
 metric, response, or support bundle. The API exposes value-free readiness and
-receipts only and has no readback route. Release activation remains disabled by
-`eng/setup-assistant/generated/setup-live-release-capabilities.json`.
+receipts only and has no readback route. External Configurator has no activated
+live workflow; its release metadata belongs to that repository. Retained Event
+backend and client transport are not an activation mechanism.
 
 ## Related
 

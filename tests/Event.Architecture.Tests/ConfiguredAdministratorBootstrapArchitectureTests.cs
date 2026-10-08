@@ -98,27 +98,24 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
     }
 
     [Test]
-    public async Task SetupCoreAndAssistantRemainOfflineAndDisconnectedFromRuntimeLayers()
+    public async Task ConfiguratorDefinitionExporterReferencesOnlyEventDomainAndWire()
     {
-        string coreProject = ContextSystemHelpers.RepoPath(
-            "src", "Event.Setup.Core", "Event.Setup.Core.csproj");
-        string assistantProject = ContextSystemHelpers.RepoPath(
-            "src", "Event.SetupAssistant", "Event.SetupAssistant.csproj");
+        string exporterProject = ContextSystemHelpers.RepoPath(
+            "eng", "configurator", "DefinitionExporter", "DefinitionExporter.csproj");
 
-        await Assert.That(ProjectReferences(coreProject))
-            .IsEquivalentTo(["Event.Wire.Contracts"]);
-        await Assert.That(ProjectReferences(assistantProject))
-            .IsEquivalentTo(["Event.Setup.Core"]);
+        await Assert.That(ProjectReferences(exporterProject))
+            .IsEquivalentTo(["Explore.Domain", "Event.Wire.Contracts"]);
 
-        string[] forbidden = ProjectClosure(coreProject, assistantProject)
+        string[] forbidden = ProjectClosure(exporterProject)
             .Where(name => name is
                 "Explore.API" or
                 "Explore.Application" or
-                "Explore.Domain" or
                 "Explore.Infrastructure" or
                 "Explore.Persistence" or
                 "Explore.Blazor" or
-                "Explore.Blazor.Client")
+                "Explore.Blazor.Client"
+                || name.StartsWith("Event.Setup", StringComparison.Ordinal)
+                || name.StartsWith("Configurator.", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)
             .ToArray();
 

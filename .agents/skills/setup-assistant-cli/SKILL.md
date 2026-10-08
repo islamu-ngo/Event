@@ -1,99 +1,55 @@
 ---
 name: setup-assistant-cli
-description: "Load when invoking the standalone `event-setup` machine CLI to inspect the environment catalogue, validate or render dotenv input, process configuration manifests or tenant packages, export/import operator-identity portability artifacts, validate legal drafts, or run setup diagnostics; do not use for the interactive terminal UI, browser setup, or API endpoint design."
+description: "Load when preparing Event configuration with the separately installed ISLAMU Configurator CLI and Event-owned local definitions; routes to external command documentation, not bundled event-setup tools, terminal UI or backend API design."
 type: workflow
 enforcement: suggest
 priority: high
 ---
 
-# Setup Assistant CLI
+# External Configurator usage pointer
 
-## Rules
+Use [ISLAMU Configurator](https://github.com/ISLAMU/Configurator), installed
+separately from Event. Its own
+[CLI guide](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/cli.md)
+and generated `schemas/islamu-configurator-command-v1.schema.json` own executable
+grammar and the machine result contract. Event does not maintain a second parser
+or command registry. The bundled offline source roots, focused tests and release
+targets are removed; install the external package and keep its notices.
 
-1. Invoke the packaged executable as `event-setup`; command families are bare
-   first arguments. Never prefix them with `setup`.
-2. Use `--machine` for automation. Read the single
-   `event-setup-command/v1` JSON object and branch on `exitCode`, `diagnostics`,
-   `coverage`, and `readiness`; do not scrape Spectre-rendered text output.
-3. Pass artifacts through `--input` and `--output`. Use `-` only where the
-   command accepts standard input or text-mode standard output.
-4. Never place passwords, tokens, credentials, private keys, API keys, or
-   connection strings in arguments, input paths, environment names, logs, or
-   retained command output. The CLI rejects secret-bearing surfaces.
-5. Treat `--dry-run` as planning only. An artifact reports `writeStatus` as
-   `planned` until a non-dry-run command writes it.
-6. Do not invent command aliases. The checked machine schema at
-   `schemas/event-setup-command-v1.schema.json` is generated from the same
-   Spectre.Console.Cli registry that owns executable grammar and settings.
-7. Operator-identity export and import are offline integrity operations. Their
-   output is sensitive, and successful CLI validation is not target readiness
-   or permission to mutate a server.
-8. Human help and results are non-interactive Spectre.Console output. Machine
-   mode bypasses rich rendering and remains ANSI-free; never redirect or parse
-   the human surface for automation.
-9. Hostile arguments are rejected before Spectre parsing so parser diagnostics
-   cannot echo secret-looking names, paths, identity values, or control text.
-   Treat a bounded diagnostic code as the complete failure detail.
+## Event workflow
 
-## Workflow
-
-1. Confirm the binary and machine contract:
+1. Select a trusted local Event definition from
+   `configurator/definitions/islamu-event/definition.json`. Check its family,
+   revision and digest against the corresponding `release.json`. Definitions
+   are data; do not load arbitrary code or fetch a definition implicitly.
+2. Choose the declared artifact ID: `environment`, `configuration-manifest`,
+   `tenant-package`, `operator-identity` or `legal-drafts`. Prepare a JSON answer
+   workspace matching that definition. Reference answers are test vectors,
+   not production credentials or a universal reverse importer.
+3. Invoke `islamu-configurator` with `--definition`, `--artifact`, `--input` and,
+   for publication, `--output`. For example:
 
    ```bash
-   event-setup doctor --machine
+   islamu-configurator artifact validate --definition configurator/definitions/islamu-event/definition.json --artifact configuration-manifest --input manifest-answers.json --machine
+   islamu-configurator env render --definition configurator/definitions/islamu-event/definition.json --artifact environment --input environment-answers.json --output deployment.env --machine
    ```
 
-2. Inspect the public configuration catalogue without writing an artifact:
+4. Branch on `exitCode` and the `islamu-configurator-command/v1` envelope, not
+   rendered text. Success reports `host-validation-required`. `--dry-run`
+   never writes an artifact or authorizes restricted stdout.
+5. Keep answer values and prepared artifacts on the protected native host.
+   Never put secrets in process arguments, logs, environment variable names
+   or public browser input. Output is create-only and restricted; unsupported
+   protected-save hosts fail closed.
+6. Submit prepared artifacts only through Event's existing authorized backend
+   workflow. Event owns wire integrity, tenant scope, expected revisions,
+   approval, legal publication and administrator authority.
 
-   ```bash
-   event-setup catalogue list --machine --dry-run
-   ```
+Old `event-setup` command families are not aliases. Existing artifacts require
+their answer-workspace proof when using `--answers`; the generic CLI cannot infer
+lost/transformed answers. Import-semantic definitions require the explicit
+`artifact import` revision options described in the external guide. Do not invent
+an identity import wrapper or replace the target revision with a source revision.
 
-3. Validate an existing dotenv file:
-
-   ```bash
-   event-setup env validate --input deployment.env --machine
-   ```
-
-4. Render a topology-specific dotenv artifact only after selecting explicit
-   non-secret capabilities and providers:
-
-   ```bash
-   event-setup env render --topology standalone --provider sqlite --output deployment.env --machine
-   ```
-
-5. Validate configuration portability artifacts before promotion:
-
-   ```bash
-   event-setup manifest validate --input instance-manifest.json --machine
-   event-setup tenant-package validate --input tenant-package.json --machine
-   ```
-
-6. Export an operator-identity portability artifact, then prepare a server
-   import request against the exact current revision:
-
-   ```bash
-   event-setup portability export-operator-identity --input operator-identity.json --output operator-identity.yaml --format yaml --machine
-   event-setup portability import-operator-identity --input operator-identity.yaml --output operator-identity-import.json --expected-revision "$EXPECTED_REVISION_SHA256" --machine
-   ```
-
-   Use `--expected-revision absent` only when the target has no current
-   operator-identity document. The import result remains incomplete until
-   server validation and authorization succeed.
-
-7. Validate a legal draft before it enters an operator review:
-
-   ```bash
-   event-setup legal validate --input legal-draft.json --machine
-   ```
-
-## Verification
-
-- `event-setup doctor --machine` exits `0` and emits one newline-terminated JSON
-  object with `schemaVersion` equal to `event-setup-command/v1`.
-- `event-setup --help` and family help are generated by the registered Spectre
-  grammar; no legacy command aliases or fallback parser exist.
-- Reject any instruction using a `setup` prefix or a command family absent from
-  the checked schema.
-- Treat exit codes `2`, `3`, `4`, `64`, `65`, `70`, and `74` as failure states;
-  do not infer success from an empty diagnostic list alone.
+See [the operator handoff](../../../docs/public/self-hosting/setup-assistant.md#external-configurator-handoff)
+and [Event definition ownership](../../../docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md).

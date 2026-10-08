@@ -36,7 +36,13 @@ internal static class Program
             string inputs;
             string[] destinations;
             bool check;
-            if (args is ["--write" or "--check", var configurator])
+            if (args is ["--check-local"])
+            {
+                inputs = Path.Combine(root, "configurator", "definitions", "islamu-event", "inputs");
+                destinations = [Path.Combine(root, "configurator", "definitions", "islamu-event")];
+                check = true;
+            }
+            else if (args is ["--write" or "--check", var configurator])
             {
                 inputs = Path.Combine(root, "configurator", "definitions", "islamu-event", "inputs");
                 destinations =
@@ -57,6 +63,7 @@ internal static class Program
             else
             {
                 Console.Error.WriteLine("Usage: DefinitionExporter (--write|--check) CONFIGURATOR_ROOT"
+                    + " | --check-local"
                     + " | --export INPUT_DIRECTORY NEW_OUTPUT_DIRECTORY"
                     + " | --verify ARTIFACT_ID INPUT | --prepare-identity DOCUMENT NEW_MANIFEST");
                 return 64;

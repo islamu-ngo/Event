@@ -15,6 +15,15 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ## Guided Setup Adds No Environment Inputs
 
+Offline preparation uses separately installed
+[ISLAMU Configurator](https://github.com/ISLAMU/Configurator) and Event's local
+definition, not new environment switches. Follow
+[the external handoff](../../../self-hosting/setup-assistant.md#external-configurator-handoff).
+Event owns its environment catalogue and validates runtime binding; Configurator
+does not become a secret authority. Keep credentials and generated dotenv files
+on a protected native host. The public browser accepts only declared public
+choices. This repository/tooling extraction needs no database migration.
+
 Legal identity seeds are optional during installation. Configure disclosure and
 paid-event identity later through authenticated administration; authoritative
 kind/country choices come from the server rather than another environment list.

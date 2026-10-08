@@ -17,12 +17,15 @@ configuration handlers or semantic apply authority. The stable family GUID is
 `/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` for public choices only.
 This contract introduces no Event URL key or runtime launch feature.
 
-The exporter reads the existing environment metadata and portable schema,
-admits native/public JSON through Configurator Core, and validates composed
+The exporter reads Event-owned environment metadata and the portable schema,
+exports native/public JSON without a Configurator runtime dependency, and validates composed
 reference artifacts through Event's parsers. Event still owns issuer
 normalization, setting scope, identity integrity and concurrency, legal lifecycle
-and backend validation. Existing source tools remain available until the parent
-cutover; generic rendering is not equivalent to every specialized Event workflow.
+and backend validation. New offline preparation uses separately installed
+Configurator with the local Event definition and a declared artifact ID. The
+bundled offline source owners are removed; generic rendering is not equivalent
+to every specialized Event workflow. CI checks retained generated
+data through exporter-owned `--check-local` and `--check-environment` gates.
 See [the architectural boundary](SETUP_ASSISTANT_ARCHITECTURE.md#external-definition-handoff)
 and [operator guidance](../public/self-hosting/setup-assistant.md#external-configurator-handoff).
 
@@ -377,10 +380,10 @@ coordinates, which never enter Setup contracts, logs, metrics, or responses.
 Recovery is to revoke the enrollment and clear the adapter's in-memory state;
 there is no credential-persistence recovery path.
 
-`eng/setup-assistant/generated/setup-live-release-capabilities.json` is the
-governed release gate. D2 closes with `targetEnabled` and every live-control
-capability set to `false`; the backend and outer adapter therefore do not imply
-an activated CLI, browser, desktop, or shared-presentation workflow.
+Configurator's own release-capability metadata governs its offline surfaces.
+The old bundled capability generator is removed. Retained Event backend
+authority and the relocated client adapter do not activate live control in
+Configurator; a future integration requires its separately scoped contract.
 
 ## Aspire Hosting Topology
 

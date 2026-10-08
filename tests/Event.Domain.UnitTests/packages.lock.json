@@ -121,6 +121,9 @@
           "Microsoft.Extensions.Compliance.Abstractions": "[10.8.0, )"
         }
       },
+      "islamu.moderation.domain": {
+        "type": "Project"
+      },
       "Microsoft.Extensions.Compliance.Abstractions": {
         "type": "CentralTransitive",
         "requested": "[10.8.0, )",

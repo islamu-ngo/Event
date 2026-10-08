@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.Domain\Explore.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ISLAMU.Moderation.Domain\ISLAMU.Moderation.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

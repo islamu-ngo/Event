@@ -44,6 +44,12 @@ Two accounts controlled by the same human do not become two independent
 approvals. Qualification expires at its exact boundary, and withdrawn assignment
 cannot be restored by renewing old evidence.
 
+Adopting rule definitions is separate from activating restrictions. An active
+publication needs current prerequisite and complete consumer evidence for its
+effects; an identifier or administrator role alone is insufficient. Published
+meaning is retained across replacement revisions, and incomplete profiles do
+not become active by omitting unsupported effects.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

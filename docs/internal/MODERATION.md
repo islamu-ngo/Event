@@ -107,6 +107,17 @@ cannot supply independent quorum; renewed controller proof invalidates the
 previous conflict assessment. Current native roles and actual controller and
 conflict evidence still require fenced server qualification.
 
+`ModerationPolicy` separates inactive adoption from qualified activation.
+Complete-state replacement returns a new checked revision and retains immutable
+rule meanings. Enabled effects require exact publication/scope/revision/time
+binding and complete prerequisite and registered-consumer evidence. The
+supported mask is explicit per rule capability; complete profiles must prove
+their entire required effect set rather than silently omit an unsupported
+consumer. These Domain checks validate source structure, not the truth or
+ongoing freshness of native evidence. Publication and lifecycle writers must
+qualify that evidence under their current fences; adopted identifiers alone
+neither grant permission nor activate runtime enforcement.
+
 Acquire privacy serialization first when identity changes. Within the primary
 moderation transaction, acquire jurisdiction and qualification sources before
 subject and policy sources, then owning Event dependencies. Sort peers by their

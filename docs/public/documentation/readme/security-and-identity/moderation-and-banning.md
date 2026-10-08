@@ -39,6 +39,11 @@ or qualified urgent-protection reference. Reversal preserves the original
 record and adds its accountable correction. These checked foundations do not
 by themselves enable the new moderation runtime.
 
+Review requires current case-specific controller and conflict qualification.
+Two accounts controlled by the same human do not become two independent
+approvals. Qualification expires at its exact boundary, and withdrawn assignment
+cannot be restored by renewing old evidence.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

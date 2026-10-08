@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EHCTKKF9FQB7E5T8G770F2
+Title: "Require current independent moderation reviewer qualification"
+Type: feat
+Scope: access
+Summary: "Record case-specific reviewer assignment with explicit current controller and independently assessed conflict evidence. Exclude unresolved, expired, withdrawn and shared-controller quorum; native fenced identity and role qualification remain the integration owner."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

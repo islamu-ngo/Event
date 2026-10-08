@@ -100,6 +100,13 @@ references. Native source writers and lifecycle participants must establish
 those facts under the primary transaction's current writer fences. The Domain
 foundation alone neither registers an enforcement path nor activates a profile.
 
+`ModerationReviewerAssignment` starts unresolved. Current controller evidence
+and an independently assessed conflict record are necessary, with half-open
+expiry and irreversible withdrawal. Distinct accounts sharing a controller
+cannot supply independent quorum; renewed controller proof invalidates the
+previous conflict assessment. Current native roles and actual controller and
+conflict evidence still require fenced server qualification.
+
 Acquire privacy serialization first when identity changes. Within the primary
 moderation transaction, acquire jurisdiction and qualification sources before
 subject and policy sources, then owning Event dependencies. Sort peers by their

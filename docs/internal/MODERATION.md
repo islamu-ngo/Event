@@ -76,6 +76,21 @@ installation, current native qualification and adopted policy remain separate
 positive operations. Qualification must still join the actual source-row fences
 described below rather than treating the epoch label as permission.
 
+The native `EstablishModerationAuthoritySourcesCommand` manually validates
+preallocated UUIDv7 coordinates. `ModerationAuthoritySourceRepository` owns its
+serializable execution-strategy unit and rechecks actual instance-admin
+assignment/role, canonical user/login bindings, selected service and tenant
+status under native row fences. A transaction-owned installation lock protects
+the initially absent singleton. Identical setup preserves an advanced epoch;
+changed historical coordinates conflict. Ambiguous acknowledgement verifies the
+exact persisted binding and epoch rather than allocating replacements.
+
+Machine callers are rejected through `IMachinePrincipalAccessor`. A user-owned
+API key can carry its owner's internal user identity, but cannot inherit that
+human's instance-installation privilege. This is separate from later explicitly
+qualified maintenance operations. The installer establishes source provenance,
+not an adopted policy or active enforcement.
+
 Acquire privacy serialization first when identity changes. Within the primary
 moderation transaction, acquire jurisdiction and qualification sources before
 subject and policy sources, then owning Event dependencies. Sort peers by their

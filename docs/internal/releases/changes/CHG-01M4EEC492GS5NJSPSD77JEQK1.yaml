@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EEC492GS5NJSPSD77JEQK1
+Title: "Establish moderation sources under current instance authority"
+Type: feat
+Scope: access
+Summary: "Install explicit host and tenant qualification identities only under current native human instance-administrator authority. Repeated installation preserves established revisions, conflicting coordinates fail closed, and user-owned API keys cannot inherit their owner's installation privilege."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

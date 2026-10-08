@@ -28,6 +28,12 @@ request coordinates or repeating setup cannot silently replace the recorded
 trust ancestry. The selected maintenance principal must already exist; creating
 the binding or a qualification revision does not grant it permission.
 
+The native installation operation requires a current human instance
+administrator and checks the selected service and tenant in the transaction.
+User-owned API keys cannot borrow their owner's administrator privilege.
+An identical repeat preserves the established identities and current revision;
+conflicting coordinates do not overwrite historical ancestry.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

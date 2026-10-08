@@ -70,6 +70,59 @@ public sealed record AuthorityScope
 
     public override string ToString() => Kind.ToString();
 
+    internal (ModerationScopeKind Kind, Guid TrustDomainId, Guid? SolutionId, Guid? InstanceId,
+        Guid? TenantId, Guid? CommunityId, Guid? ResourceId) Coordinates =>
+        (Kind, TrustDomainId, AncestorId(ModerationScopeKind.Solution), AncestorId(ModerationScopeKind.Instance),
+            AncestorId(ModerationScopeKind.Tenant), AncestorId(ModerationScopeKind.Community),
+            AncestorId(ModerationScopeKind.Resource));
+
+    internal static AuthorityScope FromCoordinates(
+        ModerationScopeKind kind, Guid trustDomainId, Guid? solutionId, Guid? instanceId,
+        Guid? tenantId, Guid? communityId, Guid? resourceId)
+    {
+        var shapeIsValid = kind switch
+        {
+            ModerationScopeKind.TrustDomain => solutionId is null && instanceId is null
+                && tenantId is null && communityId is null && resourceId is null,
+            ModerationScopeKind.Solution => solutionId is not null && instanceId is null
+                && tenantId is null && communityId is null && resourceId is null,
+            ModerationScopeKind.Instance => solutionId is not null && instanceId is not null
+                && tenantId is null && communityId is null && resourceId is null,
+            ModerationScopeKind.Tenant => solutionId is not null && instanceId is not null
+                && tenantId is not null && communityId is null && resourceId is null,
+            ModerationScopeKind.Community => solutionId is not null && instanceId is not null
+                && tenantId is not null && communityId is not null && resourceId is null,
+            ModerationScopeKind.Resource => solutionId is not null && instanceId is not null
+                && tenantId is not null && resourceId is not null,
+            _ => false
+        };
+        if (!shapeIsValid)
+        {
+            throw new ArgumentException("The jurisdiction tag and ancestry coordinates are inconsistent.", nameof(kind));
+        }
+
+        var scope = TrustDomain(trustDomainId);
+        if (solutionId is { } solution) scope = Solution(scope, solution);
+        if (instanceId is { } instance) scope = Instance(scope, instance);
+        if (tenantId is { } tenant) scope = Tenant(scope, tenant);
+        if (communityId is { } community) scope = Community(scope, community);
+        if (resourceId is { } resource) scope = Resource(scope, resource);
+        return scope;
+    }
+
+    private Guid? AncestorId(ModerationScopeKind kind)
+    {
+        for (AuthorityScope? scope = this; scope is not null; scope = scope.Parent)
+        {
+            if (scope.Kind == kind)
+            {
+                return scope.Id;
+            }
+        }
+
+        return null;
+    }
+
     private static AuthorityScope CreateChild(
         ModerationScopeKind kind, AuthorityScope parent, Guid id, ModerationScopeKind parentKind)
     {

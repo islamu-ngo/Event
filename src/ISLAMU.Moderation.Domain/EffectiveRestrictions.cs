@@ -106,4 +106,34 @@ public static class EffectiveRestrictions
 
         return snapshot;
     }
+
+    /// <summary>The current enum ordinals occupy bits 1 through 8; bit zero and protected remedies are invalid.</summary>
+    internal static int CreateCapabilityMask(IEnumerable<ModerationCapability> capabilities) =>
+        CreateCapabilitySet(capabilities).Aggregate(0, (mask, capability) => mask | CapabilityBit(capability));
+
+    internal static FrozenSet<ModerationCapability> FromCapabilityMask(int mask)
+    {
+        const int restrictiveBits = 0b1_1111_1110;
+        if (mask == 0 || (mask & ~restrictiveBits) != 0)
+        {
+            throw new ArgumentException("A capability mask requires only supported restrictive bits.", nameof(mask));
+        }
+
+        return Enum.GetValues<ModerationCapability>()
+            .Where(capability => !IsProtectedRemedy(capability) && (mask & CapabilityBit(capability)) != 0)
+            .ToFrozenSet();
+    }
+
+    private static int CapabilityBit(ModerationCapability capability) => capability switch
+    {
+        ModerationCapability.Publish => 1 << 1,
+        ModerationCapability.Upload => 1 << 2,
+        ModerationCapability.ReadResource => 1 << 3,
+        ModerationCapability.Manage => 1 << 4,
+        ModerationCapability.Participate => 1 << 5,
+        ModerationCapability.Admission => 1 << 6,
+        ModerationCapability.PrivateLogistics => 1 << 7,
+        ModerationCapability.Enrollment => 1 << 8,
+        _ => throw new ArgumentException("The capability is not restrictive.", nameof(capability))
+    };
 }

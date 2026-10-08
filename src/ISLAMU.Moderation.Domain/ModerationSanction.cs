@@ -12,6 +12,10 @@ public enum ModerationSanctionState
 /// <summary>An independent contribution whose original scope and interval never widen.</summary>
 public sealed class ModerationSanction
 {
+    private ModerationSanction()
+    {
+    }
+
     internal ModerationSanction(Guid id, ModerationDecision decision, DateTimeOffset now)
     {
         Id = id;
@@ -19,29 +23,112 @@ public sealed class ModerationSanction
         Subject = decision.Subject;
         Scope = decision.Scope;
         Rule = decision.Rule;
-        Capabilities = decision.Capabilities;
+        CapabilityMask = decision.CapabilityMask;
         StartsAt = decision.StartsAt;
         EndsAt = decision.EndsAt;
         ReviewAt = decision.ReviewAt;
         CreatedAt = now.ToUniversalTime();
         UpdatedAt = CreatedAt;
         State = now < StartsAt ? ModerationSanctionState.Scheduled : ModerationSanctionState.Active;
+        Revision = 1;
     }
 
-    public Guid Id { get; }
-    public Guid DecisionId { get; }
-    public SubjectReference Subject { get; }
-    public AuthorityScope Scope { get; }
-    public ModerationRuleReference Rule { get; }
-    public IReadOnlySet<ModerationCapability> Capabilities { get; }
-    public DateTimeOffset StartsAt { get; }
-    public DateTimeOffset? EndsAt { get; }
-    public DateTimeOffset? ReviewAt { get; }
-    public DateTimeOffset CreatedAt { get; }
+    public Guid Id { get; private set; }
+    public Guid DecisionId { get; private set; }
+    public ModerationSubjectKind SubjectKind { get; private set; }
+    public Guid SubjectId { get; private set; }
+    public ModerationScopeKind SubjectOriginKind { get; private set; }
+    public Guid SubjectOriginTrustDomainId { get; private set; }
+    public Guid? SubjectOriginSolutionId { get; private set; }
+    public Guid? SubjectOriginInstanceId { get; private set; }
+    public Guid? SubjectOriginTenantId { get; private set; }
+    public Guid? SubjectOriginCommunityId { get; private set; }
+    public Guid? SubjectOriginResourceId { get; private set; }
+    public ModerationScopeKind ScopeKind { get; private set; }
+    public Guid ScopeTrustDomainId { get; private set; }
+    public Guid? ScopeSolutionId { get; private set; }
+    public Guid? ScopeInstanceId { get; private set; }
+    public Guid? ScopeTenantId { get; private set; }
+    public Guid? ScopeCommunityId { get; private set; }
+    public Guid? ScopeResourceId { get; private set; }
+    public Guid RuleOwnerId { get; private set; }
+    public string RuleCode { get; private set; } = string.Empty;
+    public long RuleRevision { get; private set; }
+    public int CapabilityMask { get; private set; }
+
+    public SubjectReference Subject
+    {
+        get => SubjectReference.Create(SubjectKind, SubjectId, AuthorityScope.FromCoordinates(
+            SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
+            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId));
+        private set
+        {
+            SubjectKind = value.Kind;
+            SubjectId = value.Id;
+            (SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
+                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId) = value.Origin.Coordinates;
+        }
+    }
+
+    public AuthorityScope Scope
+    {
+        get => AuthorityScope.FromCoordinates(ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId);
+        private set => (ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId) = value.Coordinates;
+    }
+
+    public ModerationRuleReference Rule
+    {
+        get => ModerationRuleReference.Create(RuleOwnerId, RuleCode, RuleRevision);
+        private set => (RuleOwnerId, RuleCode, RuleRevision) = (value.OwnerId, value.Code, value.Revision);
+    }
+
+    public IReadOnlySet<ModerationCapability> Capabilities => EffectiveRestrictions.FromCapabilityMask(CapabilityMask);
+    public DateTimeOffset StartsAt { get; private set; }
+    public DateTimeOffset? EndsAt { get; private set; }
+    public DateTimeOffset? ReviewAt { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public Guid? SupersedingDecisionId { get; private set; }
     public ModerationSanctionState State { get; private set; }
-    public long Revision { get; private set; } = 1;
+    public long Revision { get; private set; }
+
+    /// <summary>Checks persisted contribution structure without reconciling time or proving the decision's authority.</summary>
+    public void ValidatePersistedState()
+    {
+        _ = Rule;
+        _ = Capabilities;
+        if (Id == Guid.Empty || DecisionId == Guid.Empty || Subject.TrustDomainId != Scope.TrustDomainId
+            || (EndsAt is not null && (EndsAt <= StartsAt || CreatedAt >= EndsAt))
+            || (EndsAt is null && ReviewAt is null)
+            || (ReviewAt is not null && (ReviewAt <= StartsAt || (EndsAt is not null && ReviewAt > EndsAt)))
+            || UpdatedAt < CreatedAt
+            || (State == ModerationSanctionState.Superseded) != (SupersedingDecisionId is not null)
+            || SupersedingDecisionId == Guid.Empty || SupersedingDecisionId == DecisionId)
+        {
+            throw new ArgumentException("The persisted contribution definition or replacement identity is inconsistent.");
+        }
+
+        var initiallyScheduled = CreatedAt < StartsAt;
+        var shapeIsValid = State switch
+        {
+            ModerationSanctionState.Scheduled => initiallyScheduled && Revision == 1 && UpdatedAt == CreatedAt,
+            ModerationSanctionState.Active => UpdatedAt >= StartsAt && (EndsAt is null || UpdatedAt < EndsAt)
+                && (initiallyScheduled ? Revision == 2 : Revision == 1 && UpdatedAt == CreatedAt),
+            ModerationSanctionState.Expired => EndsAt is not null && UpdatedAt >= EndsAt
+                && (initiallyScheduled ? Revision is 2 or 3 : Revision == 2),
+            ModerationSanctionState.Revoked or ModerationSanctionState.Superseded =>
+                Revision == 2
+                || (Revision == 3 && (initiallyScheduled ? UpdatedAt >= StartsAt : EndsAt is not null && UpdatedAt >= EndsAt))
+                || (Revision == 4 && initiallyScheduled && EndsAt is not null && UpdatedAt >= EndsAt),
+            _ => false
+        };
+        if (!shapeIsValid)
+        {
+            throw new ArgumentException("The persisted contribution state, interval and revision are inconsistent.");
+        }
+    }
 
     public bool IsEffectiveAt(DateTimeOffset now) =>
         State is ModerationSanctionState.Scheduled or ModerationSanctionState.Active

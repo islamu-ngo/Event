@@ -35,4 +35,23 @@ public sealed record SubjectReference
     }
 
     public override string ToString() => Kind.ToString();
+
+    internal static SubjectReference? FromOptionalCoordinates(
+        ModerationSubjectKind? kind, Guid? id, ModerationScopeKind? originKind, Guid? trustDomainId,
+        Guid? solutionId, Guid? instanceId, Guid? tenantId, Guid? communityId, Guid? resourceId)
+    {
+        if (kind is null && id is null && originKind is null && trustDomainId is null
+            && solutionId is null && instanceId is null && tenantId is null && communityId is null && resourceId is null)
+        {
+            return null;
+        }
+
+        if (kind is null || id is null || originKind is null || trustDomainId is null)
+        {
+            throw new ArgumentException("An optional subject must be absent or fully qualified.", nameof(kind));
+        }
+
+        return Create(kind.Value, id.Value, AuthorityScope.FromCoordinates(
+            originKind.Value, trustDomainId.Value, solutionId, instanceId, tenantId, communityId, resourceId));
+    }
 }

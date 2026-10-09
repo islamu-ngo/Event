@@ -154,6 +154,17 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         if (string.IsNullOrWhiteSpace(principal.KeyId) || principal.OwnerId == Guid.Empty)
             return false;
 
+        if (principal.OwnerType == ExternalApiKeyOwnerType.User)
+        {
+            if (principal.AuthorityTenantId is not { } ownerTenantId)
+                return false;
+            var owner = await resources.GetTenantUserAsync(
+                ownerTenantId, principal.OwnerId, cancellationToken);
+            if (owner is not { IsDeleted: false, StatusId: (int)TenantUserStatusEnum.Active,
+                User: { IsDeleted: false } })
+                return false;
+        }
+
         switch (principal.CredentialSource)
         {
             case ApiKeyCredentialSource.Persisted:

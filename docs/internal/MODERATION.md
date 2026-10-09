@@ -275,7 +275,13 @@ must still match. Configured keys use the named API-key options monitor, exclude
 absent, duplicate, inactive, expired or malformed descriptors, and copy metadata
 without credential material. Neither source can fall back to the other after
 revocation or deletion. These checks run before preparation and again before
-final metadata transfer; they do not qualify canonical owner liveness.
+final metadata transfer. User-owned credentials also require a current
+nondeleted user and an active, nondeleted membership in the credential's exact
+authority tenant. The bounded no-tracking membership read includes its user;
+owner or membership removal during preparation prevents terminal disclosure
+even when the key remains Active. This does not borrow the user's roles or
+human moderation subject. Other owner kinds still need their complete current
+qualification before canonical moderation consumer registration.
 
 These boundaries do not close the whole moderation consumer contract.
 Canonical current machine-source qualification, the moderation overlay and

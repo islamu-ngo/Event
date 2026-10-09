@@ -215,6 +215,7 @@ public sealed class EventResourceRepository : IEventResourceRepository
         Guid subjectUserId,
         CancellationToken cancellationToken) =>
         _dbContext.TenantUsers.AsNoTracking()
+            .Include(user => user.User)
             .SingleOrDefaultAsync(user => user.TenantId == tenantId
                 && user.UserId == subjectUserId, cancellationToken);
 

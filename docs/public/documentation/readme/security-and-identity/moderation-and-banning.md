@@ -101,6 +101,12 @@ cannot switch between persisted and configured credentials with matching key
 names. These source checks do not complete canonical owner qualification or
 enable a moderation profile.
 
+User-owned credentials must also retain their actual user and active membership
+in the credential's tenant. Deleting the user or removing that membership
+prevents a prepared resource response from being delivered even if its key is
+still Active. The machine does not acquire the user's roles or human identity.
+Qualification for other owner kinds remains a separate readiness requirement.
+
 Canonical machine moderation uses an explicit binding to an existing service
 identity, not the key owner's human identity. A replacement key can select the
 same service so changing credentials does not create an unrelated moderation

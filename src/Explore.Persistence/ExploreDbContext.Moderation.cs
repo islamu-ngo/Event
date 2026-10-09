@@ -19,6 +19,7 @@ public partial class ExploreDbContext
     public DbSet<ModerationOperationReceipt> ModerationOperationReceipts => Set<ModerationOperationReceipt>();
     public DbSet<ModerationEffectIntent> ModerationEffectIntents => Set<ModerationEffectIntent>();
     public DbSet<ModerationHostBinding> ModerationHostBindings => Set<ModerationHostBinding>();
+    public DbSet<ModerationMachineSubjectBinding> ModerationMachineSubjectBindings => Set<ModerationMachineSubjectBinding>();
     public DbSet<ModerationQualificationEpoch> ModerationQualificationEpochs => Set<ModerationQualificationEpoch>();
     public DbSet<ModerationQualificationEvidence> ModerationQualificationEvidence => Set<ModerationQualificationEvidence>();
     public DbSet<ModerationQualificationMutationReceipt> ModerationQualificationMutationReceipts => Set<ModerationQualificationMutationReceipt>();

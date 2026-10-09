@@ -18196,6 +18196,74 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationMachineSubjectBinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AuthorityTenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("authority_tenant_id");
+
+                    b.Property<int>("CredentialSource")
+                        .HasColumnType("int")
+                        .HasColumnName("credential_source");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("key_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("owner_id");
+
+                    b.Property<int>("OwnerType")
+                        .HasColumnType("int")
+                        .HasColumnName("owner_type");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("ServicePrincipalId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("service_principal_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_machine_subject_bindings");
+
+                    b.HasIndex("AuthorityTenantId")
+                        .HasDatabaseName("ix_moderation_machine_subject_bindings_authority_tenant_id");
+
+                    b.HasIndex("ServicePrincipalId")
+                        .HasDatabaseName("ix_moderation_machine_subject_bindings_service_principal_id");
+
+                    b.HasIndex("HostBindingId", "CredentialSource", "KeyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ie_moderation_machine_subject_bindings_host_binding__bbe9ce5f");
+
+                    b.ToTable("ie_moderation_machine_subject_bindings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_machine_binding_owner", "owner_type IN (1, 2, 3, 4, 5)");
+
+                            t.HasCheckConstraint("ck_moderation_machine_binding_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_machine_binding_source", "credential_source IN (1, 2)");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -44753,6 +44821,29 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_ie_moderation_host_bindings_ie_service_principals_ma_eaa51a03");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationMachineSubjectBinding", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorityTenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ie_moderation_machine_subject_bindings_ie_tenants_au_a54b91eb");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_moderation_machine_subject_bindings_ie_moderation_397f9b57");
+
+                    b.HasOne("Explore.Domain.ServicePrincipal", null)
+                        .WithMany()
+                        .HasForeignKey("ServicePrincipalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_moderation_machine_subject_bindings_ie_service_pr_43bd6c64");
                 });
 
             modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>

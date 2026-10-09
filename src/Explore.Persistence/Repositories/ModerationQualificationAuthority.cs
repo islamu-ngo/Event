@@ -13,8 +13,18 @@ namespace Explore.Persistence.Repositories;
 internal sealed class ModerationQualificationAuthority(
     ExploreDbContext context, IAdminContext admin, IMachinePrincipalAccessor machine)
 {
-    public async Task<ModerationSourceAuthority?> AcquireAsync(
-        ModerationQualificationMutation mutation, CancellationToken token)
+    public Task<ModerationSourceAuthority?> AcquireAsync(
+        ModerationQualificationMutation mutation, CancellationToken token) =>
+        AcquireAsync(mutation.Target, mutation is RecordModerationCaseResponse,
+            mutation is not RecordModerationCaseResponse, mutation, token);
+
+    public Task<ModerationSourceAuthority?> AcquireAsync(
+        AuthorityScope target, CancellationToken token) =>
+        AcquireAsync(target, false, true, null, token);
+
+    private async Task<ModerationSourceAuthority?> AcquireAsync(
+        AuthorityScope target, bool allowInactiveTenant, bool requireAdministrator,
+        ModerationQualificationMutation? mutation, CancellationToken token)
     {
         if (machine.IsMachineCaller || context.Database.CurrentTransaction is null
             || context.IsTenantFilterBypassed || context.TenantFilterTenantId is not { } tenantId
@@ -113,9 +123,8 @@ internal sealed class ModerationQualificationAuthority(
         if (tenant is null)
             return null;
         await RelationalEntityRowFence.AcquireLookupAsync<TenantStatus>(context, [tenant.TenantStatusId], token);
-        var isResponse = mutation is RecordModerationCaseResponse;
         if (!await context.Tenants.AsNoTracking().AnyAsync(
-            row => row.Id == tenantId && (row.TenantStatus.IsActiveState || isResponse), token))
+            row => row.Id == tenantId && (row.TenantStatus.IsActiveState || allowInactiveTenant), token))
             return null;
         var discoveredEpoch = await context.ModerationQualificationEpochs.AsNoTracking()
             .SingleOrDefaultAsync(row => row.HostBindingId == binding.Id && row.TenantId == tenantId, token);
@@ -146,13 +155,13 @@ internal sealed class ModerationQualificationAuthority(
             && row.RoleId == (int)RoleEnum.TenantAdmin && row.Role.RoleScopeId == (int)RoleScopeEnum.Tenant)
             .Select(row => row.TenantUser.UserId).Distinct().ToListAsync(token);
         var isTenantAdmin = tenantAdministrators.Contains(userId.Value);
-        if (mutation.Target != tenantScope
-            && (mutation.Target != instance || !isInstanceAdmin && mutation is not RecordModerationCaseResponse))
+        if (!(mutation is null ? tenantScope.Contains(target) : target == tenantScope)
+            && (target != instance || !isInstanceAdmin && requireAdministrator))
             return null;
-        if (mutation is not RecordModerationCaseResponse && !isInstanceAdmin && !isTenantAdmin)
+        if (requireAdministrator && !isInstanceAdmin && !isTenantAdmin)
             return null;
 
-        var administrators = mutation.Target == instance ? instanceAdministrators.ToArray()
+        var administrators = target == instance ? instanceAdministrators.ToArray()
             : instanceAdministrators.Concat(tenantAdministrators).Distinct().ToArray();
         return new ModerationSourceAuthority(userId.Value, binding, epoch, instance, tenantScope,
             isInstanceAdmin, humanIds, administrators);

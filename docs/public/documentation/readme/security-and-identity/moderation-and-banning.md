@@ -101,6 +101,20 @@ cannot switch between persisted and configured credentials with matching key
 names. These source checks do not complete canonical owner qualification or
 enable a moderation profile.
 
+Canonical machine moderation uses an explicit binding to an existing service
+identity, not the key owner's human identity. A replacement key can select the
+same service so changing credentials does not create an unrelated moderation
+subject. The native installation command requires current instance-administrator
+authority and verifies the selected credential and service; keys cannot install
+their own bindings. Credential ownership and source are pinned, and a revoked
+binding cannot be reinstated by repeating installation.
+
+Configured keys also need explicit service selection; matching names do not
+establish identity. Missing, revoked or unavailable bindings cannot establish
+canonical machine provenance. These installation foundations do not activate
+a protected machine consumer or a moderation profile: complete current owner
+qualification and consumer conformance are still required.
+
 Embedded native integrations must consume audience and management query `Projection` through
 `DiscloseAsync` instead of reading `Value`. Build the representation privately
 and transfer it only in the delivery callback; check the terminal outcome.

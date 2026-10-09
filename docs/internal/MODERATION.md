@@ -91,6 +91,34 @@ human's instance-installation privilege. This is separate from later explicitly
 qualified maintenance operations. The installer establishes source provenance,
 not an adopted policy or active enforcement.
 
+`ModerationMachineSubjectBinding` associates exact credential source, ordinal
+key ID, authority tenant and owner coordinates with an explicitly selected
+existing `ServicePrincipal`. It never derives identity from a key name, service
+code, human owner or maintenance principal. Replacement credentials can bind to
+the same canonical service, preserving sanctions across credential replacement.
+The source slot is unique per installed host, credential source and key ID;
+historical coordinates are immutable and revocation is terminal.
+
+`EstablishModerationMachineSubjectCommand` manually validates its coordinates.
+Its native repository rejects machine callers, acquires current human/provider,
+administrator, host, tenant and qualification fences, then fences the selected
+service, its actors and the exact persisted credential. New bindings advance the
+qualification epoch in the same serializable commit; identical retries preserve
+it. Changed service selection or ownership cannot rewrite a binding. Reads
+recheck the selected credential and service, reject deleted or suspended service
+actors, and do not fall back between configured and persisted sources. Configured
+descriptor changes are external to relational fencing and require fresh
+consumer checks. This provenance foundation does not complete owner liveness,
+resource consumer conformance or profile activation.
+
+The native `AddModerationMachineSubjectBindings` migrations add only the binding
+table and its constraints/indexes on PostgreSQL, SQLite, SQL Server and shared
+MySQL/MariaDB models. Existing keys are not automatically assigned a service.
+Restrictive foreign keys prevent deleting the installed host, selected service
+or authority tenant while historical bindings reference them. `Down` removes
+the binding table, not service identities or sanctions; rolling it back discards
+binding provenance and must precede any protected consumer activation.
+
 The permanent qualification foundations are in the shared Domain assembly.
 `ModerationFinding` binds a final finding to an actual open case revision,
 owner-qualified rule, adjudicator and response or qualified-urgency reference;

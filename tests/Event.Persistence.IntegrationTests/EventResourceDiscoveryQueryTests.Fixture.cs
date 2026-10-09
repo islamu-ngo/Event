@@ -2,6 +2,7 @@ using System.Data.Common;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -151,7 +152,9 @@ public sealed partial class EventResourceDiscoveryQueryTests
         }
         return new(repository, unit, new(unit, new EventResourceAuthoritySnapshotReader(repository,
             new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
-            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()), routes, provider ?? new Provider(), new Clock()),
+            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+            new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
+                Substitute.For<IModerationMachineSubjectBindingRepository>())), routes, provider ?? new Provider(), new Clock()),
             tenant, user, machine, _cursors);
     }
 

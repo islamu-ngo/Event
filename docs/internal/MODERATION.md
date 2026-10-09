@@ -300,6 +300,16 @@ deletion, placement removal or placement suspension during private preparation
 prevents terminal disclosure even when the key remains Active.
 
 These boundaries do not close the whole moderation consumer contract.
+Resource-read moderation is adoption-gated: installation alone preserves the
+existing native resource authorization. An applicable policy adopted for
+ReadResource enforcement requires current canonical subject/service provenance
+and available moderation authority; missing qualification prevents disclosure.
+Inactive adopted definitions enable no restrictive effect. Per-capability
+publication support and complete native consumer evidence must remain current
+before activation, and unrestricted moderation never grants resource access.
+Adoption nevertheless requires current canonical read provenance. Retiring
+activation support does not make the policy unadopted or erase existing sanctions;
+the read consumer continues evaluating the current persisted contributions.
 Canonical service provenance integration, the moderation overlay and
 complete consumer conformance remain open. Those gaps
 preclude a complete `ReadResource` registration or profile activation.

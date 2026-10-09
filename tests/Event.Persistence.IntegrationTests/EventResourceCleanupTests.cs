@@ -266,7 +266,9 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
             var repository = new EventResourceRepository(read);
             var authority = new EventResourceAuthorityOrchestrator(readUnit,
                 new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(read), policy,
-                    new ExternalApiKeyRepository(read), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()),
+                    new ExternalApiKeyRepository(read), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                    new Explore.Persistence.Services.EventResourceModerationSnapshotReader(read,
+                        Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
                 Substitute.For<IEventResourceProviderSnapshotReader>(),
                 Substitute.For<IEventResourceAuthorizationProvider>(), clock);
             return (await authority.AuthorizeCapabilitiesAsync(

@@ -123,6 +123,14 @@ owner, removing its placement or suspending that placement prevents a prepared
 response from being delivered even while the key remains Active. This checks
 ownership, without borrowing an issuer's human management permission.
 
+Installing moderation alone does not change resource access; existing
+resource authorization remains in force until the applicable ReadResource
+policy is adopted for enforcement. After adoption, missing canonical identity
+or unavailable moderation authority prevents disclosure. Inactive definitions
+do not activate restrictions, and unrestricted moderation does not grant access.
+Adoption still requires current canonical identity. Withdrawing support for new
+activations does not remove existing sanctions or restore restricted resource access.
+
 Canonical machine moderation uses an explicit binding to an existing service
 identity, not the key owner's human identity. A replacement key can select the
 same service so changing credentials does not create an unrelated moderation

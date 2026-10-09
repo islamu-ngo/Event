@@ -485,7 +485,9 @@ internal static class EventResourceFileProviderContractAssertions
         providers.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
         var authority = new EventResourceAuthorityOrchestrator(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
-                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()),
+                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
             routes, authorization, new ContractClock());
         return new(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
             new StorageUsageCounterRepository(context), new PrivacyErasureStateRepository(context), storagePolicy,
@@ -528,7 +530,10 @@ internal static class EventResourceFileProviderContractAssertions
         var repository = new EventResourceRepository(context);
         return new(unit, new EventResourceAuthoritySnapshotReader(repository,
             new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
-            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()), routes, provider, new ContractClock());
+            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+            new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
+                Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
+            routes, provider, new ContractClock());
     }
 
     private static async Task SetUnscannedPolicyAsync(Func<ExploreDbContext> contextFactory, bool allowed)

@@ -18,7 +18,8 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
     IEventAuthoritySnapshotService eventAuthority,
     IEventResourceGovernancePolicyReader governance,
     IExternalApiKeyRepository apiKeys,
-    IConfiguredApiKeyResourceAuthorityReader configuredApiKeys) : IEventResourceAuthoritySnapshotReader
+    IConfiguredApiKeyResourceAuthorityReader configuredApiKeys,
+    IEventResourceModerationSnapshotReader moderation) : IEventResourceAuthoritySnapshotReader
 {
     private const int FactLimit = EventResourceAuthorityRequest.MaximumBatchChecks;
 
@@ -90,6 +91,8 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             .OfType<Guid>().Where(eventsById.ContainsKey).Distinct().ToArray();
         SubjectBatchFacts subject = await ReadSubjectBatchFactsAsync(
             first, eventRows, resourceRows, sessionsById, evaluationUtc, moderationEventIds, cancellationToken);
+        var moderationFacts = await moderation.ReadBatchAsync(requests, evaluationUtc, cancellationToken);
+        if (moderationFacts.Count != requests.Count) return result;
 
         for (int index = 0; index < requests.Count; index++)
         {
@@ -135,7 +138,10 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             if (resource is null)
             {
                 result[index] = new(parent, parentEvent.ConcurrencyStamp, request.SubjectUserId,
-                    request.IsMachineCaller, management, governancePolicy, request.MachinePrincipal);
+                    request.IsMachineCaller, management, governancePolicy, request.MachinePrincipal)
+                {
+                    Moderation = moderationFacts[index]
+                };
                 continue;
             }
 
@@ -143,7 +149,10 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             result[index] = new(resource,
                 new(tenantId, request.SubjectUserId, request.IsMachineCaller, parent, audience, payloadSafe, governancePolicy),
                 management, generation, request.Action == "moderate" && subject.ModerationPrincipal is { } principal
-                    ? new(principal, CaptureNativeParent(parentEvent)) : null, request.MachinePrincipal);
+                    ? new(principal, CaptureNativeParent(parentEvent)) : null, request.MachinePrincipal)
+            {
+                Moderation = moderationFacts[index]
+            };
         }
         return result;
     }

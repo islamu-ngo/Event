@@ -18,6 +18,7 @@ public sealed class EventResourceAuthorizationFacts
     public string AttachmentGeneration { get; }
     public EventResourceParentModerationFacts? ParentModeration { get; }
     public EventResourceMachinePrincipal? MachinePrincipal { get; }
+    public EventResourceModerationFacts Moderation { get; init; } = EventResourceModerationFacts.NotAdopted;
 
     public EventResourceAuthorizationFacts(EventResource resource, EventResourceAccessFacts access,
         EventResourceManagementFacts management, string attachmentGeneration,
@@ -52,7 +53,8 @@ public sealed class EventResourceAuthorizationFacts
     {
         bool parentTarget = Policy is null;
         bool creating = request.Action == "create";
-        if (!request.HasConsistentPrincipal || parentTarget != request.TargetsParentEvent
+        if (!Moderation.PermitsNativeEvaluation
+            || !request.HasConsistentPrincipal || parentTarget != request.TargetsParentEvent
             || request.IsEventCollection && request.Action is not ("view" or "view-management" or "export")
             || request.ExpectedResourceVersion is { } expectedVersion && ResourceVersion != expectedVersion
             || request.ExpectedAttachmentGeneration is { } expectedGeneration && AttachmentGeneration != expectedGeneration

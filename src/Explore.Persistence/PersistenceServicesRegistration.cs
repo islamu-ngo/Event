@@ -190,6 +190,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
         services.AddScoped<IModerationAuthoritySourceRepository, ModerationAuthoritySourceRepository>();
         services.AddScoped<IModerationMachineSubjectBindingRepository, ModerationMachineSubjectBindingRepository>();
+        services.AddScoped<IEventResourceModerationSnapshotReader, EventResourceModerationSnapshotReader>();
         services.AddScoped<IModerationQualificationRepository, ModerationQualificationRepository>();
         services.AddScoped<IModerationStore>(provider => new ModerationStore(
             provider.GetRequiredService<ExploreDbContext>(),

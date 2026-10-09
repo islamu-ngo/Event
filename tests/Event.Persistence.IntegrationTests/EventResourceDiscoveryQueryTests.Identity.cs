@@ -238,6 +238,8 @@ public sealed partial class EventResourceDiscoveryQueryTests
     private async Task<ApiKeyPrincipalContext> ChangedPrincipalAsync(
         ApiKeyPrincipalContext original, string coordinate, Guid alternativeTenantId)
     {
+        if (coordinate == "owner-kind")
+            await SeedActorOwnerAsync(original.TenantId!.Value, ExternalApiKeyOwnerType.Organization, original.OwnerId);
         var changed = coordinate switch
         {
             "key" => original with { KeyId = ApiKeyHashing.CreateKeyId() },

@@ -187,6 +187,20 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 assignments.Where(assignment => assignment.User is { IsDeleted: false })))
                 return false;
         }
+        else if (principal.OwnerType == ExternalApiKeyOwnerType.Organization)
+        {
+            var placement = await resources.GetAuthorityOrganizationTenantAsync(
+                principal.AuthorityTenantId!.Value, principal.OwnerId, cancellationToken);
+            if (placement is not { IsDeleted: false, IsSuspended: false, Organization: { IsDeleted: false } })
+                return false;
+        }
+        else if (principal.OwnerType == ExternalApiKeyOwnerType.Group)
+        {
+            var placement = await resources.GetAuthorityGroupTenantAsync(
+                principal.AuthorityTenantId!.Value, principal.OwnerId, cancellationToken);
+            if (placement is not { IsDeleted: false, IsSuspended: false, Group: { IsDeleted: false } })
+                return false;
+        }
 
         switch (principal.CredentialSource)
         {

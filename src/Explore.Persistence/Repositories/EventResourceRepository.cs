@@ -216,6 +216,22 @@ public sealed class EventResourceRepository : IEventResourceRepository
         _dbContext.Tenants.AsNoTracking().Include(tenant => tenant.TenantStatus)
             .SingleOrDefaultAsync(tenant => tenant.Id == tenantId, cancellationToken);
 
+    public Task<OrganizationTenant?> GetAuthorityOrganizationTenantAsync(
+        Guid tenantId,
+        Guid organizationId,
+        CancellationToken cancellationToken) =>
+        _dbContext.OrganizationTenants.AsNoTracking().Include(placement => placement.Organization)
+            .SingleOrDefaultAsync(placement => placement.TenantId == tenantId
+                && placement.OrganizationId == organizationId, cancellationToken);
+
+    public Task<GroupTenant?> GetAuthorityGroupTenantAsync(
+        Guid tenantId,
+        Guid groupId,
+        CancellationToken cancellationToken) =>
+        _dbContext.GroupTenants.AsNoTracking().Include(placement => placement.Group)
+            .SingleOrDefaultAsync(placement => placement.TenantId == tenantId
+                && placement.GroupId == groupId, cancellationToken);
+
     public Task<TenantUser?> GetTenantUserAsync(
         Guid tenantId,
         Guid subjectUserId,

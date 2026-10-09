@@ -115,8 +115,13 @@ Every tenant-bound credential must retain an active owning tenant, including
 when it reads a public resource in another tenant. Suspending, archiving or
 purging the credential's tenant prevents a prepared response from being
 delivered while leaving the other tenant's resource available to qualified
-callers. Tenant-owned keys must name that exact owning tenant. Organization and
-group owner qualification remains open before complete consumer registration.
+callers. Tenant-owned keys must name that exact owning tenant.
+
+Organization- and group-owned credentials also require the actual owner and
+its current, nonsuspended placement in the credential's tenant. Deleting the
+owner, removing its placement or suspending that placement prevents a prepared
+response from being delivered even while the key remains Active. This checks
+ownership, without borrowing an issuer's human management permission.
 
 Canonical machine moderation uses an explicit binding to an existing service
 identity, not the key owner's human identity. A replacement key can select the
@@ -129,8 +134,8 @@ binding cannot be reinstated by repeating installation.
 Configured keys also need explicit service selection; matching names do not
 establish identity. Missing, revoked or unavailable bindings cannot establish
 canonical machine provenance. These installation foundations do not activate
-a protected machine consumer or a moderation profile: complete current owner
-qualification and consumer conformance are still required.
+a protected machine consumer or a moderation profile: canonical service
+provenance integration and complete consumer conformance are still required.
 
 Embedded native integrations must consume audience and management query `Projection` through
 `DiscloseAsync` instead of reading `Value`. Build the representation privately

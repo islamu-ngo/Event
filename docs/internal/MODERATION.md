@@ -291,12 +291,16 @@ ownership (no authority tenant), a current nondeleted owner and a current
 platform-scoped `platform.admin` assignment. The bounded no-tracking assignment
 read includes the actual User and Role, so owner deletion or assignment removal
 during preparation prevents terminal disclosure without granting the machine
-that human's administrator permissions. Organization and group owners
-still need their complete current qualification before canonical moderation
-consumer registration.
+that human's administrator permissions. Organization and group credentials
+require the actual nondeleted owner and its exact nondeleted, nonsuspended
+placement in the authority tenant. The bounded no-tracking placement reads
+include the Organization or Group, retain the normal tenant/soft-delete
+filters and do not borrow a human issuer's management permission. Owner
+deletion, placement removal or placement suspension during private preparation
+prevents terminal disclosure even when the key remains Active.
 
 These boundaries do not close the whole moderation consumer contract.
-Canonical current machine-source qualification, the moderation overlay and
+Canonical service provenance integration, the moderation overlay and
 complete consumer conformance remain open. Those gaps
 preclude a complete `ReadResource` registration or profile activation.
 

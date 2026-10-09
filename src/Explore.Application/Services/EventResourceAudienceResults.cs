@@ -27,13 +27,19 @@ public sealed class EventResourceAudienceDisclosureProof
     internal EventResourceCursorScope Scope { get; }
     internal EventResourceAuthorityRequest? Parent { get; }
     internal ImmutableArray<EventResourceAuthorityRequest> Checks { get; }
+    internal ImmutableArray<EventResourceAuthorityRequest> ActionChecks { get; }
+    internal ImmutableArray<EventResourceAuthorityOutcome> ActionOutcomes { get; }
 
     internal EventResourceAudienceDisclosureProof(EventResourceCursorScope scope,
-        EventResourceAuthorityRequest? parent, IEnumerable<EventResourceAuthorityRequest> checks)
+        EventResourceAuthorityRequest? parent, IEnumerable<EventResourceAuthorityRequest> checks,
+        IEnumerable<EventResourceAuthorityRequest> actionChecks,
+        IEnumerable<EventResourceAuthorityOutcome> actionOutcomes)
     {
         Scope = scope;
         Parent = parent;
         Checks = checks.DistinctBy(check => check.ResourceId).ToImmutableArray();
+        ActionChecks = actionChecks.ToImmutableArray();
+        ActionOutcomes = actionOutcomes.ToImmutableArray();
     }
 }
 

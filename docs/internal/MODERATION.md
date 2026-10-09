@@ -247,6 +247,17 @@ provider call refuses the prepared page, even before retention cleanup runs.
 Export requalifies both every export target and the decisions that produced its
 download affordances; changed download authority cannot leave a stale link.
 
+Audience detail and collection projections also capture the exact native
+download, access and management outcomes in immutable batched proof arrays.
+Server-owned affordance fields are excluded from HTTP JSON and have internal
+setters; link policies use them only as candidates for the ordinary permission
+check, never as input grants. Terminal disclosure rechecks view and action
+requests in one bounded batch and compares the action outcomes with those that
+prepared the representation. Any gained or lost action outcome invalidates that
+representation even when metadata view remains allowed. A fresh read can retain
+the metadata while omitting the denied action. This avoids one query per link
+and does not change the cursor or HTTP DTO shape.
+
 Native audience and management query consumers must replace direct `Value` access with
 `Projection.DiscloseAsync(prepare, deliver, cancellationToken)`. Preparation
 constructs a private representation; only `deliver` may serialize or transfer it.

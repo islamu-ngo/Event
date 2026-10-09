@@ -106,9 +106,11 @@ public sealed partial class EventResourceDiscoveryQueryTests
         {
             BeforeDecision = async inputs =>
         {
+            var view = inputs.FirstOrDefault(input => input.Action == "view");
+            if (view is null) return;
             await Assert.That(context.Database.CurrentTransaction).IsNull();
-            privateInputs.Add(inputs[0].Resource.DisclosePrivateMetadata);
-            if (!inputs[0].Resource.DisclosePrivateMetadata) return;
+            privateInputs.Add(view.Resource.DisclosePrivateMetadata);
+            if (!view.Resource.DisclosePrivateMetadata) return;
             await using var writer = database.CreateIndependentContext();
             await writer.TenantUsers.Where(value => value.UserId == subject)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.StatusId, (int)TenantUserStatusEnum.Suspended));

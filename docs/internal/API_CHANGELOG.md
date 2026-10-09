@@ -5,6 +5,11 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-09
 
+- Resource audience detail and collection responses now retain action-specific
+  download, access and management decisions through private HAL preparation.
+  Changed action authority invalidates the prepared response even if metadata
+  view remains allowed; a fresh request can return metadata without the denied
+  affordance. Existing routes, cursor format and HTTP DTO shapes are unchanged.
 - Resource upload-session reservation, finalization and cancellation now keep
   their success response private until a separate current resource read check at
   result execution. Idempotent reservation, finalized replay and cancelled replay

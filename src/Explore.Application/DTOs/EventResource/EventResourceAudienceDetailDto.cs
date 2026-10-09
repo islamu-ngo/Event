@@ -13,5 +13,13 @@ public sealed record EventResourceAudienceDetailDto(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? ExternalDestinationSafeOrigin = null)
 {
+    /// <summary>Server-derived affordances bound to the native terminal disclosure proof, never input grants.</summary>
+    [JsonIgnore]
+    public bool DownloadAuthorized { get; internal init; }
+    [JsonIgnore]
+    public bool AccessAuthorized { get; internal init; }
+    [JsonIgnore]
+    public bool ManagementAuthorized { get; internal init; }
+
     public override string ToString() => nameof(EventResourceAudienceDetailDto);
 }

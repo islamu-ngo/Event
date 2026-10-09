@@ -164,6 +164,13 @@ Embedded native integrations must consume audience and management query `Project
 and transfer it only in the delivery callback; check the terminal outcome.
 Existing HTTP routes and response shapes remain the same.
 
+Resource audience responses bind their download, access and management links
+to the same current authority used at final disclosure. If an action decision
+changes while a response is being prepared, the prepared response is withheld
+rather than delivering a stale action link. Refresh the resource: its metadata
+may remain available with that action omitted. Link presence remains the UI's
+authority signal; a visible link still does not bypass authorization of its use.
+
 Activation requires the adopted profile's complete registered consumers,
 current reviewer qualification, usable protected remedies, consequence owners
 and required operator prerequisites. Imported or edited drafts remain inert

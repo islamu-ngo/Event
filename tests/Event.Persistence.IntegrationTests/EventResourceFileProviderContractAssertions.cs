@@ -153,7 +153,7 @@ internal static class EventResourceFileProviderContractAssertions
                 .Where(row => row.TenantId == seed.TenantId && row.Provider == StorageProviders.Local);
             existingBytes = await inventory.SumAsync(row => row.Size);
             existingObjects = await inventory.LongCountAsync();
-            EventResourceFileUploadWorkflow workflow = UploadWorkflow(reserve, contextFactory, seed);
+            EventResourceUploadTestConsumer workflow = UploadWorkflow(reserve, contextFactory, seed);
             var firstReservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
             if (firstReservation.Id is null)
                 throw new InvalidOperationException($"First upload reservation failed: {firstReservation.FailureCode}.");
@@ -168,7 +168,7 @@ internal static class EventResourceFileProviderContractAssertions
         var releaseFirstProvider = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var deadline = new CancellationTokenSource(Timeout);
         await using var firstContext = contextFactory();
-        EventResourceFileUploadWorkflow firstWorkflow = UploadWorkflow(firstContext, contextFactory, seed,
+        EventResourceUploadTestConsumer firstWorkflow = UploadWorkflow(firstContext, contextFactory, seed,
             async cancellationToken =>
             {
                 firstProviderEntered.TrySetResult();
@@ -439,7 +439,7 @@ internal static class EventResourceFileProviderContractAssertions
         return new(scope.TenantAId, userId, resource.Id, second.Id, resource.ConcurrencyStamp);
     }
 
-    private static EventResourceFileUploadWorkflow UploadWorkflow(ExploreDbContext context,
+    private static EventResourceUploadTestConsumer UploadWorkflow(ExploreDbContext context,
         Func<ExploreDbContext> contextFactory, UploadSeed seed, Func<CancellationToken, Task>? beforeWrite = null)
     {
         var repository = new EventResourceRepository(context);
@@ -489,10 +489,10 @@ internal static class EventResourceFileProviderContractAssertions
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                     Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
             routes, authorization, new ContractClock());
-        return new(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
+        return new(new EventResourceFileUploadWorkflow(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
             new StorageUsageCounterRepository(context), new PrivacyErasureStateRepository(context), storagePolicy,
             providers, unit, new EventResourceStorageLifecycleService(new EventResourceStorageLifecycleRepository(context),
-                unit, new ContractClock()), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new ContractClock());
+                unit, new ContractClock()), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new ContractClock()));
     }
 
     private static EventResourceContentService ContentService(ExploreDbContext context, PublishedFile seed,
@@ -558,7 +558,7 @@ internal static class EventResourceFileProviderContractAssertions
     };
 
     private static async Task<Explore.Application.Responses.BaseCommandResponse<Explore.Application.DTOs.StorageObject.StorageUploadSessionDto>>
-        FinalizeAsync(EventResourceFileUploadWorkflow workflow, Guid id, CancellationToken cancellationToken)
+        FinalizeAsync(EventResourceUploadTestConsumer workflow, Guid id, CancellationToken cancellationToken)
     {
         using var content = new MemoryStream(Pdf);
         return await workflow.FinalizeAsync(new FinalizeStorageUploadSessionCommand

@@ -32,7 +32,54 @@ public sealed class EventResourceFileUploadWorkflow(
     EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
     ICurrentUserService user, IMachinePrincipalAccessor machine, TimeProvider clock)
 {
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ReserveAsync(Guid resourceId,
+    public async Task<StorageUploadSessionResult> ReserveAsync(Guid resourceId,
+        CreateEventResourceUploadSessionDto dto, CancellationToken cancellationToken) =>
+        await ProtectResponseAsync(await ReserveCoreAsync(resourceId, dto, cancellationToken),
+            resourceId, cancellationToken);
+
+    public async Task<StorageUploadSessionResult> FinalizeAsync(
+        FinalizeStorageUploadSessionCommand request, CancellationToken cancellationToken)
+    {
+        var session = await sessions.GetForAuthorizationAsync(request.UploadSessionId, cancellationToken);
+        if (!Owned(session)) return StorageUploadSessionResult.Ordinary(Fail(FailureCodes.StorageUploadSessionNotFound));
+        return await ProtectResponseAsync(await FinalizeCoreAsync(request, cancellationToken),
+            session!.OwningResourceId!.Value, cancellationToken);
+    }
+
+    public async Task<StorageUploadSessionResult> CancelAsync(Guid uploadSessionId, CancellationToken cancellationToken)
+    {
+        var session = await sessions.GetForAuthorizationAsync(uploadSessionId, cancellationToken);
+        if (!Owned(session)) return StorageUploadSessionResult.Ordinary(Fail(FailureCodes.StorageUploadSessionNotFound));
+        return await ProtectResponseAsync(await CancelCoreAsync(uploadSessionId, cancellationToken),
+            session!.OwningResourceId!.Value, cancellationToken);
+    }
+
+    private async Task<StorageUploadSessionResult> ProtectResponseAsync(
+        BaseCommandResponse<StorageUploadSessionDto> response, Guid resourceId, CancellationToken cancellationToken)
+    {
+        if (!response.IsSuccess) return StorageUploadSessionResult.Ordinary(response);
+        var request = new EventResourceAuthorityRequest(tenant.TenantId, resourceId,
+            user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "view-management");
+        var authorized = await authority.AuthorizeAsync(request,
+            (facts, _) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation(facts.AttachmentGeneration)),
+            cancellationToken);
+        if (authorized.Lease is not { } lease)
+        {
+            await authorized.DisposeAsync();
+            return StorageUploadSessionResult.Ordinary(Denied(authorized.Outcome));
+        }
+        return StorageUploadSessionResult.Resource(new(response, async token =>
+        {
+            if (tenant.TenantId != request.TenantId || !user.IsAuthenticated
+                || user.UserId != request.SubjectUserId || machine.IsMachineCaller)
+                return EventResourceAuthorityOutcome.NotFound;
+            var gate = await authority.CompleteHeadersAsync(lease, token);
+            await using var preparation = gate.Preparation;
+            return gate.Outcome;
+        }, cancellationToken, authorized));
+    }
+
+    private async Task<BaseCommandResponse<StorageUploadSessionDto>> ReserveCoreAsync(Guid resourceId,
         CreateEventResourceUploadSessionDto dto, CancellationToken cancellationToken)
     {
         var validation = await new CreateEventResourceUploadSessionDtoValidator().ValidateAsync(dto, cancellationToken);
@@ -98,7 +145,7 @@ public sealed class EventResourceFileUploadWorkflow(
         catch (ConcurrencyConflictException) { return Fail(FailureCodes.ConcurrencyConflict); }
     }
 
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> FinalizeAsync(
+    private async Task<BaseCommandResponse<StorageUploadSessionDto>> FinalizeCoreAsync(
         FinalizeStorageUploadSessionCommand request, CancellationToken cancellationToken)
     {
         var session = await sessions.GetForAuthorizationAsync(request.UploadSessionId, cancellationToken);
@@ -252,7 +299,7 @@ public sealed class EventResourceFileUploadWorkflow(
         catch (ConcurrencyConflictException) { return Fail(FailureCodes.ConcurrencyConflict); }
     }
 
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> CancelAsync(Guid uploadSessionId, CancellationToken cancellationToken)
+    private async Task<BaseCommandResponse<StorageUploadSessionDto>> CancelCoreAsync(Guid uploadSessionId, CancellationToken cancellationToken)
     {
         var session = await sessions.GetForAuthorizationAsync(uploadSessionId, cancellationToken);
         if (!Owned(session)) return Fail(FailureCodes.StorageUploadSessionNotFound);

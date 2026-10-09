@@ -72,7 +72,8 @@ public sealed class ManagedStorageBindingTests
             ContentType = "image/png"
         }, default);
         await Assert.That(finalized.IsSuccess).IsTrue();
-        var metadata = (await env.Objects.GetForGenericAccessAsync(finalized.Id!.StorageObjectId!.Value, default))!;
+        await Assert.That(finalized.Projection).IsNull();
+        var metadata = (await env.Objects.GetForGenericAccessAsync(finalized.Response!.Id!.StorageObjectId!.Value, default))!;
         var quota = await env.Counters.GetByTenantAndProviderAsync(metadata.TenantId, metadata.Provider, default);
         await Assert.That(quota!.UsedBytes).IsEqualTo((long)Png.Length);
         await Assert.That(quota.ReservedBytes).IsEqualTo(0L);
@@ -139,7 +140,7 @@ public sealed class ManagedStorageBindingTests
             ContentLength = Png.Length,
             ContentType = "image/png"
         }, default);
-        await Assert.That(result.FailureCode).IsEqualTo(Explore.Application.Responses.FailureCodes.StorageUploadContentSignatureMismatch);
+        await Assert.That(result.Response!.FailureCode).IsEqualTo(Explore.Application.Responses.FailureCodes.StorageUploadContentSignatureMismatch);
         env.Context.ChangeTracker.Clear();
         var custody = await env.Context.StorageObjectDeletionTombstones.SingleAsync(row => row.Id == reservation.Id.Id);
         await Assert.That(custody.State).IsEqualTo(StorageObjectDeletionState.Ready);
@@ -204,7 +205,7 @@ public sealed class ManagedStorageBindingTests
                     UploadSessionId = reservation.Id.Id
                 }, timeout.Token);
                 await Assert.That(response.IsSuccess).IsTrue();
-                await Assert.That(response.Id!.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
+                await Assert.That(response.Response!.Id!.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
             }
             else
             {

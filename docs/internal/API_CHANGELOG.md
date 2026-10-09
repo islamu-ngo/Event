@@ -3,6 +3,20 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-09
+
+- Resource upload-session reservation, finalization and cancellation now keep
+  their success response private until a separate current resource read check at
+  result execution. Idempotent reservation, finalized replay and cancelled replay
+  use the same disclosure boundary, including the generic storage endpoints.
+  Revocation or unavailable adopted moderation authority can withhold stored
+  session fields after the mutation has committed; no rollback of that committed
+  mutation is implied.
+- HTTP routes and `BaseCommandResponse<StorageUploadSessionDto>` success shapes
+  remain unchanged. Native CQS consumers use the disposable
+  `StorageUploadSessionResult` and consume its resource projection, rather than
+  directly reading the upload DTO. Ordinary generic uploads retain their response.
+
 ## 2026-10-06
 
 - Tenant-owned external API-key creation without a resolved trusted tenant now

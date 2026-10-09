@@ -255,6 +255,26 @@ whether delivery occurred. A consumed, refused or cancelled projection cannot
 be replayed. This is a native source-contract change; HTTP DTOs and routes retain
 their existing shapes.
 
+Resource upload reservation, idempotent reservation, finalization, finalized
+replay, cancellation and cancelled replay return `StorageUploadSessionResult`.
+Mutation authority remains the existing `update` transaction check. A successful
+mutation does not itself authorize disclosure of persisted session fields.
+Resource success carries only a private projection, backed by a separate
+`view-management` authority lease; ordinary generic uploads retain their ordinary
+command response. The terminal gate compares the original accepted read snapshot
+with current resource, caller, canonical moderation and provider facts after
+representation preparation. Read denial can therefore withhold the response
+without undoing an already committed reservation, attachment or cancellation.
+
+Both the resource reservation endpoint and generic finalization/cancellation
+aliases execute `EventResourceProjectionResult` for resource-owned success.
+Their HTTP success envelope remains `BaseCommandResponse<StorageUploadSessionDto>`.
+Native callers must consume the projection and dispose the result; it has no
+direct resource-session `Id` payload. The projection atomically owns its payload
+and lease, releases ownership on failed preparation, denial or delivery, and
+supports explicit disposal of an abandoned result. Replaying the mutation never
+replays a consumed read grant.
+
 Resource requests and fresh snapshots now carry value-equal
 `EventResourceMachinePrincipal` coordinates: the exact opaque string key ID,
 authority tenant, owner kind, owner ID and credential authority. Authentication
@@ -310,8 +330,8 @@ before activation, and unrestricted moderation never grants resource access.
 Adoption nevertheless requires current canonical read provenance. Retiring
 activation support does not make the policy unadopted or erase existing sanctions;
 the read consumer continues evaluating the current persisted contributions.
-Canonical service provenance integration, the moderation overlay and
-complete consumer conformance remain open. Those gaps
+Canonical service provenance and the shared resource-read overlay are integrated.
+Complete consumer conformance and activation qualification remain open. Those gaps
 preclude a complete `ReadResource` registration or profile activation.
 
 ## Verification and activation boundary

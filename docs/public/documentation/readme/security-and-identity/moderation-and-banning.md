@@ -143,7 +143,21 @@ Configured keys also need explicit service selection; matching names do not
 establish identity. Missing, revoked or unavailable bindings cannot establish
 canonical machine provenance. These installation foundations do not activate
 a protected machine consumer or a moderation profile: canonical service
-provenance integration and complete consumer conformance are still required.
+complete consumer conformance and activation qualification are still required.
+
+Resource upload-session responses also require current read authority. This
+includes reservations, finalization, cancellation and their idempotent replays,
+even when finalization or cancellation uses the generic storage routes. Permission
+to change a resource does not automatically permit reading its stored upload
+metadata. A committed upload operation can succeed while its response is withheld
+after read authority changes; keep the same operation identity when recovering
+and requalify access instead of treating a lost response as a fresh upload.
+
+Native upload commands return `StorageUploadSessionResult`. Ordinary uploads
+retain `Response`; resource-owned success retains only `Projection`. Dispose the
+result, prepare the representation privately, and inspect the terminal outcome
+before transferring fields. The HTTP success envelope remains unchanged.
+This response boundary does not certify complete moderation activation.
 
 Embedded native integrations must consume audience and management query `Projection` through
 `DiscloseAsync` instead of reading `Value`. Build the representation privately

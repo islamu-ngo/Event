@@ -63,4 +63,53 @@ public sealed class EventResourceReadProjectionTests
         await Assert.That(JsonSerializer.SerializeToElement(projection).EnumerateObject().Count()).IsEqualTo(0);
         await Assert.That(projection.ToString()).DoesNotContain("private metadata");
     }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PrivatePreparationOwnerIsReleasedWhenDeliveryIsDeniedOrPreparationFails(bool failPreparation)
+    {
+        var owner = new PreparationOwner();
+        await using var projection = new EventResourceReadProjection<string>("private metadata",
+            _ => Task.FromResult(EventResourceAuthorityOutcome.Forbidden), default, owner);
+        bool delivered = false;
+        Task<EventResourceAuthorityOutcome> ConsumeAsync() => projection.DiscloseAsync(
+            (value, _) => failPreparation
+                ? Task.FromException<string>(new InvalidOperationException("Preparation failed."))
+                : Task.FromResult(value),
+            (_, _) => { delivered = true; return Task.CompletedTask; });
+        if (failPreparation)
+            await Assert.That(ConsumeAsync).Throws<InvalidOperationException>();
+        else
+            await Assert.That(await ConsumeAsync()).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+        await Assert.That(owner.Disposals).IsEqualTo(1);
+        await projection.DisposeAsync();
+        await Assert.That(owner.Disposals).IsEqualTo(1);
+        await Assert.That(delivered).IsFalse();
+    }
+
+    [Test]
+    public async Task AbandonedProjectionDisposesItsOwnerAndCannotBeConsumedLater()
+    {
+        var owner = new PreparationOwner();
+        var projection = new EventResourceReadProjection<string>("private metadata",
+            _ => Task.FromResult(EventResourceAuthorityOutcome.Allowed), default, owner);
+        await projection.DisposeAsync();
+        bool delivered = false;
+        await Assert.That(await projection.DiscloseAsync((value, _) => Task.FromResult(value),
+            (_, _) => { delivered = true; return Task.CompletedTask; }))
+            .IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(owner.Disposals).IsEqualTo(1);
+        await Assert.That(delivered).IsFalse();
+    }
+
+    private sealed class PreparationOwner : IAsyncDisposable
+    {
+        internal int Disposals { get; private set; }
+        public ValueTask DisposeAsync()
+        {
+            Disposals++;
+            return ValueTask.CompletedTask;
+        }
+    }
 }

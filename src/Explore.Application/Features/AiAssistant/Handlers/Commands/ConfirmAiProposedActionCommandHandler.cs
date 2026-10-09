@@ -7,6 +7,7 @@ using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
+using Explore.Application.Models.Storage;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -25,7 +26,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
     ICurrentUserService currentUserService,
     ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createEventCommand,
     ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
-    ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload) : ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult> finalizeUpload) : ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ConfirmAiProposedActionCommand request,
@@ -200,7 +201,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
         }
 
         await using var content = new MemoryStream(imageBytes, writable: false);
-        var finalizeResult = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
+        await using var finalized = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
         {
             UploadSessionId = uploadSession.Id.Id,
             Content = content,
@@ -209,11 +210,13 @@ public sealed class ConfirmAiProposedActionCommandHandler(
             TenantId = action.TenantId
         }, cancellationToken);
 
-        if (!finalizeResult.IsSuccess || finalizeResult.Id?.StorageObjectId is not { } storageObjectId || storageObjectId == Guid.Empty)
+        var finalizeResult = finalized.Response;
+        if (finalizeResult is null || !finalizeResult.IsSuccess
+            || finalizeResult.Id?.StorageObjectId is not { } storageObjectId || storageObjectId == Guid.Empty)
         {
             return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
-                finalizeResult.FailureCode ?? "ai_image_upload_failed",
-                finalizeResult.Message ?? "AI event draft image could not be stored.");
+                finalizeResult?.FailureCode ?? "ai_image_upload_failed",
+                finalizeResult?.Message ?? "AI event draft image could not be stored.");
         }
 
         return CreateEventDraftAiFeaturedImageResolutionResult.Success(storageObjectId);

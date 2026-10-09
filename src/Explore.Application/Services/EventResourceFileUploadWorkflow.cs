@@ -68,7 +68,7 @@ public sealed class EventResourceFileUploadWorkflow(
             await authorized.DisposeAsync();
             return StorageUploadSessionResult.Ordinary(Denied(authorized.Outcome));
         }
-        return StorageUploadSessionResult.Resource(new(response, async token =>
+        return StorageUploadSessionResult.Resource(response, async token =>
         {
             if (tenant.TenantId != request.TenantId || !user.IsAuthenticated
                 || user.UserId != request.SubjectUserId || machine.IsMachineCaller)
@@ -76,7 +76,7 @@ public sealed class EventResourceFileUploadWorkflow(
             var gate = await authority.CompleteHeadersAsync(lease, token);
             await using var preparation = gate.Preparation;
             return gate.Outcome;
-        }, cancellationToken, authorized));
+        }, authorized, cancellationToken);
     }
 
     private async Task<BaseCommandResponse<StorageUploadSessionDto>> ReserveCoreAsync(Guid resourceId,

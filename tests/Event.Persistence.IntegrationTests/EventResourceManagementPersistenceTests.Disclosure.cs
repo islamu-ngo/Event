@@ -42,7 +42,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
             .ListAsync(scope.EventAId, 1, 20, default);
         await Assert.That(changed).IsTrue();
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
     }
 
@@ -64,7 +64,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         await using var context = database.CreateContext();
         var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
             .ListAsync(scope.EventAId, 1, 20, default);
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
     }
 }

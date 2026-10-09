@@ -51,6 +51,8 @@ public sealed class EventResourceAuthorizationFacts
             || request.IsEventCollection && request.Action is not ("view" or "view-management" or "export")
             || request.ExpectedResourceVersion is { } expectedVersion && ResourceVersion != expectedVersion
             || request.ExpectedAttachmentGeneration is { } expectedGeneration && AttachmentGeneration != expectedGeneration
+            || request.ExpectedAuditRetentionDays is { } expectedRetention
+                && (request.Action != "view-audit" || Access.GovernancePolicy?.AuditRetentionDays != expectedRetention)
             || request.ResourceId != ResourceId
             || request.TenantId != (Policy?.TenantId ?? Access.Parent.TenantId)
             || Access.TenantId != request.TenantId || Access.SubjectUserId != request.SubjectUserId

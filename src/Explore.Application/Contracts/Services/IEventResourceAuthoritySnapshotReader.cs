@@ -34,6 +34,9 @@ public sealed record EventResourceAuthorityRequest(
     /// <summary>Binds descriptive file metadata to the exact privately prepared attachment.</summary>
     public string? ExpectedAttachmentGeneration { get; init; }
 
+    /// <summary>Binds prepared audit entries to the retention policy that qualified their disclosure.</summary>
+    public int? ExpectedAuditRetentionDays { get; init; }
+
     /// <summary>Binds prepared audience metadata to its exact disclosure, not merely an unchanged row stamp.</summary>
     public Explore.Domain.Services.EventResourceAccessDecision? ExpectedDisclosure { get; init; }
 }

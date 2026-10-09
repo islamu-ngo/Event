@@ -108,7 +108,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         await Assert.That(JsonSerializer.Serialize(await verify.EventResourceAuditEntries.SingleAsync(item =>
             item.EventResourceId == resourceId && item.Action == EventResourceAuditAction.ConfigureDelivery)))
             .DoesNotContain(secret);
-        var detail = (await workflow.GetAsync(resourceId, default)).Value!;
+        var detail = await DiscloseAsync(await workflow.GetAsync(resourceId, default));
         await Assert.That(detail.ExternalDestinationSafeOrigin).IsEqualTo("https://files.example.com");
         string serialized = JsonSerializer.Serialize(detail);
         await Assert.That(serialized).DoesNotContain(secret);

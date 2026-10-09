@@ -26,7 +26,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         var create = await new CreateEventResourceCommandHandler(workflow).ExecuteAsync(new(scope.EventAId, id, Draft()));
         await Assert.That(create.IsSuccess).IsTrue();
         var detail = await workflow.GetAsync(id, default);
-        var command = new UpdateEventResourceCommand(id, detail.Value!.Version, Draft() with
+        var command = new UpdateEventResourceCommand(id, (await DiscloseAsync(detail)).Version, Draft() with
         {
             Title = "Revised material",
             AudienceRules = [new(EventResourceAudienceKindEnum.EventStaff)]
@@ -277,13 +277,14 @@ public sealed partial class EventResourceManagementPersistenceTests
         context.EventResourceAuditEntries.Add(expired);
         await context.SaveChangesAsync();
         var audit = await workflow.GetAuditAsync(id, 100, default);
-        await Assert.That(audit.Value!.Items.Length).IsEqualTo(1);
-        await Assert.That(audit.Value.Items.Any(value => value.Id == expired.Id)).IsFalse();
+        var auditPage = await DiscloseAsync(audit);
+        await Assert.That(auditPage.Items.Length).IsEqualTo(1);
+        await Assert.That(auditPage.Items.Any(value => value.Id == expired.Id)).IsFalse();
         var zero = await Workflow(context, scope.TenantAId, actor, Policy(retention: 0)).GetAuditAsync(id, 100, default);
-        await Assert.That(zero.Value!.Items.Length).IsEqualTo(0);
+        await Assert.That((await DiscloseAsync(zero)).Items.Length).IsEqualTo(0);
         var collection = await Workflow(context, scope.TenantAId, actor, Policy(capacity: 0))
             .ListAsync(scope.EventAId, 1, 20, default);
-        await Assert.That(collection.Value!.Items.Select(item => item.Id).SequenceEqual([id])).IsTrue();
+        await Assert.That((await DiscloseAsync(collection)).Items.Select(item => item.Id).SequenceEqual([id])).IsTrue();
     }
 
     [Test]
@@ -297,10 +298,10 @@ public sealed partial class EventResourceManagementPersistenceTests
             var id = Guid.CreateVersion7();
             var draft = Draft() with { DeliveryType = type };
             await Assert.That((await workflow.CreateAsync(scope.EventAId, id, draft, default)).IsSuccess).IsTrue();
-            var detail = (await workflow.GetAsync(id, default)).Value!;
+            var detail = await DiscloseAsync(await workflow.GetAsync(id, default));
             await Assert.That((await workflow.ChangeStateAsync(id, detail.Version, EventResourceManagementAction.Publish, default)).IsSuccess).IsFalse();
             await Assert.That((await workflow.ChangeStateAsync(id, detail.Version, EventResourceManagementAction.Archive, default)).IsSuccess).IsTrue();
-            var archived = (await workflow.GetAsync(id, default)).Value!;
+            var archived = await DiscloseAsync(await workflow.GetAsync(id, default));
             await Assert.That((await workflow.UpdateAsync(id, archived.Version, draft, default)).IsSuccess).IsFalse();
             await Assert.That((await workflow.ChangeStateAsync(id, archived.Version, EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
             var tombstone = await new EventResourceRepository(context).GetReplayIdentityAsync(scope.TenantAId, id, default);

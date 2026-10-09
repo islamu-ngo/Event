@@ -68,9 +68,10 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == id)).IsFalse();
     }
 
-    private async Task<(EventResourcePersistenceTests.ResourceScope Scope, Guid Actor)> SeedAsync()
+    private async Task<(EventResourcePersistenceTests.ResourceScope Scope, Guid Actor)> SeedAsync(
+        DateTime? eventPublishedAt = null)
     {
-        var scope = await database.SeedScopeAsync();
+        var scope = await database.SeedScopeAsync(eventPublishedAt);
         await using var seed = database.CreateContext();
         var actor = (await seed.Actors.SingleAsync(value => value.Id == scope.ActorId)).UserId!.Value;
         var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
@@ -90,12 +91,26 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         return (scope, actor);
     }
 
+    private static async Task<T> DiscloseAsync<T>(EventResourceManagementReadResult<T> result) where T : class
+    {
+        await Assert.That(result.Projection).IsNotNull();
+        T? released = null;
+        var outcome = await result.Projection!.DiscloseAsync((value, _) => Task.FromResult(value), (value, _) =>
+        {
+            released = value;
+            return Task.CompletedTask;
+        });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        return released!;
+    }
+
     private static EventResourceManagementWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid actor,
         EventResourceGovernancePolicy? policy = null, IEventResourceAuthorizationProvider? provider = null,
-        IUnitOfWork? unitOfWork = null)
+        IUnitOfWork? unitOfWork = null, TimeProvider? clock = null)
     {
         var repository = new EventResourceRepository(context);
         var unit = unitOfWork ?? new EfCoreUnitOfWork(context);
+        clock ??= new Clock();
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(tenantId, Arg.Any<CancellationToken>()).Returns(policy ?? Policy());
         var routes = Substitute.For<IEventResourceProviderSnapshotReader>();
@@ -117,9 +132,9 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         user.UserId.Returns(actor);
         var machine = Substitute.For<IMachinePrincipalAccessor>();
         return new(repository, unit, new EventResourceStorageLifecycleService(
-            new EventResourceStorageLifecycleRepository(context), unit, new Clock()), new(unit,
+            new EventResourceStorageLifecycleRepository(context), unit, clock), new(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance),
-            routes, provider, new Clock()), tenant, user, machine, new Clock());
+            routes, provider, clock), tenant, user, machine, clock);
     }
 
     private static EventResourceDraftDto Draft() => new()
@@ -132,10 +147,10 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
     };
 
     private static EventResourceGovernancePolicy Policy(int retention = 30, int capacity = 500,
-        string[]? origins = null) =>
+        string[]? origins = null, bool allowUnscanned = false) =>
         EventResourceGovernancePolicy.Create(Enum.GetValues<EventResourceDeliveryTypeEnum>(),
             Enum.GetValues<EventResourceAudienceKindEnum>(), [EventResourceGovernancePolicy.PdfMediaType],
-            10_485_760, false, origins ?? [], retention, capacity, long.MaxValue);
+            10_485_760, allowUnscanned, origins ?? [], retention, capacity, long.MaxValue);
 
     private sealed class Clock : TimeProvider { public override DateTimeOffset GetUtcNow() => new(Now); }
     private sealed class AuditWriteException : InvalidOperationException;

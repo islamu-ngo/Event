@@ -78,10 +78,16 @@ using an earlier permission check. Audience detail and collection responses also
 retain their metadata privately until a fresh check at response execution,
 including revocation after links were prepared. A stale private representation
 is refused rather than serialized. These checks do not enable a moderation
-profile: management, audit and export projections and exact machine identity
-still require complete terminal enforcement.
+profile: exact machine identity and canonical moderation enforcement still
+require complete qualification.
 
-Embedded native integrations must consume audience query `Projection` through
+Management pages, audit and metadata exports also keep their representations
+private until final authority checks. Audit pages are refused if retained entries
+expire or retention policy changes during preparation. Exports recheck the
+download decisions behind their links; retry a refused projection to obtain
+current metadata rather than reusing its prepared result.
+
+Embedded native integrations must consume audience and management query `Projection` through
 `DiscloseAsync` instead of reading `Value`. Build the representation privately
 and transfer it only in the delivery callback; check the terminal outcome.
 Existing HTTP routes and response shapes remain the same.

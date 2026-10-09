@@ -94,6 +94,16 @@ public sealed partial class EventResourceManagementWorkflow
             Items = prepared.Page.Items.Select(item => item with
             { DownloadAuthorized = downloadable.Contains(item.Id) }).ToImmutableArray()
         };
-        return EventResourceManagementReadResult.Success(pageResult);
+        return EventResourceManagementReadResult.Success(pageResult, async token =>
+        {
+            var current = await authority.AuthorizeCapabilitiesAsync(checks, token);
+            token.ThrowIfCancellationRequested();
+            var denied = current.Take(exportDecisionCount).FirstOrDefault(
+                outcome => outcome != EventResourceAuthorityOutcome.Allowed, EventResourceAuthorityOutcome.Allowed);
+            if (denied != EventResourceAuthorityOutcome.Allowed) return denied;
+            // A previously derived download affordance must not survive a changed final download decision.
+            return current.Skip(exportDecisionCount).SequenceEqual(decisions.Skip(exportDecisionCount))
+                ? EventResourceAuthorityOutcome.Allowed : EventResourceAuthorityOutcome.NotFound;
+        }, cancellationToken);
     }
 }

@@ -211,7 +211,15 @@ Original and terminal cancellation tokens remain binding. The HTTP
 immediately before invoking the prepared serializer. Serializing a native result
 cannot disclose the private payload.
 
-Native audience query consumers must replace direct `Value` access with
+Management detail/list, audit and metadata export use the same private projection
+protocol. Final checks retain exact resource versions and attachment generations.
+Audit disclosure also binds the original retention policy and the earliest
+retained entry's expiry: expiry during representation preparation or the final
+provider call refuses the prepared page, even before retention cleanup runs.
+Export requalifies both every export target and the decisions that produced its
+download affordances; changed download authority cannot leave a stale link.
+
+Native audience and management query consumers must replace direct `Value` access with
 `Projection.DiscloseAsync(prepare, deliver, cancellationToken)`. Preparation
 constructs a private representation; only `deliver` may serialize or transfer it.
 The terminal outcome, not the initial query's preparation status, determines
@@ -220,8 +228,8 @@ be replayed. This is a native source-contract change; HTTP DTOs and routes retai
 their existing shapes.
 
 These boundaries do not close the whole moderation consumer contract.
-Management, audit and export DTOs still need terminal projection ownership, and
-machine callers need their exact native principal coordinates. Those gaps
+Machine callers still need their exact native principal coordinates, and the
+canonical moderation overlay and complete consumer conformance remain open. Those gaps
 preclude a complete `ReadResource` registration or profile activation.
 
 ## Verification and activation boundary

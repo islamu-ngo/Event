@@ -525,7 +525,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             return context;
         }
 
-        internal async Task<ResourceScope> SeedScopeAsync()
+        internal async Task<ResourceScope> SeedScopeAsync(DateTime? eventPublishedAt = null)
         {
             await using ExploreDbContext context = CreateContext();
             Tenant tenantA = NewTenant("resource-a");
@@ -540,6 +540,11 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             DomainEvent eventA = NewEvent(tenantA.Id, actor.Id, "Resource A");
             DomainEvent eventB = NewEvent(tenantB.Id, actor.Id, "Resource B");
             DomainEvent eventC = NewEvent(tenantA.Id, actor.Id, "Same-tenant sibling event");
+            if (eventPublishedAt is { } publishedAt)
+            {
+                eventA.OrganizerActorId = actor.Id;
+                eventA.Publish(publishedAt);
+            }
             context.Events.AddRange(eventA, eventB, eventC);
             await SaveSeedAsync(context, "events");
 

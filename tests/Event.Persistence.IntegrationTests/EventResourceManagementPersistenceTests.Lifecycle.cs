@@ -61,7 +61,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         {
             var workflow = Workflow(seed, scope.TenantAId, actor);
             await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
-            version = (await workflow.GetAsync(id, default)).Value!.Version;
+            version = (await DiscloseAsync(await workflow.GetAsync(id, default))).Version;
         }
         await using (var context = database.CreateContext(new AuditFailure()))
         {
@@ -86,10 +86,10 @@ public sealed partial class EventResourceManagementPersistenceTests
         var workflow = Workflow(context, scope.TenantAId, actor);
         var id = Guid.CreateVersion7();
         await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
-        var first = (await workflow.GetAsync(id, default)).Value!;
+        var first = await DiscloseAsync(await workflow.GetAsync(id, default));
         await Assert.That((await workflow.ChangeStateAsync(id, first.Version,
             EventResourceManagementAction.Archive, default)).IsSuccess).IsTrue();
-        var archived = (await workflow.GetAsync(id, default)).Value!;
+        var archived = await DiscloseAsync(await workflow.GetAsync(id, default));
         await Assert.That((await workflow.UpdateAsync(id, archived.Version, Draft(), default)).IsSuccess).IsFalse();
         await Assert.That((await workflow.ChangeStateAsync(id, archived.Version,
             EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
@@ -106,7 +106,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         var workflow = Workflow(context, scope.TenantAId, actor);
         var id = Guid.CreateVersion7();
         await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
-        var version = (await workflow.GetAsync(id, default)).Value!.Version;
+        var version = (await DiscloseAsync(await workflow.GetAsync(id, default))).Version;
         await Assert.That((await workflow.ChangeStateAsync(id, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
         await Assert.That((await workflow.ChangeStateAsync(id, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsFalse();
         await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsFalse();
@@ -147,8 +147,8 @@ public sealed partial class EventResourceManagementPersistenceTests
         }
         await using var context = database.CreateContext();
         var workflow = Workflow(context, scope.TenantAId, actor);
-        await Assert.That((await workflow.GetAsync(resource.Id, default)).Value).IsNull();
-        await Assert.That((await workflow.GetAuditAsync(resource.Id, 100, default)).Value).IsNull();
+        await Assert.That((await workflow.GetAsync(resource.Id, default)).Projection).IsNull();
+        await Assert.That((await workflow.GetAuditAsync(resource.Id, 100, default)).Projection).IsNull();
         await Assert.That((await workflow.ChangeStateAsync(resource.Id, resource.ConcurrencyStamp,
             EventResourceManagementAction.Unpublish, default)).IsSuccess).IsFalse();
         await Assert.That((await workflow.ChangeStateAsync(resource.Id, resource.ConcurrencyStamp,

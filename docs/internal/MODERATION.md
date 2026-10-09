@@ -280,8 +280,14 @@ nondeleted user and an active, nondeleted membership in the credential's exact
 authority tenant. The bounded no-tracking membership read includes its user;
 owner or membership removal during preparation prevents terminal disclosure
 even when the key remains Active. This does not borrow the user's roles or
-human moderation subject. Other owner kinds still need their complete current
-qualification before canonical moderation consumer registration.
+human moderation subject. InstanceAdmin-owned credentials require global
+ownership (no authority tenant), a current nondeleted owner and a current
+platform-scoped `platform.admin` assignment. The bounded no-tracking assignment
+read includes the actual User and Role, so owner deletion or assignment removal
+during preparation prevents terminal disclosure without granting the machine
+that human's administrator permissions. Organization, group and tenant owners
+still need their complete current qualification before canonical moderation
+consumer registration.
 
 These boundaries do not close the whole moderation consumer contract.
 Canonical current machine-source qualification, the moderation overlay and

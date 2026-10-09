@@ -164,6 +164,16 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 User: { IsDeleted: false } })
                 return false;
         }
+        else if (principal.OwnerType == ExternalApiKeyOwnerType.InstanceAdmin)
+        {
+            if (principal.AuthorityTenantId is not null)
+                return false;
+            var assignments = await resources.GetSubjectPlatformRolesAsync(
+                principal.OwnerId, FactLimit, cancellationToken);
+            if (!IsNativeInstanceAdmin(principal.OwnerId,
+                assignments.Where(assignment => assignment.User is { IsDeleted: false })))
+                return false;
+        }
 
         switch (principal.CredentialSource)
         {

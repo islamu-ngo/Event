@@ -105,7 +105,12 @@ User-owned credentials must also retain their actual user and active membership
 in the credential's tenant. Deleting the user or removing that membership
 prevents a prepared resource response from being delivered even if its key is
 still Active. The machine does not acquire the user's roles or human identity.
-Qualification for other owner kinds remains a separate readiness requirement.
+Instance-administrator-owned credentials must remain globally owned by a
+current user with a current platform-administrator assignment. Removing that
+assignment or deleting its user also prevents delivery of an already prepared
+response, even when the key remains Active. This ownership check does not grant
+administrator privileges to the machine. Organization, group and tenant owner
+qualification remains a separate readiness requirement.
 
 Canonical machine moderation uses an explicit binding to an existing service
 identity, not the key owner's human identity. A replacement key can select the

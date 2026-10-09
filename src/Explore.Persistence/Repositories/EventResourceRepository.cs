@@ -619,7 +619,8 @@ public sealed class EventResourceRepository : IEventResourceRepository
         Guid subjectUserId, int limit, CancellationToken cancellationToken)
     {
         int bound = RequireLimit(limit, MaximumFactCount);
-        var values = await _dbContext.PlatformUserRoles.AsNoTracking().Include(value => value.Role)
+        var values = await _dbContext.PlatformUserRoles.AsNoTracking()
+            .Include(value => value.Role).Include(value => value.User)
             .Where(value => value.UserId == subjectUserId)
             .OrderBy(value => value.Id).Take(bound + 1).ToListAsync(cancellationToken);
         return RequireCompleteFacts(values, bound, nameof(PlatformUserRole));

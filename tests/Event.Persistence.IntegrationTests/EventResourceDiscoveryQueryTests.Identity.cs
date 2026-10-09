@@ -14,6 +14,61 @@ public sealed partial class EventResourceDiscoveryQueryTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
+    public async Task MachineProjectionCannotDeliverAfterItsInstanceOwnerLosesCurrentAuthority(bool deleteOwner)
+    {
+        var (scope, publisher) = await SeedAsync();
+        var owner = await MemberAsync(scope.TenantAId);
+        var resource = Resource(scope, publisher, 0, EventResourceAudienceKindEnum.Public);
+        await SaveAsync(resource);
+        var key = MachineKey(scope.TenantAId, ExternalApiKeyOwnerType.InstanceAdmin, owner);
+        key.TenantId = null;
+        await using (var setup = database.CreateContext())
+        {
+            var role = await setup.Roles.SingleAsync(row =>
+                row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
+            setup.AddRange(key, new PlatformUserRole
+            {
+                Id = Guid.CreateVersion7(), UserId = owner, User = null!, RoleId = role.Id, Role = role
+            });
+            await setup.SaveChangesAsync();
+        }
+        var principal = new ApiKeyPrincipalContext(key.KeyId, key.TenantId, key.OwnerType, key.OwnerId, [])
+        {
+            CredentialSource = ApiKeyCredentialSource.Persisted
+        };
+        var machine = Substitute.For<IMachinePrincipalAccessor>();
+        machine.IsMachineCaller.Returns(true);
+        machine.Current.Returns(principal);
+        await using var context = database.CreateContext();
+        var workflow = Workflow(context, scope.TenantAId, null, machinePrincipal: machine);
+        var accepted = await workflow.GetAsync(resource.Id, default);
+        await Assert.That(accepted.Failure).IsEqualTo(EventResourceAudienceFailure.None);
+        bool delivered = false;
+        var outcome = await accepted.Projection!.DiscloseAsync(async (value, _) =>
+        {
+            await using var writer = database.CreateContext();
+            var changed = deleteOwner
+                ? await writer.Users.Where(row => row.Id == owner)
+                    .ExecuteUpdateAsync(update => update.SetProperty(row => row.IsDeleted, true))
+                : await writer.PlatformUserRoles.Where(row => row.UserId == owner).ExecuteDeleteAsync();
+            await Assert.That(changed).IsEqualTo(1);
+            var currentKey = await writer.ExternalApiKeys
+                .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyAuthentication)
+                .SingleAsync(row => row.Id == key.Id);
+            await Assert.That(currentKey.ExternalApiKeyStatusId).IsEqualTo((int)ExternalApiKeyStatusEnum.Active);
+            return value;
+        }, (_, _) =>
+        {
+            delivered = true;
+            return Task.CompletedTask;
+        });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(delivered).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     public async Task MachineProjectionCannotDeliverAfterItsIndependentOwnerLosesCurrentAuthority(bool revokeMembership)
     {
         var (scope, publisher) = await SeedAsync();

@@ -265,7 +265,8 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
                 new SystemSettingRepository(read, mutationLock), new TenantSettingRepository(read, mutationLock));
             var repository = new EventResourceRepository(read);
             var authority = new EventResourceAuthorityOrchestrator(readUnit,
-                new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(read), policy),
+                new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(read), policy,
+                    new ExternalApiKeyRepository(read), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()),
                 Substitute.For<IEventResourceProviderSnapshotReader>(),
                 Substitute.For<IEventResourceAuthorizationProvider>(), clock);
             return (await authority.AuthorizeCapabilitiesAsync(

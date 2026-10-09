@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
@@ -14,7 +15,7 @@ public sealed class EventResourceCursorProtectorTests
     {
         var service = new EventResourceCursorProtector(new EphemeralDataProtectionProvider(), new Clock());
         var principal = new EventResourceMachinePrincipal("opaque-key-one", Guid.CreateVersion7(),
-            ExternalApiKeyOwnerType.Organization, Guid.CreateVersion7());
+            ExternalApiKeyOwnerType.Organization, Guid.CreateVersion7(), ApiKeyCredentialSource.Persisted);
         var scope = new EventResourceCursorScope(Guid.CreateVersion7(), Guid.CreateVersion7(), null, true)
         {
             MachinePrincipal = principal
@@ -23,7 +24,8 @@ public sealed class EventResourceCursorProtectorTests
         var token = service.Protect(scope, position);
         var equivalent = scope with
         {
-            MachinePrincipal = new(principal.KeyId, principal.AuthorityTenantId, principal.OwnerType, principal.OwnerId)
+            MachinePrincipal = new(principal.KeyId, principal.AuthorityTenantId, principal.OwnerType,
+                principal.OwnerId, principal.CredentialSource)
         };
         await Assert.That(service.TryUnprotect(token, equivalent, out var decoded)).IsTrue();
         await Assert.That(decoded).IsEqualTo(position);
@@ -33,7 +35,8 @@ public sealed class EventResourceCursorProtectorTests
             principal with { KeyId = "OPAQUE-KEY-ONE" },
             principal with { AuthorityTenantId = Guid.CreateVersion7() },
             principal with { OwnerType = ExternalApiKeyOwnerType.Group },
-            principal with { OwnerId = Guid.CreateVersion7() }
+            principal with { OwnerId = Guid.CreateVersion7() },
+            principal with { CredentialSource = ApiKeyCredentialSource.Configured }
         })
         {
             await Assert.That(service.TryUnprotect(token, scope with { MachinePrincipal = changed }, out decoded)).IsFalse();

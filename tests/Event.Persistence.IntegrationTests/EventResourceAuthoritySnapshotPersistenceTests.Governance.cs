@@ -47,7 +47,8 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
         governance.ReadAsync(scope.TenantAId, Arg.Any<CancellationToken>()).Returns(disabled);
         await using var context = database.CreateContext();
         var reader = new EventResourceAuthoritySnapshotReader(
-            new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance);
+            new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance,
+            new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>());
         EventResourceAuthorityRequest update = new(scope.TenantAId, resource.Id, userId, false, "update");
         EventResourceAuthorityRequest create = new(scope.TenantAId, scope.EventAId, userId, false, "create");
         EventResourceAuthorityRequest collection = new(scope.TenantAId, scope.EventAId, userId, false, "view-management")

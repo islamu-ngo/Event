@@ -484,7 +484,8 @@ internal static class EventResourceFileProviderContractAssertions
         });
         providers.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
         var authority = new EventResourceAuthorityOrchestrator(unit,
-            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance),
+            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
+                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()),
             routes, authorization, new ContractClock());
         return new(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
             new StorageUsageCounterRepository(context), new PrivacyErasureStateRepository(context), storagePolicy,
@@ -526,7 +527,8 @@ internal static class EventResourceFileProviderContractAssertions
             .Returns(EventResourceProviderDecision.Allow);
         var repository = new EventResourceRepository(context);
         return new(unit, new EventResourceAuthoritySnapshotReader(repository,
-            new EventAuthoritySnapshotService(context), governance), routes, provider, new ContractClock());
+            new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
+            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()), routes, provider, new ContractClock());
     }
 
     private static async Task SetUnscannedPolicyAsync(Func<ExploreDbContext> contextFactory, bool allowed)

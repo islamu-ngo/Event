@@ -126,7 +126,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
         }
         await using var context = database.CreateContext();
         var reader = CreateReader(
-            new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
+            context, new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var request = new EventResourceAuthorityRequest(scope.TenantAId, resource.Id, userId, false, "view");
         var before = (await reader.ReadAsync(request, new(Now), default))!;
         await Assert.That(EventResourceAccessRules.Evaluate(resource, before.Access, new(Now)).DisclosePrivateMetadata).IsFalse();

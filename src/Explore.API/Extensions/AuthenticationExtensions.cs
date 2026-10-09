@@ -35,6 +35,7 @@ public static class AuthenticationExtensions
         IWebHostEnvironment environment,
         bool skipAuthorityWarmup = false)
     {
+        services.AddScoped<IConfiguredApiKeyResourceAuthorityReader, ConfiguredApiKeyResourceAuthorityReader>();
         // Dynamic JWT authority: Authority / MetadataAddress / ValidIssuer are applied
         // by DynamicJwtBearerPostConfigureOptions from env + DB (IAuthProviderConfigurationService).
         // Handlers call IJwtAuthorityRefreshNotifier.ReloadAsync() after onboarding/save-config

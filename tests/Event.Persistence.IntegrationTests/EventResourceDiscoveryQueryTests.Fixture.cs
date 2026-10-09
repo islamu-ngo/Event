@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
@@ -134,13 +135,23 @@ public sealed partial class EventResourceDiscoveryQueryTests
         if (machinePrincipal is null)
         {
             machine.IsMachineCaller.Returns(isMachine);
-            if (isMachine) machine.Current.Returns(new Explore.Application.Authentication.ApiKeyPrincipalContext(
-                Guid.CreateVersion7().ToString("N"), tenantId,
-                subject.HasValue ? ExternalApiKeyOwnerType.User : ExternalApiKeyOwnerType.Tenant,
-                subject ?? tenantId, []));
+            if (isMachine)
+            {
+                var key = MachineKey(tenantId,
+                    subject.HasValue ? ExternalApiKeyOwnerType.User : ExternalApiKeyOwnerType.Tenant,
+                    subject ?? tenantId);
+                context.ExternalApiKeys.Add(key);
+                context.SaveChanges();
+                machine.Current.Returns(new ApiKeyPrincipalContext(
+                    key.KeyId, key.TenantId, key.OwnerType, key.OwnerId, [])
+                {
+                    CredentialSource = ApiKeyCredentialSource.Persisted
+                });
+            }
         }
         return new(repository, unit, new(unit, new EventResourceAuthoritySnapshotReader(repository,
-            new EventAuthoritySnapshotService(context), governance), routes, provider ?? new Provider(), new Clock()),
+            new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
+            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()), routes, provider ?? new Provider(), new Clock()),
             tenant, user, machine, _cursors);
     }
 

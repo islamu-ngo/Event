@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -15,7 +16,9 @@ namespace Explore.Application.Services;
 public sealed partial class EventResourceAuthoritySnapshotReader(
     IEventResourceRepository resources,
     IEventAuthoritySnapshotService eventAuthority,
-    IEventResourceGovernancePolicyReader governance) : IEventResourceAuthoritySnapshotReader
+    IEventResourceGovernancePolicyReader governance,
+    IExternalApiKeyRepository apiKeys,
+    IConfiguredApiKeyResourceAuthorityReader configuredApiKeys) : IEventResourceAuthoritySnapshotReader
 {
     private const int FactLimit = EventResourceAuthorityRequest.MaximumBatchChecks;
 
@@ -48,6 +51,10 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 || request.SubjectUserId != first.SubjectUserId
                 || request.IsMachineCaller != first.IsMachineCaller
                 || request.MachinePrincipal != first.MachinePrincipal))
+            return result;
+
+        if (first.IsMachineCaller
+            && !await HasCurrentMachineAuthorityAsync(first.MachinePrincipal!, evaluationUtc, cancellationToken))
             return result;
 
         Guid tenantId = first.TenantId;
@@ -139,6 +146,34 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                     ? new(principal, CaptureNativeParent(parentEvent)) : null, request.MachinePrincipal);
         }
         return result;
+    }
+
+    private async Task<bool> HasCurrentMachineAuthorityAsync(
+        EventResourceMachinePrincipal principal, DateTimeOffset evaluationUtc, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(principal.KeyId) || principal.OwnerId == Guid.Empty)
+            return false;
+
+        switch (principal.CredentialSource)
+        {
+            case ApiKeyCredentialSource.Persisted:
+                ExternalApiKey? key = await apiKeys.GetByKeyIdForAuthentication(principal.KeyId, cancellationToken);
+                return key is not null
+                    && key.ExternalApiKeyStatusId is (int)ExternalApiKeyStatusEnum.Active
+                        or (int)ExternalApiKeyStatusEnum.PendingRotation
+                    && (!key.ExpiresAt.HasValue || key.ExpiresAt.Value > evaluationUtc.UtcDateTime)
+                    && string.Equals(key.KeyId, principal.KeyId, StringComparison.Ordinal)
+                    && key.TenantId == principal.AuthorityTenantId
+                    && key.OwnerType == principal.OwnerType && key.OwnerId == principal.OwnerId;
+            case ApiKeyCredentialSource.Configured:
+                ApiKeyPrincipalContext? configured = await configuredApiKeys.ReadAsync(
+                    principal.KeyId, evaluationUtc, cancellationToken);
+                return configured is not null
+                    && configured.CredentialSource == ApiKeyCredentialSource.Configured
+                    && EventResourceMachinePrincipal.Capture(configured) == principal;
+            default:
+                return false;
+        }
     }
 
     private async Task<SubjectBatchFacts> ReadSubjectBatchFactsAsync(

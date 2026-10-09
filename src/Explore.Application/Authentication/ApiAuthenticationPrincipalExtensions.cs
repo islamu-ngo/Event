@@ -115,7 +115,17 @@ public static class ApiAuthenticationPrincipalExtensions
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        return new ApiKeyPrincipalContext(keyId, tenantId, ownerType, ownerId, scopes);
+        string? credentialSource = principal.FindAll(ApiAuthenticationClaimTypes.CredentialSource)
+            .Take(2).ToArray() is [var sourceClaim] ? sourceClaim.Value : null;
+        return new ApiKeyPrincipalContext(keyId, tenantId, ownerType, ownerId, scopes)
+        {
+            CredentialSource = credentialSource switch
+            {
+                "persisted" => ApiKeyCredentialSource.Persisted,
+                "configured" => ApiKeyCredentialSource.Configured,
+                _ => ApiKeyCredentialSource.Unqualified
+            }
+        };
     }
 
     /// <summary>
@@ -136,4 +146,14 @@ public sealed record ApiKeyPrincipalContext(
     Guid? TenantId,
     ExternalApiKeyOwnerType OwnerType,
     Guid OwnerId,
-    IReadOnlyList<string> Scopes);
+    IReadOnlyList<string> Scopes)
+{
+    public ApiKeyCredentialSource CredentialSource { get; init; }
+}
+
+public enum ApiKeyCredentialSource
+{
+    Unqualified,
+    Persisted,
+    Configured
+}

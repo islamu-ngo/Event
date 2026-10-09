@@ -133,7 +133,8 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         var machine = Substitute.For<IMachinePrincipalAccessor>();
         return new(repository, unit, new EventResourceStorageLifecycleService(
             new EventResourceStorageLifecycleRepository(context), unit, clock), new(unit,
-            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance),
+            new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
+                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>()),
             routes, provider, clock), tenant, user, machine, clock);
     }
 

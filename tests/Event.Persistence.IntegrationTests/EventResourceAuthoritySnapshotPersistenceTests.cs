@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Persistence;
@@ -104,7 +105,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         routes.ReadAsync(scope.TenantAId, Arg.Any<CancellationToken>())
             .Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var service = new EventResourceAuthorityOrchestrator(new EfCoreUnitOfWork(read),
-            CreateReader(new EventResourceRepository(read), new EventAuthoritySnapshotService(read)),
+            CreateReader(read, new EventResourceRepository(read), new EventAuthoritySnapshotService(read)),
             routes, provider, new AuthorityClock());
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         AuthorityPreparation? preparation = null;
@@ -251,7 +252,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var reader = CreateReader(
+        var reader = CreateReader(context,
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var request = new EventResourceAuthorityRequest(scope.TenantAId, resourceId, userId, false, "view");
         var before = (await reader.ReadAsync(request, new(Now), default))!;
@@ -358,7 +359,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var reader = CreateReader(
+        var reader = CreateReader(context,
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var request = new EventResourceAuthorityRequest(scope.TenantAId, resource.Id, userId, false, "view");
         await Assert.That((await reader.ReadAsync(request, new(Now), default))!.Access.Parent.EventEligible).IsTrue();
@@ -378,6 +379,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
     {
         var scope = await database.SeedScopeAsync();
         var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
+        EventResourceMachinePrincipal? principal = null;
         await using (var seed = database.CreateContext())
         {
             var userId = (await seed.Actors.Where(actor => actor.Id == scope.ActorId)
@@ -396,14 +398,34 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
             if (parent.EventStatusId != (int)EventStatusEnum.Published) parent.Publish(Now);
             parent.VisibilityTypeId = (int)VisibilityTypeEnum.Unlisted;
+            if (machine)
+            {
+                var key = new ExternalApiKey
+                {
+                    Id = Guid.CreateVersion7(), TenantId = scope.TenantAId,
+                    Name = "Public-only resource witness", KeyId = ApiKeyHashing.CreateKeyId(),
+                    SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
+                    OwnerType = ExternalApiKeyOwnerType.User, OwnerId = userId,
+                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
+                    ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                    ExternalApiKeyCreditPeriod = null!, CreatedAt = Now, ExpiresAt = Now.AddDays(1)
+                };
+                seed.ExternalApiKeys.Add(key);
+                principal = EventResourceMachinePrincipal.Capture(new(
+                    key.KeyId, key.TenantId, key.OwnerType, key.OwnerId, [])
+                {
+                    CredentialSource = ApiKeyCredentialSource.Persisted
+                });
+            }
             seed.Add(resource);
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var reader = CreateReader(
+        var reader = CreateReader(context,
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var facts = await reader.ReadAsync(
-            new(scope.TenantAId, resource.Id, null, machine, "view"), new(Now), default);
+            new(scope.TenantAId, resource.Id, null, machine, "view") { MachinePrincipal = principal },
+            new(Now), default);
         await Assert.That(facts!.Access.Parent.EventEligible).IsFalse();
     }
 
@@ -425,7 +447,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         }
 
         await using var context = database.CreateContext();
-        var reader = CreateReader(
+        var reader = CreateReader(context,
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var facts = (await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, userId, false, "view", new DateTimeOffset(Now.AddMinutes(1))),
@@ -479,7 +501,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         }
 
         await using var context = database.CreateContext();
-        var reader = CreateReader(
+        var reader = CreateReader(context,
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var facts = await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, userId, false, "view", new DateTimeOffset(Now.AddMinutes(1))),
@@ -532,7 +554,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         await Assert.That(fresh.Title).IsEqualTo("Fresh authority title");
         await Assert.That(tracked.Title).IsEqualTo("Portable resource");
 
-        var reader = CreateReader(
+        var reader = CreateReader(staleContext,
             repository, new EventAuthoritySnapshotService(staleContext));
         EventResourceAuthorizationFacts? facts = await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, null, false, "view"),
@@ -563,7 +585,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         }
 
         await using ExploreDbContext read = database.CreateContext();
-        var reader = CreateReader(
+        var reader = CreateReader(read,
             new EventResourceRepository(read), new EventAuthoritySnapshotService(read));
         EventResourceAuthorizationFacts? facts = await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, null, false, "view",
@@ -593,7 +615,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         var smallCounter = new ReaderCommandCounter();
         await using (ExploreDbContext context = database.CreateContext(smallCounter))
         {
-            var reader = CreateReader(
+            var reader = CreateReader(context,
                 new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
             IReadOnlyList<EventResourceAuthorizationFacts?> facts = await reader.ReadBatchAsync(
                 smallRequests, new DateTimeOffset(Now), default);
@@ -609,7 +631,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         var largeCounter = new ReaderCommandCounter();
         await using (ExploreDbContext context = database.CreateContext(largeCounter))
         {
-            var reader = CreateReader(
+            var reader = CreateReader(context,
                 new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
             IReadOnlyList<EventResourceAuthorizationFacts?> facts = await reader.ReadBatchAsync(
                 largeRequests, new DateTimeOffset(Now), default);
@@ -645,12 +667,13 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
     }
 
     private static EventResourceAuthoritySnapshotReader CreateReader(
-        IEventResourceRepository resources, IEventAuthoritySnapshotService authority)
+        ExploreDbContext context, IEventResourceRepository resources, IEventAuthoritySnapshotService authority)
     {
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(EventResourceGovernancePolicy.Default(long.MaxValue));
-        return new(resources, authority, governance);
+        return new(resources, authority, governance, new ExternalApiKeyRepository(context),
+            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>());
     }
 
     private sealed class AuthorityClock : TimeProvider

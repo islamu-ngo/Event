@@ -88,10 +88,18 @@ download decisions behind their links; retry a refused projection to obtain
 current metadata rather than reusing its prepared result.
 
 Machine requests retain their exact API-key ID, owning authority tenant and
-owner coordinates, without inheriting the owner's human identity. Audience
+owner coordinates and credential authority, without inheriting the owner's human identity. Audience
 continuations and prepared responses cannot transfer between those identities.
 Existing audience cursors must be refreshed from the first page after this
 change; they are paging positions, never transferable permission grants.
+
+Prepared machine responses also recheck the current key source before delivery.
+Revoked, suspended, expired or deleted persisted keys, changed ownership or
+changed authority tenancy refuse the response. Configured clients must remain
+uniquely configured, active, unexpired and bound to the same owner. A response
+cannot switch between persisted and configured credentials with matching key
+names. These source checks do not complete canonical owner qualification or
+enable a moderation profile.
 
 Embedded native integrations must consume audience and management query `Projection` through
 `DiscloseAsync` instead of reading `Value`. Build the representation privately

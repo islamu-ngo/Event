@@ -229,13 +229,25 @@ their existing shapes.
 
 Resource requests and fresh snapshots now carry value-equal
 `EventResourceMachinePrincipal` coordinates: the exact opaque string key ID,
-authority tenant, owner kind and owner ID. A machine request has no human
+authority tenant, owner kind, owner ID and credential authority. Authentication
+emits `explore:api-key:source`; missing, unknown or duplicate source claims remain
+unqualified. A machine request has no human
 `SubjectUserId`, including when its key belongs to a user. Batch qualification
 cannot combine different machine coordinates. Audience proofs capture the
 original caller before native preparation and compare it with the current
 caller at delivery. Audience cursors use purpose/query version 2 and bind those
 same coordinates; old tokens require a fresh first page rather than a legacy
 identity fallback.
+
+Every native machine snapshot rereads exclusively the captured credential
+authority. Persisted keys use the fresh no-tracking authentication repository
+lookup, require Active or PendingRotation status, and require expiration strictly
+after the evaluation instant. Key ID, authority tenant and owner coordinates
+must still match. Configured keys use the named API-key options monitor, exclude
+absent, duplicate, inactive, expired or malformed descriptors, and copy metadata
+without credential material. Neither source can fall back to the other after
+revocation or deletion. These checks run before preparation and again before
+final metadata transfer; they do not qualify canonical owner liveness.
 
 These boundaries do not close the whole moderation consumer contract.
 Canonical current machine-source qualification, the moderation overlay and

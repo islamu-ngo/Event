@@ -1,4 +1,5 @@
 using Explore.Application.Authorization;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -589,7 +590,7 @@ public class EventResourceAuthorityOrchestratorTests
     {
         var f = new Fixture(restricted ? EventResourceAudienceKindEnum.AuthenticatedTenantMember : EventResourceAudienceKindEnum.Public);
         var identity = machine ? new EventResourceMachinePrincipal("public-resource-key", Tenant,
-            ExternalApiKeyOwnerType.User, Subject) : null;
+            ExternalApiKeyOwnerType.User, Subject, ApiKeyCredentialSource.Persisted) : null;
         f.Request = f.Request with { IsMachineCaller = machine, SubjectUserId = null, MachinePrincipal = identity };
         f.Facts = f.Capture(access: new(Tenant, null, machine, f.Access.Parent, f.Access.Audience, true, f.Access.GovernancePolicy),
             machinePrincipal: identity);
@@ -603,14 +604,19 @@ public class EventResourceAuthorityOrchestratorTests
     }
 
     [Test]
-    public async Task BatchCannotCombineDistinctMachineKeysWithTheSameOwner()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task BatchCannotCombineDistinctMachineAuthoritiesWithTheSameOwner(bool changeSource)
     {
         var f = new Fixture(EventResourceAudienceKindEnum.Public);
         var identity = new EventResourceMachinePrincipal("resource-key-one", Tenant,
-            ExternalApiKeyOwnerType.User, Subject);
+            ExternalApiKeyOwnerType.User, Subject, ApiKeyCredentialSource.Persisted);
         var request = f.Request with { SubjectUserId = null, IsMachineCaller = true, MachinePrincipal = identity };
+        var changed = changeSource
+            ? identity with { CredentialSource = ApiKeyCredentialSource.Configured }
+            : identity with { KeyId = "resource-key-two" };
         var outcomes = await f.Service.AuthorizeCapabilitiesAsync(
-            [request, request with { MachinePrincipal = identity with { KeyId = "resource-key-two" } }], default);
+            [request, request with { MachinePrincipal = changed }], default);
         await Assert.That(outcomes.Count).IsEqualTo(2);
         await Assert.That(outcomes.All(outcome => outcome == EventResourceAuthorityOutcome.Forbidden)).IsTrue();
     }

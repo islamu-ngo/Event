@@ -153,6 +153,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             new(ClaimTypes.Name, $"api-key:{keyId}"),
             new(ApiAuthenticationClaimTypes.AuthMethod, "api_key"),
             new(ApiAuthenticationClaimTypes.ApiKeyId, keyId),
+            new(ApiAuthenticationClaimTypes.CredentialSource, source),
             new(ApiAuthenticationClaimTypes.OwnerType, ownerType),
             new(ApiAuthenticationClaimTypes.OwnerId, ownerId)
         };

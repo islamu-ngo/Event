@@ -323,6 +323,7 @@ public sealed class EventResourceParentModerationPersistenceTests(EventResourceP
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(EventResourceGovernancePolicy.Default(long.MaxValue));
-        return new(new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance);
+        return new(new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance,
+            new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>());
     }
 }

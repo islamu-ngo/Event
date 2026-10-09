@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4GP0WW8HV2TG2A8W1Z23HWA
+Title: "Define complete non-chat moderation reference profiles"
+Type: feat
+Scope: access
+Summary: "Define 27 immutable non-chat reference profiles with ten complete consequence bundles and three additive strategies. Distinguish native-owned review and eligibility from binary denials, bind event-window timing, and require explicit entitlement-integrity or credential-recovery purpose. Definitions do not adopt or activate policy."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

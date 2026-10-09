@@ -24,6 +24,7 @@ public interface IEventResourceRepository
     Task<IReadOnlyList<Event>> GetPublishedEligibleEventsAsync(Guid tenantId, IReadOnlyCollection<Guid> eventIds, CancellationToken cancellationToken);
     Task<StorageObject?> GetStorageObjectAsync(Guid tenantId, Guid storageObjectId, CancellationToken cancellationToken);
     Task<IReadOnlyList<StorageObject>> GetStorageObjectsAsync(Guid tenantId, IReadOnlyCollection<Guid> storageObjectIds, CancellationToken cancellationToken);
+    Task<Tenant?> GetAuthorityTenantAsync(Guid tenantId, CancellationToken cancellationToken);
     Task<TenantUser?> GetTenantUserAsync(Guid tenantId, Guid subjectUserId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PlatformUserRole>> GetSubjectPlatformRolesAsync(Guid subjectUserId, int limit, CancellationToken cancellationToken);
     Task<IReadOnlyList<TenantUserRoleGrant>> GetSubjectTenantRoleGrantsAsync(Guid subjectUserId, int limit, CancellationToken cancellationToken);

@@ -210,6 +210,12 @@ public sealed class EventResourceRepository : IEventResourceRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<Tenant?> GetAuthorityTenantAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken) =>
+        _dbContext.Tenants.AsNoTracking().Include(tenant => tenant.TenantStatus)
+            .SingleOrDefaultAsync(tenant => tenant.Id == tenantId, cancellationToken);
+
     public Task<TenantUser?> GetTenantUserAsync(
         Guid tenantId,
         Guid subjectUserId,

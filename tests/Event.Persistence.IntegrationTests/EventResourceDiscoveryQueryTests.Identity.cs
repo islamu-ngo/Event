@@ -12,6 +12,56 @@ namespace Event.Persistence.IntegrationTests;
 public sealed partial class EventResourceDiscoveryQueryTests
 {
     [Test]
+    [Arguments(TenantStatusEnum.Suspended)]
+    [Arguments(TenantStatusEnum.Archived)]
+    [Arguments(TenantStatusEnum.Purged)]
+    public async Task MachineProjectionCannotDeliverAfterItsIndependentTenantOwnerLeavesActiveState(
+        TenantStatusEnum status)
+    {
+        var (scope, publisher) = await SeedAsync();
+        var resource = Resource(scope, publisher, 0, EventResourceAudienceKindEnum.Public);
+        await SaveAsync(resource);
+        var key = MachineKey(scope.TenantBId, ExternalApiKeyOwnerType.Tenant, scope.TenantBId);
+        await using (var setup = database.CreateContext())
+        {
+            setup.ExternalApiKeys.Add(key);
+            await setup.SaveChangesAsync();
+        }
+        var principal = new ApiKeyPrincipalContext(key.KeyId, key.TenantId, key.OwnerType, key.OwnerId, [])
+        {
+            CredentialSource = ApiKeyCredentialSource.Persisted
+        };
+        var machine = Substitute.For<IMachinePrincipalAccessor>();
+        machine.IsMachineCaller.Returns(true);
+        machine.Current.Returns(principal);
+        await using var context = database.CreateContext();
+        var workflow = Workflow(context, scope.TenantAId, null, machinePrincipal: machine);
+        var accepted = await workflow.GetAsync(resource.Id, default);
+        await Assert.That(accepted.Failure).IsEqualTo(EventResourceAudienceFailure.None);
+        bool delivered = false;
+        var outcome = await accepted.Projection!.DiscloseAsync(async (value, _) =>
+        {
+            await using var writer = database.CreateContext();
+            var changed = await writer.Tenants.Where(row => row.Id == scope.TenantBId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.TenantStatusId, (int)status));
+            await Assert.That(changed).IsEqualTo(1);
+            var currentKey = await writer.ExternalApiKeys
+                .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyAuthentication)
+                .SingleAsync(row => row.Id == key.Id);
+            await Assert.That(currentKey.ExternalApiKeyStatusId).IsEqualTo((int)ExternalApiKeyStatusEnum.Active);
+            await Assert.That(await writer.Tenants.AnyAsync(row =>
+                row.Id == scope.TenantAId && row.TenantStatus.IsActiveState)).IsTrue();
+            return value;
+        }, (_, _) =>
+        {
+            delivered = true;
+            return Task.CompletedTask;
+        });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(delivered).IsFalse();
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task MachineProjectionCannotDeliverAfterItsInstanceOwnerLosesCurrentAuthority(bool deleteOwner)

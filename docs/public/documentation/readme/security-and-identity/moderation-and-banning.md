@@ -109,8 +109,14 @@ Instance-administrator-owned credentials must remain globally owned by a
 current user with a current platform-administrator assignment. Removing that
 assignment or deleting its user also prevents delivery of an already prepared
 response, even when the key remains Active. This ownership check does not grant
-administrator privileges to the machine. Organization, group and tenant owner
-qualification remains a separate readiness requirement.
+administrator privileges to the machine.
+
+Every tenant-bound credential must retain an active owning tenant, including
+when it reads a public resource in another tenant. Suspending, archiving or
+purging the credential's tenant prevents a prepared response from being
+delivered while leaving the other tenant's resource available to qualified
+callers. Tenant-owned keys must name that exact owning tenant. Organization and
+group owner qualification remains open before complete consumer registration.
 
 Canonical machine moderation uses an explicit binding to an existing service
 identity, not the key owner's human identity. A replacement key can select the

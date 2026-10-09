@@ -154,6 +154,19 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         if (string.IsNullOrWhiteSpace(principal.KeyId) || principal.OwnerId == Guid.Empty)
             return false;
 
+        if (principal.AuthorityTenantId is { } authorityTenantId)
+        {
+            var tenant = await resources.GetAuthorityTenantAsync(authorityTenantId, cancellationToken);
+            if (tenant is null || !tenant.IsActive)
+                return false;
+        }
+        else if (principal.OwnerType != ExternalApiKeyOwnerType.InstanceAdmin)
+            return false;
+
+        if (principal.OwnerType == ExternalApiKeyOwnerType.Tenant
+            && principal.OwnerId != principal.AuthorityTenantId)
+            return false;
+
         if (principal.OwnerType == ExternalApiKeyOwnerType.User)
         {
             if (principal.AuthorityTenantId is not { } ownerTenantId)

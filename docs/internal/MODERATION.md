@@ -275,7 +275,13 @@ must still match. Configured keys use the named API-key options monitor, exclude
 absent, duplicate, inactive, expired or malformed descriptors, and copy metadata
 without credential material. Neither source can fall back to the other after
 revocation or deletion. These checks run before preparation and again before
-final metadata transfer. User-owned credentials also require a current
+final metadata transfer. Every tenant-bound credential also rereads its exact
+authority Tenant with the current TenantStatus lookup and requires
+`IsActiveState`; suspended, archived, purged or unavailable tenants cannot
+authorize delivery. Tenant-owned credentials must name that same tenant as
+OwnerId. This checks the credential tenant, independently of the resource's
+tenant, through an exact-ID no-tracking entity read.
+User-owned credentials also require a current
 nondeleted user and an active, nondeleted membership in the credential's exact
 authority tenant. The bounded no-tracking membership read includes its user;
 owner or membership removal during preparation prevents terminal disclosure
@@ -285,7 +291,7 @@ ownership (no authority tenant), a current nondeleted owner and a current
 platform-scoped `platform.admin` assignment. The bounded no-tracking assignment
 read includes the actual User and Role, so owner deletion or assignment removal
 during preparation prevents terminal disclosure without granting the machine
-that human's administrator permissions. Organization, group and tenant owners
+that human's administrator permissions. Organization and group owners
 still need their complete current qualification before canonical moderation
 consumer registration.
 

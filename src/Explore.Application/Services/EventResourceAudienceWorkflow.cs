@@ -33,6 +33,7 @@ public sealed class EventResourceAudienceWorkflow(
 
     private async Task<EventResourceAudienceDetailResult> ReadDetailAsync(Guid resourceId, CancellationToken cancellationToken)
     {
+        var principal = Scope(Guid.Empty);
         var prepared = await unitOfWork.ExecuteSerializableAsync(async ct =>
         {
             var row = await resources.GetAuthorityResourceAsync(tenant.TenantId, resourceId, ct);
@@ -49,7 +50,7 @@ public sealed class EventResourceAudienceWorkflow(
                 ct => resources.GetAuthorityResourceAsync(tenant.TenantId, alternativeId, ct), cancellationToken);
             if (alternative?.EventId == resource.EventId) rows.Add(alternative);
         }
-        var checks = rows.Select(BindVersion).ToArray();
+        var checks = rows.Select(row => BindVersion(row, principal)).ToArray();
         checks[0] = checks[0] with { ExpectedAttachmentGeneration = prepared.File?.AttachmentGeneration };
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -58,7 +59,7 @@ public sealed class EventResourceAudienceWorkflow(
         var accepted = Accepted(rows, checks, decisions);
         var proofChecks = new List<EventResourceAuthorityRequest>();
         var dto = Project(resource, accepted, proofChecks, prepared.File);
-        var proof = new EventResourceAudienceDisclosureProof(Scope(resource.EventId), null, proofChecks);
+        var proof = new EventResourceAudienceDisclosureProof(principal with { EventId = resource.EventId }, null, proofChecks);
         return new(EventResourceAudienceFailure.None, Projection(dto, proof, cancellationToken), proof);
     }
 
@@ -71,7 +72,7 @@ public sealed class EventResourceAudienceWorkflow(
         EventResourceCursorPosition? position = null;
         if (cursor is not null && (cursor.Length > 2048 || !cursors.TryUnprotect(cursor, scope, out position)))
             return new(EventResourceAudienceFailure.InvalidRequest);
-        var parentRequest = Request(eventId) with { IsEventCollection = true };
+        var parentRequest = Request(eventId, scope) with { IsEventCollection = true };
         var parent = (await authority.AuthorizeAudienceAsync([parentRequest], cancellationToken))[0];
         cancellationToken.ThrowIfCancellationRequested();
         if (parent.Outcome is not (EventResourceAuthorityOutcome.Allowed or EventResourceAuthorityOutcome.NotFound))
@@ -101,7 +102,7 @@ public sealed class EventResourceAudienceWorkflow(
         if (prepared is null) return new(parentBinding is null
             ? EventResourceAudienceFailure.NotFound : EventResourceAudienceFailure.Unavailable);
         var rows = prepared.Rows;
-        var checks = rows.Select(row => BindVersion(row) with
+        var checks = rows.Select(row => BindVersion(row, scope) with
         { ExpectedAttachmentGeneration = prepared.Files[row.Id]?.AttachmentGeneration }).ToArray();
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -167,11 +168,24 @@ public sealed class EventResourceAudienceWorkflow(
             EventResourceAuthorityOutcome.Allowed));
     }
 
-    private EventResourceCursorScope Scope(Guid eventId) => new(tenant.TenantId, eventId,
-        user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller);
-    private EventResourceAuthorityRequest Request(Guid id) => new(tenant.TenantId, id,
-        user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "view");
-    private EventResourceAuthorityRequest BindVersion(EventResource row) => Request(row.Id) with
+    private EventResourceCursorScope Scope(Guid eventId)
+    {
+        var principal = machine.Current;
+        return new(tenant.TenantId, eventId,
+            principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
+            machine.IsMachineCaller)
+        {
+            MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
+        };
+    }
+
+    private static EventResourceAuthorityRequest Request(Guid id, EventResourceCursorScope scope) =>
+        new(scope.TenantId, id, scope.SubjectUserId, scope.IsMachineCaller, "view")
+        {
+            MachinePrincipal = scope.MachinePrincipal
+        };
+
+    private static EventResourceAuthorityRequest BindVersion(EventResource row, EventResourceCursorScope scope) => Request(row.Id, scope) with
     { ExpectedResourceVersion = row.ConcurrencyStamp };
 
     private static Dictionary<Guid, EventResourceAuthorityRequest> Accepted(IReadOnlyList<EventResource> rows,

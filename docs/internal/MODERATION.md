@@ -227,9 +227,19 @@ whether delivery occurred. A consumed, refused or cancelled projection cannot
 be replayed. This is a native source-contract change; HTTP DTOs and routes retain
 their existing shapes.
 
+Resource requests and fresh snapshots now carry value-equal
+`EventResourceMachinePrincipal` coordinates: the exact opaque string key ID,
+authority tenant, owner kind and owner ID. A machine request has no human
+`SubjectUserId`, including when its key belongs to a user. Batch qualification
+cannot combine different machine coordinates. Audience proofs capture the
+original caller before native preparation and compare it with the current
+caller at delivery. Audience cursors use purpose/query version 2 and bind those
+same coordinates; old tokens require a fresh first page rather than a legacy
+identity fallback.
+
 These boundaries do not close the whole moderation consumer contract.
-Machine callers still need their exact native principal coordinates, and the
-canonical moderation overlay and complete consumer conformance remain open. Those gaps
+Canonical current machine-source qualification, the moderation overlay and
+complete consumer conformance remain open. Those gaps
 preclude a complete `ReadResource` registration or profile activation.
 
 ## Verification and activation boundary

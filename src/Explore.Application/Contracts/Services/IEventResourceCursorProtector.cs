@@ -1,7 +1,10 @@
 namespace Explore.Application.Contracts.Services;
 
 public sealed record EventResourceCursorScope(
-    Guid TenantId, Guid EventId, Guid? SubjectUserId, bool IsMachineCaller);
+    Guid TenantId, Guid EventId, Guid? SubjectUserId, bool IsMachineCaller)
+{
+    public EventResourceMachinePrincipal? MachinePrincipal { get; init; }
+}
 
 public sealed record EventResourceCursorPosition(int SortOrder, Guid ResourceId);
 

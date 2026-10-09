@@ -220,9 +220,17 @@ public sealed partial class EventResourceManagementWorkflow(
         policy.EnabledDeliveryTypes.Contains(draft.DeliveryType)
         && policy.EnabledAudiences.IsSupersetOf(draft.AudienceRules.Select(rule => rule.Kind));
 
-    private EventResourceAuthorityRequest Request(Guid targetId, string action, bool collection = false) =>
-        new(tenant.TenantId, targetId, user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, action)
-        { IsEventCollection = collection };
+    private EventResourceAuthorityRequest Request(Guid targetId, string action, bool collection = false)
+    {
+        var principal = machine.Current;
+        return new(tenant.TenantId, targetId,
+            principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
+            machine.IsMachineCaller, action)
+        {
+            IsEventCollection = collection,
+            MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
+        };
+    }
 
     private static EventResourceAuditEntry Audit(EventResourceAuthorityRequest request, Guid resourceId,
         EventResourceAuditAction action, DateTime now) => EventResourceAuditEntry.Create(request.TenantId, resourceId,

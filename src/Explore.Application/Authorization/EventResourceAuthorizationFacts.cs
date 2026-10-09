@@ -17,10 +17,12 @@ public sealed class EventResourceAuthorizationFacts
     public Guid? StorageObjectId { get; }
     public string AttachmentGeneration { get; }
     public EventResourceParentModerationFacts? ParentModeration { get; }
+    public EventResourceMachinePrincipal? MachinePrincipal { get; }
 
     public EventResourceAuthorizationFacts(EventResource resource, EventResourceAccessFacts access,
         EventResourceManagementFacts management, string attachmentGeneration,
-        EventResourceParentModerationFacts? parentModeration = null)
+        EventResourceParentModerationFacts? parentModeration = null,
+        EventResourceMachinePrincipal? machinePrincipal = null)
     {
         Policy = EventResourcePolicySnapshot.Capture(resource);
         Access = access;
@@ -29,17 +31,20 @@ public sealed class EventResourceAuthorizationFacts
         StorageObjectId = resource.StorageObjectId;
         AttachmentGeneration = attachmentGeneration;
         ParentModeration = parentModeration;
+        MachinePrincipal = machinePrincipal;
     }
 
     /// <summary>Parent-event operations resolve the existing Event, never a fabricated persisted resource.</summary>
     public EventResourceAuthorizationFacts(EventResourceParentFacts parent, Guid parentVersion,
         Guid? subjectUserId, bool isMachineCaller, EventResourceManagementFacts management,
-        EventResourceGovernancePolicy? governancePolicy)
+        EventResourceGovernancePolicy? governancePolicy,
+        EventResourceMachinePrincipal? machinePrincipal = null)
     {
         Access = new(parent.TenantId, subjectUserId, isMachineCaller, parent, [], false, governancePolicy);
         Management = management;
         ResourceVersion = parentVersion;
         AttachmentGeneration = "parent";
+        MachinePrincipal = machinePrincipal;
     }
 
     internal EventResourceEvaluation Evaluate(EventResourceAuthorityRequest request,
@@ -47,7 +52,7 @@ public sealed class EventResourceAuthorizationFacts
     {
         bool parentTarget = Policy is null;
         bool creating = request.Action == "create";
-        if (parentTarget != request.TargetsParentEvent
+        if (!request.HasConsistentPrincipal || parentTarget != request.TargetsParentEvent
             || request.IsEventCollection && request.Action is not ("view" or "view-management" or "export")
             || request.ExpectedResourceVersion is { } expectedVersion && ResourceVersion != expectedVersion
             || request.ExpectedAttachmentGeneration is { } expectedGeneration && AttachmentGeneration != expectedGeneration
@@ -56,7 +61,8 @@ public sealed class EventResourceAuthorizationFacts
             || request.ResourceId != ResourceId
             || request.TenantId != (Policy?.TenantId ?? Access.Parent.TenantId)
             || Access.TenantId != request.TenantId || Access.SubjectUserId != request.SubjectUserId
-            || Access.IsMachineCaller != request.IsMachineCaller || string.IsNullOrWhiteSpace(AttachmentGeneration))
+            || Access.IsMachineCaller != request.IsMachineCaller
+            || MachinePrincipal != request.MachinePrincipal || string.IsNullOrWhiteSpace(AttachmentGeneration))
             return new(false, new(false, false, false), null);
         bool publicOnly = request.IsMachineCaller || request.SubjectUserId is null;
         var access = publicOnly

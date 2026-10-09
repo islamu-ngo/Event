@@ -78,7 +78,7 @@ using an earlier permission check. Audience detail and collection responses also
 retain their metadata privately until a fresh check at response execution,
 including revocation after links were prepared. A stale private representation
 is refused rather than serialized. These checks do not enable a moderation
-profile: exact machine identity and canonical moderation enforcement still
+profile: current machine-source and canonical moderation enforcement still
 require complete qualification.
 
 Management pages, audit and metadata exports also keep their representations
@@ -86,6 +86,12 @@ private until final authority checks. Audit pages are refused if retained entrie
 expire or retention policy changes during preparation. Exports recheck the
 download decisions behind their links; retry a refused projection to obtain
 current metadata rather than reusing its prepared result.
+
+Machine requests retain their exact API-key ID, owning authority tenant and
+owner coordinates, without inheriting the owner's human identity. Audience
+continuations and prepared responses cannot transfer between those identities.
+Existing audience cursors must be refreshed from the first page after this
+change; they are paging positions, never transferable permission grants.
 
 Embedded native integrations must consume audience and management query `Projection` through
 `DiscloseAsync` instead of reading `Value`. Build the representation privately

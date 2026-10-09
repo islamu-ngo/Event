@@ -117,7 +117,8 @@ public sealed partial class EventResourceDiscoveryQueryTests
     }
 
     private EventResourceAudienceWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid? subject,
-        Provider? provider = null, bool isMachine = false, string[]? origins = null)
+        Provider? provider = null, bool isMachine = false, string[]? origins = null,
+        IMachinePrincipalAccessor? machinePrincipal = null)
     {
         var repository = new EventResourceRepository(context);
         var unit = new EfCoreUnitOfWork(context);
@@ -129,7 +130,15 @@ public sealed partial class EventResourceDiscoveryQueryTests
         routes.ReadAsync(tenantId, Arg.Any<CancellationToken>()).Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var tenant = Substitute.For<ITenantContext>(); tenant.TenantId.Returns(tenantId);
         var user = Substitute.For<ICurrentUserService>(); user.IsAuthenticated.Returns(subject.HasValue); user.UserId.Returns(subject);
-        var machine = Substitute.For<IMachinePrincipalAccessor>(); machine.IsMachineCaller.Returns(isMachine);
+        var machine = machinePrincipal ?? Substitute.For<IMachinePrincipalAccessor>();
+        if (machinePrincipal is null)
+        {
+            machine.IsMachineCaller.Returns(isMachine);
+            if (isMachine) machine.Current.Returns(new Explore.Application.Authentication.ApiKeyPrincipalContext(
+                Guid.CreateVersion7().ToString("N"), tenantId,
+                subject.HasValue ? ExternalApiKeyOwnerType.User : ExternalApiKeyOwnerType.Tenant,
+                subject ?? tenantId, []));
+        }
         return new(repository, unit, new(unit, new EventResourceAuthoritySnapshotReader(repository,
             new EventAuthoritySnapshotService(context), governance), routes, provider ?? new Provider(), new Clock()),
             tenant, user, machine, _cursors);

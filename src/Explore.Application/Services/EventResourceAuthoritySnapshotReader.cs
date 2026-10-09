@@ -42,10 +42,12 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         if (evaluationUtc.Offset != TimeSpan.Zero) return result;
 
         EventResourceAuthorityRequest first = requests[0];
-        if (first.TenantId == Guid.Empty || first.SubjectUserId == Guid.Empty
+        if (first.TenantId == Guid.Empty || first.SubjectUserId == Guid.Empty || !first.HasConsistentPrincipal
             || requests.Any(request => request.TenantId != first.TenantId
+                || !request.HasConsistentPrincipal
                 || request.SubjectUserId != first.SubjectUserId
-                || request.IsMachineCaller != first.IsMachineCaller))
+                || request.IsMachineCaller != first.IsMachineCaller
+                || request.MachinePrincipal != first.MachinePrincipal))
             return result;
 
         Guid tenantId = first.TenantId;
@@ -126,7 +128,7 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             if (resource is null)
             {
                 result[index] = new(parent, parentEvent.ConcurrencyStamp, request.SubjectUserId,
-                    request.IsMachineCaller, management, governancePolicy);
+                    request.IsMachineCaller, management, governancePolicy, request.MachinePrincipal);
                 continue;
             }
 
@@ -134,7 +136,7 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             result[index] = new(resource,
                 new(tenantId, request.SubjectUserId, request.IsMachineCaller, parent, audience, payloadSafe, governancePolicy),
                 management, generation, request.Action == "moderate" && subject.ModerationPrincipal is { } principal
-                    ? new(principal, CaptureNativeParent(parentEvent)) : null);
+                    ? new(principal, CaptureNativeParent(parentEvent)) : null, request.MachinePrincipal);
         }
         return result;
     }

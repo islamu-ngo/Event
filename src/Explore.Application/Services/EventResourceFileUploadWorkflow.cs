@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventResource;
 using Explore.Application.DTOs.EventResource.Validators;
 using Explore.Application.DTOs.StorageObject;
@@ -355,9 +356,18 @@ public sealed class EventResourceFileUploadWorkflow(
     private async Task<bool> FencedAsync(CancellationToken ct) => user.UserId is { } id
         && await privacy.GetBySubjectAsync(id, ct) is not null;
 
-    private Task<EventResourceAuthorityResult> AuthorizeAsync(Guid id, CancellationToken ct) => authority.AuthorizeAsync(
-        new(tenant.TenantId, id, user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "update"),
-        (facts, token) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation(facts.AttachmentGeneration)), ct);
+    private Task<EventResourceAuthorityResult> AuthorizeAsync(Guid id, CancellationToken ct)
+    {
+        var principal = machine.Current;
+        return authority.AuthorizeAsync(
+            new(tenant.TenantId, id,
+                principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
+                machine.IsMachineCaller, "update")
+            {
+                MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
+            },
+            (facts, token) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation(facts.AttachmentGeneration)), ct);
+    }
 
     private sealed class Preparation(string generation) : IEventResourcePrivatePreparation
     {

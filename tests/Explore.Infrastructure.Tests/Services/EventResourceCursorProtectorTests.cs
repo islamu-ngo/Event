@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Services;
+using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
 using NSubstitute;
@@ -8,6 +9,38 @@ namespace Explore.Infrastructure.Tests.Services;
 
 public sealed class EventResourceCursorProtectorTests
 {
+    [Test]
+    public async Task MachineContinuationUsesExactValueEqualKeyAndOwnerCoordinates()
+    {
+        var service = new EventResourceCursorProtector(new EphemeralDataProtectionProvider(), new Clock());
+        var principal = new EventResourceMachinePrincipal("opaque-key-one", Guid.CreateVersion7(),
+            ExternalApiKeyOwnerType.Organization, Guid.CreateVersion7());
+        var scope = new EventResourceCursorScope(Guid.CreateVersion7(), Guid.CreateVersion7(), null, true)
+        {
+            MachinePrincipal = principal
+        };
+        var position = new EventResourceCursorPosition(17, Guid.CreateVersion7());
+        var token = service.Protect(scope, position);
+        var equivalent = scope with
+        {
+            MachinePrincipal = new(principal.KeyId, principal.AuthorityTenantId, principal.OwnerType, principal.OwnerId)
+        };
+        await Assert.That(service.TryUnprotect(token, equivalent, out var decoded)).IsTrue();
+        await Assert.That(decoded).IsEqualTo(position);
+        foreach (var changed in new[]
+        {
+            principal with { KeyId = "opaque-key-two" },
+            principal with { KeyId = "OPAQUE-KEY-ONE" },
+            principal with { AuthorityTenantId = Guid.CreateVersion7() },
+            principal with { OwnerType = ExternalApiKeyOwnerType.Group },
+            principal with { OwnerId = Guid.CreateVersion7() }
+        })
+        {
+            await Assert.That(service.TryUnprotect(token, scope with { MachinePrincipal = changed }, out decoded)).IsFalse();
+            await Assert.That(decoded).IsNull();
+        }
+    }
+
     [Test]
     public async Task PositionIsOpaqueAndBoundToTenantEventSubjectAnonymousAndMachineIdentity()
     {
@@ -50,8 +83,8 @@ public sealed class EventResourceCursorProtectorTests
         await Assert.That(service.TryUnprotect(token, scope, out _)).IsTrue();
         clock.Now = clock.Now.AddTicks(1);
         await Assert.That(service.TryUnprotect(token, scope, out _)).IsFalse();
-        var wrongVersion = provider.CreateProtector("EventResource.AudienceCursor.v1").Protect(JsonSerializer.Serialize(
-            new { Version = 2, Scope = scope, Position = position, ExpiresAt = clock.Now.AddMinutes(1) }));
+        var wrongVersion = provider.CreateProtector("EventResource.AudienceCursor.v2").Protect(JsonSerializer.Serialize(
+            new { Version = 3, Scope = scope, Position = position, ExpiresAt = clock.Now.AddMinutes(1) }));
         foreach (var invalid in new[] { "", "invalid", token + "broken", wrongVersion })
             await Assert.That(service.TryUnprotect(invalid, scope, out _)).IsFalse();
         var restarted = new EventResourceCursorProtector(new EphemeralDataProtectionProvider(), clock);

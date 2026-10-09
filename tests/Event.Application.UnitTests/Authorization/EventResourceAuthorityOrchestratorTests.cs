@@ -588,9 +588,11 @@ public class EventResourceAuthorityOrchestratorTests
     public async Task Anonymous_and_machine_callers_share_only_the_public_path_without_PDP(bool machine, bool restricted)
     {
         var f = new Fixture(restricted ? EventResourceAudienceKindEnum.AuthenticatedTenantMember : EventResourceAudienceKindEnum.Public);
-        var user = machine ? Subject : (Guid?)null;
-        f.Request = f.Request with { IsMachineCaller = machine, SubjectUserId = user };
-        f.Facts = f.Capture(access: new(Tenant, user, machine, f.Access.Parent, f.Access.Audience, true, f.Access.GovernancePolicy));
+        var identity = machine ? new EventResourceMachinePrincipal("public-resource-key", Tenant,
+            ExternalApiKeyOwnerType.User, Subject) : null;
+        f.Request = f.Request with { IsMachineCaller = machine, SubjectUserId = null, MachinePrincipal = identity };
+        f.Facts = f.Capture(access: new(Tenant, null, machine, f.Access.Parent, f.Access.Audience, true, f.Access.GovernancePolicy),
+            machinePrincipal: identity);
         f.OnProvider = (_, _) => throw new InvalidOperationException("Public-only callers must not enter PDP");
         await using var preparation = new Preparation("generation-1");
         var result = await f.Service.AuthorizeAsync(f.Request,
@@ -598,6 +600,19 @@ public class EventResourceAuthorityOrchestratorTests
         await using var lease = result.Lease;
         await Assert.That(result.Outcome == EventResourceAuthorityOutcome.Allowed).IsEqualTo(!restricted);
         await Assert.That(f.Inputs.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task BatchCannotCombineDistinctMachineKeysWithTheSameOwner()
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.Public);
+        var identity = new EventResourceMachinePrincipal("resource-key-one", Tenant,
+            ExternalApiKeyOwnerType.User, Subject);
+        var request = f.Request with { SubjectUserId = null, IsMachineCaller = true, MachinePrincipal = identity };
+        var outcomes = await f.Service.AuthorizeCapabilitiesAsync(
+            [request, request with { MachinePrincipal = identity with { KeyId = "resource-key-two" } }], default);
+        await Assert.That(outcomes.Count).IsEqualTo(2);
+        await Assert.That(outcomes.All(outcome => outcome == EventResourceAuthorityOutcome.Forbidden)).IsTrue();
     }
 
     [Test]
@@ -1055,8 +1070,9 @@ public class EventResourceAuthorityOrchestratorTests
         }
 
         public EventResourceAuthorizationFacts Capture(string generation = "generation-1", EventResourceManagementFacts? management = null,
-            EventResourceAccessFacts? access = null) => new(Resource, access ?? Access, management ?? new(
-                new(false), new(true), new(false), [], true, true), generation);
+            EventResourceAccessFacts? access = null, EventResourceMachinePrincipal? machinePrincipal = null) =>
+            new(Resource, access ?? Access, management ?? new(
+                new(false), new(true), new(false), [], true, true), generation, machinePrincipal: machinePrincipal);
 
         public EventResourceCapabilityAuthorizer NativeAuthorizer()
         {

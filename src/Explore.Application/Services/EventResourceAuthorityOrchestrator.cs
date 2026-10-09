@@ -219,6 +219,7 @@ public sealed partial class EventResourceAuthorityOrchestrator(
         && a.Evaluation.Disclosure == b.Evaluation.Disclosure
         && Equals(a.Facts.Access.GovernancePolicy, b.Facts.Access.GovernancePolicy)
         && a.Facts.ResourceVersion == b.Facts.ResourceVersion
+        && a.Facts.MachinePrincipal == b.Facts.MachinePrincipal
         && a.Facts.StorageObjectId == b.Facts.StorageObjectId
         && a.Facts.AttachmentGeneration == b.Facts.AttachmentGeneration;
 }

@@ -24,6 +24,11 @@ public sealed record EventResourceAuthorityRequest(
     public const int MaximumBatchResources = 500;
     public const int MaximumBatchChecks = MaximumBatchResources * 13;
 
+    public EventResourceMachinePrincipal? MachinePrincipal { get; init; }
+    public bool HasConsistentPrincipal => IsMachineCaller
+        ? SubjectUserId is null && MachinePrincipal is not null
+        : MachinePrincipal is null;
+
     /// <summary>Server-selected parent-event authority for management collection and export reads.</summary>
     public bool IsEventCollection { get; init; }
     public bool TargetsParentEvent => Action == "create" || IsEventCollection;

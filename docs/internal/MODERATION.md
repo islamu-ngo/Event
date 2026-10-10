@@ -6,6 +6,31 @@ store scalar ancestry coordinates and reconstruct checked semantic values.
 `Explore.Persistence` maps those same entities; it does not keep a second
 serialized interpretation of their state.
 
+## Canonical recognition token computation
+
+`ModerationRecognitionKey` adds the native computation primitive without
+registering or enabling a capture service. An ephemeral 32-byte key is supplied
+by the selected secret authority, snapshotted and zeroed on disposal. The
+computed `ModerationRecognitionToken` retains only trust-domain UUID, provider
+kind, purpose, key ID/generation, serialization version and HMAC digest. Its
+constructor rejects unsupported provider/purpose/version, ambiguous key IDs and
+noncanonical digests. Native identity, policy, sanction and secret authority
+must still be qualified by the eventual capture owner.
+
+Version 1 uses HMAC-SHA-256 over ordered UTF-8 fields, each prefixed by a
+four-byte big-endian byte length: `ISLAMU.Moderation.Recognition.Account.v1`,
+`final-action` or `final-enrollment`, canonical trust UUID, key ID, invariant
+decimal key generation, invariant decimal provider kind and the exact opaque
+`ProviderAccountKey.Value`. The trusted principal/binding adapter remains the
+only provider normalization authority; issuer path/subject case and DID
+semantics are not reinterpreted. Strict UTF-8 rejects malformed surrogates
+instead of collapsing them into replacement identities. The distinct
+`ISLAMU.Moderation.Recognition.Key.v1` verification domain binds trust, key ID
+and generation without producing an account token. Temporary encoded buffers
+and digests are cleared; neither token nor key `ToString` exposes their values.
+No ring provisioning, rotation, matching, persistence, erasure settlement or
+recovery is supplied by this primitive, and erased inputs cannot be rehashed.
+
 ## Local transaction boundary
 
 `ModerationStore` owns a serializable primary-store execution-strategy unit.

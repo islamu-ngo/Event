@@ -23,6 +23,15 @@ The current programme is building the authoritative ledger and native
 integration. Installing its schema does not enable a policy, replace existing
 actor protection or certify a deployment as protected.
 
+The native token computation primitive now uses a versioned, length-prefixed
+HMAC-SHA-256 format with separate action/enrollment purposes, trust domain and
+key ID/generation. It preserves the trusted provider-account identity exactly
+and rejects malformed Unicode rather than inventing a replacement identity.
+Only minimized digest coordinates are returned; ephemeral key material is
+cleared on disposal. This is not a configured key ring or an enabled matching/
+capture service. Keys still require the selected secret authority, and native
+capture, durable erasure ordering and recovery remain separate requirements.
+
 Installation identity is recorded separately from tenant qualification. Changing
 request coordinates or repeating setup cannot silently replace the recorded
 trust ancestry. The selected maintenance principal must already exist; creating

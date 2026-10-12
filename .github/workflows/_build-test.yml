@@ -401,7 +401,7 @@ jobs:
 
       - name: Retain fast coverage
         if: ${{ always() && inputs.run-fast-tests && inputs.collect-coverage }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-fast
           path: artifacts/coverage/*.cobertura.xml
@@ -410,7 +410,7 @@ jobs:
 
       - name: Upload Test Results
         if: ${{ always() && inputs.run-fast-tests }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-fast
           path: |
@@ -550,7 +550,7 @@ jobs:
       - name: Retain bounded HTTP coverage before broad integration
         id: retain_issuance_http_coverage
         if: ${{ always() && inputs.collect-coverage && contains(fromJSON('["success","failure"]'), steps.issuance_http.outcome) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-runtime-IssuanceHttp
           path: artifacts/coverage/runtime-IssuanceHttp.cobertura.xml
@@ -658,7 +658,7 @@ jobs:
 
       - name: Retain validated runtime coverage
         if: ${{ always() && inputs.collect-coverage && steps.coverage_reports.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-runtime-validated
           path: artifacts/coverage/*.cobertura.xml
@@ -667,7 +667,7 @@ jobs:
 
       - name: Retain runtime coverage
         if: ${{ always() && inputs.collect-coverage }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-runtime
           path: artifacts/coverage/*.cobertura.xml
@@ -692,7 +692,7 @@ jobs:
 
       - name: Upload Integration Test Results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-integration
           path: |
@@ -1054,7 +1054,7 @@ jobs:
       - name: Retain provider coverage
         id: retain_provider_coverage
         if: ${{ always() && inputs.collect-coverage && steps.runtime_smoke.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-runtime-${{ matrix.provider }}
           path: artifacts/coverage/*.cobertura.xml
@@ -1084,7 +1084,7 @@ jobs:
 
       - name: Upload Provider Evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: database-provider-${{ matrix.provider }}
           path: |

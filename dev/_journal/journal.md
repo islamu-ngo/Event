@@ -2853,3 +2853,27 @@ Do not infer wire presence from DTO nullability or an isolated serializer test.
 - [x] Stays in journal only; production HTTP field-presence assertions are the regression.
 
 ---
+
+[2026-10-12 Europe/Brussels] — Standalone client builds do not export fresh API schema
+
+**Context**: While reviewing the Studio event workspace implementation plan, its phase gates claimed that a standalone Blazor client build would also produce the current backend OpenAPI input. The review changed documentation only.
+
+**Symptom / Observation**: `Explore.Blazor.Client.csproj` regenerates and captures the client from the selected checked-in schema, but its `BuildApiContractForClient` target invokes API export only when `BuildingSolutionFile` is `true`. A successful standalone client build can therefore consume a schema that predates a DTO change.
+
+**Root Cause**: Solution-build ordering and standalone schema-driven generation are deliberately separate contracts. Input hashing proves which schema the client consumed; it does not prove that schema was generated from the latest backend source.
+
+**Resolution**: The reviewed plan now requires native API `GetOpenApiContractInput`, then the API inventory producer, then `GenerateApiClient`, followed by the affected client gate. These commands are planned, not executed or claimed passing in this documentation review. The actual generated client owner is `Clients/EventApiTagClients.g.cs`; older API documentation still contains a retired filename example.
+
+**Why This Matters for Future Work**: Every API contract change needs producer-to-consumer provenance. Standalone client compilation or a matching capture hash alone cannot establish that the backend and browser agree on new nullability or wire shape.
+
+**References**:
+- `src/Explore.Blazor.Client/Explore.Blazor.Client.csproj:134`
+- `src/Explore.API/Explore.API.csproj:109`
+- `eng/tools/Explore.ApiContractInventory/Program.cs:50`
+- `docs/internal/API.md#openapi-export-and-client-generation`
+- Repository evidence: `072f2b6dbd8e4b87e16b795bc02a9ea23f902046`
+
+**Promotion Consideration**:
+- [x] Candidate for updating the API generation guidance when its owning contract work is implemented; no generation tooling change is implied.
+
+---

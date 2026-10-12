@@ -978,6 +978,17 @@ jobs:
             --minimum-expected-tests 2 --no-progress --maximum-parallel-tests 1 \
             --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.Behavior.trx "${coverage_args[@]}"
 
+      - name: Run Native Draft Graph Provider Contract
+        id: native_draft_graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+            --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- \
+            --treenode-filter "/*/*/CreateEventDraftGraphTests/*" \
+            --minimum-expected-tests 6 \
+            --report-trx --report-trx-filename Event.Persistence.IntegrationTests.${{ matrix.provider }}.NativeDraftGraph.trx
+
       - name: Run API Key Issuance Provider Contract
         id: api_key_issuance
         shell: bash
@@ -1025,6 +1036,7 @@ jobs:
           ${{ always() && inputs.collect-coverage &&
             (contains(fromJSON('["success","failure"]'), steps.runtime_smoke.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.behavior_contract.outcome) ||
+             contains(fromJSON('["success","failure"]'), steps.native_draft_graph.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.api_key_issuance.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.secret_binding_contract.outcome)) }}
         shell: bash

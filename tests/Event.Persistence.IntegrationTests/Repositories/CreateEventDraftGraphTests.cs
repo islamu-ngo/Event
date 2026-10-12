@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Security.Claims;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -55,7 +54,10 @@ public sealed class CreateEventDraftGraphTests
         var publisher = await SeedOwnerAsync(db, tenant.TenantId, userId);
         await AssertProviderAsync(providerFixture, db);
         var request = DraftRequest(publisher.LocationId, mixed, explicitReferences)
-            with { OrganizationId = publisher.OrganizationId };
+            with
+        {
+            OrganizationId = publisher.OrganizationId
+        };
         var response = await scope.ServiceProvider
             .GetRequiredService<ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(new() { EventDto = request }, default);
@@ -158,14 +160,15 @@ public sealed class CreateEventDraftGraphTests
         await providerFixture.PrepareAsync();
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
-        var failure = new PublicationCommitFailure(tenant.TenantId);
+        var failure = new PublicationWriteFailure(tenant.TenantId);
         await using var services = BuildServices(providerFixture, tenant, userId, failure);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var publisher = await SeedOwnerAsync(db, tenant.TenantId, userId);
         await AssertProviderAsync(providerFixture, db);
         var draft = DraftRequest(publisher.LocationId, mixed: true, explicitReferences: false)
-            with { OrganizationId = publisher.OrganizationId };
+            with
+        { OrganizationId = publisher.OrganizationId };
         var request = draft with
         {
             EventStatusId = (int)EventStatusEnum.Published,
@@ -206,7 +209,8 @@ public sealed class CreateEventDraftGraphTests
         var publisher = await SeedOwnerAsync(db, tenant.TenantId, userId);
         await AssertProviderAsync(providerFixture, db);
         var request = DraftRequest(publisher.LocationId, mixed: false, explicitReferences: true)
-            with { OrganizationId = publisher.OrganizationId };
+            with
+        { OrganizationId = publisher.OrganizationId };
         var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>>>();
         await Assert.ThrowsAsync<NativeGraphWriteFailureException>(() =>
             handler.ExecuteAsync(new() { EventDto = request }, default));
@@ -238,7 +242,7 @@ public sealed class CreateEventDraftGraphTests
             PrimaryDatabaseProvider.PostgreSql => "Npgsql.EntityFrameworkCore.PostgreSQL",
             PrimaryDatabaseProvider.Sqlite => "Microsoft.EntityFrameworkCore.Sqlite",
             PrimaryDatabaseProvider.SqlServer => "Microsoft.EntityFrameworkCore.SqlServer",
-            PrimaryDatabaseProvider.MySql or PrimaryDatabaseProvider.MariaDb => "Pomelo.EntityFrameworkCore.MySql",
+            PrimaryDatabaseProvider.MySql or PrimaryDatabaseProvider.MariaDb => "Microting.EntityFrameworkCore.MySql",
             _ => throw new InvalidOperationException($"Unexpected graph runtime provider {fixture.Provider}.")
         };
         await Assert.That(db.Database.ProviderName).IsEqualTo(expected);
@@ -249,9 +253,12 @@ public sealed class CreateEventDraftGraphTests
     {
         var prepared = new Dictionary<string, object?>
         {
-            ["title"] = "Prepared native session", ["description"] = "Prepared description",
-            ["slug"] = "prepared-native-session", ["maxAudienceAttendees"] = 37,
-            ["sortOrder"] = 7, ["locationId"] = locationId
+            ["title"] = "Prepared native session",
+            ["description"] = "Prepared description",
+            ["slug"] = "prepared-native-session",
+            ["maxAudienceAttendees"] = 37,
+            ["sortOrder"] = 7,
+            ["locationId"] = locationId
         };
         if (explicitReferences)
         {
@@ -261,7 +268,8 @@ public sealed class CreateEventDraftGraphTests
         var second = new Dictionary<string, object?>
         {
             ["title"] = mixed ? "Scheduled native session" : "Another prepared native session",
-            ["sortOrder"] = 8, ["locationId"] = locationId
+            ["sortOrder"] = 8,
+            ["locationId"] = locationId
         };
         if (mixed)
         {
@@ -298,7 +306,8 @@ public sealed class CreateEventDraftGraphTests
             }).Build();
         var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
-            DisableDefaults = true, EnvironmentName = Environments.Production
+            DisableDefaults = true,
+            EnvironmentName = Environments.Production
         }).Services;
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
@@ -352,28 +361,46 @@ public sealed class CreateEventDraftGraphTests
         var actorId = Guid.CreateVersion7();
         db.Tenants.Add(new Tenant
         {
-            Id = tenantId, Slug = $"native-graph-{tenantId:N}", FullName = "Native graph tenant",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = tenantId,
+            Slug = $"native-graph-{tenantId:N}",
+            FullName = "Native graph tenant",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         db.Users.Add(new User
         {
-            Id = userId, Pii = new UserPii { Email = string.Empty, FirstName = "Native", LastName = "Organizer" }
+            Id = userId,
+            Pii = new UserPii { Email = string.Empty, FirstName = "Native", LastName = "Organizer" }
         });
         db.Actors.Add(new Actor
         {
-            Id = actorId, UserId = userId, ActorTypeId = (int)ActorTypeEnum.User,
-            ActorType = null!, Pii = new ActorPii { DisplayName = "Native organizer" }
+            Id = actorId,
+            UserId = userId,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Native organizer" }
         });
         db.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, UserId = userId, User = null!,
-            ActorId = actorId, StatusId = (int)TenantUserStatusEnum.Active,
-            JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            UserId = userId,
+            User = null!,
+            ActorId = actorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
         });
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            FullName = "Prepared venue", City = "Brussels", Country = "Belgium", Timezone = "Europe/Brussels"
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            FullName = "Prepared venue",
+            City = "Brussels",
+            Country = "Belgium",
+            Timezone = "Europe/Brussels"
         };
         location.ClassifyAs(LocationKindEnum.CommercialVenue);
         location.SetManualAddress("Prepared street", "1000");
@@ -387,24 +414,39 @@ public sealed class CreateEventDraftGraphTests
         };
         var participation = new OrganizationTenant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            OrganizationId = organizationId, Organization = organization,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!,
-            IsVisible = true, IsOrganizerEligible = true, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            OrganizationId = organizationId,
+            Organization = organization,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!,
+            IsVisible = true,
+            IsOrganizerEligible = true,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         db.Organizations.Add(organization);
         db.OrganizationTenants.Add(participation);
         db.Actors.Add(new Actor
         {
-            Id = Guid.CreateVersion7(), OrganizationId = organizationId,
-            ActorTypeId = (int)ActorTypeEnum.Organization, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            OrganizationId = organizationId,
+            ActorTypeId = (int)ActorTypeEnum.Organization,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Native graph publisher" }
         });
         db.OrganizationMembers.Add(new OrganizationMember
         {
-            Id = Guid.CreateVersion7(), OrganizationTenantId = participation.Id, OrganizationTenant = participation,
-            UserId = userId, User = null!, TenantId = tenantId, Tenant = null!,
-            RoleId = (int)RoleEnum.OrgAdmin, Role = null!, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            OrganizationTenantId = participation.Id,
+            OrganizationTenant = participation,
+            UserId = userId,
+            User = null!,
+            TenantId = tenantId,
+            Tenant = null!,
+            RoleId = (int)RoleEnum.OrgAdmin,
+            Role = null!,
+            CreatedAt = DateTime.UtcNow
         });
         var permissionId = await db.Permissions
             .Where(permission => permission.MasterCode == PermissionCodes.EventCreate)
@@ -414,8 +456,11 @@ public sealed class CreateEventDraftGraphTests
         {
             db.RolePermissions.Add(new RolePermission
             {
-                RoleId = (int)RoleEnum.OrgAdmin, Role = null!,
-                PermissionId = permissionId, Permission = null!, GrantedAt = DateTime.UtcNow
+                RoleId = (int)RoleEnum.OrgAdmin,
+                Role = null!,
+                PermissionId = permissionId,
+                Permission = null!,
+                GrantedAt = DateTime.UtcNow
             });
         }
         await db.SaveChangesAsync();
@@ -468,7 +513,7 @@ public sealed class CreateEventDraftGraphTests
         }
     }
 
-    private sealed class PublicationCommitFailure(Guid tenantId) : DbTransactionInterceptor
+    private sealed class PublicationWriteFailure(Guid tenantId) : SaveChangesInterceptor
     {
         public Guid RootId { get; private set; }
         public int ChildrenWritten { get; private set; }
@@ -476,23 +521,25 @@ public sealed class CreateEventDraftGraphTests
         public bool OutboxWritten { get; private set; }
         public bool Injected { get; private set; }
 
-        public override async ValueTask<InterceptionResult> TransactionCommittingAsync(
-            DbTransaction transaction, TransactionEventData eventData, InterceptionResult result,
+        public override async ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData, int result,
             CancellationToken cancellationToken = default)
         {
-            if (Injected || eventData.Context is not ExploreDbContext db)
+            if (Injected || eventData.Context is not ExploreDbContext db || db.Database.CurrentTransaction is null)
                 return result;
             var rootId = await db.Events.Where(root => root.TenantId == tenantId)
                 .Select(root => (Guid?)root.Id).SingleOrDefaultAsync(cancellationToken);
             if (rootId is null)
                 return result;
             RootId = rootId.Value;
+            OutboxWritten = await db.OutboxMessages.AnyAsync(message => message.AggregateId == RootId, cancellationToken);
+            if (!OutboxWritten)
+                return result;
             ChildrenWritten = await db.EventSessions.CountAsync(session => session.EventId == RootId, cancellationToken);
             OwnerWritten = await db.EventRoleAssignments.AnyAsync(grant => grant.EventId == RootId
                 && grant.RoleId == (int)RoleEnum.EventOwner, cancellationToken);
-            OutboxWritten = await db.OutboxMessages.AnyAsync(message => message.AggregateId == RootId, cancellationToken);
             if (ChildrenWritten != 2 || !OwnerWritten || !OutboxWritten)
-                throw new InvalidOperationException("The provider commit seam did not observe the persisted published graph and outbox.");
+                throw new InvalidOperationException("The provider write seam did not observe the persisted published graph and outbox.");
             Injected = true;
             throw new NativeGraphWriteFailureException();
         }

@@ -419,7 +419,11 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             _actorRepository);
 
         var validationResult = await validator.ValidateAsync(request, cancellationToken);
-        return validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+        return validationResult.Errors
+            .Select(error => string.IsNullOrEmpty(error.PropertyName)
+                ? error.ErrorMessage
+                : $"{error.PropertyName}: {error.ErrorMessage}")
+            .ToList();
     }
 
     private Task<EventActorResult> ResolvePublisherActorAsync(CreateEventDto request, Guid currentUserId, CancellationToken cancellationToken) =>
@@ -433,17 +437,17 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         DateTimeOffset createdAt,
         bool includePublicScheduleRollup)
     {
-        var publicSessionRequests = includePublicScheduleRollup
-            ? dto.Sessions
+        IReadOnlyList<CreateEventGraphSessionDto> publicSessionRequests = includePublicScheduleRollup
+            ? dto.Sessions.Where(session => session.StartTime.HasValue).ToArray()
             : [];
         var firstSession = publicSessionRequests.MinBy(s => s.StartTime);
         var lastSession = publicSessionRequests.MaxBy(s => s.StartTime);
         var firstSessionLocal = firstSession is null
             ? (DateOnly?)null
-            : _scheduleProjectionCalculator.Project(firstSession.StartTime, firstSession.EndTime, timezoneId).LocalStartDate;
+            : _scheduleProjectionCalculator.Project(firstSession.StartTime!.Value, firstSession.EndTime, timezoneId).LocalStartDate;
         var lastSessionLocal = lastSession is null
             ? (DateOnly?)null
-            : _scheduleProjectionCalculator.Project(lastSession.StartTime, lastSession.EndTime, timezoneId).LocalStartDate;
+            : _scheduleProjectionCalculator.Project(lastSession.StartTime!.Value, lastSession.EndTime, timezoneId).LocalStartDate;
 
         var eventEntity = new Event(includePublicScheduleRollup
             ? EventStatusEnum.Published
@@ -473,8 +477,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             RegistrationPolicyId = dto.RegistrationPolicyId,
             FirstSessionDate = firstSessionLocal,
             LastSessionDate = lastSessionLocal,
-            FirstSessionStartUtc = firstSession?.StartTime.ToUniversalTime(),
-            LastSessionStartUtc = lastSession?.StartTime.ToUniversalTime(),
+            FirstSessionStartUtc = firstSession?.StartTime?.ToUniversalTime(),
+            LastSessionStartUtc = lastSession?.StartTime?.ToUniversalTime(),
             SessionCount = publicSessionRequests.Count,
             ActorId = actorResult.ActorId,
             Actor = null!,
@@ -577,7 +581,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             .ToDictionary(g => g.Key, g => g.First());
 
         var sessionDates = dto.Sessions
-            .Select(s => _scheduleProjectionCalculator.Project(s.StartTime, s.EndTime, timezoneId).LocalStartDate)
+            .Where(session => session.StartTime.HasValue)
+            .Select(session => _scheduleProjectionCalculator.Project(session.StartTime!.Value, session.EndTime, timezoneId).LocalStartDate)
             .Distinct()
             .Order()
             .ToList();
@@ -717,7 +722,10 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         }
 
         var index = 0;
-        foreach (var sessionDto in dto.Sessions.OrderBy(s => s.StartTime).ThenBy(s => s.SortOrder))
+        foreach (var sessionDto in dto.Sessions
+                     .OrderBy(session => !session.StartTime.HasValue)
+                     .ThenBy(session => session.StartTime)
+                     .ThenBy(session => session.SortOrder))
         {
             index++;
             var session = new EventSession(eventEntity.EventStatusId == (int)EventStatusEnum.Published
@@ -738,6 +746,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 CurrentAudienceAttendees = 0,
                 EventSessionKindId = sessionDto.EventSessionKindId,
                 RegistrationModeId = sessionDto.RegistrationModeId,
+                EndTimeType = sessionDto.EndTimeType,
                 Slug = string.IsNullOrWhiteSpace(sessionDto.Slug)
                     ? SlugGenerator.FromTitle(sessionDto.Title ?? $"{eventEntity.Title}-session-{index}", "session")
                     : sessionDto.Slug
@@ -750,38 +759,37 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 ct);
             session.AssignEventLocation(eventLocation);
 
-            switch (sessionDto.EndTimeType)
+            if (sessionDto.StartTime is { } startTime)
             {
-                case SessionEndTimeType.Fixed:
-                    session.Reschedule(
-                        UtcInstantRange.Create(sessionDto.StartTime, sessionDto.EndTime!.Value),
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                case SessionEndTimeType.OpenEnded:
-                    session.ScheduleOpenEnded(
-                        sessionDto.StartTime,
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                case SessionEndTimeType.RelativeToPrayer when sessionDto.EndTime is { } endTime:
-                    session.ScheduleRelativeToPrayer(
-                        UtcInstantRange.Create(sessionDto.StartTime, endTime),
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                case SessionEndTimeType.RelativeToPrayer:
-                    session.ScheduleRelativeToPrayer(
-                        sessionDto.StartTime,
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                default:
-                    throw new InvalidOperationException("Event session end time type is not supported.");
+                switch (sessionDto.EndTimeType)
+                {
+                    case SessionEndTimeType.Fixed:
+                        session.Reschedule(
+                            UtcInstantRange.Create(startTime, sessionDto.EndTime!.Value),
+                            timezoneId,
+                            _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.OpenEnded:
+                        session.ScheduleOpenEnded(startTime, timezoneId, _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.RelativeToPrayer when sessionDto.EndTime is { } endTime:
+                        session.ScheduleRelativeToPrayer(
+                            UtcInstantRange.Create(startTime, endTime),
+                            timezoneId,
+                            _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.RelativeToPrayer:
+                        session.ScheduleRelativeToPrayer(startTime, timezoneId, _scheduleProjectionCalculator);
+                        break;
+                    default:
+                        throw new InvalidOperationException("Event session end time type is not supported.");
+                }
             }
             session.EventDayId = session.LocalStartDate is not null
                 ? ResolveDayId(sessionDto.DayTempKey, session.LocalStartDate.Value, dayMaps)
-                : null;
+                : !string.IsNullOrWhiteSpace(sessionDto.DayTempKey)
+                    ? dayMaps.ByKey[sessionDto.DayTempKey.Trim()].Id
+                    : null;
             session = await PersistSessionWithRoomGuardAsync(session, ct);
 
             await CreateSessionAspectsAsync(sessionDto, session, ct);

@@ -380,6 +380,27 @@ Event sessions also remain normal `EventSession` rows. Draft/internal sessions a
 
 Session moderation is event-scoped, not independently session-scoped. Light event moderation moves every session in the event to `Moderated`. Heavy event moderation also redacts event-owned session text/custom-property values to `Redacted`, clears session image references, and moves the sessions to `Moderated`. If one session violates listing rules, the entire event is removed from listing because sessions are tightly bound to the event container.
 
+Native event creation uses that same draft model. A nested
+`CreateEventGraphSessionDto` with no `StartTime` or `EndTime` creates a normal
+unscheduled Draft session, retaining its title, metadata and valid venue/room/day
+references. It does not manufacture local projections or an inferred day.
+Explicit day references remain organizational associations, not a concrete
+session occurrence. Mixed scheduled/unscheduled draft programs are valid;
+scheduled entries precede unscheduled entries, with existing start/order
+semantics and stable submitted order for ties.
+
+Fixed schedules require both instants and a strictly later end. OpenEnded
+schedules retain a start and no end; prayer-relative scheduling keeps its
+existing explicit-start/aspect requirements. Publication rejects any
+unscheduled nested entry before event rollups and graph writes; it does not
+publish only the scheduled subset. Draft rollups remain non-public. The existing
+serializable transaction owns parent, sessions, initial owner and publication
+outbox together where those writes apply. Organizer-created events receive the
+existing initial owner grant; personal community reports retain their
+submitted-by identity without inventing an EventOwner grant. Transport
+nullability requires no database migration because
+Domain and persistence already support absent draft schedules.
+
 `EventSessionStatus` is a seeded lookup with stable IDs/codes:
 
 | ID | Code | Meaning |

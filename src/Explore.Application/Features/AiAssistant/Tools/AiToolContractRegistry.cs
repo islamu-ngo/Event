@@ -176,8 +176,10 @@ public sealed class AiToolContractRegistry : IAiToolContractRegistry
 
         var session = FindObject(payload, "session");
         if (session is not null
-            && (!HasNonBlankStringProperty(session, "startTime")
-                || !HasNonBlankStringProperty(session, "endTime")))
+            && (HasNonBlankStringProperty(session, "startTime") != HasNonBlankStringProperty(session, "endTime")
+                || (!HasNonBlankStringProperty(session, "startTime")
+                    && !HasNonBlankStringProperty(session, "endTime")
+                    && !HasNonBlankStringProperty(session, "title"))))
         {
             changed |= RemoveProperty(payload, "session");
         }

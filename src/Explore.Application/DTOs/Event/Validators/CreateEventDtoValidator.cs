@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;
+using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using FluentValidation;
@@ -122,10 +123,15 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             session.RuleFor(s => s.DayTempKey).MaximumLength(80).When(s => !string.IsNullOrWhiteSpace(s.DayTempKey));
             session.RuleFor(s => s.RoomTempKey).MaximumLength(80).When(s => !string.IsNullOrWhiteSpace(s.RoomTempKey));
             session.RuleFor(s => s.LocationTempKey).MaximumLength(80).When(s => !string.IsNullOrWhiteSpace(s.LocationTempKey));
-            session.RuleFor(s => s.StartTime).NotEmpty().WithMessage("Session start time is required.");
+            session.RuleFor(s => s.StartTime)
+                .NotEmpty()
+                .When(s => s.StartTime.HasValue || s.EndTime.HasValue
+                    || s.EndTimeType == SessionEndTimeType.RelativeToPrayer
+                    || s.IslamicAspect?.StartTimeType == SessionStartTimeType.RelativeToPrayer)
+                .WithMessage("A scheduled or prayer-relative session requires a start time.");
             session.RuleFor(s => s.EndTimeType).IsInEnum().WithMessage("Invalid session end-time type.");
             session.RuleFor(s => s.EndTime)
-                .NotEmpty().When(s => s.EndTimeType == SessionEndTimeType.Fixed)
+                .NotEmpty().When(s => s.StartTime.HasValue && s.EndTimeType == SessionEndTimeType.Fixed)
                 .WithMessage("Session end time is required when EndTimeType is Fixed.");
             session.RuleFor(s => s.EndTime)
                 .Empty().When(s => s.EndTimeType == SessionEndTimeType.OpenEnded)
@@ -138,6 +144,32 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             session.RuleFor(s => s.FeaturedImageId)
                 .MustAsync(async (id, _) => !id.HasValue || await storageObjectRepository.Exists(id.Value))
                 .WithMessage("Session featured image does not exist.");
+            session.RuleFor(s => s.LocationId)
+                .MustAsync(async (id, _) => !id.HasValue || await locationRepository.Exists(id.Value))
+                .WithMessage("Session location does not exist.");
+            session.RuleFor(s => s.RoomId)
+                .MustAsync(async (id, _) => !id.HasValue || await locationRoomRepository.Exists(id.Value))
+                .WithMessage("Session room does not exist.");
+            session.RuleFor(s => s.RoomId)
+                .MustAsync(async (s, id, _) => !id.HasValue || !s.LocationId.HasValue
+                    || (await locationRoomRepository.GetById(id.Value))?.LocationId == s.LocationId.Value)
+                .WithMessage("Session room does not belong to the submitted location.");
+        });
+
+        RuleFor(p => p).Custom((request, context) =>
+        {
+            if (request.EventStatusId != (int)EventStatusEnum.Published)
+            {
+                return;
+            }
+
+            for (int index = 0; index < request.Sessions.Count; index++)
+            {
+                if (!request.Sessions[index].StartTime.HasValue)
+                {
+                    context.AddFailure($"Sessions[{index}].StartTime", "Publication requires every session to be scheduled.");
+                }
+            }
         });
 
         RuleForEach(p => p.Locations).ChildRules(location =>
@@ -187,8 +219,61 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             item.RuleFor(i => i.SortOrder).GreaterThanOrEqualTo(0);
         });
 
-        RuleFor(p => p).Must(HaveUniqueTempKeys).WithMessage("Temp keys must be unique within locations, days, rooms, and sessions.");
-        RuleFor(p => p).Must(HaveValidTempReferences).WithMessage("One or more location, day, or room temp-key references are invalid.");
+        RuleFor(p => p).Custom((request, context) =>
+        {
+            CheckDuplicateKeys(request.Locations.Select(location => location.TempKey), "Locations");
+            CheckDuplicateKeys(request.Days.Select(day => day.TempKey), "Days");
+            CheckDuplicateKeys(request.Rooms.Select(room => room.TempKey), "Rooms");
+            CheckDuplicateKeys(request.Sessions.Select(session => session.TempKey), "Sessions");
+
+            var dayKeys = Keys(request.Days.Select(day => day.TempKey));
+            var locationKeys = Keys(request.Locations.Select(location => location.TempKey));
+            var roomKeys = Keys(request.Rooms.Select(room => room.TempKey));
+            for (int index = 0; index < request.Rooms.Count; index++)
+            {
+                CheckReference(request.Rooms[index].LocationTempKey, locationKeys, $"Rooms[{index}].LocationTempKey");
+            }
+            for (int index = 0; index < request.Sessions.Count; index++)
+            {
+                var session = request.Sessions[index];
+                CheckReference(session.DayTempKey, dayKeys, $"Sessions[{index}].DayTempKey");
+                CheckReference(session.LocationTempKey, locationKeys, $"Sessions[{index}].LocationTempKey");
+                CheckReference(session.RoomTempKey, roomKeys, $"Sessions[{index}].RoomTempKey");
+            }
+            for (int index = 0; index < request.AgendaItems.Count; index++)
+            {
+                var item = request.AgendaItems[index];
+                CheckReference(item.DayTempKey, dayKeys, $"AgendaItems[{index}].DayTempKey");
+                CheckReference(item.LocationTempKey, locationKeys, $"AgendaItems[{index}].LocationTempKey");
+                CheckReference(item.RoomTempKey, roomKeys, $"AgendaItems[{index}].RoomTempKey");
+            }
+
+            void CheckDuplicateKeys(IEnumerable<string?> values, string collection)
+            {
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                int index = 0;
+                foreach (var value in values)
+                {
+                    if (!string.IsNullOrWhiteSpace(value) && !seen.Add(value.Trim()))
+                    {
+                        context.AddFailure($"{collection}[{index}].TempKey", "Temp keys must be unique within their collection.");
+                    }
+                    index++;
+                }
+            }
+
+            void CheckReference(string? value, HashSet<string> allowed, string field)
+            {
+                if (!string.IsNullOrWhiteSpace(value) && !allowed.Contains(value.Trim()))
+                {
+                    context.AddFailure(field, "The temp-key reference does not exist in the submitted graph.");
+                }
+            }
+
+            static HashSet<string> Keys(IEnumerable<string?> values) =>
+                values.Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        });
         RuleFor(p => p).Must(HaveValidIslamicSessionScheduling).WithMessage(EventSessionIslamicAspectValidationRules.SchedulingStateMessage);
 
         RuleFor(p => p).MustAsync(async (request, _) => await AllLocationsExistAsync(request, locationRepository))
@@ -228,14 +313,6 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             .WithMessage("One or more speaker actors do not exist.");
     }
 
-    private static bool HaveUniqueTempKeys(CreateEventDto request)
-    {
-        return IsUnique(request.Locations.Select(l => l.TempKey))
-            && IsUnique(request.Days.Select(d => d.TempKey))
-            && IsUnique(request.Rooms.Select(r => r.TempKey))
-            && IsUnique(request.Sessions.Select(s => s.TempKey));
-    }
-
     private static bool HaveValidScheduleTimeZone(CreateEventDto request)
     {
         return ScheduleTimeZoneResolver.IsValidOrBlank(request.EventTimeZoneId ?? request.Timezone);
@@ -259,31 +336,6 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
         }
     }
 
-    private static bool IsUnique(IEnumerable<string?> keys)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var key in keys.Where(k => !string.IsNullOrWhiteSpace(k)).Select(k => k!.Trim()))
-        {
-            if (!seen.Add(key)) return false;
-        }
-
-        return true;
-    }
-
-    private static bool HaveValidTempReferences(CreateEventDto request)
-    {
-        var dayKeys = request.Days.Where(d => !string.IsNullOrWhiteSpace(d.TempKey)).Select(d => d.TempKey!.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var locationKeys = request.Locations.Where(l => !string.IsNullOrWhiteSpace(l.TempKey)).Select(l => l.TempKey.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var roomKeys = request.Rooms.Select(r => r.TempKey.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return request.Rooms.All(r => IsBlankOrContained(r.LocationTempKey, locationKeys))
-            && request.Sessions.All(s => IsBlankOrContained(s.DayTempKey, dayKeys) && IsBlankOrContained(s.RoomTempKey, roomKeys) && IsBlankOrContained(s.LocationTempKey, locationKeys))
-            && request.AgendaItems.All(i => IsBlankOrContained(i.DayTempKey, dayKeys) && IsBlankOrContained(i.RoomTempKey, roomKeys) && IsBlankOrContained(i.LocationTempKey, locationKeys));
-    }
-
-    private static bool IsBlankOrContained(string? value, HashSet<string> allowed) =>
-        string.IsNullOrWhiteSpace(value) || allowed.Contains(value.Trim());
-
     private static bool HaveValidIslamicSessionScheduling(CreateEventDto request)
     {
         return request.Sessions.All(session =>
@@ -296,8 +348,7 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
 
     private static async Task<bool> AllLocationsExistAsync(CreateEventDto request, ILocationRepository repository)
     {
-        var ids = request.Sessions.Select(s => s.LocationId)
-            .Concat(request.Rooms.Select(r => r.LocationId))
+        var ids = request.Rooms.Select(r => r.LocationId)
             .Concat(request.AgendaItems.Select(i => i.LocationId))
             .Where(id => id.HasValue)
             .Select(id => id!.Value)
@@ -436,19 +487,13 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
     }
 
     private static IEnumerable<Guid> GetExistingRoomIds(CreateEventDto request) =>
-        request.Sessions.Select(s => s.RoomId)
-            .Concat(request.AgendaItems.Select(i => i.RoomId))
+        request.AgendaItems.Select(i => i.RoomId)
             .Where(id => id.HasValue)
             .Select(id => id!.Value)
             .Distinct();
 
     private static IEnumerable<(Guid RoomId, Guid LocationId)> GetExistingRoomLocationPairs(CreateEventDto request)
     {
-        foreach (var session in request.Sessions.Where(s => s.RoomId.HasValue && s.LocationId.HasValue))
-        {
-            yield return (session.RoomId!.Value, session.LocationId!.Value);
-        }
-
         foreach (var agendaItem in request.AgendaItems.Where(i => i.RoomId.HasValue && i.LocationId.HasValue))
         {
             yield return (agendaItem.RoomId!.Value, agendaItem.LocationId!.Value);

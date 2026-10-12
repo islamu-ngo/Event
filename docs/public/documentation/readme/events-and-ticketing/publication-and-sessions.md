@@ -97,6 +97,30 @@ ownership, or change unrelated listings.
 
 ## API consumers
 
+### Preparing draft programs without dates
+
+Event-creation API requests can include title-only sessions in a Draft program.
+Omit both `startTime` and `endTime` when a date has not been decided; their
+metadata and valid venue, room and explicit day associations are retained.
+No public occurrence or inferred day is created. A draft can mix scheduled
+and unscheduled sessions, and managed program reads retain both.
+
+A Fixed scheduled session needs a start and a later end, including an explicit
+next-day end for an overnight interval. An OpenEnded session needs a start and
+no end. Existing prayer-relative schedules keep their own scheduling rules.
+Partial/invalid schedules are rejected with session/field context. Publishing
+requires every submitted session to be scheduled: one valid child does not
+cause another unscheduled child to be discarded.
+
+Use the regenerated client contracts. This change needs no database migration,
+but older code that assumes all drafts have start times is unsafe after these
+drafts are saved. Preserve the program and use compatible code or a forward
+correction rather than deleting drafts to downgrade.
+
+If a creation response is lost, the save outcome is unknown. Keep the prepared
+input and inspect your managed events before creating again; do not
+automatically replay the create request or treat response loss as rollback.
+
 Public event browsing uses forward continuation. Start with the desired filters
 and `pageSize` (1 through 100), then follow the returned HAL `next` link with those
 same filters. Public `pageNumber`, random pages and total-page counts are removed.

@@ -80,6 +80,8 @@
                                       DescriptionFor="@(() => _session.Description!.Value!.Value)"
                                       SessionDate="@_sessionDate"
                                       SessionDateChanged="@(value => _sessionDate = value)"
+                                      EndDate="@_endDate"
+                                      EndDateChanged="@(value => _endDate = value)"
                                       StartTime="@_startTime"
                                       StartTimeChanged="@(value => _startTime = value)"
                                       EndTime="@_endTime"
@@ -159,6 +161,7 @@
     private ICollection<RegistrationModeListDto> _registrationModes = new List<RegistrationModeListDto>();
     private readonly UpdateEventSessionDto _session = new();
     private DateTime? _sessionDate;
+    private DateTime? _endDate;
     private TimeSpan? _startTime;
     private TimeSpan? _endTime;
     private bool _isLoading = true;
@@ -289,6 +292,7 @@
             EventId,
             _eventTimeZoneId!);
         _sessionDate = formState.SessionDate;
+        _endDate = formState.EndDate;
         _startTime = formState.StartTime;
         _endTime = formState.EndTime;
         return formState;
@@ -359,6 +363,11 @@
             validationError = "You do not currently have permission to edit this program item.";
             return false;
         }
+        if (!_endDate.HasValue)
+        {
+            validationError = "Program item end date is required.";
+            return false;
+        }
 
         return EventSessionFormModelMapper.TryPrepareUpdateRequest(
             _session,
@@ -371,7 +380,8 @@
             out validationError,
             _eventTimeZoneId!,
             _sourceSession?.StartTime,
-            _sourceSession?.EndTime);
+            _sourceSession?.EndTime,
+            endDate: _endDate);
     }
 
     private static string FormatLocation(EventSessionCreateLocationOptionDto location)

@@ -74,6 +74,8 @@
                                       DescriptionFor="@(() => _session.Description)"
                                       SessionDate="@_sessionDate"
                                       SessionDateChanged="@(value => _sessionDate = value)"
+                                      EndDate="@_endDate"
+                                      EndDateChanged="@(value => _endDate = value)"
                                       StartTime="@_startTime"
                                       StartTimeChanged="@(value => _startTime = value)"
                                       EndTime="@_endTime"
@@ -157,6 +159,7 @@
         Title = string.Empty
     };
     private DateTime? _sessionDate;
+    private DateTime? _endDate;
     private TimeSpan? _startTime = new(9, 0, 0);
     private TimeSpan? _endTime = new(10, 0, 0);
     private bool _isLoading = true;
@@ -237,10 +240,8 @@
             FallbackRegistrationModeId);
         _locations = formState.Locations;
         _sessionGroups = formState.SessionGroups;
-        _sessionDate = formState.SessionDate
-            ?? (string.IsNullOrWhiteSpace(context.TimeZoneId)
-                ? null
-                : DateTimeHelper.ConvertUtcToLocal(DateTimeOffset.UtcNow, context.TimeZoneId).Date.AddDays(1));
+        _sessionDate = formState.SessionDate;
+        _endDate = formState.SessionDate;
         _startTime = formState.StartTime ?? _startTime;
         _endTime = formState.EndTime ?? _endTime;
     }
@@ -340,6 +341,11 @@
             validationError = "You do not currently have permission to add program items to this event draft.";
             return false;
         }
+        if (!_endDate.HasValue)
+        {
+            validationError = "Program item end date is required.";
+            return false;
+        }
 
         return EventSessionFormModelMapper.TryPrepareCreateRequest(
             _session,
@@ -349,7 +355,8 @@
             _startTime,
             _endTime,
             out validationError,
-            _createContext?.TimeZoneId);
+            _createContext?.TimeZoneId,
+            endDate: _endDate);
     }
 
     private static string FormatLocation(EventSessionCreateLocationOptionDto location)

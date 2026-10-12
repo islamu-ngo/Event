@@ -3,6 +3,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Explore.Blazor.Client.Pages.Events;
+using Explore.Blazor.Client.Pages.Events.Components;
+using Explore.Blazor.Client.Pages.Events.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
 
@@ -18,6 +20,7 @@ public sealed class CreateEventVisitorCapabilityTests : IDisposable
 
     public CreateEventVisitorCapabilityTests()
     {
+        _ctx.JSInterop.SetupVoid("mudTimePicker.destroyPointerEvents", _ => true).SetVoidResult();
         _http = new HttpClient(_creation) { BaseAddress = new Uri("https://event.test/") };
         var management = Substitute.For<IEventManagementReadClient>();
         management.GetEventCreationContextAsync(cancellationToken: Arg.Any<CancellationToken>())
@@ -136,8 +139,13 @@ public sealed class CreateEventVisitorCapabilityTests : IDisposable
     public async Task Publish_SendsCompleteInlineOccurrence()
     {
         var cut = await RenderAccountRequiredAsync();
-        await cut.InvokeAsync(() => cut.FindComponent<MudDatePicker>().Instance.DateChanged
-            .InvokeAsync(new DateTime(2030, 1, 1)));
+        await cut.InvokeAsync(() => cut.FindComponent<ScheduleTimelineComposer>().Instance.OnAddSession.InvokeAsync());
+        await cut.InvokeAsync(() => cut.FindComponent<EventSessionForm>().Instance.TitleChanged.InvokeAsync("Prepared occurrence"));
+        await cut.InvokeAsync(() => cut.FindComponent<EventSessionForm>().Instance.SessionDateChanged.InvokeAsync(new DateTime(2030, 1, 1)));
+        await cut.InvokeAsync(() => cut.FindComponent<EventSessionForm>().Instance.EndDateChanged.InvokeAsync(new DateTime(2030, 1, 1)));
+        await cut.InvokeAsync(() => cut.FindComponent<EventSessionForm>().Instance.StartTimeChanged.InvokeAsync(TimeSpan.FromHours(9)));
+        await cut.InvokeAsync(() => cut.FindComponent<EventSessionForm>().Instance.EndTimeChanged.InvokeAsync(TimeSpan.FromHours(10)));
+        await cut.Find("[data-testid='program-save']").ClickAsync(new MouseEventArgs());
 
         var submission = cut.Find("button.create-event__submit-button").ClickAsync(new MouseEventArgs());
         var submitted = await _creation.Started.Task.WaitAsync(Timeout);

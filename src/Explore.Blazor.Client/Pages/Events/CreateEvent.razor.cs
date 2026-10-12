@@ -5,6 +5,7 @@ using Explore.Blazor.Client.Contracts.Services.EventTemplates;
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Pages.Events.Components;
 using Explore.Blazor.Client.Pages.Events.Models;
+using Explore.Blazor.Client.Pages.Events.Workflows;
 using Explore.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -32,7 +33,7 @@ public partial class CreateEvent : IDisposable
     private const int NoRecovery = 5;
 
     [Inject] protected IEventService EventService { get; set; } = null!;
-    [Inject] protected Explore.Blazor.Client.Contracts.Services.IEventSessionService EventSessionService { get; set; } = null!;
+    [Parameter] public CreateEventDraftRequestDto? InitialDraft { get; set; }
     [Inject] protected IUserService UserService { get; set; } = null!;
     [Inject] protected Explore.Blazor.Client.Contracts.Services.Lookup.IEventLookupService EventLookupService { get; set; } = null!;
     [Inject] protected Explore.Blazor.Client.Contracts.Services.Lookup.IDemographicLookupService DemographicLookupService { get; set; } = null!;
@@ -91,6 +92,9 @@ public partial class CreateEvent : IDisposable
     private int _templatePreviewRequestVersion;
     private bool IsSubmitDisabled =>
         _submitState.IsSubmitting
+        || _creationOutcomeUnknown
+        || createdEventId != Guid.Empty
+        || _programEdit is not null
         || _isUploadingImage
         || _isLoadingTemplatePreview
         || _creationContext is null
@@ -120,11 +124,17 @@ public partial class CreateEvent : IDisposable
     private IReadOnlyCollection<Guid> _createTagCatInitialIds = Array.Empty<Guid>();
 
     private List<SessionEditorModel> sessions = new();
-    private DateTime? _inlineSessionDate;
-    private TimeSpan? _inlineSessionStartTime = TimeSpan.FromHours(9);
-    private TimeSpan? _inlineSessionEndTime = TimeSpan.FromHours(17);
-    private Guid? _inlineSessionLocationId;
-    private int? _inlineSessionCapacity;
+    private SessionEditorModel? _programEdit;
+    private Guid? _editingLocalId;
+    private DateTime? _programStartDate;
+    private DateTime? _programEndDate;
+    private TimeSpan? _programStartTime;
+    private TimeSpan? _programEndTime;
+    private string? _programEditError;
+    private IReadOnlyList<string> _programServerErrors = Array.Empty<string>();
+    private bool _creationOutcomeUnknown;
+    private string? _savedDestination;
+    private bool _savedNavigationFailed;
     private string _bgColor = string.Empty;
     private string _bgEffect = "None";
     private string _bgImageUri = string.Empty;
@@ -179,7 +189,7 @@ public partial class CreateEvent : IDisposable
             _ => $"{sessions.Count} sessions prepared"
         };
 
-        return $"{sessionLabel}; logistics are managed after the draft is saved.";
+        return $"{sessionLabel}; changes stay here until you save the event.";
     }
 
     private string BuildProgramItemsSummary()
@@ -507,6 +517,21 @@ public partial class CreateEvent : IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        if (InitialDraft is not null)
+        {
+            createDto = CreateEventProgramMapper.Snapshot(InitialDraft);
+            sessions = CreateEventProgramMapper.FromRequest(createDto);
+            selectedCategoryIds = Array.AsReadOnly((createDto.CategoryIds ?? []).ToArray());
+            selectedTagIds = Array.AsReadOnly((createDto.TagIds ?? []).ToArray());
+            selectedMadhabId = createDto.MadhabId;
+            _uploadedImageStorageObjectId = createDto.FeaturedImageId;
+            _bgColor = createDto.BackgroundColor ?? string.Empty;
+            _bgEffect = createDto.BackgroundEffect ?? "None";
+            _selectedTimezone = TimeZoneInfo.FindSystemTimeZoneById(createDto.EventTimeZoneId ?? createDto.Timezone ?? "UTC");
+            _publisherMode = createDto.OrganizationId.HasValue ? "organization" : createDto.GroupId.HasValue ? "group" : "personal";
+            _selectedOrganizationId = createDto.OrganizationId;
+            _selectedGroupId = createDto.GroupId;
+        }
         _editContext = new EditContext(createDto);
         _errorStore.Init(_editContext);
 
@@ -620,7 +645,6 @@ public partial class CreateEvent : IDisposable
         createDto.TemplateId = null;
         _selectedEventTemplate = null;
         eventTemplates = Array.Empty<HalResourceOfEventTemplateListDto>();
-        ClearSessionTemplateSelections();
         await LoadEventTemplatesAsync(eventTypeId);
     }
 
@@ -630,7 +654,6 @@ public partial class CreateEvent : IDisposable
         createDto.TemplateId = templateId;
         _selectedEventTemplate = null;
         _templateLoadError = null;
-        ClearSessionTemplateSelections();
 
         if (!templateId.HasValue || templateId.Value == Guid.Empty)
         {
@@ -677,15 +700,6 @@ public partial class CreateEvent : IDisposable
 
     private bool IsCurrentTemplatePreviewRequest(int requestVersion, Guid requestedTemplateId) =>
         requestVersion == _templatePreviewRequestVersion && createDto.TemplateId == requestedTemplateId;
-
-    private void ClearSessionTemplateSelections()
-    {
-        foreach (var session in sessions)
-        {
-            session.SessionTemplateId = null;
-        }
-
-    }
 
     // ========== Image Upload ==========
 
@@ -788,24 +802,125 @@ public partial class CreateEvent : IDisposable
 
     private async Task AddSessionAsync()
     {
-        AnnounceProgramChange("Saving this event as a draft before opening session management.");
-        await SubmitEventAsync(CreateEventSubmitIntent.SaveDraftAndAddSession);
+        if (_submitState.IsSubmitting || createdEventId != Guid.Empty) return;
+        await AccessibilityFocusService.SaveFocusAsync();
+        BeginProgramEdit(new SessionEditorModel(), null);
+        await InvokeAsync(StateHasChanged);
+        await AccessibilityFocusService.FocusAsync("#local-program-editor input");
     }
 
-    private async Task OpenDedicatedSessionComposerAsync(int _)
+    private async Task EditSessionAsync(Guid localId)
     {
-        AnnounceProgramChange("Saving this event as a draft before opening the dedicated session composer.");
-        await SubmitEventAsync(CreateEventSubmitIntent.SaveDraftAndAddSession);
+        if (_submitState.IsSubmitting || createdEventId != Guid.Empty) return;
+        var row = sessions.Single(session => session.LocalId == localId);
+        BeginProgramEdit(row.Clone(), row.LocalId);
+        await AccessibilityFocusService.SaveFocusAsync();
+        await InvokeAsync(StateHasChanged);
+        await AccessibilityFocusService.FocusAsync("#local-program-editor input");
     }
 
-    private void ShowDuplicateSessionUnavailable(int _)
+    private void BeginProgramEdit(SessionEditorModel row, Guid? localId)
     {
-        AnnounceProgramChange("Duplicate session will be available from the dedicated session composer.");
+        _programEdit = row;
+        _editingLocalId = localId;
+        _programStartDate = row.StartTime?.Date;
+        _programStartTime = row.StartTime?.TimeOfDay;
+        _programEndDate = row.EndTime?.Date;
+        _programEndTime = row.EndTime?.TimeOfDay;
+        _programEditError = null;
     }
 
-    private void ShowProgramSectionUnavailable()
+    private async Task AddSessionToDayAsync(DateTime day)
     {
-        AnnounceProgramChange("Section and track setup will open from the saved event program manager.");
+        await AddSessionAsync();
+        if (_programEdit is not null)
+        {
+            _programStartDate = day.Date;
+            _programEndDate = day.Date;
+        }
+    }
+
+    private async Task SaveLocalSessionAsync(bool addAnother)
+    {
+        if (_programEdit is null || _submitState.IsSubmitting || createdEventId != Guid.Empty) return;
+        _programEditError = null;
+        if (_programStartDate.HasValue != _programStartTime.HasValue
+            || _programEndDate.HasValue != _programEndTime.HasValue)
+        {
+            _programEditError = "Choose both the date and time, or clear both to leave the item unscheduled.";
+            return;
+        }
+        _programEdit.StartTime = _programStartDate?.Date + _programStartTime;
+        _programEdit.EndTime = _programEndDate?.Date + _programEndTime;
+        var parent = new CreateEventDraftRequestDto { EventStatusId = 1, Timezone = _selectedTimezone.Id };
+        if (!CreateEventProgramMapper.TryMap(parent, [_programEdit], out _, out var error))
+        {
+            _programEditError = error;
+            return;
+        }
+        var savedRow = _programEdit.Clone();
+        if (_editingLocalId.HasValue)
+        {
+            var index = sessions.FindIndex(row => row.LocalId == _editingLocalId.Value);
+            sessions[index] = savedRow;
+        }
+        else
+        {
+            sessions.Add(savedRow);
+        }
+        _programEdit = null;
+        _editingLocalId = null;
+        if (addAnother)
+        {
+            BeginProgramEdit(new SessionEditorModel(), null);
+            await InvokeAsync(StateHasChanged);
+            await AccessibilityFocusService.FocusAsync("#local-program-editor input");
+        }
+        else
+        {
+            AnnounceProgramChange("Program item prepared locally. Save the event to persist the program.");
+            await InvokeAsync(StateHasChanged);
+            await AccessibilityFocusService.RestoreFocusAsync(".schedule-timeline__footer button");
+        }
+    }
+
+    private async Task CancelLocalSessionAsync()
+    {
+        _programEdit = null;
+        _editingLocalId = null;
+        _programEditError = null;
+        await InvokeAsync(StateHasChanged);
+        await AccessibilityFocusService.RestoreFocusAsync(".schedule-timeline__footer button");
+    }
+
+    private void OnLocalEndTypeChanged(SessionEndTimeType value)
+    {
+        if (_programEdit is null) return;
+        _programEdit.EndTimeType = value;
+        if (value == SessionEndTimeType.OpenEnded)
+        {
+            _programEndDate = null;
+            _programEndTime = null;
+            _programEdit.EndTime = null;
+        }
+    }
+
+    private void DuplicateSession(Guid localId)
+    {
+        if (_submitState.IsSubmitting || createdEventId != Guid.Empty) return;
+        var index = sessions.FindIndex(row => row.LocalId == localId);
+        sessions.Insert(index + 1, sessions[index].Clone(newLocalId: true));
+        AnnounceProgramChange("Program item duplicated locally.");
+    }
+
+    private void MoveSession((Guid LocalId, int Direction) move)
+    {
+        if (_submitState.IsSubmitting || createdEventId != Guid.Empty) return;
+        var index = sessions.FindIndex(row => row.LocalId == move.LocalId);
+        var target = index + move.Direction;
+        if (index < 0 || target < 0 || target >= sessions.Count) return;
+        (sessions[index], sessions[target]) = (sessions[target], sessions[index]);
+        AnnounceProgramChange("Program item order changed locally.");
     }
 
     private void AnnounceProgramChange(string message)
@@ -813,46 +928,15 @@ public partial class CreateEvent : IDisposable
         _programAnnouncement = message;
     }
 
-    private async void RemoveSession(int index)
+    private async Task RemoveSession(Guid localId)
     {
-        if (index >= 0 && index < sessions.Count)
-        {
-            if (sessions.Count <= 1)
-            {
-                _submitState.Fail("You must have at least one session.");
-                return;
-            }
-
-            var session = sessions[index];
-
-            if (session.Id.HasValue && session.Id != Guid.Empty)
-            {
-                await AccessibilityFocusService.SaveFocusAsync();
-                bool? confirm = await DialogService.ShowMessageBoxAsync(
-                    "Delete Session",
-                    "This session already exists. Deleting it here will remove it permanently. Continue?",
-                    yesText: "Delete", cancelText: "Cancel");
-                await AccessibilityFocusService.RestoreFocusAsync();
-
-                if (confirm == true)
-                {
-                    try
-                    {
-                        await EventSessionService.DeleteSessionAsync(session.Id.Value);
-                        sessions.RemoveAt(index);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, "Failed to delete session {EventSessionId} while editing draft event", session.Id.Value);
-                        _submitState.Fail("Session could not be deleted. Please try again.");
-                    }
-                }
-            }
-            else
-            {
-                sessions.RemoveAt(index);
-            }
-        }
+        if (_submitState.IsSubmitting || createdEventId != Guid.Empty) return;
+        var index = sessions.FindIndex(row => row.LocalId == localId);
+        if (index < 0) return;
+        sessions.RemoveAt(index);
+        AnnounceProgramChange("Program item removed locally.");
+        await InvokeAsync(StateHasChanged);
+        await AccessibilityFocusService.FocusAsync(".schedule-timeline__footer button");
     }
 
     // ========== Form Data Loading ==========
@@ -976,7 +1060,6 @@ public partial class CreateEvent : IDisposable
         {
             createDto.VisibilityTypeId = visibilityTypes.First().Id;
         }
-        _inlineSessionDate ??= TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _selectedTimezone).Date.AddDays(1);
     }
 
     // ========== Validation & Submission ==========
@@ -1086,6 +1169,10 @@ public partial class CreateEvent : IDisposable
             return;
         }
 
+        if (InitialDraft is not null && GetPublisherOption(_publisherMode, _selectedOrganizationId ?? _selectedGroupId)?.CanPublish == true)
+        {
+            return;
+        }
         var defaultMode = _creationContext.DefaultPublisherMode;
         if (string.IsNullOrWhiteSpace(defaultMode) || !CanSelectPublisherMode(defaultMode))
         {
@@ -1133,6 +1220,12 @@ public partial class CreateEvent : IDisposable
 
     private async Task SubmitEventAsync(CreateEventSubmitIntent intent)
     {
+        if (_submitState.IsSubmitting || _creationOutcomeUnknown || createdEventId != Guid.Empty) return;
+        if (_programEdit is not null)
+        {
+            _submitState.Fail("Save or cancel the open program item before saving the event.");
+            return;
+        }
         if (!ValidateForm())
         {
             return;
@@ -1153,6 +1246,9 @@ public partial class CreateEvent : IDisposable
         if (_submitState.IsSubmitting) return;
         _submitState.Start();
         _publishReadinessErrors = Array.Empty<EventPublishReadinessErrorDto>();
+        _programServerErrors = Array.Empty<string>();
+        _errorStore.ClearErrors();
+        var requestSent = false;
 
         try
         {
@@ -1175,8 +1271,9 @@ public partial class CreateEvent : IDisposable
             createDto.BackgroundEffect = string.IsNullOrWhiteSpace(_bgEffect) || _bgEffect == "None" ? null : _bgEffect;
 
             PopulateCreateRequest();
-            if (!ApplyInlineSessionForIntent(intent))
+            if (!CreateEventProgramMapper.TryMap(createDto, sessions, out var snapshot, out var validationError))
             {
+                _submitState.Fail(validationError!);
                 return;
             }
 
@@ -1185,7 +1282,8 @@ public partial class CreateEvent : IDisposable
                 _publisherMode,
                 createDto.OrganizationId,
                 createDto.GroupId);
-            var response = await EventService.CreateEventAsync(createDto);
+            requestSent = true;
+            var response = await EventService.CreateEventAsync(snapshot!);
 
             if (response?.Success == true && response.Id != Guid.Empty)
             {
@@ -1193,34 +1291,43 @@ public partial class CreateEvent : IDisposable
                 createdEventId = response.Id;
                 Logger.LogInformation("Event created with ID: {EventId}", createdEventId);
 
-                if (intent == CreateEventSubmitIntent.SaveDraft)
+                _savedDestination = intent == CreateEventSubmitIntent.SaveDraft
+                    ? $"/events/{createdEventId}/edit"
+                    : $"/event-created/{createdEventId}";
+                try
                 {
-                    Navigation.NavigateTo($"/events/{createdEventId}/edit");
-                    return;
+                    Navigation.NavigateTo(_savedDestination);
                 }
-
-                if (intent == CreateEventSubmitIntent.SaveDraftAndAddSession)
+                catch (Exception)
                 {
-                    Navigation.NavigateTo($"/events/{createdEventId}/sessions/create");
-                    return;
+                    _savedNavigationFailed = true;
                 }
-
-                Navigation.NavigateTo($"/event-created/{createdEventId}");
+                return;
+            }
+            else if (response?.Success != false)
+            {
+                RetainUnknownCreationOutcome();
             }
             else
             {
-                await RefreshVisitorAccessAfterRejectionAsync();
                 var errorMsg = response?.Message ?? "Failed to create event.";
                 if (response?.Errors != null && response.Errors.Any())
                 {
                     errorMsg += " Errors: " + string.Join(", ", response.Errors);
                 }
                 _submitState.Fail(errorMsg);
+                await RefreshVisitorAccessAfterRejectionAsync();
             }
         }
-        catch (ApiException ex)
+        catch (ApiException ex) when (ex.StatusCode is >= 400 and < 500)
         {
-            await RefreshVisitorAccessAfterRejectionAsync();
+            if (ex is ApiException<ValidationProblemDetails> validationException)
+            {
+                _programServerErrors = (validationException.Result?.Errors ?? new Dictionary<string, ICollection<string>>())
+                    .Where(entry => entry.Key.StartsWith("Sessions", StringComparison.OrdinalIgnoreCase))
+                    .SelectMany(entry => entry.Value.Select(message => $"{entry.Key}: {message}"))
+                    .ToArray();
+            }
             if (!_errorStore.HandleApiError(ex))
             {
                 Logger.LogError(ex, "Exception during event creation");
@@ -1230,11 +1337,19 @@ public partial class CreateEvent : IDisposable
             {
                 _submitState.Fail("Please fix the validation errors below.");
             }
+            await RefreshVisitorAccessAfterRejectionAsync();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Exception during event creation");
-            _submitState.Fail("Event could not be submitted. Please try again.");
+            if (requestSent)
+            {
+                RetainUnknownCreationOutcome();
+            }
+            else
+            {
+                _submitState.Fail("Event could not be prepared. Your input is retained.");
+            }
         }
     }
 
@@ -1243,63 +1358,20 @@ public partial class CreateEvent : IDisposable
         // Creation failures do not always retain their policy code at the service boundary.
         // Invalidate before refreshing so an unavailable read cannot retain stale permission.
         _visitorAccess = null;
-        _visitorAccess = (await PublicExperienceService.GetSettingsAsync())?.VisitorAccess;
+        try
+        {
+            _visitorAccess = (await PublicExperienceService.GetSettingsAsync())?.VisitorAccess;
+        }
+        catch (Exception)
+        {
+            // Keep the original rejection and unavailable visitor capability when refresh fails.
+        }
     }
 
-    private bool ApplyInlineSessionForIntent(CreateEventSubmitIntent intent)
+    private void RetainUnknownCreationOutcome()
     {
-        createDto.Sessions = new List<CreateEventGraphSessionDto>();
-
-        if (intent != CreateEventSubmitIntent.ReviewAndPublish)
-        {
-            return true;
-        }
-
-        if (!DateTimeHelper.TryCombineDateTimeToUtc(
-                _inlineSessionDate,
-                _inlineSessionStartTime,
-                _selectedTimezone.Id,
-                existingInstant: null,
-                out DateTimeOffset startTimeUtc,
-                out string? scheduleValidationError)
-            || !DateTimeHelper.TryCombineDateTimeToUtc(
-                _inlineSessionDate,
-                _inlineSessionEndTime,
-                _selectedTimezone.Id,
-                existingInstant: null,
-                out DateTimeOffset endTimeUtc,
-                out scheduleValidationError))
-        {
-            _submitState.Fail(scheduleValidationError ?? "Choose the event date, start time, and end time before publishing.");
-            return false;
-        }
-
-        if (endTimeUtc <= startTimeUtc)
-        {
-            _submitState.Fail("The event end time must be after the start time.");
-            return false;
-        }
-
-        createDto.Sessions = new List<CreateEventGraphSessionDto>
-        {
-            new()
-            {
-                TempKey = "inline-primary-session",
-                Title = string.IsNullOrWhiteSpace(createDto.Title) ? "Main session" : createDto.Title.Trim(),
-                Description = createDto.Description,
-                StartTime = startTimeUtc,
-                EndTime = endTimeUtc,
-                EndTimeType = SessionEndTimeType.Fixed,
-                LocationId = _inlineSessionLocationId,
-                SortOrder = 1,
-                MaxAudienceAttendees = _inlineSessionCapacity is > 0 ? _inlineSessionCapacity : null,
-                RegistrationModeId = registrationModes?.FirstOrDefault()?.Id,
-                LanguageIds = new List<int>(),
-                SpeakerActorIds = new List<Guid>()
-            }
-        };
-
-        return true;
+        _creationOutcomeUnknown = true;
+        _submitState.Reset();
     }
 
     private async Task SaveAsDraftAsync()
@@ -1323,7 +1395,6 @@ public partial class CreateEvent : IDisposable
     private enum CreateEventSubmitIntent
     {
         SaveDraft,
-        SaveDraftAndAddSession,
         ReviewAndPublish
     }
 
@@ -1364,6 +1435,7 @@ public partial class CreateEvent : IDisposable
         if (tz != null)
         {
             _selectedTimezone = tz;
+            createDto.EventTimeZoneId = tz.Id;
         }
         _showTimezoneSelector = false;
     }
@@ -1388,15 +1460,9 @@ public partial class CreateEvent : IDisposable
 
     private void PopulateCreateRequest()
     {
-        createDto.Title = createDto.Title?.Trim() ?? string.Empty;
-        createDto.Subtitle = string.IsNullOrWhiteSpace(createDto.Subtitle) ? null : createDto.Subtitle.Trim();
-        createDto.Description = string.IsNullOrWhiteSpace(createDto.Description) ? null : createDto.Description.Trim();
-        createDto.Content = string.IsNullOrWhiteSpace(createDto.Content) ? null : createDto.Content.Trim();
-        createDto.Slug = string.IsNullOrWhiteSpace(createDto.Slug) ? null : createDto.Slug.Trim();
         createDto.CategoryIds = selectedCategoryIds.ToList();
         createDto.TagIds = selectedTagIds.ToList();
         createDto.Locations ??= new List<CreateEventLocationDto>();
-        createDto.Sessions ??= new List<CreateEventGraphSessionDto>();
         createDto.Days ??= new List<CreateEventGraphDayDto>();
         createDto.Rooms ??= new List<CreateEventRoomDto>();
         createDto.AgendaItems ??= new List<CreateEventGraphAgendaItemDto>();

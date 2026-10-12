@@ -144,6 +144,7 @@ public sealed class CreateSessionTests : IDisposable
         session.EventSessionKindId = 1;
         session.RegistrationModeId = 2;
         SetPrivateField(cut.Instance, "_sessionDate", new DateTime(2026, 6, 1));
+        SetPrivateField(cut.Instance, "_endDate", new DateTime(2026, 6, 1));
         SetPrivateField(cut.Instance, "_startTime", new TimeSpan(9, 30, 0));
         SetPrivateField(cut.Instance, "_endTime", new TimeSpan(10, 30, 0));
 
@@ -190,6 +191,7 @@ public sealed class CreateSessionTests : IDisposable
         var cut = _ctx.Render<CreateSession>(parameters => parameters.Add(component => component.EventId, eventId));
         var session = GetPrivateField<ComposerCreateEventSessionRequest>(cut.Instance, "_session");
         session.Title = "Opening talk";
+        SetFixedSchedule(cut.Instance);
         SetPrivateField(cut.Instance, "_selectedSessionGroupId", (Guid?)groupId);
 
         await cut.InvokeAsync(() => InvokePrivateAsync(cut.Instance, "SaveSessionAsync"));
@@ -223,6 +225,7 @@ public sealed class CreateSessionTests : IDisposable
         var cut = _ctx.Render<CreateSession>(parameters => parameters.Add(component => component.EventId, eventId));
         var session = GetPrivateField<ComposerCreateEventSessionRequest>(cut.Instance, "_session");
         session.Title = "Opening talk";
+        SetFixedSchedule(cut.Instance);
         SetPrivateField(cut.Instance, "_selectedSessionGroupId", (Guid?)groupId);
 
         await cut.InvokeAsync(() => InvokePrivateAsync(cut.Instance, "SaveSessionAsync"));
@@ -242,6 +245,7 @@ public sealed class CreateSessionTests : IDisposable
         var cut = _ctx.Render<CreateSession>(parameters => parameters.Add(component => component.EventId, eventId));
         var session = GetPrivateField<ComposerCreateEventSessionRequest>(cut.Instance, "_session");
         session.Title = "Opening talk";
+        SetFixedSchedule(cut.Instance);
         SetPrivateField(cut.Instance, "_startTime", new TimeSpan(11, 0, 0));
         SetPrivateField(cut.Instance, "_endTime", new TimeSpan(10, 0, 0));
 
@@ -266,6 +270,7 @@ public sealed class CreateSessionTests : IDisposable
         var cut = _ctx.Render<CreateSession>(parameters => parameters.Add(component => component.EventId, eventId));
         var session = GetPrivateField<ComposerCreateEventSessionRequest>(cut.Instance, "_session");
         session.Title = "Opening talk";
+        SetFixedSchedule(cut.Instance);
 
         await cut.InvokeAsync(async () => await InvokePrivateAsync(cut.Instance, "SaveSessionAsync"));
 
@@ -296,6 +301,7 @@ public sealed class CreateSessionTests : IDisposable
         var cut = _ctx.Render<CreateSession>(parameters => parameters.Add(component => component.EventId, eventId));
         var session = GetPrivateField<ComposerCreateEventSessionRequest>(cut.Instance, "_session");
         session.Title = "Opening talk";
+        SetFixedSchedule(cut.Instance);
 
         await cut.InvokeAsync(async () => await InvokePrivateAsync(cut.Instance, "SaveSessionAsync"));
 
@@ -315,6 +321,7 @@ public sealed class CreateSessionTests : IDisposable
         var cut = _ctx.Render<CreateSession>(parameters => parameters.Add(component => component.EventId, eventId));
         var session = GetPrivateField<ComposerCreateEventSessionRequest>(cut.Instance, "_session");
         session.Title = "Opening talk";
+        SetFixedSchedule(cut.Instance);
 
         await cut.InvokeAsync(async () => await InvokePrivateAsync(cut.Instance, "SaveSessionAsync"));
 
@@ -339,6 +346,7 @@ public sealed class CreateSessionTests : IDisposable
         var cut = _ctx.Render<CreateSession>(parameters => parameters.Add(component => component.EventId, eventId));
         var session = GetPrivateField<ComposerCreateEventSessionRequest>(cut.Instance, "_session");
         session.Title = "Opening talk";
+        SetFixedSchedule(cut.Instance);
         session.MaxAudienceAttendees = 0;
 
         await InvokePrivateAsync(cut.Instance, "SaveSessionAsync");
@@ -407,6 +415,14 @@ public sealed class CreateSessionTests : IDisposable
     }
 
     public void Dispose() => _ctx.Dispose();
+
+    private static void SetFixedSchedule(CreateSession component)
+    {
+        SetPrivateField(component, "_sessionDate", new DateTime(2030, 6, 1));
+        SetPrivateField(component, "_endDate", new DateTime(2030, 6, 1));
+        SetPrivateField(component, "_startTime", TimeSpan.FromHours(9));
+        SetPrivateField(component, "_endTime", TimeSpan.FromHours(10));
+    }
 
     private static EventDto CreateDraftEvent(Guid eventId, Guid tenantId, bool canAddSession = true)
     {

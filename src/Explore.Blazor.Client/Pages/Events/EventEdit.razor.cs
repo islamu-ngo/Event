@@ -418,7 +418,8 @@ public partial class EventEdit : IDisposable
                 var eventSessions = await EventSessionService.GetSessionsByEventAsync(
                     EventId,
                     includeManagedSessions: CanRequestManagedSessions);
-                sessions = eventSessions?.Select(s => SessionEditorModel.FromDto(s)).ToList()
+                sessions = eventSessions?.Select(s => SessionEditorModel.FromDto(
+                    s, eventTimeZoneId: currentEvent.Timezone ?? "UTC")).ToList()
                            ?? new List<SessionEditorModel>();
                 _programSections = (await sessionGroupsTask).ToList();
                 _programSummary = await programSummaryTask;

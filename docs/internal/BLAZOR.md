@@ -480,6 +480,61 @@ Event detail and profile surfaces are HAL-driven management views:
 6. Moderated event cards and sidebars may show a red/error "Moderated" state only after the API returned the authorized management DTO. Public visitors should not receive moderated event data at all.
 7. Heavy redaction is destructive and must require explicit user confirmation in UI before calling the API. The API remains authoritative for redaction, deletion, notification, and authorization outcomes.
 
+### Inline Event Program Preparation
+
+`CreateEvent` owns the complete local program. Its existing
+`ScheduleTimelineComposer` renders scheduled and unscheduled rows and offers
+keyboard-operable edit, duplicate, remove and move actions. `EventSessionForm`
+edits an isolated `SessionEditorModel` copy inline. Save replaces the row with
+the same local identity; Save and add another starts an empty editor; Cancel
+discards the copy. Duplicates receive distinct local identities and graph temp
+keys. None of these operations saves a parent, writes a persisted session or
+navigates.
+
+An optional generated `CreateEventDraftRequestDto` initialization input is
+captured once into local parent and session state. Source, AI proposal and
+template-associated rows retain their day/room/location temp references,
+kind, slug, image, template, languages, speakers and Islamic metadata. This
+initialization is not another AI confirmation or execution authority. Changing
+the event's property template does not erase session template metadata.
+
+`CreateEventProgramMapper` is the single submission mapper for both Draft and
+Publish. It snapshots the generated parent graph through the existing AOT
+`AppJsonSerializerContext`, clones each row and its mutable metadata, and emits
+the full generated `Sessions` collection with explicit list-order values.
+Collections are read-only and the submitted graph shares no mutable edit state.
+The generated transport input remains the existing protocol class, not a new
+public DTO. The component does not mutate or replay the submitted snapshot.
+
+Title-only rows retain null schedules. Drafts may have no rows or a mixture of
+scheduled and unscheduled rows; publishing checks every prepared row rather
+than selecting a scheduled subset. Fixed schedules require both instants and
+a later end. Open-ended schedules retain a start without an end. Start and end
+dates are separate, so an overnight interval does not depend on implicit
+rollover. Incomplete date/time pairs stay in the open editor with an error.
+All wall times are converted in the event timezone at submit, including after
+a timezone change. `DateTimeHelper` rejects nonexistent or newly ambiguous
+times, and preserves an unchanged saved ambiguous occurrence's offset.
+Persisted CreateSession/EditSession use the same end-date callbacks and pass
+their selected end date into the existing mapper.
+
+The submission guard runs before form reset or validation, so a pending
+request cannot be replaced by another native form submission. A definite
+rejection keeps parent fields, local rows and indexed server errors available
+for correction. A missing response, unexpected server failure or post-send
+cancellation is an unknown save outcome: input remains, and this page disables
+creation rather than assuming rollback or automatically replaying. The
+existing managed-event list opens separately for authoritative reconciliation;
+there is no local reset or guessed verification that re-enables creation.
+
+A confirmed event ID is recorded before navigating. If navigation fails, the
+page still reports a saved event and exposes the existing destination link;
+another create is blocked. Draft saves continue to the existing event editor,
+and publish continues to EventCreated until the separate workspace-route
+outcome changes those destinations. Local keys and navigation links grant no
+server permission; existing provenance, native authorization and HAL
+affordances remain authoritative.
+
 ### AI Assistant Client Surface
 
 The product assistant follows the same BFF and service-layer boundary:

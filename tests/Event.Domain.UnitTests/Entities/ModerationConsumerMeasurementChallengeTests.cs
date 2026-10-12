@@ -48,4 +48,34 @@ public sealed class ModerationConsumerMeasurementChallengeTests
         ModerationConsumerInstallation.Install(Guid.CreateVersion7(), Guid.CreateVersion7(),
             Guid.CreateVersion7(), Guid.CreateVersion7(), "resource.payload", 1,
             new string('c', 64), new string('d', 64), Guid.CreateVersion7(), 2, Now, Now.AddMinutes(5));
+
+    [Test]
+    public async Task OriginalAnchorRemainsExactWithoutExtendingTheChallenge()
+    {
+        var effect = Guid.CreateVersion7();
+        var challenge = ModerationConsumerMeasurementChallenge.Prepare(Guid.CreateVersion7(), Installation(),
+            Guid.CreateVersion7(), Guid.CreateVersion7(), new string('a', 64), new string('b', 64),
+            new string('e', 64), Guid.CreateVersion7(), 3, Now, Now.AddMinutes(1),
+            effect, new string('f', 64), new string('a', 64));
+        await Assert.That(challenge.OriginalEffectId).IsEqualTo(effect);
+        await Assert.That(challenge.OriginalSnapshotHash).IsEqualTo(new string('f', 64));
+        await Assert.That(challenge.OriginalEffectBindingHash).IsEqualTo(new string('a', 64));
+        await Assert.That(challenge.ValidUntil).IsEqualTo(Now.AddMinutes(1));
+    }
+
+    [Test]
+    [Arguments("without-effect")]
+    [Arguments("missing-snapshot")]
+    [Arguments("missing-binding")]
+    [Arguments("invalid-effect")]
+    public async Task PartialOrInvalidOriginalAnchorsAreRejected(string change)
+    {
+        await Assert.That(() => ModerationConsumerMeasurementChallenge.Prepare(
+            Guid.CreateVersion7(), Installation(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            new string('a', 64), new string('b', 64), new string('e', 64),
+            Guid.CreateVersion7(), 3, Now, Now.AddMinutes(1),
+            change == "without-effect" ? null : change == "invalid-effect" ? Guid.Empty : Guid.CreateVersion7(),
+            change == "missing-snapshot" ? null : new string('f', 64),
+            change == "missing-binding" ? null : new string('a', 64))).Throws<ArgumentException>();
+    }
 }

@@ -28,11 +28,15 @@ public sealed class ModerationConsumerMeasurementChallenge
     public long Revision { get; private set; }
     public DateTimeOffset PreparedAt { get; private set; }
     public DateTimeOffset ValidUntil { get; private set; }
+    public Guid? OriginalEffectId { get; private set; }
+    public string? OriginalSnapshotHash { get; private set; }
+    public string? OriginalEffectBindingHash { get; private set; }
 
     public static ModerationConsumerMeasurementChallenge Prepare(
         Guid id, ModerationConsumerInstallation installed, Guid publicationId, Guid definitionId, string bindingDigest,
         string consumerContractDigest, string nonce, Guid humanId, long writerGeneration,
-        DateTimeOffset now, DateTimeOffset validUntil)
+        DateTimeOffset now, DateTimeOffset validUntil, Guid? originalEffectId = null,
+        string? originalSnapshotHash = null, string? originalEffectBindingHash = null)
     {
         ArgumentNullException.ThrowIfNull(installed);
         installed.ValidatePersistedState();
@@ -50,7 +54,9 @@ public sealed class ModerationConsumerMeasurementChallenge
             DefinitionId = definitionId,
             BindingDigest = bindingDigest, ConsumerContractDigest = consumerContractDigest, Nonce = nonce,
             PreparedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1,
-            PreparedAt = now.ToUniversalTime(), ValidUntil = validUntil
+            PreparedAt = now.ToUniversalTime(), ValidUntil = validUntil,
+            OriginalEffectId = originalEffectId, OriginalSnapshotHash = originalSnapshotHash,
+            OriginalEffectBindingHash = originalEffectBindingHash
         };
         challenge.ValidatePersistedState();
         return challenge;
@@ -67,6 +73,14 @@ public sealed class ModerationConsumerMeasurementChallenge
             || !Digest(ConsumerContractDigest) || !Digest(Nonce))
             throw new ArgumentException("Measurement preparation requires immutable original source, binding, contract and nonce coordinates.");
         ModerationQualificationPolicySource.RequireValidity(PreparedAt, ValidUntil);
+        if (OriginalEffectId is { } effect)
+        {
+            ModerationHostBinding.RequireUuidV7(effect, nameof(OriginalEffectId));
+            if (!Digest(OriginalSnapshotHash) || !Digest(OriginalEffectBindingHash))
+                throw new ArgumentException("Original measurement preparation requires the exact complete custody anchor.");
+        }
+        else if (OriginalSnapshotHash is not null || OriginalEffectBindingHash is not null)
+            throw new ArgumentException("Original measurement custody hashes require their original effect.");
     }
 
     private static bool Digest(string? value) => value is { Length: 64 } && value.All(char.IsAsciiHexDigit);

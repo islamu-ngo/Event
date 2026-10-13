@@ -18,6 +18,8 @@ namespace Explore.Blazor.Client.Pages.Events;
 public partial class CreateEvent : IDisposable
 {
     private const string MainContentAppearanceOwner = nameof(CreateEvent);
+    private const string OrganizationPublisherMode = "organization";
+    private const string GroupPublisherMode = "group";
     private const int InformationOnly = 1;
     private const int WalkIn = 2;
     private const int ExternalManaged = 3;
@@ -155,7 +157,10 @@ public partial class CreateEvent : IDisposable
                 Translation.T("ui.studio.event.unsavedChanges", "Leave this page and discard unsaved changes?"));
             if (_disposed || context.CancellationToken.IsCancellationRequested || !leave) context.PreventNavigation();
         }
-        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            // A superseded navigation no longer needs a leave decision.
+        }
     }
     private string _bgColor = string.Empty;
     private string _bgEffect = "None";
@@ -561,7 +566,11 @@ public partial class CreateEvent : IDisposable
                 _initialTimezoneError = "The proposed timezone is unavailable. Select a valid timezone before editing the prepared program or saving. Original session instants are retained.";
                 _showTimezoneSelector = true;
             }
-            _publisherMode = createDto.OrganizationId.HasValue ? "organization" : createDto.GroupId.HasValue ? "group" : "personal";
+            _publisherMode = "personal";
+            if (createDto.OrganizationId.HasValue)
+                _publisherMode = OrganizationPublisherMode;
+            else if (createDto.GroupId.HasValue)
+                _publisherMode = GroupPublisherMode;
             _selectedOrganizationId = createDto.OrganizationId;
             _selectedGroupId = createDto.GroupId;
         }
@@ -578,8 +587,8 @@ public partial class CreateEvent : IDisposable
 
     private string SelectedPublisherKey => BuildPublisherKey(_publisherMode, _publisherMode switch
     {
-        "organization" => _selectedOrganizationId,
-        "group" => _selectedGroupId,
+        OrganizationPublisherMode => _selectedOrganizationId,
+        GroupPublisherMode => _selectedGroupId,
         _ => null
     });
 
@@ -617,8 +626,8 @@ public partial class CreateEvent : IDisposable
         }
 
         _publisherMode = mode;
-        _selectedOrganizationId = mode == "organization" ? publisherId : null;
-        _selectedGroupId = mode == "group" ? publisherId : null;
+        _selectedOrganizationId = mode == OrganizationPublisherMode ? publisherId : null;
+        _selectedGroupId = mode == GroupPublisherMode ? publisherId : null;
     }
 
     private static string BuildPublisherKey(string? mode, Guid? publisherId) =>
@@ -648,15 +657,15 @@ public partial class CreateEvent : IDisposable
     private static string GetPublisherModeLabel(string? mode) => mode switch
     {
         "personal" => "Personal profile",
-        "organization" => "Organization",
-        "group" => "Group",
+        OrganizationPublisherMode => "Organization",
+        GroupPublisherMode => "Group",
         _ => "Publisher"
     };
 
     private static string GetPublisherIcon(string? mode) => mode switch
     {
-        "organization" => Icons.Material.Filled.Business,
-        "group" => Icons.Material.Filled.Group,
+        OrganizationPublisherMode => Icons.Material.Filled.Business,
+        GroupPublisherMode => Icons.Material.Filled.Group,
         _ => Icons.Material.Filled.Person
     };
 
@@ -897,9 +906,9 @@ public partial class CreateEvent : IDisposable
             return;
         }
         var savedRow = _programEdit.Clone();
-        if (_editingLocalId.HasValue)
+        if (_editingLocalId is Guid editingLocalId)
         {
-            var index = sessions.FindIndex(row => row.LocalId == _editingLocalId.Value);
+            var index = sessions.FindIndex(row => row.LocalId == editingLocalId);
             sessions[index] = savedRow;
         }
         else
@@ -1144,28 +1153,28 @@ public partial class CreateEvent : IDisposable
             return false;
         }
 
-        if (_publisherMode == "organization")
+        if (_publisherMode == OrganizationPublisherMode)
         {
             if (!_selectedOrganizationId.HasValue)
             {
                 _submitState.Fail("Please select an organization.");
                 return false;
             }
-            if (GetPublisherOption("organization", _selectedOrganizationId.Value)?.CanPublish != true)
+            if (GetPublisherOption(OrganizationPublisherMode, _selectedOrganizationId.Value)?.CanPublish != true)
             {
                 _submitState.Fail("You cannot publish events for the selected organization.");
                 return false;
             }
         }
 
-        if (_publisherMode == "group")
+        if (_publisherMode == GroupPublisherMode)
         {
             if (!_selectedGroupId.HasValue)
             {
                 _submitState.Fail("Please select a group.");
                 return false;
             }
-            if (GetPublisherOption("group", _selectedGroupId.Value)?.CanPublish != true)
+            if (GetPublisherOption(GroupPublisherMode, _selectedGroupId.Value)?.CanPublish != true)
             {
                 _submitState.Fail("You cannot publish events for the selected group.");
                 return false;
@@ -1237,13 +1246,13 @@ public partial class CreateEvent : IDisposable
         _publisherMode = defaultMode;
         _selectedOrganizationId = null;
         _selectedGroupId = null;
-        if (_publisherMode == "organization")
+        if (_publisherMode == OrganizationPublisherMode)
         {
-            _selectedOrganizationId = GetFirstPublishableOption("organization")?.PublisherId;
+            _selectedOrganizationId = GetFirstPublishableOption(OrganizationPublisherMode)?.PublisherId;
         }
-        else if (_publisherMode == "group")
+        else if (_publisherMode == GroupPublisherMode)
         {
-            _selectedGroupId = GetFirstPublishableOption("group")?.PublisherId;
+            _selectedGroupId = GetFirstPublishableOption(GroupPublisherMode)?.PublisherId;
         }
     }
 
@@ -1260,8 +1269,8 @@ public partial class CreateEvent : IDisposable
         return mode switch
         {
             "personal" => GetPublisherOption("personal", null)?.CanPublish == true,
-            "organization" => GetFirstPublishableOption("organization") is not null,
-            "group" => GetFirstPublishableOption("group") is not null,
+            OrganizationPublisherMode => GetFirstPublishableOption(OrganizationPublisherMode) is not null,
+            GroupPublisherMode => GetFirstPublishableOption(GroupPublisherMode) is not null,
             _ => false
         };
     }

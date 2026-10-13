@@ -327,10 +327,11 @@ public sealed class CreateEventProgramComposerTests : IDisposable
         await Assert.That(submitted.Sessions!.Count).IsEqualTo(2);
         await Assert.That(submitted.EventStatusId).IsEqualTo(publish ? 2 : 1);
         await Assert.That(submitted.Sessions.Last().Title).IsEqualTo("Second");
-        _handler.Response.SetResult(new HttpResponseMessage(HttpStatusCode.Created)
+        using var response = new HttpResponseMessage(HttpStatusCode.Created)
         {
             Content = JsonContent.Create(new BaseCommandResponseOfGuid { Success = true, Id = CreatedId })
-        });
+        };
+        _handler.Response.SetResult(response);
         await submission.WaitAsync(Timeout);
         await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri)
             .IsEqualTo($"http://localhost/studio/events/{CreatedId}");
@@ -344,14 +345,15 @@ public sealed class CreateEventProgramComposerTests : IDisposable
         await AddTitleOnly(cut, "Retained child");
         var submission = cut.Find("button.create-event__draft-button").ClickAsync(new MouseEventArgs());
         await _handler.Started.Task.WaitAsync(Timeout);
-        _handler.Response.SetResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        using var response = new HttpResponseMessage(HttpStatusCode.BadRequest)
         {
             Content = JsonContent.Create(new ValidationProblemDetails
             {
                 Status = 400,
                 Errors = new Dictionary<string, ICollection<string>> { ["Sessions[0].Title"] = ["Invalid value"] }
             })
-        });
+        };
+        _handler.Response.SetResult(response);
         await submission.WaitAsync(Timeout);
         await Assert.That(Timeline(cut).Instance.Sessions.Single().Title).IsEqualTo("Retained child");
         await Assert.That(cut.Find("button.create-event__draft-button").HasAttribute("disabled")).IsFalse();

@@ -72,7 +72,10 @@ public partial class EventEdit : IDisposable
                 Translation.T("ui.studio.event.unsavedChanges", "Leave this page and discard unsaved changes?"));
             if (_disposed || context.CancellationToken.IsCancellationRequested || !leave) context.PreventNavigation();
         }
-        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            // A superseded navigation no longer needs a leave decision.
+        }
     }
 
     private bool CanAddSession => currentEvent?.HasHalLink("add-session") == true

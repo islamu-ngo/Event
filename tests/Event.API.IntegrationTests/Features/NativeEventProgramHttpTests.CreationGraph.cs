@@ -155,9 +155,13 @@ public sealed partial class NativeEventProgramHttpTests
             var original = await setupDb.Locations.AsNoTracking().SingleAsync(row => row.Id == factory.LocationId);
             var selected = new Location
             {
-                Id = selectedLocationId, TenantId = original.TenantId, Tenant = null!,
-                FullName = "Selected existing venue", City = original.City,
-                Country = original.Country, Timezone = original.Timezone
+                Id = selectedLocationId,
+                TenantId = original.TenantId,
+                Tenant = null!,
+                FullName = "Selected existing venue",
+                City = original.City,
+                Country = original.Country,
+                Timezone = original.Timezone
             };
             selected.ClassifyAs(LocationKindEnum.CommercialVenue);
             selected.SetManualAddress("Selected test street", "Selected test postcode");

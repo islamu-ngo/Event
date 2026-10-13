@@ -131,6 +131,25 @@ public sealed class StudioEventContextStateTests
         pending.SetResult(new AuthenticationState(new ClaimsPrincipal()));
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task EventScopedInvalidation_DoesNotClearAnotherSelectedWorkspace(bool sameEvent)
+    {
+        var eventId = Guid.CreateVersion7();
+        var service = Substitute.For<IEventService>();
+        var resource = new EventDto { Id = eventId, Title = "Current selected workspace" };
+        service.GetEventByIdAsync(eventId).Returns(resource);
+        using var state = new StudioEventContextState(service);
+        await state.LoadAsync(eventId);
+        var generation = state.Generation;
+
+        state.Invalidate(sameEvent ? eventId : Guid.CreateVersion7());
+
+        await Assert.That(state.Event).IsEqualTo(sameEvent ? null : resource);
+        await Assert.That(state.Generation).IsEqualTo(sameEvent ? generation + 1 : generation);
+    }
+
     private sealed class WorkspaceAuthentication : AuthenticationStateProvider
     {
         public override Task<AuthenticationState> GetAuthenticationStateAsync()

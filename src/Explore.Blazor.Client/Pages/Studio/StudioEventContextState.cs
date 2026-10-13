@@ -96,11 +96,13 @@ public sealed class StudioEventContextState : IDisposable
         }
     }
 
-    public void Invalidate()
+    public void Invalidate() => Invalidate(null);
+
+    public void Invalidate(Guid? eventId)
     {
         lock (_sync)
         {
-            if (_disposed) return;
+            if (_disposed || (eventId.HasValue && EventId != eventId)) return;
             ++Generation;
             _loadTask = null;
             EventId = null;

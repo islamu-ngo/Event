@@ -4,6 +4,7 @@ using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models.Events;
 using Explore.Blazor.Client.Pages.Events;
 using Explore.Blazor.Client.Pages.Events.Models;
+using Explore.Blazor.Client.Pages.Studio;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;
@@ -443,7 +444,10 @@ public sealed class EventEditTests : IDisposable
         bool canManageProgramSections = false)
     {
         var component = new EventEdit();
-        SetProperty(component, "EventService", eventService ?? Substitute.For<IEventService>());
+        eventService ??= Substitute.For<IEventService>();
+        _ctx.Services.AddScoped(_ => new StudioEventContextState(eventService));
+        SetProperty(component, "EventService", eventService);
+        SetProperty(component, "StudioContext", _ctx.Services.GetRequiredService<StudioEventContextState>());
         SetProperty(component, "Navigation", _ctx.Services.GetRequiredService<NavigationManager>());
         SetProperty(component, "Logger", Substitute.For<ILogger<EventEdit>>());
         SetProperty(component, "EventId", eventId);

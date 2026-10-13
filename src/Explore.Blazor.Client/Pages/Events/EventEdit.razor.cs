@@ -46,6 +46,7 @@ public partial class EventEdit : IDisposable
     [Inject] private MainContentAppearanceState MainContentAppearanceState { get; set; } = default!;
     [Inject] private IJSRuntime Browser { get; set; } = default!;
     [Inject] private Explore.Blazor.Client.Contracts.Services.ITranslationService Translation { get; set; } = default!;
+    [Inject] private Explore.Blazor.Client.Pages.Studio.StudioEventContextState StudioContext { get; set; } = default!;
 
     private Guid EventId { get; set; }
     private bool _dirty;
@@ -926,6 +927,7 @@ public partial class EventEdit : IDisposable
                 _submitState.Complete();
                 _savedDestination = $"/studio/events/{EventId}";
                 _savedMessage = "Event details saved.";
+                StudioContext.Invalidate(EventId);
                 if (_disposed) return true;
                 currentEvent = null;
                 try

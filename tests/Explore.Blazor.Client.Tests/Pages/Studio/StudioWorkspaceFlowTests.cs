@@ -5,6 +5,7 @@ using Blazouter.Models;
 using Explore.Blazor.Client.Contracts.Services.CustomProperties;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Models;
+using Explore.Blazor.Client.Models.Events;
 using Explore.Blazor.Client.Pages.Events;
 using Explore.Blazor.Client.Pages.Events.Components;
 using Explore.Blazor.Client.Pages.Events.Sessions;
@@ -158,6 +159,36 @@ public sealed class StudioWorkspaceFlowTests : IDisposable
     private async Task<IRenderedComponent<Blazouter.Components.Router>> OpenSessionAsync()
     {
         return await OpenRouteAsync($"/studio/events/{_eventId}/sessions/create", "form");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ActualRouter_DetailsSave_RefreshesLoadedOverviewWithoutRestoringOldAuthority(bool denyRead)
+    {
+        _ctx.JSInterop.Setup<bool>("confirm", _ => true).SetResult(false);
+        var router = await OpenRouteAsync($"/studio/events/{_eventId}", "[data-testid='studio-event-overview']");
+        var details = NextRender(router, () => router.FindComponents<EventEdit>().Count == 1
+            && router.FindAll("form").Count == 1);
+        await router.InvokeAsync(() => _navigation.NavigateAsync($"/studio/events/{_eventId}/details"));
+        await details;
+        _events.UpdateEventAsync(_eventId, Arg.Any<EventDraftEditModel>()).Returns(_ =>
+        {
+            _events.GetEventByIdAsync(_eventId).Returns(denyRead ? null : Resource() with { Title = "Saved details" });
+            return new BaseCommandResponseOfGuid { Success = true, Id = _eventId };
+        });
+        var overview = NextRender(router, () => router.FindComponents<StudioEventShell>().Count == 1
+            && router.FindComponents<EventEdit>().Count == 0);
+
+        await router.FindComponent<EventEdit>().FindComponent<EditForm>()
+            .InvokeAsync(() => router.FindComponent<EventEdit>().FindComponent<EditForm>().Instance.OnValidSubmit.InvokeAsync());
+        await _navigation.Pending.WaitAsync(Timeout);
+        await overview;
+
+        var state = _ctx.Services.GetRequiredService<StudioEventContextState>();
+        await Assert.That(state.Event?.Title).IsEqualTo(denyRead ? null : "Saved details");
+        await Assert.That(router.FindAll($"a[href='/studio/events/{_eventId}/details']")).IsEmpty();
+        await Assert.That(_navigation.ToBaseRelativePath(_navigation.Uri)).IsEqualTo($"studio/events/{_eventId}");
     }
 
     [Test]

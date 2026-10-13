@@ -785,11 +785,18 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                         throw new InvalidOperationException("Event session end time type is not supported.");
                 }
             }
-            session.EventDayId = session.LocalStartDate is not null
-                ? ResolveDayId(sessionDto.DayTempKey, session.LocalStartDate.Value, dayMaps)
-                : !string.IsNullOrWhiteSpace(sessionDto.DayTempKey)
-                    ? dayMaps.ByKey[sessionDto.DayTempKey.Trim()].Id
-                    : null;
+            if (session.LocalStartDate is { } localStartDate)
+            {
+                session.EventDayId = ResolveDayId(sessionDto.DayTempKey, localStartDate, dayMaps);
+            }
+            else if (!string.IsNullOrWhiteSpace(sessionDto.DayTempKey))
+            {
+                session.EventDayId = dayMaps.ByKey[sessionDto.DayTempKey.Trim()].Id;
+            }
+            else
+            {
+                session.EventDayId = null;
+            }
             session = await PersistSessionWithRoomGuardAsync(session, ct);
 
             await CreateSessionAspectsAsync(sessionDto, session, ct);

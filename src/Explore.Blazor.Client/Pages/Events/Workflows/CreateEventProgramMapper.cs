@@ -19,10 +19,8 @@ internal static class CreateEventProgramMapper
                 TempKey = string.IsNullOrWhiteSpace(row.TempKey) ? Guid.NewGuid().ToString("N") : row.TempKey,
                 Title = row.Title,
                 Description = row.Description,
-                StartTime = row.StartTime.HasValue ? timezoneAvailable
-                    ? DateTimeHelper.ConvertUtcToLocal(row.StartTime.Value, timezone) : row.StartTime.Value.DateTime : null,
-                EndTime = row.EndTime.HasValue ? timezoneAvailable
-                    ? DateTimeHelper.ConvertUtcToLocal(row.EndTime.Value, timezone) : row.EndTime.Value.DateTime : null,
+                StartTime = MapInstantToLocal(row.StartTime, timezone, timezoneAvailable),
+                EndTime = MapInstantToLocal(row.EndTime, timezone, timezoneAvailable),
                 ExistingStartInstant = row.StartTime,
                 ExistingEndInstant = row.EndTime,
                 EndTimeType = row.EndTimeType ?? SessionEndTimeType.Fixed,
@@ -42,6 +40,18 @@ internal static class CreateEventProgramMapper
                 LanguageIds = Array.AsReadOnly((row.LanguageIds ?? []).ToArray()),
                 SpeakerActorIds = Array.AsReadOnly((row.SpeakerActorIds ?? []).ToArray())
             }).ToList();
+    }
+
+    private static DateTime? MapInstantToLocal(DateTimeOffset? instant, string timezone, bool timezoneAvailable)
+    {
+        if (instant is not { } value)
+        {
+            return null;
+        }
+
+        return timezoneAvailable
+            ? DateTimeHelper.ConvertUtcToLocal(value, timezone)
+            : value.DateTime;
     }
 
     public static bool TryMap(
@@ -147,6 +157,15 @@ internal static class CreateEventProgramMapper
         }
         start = startUtc;
         field = "EndTime";
+        return TryValidateEndTime(row, timezone, startUtc, out end, out error);
+    }
+
+    private static bool TryValidateEndTime(
+        SessionEditorModel row, string? timezone, DateTimeOffset startUtc,
+        out DateTimeOffset? end, out string? error)
+    {
+        end = null;
+        error = null;
         if (row.EndTimeType == SessionEndTimeType.OpenEnded)
         {
             if (row.EndTime.HasValue)

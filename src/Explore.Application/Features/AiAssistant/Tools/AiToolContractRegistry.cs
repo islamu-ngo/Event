@@ -6,6 +6,10 @@ namespace Explore.Application.Features.AiAssistant.Tools;
 
 public sealed class AiToolContractRegistry : IAiToolContractRegistry
 {
+    private const string TitlePropertyName = "title";
+    private const string StartTimePropertyName = "startTime";
+    private const string EndTimePropertyName = "endTime";
+
     private readonly IReadOnlyDictionary<AiProposedActionKind, AiToolDefinition> _definitionsByKind;
 
     public static AiToolContractRegistry CreateDefault()
@@ -144,7 +148,7 @@ public sealed class AiToolContractRegistry : IAiToolContractRegistry
     {
         var changed = false;
 
-        changed |= MoveAliasedProperty(payload, payload, "title", "eventTitle", "eventName", "name");
+        changed |= MoveAliasedProperty(payload, payload, TitlePropertyName, "eventTitle", "eventName", "name");
         changed |= MoveAliasedProperty(payload, payload, "description", "summary", "shortDescription");
         changed |= MoveAliasedProperty(payload, payload, "eventUrl", "url", "eventLink", "websiteUrl");
 
@@ -176,10 +180,10 @@ public sealed class AiToolContractRegistry : IAiToolContractRegistry
 
         var session = FindObject(payload, "session");
         if (session is not null
-            && (HasNonBlankStringProperty(session, "startTime") != HasNonBlankStringProperty(session, "endTime")
-                || (!HasNonBlankStringProperty(session, "startTime")
-                    && !HasNonBlankStringProperty(session, "endTime")
-                    && !HasNonBlankStringProperty(session, "title"))))
+            && (HasNonBlankStringProperty(session, StartTimePropertyName) != HasNonBlankStringProperty(session, EndTimePropertyName)
+                || (!HasNonBlankStringProperty(session, StartTimePropertyName)
+                    && !HasNonBlankStringProperty(session, EndTimePropertyName)
+                    && !HasNonBlankStringProperty(session, TitlePropertyName))))
         {
             changed |= RemoveProperty(payload, "session");
         }
@@ -336,10 +340,10 @@ public sealed class AiToolContractRegistry : IAiToolContractRegistry
         if (session is null
             && HasAnyProperty(
                 payload,
-                "startTime",
+                StartTimePropertyName,
                 "startsAt",
                 "startDateTime",
-                "endTime",
+                EndTimePropertyName,
                 "endsAt",
                 "endDateTime",
                 "sessionTitle",
@@ -360,12 +364,12 @@ public sealed class AiToolContractRegistry : IAiToolContractRegistry
             return changed;
         }
 
-        changed |= MoveAliasedProperty(session, session, "startTime", "startsAt", "startDateTime");
-        changed |= MoveAliasedProperty(session, session, "endTime", "endsAt", "endDateTime");
-        changed |= MoveAliasedProperty(session, session, "title", "name", "sessionTitle", "sessionName");
-        changed |= MoveAliasedProperty(payload, session, "startTime", "startTime", "startsAt", "startDateTime");
-        changed |= MoveAliasedProperty(payload, session, "endTime", "endTime", "endsAt", "endDateTime");
-        changed |= MoveAliasedProperty(payload, session, "title", "sessionTitle", "sessionName");
+        changed |= MoveAliasedProperty(session, session, StartTimePropertyName, "startsAt", "startDateTime");
+        changed |= MoveAliasedProperty(session, session, EndTimePropertyName, "endsAt", "endDateTime");
+        changed |= MoveAliasedProperty(session, session, TitlePropertyName, "name", "sessionTitle", "sessionName");
+        changed |= MoveAliasedProperty(payload, session, StartTimePropertyName, StartTimePropertyName, "startsAt", "startDateTime");
+        changed |= MoveAliasedProperty(payload, session, EndTimePropertyName, EndTimePropertyName, "endsAt", "endDateTime");
+        changed |= MoveAliasedProperty(payload, session, TitlePropertyName, "sessionTitle", "sessionName");
         changed |= MoveAliasedProperty(payload, session, "eventSessionKindId", "eventSessionKindId");
         changed |= MoveAliasedProperty(payload, session, "maxAudienceAttendees", "maxAudienceAttendees");
         changed |= MoveAliasedProperty(payload, session, "registrationModeId", "registrationModeId");

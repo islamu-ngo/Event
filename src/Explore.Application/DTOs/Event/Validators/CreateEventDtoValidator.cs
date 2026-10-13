@@ -31,6 +31,25 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
         IEventSessionTemplateRepository eventSessionTemplateRepository,
         IActorRepository actorRepository)
     {
+        RegisterMetadataRules();
+        RegisterIslamicAspectRules();
+        RegisterClassificationRules(eventTypeRepository, audienceGenderRepository, audienceAgeRepository);
+        RegisterOwnershipRules(organizationRepository, groupRepository);
+        RegisterMediaAndTemplateRules(storageObjectRepository, eventTemplateRepository, eventSeriesRepository, eventRegistrationPolicyRepository);
+        RegisterSessionRules(storageObjectRepository, locationRepository, locationRoomRepository);
+        RegisterPublicationRules();
+        RegisterLocationRules();
+        RegisterDayRules(storageObjectRepository);
+        RegisterRoomRules();
+        RegisterAgendaRules();
+        RegisterSubmittedGraphRules();
+        RegisterLookupRules(locationRepository, registrationModeRepository, languageRepository, madhabRepository,
+            categoryRepository, tagRepository, scheduleItemKindRepository, eventSessionKindRepository,
+            locationRoomRepository, eventSessionTemplateRepository, actorRepository);
+    }
+
+    private void RegisterMetadataRules()
+    {
         RuleFor(p => p.Title)
             .NotEmpty().WithMessage("{PropertyName} is required.")
             .MaximumLength(200).WithMessage("{PropertyName} must not exceed 200 characters.");
@@ -53,7 +72,10 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
         RuleFor(p => p.BackgroundColor).MaximumLength(32).When(p => !string.IsNullOrWhiteSpace(p.BackgroundColor));
         RuleFor(p => p.BackgroundEffect).MaximumLength(64).When(p => !string.IsNullOrWhiteSpace(p.BackgroundEffect));
         RuleFor(p => p.SeriesOrder).GreaterThanOrEqualTo(0).When(p => p.SeriesOrder.HasValue);
+    }
 
+    private void RegisterIslamicAspectRules()
+    {
         RuleFor(p => p.IslamicAspect!.PrayerTimeOffset)
             .InclusiveBetween(-180, 180)
             .When(p => p.IslamicAspect?.PrayerTimeOffset is not null)
@@ -68,7 +90,13 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             .IsInEnum()
             .When(p => p.IslamicAspect is not null)
             .WithMessage("Invalid gender segregation mode.");
+    }
 
+    private void RegisterClassificationRules(
+        IEventTypeRepository eventTypeRepository,
+        IAudienceGenderRepository audienceGenderRepository,
+        IAudienceAgeRepository audienceAgeRepository)
+    {
         RuleFor(p => p.EventTypeId)
             .MustAsync(async (id, _) => !id.HasValue || await eventTypeRepository.Exists(id.Value))
             .WithMessage("Event type does not exist.");
@@ -80,7 +108,10 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
         RuleFor(p => p.AudienceAgeId)
             .MustAsync(async (id, _) => !id.HasValue || await audienceAgeRepository.Exists(id.Value))
             .WithMessage("Audience age does not exist.");
+    }
 
+    private void RegisterOwnershipRules(IOrganizationRepository organizationRepository, IGroupRepository groupRepository)
+    {
         RuleFor(p => p.OrganizationId)
             .MustAsync(async (id, _) => !id.HasValue || await organizationRepository.Exists(id.Value))
             .WithMessage("Organization does not exist.");
@@ -92,7 +123,14 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
         RuleFor(p => p)
             .Must(p => !(p.OrganizationId.HasValue && p.GroupId.HasValue))
             .WithMessage("OrganizationId and GroupId cannot both be provided.");
+    }
 
+    private void RegisterMediaAndTemplateRules(
+        IStorageObjectRepository storageObjectRepository,
+        IEventTemplateRepository eventTemplateRepository,
+        IEventSeriesRepository eventSeriesRepository,
+        IEventRegistrationPolicyRepository eventRegistrationPolicyRepository)
+    {
         RuleFor(p => p.FeaturedImageId)
             .MustAsync(async (id, _) => !id.HasValue || await storageObjectRepository.Exists(id.Value))
             .WithMessage("Featured image does not exist.");
@@ -113,7 +151,13 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
         RuleFor(p => p.RegistrationPolicyId)
             .MustAsync(async (id, _) => !id.HasValue || await eventRegistrationPolicyRepository.Exists(id.Value))
             .WithMessage("Registration policy does not exist.");
+    }
 
+    private void RegisterSessionRules(
+        IStorageObjectRepository storageObjectRepository,
+        ILocationRepository locationRepository,
+        ILocationRoomRepository locationRoomRepository)
+    {
         RuleForEach(p => p.Sessions).ChildRules(session =>
         {
             session.RuleFor(s => s.Title).MaximumLength(500).When(s => !string.IsNullOrWhiteSpace(s.Title));
@@ -155,7 +199,10 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
                     || (await locationRoomRepository.GetById(id.Value))?.LocationId == s.LocationId.Value)
                 .WithMessage("Session room does not belong to the submitted location.");
         });
+    }
 
+    private void RegisterPublicationRules()
+    {
         RuleFor(p => p).Custom((request, context) =>
         {
             if (request.EventStatusId != (int)EventStatusEnum.Published)
@@ -171,7 +218,10 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
                 }
             }
         });
+    }
 
+    private void RegisterLocationRules()
+    {
         RuleForEach(p => p.Locations).ChildRules(location =>
         {
             location.RuleFor(l => l.TempKey).NotEmpty().MaximumLength(80);
@@ -182,7 +232,10 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             location.RuleFor(l => l.City).NotEmpty().MaximumLength(500);
             location.RuleFor(l => l.Timezone).MaximumLength(500).When(l => !string.IsNullOrWhiteSpace(l.Timezone));
         });
+    }
 
+    private void RegisterDayRules(IStorageObjectRepository storageObjectRepository)
+    {
         RuleForEach(p => p.Days).ChildRules(day =>
         {
             day.RuleFor(d => d.Label).MaximumLength(200).When(d => !string.IsNullOrWhiteSpace(d.Label));
@@ -192,7 +245,10 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
                 .MustAsync(async (id, _) => !id.HasValue || await storageObjectRepository.Exists(id.Value))
                 .WithMessage("Day banner image does not exist.");
         });
+    }
 
+    private void RegisterRoomRules()
+    {
         RuleForEach(p => p.Rooms).ChildRules(room =>
         {
             room.RuleFor(r => r.TempKey).NotEmpty().MaximumLength(80);
@@ -205,7 +261,10 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             room.RuleFor(r => r.Description).MaximumLength(2000).When(r => !string.IsNullOrWhiteSpace(r.Description));
             room.RuleFor(r => r.Capacity).GreaterThan(0).When(r => r.Capacity.HasValue);
         });
+    }
 
+    private void RegisterAgendaRules()
+    {
         RuleForEach(p => p.AgendaItems).ChildRules(item =>
         {
             item.RuleFor(i => i.Title).NotEmpty().MaximumLength(300);
@@ -218,70 +277,90 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             item.RuleFor(i => i.EndTime).NotEmpty().GreaterThan(i => i.StartTime).WithMessage("Agenda item end time must be after start time.");
             item.RuleFor(i => i.SortOrder).GreaterThanOrEqualTo(0);
         });
+    }
 
-        RuleFor(p => p).Custom((request, context) =>
+    private void RegisterSubmittedGraphRules()
+    {
+        RuleFor(p => p).Custom(ValidateSubmittedGraph);
+    }
+
+    private static void ValidateSubmittedGraph(CreateEventDto request, ValidationContext<CreateEventDto> context)
+    {
+        CheckDuplicateKeys(request.Locations.Select(location => location.TempKey), "Locations", context);
+        CheckDuplicateKeys(request.Days.Select(day => day.TempKey), "Days", context);
+        CheckDuplicateKeys(request.Rooms.Select(room => room.TempKey), "Rooms", context);
+        CheckDuplicateKeys(request.Sessions.Select(session => session.TempKey), "Sessions", context);
+        var dayDates = new HashSet<DateOnly>();
+        for (int index = 0; index < request.Days.Count; index++)
         {
-            CheckDuplicateKeys(request.Locations.Select(location => location.TempKey), "Locations");
-            CheckDuplicateKeys(request.Days.Select(day => day.TempKey), "Days");
-            CheckDuplicateKeys(request.Rooms.Select(room => room.TempKey), "Rooms");
-            CheckDuplicateKeys(request.Sessions.Select(session => session.TempKey), "Sessions");
-            var dayDates = new HashSet<DateOnly>();
-            for (int index = 0; index < request.Days.Count; index++)
+            if (!dayDates.Add(request.Days[index].LocalDate))
             {
-                if (!dayDates.Add(request.Days[index].LocalDate))
-                {
-                    context.AddFailure($"Days[{index}].LocalDate", "Each submitted day must have a unique local date.");
-                }
+                context.AddFailure($"Days[{index}].LocalDate", "Each submitted day must have a unique local date.");
             }
+        }
 
-            var dayKeys = Keys(request.Days.Select(day => day.TempKey));
-            var locationKeys = Keys(request.Locations.Select(location => location.TempKey));
-            var roomKeys = Keys(request.Rooms.Select(room => room.TempKey));
-            for (int index = 0; index < request.Rooms.Count; index++)
-            {
-                CheckReference(request.Rooms[index].LocationTempKey, locationKeys, $"Rooms[{index}].LocationTempKey");
-            }
-            for (int index = 0; index < request.Sessions.Count; index++)
-            {
-                var session = request.Sessions[index];
-                CheckReference(session.DayTempKey, dayKeys, $"Sessions[{index}].DayTempKey");
-                CheckReference(session.LocationTempKey, locationKeys, $"Sessions[{index}].LocationTempKey");
-                CheckReference(session.RoomTempKey, roomKeys, $"Sessions[{index}].RoomTempKey");
-            }
-            for (int index = 0; index < request.AgendaItems.Count; index++)
-            {
-                var item = request.AgendaItems[index];
-                CheckReference(item.DayTempKey, dayKeys, $"AgendaItems[{index}].DayTempKey");
-                CheckReference(item.LocationTempKey, locationKeys, $"AgendaItems[{index}].LocationTempKey");
-                CheckReference(item.RoomTempKey, roomKeys, $"AgendaItems[{index}].RoomTempKey");
-            }
+        var dayKeys = Keys(request.Days.Select(day => day.TempKey));
+        var locationKeys = Keys(request.Locations.Select(location => location.TempKey));
+        var roomKeys = Keys(request.Rooms.Select(room => room.TempKey));
+        for (int index = 0; index < request.Rooms.Count; index++)
+        {
+            CheckReference(request.Rooms[index].LocationTempKey, locationKeys, $"Rooms[{index}].LocationTempKey", context);
+        }
+        for (int index = 0; index < request.Sessions.Count; index++)
+        {
+            var session = request.Sessions[index];
+            CheckReference(session.DayTempKey, dayKeys, $"Sessions[{index}].DayTempKey", context);
+            CheckReference(session.LocationTempKey, locationKeys, $"Sessions[{index}].LocationTempKey", context);
+            CheckReference(session.RoomTempKey, roomKeys, $"Sessions[{index}].RoomTempKey", context);
+        }
+        for (int index = 0; index < request.AgendaItems.Count; index++)
+        {
+            var item = request.AgendaItems[index];
+            CheckReference(item.DayTempKey, dayKeys, $"AgendaItems[{index}].DayTempKey", context);
+            CheckReference(item.LocationTempKey, locationKeys, $"AgendaItems[{index}].LocationTempKey", context);
+            CheckReference(item.RoomTempKey, roomKeys, $"AgendaItems[{index}].RoomTempKey", context);
+        }
+    }
 
-            void CheckDuplicateKeys(IEnumerable<string?> values, string collection)
+    private static void CheckDuplicateKeys(IEnumerable<string?> values, string collection, ValidationContext<CreateEventDto> context)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int index = 0;
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && !seen.Add(value.Trim()))
             {
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                int index = 0;
-                foreach (var value in values)
-                {
-                    if (!string.IsNullOrWhiteSpace(value) && !seen.Add(value.Trim()))
-                    {
-                        context.AddFailure($"{collection}[{index}].TempKey", "Temp keys must be unique within their collection.");
-                    }
-                    index++;
-                }
+                context.AddFailure($"{collection}[{index}].TempKey", "Temp keys must be unique within their collection.");
             }
+            index++;
+        }
+    }
 
-            void CheckReference(string? value, HashSet<string> allowed, string field)
-            {
-                if (!string.IsNullOrWhiteSpace(value) && !allowed.Contains(value.Trim()))
-                {
-                    context.AddFailure(field, "The temp-key reference does not exist in the submitted graph.");
-                }
-            }
+    private static void CheckReference(string? value, HashSet<string> allowed, string field, ValidationContext<CreateEventDto> context)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && !allowed.Contains(value.Trim()))
+        {
+            context.AddFailure(field, "The temp-key reference does not exist in the submitted graph.");
+        }
+    }
 
-            static HashSet<string> Keys(IEnumerable<string?> values) =>
-                values.Where(value => !string.IsNullOrWhiteSpace(value))
-                    .Select(value => value!.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        });
+    private static HashSet<string> Keys(IEnumerable<string?> values) =>
+        values.Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private void RegisterLookupRules(
+        ILocationRepository locationRepository,
+        IRegistrationModeRepository registrationModeRepository,
+        ILanguageRepository languageRepository,
+        IMadhabRepository madhabRepository,
+        ICategoryRepository categoryRepository,
+        ITagRepository tagRepository,
+        IScheduleItemKindRepository scheduleItemKindRepository,
+        IEventSessionKindRepository eventSessionKindRepository,
+        ILocationRoomRepository locationRoomRepository,
+        IEventSessionTemplateRepository eventSessionTemplateRepository,
+        IActorRepository actorRepository)
+    {
         RuleFor(p => p).Must(HaveValidIslamicSessionScheduling).WithMessage(EventSessionIslamicAspectValidationRules.SchedulingStateMessage);
 
         RuleFor(p => p).MustAsync(async (request, _) => await AllLocationsExistAsync(request, locationRepository))

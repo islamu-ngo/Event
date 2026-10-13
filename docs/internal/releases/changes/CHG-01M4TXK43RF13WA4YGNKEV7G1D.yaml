@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4TXK43RF13WA4YGNKEV7G1D
+Title: "Refresh saved event details and Studio permissions"
+Type: fix
+Scope: events
+Summary: "After a confirmed details save, discard that event's cached Studio resource so Overview reloads metadata and available actions without restoring revoked authority."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

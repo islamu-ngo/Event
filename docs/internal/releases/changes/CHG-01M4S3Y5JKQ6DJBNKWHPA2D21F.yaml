@@ -1,0 +1,27 @@
+Change-Id: CHG-01M4S3Y5JKQ6DJBNKWHPA2D21F
+Title: "reject duplicate event program dates before saving"
+Type: fix
+Scope: events
+Summary: "Reject duplicate explicit program dates with field errors instead of failing after graph preparation."
+Group: studio-event-workspace
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "Duplicate explicit local program dates reject before graph writes. The native HTTP regression verifies indexed field errors and unchanged graph storage."
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/publication-and-sessions.md
+    Disposition: not-applicable

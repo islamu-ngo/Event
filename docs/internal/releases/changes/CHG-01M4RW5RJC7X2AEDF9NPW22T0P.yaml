@@ -1,0 +1,28 @@
+Change-Id: CHG-01M4RW5RJC7X2AEDF9NPW22T0P
+Title: "compose sessions before creating an event"
+Type: feat
+Scope: events
+Summary: "Organizers can prepare several sessions without leaving event creation or saving a parent first."
+Group: studio-event-workspace
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md#inline-event-program-preparation
+    Disposition: documented
+    Detail: "Local editing preserves native publisher and HAL authority. Unknown post-send outcomes disable replay; confirmed saves retain their destination when navigation fails."
+  Migration:
+    Reference: docs/internal/BLAZOR.md#inline-event-program-preparation
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md#inline-event-program-preparation
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/publication-and-sessions.md
+    Disposition: documented
+    Detail: "The creation guide describes unscheduled and overnight program preparation, retained validation input, and checking Studio before attempting a new creation after an uncertain result."

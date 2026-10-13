@@ -72,10 +72,11 @@ internal static class EventSessionFormModelMapper
                 ? DateTimeHelper.ConvertUtcToLocal(sourceSession.EndTime.Value, eventTimeZoneId)
                 : null;
         return new EventSessionEditFormState(
-            localStart?.Date ?? DateTimeHelper.ConvertUtcToLocal(DateTimeOffset.UtcNow, eventTimeZoneId).Date,
-            localStart?.TimeOfDay ?? new TimeSpan(9, 0, 0),
-            localEnd?.TimeOfDay ?? new TimeSpan(10, 0, 0),
-            GetPrimarySessionGroupId(sourceSession));
+            localStart?.Date,
+            localStart?.TimeOfDay,
+            localEnd?.TimeOfDay,
+            GetPrimarySessionGroupId(sourceSession),
+            localEnd?.Date);
     }
 
     public static bool TryPrepareCreateRequest(
@@ -86,7 +87,8 @@ internal static class EventSessionFormModelMapper
         TimeSpan? startTime,
         TimeSpan? endTime,
         out string? validationError,
-        string eventTimeZoneId = "UTC")
+        string eventTimeZoneId = "UTC",
+        DateTime? endDate = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         validationError = null;
@@ -97,7 +99,7 @@ internal static class EventSessionFormModelMapper
             return false;
         }
 
-        if (!TryNormalizeSchedule(session.Title, sessionDate, startTime, endTime, out var title, out var start, out var end, out validationError))
+        if (!TryNormalizeSchedule(session.Title, sessionDate, endDate ?? sessionDate, startTime, endTime, out var title, out var start, out var end, out validationError))
         {
             return false;
         }
@@ -134,7 +136,8 @@ internal static class EventSessionFormModelMapper
         out string? validationError,
         string eventTimeZoneId = "UTC",
         DateTimeOffset? existingStartUtc = null,
-        DateTimeOffset? existingEndUtc = null)
+        DateTimeOffset? existingEndUtc = null,
+        DateTime? endDate = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         validationError = null;
@@ -148,7 +151,7 @@ internal static class EventSessionFormModelMapper
             return false;
         }
 
-        if (!TryNormalizeSchedule(session.Title?.Value?.Value, sessionDate, startTime, endTime, out var title, out var start, out var end, out validationError))
+        if (!TryNormalizeSchedule(session.Title?.Value?.Value, sessionDate, endDate ?? sessionDate, startTime, endTime, out var title, out var start, out var end, out validationError))
         {
             return false;
         }
@@ -178,6 +181,7 @@ internal static class EventSessionFormModelMapper
     private static bool TryNormalizeSchedule(
         string? title,
         DateTime? sessionDate,
+        DateTime? endDate,
         TimeSpan? startTime,
         TimeSpan? endTime,
         out string normalizedTitle,
@@ -196,14 +200,14 @@ internal static class EventSessionFormModelMapper
             return false;
         }
 
-        if (!sessionDate.HasValue || !startTime.HasValue || !endTime.HasValue)
+        if (!sessionDate.HasValue || !endDate.HasValue || !startTime.HasValue || !endTime.HasValue)
         {
             validationError = "Program item date, start time, and end time are required.";
             return false;
         }
 
         start = sessionDate.Value.Date + startTime.Value;
-        end = sessionDate.Value.Date + endTime.Value;
+        end = endDate.Value.Date + endTime.Value;
         if (end <= start)
         {
             validationError = "End time must be after start time.";
@@ -298,4 +302,5 @@ internal sealed record EventSessionEditFormState(
     DateTime? SessionDate,
     TimeSpan? StartTime,
     TimeSpan? EndTime,
-    Guid? PrimarySessionGroupId);
+    Guid? PrimarySessionGroupId,
+    DateTime? EndDate);

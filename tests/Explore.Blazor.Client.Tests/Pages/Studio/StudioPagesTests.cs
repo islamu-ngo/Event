@@ -228,7 +228,7 @@ public sealed class StudioPagesTests : IDisposable
         var editLinks = cut.FindAll("a[data-testid^='studio-edit-event-']");
         var deleteButtons = cut.FindAll("button[data-testid^='studio-delete-event-']");
         await Assert.That(editLinks.Count).IsEqualTo(1);
-        await Assert.That(editLinks[0].GetAttribute("href")).IsEqualTo($"/events/{authorized.Id}/edit");
+        await Assert.That(editLinks[0].GetAttribute("href")).IsEqualTo($"/studio/events/{authorized.Id}/details");
         await Assert.That(deleteButtons.Count).IsEqualTo(1);
     }
 
@@ -301,7 +301,7 @@ public sealed class StudioPagesTests : IDisposable
                     relation => relation,
                     relation => new
                     {
-                        href = relation == "edit" ? $"/events/{id}/edit" : $"/events/{id}",
+                        href = relation == "edit" ? $"/api/events/{id}" : $"/events/{id}",
                         method = relation == "delete" ? "DELETE" : "GET"
                     }));
         }

@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
@@ -28,9 +29,11 @@ public sealed partial class NativeEventProgramHttpTests
     {
         private readonly string _sqlitePath = Path.Combine(Path.GetTempPath(), $"event-program-ordering-{Guid.CreateVersion7():N}.db");
         private readonly PostgreSqlContainer? _database;
+        private readonly IInterceptor? _creationGraphInterceptor;
 
-        private ProgramFactory(bool useSqlite)
+        private ProgramFactory(bool useSqlite, IInterceptor? creationGraphInterceptor)
         {
+            _creationGraphInterceptor = creationGraphInterceptor;
             if (!useSqlite)
             {
                 _database = new PostgreSqlBuilder("postgres:18-alpine")
@@ -39,6 +42,7 @@ public sealed partial class NativeEventProgramHttpTests
             }
         }
         public Guid OwnerId { get; private set; }
+        public Guid? OrganizationId { get; private set; }
         public Guid OutsiderId { get; private set; }
         public Guid PublicId { get; private set; }
         public Guid PrivateId { get; private set; }
@@ -47,11 +51,14 @@ public sealed partial class NativeEventProgramHttpTests
         public Guid ForeignId { get; private set; }
         public Guid GroupId { get; private set; }
         public Guid LocationId { get; private set; }
+        public Guid ForeignLocationId { get; private set; }
+        public Guid ForeignRoomId { get; private set; }
 
         public static async Task<ProgramFactory> CreateAsync(
-            int publicItemCount = 2, bool useSqlite = false, DateTime? revealFullDetailsFromUtc = null)
+            int publicItemCount = 2, bool useSqlite = false, DateTime? revealFullDetailsFromUtc = null,
+            IInterceptor? creationGraphInterceptor = null, bool organizerPublisher = false)
         {
-            var factory = new ProgramFactory(useSqlite);
+            var factory = new ProgramFactory(useSqlite, creationGraphInterceptor);
             try
             {
                 if (factory._database is not null)
@@ -73,7 +80,17 @@ public sealed partial class NativeEventProgramHttpTests
                 }
                 using var scope = factory.Services.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-                var owner = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+                TenantScenarioSeed.TenantScenarioResult owner;
+                if (organizerPublisher)
+                {
+                    var publisher = await TenantScenarioSeed.SeedActiveTenantWithOrganizationPublisherAsync(context);
+                    factory.OrganizationId = publisher.OrganizationId;
+                    owner = new(publisher.TenantId, publisher.UserId, publisher.ActorId);
+                }
+                else
+                {
+                    owner = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+                }
                 var outsider = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
                 var foreign = await TenantScenarioSeed.SeedSecondaryTenantWithUserAsync(context);
                 var tenant = scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
@@ -157,6 +174,30 @@ public sealed partial class NativeEventProgramHttpTests
                 var foreignEvent = Parent(foreign, EventStatusEnum.Published, VisibilityTypeEnum.Public);
                 context.Events.Add(foreignEvent);
                 context.EventSessions.Add(Session(foreignEvent, "Foreign item", EventSessionStatusEnum.Published));
+                var foreignLocation = new Location
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = foreign.TenantId,
+                    Tenant = null!,
+                    FullName = "Foreign tenant venue",
+                    City = "Foreign city",
+                    Country = "Foreign country",
+                    Timezone = "Europe/Brussels"
+                };
+                foreignLocation.ClassifyAs(LocationKindEnum.CommercialVenue);
+                foreignLocation.SetManualAddress("Foreign street", "Foreign postcode");
+                context.Locations.Add(foreignLocation);
+                var foreignRoom = new LocationRoom
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = foreign.TenantId,
+                    Tenant = null!,
+                    LocationId = foreignLocation.Id,
+                    Location = foreignLocation,
+                    Name = "Foreign tenant room",
+                    Slug = $"foreign-room-{Guid.CreateVersion7():N}"
+                };
+                context.LocationRooms.Add(foreignRoom);
                 await context.SaveChangesAsync();
                 factory.PublicId = published.Id;
                 factory.PrivateId = privateEvent.Id;
@@ -165,6 +206,8 @@ public sealed partial class NativeEventProgramHttpTests
                 factory.ForeignId = foreignEvent.Id;
                 factory.GroupId = group.Id;
                 factory.LocationId = location.Id;
+                factory.ForeignLocationId = foreignLocation.Id;
+                factory.ForeignRoomId = foreignRoom.Id;
                 return factory;
             }
             catch
@@ -241,6 +284,8 @@ public sealed partial class NativeEventProgramHttpTests
                 PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
                 { Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _sqlitePath });
             options.UseSnakeCaseNamingConvention();
+            if (_creationGraphInterceptor is not null)
+                options.AddInterceptors(_creationGraphInterceptor);
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)

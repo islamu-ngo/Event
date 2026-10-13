@@ -54,7 +54,7 @@
                             <MudButton Elevation="0"
                                        Variant="Variant.Text"
                                        Color="Color.Primary"
-                                       Href="@($"/events/{EventId}/edit")"
+                                       Href="@($"/studio/events/{EventId}/details")"
                                        StartIcon="@Icons.Material.Filled.Edit"
                                        Class="event-detail-action-bar__edit-link">
                                 @GetEditActionLabel()
@@ -171,7 +171,7 @@
                                     @if (_canEdit)
                                     {
                                         <MudMenuItem Icon="@Icons.Material.Filled.Edit"
-                                                     Href="@($"/events/{EventId}/edit")">
+                                                     Href="@($"/studio/events/{EventId}/details")">
                                             Edit
                                         </MudMenuItem>
                                     }

@@ -30,9 +30,12 @@
                 }
             </div>
 
+            <MudNavLink Href="@StudioRoute" Icon="@Icons.Material.Outlined.Dashboard" Match="NavLinkMatch.All" data-event-section="overview">
+                Overview
+            </MudNavLink>
             @if (Resource.HasHalLink("edit"))
             {
-                <MudNavLink Href="@StudioRoute" Icon="@Icons.Material.Outlined.Edit" Match="NavLinkMatch.All" data-event-section="details">
+                <MudNavLink Href="@($"{StudioRoute}/details")" Icon="@Icons.Material.Outlined.Edit" Match="NavLinkMatch.All" data-event-section="details">
                     Details
                 </MudNavLink>
             }
@@ -84,6 +87,12 @@
                     Forms
                 </MudNavLink>
             }
+            @if (Resource.HasHalLink("view-registration-analytics"))
+            {
+                <MudNavLink Href="@($"{StudioRoute}/analytics")" Icon="@Icons.Material.Outlined.Analytics" Match="NavLinkMatch.All" data-event-section="analytics">
+                    Answer analytics
+                </MudNavLink>
+            }
             @if (Resource.HasHalLink("check-in-admissions"))
             {
                 <MudNavLink Href="@($"{StudioRoute}/check-in")" Icon="@Icons.Material.Outlined.QrCodeScanner" Match="NavLinkMatch.All" data-event-section="check-in">
@@ -94,24 +103,6 @@
             {
                 <MudNavLink Href="@($"{StudioRoute}/attendees")" Icon="@Icons.Material.Outlined.Groups" Match="NavLinkMatch.All" data-event-section="attendees">
                     Attendees
-                </MudNavLink>
-            }
-            @if (Resource.HasHalLink("publish-readiness"))
-            {
-                <MudNavLink Href="@($"{StudioRoute}/publication")" Icon="@Icons.Material.Outlined.Publish" Match="NavLinkMatch.All" data-event-section="publication">
-                    Publication
-                </MudNavLink>
-            }
-            @if (Resource.HasHalLink("team"))
-            {
-                <MudNavLink Href="@PublicEventRoute" Icon="@Icons.Material.Outlined.Groups" Match="NavLinkMatch.All" data-event-section="team">
-                    Team
-                </MudNavLink>
-            }
-            @if (Resource.HasHalLink("delete"))
-            {
-                <MudNavLink Href="@PublicEventRoute" Icon="@Icons.Material.Outlined.Warning" Match="NavLinkMatch.All" data-event-section="danger">
-                    Danger zone
                 </MudNavLink>
             }
         }
@@ -127,8 +118,7 @@
 
     private EventDto? Resource => EventContext.EventId == EventId ? EventContext.Event : null;
     private string StudioRoute => $"/studio/events/{EventId}";
-    private string PublicEventRoute => EventUrlHelper.BuildPublicPath(Resource?.Slug, Resource?.PublicCode)
-        ?? $"/events/{EventId}/edit";
+    private bool _disposed;
     private CancellationTokenSource? _promotionRequest;
     private long _promotionLoadGeneration;
     private bool _promotionNavigationAvailable;
@@ -137,9 +127,15 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        var eventId = EventId;
+        ++_promotionLoadGeneration;
+        ++_resourceNavigationGeneration;
+        _promotionNavigationAvailable = false;
+        _resourceNavigationHref = null;
         EventContext.Changed -= OnContextChanged;
         EventContext.Changed += OnContextChanged;
-        await EventContext.LoadAsync(EventId);
+        var resource = await EventContext.LoadAsync(eventId);
+        if (_disposed || EventId != eventId || resource is null) return;
         await LoadPromotionNavigationAsync();
         await LoadResourceNavigationAsync();
     }
@@ -147,13 +143,15 @@
     private async Task LoadResourceNavigationAsync()
     {
         var generation = ++_resourceNavigationGeneration;
+        var contextGeneration = EventContext.Generation;
         var eventId = EventId;
         _resourceNavigationHref = null;
         if (Resource is null) return;
         try
         {
             var page = await Resources.AudienceAsync(eventId);
-            if (generation == _resourceNavigationGeneration && EventId == eventId && Resource?.Id == eventId)
+            if (!_disposed && generation == _resourceNavigationGeneration
+                && contextGeneration == EventContext.Generation && EventId == eventId && Resource?.Id == eventId)
                 _resourceNavigationHref = EventResources.Href(page._links, "manage-resources") is not null
                     ? $"{StudioRoute}/resources" : null;
         }
@@ -176,6 +174,7 @@
         _promotionRequest?.Cancel();
         _promotionRequest?.Dispose();
         var generation = ++_promotionLoadGeneration;
+        var contextGeneration = EventContext.Generation;
         var eventId = EventId;
         _promotionNavigationAvailable = false;
         if (Resource is not { } resource
@@ -192,7 +191,8 @@
             PromotionManagementCollectionState? promotions = catalog?.CatalogId is { } catalogVersionId
                 ? await Promotions.GetPromotionsAsync(eventId, catalogVersionId, request.Token)
                 : null;
-            if (generation == _promotionLoadGeneration && EventId == eventId && ReferenceEquals(_promotionRequest, request))
+            if (!_disposed && generation == _promotionLoadGeneration && contextGeneration == EventContext.Generation
+                && EventId == eventId && ReferenceEquals(_promotionRequest, request))
             {
                 _promotionNavigationAvailable = promotions?.HasLink("create-promotion") == true;
             }
@@ -202,19 +202,31 @@
         }
         catch (Exception)
         {
-            _promotionNavigationAvailable = false;
+            if (!_disposed && generation == _promotionLoadGeneration && contextGeneration == EventContext.Generation)
+                _promotionNavigationAvailable = false;
         }
     }
 
-    private void OnContextChanged() => _ = InvokeAsync(async () =>
+    private void OnContextChanged()
     {
-        await LoadPromotionNavigationAsync();
-        await LoadResourceNavigationAsync();
-        StateHasChanged();
-    });
+        ++_promotionLoadGeneration;
+        ++_resourceNavigationGeneration;
+        _promotionNavigationAvailable = false;
+        _resourceNavigationHref = null;
+        if (_disposed) return;
+        _ = InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            await LoadPromotionNavigationAsync();
+            await LoadResourceNavigationAsync();
+            if (!_disposed) StateHasChanged();
+        });
+    }
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         EventContext.Changed -= OnContextChanged;
         ++_promotionLoadGeneration;
         ++_resourceNavigationGeneration;

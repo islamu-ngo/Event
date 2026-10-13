@@ -8,6 +8,7 @@
                   For="@TitleFor"
                   Required="true"
                   FullWidth="true"
+                  Label="Program item title"
                   Placeholder="Program item title"
                   aria-label="Program item title" />
 
@@ -17,25 +18,34 @@
                   For="@DescriptionFor"
                   FullWidth="true"
                   Lines="4"
+                  Label="Program item description"
                   Placeholder="What will attendees learn or do?"
                   aria-label="Program item description" />
 
     <MudDatePicker Label="Program item date"
                    Date="@SessionDate"
                    DateChanged="SessionDateChanged"
-                   Required="true"
+                   Required="@(!AllowUnscheduled)"
+                   Variant="Variant.Outlined" />
+
+    <MudDatePicker Label="End date"
+                   Date="@EndDate"
+                   DateChanged="EndDateChanged"
+                   Required="@(!AllowUnscheduled && !IsOpenEnded)"
+                   Disabled="@IsOpenEnded"
                    Variant="Variant.Outlined" />
 
     <div class="@TimeGridClass">
         <MudTimePicker Label="Start time"
                        Time="@StartTime"
                        TimeChanged="StartTimeChanged"
-                       Required="true"
+                       Required="@(!AllowUnscheduled)"
                        Variant="Variant.Outlined" />
         <MudTimePicker Label="End time"
                        Time="@EndTime"
                        TimeChanged="EndTimeChanged"
-                       Required="true"
+                       Required="@(!AllowUnscheduled && !IsOpenEnded)"
+                       Disabled="@IsOpenEnded"
                        Variant="Variant.Outlined" />
     </div>
 
@@ -101,6 +111,10 @@
 
     [Parameter] public DateTime? SessionDate { get; set; }
     [Parameter] public EventCallback<DateTime?> SessionDateChanged { get; set; }
+    [Parameter] public DateTime? EndDate { get; set; }
+    [Parameter] public EventCallback<DateTime?> EndDateChanged { get; set; }
+    [Parameter] public bool AllowUnscheduled { get; set; }
+    [Parameter] public bool IsOpenEnded { get; set; }
 
     [Parameter] public TimeSpan? StartTime { get; set; }
     [Parameter] public EventCallback<TimeSpan?> StartTimeChanged { get; set; }

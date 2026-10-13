@@ -107,7 +107,7 @@ public abstract class StudioEventPageBase : ComponentBase, IDisposable
 
     protected bool CanDelete(EventListDto item) => item.Id.HasValue && item.HasHalLink("delete");
 
-    protected string EditRoute(EventListDto item) => $"/events/{item.Id}/edit";
+    protected string EditRoute(EventListDto item) => $"/studio/events/{item.Id}/details";
 
     protected async Task OpenDeleteDialogAsync(EventListDto item)
     {

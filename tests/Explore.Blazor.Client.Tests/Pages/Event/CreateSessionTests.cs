@@ -73,6 +73,37 @@ public sealed class CreateSessionTests : IDisposable
     }
 
     [Test]
+    [Arguments(9, 9, false)]
+    [Arguments(11, 11, false)]
+    [Arguments(9, 10, true)]
+    [Arguments(11, 12, true)]
+    public async Task MovingStartDate_PreservesSameDayOrOvernightEnd(int startDay, int endDay, bool overnight)
+    {
+        var eventId = Guid.NewGuid();
+        _eventService.GetEventByIdAsync(eventId).Returns(CreateDraftEvent(eventId, Guid.NewGuid()));
+        var submitted = new TaskCompletionSource<ComposerCreateEventSessionRequest>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _eventSessionService.CreateSessionAsync(Arg.Any<ComposerCreateEventSessionRequest>()).Returns(call =>
+        {
+            submitted.TrySetResult(call.ArgAt<ComposerCreateEventSessionRequest>(0));
+            return new BaseCommandResponseOfGuid { Success = true, Id = Guid.NewGuid() };
+        });
+        var cut = _ctx.Render<CreateSession>(p => p.Add(c => c.EventId, eventId));
+        var form = cut.FindComponent<EventSessionForm>();
+        await cut.InvokeAsync(() => form.Instance.TitleChanged.InvokeAsync("Moved program item"));
+        await cut.InvokeAsync(() => form.Instance.SessionDateChanged.InvokeAsync(new DateTime(2026, 6, 10)));
+        await cut.InvokeAsync(() => form.Instance.EndDateChanged.InvokeAsync(new DateTime(2026, 6, overnight ? 11 : 10)));
+        await cut.InvokeAsync(() => form.Instance.StartTimeChanged.InvokeAsync(TimeSpan.FromHours(overnight ? 23 : 9)));
+        await cut.InvokeAsync(() => form.Instance.EndTimeChanged.InvokeAsync(TimeSpan.FromHours(overnight ? 1 : 10)));
+        await cut.InvokeAsync(() => form.Instance.SessionDateChanged.InvokeAsync(new DateTime(2026, 6, startDay)));
+        await Assert.That(cut.FindComponent<EventSessionForm>().Instance.EndDate).IsEqualTo(new DateTime(2026, 6, endDay));
+
+        await cut.Find("form").SubmitAsync();
+        var request = await submitted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.That(request.StartTime).IsEqualTo(new DateTimeOffset(2026, 6, startDay, overnight ? 23 : 9, 0, 0, TimeSpan.FromHours(2)));
+        await Assert.That(request.EndTime).IsEqualTo(new DateTimeOffset(2026, 6, endDay, overnight ? 1 : 10, 0, 0, TimeSpan.FromHours(2)));
+    }
+
+    [Test]
     public async Task Render_UsesProgramItemDefaultCopy()
     {
         var eventId = Guid.NewGuid();

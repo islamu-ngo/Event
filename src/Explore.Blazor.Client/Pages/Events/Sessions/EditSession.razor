@@ -85,7 +85,7 @@
                                       DescriptionChanged="@(value => { _session.Description!.Value!.Value = value; MarkDirty(); })"
                                       DescriptionFor="@(() => _session.Description!.Value!.Value)"
                                       SessionDate="@_sessionDate"
-                                      SessionDateChanged="@(value => { _sessionDate = value; MarkDirty(); })"
+                                      SessionDateChanged="OnSessionDateChanged"
                                       EndDate="@_endDate"
                                       EndDateChanged="@(value => { _endDate = value; MarkDirty(); })"
                                       StartTime="@_startTime"
@@ -183,6 +183,20 @@
     private bool HasUnsavedChanges => !_saveConfirmed && (_dirty || _submitState.IsSubmitting);
     private void MarkDirty() => _dirty = true;
 
+    private void OnSessionDateChanged(DateTime? value)
+    {
+        if (value is DateTime date && _sessionDate is DateTime previousDate && _endDate is DateTime endDate)
+        {
+            _endDate = endDate.AddDays((date.Date - previousDate.Date).Days);
+        }
+        else if (_endDate is null)
+        {
+            _endDate = value;
+        }
+        _sessionDate = value;
+        MarkDirty();
+    }
+
     private async Task ConfirmLeaveAsync(LocationChangingContext context)
     {
         if (!HasUnsavedChanges) return;
@@ -192,7 +206,10 @@
                 Translation.T("ui.studio.event.unsavedChanges", "Leave this page and discard unsaved changes?"));
             if (_disposed || context.CancellationToken.IsCancellationRequested || !leave) context.PreventNavigation();
         }
-        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            // A superseded navigation no longer needs a leave decision.
+        }
     }
 
     private EditContext _editContext = default!;

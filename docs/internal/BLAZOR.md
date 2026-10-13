@@ -551,8 +551,11 @@ inventing new portfolio filters or changing active actor selection.
 
 `CreateEvent` owns the complete local program. Its existing
 `ScheduleTimelineComposer` renders scheduled and unscheduled rows and offers
-keyboard-operable edit, duplicate, remove and move actions. `EventSessionForm`
-edits an isolated `SessionEditorModel` copy inline. Save replaces the row with
+keyboard-operable edit, duplicate, remove and move actions.
+Move callbacks identify the adjacent local row within the displayed day group,
+not a direction in the flat list. The parent swaps those identities only when
+their local day matches, preserving dated and unscheduled group boundaries.
+`EventSessionForm` edits an isolated `SessionEditorModel` copy inline. Save replaces the row with
 the same local identity; Save and add another starts an empty editor; Cancel
 discards the copy. Duplicates receive distinct local identities and graph temp
 keys. None of these operations saves a parent, writes a persisted session or
@@ -584,6 +587,9 @@ a timezone change. `DateTimeHelper` rejects nonexistent or newly ambiguous
 times, and preserves an unchanged saved ambiguous occurrence's offset.
 Persisted CreateSession/EditSession use the same end-date callbacks and pass
 their selected end date into the existing mapper.
+Their start-date callbacks shift an existing end date by the same whole-day
+interval, preserving explicit overnight duration when moving an item. Changing
+the end date remains an independent edit.
 
 The submission guard runs before form reset or validation, so a pending
 request cannot be replaced by another native form submission. A definite

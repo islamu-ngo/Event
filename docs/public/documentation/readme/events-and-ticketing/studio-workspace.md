@@ -19,6 +19,14 @@ Return to Overview for server-provided publication readiness guidance. **Add ses
 `/studio/events/{eventId}/sessions/{sessionId}/edit` and returns to Schedule
 after saving.
 
+Moving a saved session's start date shifts its end date by the same number of
+days, preserving a same-day or overnight interval. You can still change the
+end date explicitly when the duration itself needs to change.
+
+Before saving an event, **Move session earlier** and **Move session later**
+reorder prepared items within the same displayed day, or within Unscheduled.
+The controls stop at each group's first and last item; they do not change dates.
+
 If an imported proposal names a timezone unavailable on this installation,
 the page retains its program and asks you to select a valid timezone before
 editing or saving. That selection converts the retained session instants; it

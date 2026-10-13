@@ -596,9 +596,9 @@ there is no local reset or guessed verification that re-enables creation.
 
 A confirmed event ID is recorded before navigating. If navigation fails, the
 page still reports a saved event and exposes the existing destination link;
-another create is blocked. Draft saves continue to the existing event editor,
-and publish continues to EventCreated until the separate workspace-route
-outcome changes those destinations. Local keys and navigation links grant no
+another create is blocked. Both draft and published saves enter that event's
+canonical Studio Overview at `/studio/events/{eventId}`. The standalone
+EventCreated destination has been removed. Local keys and navigation links grant no
 server permission; existing provenance, native authorization and HAL
 affordances remain authoritative.
 

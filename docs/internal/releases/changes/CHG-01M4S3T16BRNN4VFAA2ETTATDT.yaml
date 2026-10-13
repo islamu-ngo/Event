@@ -1,0 +1,29 @@
+Change-Id: CHG-01M4S3T16BRNN4VFAA2ETTATDT
+Title: "enter the event workspace after creation"
+Type: feat
+Scope: events
+Summary: "A successful save now opens that event's Studio Overview with applicable next actions."
+Group: studio-event-workspace
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "Event editing and session management use canonical Studio routes. The event-created page and old management URLs are removed without aliases."
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "Generation fencing discards stale event and module authority. Resource management uses current collection HAL capabilities; denied editor refresh discards prior write authority while retaining the confirmed save receipt."
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/studio-workspace.md
+    Disposition: documented
+    Detail: "Successful creation opens Studio Overview. The guide explains contextual actions, publication readiness, unsaved navigation protection and recovery after a confirmed save."

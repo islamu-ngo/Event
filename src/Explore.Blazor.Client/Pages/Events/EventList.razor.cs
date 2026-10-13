@@ -1000,8 +1000,8 @@ public partial class EventList : ComponentBase, IAsyncDisposable
 
     private void NavigateToEdit(EventListDto evt)
     {
-        if (evt.Id.HasValue)
-            Navigation.NavigateTo($"/events/{evt.Id.Value}/edit");
+        if (evt.Id.HasValue && evt.HasHalLink("edit"))
+            Navigation.NavigateTo($"/studio/events/{evt.Id.Value}/details");
     }
 
     private async Task OpenDeleteDialog(EventListDto evt)

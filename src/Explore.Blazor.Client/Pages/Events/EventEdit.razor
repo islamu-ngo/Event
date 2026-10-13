@@ -9,10 +9,17 @@
 @attribute [Authorize]
 
 <PageTitle>Edit Event</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 <MudText Typo="Typo.h1" HtmlTag="h1" Class="sr-only">Edit Event</MudText>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+    @if (_savedMessage is not null)
+    {
+        <p role="status" data-testid="event-details-saved">
+            @_savedMessage <a href="@_savedDestination">Open event workspace</a>
+        </p>
+    }
     @if (isLoading)
     {
         <div class="d-flex flex-column align-center justify-center py-16">
@@ -24,12 +31,13 @@
     {
         <MudContainer Class="py-8">
             <MudAlert Severity="Severity.Error" Variant="Variant.Filled">Event not found.</MudAlert>
-            <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" Href="/my/events" Class="mt-4">Back to My Events</MudButton>
+            <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" Href="/studio/events" Class="mt-4">All events</MudButton>
         </MudContainer>
     }
     else
     {
-        <div class="edit-event">
+        <div class="edit-event" @oninput="MarkDirty" @onchange="MarkDirty">
+        <AppButton Href="@($"/studio/events/{EventId}")" Variant="Variant.Text">Event overview</AppButton>
         <EditForm EditContext="_editContext" OnValidSubmit="@HandleSubmit">
             <FormSubmissionGuard State="@_submitState">
             <AppValidationSummary />
@@ -91,7 +99,7 @@
                 <MudItem xs="12" sm="7" Class="edit-event__col-right">
 
                     @* --- Event Title (large, Luma-style) --- *@
-                    <MudTextField T="string" @bind-Value="updateDto.Title"
+                    <MudTextField T="string" @bind-Value="updateDto.Title" @bind-Value:after="MarkDirty"
                                   Label="Event name"
                                   Placeholder="Event Name"
                                   Variant="Variant.Text"
@@ -173,25 +181,9 @@
                         }
                     </MudButton>
 
-                    @if (sessions.Count > 0)
-                    {
-                        var primarySession = sessions.First();
-                        var primaryLocationName = locations?.FirstOrDefault(l => l.Id == primarySession.LocationId)?.FullName;
-                        var primaryImageUrl = primarySession.UseEventImage ? imagePreviewUrl : primarySession.FeaturedImagePreviewUrl;
-
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mt-4 mb-2">Program items</MudText>
-                        <SessionSummaryCard Session="primarySession"
-                                            Index="0"
-                                            LocationName="@primaryLocationName"
-                                            RegistrationModeName="@GetRegistrationModeName(primarySession.RegistrationModeId)"
-                                            ImageUrl="@primaryImageUrl"
-                                            OnEdit="@(() => EditSession(0))"
-                                            OnDuplicate="@(() => ShowDuplicateUnavailable())"
-                                            OnDelete="@(() => RemoveSession(0))" />
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2 mb-3">
-                            Session date, location, registration, capacity, and language details are edited in the dedicated session composer.
-                        </MudText>
-                    }
+                    <AppButton Href="@($"/studio/events/{EventId}/schedule")" Variant="Variant.Outlined">
+                        Manage program
+                    </AppButton>
 
                     @* --- Program Summary: sessions stay as program items, sections stay in the program manager. --- *@
                     <EventOptionsSection Title="Program summary"
@@ -228,30 +220,6 @@
                     @if (_programSummary is not null)
                     {
                         <EventProgramSummaryView Summary="_programSummary" />
-                    }
-
-                    @* --- Additional Sessions (2+) --- *@
-                    @if (sessions.Count > 1)
-                    {
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mt-4 mb-2">Additional Sessions</MudText>
-                        <div class="edit-event__sessions-list mb-3">
-                            @for (int i = 1; i < sessions.Count; i++)
-                            {
-                                var idx = i;
-                                var session = sessions[idx];
-                                var locationName = locations?.FirstOrDefault(l => l.Id == session.LocationId)?.FullName;
-                                var imageUrl = session.UseEventImage ? imagePreviewUrl : session.FeaturedImagePreviewUrl;
-
-                                <SessionSummaryCard Session="session"
-                                                    Index="idx"
-                                                    LocationName="@locationName"
-                                                    RegistrationModeName="@GetRegistrationModeName(session.RegistrationModeId)"
-                                                    ImageUrl="@imageUrl"
-                                                    OnEdit="@(() => EditSession(idx))"
-                                                    OnDuplicate="@(() => ShowDuplicateUnavailable())"
-                                                    OnDelete="@(() => RemoveSession(idx))" />
-                            }
-                        </div>
                     }
 
                     @* --- Event Settings (normal behavior controls stay visible) --- *@

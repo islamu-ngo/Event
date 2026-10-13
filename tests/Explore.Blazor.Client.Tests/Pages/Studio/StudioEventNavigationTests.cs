@@ -51,18 +51,16 @@ public sealed class StudioEventNavigationTests : IDisposable
     }
 
     [Test]
-    [Arguments("edit", "Details")]
-    [Arguments("publish-readiness", "Publication")]
-    [Arguments("sessions", "Schedule")]
-    [Arguments("configure-participation", "Registration")]
-    [Arguments("view-registration-orders", "Orders")]
-    [Arguments("manage-registration-channels", "Integrations")]
-    [Arguments("view-registration-provider-health", "Integrations")]
-    [Arguments("view-participants", "Attendees")]
-    [Arguments("manage-registration-workflow", "Forms")]
-    [Arguments("team", "Team")]
-    [Arguments("delete", "Danger zone")]
-    public async Task Render_ShowsSectionOnlyWhenMappedHalRelationExists(string relation, string expectedLabel)
+    [Arguments("edit", "details")]
+    [Arguments("sessions", "schedule")]
+    [Arguments("configure-participation", "registration")]
+    [Arguments("view-registration-orders", "orders")]
+    [Arguments("manage-registration-channels", "integrations")]
+    [Arguments("view-registration-provider-health", "integrations")]
+    [Arguments("view-participants", "attendees")]
+    [Arguments("manage-registration-workflow", "forms")]
+    [Arguments("view-registration-analytics", "analytics")]
+    public async Task Render_ShowsSectionOnlyWhenMappedHalRelationExists(string relation, string section)
     {
         var resource = CreateEvent(relation);
         _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
@@ -70,10 +68,60 @@ public sealed class StudioEventNavigationTests : IDisposable
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
             .Add(component => component.EventId, resource.Id.Value));
 
-        cut.WaitForAssertion(() => cut.FindAll("a").Any(link => link.TextContent.Contains(expectedLabel, StringComparison.Ordinal)));
-        await Assert.That(cut.FindAll("[data-event-section]").Count).IsEqualTo(1);
+        var link = cut.Find($"[data-event-section='{section}']");
+        await Assert.That(link.QuerySelector("a")!.GetAttribute("href")).IsEqualTo($"/studio/events/{resource.Id}/{section}");
+        await Assert.That(cut.FindAll("[data-event-section]").Count).IsEqualTo(2);
         await Assert.That(cut.Markup).Contains("All events");
         await Assert.That(cut.Markup).DoesNotContain("studio-actor-switcher");
+    }
+
+    [Test]
+    public async Task Render_PublicationReadinessUsesCanonicalOverviewWithoutOrphanRoute()
+    {
+        var resource = CreateEvent("publish-readiness");
+        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, resource.Id.Value));
+        await Assert.That(cut.Find("[data-event-section='overview'] a").GetAttribute("href"))
+            .IsEqualTo($"/studio/events/{resource.Id}");
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{resource.Id}/publication']")).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("team")]
+    [Arguments("delete")]
+    public async Task Render_UnimplementedModulesNeverLinkToPublicEvent(string relation)
+    {
+        var resource = CreateEvent(relation);
+        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, resource.Id.Value));
+        await Assert.That(cut.FindAll("[data-event-section='team'], [data-event-section='danger']")).IsEmpty();
+        await Assert.That(cut.Find("[data-event-section='overview'] a").GetAttribute("href"))
+            .IsEqualTo($"/studio/events/{resource.Id}");
+    }
+
+    [Test]
+    public async Task ResourceLoad_FromPreviousAuthorityCannotRestoreNavigationAfterDenial()
+    {
+        var resource = CreateEvent("edit");
+        var eventId = resource.Id!.Value;
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
+        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, eventId));
+        var state = _ctx.Services.GetRequiredService<StudioEventContextState>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<EventResourceAudiencePageResource>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _resources.AudienceAsync(eventId, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { started.TrySetResult(); return completion.Task; });
+        await cut.InvokeAsync(() => state.ReloadAsync(eventId));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        _eventService.GetEventByIdAsync(eventId).Returns((EventDto?)null);
+        await cut.InvokeAsync(() => state.ReloadAsync(eventId));
+        var rendered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnAfterRender += (_, _) => rendered.TrySetResult();
+        completion.SetResult(ResourcePage(true));
+        await rendered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(state.Event).IsNull();
+        await Assert.That(cut.FindAll("[data-event-section='resources']")).IsEmpty();
+        await Assert.That(cut.FindAll("[data-event-section='details']")).IsEmpty();
     }
 
     [Test]
@@ -199,7 +247,7 @@ public sealed class StudioEventNavigationTests : IDisposable
     }
 
     [Test]
-    public async Task Render_TeamSection_UsesPublicEventRouteInsteadOfRawGuidRoute()
+    public async Task Render_TeamRelationCannotExposePublicRouteAsManagement()
     {
         var resource = CreateEvent("team");
         _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
@@ -207,8 +255,10 @@ public sealed class StudioEventNavigationTests : IDisposable
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
             .Add(component => component.EventId, resource.Id.Value));
 
-        cut.WaitForAssertion(() => cut.Find("[data-event-section='team']"));
-        await Assert.That(cut.FindAll("a[href='/events/community-gathering-EVT123']").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("[data-event-section='team']")).IsEmpty();
+        await Assert.That(cut.FindAll("a[href='/events/community-gathering-EVT123']")).IsEmpty();
+        await Assert.That(cut.Find("[data-event-section='overview'] a").GetAttribute("href"))
+            .IsEqualTo($"/studio/events/{resource.Id}");
     }
 
     private static EventDto CreateEvent(params string[] relations)

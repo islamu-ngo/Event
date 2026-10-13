@@ -21,6 +21,9 @@ public sealed class StudioEventShellTests : IDisposable
         _eventService = _ctx.AddMockService<IEventService>();
         _ticketingService = _ctx.AddMockService<IEventTicketingService>();
         _promotionService = _ctx.AddMockService<IEventPromotionService>();
+        _ctx.AddMockService<IEventResourceService>()
+            .AudienceAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EventResourceAudiencePageResource { _links = new Dictionary<string, HalLink>() });
         _ticketingService.GetCatalogAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((EventTicketCatalogState?)null);
         _ctx.AddMockService<IRegistrationFormAuthoringService>();
@@ -34,6 +37,75 @@ public sealed class StudioEventShellTests : IDisposable
     }
 
     public void Dispose() => _ctx.Dispose();
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ResourcesRoute_UsesManagementCollectionRatherThanPublicEventRelation(bool canManage)
+    {
+        var resource = canManage ? CreateEvent() : CreateEvent("resources");
+        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        _ctx.AddMockService<IEventResourceService>()
+            .AudienceAsync(resource.Id.Value, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EventResourceAudiencePageResource
+            {
+                _links = canManage ? new Dictionary<string, HalLink>
+                {
+                    ["manage-resources"] = new() { Href = "/api/eventresource/event/manage", Method = "GET" }
+                } : new Dictionary<string, HalLink>()
+            });
+        _ctx.ComponentFactories.AddStub<StudioEventResources>(p => b => b.AddMarkupContent(0,
+            "<div data-testid='resource-management-surface'></div>"));
+        _ctx.Services.GetRequiredService<NavigationManager>().NavigateTo($"/studio/events/{resource.Id}/resources");
+        var cut = _ctx.RenderMudComponent<StudioEventShell>(p => p.Add(c => c.EventId, resource.Id.Value));
+        await Assert.That(cut.FindAll("[data-testid='resource-management-surface']").Count).IsEqualTo(canManage ? 1 : 0);
+        await Assert.That(cut.FindAll("[data-testid='resources-route-unavailable']").Count).IsEqualTo(canManage ? 0 : 1);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task OverviewResourcesAction_UsesCurrentManagementCollectionRatherThanPublicVisibility(bool canManage)
+    {
+        var resource = canManage ? CreateEvent() : CreateEvent("resources");
+        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        _ctx.AddMockService<IEventResourceService>()
+            .AudienceAsync(resource.Id.Value, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EventResourceAudiencePageResource
+            {
+                _links = canManage ? new Dictionary<string, HalLink>
+                {
+                    ["manage-resources"] = new() { Href = "/api/eventresource/event/manage", Method = "GET" }
+                } : new Dictionary<string, HalLink>()
+            });
+        _ctx.Services.GetRequiredService<NavigationManager>().NavigateTo($"/studio/events/{resource.Id}");
+        var cut = _ctx.RenderMudComponent<StudioEventShell>(p => p.Add(c => c.EventId, resource.Id.Value));
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{resource.Id}/resources']").Count).IsEqualTo(canManage ? 1 : 0);
+    }
+
+    [Test]
+    public async Task InvalidatedCurrentContext_RemovesMountedParticipationEditorImmediately()
+    {
+        var resource = CreateEvent("configure-participation");
+        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        _ctx.Services.GetRequiredService<NavigationManager>().NavigateTo($"/studio/events/{resource.Id}/registration");
+        var cut = _ctx.RenderMudComponent<StudioEventShell>(parameters => parameters
+            .Add(component => component.EventId, resource.Id.Value));
+        await Assert.That(cut.FindAll("[data-testid='participation-configuration-editor']").Count).IsEqualTo(1);
+        var rendered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnAfterRender += (_, _) =>
+        {
+            if (cut.FindAll("[data-testid='participation-configuration-editor']").Count == 0)
+                rendered.TrySetResult();
+        };
+
+        await cut.InvokeAsync(() => _ctx.Services.GetRequiredService<StudioEventContextState>().Invalidate());
+        await rendered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That(cut.FindAll("[data-testid='participation-configuration-editor']")).IsEmpty();
+        await Assert.That(cut.Find("a[href='/studio/events']").GetAttribute("href")).IsEqualTo("/studio/events");
+        await Assert.That(cut.FindAll("h1").Count).IsEqualTo(1);
+    }
 
     [Test]
     public async Task PromotionsRoute_WithoutCatalog_FailsClosedInsidePromotionComponent()

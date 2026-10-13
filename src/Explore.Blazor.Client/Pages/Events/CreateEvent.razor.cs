@@ -9,6 +9,8 @@ using Explore.Blazor.Client.Pages.Events.Workflows;
 using Explore.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.JSInterop;
 using MudBlazor;
 
 namespace Explore.Blazor.Client.Pages.Events;
@@ -50,6 +52,8 @@ public partial class CreateEvent : IDisposable
     [Inject] private IEventRegistrationPolicyService RegistrationPolicyService { get; set; } = default!;
     [Inject] private IPublicExperienceService PublicExperienceService { get; set; } = default!;
     [Inject] private MainContentAppearanceState MainContentAppearanceState { get; set; } = default!;
+    [Inject] private IJSRuntime Browser { get; set; } = default!;
+    [Inject] private Explore.Blazor.Client.Contracts.Services.ITranslationService Translation { get; set; } = default!;
 
     // Publisher selection state
     private string _publisherMode = "personal";
@@ -135,6 +139,24 @@ public partial class CreateEvent : IDisposable
     private bool _creationOutcomeUnknown;
     private string? _savedDestination;
     private bool _savedNavigationFailed;
+    private bool _dirty;
+    private bool _disposed;
+    private bool HasUnsavedChanges => createdEventId == Guid.Empty
+        && (_dirty || _programEdit is not null || _submitState.IsSubmitting || _creationOutcomeUnknown);
+
+    private void MarkDirty() => _dirty = true;
+
+    private async Task ConfirmLeaveAsync(LocationChangingContext context)
+    {
+        if (!HasUnsavedChanges) return;
+        try
+        {
+            var leave = await Browser.InvokeAsync<bool>("confirm", context.CancellationToken,
+                Translation.T("ui.studio.event.unsavedChanges", "Leave this page and discard unsaved changes?"));
+            if (_disposed || context.CancellationToken.IsCancellationRequested || !leave) context.PreventNavigation();
+        }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested) { }
+    }
     private string _bgColor = string.Empty;
     private string _bgEffect = "None";
     private string _bgImageUri = string.Empty;
@@ -176,7 +198,8 @@ public partial class CreateEvent : IDisposable
         : "Account-required participation needs at least one public visitor signup destination. Existing-account and operator sign-in remain separate.";
     // Timezone
     private TimeZoneInfo _selectedTimezone = TimeZoneInfo.Utc;
-    private string _selectedTimezoneDisplay => FormatTimezoneShort(_selectedTimezone);
+    private string? _initialTimezoneError;
+    private string _selectedTimezoneDisplay => _initialTimezoneError is null ? FormatTimezoneShort(_selectedTimezone) : "Choose a valid timezone";
     private static readonly IReadOnlyList<TimeZoneInfo> _allTimezones = TimeZoneInfo.GetSystemTimeZones();
     private Guid createdEventId = Guid.Empty;
 
@@ -462,6 +485,7 @@ public partial class CreateEvent : IDisposable
 
     private Task SetBackgroundColorAsync(string value)
     {
+        MarkDirty();
         _bgColor = value;
         PublishMainContentAppearance();
         return Task.CompletedTask;
@@ -469,6 +493,7 @@ public partial class CreateEvent : IDisposable
 
     private Task SetBackgroundEffectAsync(string value)
     {
+        MarkDirty();
         _bgEffect = string.IsNullOrWhiteSpace(value) ? "None" : value;
         PublishMainContentAppearance();
         return Task.CompletedTask;
@@ -512,6 +537,7 @@ public partial class CreateEvent : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         MainContentAppearanceState.Clear(MainContentAppearanceOwner);
     }
 
@@ -519,6 +545,7 @@ public partial class CreateEvent : IDisposable
     {
         if (InitialDraft is not null)
         {
+            MarkDirty();
             createDto = CreateEventProgramMapper.Snapshot(InitialDraft);
             sessions = CreateEventProgramMapper.FromRequest(createDto);
             selectedCategoryIds = Array.AsReadOnly((createDto.CategoryIds ?? []).ToArray());
@@ -527,7 +554,13 @@ public partial class CreateEvent : IDisposable
             _uploadedImageStorageObjectId = createDto.FeaturedImageId;
             _bgColor = createDto.BackgroundColor ?? string.Empty;
             _bgEffect = createDto.BackgroundEffect ?? "None";
-            _selectedTimezone = TimeZoneInfo.FindSystemTimeZoneById(createDto.EventTimeZoneId ?? createDto.Timezone ?? "UTC");
+            if (TimeZoneInfo.TryFindSystemTimeZoneById(createDto.EventTimeZoneId ?? createDto.Timezone ?? "UTC", out var initialTimezone))
+                _selectedTimezone = initialTimezone;
+            else
+            {
+                _initialTimezoneError = "The proposed timezone is unavailable. Select a valid timezone before editing the prepared program or saving. Original session instants are retained.";
+                _showTimezoneSelector = true;
+            }
             _publisherMode = createDto.OrganizationId.HasValue ? "organization" : createDto.GroupId.HasValue ? "group" : "personal";
             _selectedOrganizationId = createDto.OrganizationId;
             _selectedGroupId = createDto.GroupId;
@@ -572,6 +605,7 @@ public partial class CreateEvent : IDisposable
 
     private void OnPublisherSelectionChanged(string? key)
     {
+        MarkDirty();
         if (!TryParsePublisherKey(key, out var mode, out var publisherId))
         {
             return;
@@ -636,6 +670,7 @@ public partial class CreateEvent : IDisposable
 
     private async Task OnEventTypeChanged(int? eventTypeId)
     {
+        MarkDirty();
         if (createDto.EventTypeId == eventTypeId)
         {
             return;
@@ -650,6 +685,7 @@ public partial class CreateEvent : IDisposable
 
     private async Task OnEventTemplateChanged(Guid? templateId)
     {
+        MarkDirty();
         var previewRequestVersion = ++_templatePreviewRequestVersion;
         createDto.TemplateId = templateId;
         _selectedEventTemplate = null;
@@ -705,6 +741,7 @@ public partial class CreateEvent : IDisposable
 
     private async Task OnImageFileSelected(IBrowserFile? file)
     {
+        if (file is not null) MarkDirty();
         _uploadError = null;
 
         if (file == null) return;
@@ -794,6 +831,7 @@ public partial class CreateEvent : IDisposable
 
         if (result is not null && !result.Canceled)
         {
+            MarkDirty();
             createDto.Content = result.Data?.ToString();
         }
     }
@@ -925,6 +963,7 @@ public partial class CreateEvent : IDisposable
 
     private void AnnounceProgramChange(string message)
     {
+        MarkDirty();
         _programAnnouncement = message;
     }
 
@@ -1221,6 +1260,11 @@ public partial class CreateEvent : IDisposable
     private async Task SubmitEventAsync(CreateEventSubmitIntent intent)
     {
         if (_submitState.IsSubmitting || _creationOutcomeUnknown || createdEventId != Guid.Empty) return;
+        if (_initialTimezoneError is not null)
+        {
+            _submitState.Fail(_initialTimezoneError);
+            return;
+        }
         if (_programEdit is not null)
         {
             _submitState.Fail("Save or cancel the open program item before saving the event.");
@@ -1289,11 +1333,12 @@ public partial class CreateEvent : IDisposable
             {
                 _submitState.Complete();
                 createdEventId = response.Id;
+                _dirty = false;
+                _editContext.MarkAsUnmodified();
                 Logger.LogInformation("Event created with ID: {EventId}", createdEventId);
 
-                _savedDestination = intent == CreateEventSubmitIntent.SaveDraft
-                    ? $"/events/{createdEventId}/edit"
-                    : $"/event-created/{createdEventId}";
+                _savedDestination = $"/studio/events/{createdEventId}";
+                if (_disposed) return;
                 try
                 {
                     Navigation.NavigateTo(_savedDestination);
@@ -1432,10 +1477,16 @@ public partial class CreateEvent : IDisposable
 
     private void OnTimezoneChanged(TimeZoneInfo? tz)
     {
+        MarkDirty();
         if (tz != null)
         {
             _selectedTimezone = tz;
             createDto.EventTimeZoneId = tz.Id;
+            if (_initialTimezoneError is not null)
+            {
+                sessions = CreateEventProgramMapper.FromRequest(createDto);
+                _initialTimezoneError = null;
+            }
         }
         _showTimezoneSelector = false;
     }
@@ -1450,6 +1501,7 @@ public partial class CreateEvent : IDisposable
 
     private void HandleCreateTagCatSaved(IReadOnlyCollection<Guid> newIds)
     {
+        MarkDirty();
         if (_createTagCatMode == TagCategoryMode.Tags)
             selectedTagIds = new HashSet<Guid>(newIds);
         else

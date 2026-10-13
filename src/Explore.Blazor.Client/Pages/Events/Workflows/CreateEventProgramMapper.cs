@@ -12,14 +12,17 @@ internal static class CreateEventProgramMapper
     {
         var snapshot = Snapshot(source);
         var timezone = snapshot.EventTimeZoneId ?? snapshot.Timezone ?? "UTC";
+        var timezoneAvailable = TimeZoneInfo.TryFindSystemTimeZoneById(timezone, out _);
         return (snapshot.Sessions ?? [])
             .Select(row => new SessionEditorModel
             {
                 TempKey = string.IsNullOrWhiteSpace(row.TempKey) ? Guid.NewGuid().ToString("N") : row.TempKey,
                 Title = row.Title,
                 Description = row.Description,
-                StartTime = row.StartTime.HasValue ? DateTimeHelper.ConvertUtcToLocal(row.StartTime.Value, timezone) : null,
-                EndTime = row.EndTime.HasValue ? DateTimeHelper.ConvertUtcToLocal(row.EndTime.Value, timezone) : null,
+                StartTime = row.StartTime.HasValue ? timezoneAvailable
+                    ? DateTimeHelper.ConvertUtcToLocal(row.StartTime.Value, timezone) : row.StartTime.Value.DateTime : null,
+                EndTime = row.EndTime.HasValue ? timezoneAvailable
+                    ? DateTimeHelper.ConvertUtcToLocal(row.EndTime.Value, timezone) : row.EndTime.Value.DateTime : null,
                 ExistingStartInstant = row.StartTime,
                 ExistingEndInstant = row.EndTime,
                 EndTimeType = row.EndTimeType ?? SessionEndTimeType.Fixed,

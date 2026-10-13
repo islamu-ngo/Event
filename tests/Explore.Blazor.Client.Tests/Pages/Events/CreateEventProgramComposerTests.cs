@@ -21,6 +21,8 @@ public sealed class CreateEventProgramComposerTests : IDisposable
 
     public CreateEventProgramComposerTests()
     {
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.enableNavigationPrompt", _ => true).SetVoidResult();
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.disableNavigationPrompt", _ => true).SetVoidResult();
         _ctx.JSInterop.SetupVoid("mudTimePicker.destroyPointerEvents", _ => true).SetVoidResult();
         _http = new HttpClient(_handler) { BaseAddress = new Uri("https://event.test/") };
         _ctx.Services.AddSingleton<IEventService>(new EventService(
@@ -46,6 +48,33 @@ public sealed class CreateEventProgramComposerTests : IDisposable
     {
         _ctx.Dispose();
         _http.Dispose();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task InvalidInitialTimezone_RetainsProposalUntilExplicitCorrection(bool scheduled)
+    {
+        var parent = Parent();
+        parent.Timezone = "Mars/Olympus";
+        parent.Sessions = [new CreateEventGraphSessionDto
+        {
+            TempKey = "retained-proposal", Title = "Prepared proposal", Description = "Retained metadata",
+            StartTime = scheduled ? new DateTimeOffset(2040, 7, 21, 9, 0, 0, TimeSpan.FromHours(2)) : null,
+            EndTime = scheduled ? new DateTimeOffset(2040, 7, 21, 10, 0, 0, TimeSpan.FromHours(2)) : null
+        }];
+        var cut = _ctx.RenderMudComponent<CreateEvent>(p => p.Add(x => x.InitialDraft, parent));
+        await Assert.That(Timeline(cut).Instance.Sessions.Single().Title).IsEqualTo("Prepared proposal");
+        await Assert.That(Timeline(cut).Instance.Sessions.Single().ExistingStartInstant).IsEqualTo(parent.Sessions.Single().StartTime);
+        await Assert.That(cut.Find("[data-testid='initial-timezone-error']").GetAttribute("role")).IsEqualTo("alert");
+        await cut.Find("button.create-event__draft-button").ClickAsync(new MouseEventArgs());
+        await Assert.That(_handler.Requests).IsEmpty();
+        await cut.InvokeAsync(() => cut.FindComponent<MudAutocomplete<TimeZoneInfo>>().Instance.ValueChanged.InvokeAsync(TimeZoneInfo.Utc));
+        await Assert.That(cut.FindAll("[data-testid='initial-timezone-error']")).IsEmpty();
+        var row = Timeline(cut).Instance.Sessions.Single();
+        await Assert.That(row.Description).IsEqualTo("Retained metadata");
+        await Assert.That(row.StartTime).IsEqualTo(scheduled ? new DateTime(2040, 7, 21, 7, 0, 0) : null);
+        await Assert.That(parent.Timezone).IsEqualTo("Mars/Olympus");
     }
 
     [Test]
@@ -204,7 +233,9 @@ public sealed class CreateEventProgramComposerTests : IDisposable
         var sessionId = Guid.NewGuid();
         var source = new EventSessionDto
         {
-            Id = sessionId, EventId = eventId, Title = "Overlap",
+            Id = sessionId,
+            EventId = eventId,
+            Title = "Overlap",
             StartTime = new DateTimeOffset(2026, 10, 25, 1, 30, 0, TimeSpan.Zero),
             EndTime = new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.Zero)
         };
@@ -274,7 +305,7 @@ public sealed class CreateEventProgramComposerTests : IDisposable
         });
         await submission.WaitAsync(Timeout);
         await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri)
-            .IsEqualTo(publish ? $"http://localhost/event-created/{CreatedId}" : $"http://localhost/events/{CreatedId}/edit");
+            .IsEqualTo($"http://localhost/studio/events/{CreatedId}");
     }
 
     [Test]
@@ -289,7 +320,8 @@ public sealed class CreateEventProgramComposerTests : IDisposable
         {
             Content = JsonContent.Create(new ValidationProblemDetails
             {
-                Status = 400, Errors = new Dictionary<string, ICollection<string>> { ["Sessions[0].Title"] = ["Invalid value"] }
+                Status = 400,
+                Errors = new Dictionary<string, ICollection<string>> { ["Sessions[0].Title"] = ["Invalid value"] }
             })
         });
         await submission.WaitAsync(Timeout);
@@ -347,7 +379,7 @@ public sealed class CreateEventProgramComposerTests : IDisposable
         });
         await submission.WaitAsync(Timeout);
         await Assert.That(cut.Find("[data-testid='create-saved-link']").GetAttribute("href"))
-            .IsEqualTo($"/events/{CreatedId}/edit");
+            .IsEqualTo($"/studio/events/{CreatedId}");
         await Assert.That(cut.Find("[data-testid='create-saved']").GetAttribute("role")).IsEqualTo("status");
         await cut.Find("form").SubmitAsync();
         await Assert.That(_handler.Requests.Count).IsEqualTo(1);
@@ -396,7 +428,7 @@ public sealed class CreateEventProgramComposerTests : IDisposable
             await Assert.That(sent.EndTime).IsEqualTo(new DateTimeOffset(2030, 6, 2, 1, 0, 0, TimeSpan.Zero));
         }
         await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri)
-            .IsEqualTo($"http://localhost/events/{CreatedId}/edit?programUpdated=1");
+            .IsEqualTo($"http://localhost/studio/events/{CreatedId}/schedule?programUpdated=1");
     }
 
     [Test]
@@ -462,7 +494,9 @@ public sealed class CreateEventProgramComposerTests : IDisposable
 
     private static CreateEventDraftRequestDto Parent() => new()
     {
-        Title = "Prepared event", EventStatusId = 1, Timezone = "UTC",
+        Title = "Prepared event",
+        EventStatusId = 1,
+        Timezone = "UTC",
         ParticipationConfiguration = new ConfigureEventParticipationDto { ParticipationHandlingModeId = 1, AdvanceRegistrationObligationId = 1 }
     };
 
@@ -490,9 +524,13 @@ public sealed class CreateEventProgramComposerTests : IDisposable
                 {
                     return JsonResponse(new EventSessionCreateContextDto
                     {
-                        EventId = CreatedId, TenantId = CreatedId, TimeZoneId = "UTC",
+                        EventId = CreatedId,
+                        TenantId = CreatedId,
+                        TimeZoneId = "UTC",
                         Defaults = new EventSessionCreateDefaultsDto { RegistrationModeId = 1 },
-                        Locations = [], Rooms = [], SessionGroups = []
+                        Locations = [],
+                        Rooms = [],
+                        SessionGroups = []
                     });
                 }
                 if (path.Contains("eventsessiongroup", StringComparison.Ordinal))
@@ -503,7 +541,10 @@ public sealed class CreateEventProgramComposerTests : IDisposable
                 {
                     return JsonResponse(new
                     {
-                        id = SessionId, eventId = CreatedId, title = "Existing overnight", concurrencyStamp = CreatedId,
+                        id = SessionId,
+                        eventId = CreatedId,
+                        title = "Existing overnight",
+                        concurrencyStamp = CreatedId,
                         startTime = new DateTimeOffset(2030, 6, 1, 23, 0, 0, TimeSpan.Zero),
                         endTime = new DateTimeOffset(2030, 6, 2, 0, 0, 0, TimeSpan.Zero),
                         _links = new Dictionary<string, object> { ["edit"] = new { href = $"/api/eventsession/{SessionId}", method = "PATCH" } }
@@ -511,7 +552,9 @@ public sealed class CreateEventProgramComposerTests : IDisposable
                 }
                 return JsonResponse(new
                 {
-                    id = CreatedId, tenantId = CreatedId, title = "Saved event",
+                    id = CreatedId,
+                    tenantId = CreatedId,
+                    title = "Saved event",
                     _links = new Dictionary<string, object> { ["add-session"] = new { href = "/api/eventsession", method = "POST" } }
                 });
             }
@@ -521,7 +564,8 @@ public sealed class CreateEventProgramComposerTests : IDisposable
                 {
                     Content = JsonContent.Create(new EventCreationContextDto
                     {
-                        CanCreate = true, DefaultPublisherMode = "personal",
+                        CanCreate = true,
+                        DefaultPublisherMode = "personal",
                         PublisherOptions = [new EventCreationPublisherOptionDto { PublisherMode = "personal", CanPublish = true, DisplayName = "Publisher" }]
                     })
                 };
@@ -542,5 +586,6 @@ public sealed class CreateEventProgramComposerTests : IDisposable
     {
         public FailingNavigation() => Initialize("http://localhost/", "http://localhost/");
         protected override void NavigateToCore(string uri, bool forceLoad) => throw new InvalidOperationException("Navigation unavailable");
+        protected override void SetNavigationLockState(bool value) { }
     }
 }

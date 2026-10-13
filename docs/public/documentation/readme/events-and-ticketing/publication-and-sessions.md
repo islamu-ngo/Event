@@ -33,8 +33,10 @@ new time nonexistent or repeated.
 Finish or cancel the open item, then choose **Save draft** or **Publish**.
 Both send the complete prepared program together with the event. Publishing
 requires each prepared item to have a valid schedule; it does not discard
-unscheduled items to publish the rest. Save draft returns to the existing
-event editor, while publishing keeps the existing creation-success destination.
+unscheduled items to publish the rest. Both a saved draft and a successfully
+published event open that event's [Studio Overview](studio-workspace.md).
+Details and appearance, the managed schedule and available next actions stay
+within that workspace.
 
 If the server rejects the request, your fields and prepared items remain so
 you can correct them. Session errors identify the submitted row and field.

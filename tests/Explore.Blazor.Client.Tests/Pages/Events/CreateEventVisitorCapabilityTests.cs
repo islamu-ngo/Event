@@ -20,6 +20,8 @@ public sealed class CreateEventVisitorCapabilityTests : IDisposable
 
     public CreateEventVisitorCapabilityTests()
     {
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.enableNavigationPrompt", _ => true).SetVoidResult();
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.disableNavigationPrompt", _ => true).SetVoidResult();
         _ctx.JSInterop.SetupVoid("mudTimePicker.destroyPointerEvents", _ => true).SetVoidResult();
         _http = new HttpClient(_creation) { BaseAddress = new Uri("https://event.test/") };
         var management = Substitute.For<IEventManagementReadClient>();
@@ -132,7 +134,7 @@ public sealed class CreateEventVisitorCapabilityTests : IDisposable
         await Assert.That(_creation.Requests.Count).IsEqualTo(2);
         await Assert.That(_creation.Requests[1]).IsEqualTo(_creation.Requests[0]);
         await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri)
-            .IsEqualTo($"http://localhost/events/{CreationHandler.CreatedId}/edit");
+            .IsEqualTo($"http://localhost/studio/events/{CreationHandler.CreatedId}");
     }
 
     [Test]

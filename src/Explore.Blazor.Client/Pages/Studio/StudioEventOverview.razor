@@ -1,0 +1,275 @@
+@using Explore.Blazor.Client.Pages.Events.Components
+@implements IDisposable
+@rendermode InteractiveAuto
+@inject StudioEventContextState EventContext
+@inject IEventService Events
+@inject IEventSessionService Sessions
+@inject IEventResourceService Resources
+@inject ITranslationService Translation
+
+<div class="studio-event-overview" data-testid="studio-event-overview"
+     dir="@(Translation.CurrentLanguage == "ar" ? "rtl" : null)" aria-busy="@_loading">
+    @if (Resource is not null)
+    {
+        @if (!ScheduleOnly)
+        {
+            <dl class="studio-event-overview__status">
+                <dt>@T("status", "Status")</dt>
+                <dd data-testid="event-status">
+                    @(string.IsNullOrWhiteSpace(Resource.EventStatusFullName) ? T("statusUnknown", "Status unavailable") : Resource.EventStatusFullName)
+                </dd>
+                <dt>@T("participation", "Participation")</dt>
+                <dd data-testid="event-participation">
+                    @(string.IsNullOrWhiteSpace(Resource.ParticipationConfiguration?.ParticipationHandlingModeName)
+                        ? T("participationUnknown", "Participation configuration unavailable")
+                        : Resource.ParticipationConfiguration.ParticipationHandlingModeName)
+                </dd>
+            </dl>
+        }
+        <div class="studio-event-overview__actions">
+            @if (Resource.HasHalLink("edit") && !ScheduleOnly)
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/details")" Variant="Variant.Outlined">
+                    @T("details", "Details and appearance")
+                </AppButton>
+            }
+            @if (Resource.HasHalLink("add-session") || Resource.HasHalLink("create-session-draft"))
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/sessions/create")" StartIcon="@Icons.Material.Filled.Add">
+                    @T("addSession", "Add session")
+                </AppButton>
+            }
+            @if (_canManageResources && !ScheduleOnly)
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/resources")" Variant="Variant.Outlined">
+                    @T("resources", "Resources")
+                </AppButton>
+            }
+            @if (Resource.HasHalLink("configure-participation") && !ScheduleOnly)
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/registration")" Variant="Variant.Outlined">
+                    @T("registration", "Registration")
+                </AppButton>
+            }
+            @if (Resource.HasHalLink("view-registration-analytics") && !ScheduleOnly)
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/analytics")" Variant="Variant.Outlined">
+                    @T("answerAnalytics", "Answer analytics")
+                </AppButton>
+            }
+            @if (!ScheduleOnly && (Resource.HasHalLink("manage-ticket-types") || Resource.HasHalLink("manage-capacity-pools")))
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/tickets")" Variant="Variant.Outlined">@T("tickets", "Tickets")</AppButton>
+            }
+            @if (!ScheduleOnly && Resource.HasHalLink("manage-registration-workflow"))
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/forms")" Variant="Variant.Outlined">@T("forms", "Forms")</AppButton>
+            }
+            @if (!ScheduleOnly && Resource.HasHalLink("view-registration-orders"))
+            {
+                <AppButton Href="@($"/studio/events/{EventId}/orders")" Variant="Variant.Outlined">@T("orders", "Orders")</AppButton>
+            }
+        </div>
+        @if (_loading)
+        {
+            <p role="status">@T("loading", "Loading managed program and readiness…")</p>
+        }
+        else if (_error is not null)
+        {
+            <p role="alert">@_error</p>
+            <AppButton OnClick="ReloadAsync" Variant="Variant.Outlined">@T("retry", "Reload event")</AppButton>
+        }
+        else
+        {
+            @if (!ScheduleOnly && Resource.HasHalLink("publish-readiness"))
+            {
+                <section aria-labelledby="studio-publish-readiness-title">
+                    <h3 id="studio-publish-readiness-title">@T("readiness", "Publication readiness")</h3>
+                    @if (_readiness is null)
+                    {
+                        <p role="status">@T("readinessUnavailable", "Publication readiness is unavailable. Reload before publishing.")</p>
+                    }
+                    else
+                    {
+                        <p role="status" data-testid="publish-readiness" data-ready="@_readiness.IsReady.ToString()">
+                            @(_readiness.IsReady switch
+                            {
+                                true => T("ready", "Ready to publish"),
+                                false => T("notReady", "Changes are needed before publication"),
+                                null => T("readinessUnavailable", "Publication readiness is unavailable. Reload before publishing.")
+                            })
+                        </p>
+                        @if (_readiness.Errors?.Count > 0)
+                        {
+                            <ul>
+                                @foreach (var error in _readiness.Errors)
+                                {
+                                    <li><strong>@error.FieldPath</strong>: @error.Message</li>
+                                }
+                            </ul>
+                        }
+                    }
+                    @if (Resource.HasHalLink("publish") && _readiness?.IsReady == true)
+                    {
+                        <AppButton OnClick="PublishAsync" Disabled="_publishing" data-testid="publish-event">
+                            @T("publish", "Publish event")
+                        </AppButton>
+                    }
+                </section>
+            }
+            @if (_program is not null)
+            {
+                <EventProgramSummaryView Summary="_program" />
+            }
+            else
+            {
+                <p role="status" data-testid="managed-program-unavailable">
+                    @T("programUnavailable", "The managed program is unavailable. No public program is substituted.")
+                </p>
+            }
+            @if (_sessions.Count > 0)
+            {
+                <ul class="studio-event-overview__sessions">
+                    @foreach (var session in _sessions)
+                    {
+                        <li>
+                            <span>@session.Title</span>
+                            @if (session.HasHalLink("edit"))
+                            {
+                                <a href="@($"/studio/events/{EventId}/sessions/{session.Id}/edit")">
+                                    @T("editSession", "Edit session") <span class="sr-only">@session.Title</span>
+                                </a>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        }
+        @if (_publishMessage is not null)
+        {
+            <p role="status">@_publishMessage</p>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid EventId { get; set; }
+    [Parameter] public bool ScheduleOnly { get; set; }
+
+    private EventDto? Resource => !_disposed && EventContext.EventId == EventId
+        && _generation == EventContext.Generation ? EventContext.Event : null;
+    private EventProgramSummaryDto? _program;
+    private EventPublishReadinessDto? _readiness;
+    private IReadOnlyList<EventSessionListDto> _sessions = [];
+    private long _generation = -1;
+    private bool _loading;
+    private bool _canManageResources;
+    private bool _publishing;
+    private bool _disposed;
+    private string? _error;
+    private string? _publishMessage;
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task _loadTask = Task.CompletedTask;
+    private string T(string key, string fallback) => Translation.T($"ui.studio.event.{key}", fallback);
+
+    protected override Task OnParametersSetAsync() => _loadTask = LoadCurrentAsync();
+
+    private async Task LoadCurrentAsync()
+    {
+        var resource = EventContext.EventId == EventId ? EventContext.Event : null;
+        if (resource is null || _generation == EventContext.Generation) return;
+        var generation = _generation = EventContext.Generation;
+        var eventId = EventId;
+        _program = null;
+        _readiness = null;
+        _sessions = [];
+        _canManageResources = false;
+        _loading = true;
+        _error = null;
+        try
+        {
+            // Public program relations are not management authority.
+            var canManageProgram = resource.HasHalLink("edit") || resource.HasHalLink("add-session")
+                || resource.HasHalLink("create-session-draft") || resource.HasHalLink("add-session-group");
+            var programTask = canManageProgram
+                ? Events.GetManagedEventProgramSummaryAsync(eventId, _lifetime.Token)
+                : Task.FromResult<EventProgramSummaryDto?>(null);
+            var readinessTask = resource.HasHalLink("publish-readiness")
+                ? Events.GetEventPublishReadinessAsync(eventId, _lifetime.Token)
+                : Task.FromResult<EventPublishReadinessDto?>(null);
+            var sessionsTask = canManageProgram
+                ? Sessions.GetSessionsByEventAsync(eventId, includeManagedSessions: true)
+                : Task.FromResult<ICollection<EventSessionListDto>>([]);
+            await Task.WhenAll(programTask, readinessTask, sessionsTask);
+            if (!IsCurrent(eventId, generation)) return;
+            _program = await programTask;
+            _readiness = await readinessTask;
+            _sessions = (await sessionsTask ?? []).ToArray();
+            if (!ScheduleOnly)
+            {
+                try
+                {
+                    var audience = await Resources.AudienceAsync(eventId, null, _lifetime.Token);
+                    if (IsCurrent(eventId, generation))
+                        _canManageResources = audience?._links?.ContainsKey("manage-resources") == true;
+                }
+                catch (ApiException) { }
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch
+        {
+            if (IsCurrent(eventId, generation))
+                _error = T("loadFailed", "Managed program and readiness could not be loaded.");
+        }
+        finally
+        {
+            if (IsCurrent(eventId, generation)) _loading = false;
+        }
+    }
+
+    private bool IsCurrent(Guid eventId, long generation) =>
+        !_disposed && EventId == eventId && EventContext.EventId == eventId
+        && EventContext.Generation == generation && EventContext.Event is not null;
+
+    private async Task PublishAsync()
+    {
+        var resource = Resource;
+        if (_publishing || resource?.HasHalLink("publish") != true || _readiness?.IsReady != true) return;
+        var generation = EventContext.Generation;
+        var eventId = EventId;
+        _publishing = true;
+        try
+        {
+            var response = await Events.PublishEventAsync(eventId, resource.ConcurrencyStamp ?? Guid.Empty, _lifetime.Token);
+            if (!IsCurrent(eventId, generation)) return;
+            if (response?.Success == true)
+            {
+                await EventContext.ReloadAsync(eventId);
+            }
+            else
+            {
+                _publishMessage = response?.Message ?? T("publishFailed", "Publication could not be confirmed. Reload before trying again.");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch
+        {
+            if (IsCurrent(eventId, generation))
+                _publishMessage = T("publishUnknown", "Publication outcome is unknown. Reload to check current status.");
+        }
+        finally
+        {
+            if (IsCurrent(eventId, generation)) _publishing = false;
+        }
+    }
+
+    private Task ReloadAsync() => EventContext.ReloadAsync(EventId);
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

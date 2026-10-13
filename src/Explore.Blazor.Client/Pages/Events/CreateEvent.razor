@@ -12,6 +12,7 @@
 @attribute [Authorize]
 
 <PageTitle>Create Event</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 <MudText Typo="Typo.h1" HtmlTag="h1" Class="sr-only">Create Event</MudText>
 
@@ -25,7 +26,7 @@
     }
     else
     {
-        <div class="create-event">
+        <div class="create-event" @oninput="MarkDirty" @onchange="MarkDirty">
             @if (_creationOutcomeUnknown)
             {
                 <div data-testid="create-outcome-unknown" role="status" aria-live="polite" class="mb-4">
@@ -188,7 +189,7 @@
 
 
                     @* --- Event Title (large, Luma-style) --- *@
-                    <MudTextField T="string" @bind-Value="createDto.Title"
+                    <MudTextField T="string" @bind-Value="createDto.Title" @bind-Value:after="MarkDirty"
                                   Label="Event name"
                                   Placeholder="Event Name"
                                   Variant="Variant.Text"
@@ -218,6 +219,10 @@
                             <MudIcon Icon="@(_showTimezoneSelector ? Icons.Material.Filled.ArrowDropUp : Icons.Material.Filled.ArrowDropDown)" Size="Size.Small" />
                         </MudButton>
                     </div>
+                    @if (_initialTimezoneError is not null)
+                    {
+                        <div data-testid="initial-timezone-error" role="alert">@_initialTimezoneError</div>
+                    }
                     @if (_showTimezoneSelector)
                     {
                         <MudAutocomplete T="TimeZoneInfo"
@@ -289,7 +294,7 @@
                         }
                         <ScheduleTimelineComposer Sessions="@sessions"
                                                   TimezoneDisplay="@_selectedTimezoneDisplay"
-                                                  Disabled="@(_submitState.IsSubmitting || createdEventId != Guid.Empty || _programEdit is not null)"
+                                                   Disabled="@(_submitState.IsSubmitting || createdEventId != Guid.Empty || _programEdit is not null || _initialTimezoneError is not null)"
                                                   OnAddSession="AddSessionAsync"
                                                   OnAddItineraryItem="AddSessionToDayAsync"
                                                   OnEditSession="EditSessionAsync"

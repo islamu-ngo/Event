@@ -1,7 +1,7 @@
+using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Serialization;
-using System.Text.Json;
 
 namespace Explore.Blazor.Client.Pages.Events.Models;
 

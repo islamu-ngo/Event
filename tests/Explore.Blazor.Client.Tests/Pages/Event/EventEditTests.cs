@@ -15,6 +15,33 @@ public sealed class EventEditTests : IDisposable
     private readonly BlazorTestContext _ctx = new();
 
     [Test]
+    public async Task ConfirmedSave_DeniedRefreshAndFailedNavigationDiscardAuthorityWithoutDiscardingReceipt()
+    {
+        var eventId = Guid.CreateVersion7();
+        var service = Substitute.For<IEventService>();
+        service.UpdateEventAsync(eventId, Arg.Any<EventDraftEditModel>())
+            .Returns(new BaseCommandResponseOfGuid { Success = true, Id = eventId });
+        service.GetEventByIdAsync(eventId).Returns((EventDto?)null);
+        var component = CreateComponent(eventId, true, service);
+        SetProperty(component, "Navigation", new FailedNavigation());
+        InvokePrivate(component, "PopulateFormFromEvent");
+        await InvokePrivateAsync(component, "AddSession");
+        await Assert.That(typeof(EventEdit).GetField("currentEvent", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(component)).IsNull();
+        await Assert.That(GetPrivateField<bool>(component, "_saveConfirmed")).IsTrue();
+        await Assert.That(GetPrivateField<string>(component, "_savedDestination")).IsEqualTo($"/studio/events/{eventId}");
+        InvokePrivate(component, "MarkDirty");
+        await Assert.That(GetPrivateField<bool>(component, "_saveConfirmed")).IsTrue();
+        await Assert.That(GetPrivateProperty<bool>(component, "CanAddSession")).IsFalse();
+    }
+
+    private sealed class FailedNavigation : NavigationManager
+    {
+        public FailedNavigation() => Initialize("http://localhost/", "http://localhost/");
+        protected override void NavigateToCore(string uri, bool forceLoad)
+            => throw new InvalidOperationException("Navigation unavailable");
+    }
+
+    [Test]
     public async Task AddSession_WhenHalLinkExists_NavigatesToDedicatedSessionComposer()
     {
         var eventId = Guid.NewGuid();
@@ -31,7 +58,7 @@ public sealed class EventEditTests : IDisposable
 
         var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
         await eventService.Received(1).UpdateEventAsync(eventId, Arg.Any<EventDraftEditModel>());
-        await Assert.That(navigation.Uri.EndsWith($"/events/{eventId}/sessions/create", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(navigation.Uri.EndsWith($"/studio/events/{eventId}/sessions/create", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
@@ -130,7 +157,7 @@ public sealed class EventEditTests : IDisposable
         InvokePrivate(component, "EditSession", 0);
 
         var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
-        await Assert.That(navigation.Uri.EndsWith($"/events/{eventId}/sessions/{sessionId}/edit", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(navigation.Uri.EndsWith($"/studio/events/{eventId}/sessions/{sessionId}/edit", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
@@ -328,13 +355,14 @@ public sealed class EventEditTests : IDisposable
             }
         });
 
+        var submittedStamp = GetPrivateField<EventDto>(component, "currentEvent").ConcurrencyStamp;
         await InvokePrivateAsync(component, "HandleSubmit");
 
         await eventService.Received(1).UpdateEventAsync(
             eventId,
             Arg.Is<EventDraftEditModel>(dto =>
                 dto.RegistrationPolicyId == registrationPolicyId
-                && dto.ExpectedConcurrencyStamp == GetPrivateField<EventDto>(component, "currentEvent").ConcurrencyStamp));
+                && dto.ExpectedConcurrencyStamp == submittedStamp));
     }
 
     [Test]

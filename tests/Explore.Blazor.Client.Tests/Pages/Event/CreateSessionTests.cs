@@ -21,6 +21,8 @@ public sealed class CreateSessionTests : IDisposable
     public CreateSessionTests()
     {
         _ctx = new BlazorTestContext();
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.enableNavigationPrompt", _ => true).SetVoidResult();
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.disableNavigationPrompt", _ => true).SetVoidResult();
         _eventService = Substitute.For<IEventService>();
         _eventSessionService = Substitute.For<Explore.Blazor.Client.Contracts.Services.IEventSessionService>();
         _eventSessionLanguageService = Substitute.For<IEventSessionLanguageService>();
@@ -56,7 +58,7 @@ public sealed class CreateSessionTests : IDisposable
         var eventId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
         var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
-        navigation.NavigateTo($"/events/{eventId}/sessions/create");
+        navigation.NavigateTo($"/studio/events/{eventId}/sessions/create");
 
         _eventService.GetEventByIdAsync(eventId).Returns(CreateDraftEvent(eventId, tenantId));
         _eventSessionService.GetEventSessionCreateContextAsync(eventId, Arg.Any<CancellationToken>())
@@ -162,7 +164,7 @@ public sealed class CreateSessionTests : IDisposable
             && dto.EndTime == new DateTimeOffset(2026, 6, 1, 8, 30, 0, TimeSpan.Zero)
             && dto.StartTime.Value.Offset == TimeSpan.Zero
             && dto.EndTime.Value.Offset == TimeSpan.Zero));
-        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/events/{eventId}/edit?programUpdated=1", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/studio/events/{eventId}/schedule?programUpdated=1", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
@@ -197,7 +199,7 @@ public sealed class CreateSessionTests : IDisposable
         await cut.InvokeAsync(() => InvokePrivateAsync(cut.Instance, "SaveSessionAsync"));
 
         await _eventSessionService.Received(1).AssignSessionToGroupAsync(eventId, groupId, sessionId, true, 0);
-        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/events/{eventId}/edit?programUpdated=1", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/studio/events/{eventId}/schedule?programUpdated=1", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
@@ -233,7 +235,7 @@ public sealed class CreateSessionTests : IDisposable
 
         await _eventSessionService.Received(1).CreateSessionAsync(Arg.Any<ComposerCreateEventSessionRequest>());
         await _eventSessionService.Received(2).AssignSessionToGroupAsync(eventId, groupId, sessionId, true, 0);
-        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/events/{eventId}/edit?programUpdated=1", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/studio/events/{eventId}/schedule?programUpdated=1", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]

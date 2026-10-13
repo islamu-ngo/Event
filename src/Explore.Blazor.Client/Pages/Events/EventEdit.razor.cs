@@ -16,7 +16,9 @@ using Explore.Blazor.Client.Pages.Events.Models;
 using Explore.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using MudBlazor;
 
 namespace Explore.Blazor.Client.Pages.Events;
@@ -42,18 +44,40 @@ public partial class EventEdit : IDisposable
     [Inject] private IEventRegistrationPolicyService RegistrationPolicyService { get; set; } = default!;
     [Inject] private ICustomPropertyDefinitionService CustomPropertyDefinitionService { get; set; } = default!;
     [Inject] private MainContentAppearanceState MainContentAppearanceState { get; set; } = default!;
+    [Inject] private IJSRuntime Browser { get; set; } = default!;
+    [Inject] private Explore.Blazor.Client.Contracts.Services.ITranslationService Translation { get; set; } = default!;
 
     private Guid EventId { get; set; }
+    private bool _dirty;
+    private bool _disposed;
+    private bool _saveConfirmed;
+    private string? _savedMessage;
+    private string? _savedDestination;
+    private bool HasUnsavedChanges => _dirty || _submitState.IsSubmitting;
+    private void MarkDirty()
+    {
+        if (currentEvent is null) return;
+        _dirty = true;
+        _saveConfirmed = false;
+        _savedMessage = null;
+    }
 
-    private bool CanAddSession => currentEvent?.HasHalLink("add-session") == true;
+    private async Task ConfirmLeaveAsync(LocationChangingContext context)
+    {
+        if (!HasUnsavedChanges) return;
+        try
+        {
+            var leave = await Browser.InvokeAsync<bool>("confirm", context.CancellationToken,
+                Translation.T("ui.studio.event.unsavedChanges", "Leave this page and discard unsaved changes?"));
+            if (_disposed || context.CancellationToken.IsCancellationRequested || !leave) context.PreventNavigation();
+        }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested) { }
+    }
+
+    private bool CanAddSession => currentEvent?.HasHalLink("add-session") == true
+        || currentEvent?.HasHalLink("create-session-draft") == true;
 
     private bool CanManageProgramSections => currentEvent?.HasHalLink("add-session-group") == true;
-
-    private bool CanRequestManagedSessions =>
-        currentEvent?.HasHalLink("edit") == true ||
-        CanAddSession ||
-        CanManageProgramSections ||
-        currentEvent?.HasHalLink("team") == true;
 
     private string ProgramSummary
     {
@@ -409,7 +433,8 @@ public partial class EventEdit : IDisposable
 
             currentEvent = await EventService.GetEventByIdAsync(EventId);
 
-            if (currentEvent != null)
+            if (_disposed) return;
+            if (currentEvent?.HasHalLink("edit") == true)
             {
                 PopulateFormFromEvent();
 
@@ -417,7 +442,8 @@ public partial class EventEdit : IDisposable
                 var sessionGroupsTask = EventSessionService.GetManagedSessionGroupsByEventAsync(EventId);
                 var eventSessions = await EventSessionService.GetSessionsByEventAsync(
                     EventId,
-                    includeManagedSessions: CanRequestManagedSessions);
+                    includeManagedSessions: true);
+                if (_disposed) return;
                 sessions = eventSessions?.Select(s => SessionEditorModel.FromDto(
                     s, eventTimeZoneId: currentEvent.Timezone ?? "UTC")).ToList()
                            ?? new List<SessionEditorModel>();
@@ -429,6 +455,7 @@ public partial class EventEdit : IDisposable
             }
             else
             {
+                currentEvent = null;
                 _submitState.Fail("Event not found");
                 PublishMainContentAppearance();
             }
@@ -512,6 +539,7 @@ public partial class EventEdit : IDisposable
 
     private Task SetBackgroundColorAsync(string value)
     {
+        MarkDirty();
         _appearance.BackgroundColor = value;
         if (updateDto is not null)
         {
@@ -524,6 +552,7 @@ public partial class EventEdit : IDisposable
 
     private Task SetBackgroundEffectAsync(string value)
     {
+        MarkDirty();
         var normalized = string.IsNullOrWhiteSpace(value) ? "None" : value;
         _appearance.BackgroundEffect = normalized;
         if (updateDto is not null)
@@ -574,6 +603,7 @@ public partial class EventEdit : IDisposable
 
     private async Task OnImageFileSelected(IBrowserFile? file)
     {
+        if (file is not null) MarkDirty();
         _uploadError = null;
 
         if (file == null) return;
@@ -659,6 +689,7 @@ public partial class EventEdit : IDisposable
 
         if (result is not null && !result.Canceled)
         {
+            MarkDirty();
             updateDto.Content = result.Data?.ToString();
         }
     }
@@ -673,7 +704,7 @@ public partial class EventEdit : IDisposable
             return;
         }
 
-        await SaveEventAsync($"/events/{EventId}/sessions/create");
+        await SaveEventAsync($"/studio/events/{EventId}/sessions/create");
     }
 
     private void EditSession(int index)
@@ -684,7 +715,7 @@ public partial class EventEdit : IDisposable
             return;
         }
 
-        Navigation.NavigateTo($"/events/{EventId}/sessions/{sessionId}/edit");
+        Navigation.NavigateTo($"/studio/events/{EventId}/sessions/{sessionId}/edit");
     }
 
     private void ShowDuplicateUnavailable()
@@ -852,12 +883,12 @@ public partial class EventEdit : IDisposable
 
     private async Task HandleSubmit()
     {
-        await SaveEventAsync($"/events/{EventId}");
+        await SaveEventAsync($"/studio/events/{EventId}");
     }
 
     private async Task<bool> SaveEventAsync(string? navigateToOnSuccess)
     {
-        if (updateDto == null) return false;
+        if (updateDto == null || _disposed || _saveConfirmed) return false;
 
         if (_isUploadingImage)
         {
@@ -889,7 +920,24 @@ public partial class EventEdit : IDisposable
 
             if (response?.Success == true)
             {
-                currentEvent = await EventService.GetEventByIdAsync(EventId) ?? currentEvent;
+                _saveConfirmed = true;
+                _dirty = false;
+                _editContext.MarkAsUnmodified();
+                _submitState.Complete();
+                _savedDestination = $"/studio/events/{EventId}";
+                _savedMessage = "Event details saved.";
+                if (_disposed) return true;
+                currentEvent = null;
+                try
+                {
+                    var refreshed = await EventService.GetEventByIdAsync(EventId);
+                    if (!_disposed && refreshed?.HasHalLink("edit") == true) currentEvent = refreshed;
+                }
+                catch
+                {
+                    _savedMessage = "Event details saved. Reload the workspace to obtain current actions.";
+                }
+                if (_disposed) return true;
                 if (currentEvent is not null)
                 {
                     updateDto.ExpectedConcurrencyStamp = currentEvent.ConcurrencyStamp ?? Guid.Empty;
@@ -897,7 +945,14 @@ public partial class EventEdit : IDisposable
 
                 if (!string.IsNullOrWhiteSpace(navigateToOnSuccess))
                 {
-                    Navigation.NavigateTo(navigateToOnSuccess);
+                    try
+                    {
+                        Navigation.NavigateTo(navigateToOnSuccess);
+                    }
+                    catch
+                    {
+                        _savedMessage = "Event details saved. Navigation is unavailable; use the workspace link.";
+                    }
                 }
 
                 _submitState.Complete();
@@ -955,6 +1010,7 @@ public partial class EventEdit : IDisposable
 
     private void OnTimezoneChanged(TimeZoneInfo? tz)
     {
+        MarkDirty();
         if (tz != null)
         {
             _selectedTimezone = tz;
@@ -986,6 +1042,7 @@ public partial class EventEdit : IDisposable
 
     private void HandleEditTagCatSaved(IReadOnlyCollection<Guid> newIds)
     {
+        MarkDirty();
         if (_editTagCatMode == TagCategoryMode.Tags)
             selectedTagIds = new HashSet<Guid>(newIds);
         else
@@ -996,6 +1053,7 @@ public partial class EventEdit : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         MainContentAppearanceState?.Clear(MainContentAppearanceOwner);
     }
 

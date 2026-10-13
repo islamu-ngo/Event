@@ -124,6 +124,25 @@ public sealed partial class NativeEventProgramHttpTests
     }
 
     [Test]
+    public async Task SqliteCreationGraph_DuplicateLocalDayDatesRejectBeforeAnyGraphWrite()
+    {
+        await using var factory = await ProgramFactory.CreateAsync(useSqlite: true);
+        using var owner = factory.Client(factory.OwnerId);
+        var before = await GraphStorageAsync(factory);
+        var session = GraphSession("Prepared second-day discussion");
+        session["dayTempKey"] = "second";
+        var request = GraphRequest($"Duplicate day graph {Guid.CreateVersion7():N}", [session]);
+        request["days"] = new[]
+        {
+            new { tempKey = "first", localDate = "2040-07-21", label = "First", sortOrder = 1 },
+            new { tempKey = "second", localDate = "2040-07-21", label = "Second", sortOrder = 2 }
+        };
+        using var response = await owner.PostAsJsonAsync("/api/event", request);
+        await GraphFieldProblemAsync(response, "Days[1].LocalDate");
+        await Assert.That(await GraphStorageAsync(factory)).IsEqualTo(before);
+    }
+
+    [Test]
     public async Task SqliteCreationGraph_PublicationWithUnscheduledChildRejectsBeforeAnyGraphWrite()
     {
         await using var factory = await ProgramFactory.CreateAsync(useSqlite: true);
@@ -315,8 +334,10 @@ public sealed partial class NativeEventProgramHttpTests
     {
         var session = new Dictionary<string, object?>
         {
-            ["title"] = title, ["description"] = "Prepared metadata",
-            ["slug"] = title.ToLowerInvariant().Replace(' ', '-'), ["sortOrder"] = 9,
+            ["title"] = title,
+            ["description"] = "Prepared metadata",
+            ["slug"] = title.ToLowerInvariant().Replace(' ', '-'),
+            ["sortOrder"] = 9,
             ["maxAudienceAttendees"] = 37
         };
         if (scheduled)
@@ -330,18 +351,19 @@ public sealed partial class NativeEventProgramHttpTests
     private static Dictionary<string, object?> GraphRequest(
         string title, Dictionary<string, object?>[] sessions, bool published = false,
         Guid? organizationId = null) => new()
-    {
-        ["title"] = title, ["description"] = "Native creation graph",
-        ["eventTimeZoneId"] = "Europe/Brussels",
-        ["eventStatusId"] = (int)(published ? EventStatusEnum.Published : EventStatusEnum.Draft),
-        ["organizationId"] = organizationId,
-        ["participationConfiguration"] = new
         {
-            participationHandlingModeId = (int)ParticipationHandlingModeEnum.InformationOnly,
-            advanceRegistrationObligationId = (int)AdvanceRegistrationObligationEnum.NotApplicable
-        },
-        ["sessions"] = sessions
-    };
+            ["title"] = title,
+            ["description"] = "Native creation graph",
+            ["eventTimeZoneId"] = "Europe/Brussels",
+            ["eventStatusId"] = (int)(published ? EventStatusEnum.Published : EventStatusEnum.Draft),
+            ["organizationId"] = organizationId,
+            ["participationConfiguration"] = new
+            {
+                participationHandlingModeId = (int)ParticipationHandlingModeEnum.InformationOnly,
+                advanceRegistrationObligationId = (int)AdvanceRegistrationObligationEnum.NotApplicable
+            },
+            ["sessions"] = sessions
+        };
 
     private static async Task GraphFieldProblemAsync(HttpResponseMessage response, string field)
     {

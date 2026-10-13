@@ -225,6 +225,14 @@ public class CreateEventDtoValidator : AbstractValidator<CreateEventDto>
             CheckDuplicateKeys(request.Days.Select(day => day.TempKey), "Days");
             CheckDuplicateKeys(request.Rooms.Select(room => room.TempKey), "Rooms");
             CheckDuplicateKeys(request.Sessions.Select(session => session.TempKey), "Sessions");
+            var dayDates = new HashSet<DateOnly>();
+            for (int index = 0; index < request.Days.Count; index++)
+            {
+                if (!dayDates.Add(request.Days[index].LocalDate))
+                {
+                    context.AddFailure($"Days[{index}].LocalDate", "Each submitted day must have a unique local date.");
+                }
+            }
 
             var dayKeys = Keys(request.Days.Select(day => day.TempKey));
             var locationKeys = Keys(request.Locations.Select(location => location.TempKey));

@@ -172,7 +172,10 @@
             if (IsCurrent(eventId, request) && _formId == formId && _versionId == versionId)
                 _analytics = analytics;
         }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            // Disposal cancels this request; obsolete aggregates must not become a visible error.
+        }
         catch
         {
             if (IsCurrent(eventId, request)) _error = "Answer analytics could not be loaded.";

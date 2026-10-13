@@ -262,8 +262,14 @@
             if (IsCurrentResourceScope(eventId, generation))
                 _canManageResources = page?._links?.ContainsKey("manage-resources") == true;
         }
-        catch (OperationCanceledException) when (_resourceLifetime.IsCancellationRequested) { }
-        catch (ApiException) { }
+        catch (OperationCanceledException) when (_resourceLifetime.IsCancellationRequested)
+        {
+            // Disposal cancels the authority read; no permission result belongs to the departed shell.
+        }
+        catch (ApiException)
+        {
+            // Denied or unavailable collection authority keeps the resources route closed.
+        }
         finally
         {
             if (IsCurrentResourceScope(eventId, generation)) _resourceManagementLoading = false;
@@ -296,6 +302,7 @@
 
     public void Dispose()
     {
+        if (_disposed) return;
         _disposed = true;
         EventContext.Changed -= OnContextChanged;
         _resourceLifetime.Cancel();

@@ -205,18 +205,12 @@
             _program = await programTask;
             _readiness = await readinessTask;
             _sessions = (await sessionsTask ?? []).ToArray();
-            if (!ScheduleOnly)
-            {
-                try
-                {
-                    var audience = await Resources.AudienceAsync(eventId, null, _lifetime.Token);
-                    if (IsCurrent(eventId, generation))
-                        _canManageResources = audience?._links?.ContainsKey("manage-resources") == true;
-                }
-                catch (ApiException) { }
-            }
+            await LoadResourceAuthorityAsync(eventId, generation);
         }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            // Disposal cancels this load; the departed component must not report a load failure.
+        }
         catch
         {
             if (IsCurrent(eventId, generation))
@@ -225,6 +219,21 @@
         finally
         {
             if (IsCurrent(eventId, generation)) _loading = false;
+        }
+    }
+
+    private async Task LoadResourceAuthorityAsync(Guid eventId, long generation)
+    {
+        if (ScheduleOnly) return;
+        try
+        {
+            var audience = await Resources.AudienceAsync(eventId, null, _lifetime.Token);
+            if (IsCurrent(eventId, generation))
+                _canManageResources = audience?._links?.ContainsKey("manage-resources") == true;
+        }
+        catch (ApiException)
+        {
+            // A denied or unavailable audience read leaves resource management unadvertised.
         }
     }
 
@@ -252,7 +261,10 @@
                 _publishMessage = response?.Message ?? T("publishFailed", "Publication could not be confirmed. Reload before trying again.");
             }
         }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            // Disposal ends observation, not publication; a later workspace load reads authoritative status.
+        }
         catch
         {
             if (IsCurrent(eventId, generation))
@@ -268,6 +280,7 @@
 
     public void Dispose()
     {
+        if (_disposed) return;
         _disposed = true;
         _lifetime.Cancel();
         _lifetime.Dispose();

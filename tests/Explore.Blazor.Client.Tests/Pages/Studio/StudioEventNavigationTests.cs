@@ -36,12 +36,13 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_ResourceNavigationRequiresCollectionManageRelation(bool advertised)
     {
         var resource = CreateEvent("edit");
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
-        _resources.AudienceAsync(resource.Id.Value, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
+        _resources.AudienceAsync(eventId, Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(ResourcePage(advertised));
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForElement("[data-testid='studio-event-navigation']");
         if (advertised)
@@ -63,13 +64,14 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_ShowsSectionOnlyWhenMappedHalRelationExists(string relation, string section)
     {
         var resource = CreateEvent(relation);
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         var link = cut.Find($"[data-event-section='{section}']");
-        await Assert.That(link.QuerySelector("a")!.GetAttribute("href")).IsEqualTo($"/studio/events/{resource.Id}/{section}");
+        await Assert.That(link.QuerySelector("a")!.GetAttribute("href")).IsEqualTo($"/studio/events/{eventId}/{section}");
         await Assert.That(cut.FindAll("[data-event-section]").Count).IsEqualTo(2);
         await Assert.That(cut.Markup).Contains("All events");
         await Assert.That(cut.Markup).DoesNotContain("studio-actor-switcher");
@@ -79,11 +81,12 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_PublicationReadinessUsesCanonicalOverviewWithoutOrphanRoute()
     {
         var resource = CreateEvent("publish-readiness");
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
-        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, resource.Id.Value));
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
+        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, eventId));
         await Assert.That(cut.Find("[data-event-section='overview'] a").GetAttribute("href"))
-            .IsEqualTo($"/studio/events/{resource.Id}");
-        await Assert.That(cut.FindAll($"a[href='/studio/events/{resource.Id}/publication']")).IsEmpty();
+            .IsEqualTo($"/studio/events/{eventId}");
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{eventId}/publication']")).IsEmpty();
     }
 
     [Test]
@@ -92,18 +95,19 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_UnimplementedModulesNeverLinkToPublicEvent(string relation)
     {
         var resource = CreateEvent(relation);
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
-        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, resource.Id.Value));
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
+        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, eventId));
         await Assert.That(cut.FindAll("[data-event-section='team'], [data-event-section='danger']")).IsEmpty();
         await Assert.That(cut.Find("[data-event-section='overview'] a").GetAttribute("href"))
-            .IsEqualTo($"/studio/events/{resource.Id}");
+            .IsEqualTo($"/studio/events/{eventId}");
     }
 
     [Test]
     public async Task ResourceLoad_FromPreviousAuthorityCannotRestoreNavigationAfterDenial()
     {
         var resource = CreateEvent("edit");
-        var eventId = resource.Id!.Value;
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
         _eventService.GetEventByIdAsync(eventId).Returns(resource);
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(p => p.Add(c => c.EventId, eventId));
         var state = _ctx.Services.GetRequiredService<StudioEventContextState>();
@@ -128,10 +132,11 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_WithLegacyRegistrationRelation_OmitsRegistrationSection()
     {
         var resource = CreateEvent("registration");
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForAssertion(() => cut.Find("[data-testid='studio-event-navigation']"));
         await Assert.That(cut.FindAll("[data-event-section='registration']")).IsEmpty();
@@ -142,10 +147,11 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_WithLegacyTicketingRelation_OmitsTicketsSection()
     {
         var resource = CreateEvent("ticketing");
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForAssertion(() => cut.Find("[data-testid='studio-event-navigation']"));
         await Assert.That(cut.FindAll("[data-event-section='tickets']")).IsEmpty();
@@ -158,9 +164,10 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_TicketsSectionAcceptsEitherEventManagementRelation(string relation)
     {
         var resource = CreateEvent(relation);
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForElement("[data-event-section='tickets']");
         await Assert.That(cut.FindAll("[data-event-section='tickets']").Count).IsEqualTo(1);
@@ -170,9 +177,10 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_TicketsSectionRequiresAtLeastOneEventManagementRelation()
     {
         var resource = CreateEvent();
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForElement("[data-testid='studio-event-navigation']");
         await Assert.That(cut.FindAll("[data-event-section='tickets']")).IsEmpty();
@@ -182,10 +190,11 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_WithoutPromotionManagementRelation_OmitsPromotionsSection()
     {
         var resource = CreateEvent("edit");
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForElement("[data-testid='studio-event-navigation']");
         await Assert.That(cut.FindAll("[data-event-section='promotions']")).IsEmpty();
@@ -195,22 +204,23 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_PromotionsSectionRequiresCreatePromotionCollectionRelation()
     {
         var resource = CreateEvent("manage-ticket-types");
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
         var catalogVersionId = Guid.CreateVersion7();
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
-        _ticketingService.GetCatalogAsync(resource.Id.Value, Arg.Any<CancellationToken>())
-            .Returns(Catalog(resource.Id.Value, catalogVersionId));
-        _promotionService.GetPromotionsAsync(resource.Id.Value, catalogVersionId, Arg.Any<CancellationToken>())
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
+        _ticketingService.GetCatalogAsync(eventId, Arg.Any<CancellationToken>())
+            .Returns(Catalog(eventId, catalogVersionId));
+        _promotionService.GetPromotionsAsync(eventId, catalogVersionId, Arg.Any<CancellationToken>())
             .Returns(PromotionManagementCollectionState.Create(
-                resource.Id.Value,
+                eventId,
                 catalogVersionId,
                 [],
                 new Dictionary<string, HalLink>
                 {
-                    ["create-promotion"] = new() { Href = $"/api/events/{resource.Id}/promotions", Method = "POST" }
+                    ["create-promotion"] = new() { Href = $"/api/events/{eventId}/promotions", Method = "POST" }
                 }));
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForElement("[data-event-section='promotions']");
         await Assert.That(cut.FindAll("[data-event-section='promotions']").Count).IsEqualTo(1);
@@ -220,15 +230,16 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_PromotionCollectionWithoutCreateRelation_OmitsPromotionsSection()
     {
         var resource = CreateEvent("manage-ticket-types");
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
         var catalogVersionId = Guid.CreateVersion7();
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
-        _ticketingService.GetCatalogAsync(resource.Id.Value, Arg.Any<CancellationToken>())
-            .Returns(Catalog(resource.Id.Value, catalogVersionId));
-        _promotionService.GetPromotionsAsync(resource.Id.Value, catalogVersionId, Arg.Any<CancellationToken>())
-            .Returns(PromotionManagementCollectionState.Create(resource.Id.Value, catalogVersionId, []));
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
+        _ticketingService.GetCatalogAsync(eventId, Arg.Any<CancellationToken>())
+            .Returns(Catalog(eventId, catalogVersionId));
+        _promotionService.GetPromotionsAsync(eventId, catalogVersionId, Arg.Any<CancellationToken>())
+            .Returns(PromotionManagementCollectionState.Create(eventId, catalogVersionId, []));
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForElement("[data-testid='studio-event-navigation']");
         await Assert.That(cut.FindAll("[data-event-section='promotions']")).IsEmpty();
@@ -238,9 +249,10 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_FormsSectionRequiresManageRegistrationWorkflowRelation()
     {
         var resource = CreateEvent();
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         cut.WaitForElement("[data-testid='studio-event-navigation']");
         await Assert.That(cut.FindAll("[data-event-section='forms']")).IsEmpty();
@@ -250,15 +262,16 @@ public sealed class StudioEventNavigationTests : IDisposable
     public async Task Render_TeamRelationCannotExposePublicRouteAsManagement()
     {
         var resource = CreateEvent("team");
-        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        var eventId = resource.Id ?? throw new InvalidOperationException("The event fixture requires an ID.");
+        _eventService.GetEventByIdAsync(eventId).Returns(resource);
 
         var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
-            .Add(component => component.EventId, resource.Id.Value));
+            .Add(component => component.EventId, eventId));
 
         await Assert.That(cut.FindAll("[data-event-section='team']")).IsEmpty();
         await Assert.That(cut.FindAll("a[href='/events/community-gathering-EVT123']")).IsEmpty();
         await Assert.That(cut.Find("[data-event-section='overview'] a").GetAttribute("href"))
-            .IsEqualTo($"/studio/events/{resource.Id}");
+            .IsEqualTo($"/studio/events/{eventId}");
     }
 
     private static EventDto CreateEvent(params string[] relations)

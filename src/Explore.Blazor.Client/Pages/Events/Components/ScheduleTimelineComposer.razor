@@ -20,21 +20,23 @@
                             @group.Sessions.Count session@(group.Sessions.Count == 1 ? string.Empty : "s") · @TimezoneDisplay
                         </MudText>
                     </div>
-                    @if (group.Day.HasValue)
+                    @if (group.Day is DateTime day)
                     {
                         <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Text"
                                    Size="Size.Small"
                                    Disabled="@Disabled"
                                    StartIcon="@Icons.Material.Filled.Add"
-                                   OnClick="@(() => OnAddItineraryItem.InvokeAsync(group.Day.Value))">
+                                   OnClick="@(() => OnAddItineraryItem.InvokeAsync(day))">
                             Add to this day
                         </MudButton>
                     }
                 </div>
 
                 <div class="schedule-timeline__items">
-                    @foreach (var entry in group.Sessions)
+                    @for (var groupIndex = 0; groupIndex < group.Sessions.Count; groupIndex++)
                     {
+                        var position = groupIndex;
+                        var entry = group.Sessions[position];
                         <article @key="entry.Session.LocalId" class="schedule-timeline__item" aria-label="@GetSessionTitle(entry.Session, entry.Index)">
                             <div class="schedule-timeline__time">
                                 <MudText Typo="Typo.body2">@(entry.Session.StartTime?.ToString("h:mm tt") ?? "Date not set")</MudText>
@@ -67,14 +69,14 @@
                                                OnClick="@(() => OnRemoveSession.InvokeAsync(entry.Session.LocalId))" />
                                 <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
                                                Size="Size.Small"
-                                               Disabled="@(Disabled || entry.Index == 0)"
+                                               Disabled="@(Disabled || position == 0)"
                                                aria-label="Move session earlier"
-                                               OnClick="@(() => OnMoveSession.InvokeAsync((entry.Session.LocalId, -1)))" />
+                                               OnClick="@(() => OnMoveSession.InvokeAsync((entry.Session.LocalId, group.Sessions[position - 1].Session.LocalId)))" />
                                 <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward"
                                                Size="Size.Small"
-                                               Disabled="@(Disabled || entry.Index == Sessions.Count - 1)"
+                                               Disabled="@(Disabled || position == group.Sessions.Count - 1)"
                                                aria-label="Move session later"
-                                               OnClick="@(() => OnMoveSession.InvokeAsync((entry.Session.LocalId, 1)))" />
+                                               OnClick="@(() => OnMoveSession.InvokeAsync((entry.Session.LocalId, group.Sessions[position + 1].Session.LocalId)))" />
                             </div>
                         </article>
                     }
@@ -104,7 +106,7 @@
     [Parameter] public EventCallback<Guid> OnEditSession { get; set; }
     [Parameter] public EventCallback<Guid> OnDuplicateSession { get; set; }
     [Parameter] public EventCallback<Guid> OnRemoveSession { get; set; }
-    [Parameter] public EventCallback<(Guid LocalId, int Direction)> OnMoveSession { get; set; }
+    [Parameter] public EventCallback<(Guid LocalId, Guid NeighborId)> OnMoveSession { get; set; }
 
     private IReadOnlyList<SessionDayGroup> SessionDayGroups => Sessions
         .Select((session, index) => new SessionEntry(index, session))

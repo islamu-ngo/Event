@@ -961,12 +961,13 @@ public partial class CreateEvent : IDisposable
         AnnounceProgramChange("Program item duplicated locally.");
     }
 
-    private void MoveSession((Guid LocalId, int Direction) move)
+    private void MoveSession((Guid LocalId, Guid NeighborId) move)
     {
         if (_submitState.IsSubmitting || createdEventId != Guid.Empty) return;
         var index = sessions.FindIndex(row => row.LocalId == move.LocalId);
-        var target = index + move.Direction;
-        if (index < 0 || target < 0 || target >= sessions.Count) return;
+        var target = sessions.FindIndex(row => row.LocalId == move.NeighborId);
+        if (index < 0 || target < 0
+            || sessions[index].StartTime?.Date != sessions[target].StartTime?.Date) return;
         (sessions[index], sessions[target]) = (sessions[target], sessions[index]);
         AnnounceProgramChange("Program item order changed locally.");
     }

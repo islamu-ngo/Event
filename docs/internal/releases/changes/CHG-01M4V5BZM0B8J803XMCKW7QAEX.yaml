@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4V5BZM0B8J803XMCKW7QAEX
+Title: "Move prepared sessions within the displayed day group"
+Type: fix
+Scope: events
+Summary: "Earlier and later controls swap adjacent prepared items within the same visible day or unscheduled group, rather than unrelated flat-list neighbors."
+Group: studio-event-workspace
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

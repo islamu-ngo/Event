@@ -255,6 +255,33 @@ public sealed class CreateEventProgramComposerTests : IDisposable
     }
 
     [Test]
+    public async Task MixedDayGroups_MoveOnlyWithinDisplayedGroupAndRespectVisibleBoundaries()
+    {
+        var parent = Parent();
+        parent.Sessions =
+        [
+            new() { Title = "Unscheduled A" },
+            new() { Title = "Scheduled B", StartTime = new DateTimeOffset(2030, 6, 1, 9, 0, 0, TimeSpan.Zero), EndTime = new DateTimeOffset(2030, 6, 1, 10, 0, 0, TimeSpan.Zero) },
+            new() { Title = "Unscheduled C" },
+            new() { Title = "Other day", StartTime = new DateTimeOffset(2030, 6, 2, 9, 0, 0, TimeSpan.Zero), EndTime = new DateTimeOffset(2030, 6, 2, 10, 0, 0, TimeSpan.Zero) }
+        ];
+        var cut = _ctx.RenderMudComponent<CreateEvent>(p => p.Add(c => c.InitialDraft, parent));
+        var dated = cut.FindAll(".schedule-timeline__day")[0];
+        await Assert.That(dated.QuerySelector("button[aria-label='Move session earlier']")!.HasAttribute("disabled")).IsTrue();
+        await Assert.That(dated.QuerySelector("button[aria-label='Move session later']")!.HasAttribute("disabled")).IsTrue();
+        var unscheduled = cut.FindAll(".schedule-timeline__day")[2];
+        await Assert.That(unscheduled.QuerySelectorAll("button[aria-label='Move session earlier']")[0].HasAttribute("disabled")).IsTrue();
+        await cut.FindAll(".schedule-timeline__day")[2].QuerySelectorAll("button[aria-label='Move session later']")[0].ClickAsync(new MouseEventArgs());
+        await Assert.That(cut.FindAll(".schedule-timeline__day")[2].QuerySelectorAll("article")[0].TextContent).Contains("Unscheduled C");
+        await Assert.That(cut.FindAll(".schedule-timeline__day")[2].QuerySelectorAll("article")[1].TextContent).Contains("Unscheduled A");
+        await Assert.That(Timeline(cut).Instance.Sessions[0].Title).IsEqualTo("Unscheduled C");
+        await Assert.That(Timeline(cut).Instance.Sessions[1].Title).IsEqualTo("Scheduled B");
+        await Assert.That(Timeline(cut).Instance.Sessions[2].Title).IsEqualTo("Unscheduled A");
+        await Assert.That(Timeline(cut).Instance.Sessions[3].Title).IsEqualTo("Other day");
+        await Assert.That(_handler.Requests).IsEmpty();
+    }
+
+    [Test]
     public async Task LocalEditing_CancelDuplicateMoveDeleteAndSaveAnotherNeverWriteOrNavigate()
     {
         var cut = Render();
@@ -271,7 +298,8 @@ public sealed class CreateEventProgramComposerTests : IDisposable
         await Assert.That(Timeline(cut).Instance.Sessions.Count).IsEqualTo(3);
         await Assert.That(Timeline(cut).Instance.Sessions[1].LocalId == firstId).IsFalse();
         var duplicateId = Timeline(cut).Instance.Sessions[1].LocalId;
-        await cut.InvokeAsync(() => Timeline(cut).Instance.OnMoveSession.InvokeAsync((duplicateId, 1)));
+        var neighborId = Timeline(cut).Instance.Sessions[2].LocalId;
+        await cut.InvokeAsync(() => Timeline(cut).Instance.OnMoveSession.InvokeAsync((duplicateId, neighborId)));
         await Assert.That(Timeline(cut).Instance.Sessions[1].Title).IsEqualTo("Second");
         await cut.InvokeAsync(() => Timeline(cut).Instance.OnRemoveSession.InvokeAsync(firstId));
         await cut.InvokeAsync(() => Timeline(cut).Instance.OnRemoveSession.InvokeAsync(Timeline(cut).Instance.Sessions[0].LocalId));

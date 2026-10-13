@@ -2853,3 +2853,54 @@ Do not infer wire presence from DTO nullability or an isolated serializer test.
 - [x] Stays in journal only; production HTTP field-presence assertions are the regression.
 
 ---
+
+[2026-10-12 Europe/Brussels] — Standalone client builds do not export fresh API schema
+
+**Context**: While reviewing the Studio event workspace implementation plan, its phase gates claimed that a standalone Blazor client build would also produce the current backend OpenAPI input. The review changed documentation only.
+
+**Symptom / Observation**: `Explore.Blazor.Client.csproj` regenerates and captures the client from the selected checked-in schema, but its `BuildApiContractForClient` target invokes API export only when `BuildingSolutionFile` is `true`. A successful standalone client build can therefore consume a schema that predates a DTO change.
+
+**Root Cause**: Solution-build ordering and standalone schema-driven generation are deliberately separate contracts. Input hashing proves which schema the client consumed; it does not prove that schema was generated from the latest backend source.
+
+**Resolution**: The reviewed plan now requires native API `GetOpenApiContractInput`, then the API inventory producer, then `GenerateApiClient`, followed by the affected client gate. These commands are planned, not executed or claimed passing in this documentation review. The actual generated client owner is `Clients/EventApiTagClients.g.cs`; older API documentation still contains a retired filename example.
+
+**Why This Matters for Future Work**: Every API contract change needs producer-to-consumer provenance. Standalone client compilation or a matching capture hash alone cannot establish that the backend and browser agree on new nullability or wire shape.
+
+**References**:
+- `src/Explore.Blazor.Client/Explore.Blazor.Client.csproj:134`
+- `src/Explore.API/Explore.API.csproj:109`
+- `eng/tools/Explore.ApiContractInventory/Program.cs:50`
+- `docs/internal/API.md#openapi-export-and-client-generation`
+- Repository evidence: `072f2b6dbd8e4b87e16b795bc02a9ea23f902046`
+
+**Promotion Consideration**:
+- [x] Candidate for updating the API generation guidance when its owning contract work is implemented; no generation tooling change is implied.
+
+---
+
+[2026-10-13 Europe/Brussels] — Projection bootstrap failures depend on shared fixture context
+
+**Context**: Final Studio workspace assurance executed disjoint persistence classes and compared failures against untouched base `c65788c36`. Projection tests unexpectedly failed before reaching their projection assertions.
+
+**Symptom / Observation**: Full-class runs reported `DbUpdateConcurrencyException: Discovery tenant enrollment changed after the empty snapshot.` All three failing methods passed in isolated baseline slices. Full updater-class baseline runs reproduced the exact failing methods; the coordination baseline instead failed Upsert while the current class failed MarkDrained. Both coordination failures stopped in `SeedTenantAsync`, not the dirty-scope behavior being asserted.
+
+**Root Cause**: Projection tests share a PostgreSQL fixture with `SharedType.PerAssembly`. Tenant creation enters the discovery enrollment fence during `SaveChangesAsync`. When its transaction sees an empty tenant catalog, `RequireEmptyCurrentCatalogAsync` checks another ReadCommitted connection and rejects a snapshot that predates an already committed tenant. The reported guard and seed-helper frames are unchanged on base. Concurrent first-tenant bootstrap in a shared fixture can therefore fail a different seeding method depending on execution context; an isolated method does not exercise that contention.
+
+**Resolution**: Preserve the original class failures, isolated passes and different losing coordination methods. Quarantine the existing fixture problem rather than retry until green, serialize the feature's original receipt, change business expectations or modify the enrollment guard. Verification used `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/EventCustomPropertyProjectionUpdaterTests*/*" --minimum-expected-tests 8 --maximum-parallel-tests 2` and the corresponding six-case session-updater and five-case coordination filters on untouched base. Exact-method filters under the same class selected one case each and passed. These are deliberately mixed receipts, not a passing full suite. Future fixture work should establish first-tenant enrollment deterministically before concurrent unrelated projection assertions while retaining separate tests for the real enrollment conflict.
+
+**Why This Matters for Future Work**: A same-class failure count or generic enrollment exception is not proof that the same test failed on base. Compare case identity and seed/guard frames, retain class-versus-isolated differences, and distinguish fixture initialization failure from coverage of later business assertions.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Projections/CustomPropertyProjectionCoordinationTests.cs:16`
+- `tests/Event.Persistence.IntegrationTests/Projections/CustomPropertyProjectionCoordinationTests.cs:291`
+- `tests/Event.Persistence.IntegrationTests/Projections/EventCustomPropertyProjectionUpdaterTests.cs:393`
+- `tests/Event.Persistence.IntegrationTests/Projections/EventSessionCustomPropertyProjectionUpdaterTests.cs:299`
+- `tests/Event.Persistence.IntegrationTests/Fixtures/ProjectionTestContainerFixture.cs:35`
+- `src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoverySourceProviderOperations.cs:69`
+- `.agents/skills/finding/SKILL.md`
+- Baseline source: `c65788c36`; full-class comparison monitors `mon_559EDJS7B070SM4B` and `mon_BJT4JE70KD30FXY5`; isolated comparison `mon_X9QY8EMF9B0DWN2A`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; preserve the fixture-context evidence without creating a new product invariant or repairing unrelated tests.
+
+---

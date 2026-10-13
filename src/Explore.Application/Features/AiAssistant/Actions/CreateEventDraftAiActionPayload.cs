@@ -80,9 +80,9 @@ public sealed class CreateEventDraftRoomPayload
 
 public sealed class CreateEventDraftSessionPayload
 {
-    public DateTimeOffset StartTime { get; init; }
+    public DateTimeOffset? StartTime { get; init; }
 
-    public DateTimeOffset EndTime { get; init; }
+    public DateTimeOffset? EndTime { get; init; }
 
     public string? Title { get; init; }
 

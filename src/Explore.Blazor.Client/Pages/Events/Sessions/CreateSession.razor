@@ -1,6 +1,7 @@
-@page "/events/{EventId:guid}/sessions/create"
-@rendermode InteractiveServer
+@page "/studio/events/{EventId:guid}/sessions/create"
+@rendermode InteractiveAuto
 @attribute [Authorize]
+@implements IDisposable
 
 @using Explore.Blazor.Client.Clients
 @using Explore.Blazor.Client.Contracts.Services.Events
@@ -11,8 +12,11 @@
 @using Microsoft.AspNetCore.Components.Forms
 
 @inject ILogger<CreateSession> Logger
+@inject IJSRuntime Browser
+@inject ITranslationService Translation
 
 <PageTitle>Add program item</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 <main class="create-session" aria-labelledby="create-session-title">
     <MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
@@ -25,7 +29,7 @@
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Loading event draft...</MudText>
                 </div>
             }
-            else if (_event is null)
+            else if (_event is null || !_canAddSession)
             {
                 <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-4">
                     @(_submitState.ErrorMessage ?? "The event draft could not be loaded. Return to the draft and try again.")
@@ -45,6 +49,7 @@
                 {
                     <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-4" role="status">
                         @_successMessage
+                        <a href="@($"/studio/events/{EventId}/schedule")" data-testid="saved-session-workspace">Open managed schedule</a>
                     </MudAlert>
                 }
 
@@ -62,34 +67,37 @@
 
                 <EditForm EditContext="_editContext" OnValidSubmit="SaveSessionAsync">
                     <FormSubmissionGuard State="@_submitState">
+                    <fieldset class="border-0 pa-0" disabled="@_saveConfirmed">
                     <AppValidationSummary />
 
                     <EventSessionForm FormGridClass="create-session__form-grid"
                                       TimeGridClass="create-session__time-grid"
                                       Title="@_session.Title"
-                                      TitleChanged="@(value => _session.Title = value)"
+                                      TitleChanged="@(value => { _session.Title = value; MarkDirty(); })"
                                       TitleFor="@(() => _session.Title)"
                                       Description="@_session.Description"
-                                      DescriptionChanged="@(value => _session.Description = value)"
+                                      DescriptionChanged="@(value => { _session.Description = value; MarkDirty(); })"
                                       DescriptionFor="@(() => _session.Description)"
                                       SessionDate="@_sessionDate"
-                                      SessionDateChanged="@(value => _sessionDate = value)"
+                                      SessionDateChanged="OnSessionDateChanged"
+                                      EndDate="@_endDate"
+                                      EndDateChanged="@(value => { _endDate = value; MarkDirty(); })"
                                       StartTime="@_startTime"
-                                      StartTimeChanged="@(value => _startTime = value)"
+                                      StartTimeChanged="@(value => { _startTime = value; MarkDirty(); })"
                                       EndTime="@_endTime"
-                                      EndTimeChanged="@(value => _endTime = value)"
+                                      EndTimeChanged="@(value => { _endTime = value; MarkDirty(); })"
                                       LocationId="@_session.LocationId"
                                       LocationIdChanged="OnLocationChangedAsync"
                                       RoomId="@_session.RoomId"
-                                      RoomIdChanged="@(value => _session.RoomId = value)"
+                                      RoomIdChanged="@(value => { _session.RoomId = value; MarkDirty(); })"
                                       RoomDisabled="@(!_session.LocationId.HasValue || !_rooms.Any())"
                                       ProgramSectionId="@_selectedSessionGroupId"
-                                      ProgramSectionIdChanged="@(value => _selectedSessionGroupId = value)"
+                                      ProgramSectionIdChanged="@(value => { _selectedSessionGroupId = value; MarkDirty(); })"
                                       ProgramSectionDisabled="@(!_sessionGroups.Any())"
                                       Capacity="@_session.MaxAudienceAttendees"
-                                      CapacityChanged="@(value => _session.MaxAudienceAttendees = value)"
+                                      CapacityChanged="@(value => { _session.MaxAudienceAttendees = value; MarkDirty(); })"
                                       RegistrationModeId="@_session.RegistrationModeId"
-                                      RegistrationModeIdChanged="@(value => _session.RegistrationModeId = value)"
+                                      RegistrationModeIdChanged="@(value => { _session.RegistrationModeId = value; MarkDirty(); })"
                                       RegistrationModeDisabled="@(!_registrationModes.Any())">
                         <LocationOptions>
                             <MudSelectItem T="Guid?" Value="@((Guid?)null)">No location yet</MudSelectItem>
@@ -124,10 +132,11 @@
                         <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="BackToEventDraft" Disabled="@_submitState.IsSubmitting">
                             Back to event draft
                         </MudButton>
-                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" ButtonType="ButtonType.Submit" StartIcon="@Icons.Material.Filled.Save" Disabled="@(_submitState.IsSubmitting || !_canAddSession)">
+                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" ButtonType="ButtonType.Submit" StartIcon="@Icons.Material.Filled.Save" Disabled="@(_saveConfirmed || _submitState.IsSubmitting || !_canAddSession)">
                             @(_submitState.IsSubmitting ? "Saving..." : "Save program item")
                         </MudButton>
                     </div>
+                    </fieldset>
                     </FormSubmissionGuard>
                 </EditForm>
             }
@@ -157,6 +166,7 @@
         Title = string.Empty
     };
     private DateTime? _sessionDate;
+    private DateTime? _endDate;
     private TimeSpan? _startTime = new(9, 0, 0);
     private TimeSpan? _endTime = new(10, 0, 0);
     private bool _isLoading = true;
@@ -164,6 +174,40 @@
     private Guid? _selectedSessionGroupId;
     private Guid? _savedSessionId;
     private string? _successMessage;
+    private bool _dirty;
+    private bool _saveConfirmed;
+    private bool _disposed;
+    private bool HasUnsavedChanges => !_saveConfirmed && (_dirty || _submitState.IsSubmitting);
+    private void MarkDirty() => _dirty = true;
+
+    private void OnSessionDateChanged(DateTime? value)
+    {
+        if (value is DateTime date && _sessionDate is DateTime previousDate && _endDate is DateTime endDate)
+        {
+            _endDate = endDate.AddDays((date.Date - previousDate.Date).Days);
+        }
+        else if (_endDate is null)
+        {
+            _endDate = value;
+        }
+        _sessionDate = value;
+        MarkDirty();
+    }
+
+    private async Task ConfirmLeaveAsync(LocationChangingContext context)
+    {
+        if (!HasUnsavedChanges) return;
+        try
+        {
+            var leave = await Browser.InvokeAsync<bool>("confirm", context.CancellationToken,
+                Translation.T("ui.studio.event.unsavedChanges", "Leave this page and discard unsaved changes?"));
+            if (_disposed || context.CancellationToken.IsCancellationRequested || !leave) context.PreventNavigation();
+        }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            // A superseded navigation no longer needs a leave decision.
+        }
+    }
 
     private EditContext _editContext = default!;
     private FormSubmitState _submitState = new();
@@ -188,7 +232,9 @@
         }
         else
         {
-            _canAddSession = _event.HasHalLink("add-session");
+            _canAddSession = _event.HasHalLink("add-session") || _event.HasHalLink("create-session-draft");
+            if (!_canAddSession)
+                _submitState.Fail("You do not currently have permission to add program items to this event draft.");
             if (_createContext is null)
             {
                 _submitState.Fail("Program item context could not be loaded. You can still save basic details, but inherited defaults and selector options are unavailable.");
@@ -237,16 +283,15 @@
             FallbackRegistrationModeId);
         _locations = formState.Locations;
         _sessionGroups = formState.SessionGroups;
-        _sessionDate = formState.SessionDate
-            ?? (string.IsNullOrWhiteSpace(context.TimeZoneId)
-                ? null
-                : DateTimeHelper.ConvertUtcToLocal(DateTimeOffset.UtcNow, context.TimeZoneId).Date.AddDays(1));
+        _sessionDate = formState.SessionDate;
+        _endDate = formState.SessionDate;
         _startTime = formState.StartTime ?? _startTime;
         _endTime = formState.EndTime ?? _endTime;
     }
 
     private Task OnLocationChangedAsync(Guid? locationId)
     {
+        MarkDirty();
         _session.LocationId = locationId;
         _session.RoomId = null;
         LoadRoomsForLocation(locationId);
@@ -275,6 +320,7 @@
 
     private async Task SaveSessionAsync()
     {
+        if (_saveConfirmed || _disposed) return;
         _successMessage = null;
 
         if (!TryPrepareSession(out var validationError))
@@ -303,8 +349,20 @@
                 _submitState.Fail(result.ErrorMessage!);
                 return;
             }
-            _successMessage = "Program item saved. Returning to the event draft.";
-            Navigation.NavigateTo($"/events/{EventId}/edit?programUpdated=1");
+            if (_disposed) return;
+            _saveConfirmed = true;
+            _dirty = false;
+            _editContext.MarkAsUnmodified();
+            _submitState.Complete();
+            _successMessage = "Program item saved.";
+            try
+            {
+                Navigation.NavigateTo($"/studio/events/{EventId}/schedule?programUpdated=1");
+            }
+            catch
+            {
+                _successMessage = "Program item saved. Navigation is unavailable; use the managed schedule link.";
+            }
         }
         catch (ApiException ex)
         {
@@ -340,6 +398,11 @@
             validationError = "You do not currently have permission to add program items to this event draft.";
             return false;
         }
+        if (!_endDate.HasValue)
+        {
+            validationError = "Program item end date is required.";
+            return false;
+        }
 
         return EventSessionFormModelMapper.TryPrepareCreateRequest(
             _session,
@@ -349,7 +412,8 @@
             _startTime,
             _endTime,
             out validationError,
-            _createContext?.TimeZoneId);
+            _createContext?.TimeZoneId,
+            endDate: _endDate);
     }
 
     private static string FormatLocation(EventSessionCreateLocationOptionDto location)
@@ -382,5 +446,7 @@
             ? mode.FullName
             : $"{mode.FullName} · {mode.Description}";
 
-    private void BackToEventDraft() => Navigation.NavigateTo($"/events/{EventId}/edit");
+    private void BackToEventDraft() => Navigation.NavigateTo($"/studio/events/{EventId}/schedule");
+
+    public void Dispose() => _disposed = true;
 }

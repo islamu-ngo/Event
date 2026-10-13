@@ -1,0 +1,30 @@
+Change-Id: CHG-01M4RSCGHVP6W34J9B01K6CJT2
+Title: "preserve unscheduled sessions in event drafts"
+Type: feat
+Scope: events
+Summary: "Organizers can save prepared draft sessions without invented dates."
+Group: studio-event-workspace
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Nested creation sessions can omit start and end for genuine drafts. Consumers must handle null schedules, and an older executable that dereferences starts is unsafe after these drafts exist."
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Native references remain tenant-qualified. Real HTTP guards reject invalid and foreign references without exposing foreign venue or room text; owner policy and public draft exclusion remain authoritative."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "The authoritative nested startTime schema admits null. API-first generation, inventory and client generation succeeded; generated optional browser inputs already supported null, so their bytes are unchanged."
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/publication-and-sessions.md
+    Disposition: documented
+    Detail: "Deploy coherent API/client contracts. Preserve stored nullable drafts during correction; do not downgrade to code that assumes starts exist or automatically replay an uncertain creation response."

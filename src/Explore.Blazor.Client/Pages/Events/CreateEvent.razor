@@ -2,6 +2,8 @@
 @using MudBlazor
 @using Explore.Blazor.Client.Shared
 @using Explore.Blazor.Client.Pages.Events.Components
+@using Explore.Blazor.Client.Pages.Events.Sessions
+@using Explore.Blazor.Client.Clients
 @using Blazored.FluentValidation
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
@@ -10,6 +12,7 @@
 @attribute [Authorize]
 
 <PageTitle>Create Event</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 <MudText Typo="Typo.h1" HtmlTag="h1" Class="sr-only">Create Event</MudText>
 
@@ -23,7 +26,31 @@
     }
     else
     {
-        <div class="create-event">
+        <div class="create-event" @oninput="MarkDirty" @onchange="MarkDirty">
+            @if (_creationOutcomeUnknown)
+            {
+                <div data-testid="create-outcome-unknown" role="status" aria-live="polite" class="mb-4">
+                    <MudAlert Severity="Severity.Warning">
+                        The save outcome is unknown. Your event and program are retained here.
+                        Creation is disabled to avoid creating the same event twice. Check your managed
+                        events and reconcile the result before starting another creation.
+                        <a href="/studio/events" target="_blank" rel="noopener noreferrer">Check managed events in another tab</a>
+                    </MudAlert>
+                </div>
+            }
+            @if (createdEventId != Guid.Empty)
+            {
+                <div data-testid="create-saved" role="status" aria-live="polite" class="mb-4">
+                    <MudAlert Severity="Severity.Success">
+                        Event saved.
+                        @if (_savedNavigationFailed)
+                        {
+                            <span>Navigation is unavailable; the save has already completed.</span>
+                        }
+                        <a data-testid="create-saved-link" href="@_savedDestination">Open saved event</a>
+                    </MudAlert>
+                </div>
+            }
             @if (_publishReadinessErrors.Count > 0)
             {
                 <div id="publish-readiness-errors" role="alert" tabindex="-1">
@@ -162,7 +189,7 @@
 
 
                     @* --- Event Title (large, Luma-style) --- *@
-                    <MudTextField T="string" @bind-Value="createDto.Title"
+                    <MudTextField T="string" @bind-Value="createDto.Title" @bind-Value:after="MarkDirty"
                                   Label="Event name"
                                   Placeholder="Event Name"
                                   Variant="Variant.Text"
@@ -192,6 +219,10 @@
                             <MudIcon Icon="@(_showTimezoneSelector ? Icons.Material.Filled.ArrowDropUp : Icons.Material.Filled.ArrowDropDown)" Size="Size.Small" />
                         </MudButton>
                     </div>
+                    @if (_initialTimezoneError is not null)
+                    {
+                        <div data-testid="initial-timezone-error" role="alert">@_initialTimezoneError</div>
+                    }
                     @if (_showTimezoneSelector)
                     {
                         <MudAutocomplete T="TimeZoneInfo"
@@ -247,90 +278,105 @@
                         }
                     </MudButton>
 
-                    @* --- Event Schedule: single-session defaults, multi-session as progressive disclosure. --- *@
-                    <EventOptionsSection Title="Event schedule"
+                    <EventOptionsSection Title="Event program"
                                          TitleId="event-schedule-title"
-                                         Summary="A single scheduled session is created with the event by default."
-                                         PolicyNote="Most events only need one session. Use the multi-session handoff when you need tracks, repeated sessions, or a larger program.">
-                        <EventOptionRow Title="Date and time"
-                                        Icon="@Icons.Material.Filled.Schedule"
-                                        Summary="Publish with one scheduled session."
-                                        Description="Set the main session date and hours before publishing."
-                                        Required="true">
-                            <div class="create-event__schedule-grid">
-                                <MudDatePicker Label="Event date"
-                                               Date="@_inlineSessionDate"
-                                               DateChanged="@((DateTime? value) => _inlineSessionDate = value)"
-                                               Required="true"
-                                               Variant="Variant.Outlined"
-                                               Margin="Margin.Dense" />
-
-                                <MudTimePicker Label="Start time"
-                                               Time="@_inlineSessionStartTime"
-                                               TimeChanged="@((TimeSpan? value) => _inlineSessionStartTime = value)"
-                                               Required="true"
-                                               Variant="Variant.Outlined"
-                                               Margin="Margin.Dense" />
-
-                                <MudTimePicker Label="End time"
-                                               Time="@_inlineSessionEndTime"
-                                               TimeChanged="@((TimeSpan? value) => _inlineSessionEndTime = value)"
-                                               Required="true"
-                                               Variant="Variant.Outlined"
-                                               Margin="Margin.Dense" />
-                            </div>
-                        </EventOptionRow>
-
-                        <EventOptionRow Title="Location"
-                                        Icon="@Icons.Material.Filled.Place"
-                                        Summary="@(GetLookupName(locations, _inlineSessionLocationId) ?? "Choose a location")"
-                                        Description="Attach the primary place for this single-session event.">
-                            <MudSelect T="Guid?"
-                                       Label="Location"
-                                       Value="@_inlineSessionLocationId"
-                                       ValueChanged="@((Guid? value) => _inlineSessionLocationId = value)"
-                                       Variant="Variant.Text"
-                                       Margin="Margin.Dense"
-                                       AnchorOrigin="Origin.BottomCenter"
-                                       Class="create-event__option-select">
-                                <MudSelectItem T="Guid?" Value="@(null)">No location yet</MudSelectItem>
-                                @if (locations != null)
+                                         Summary="@ProgramSummary"
+                                         PolicyNote="Prepare sessions here without saving a parent first. Draft items can remain unscheduled; publishing validates the entire program.">
+                        <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="sr-only">Prepared program</MudText>
+                        @if (_programServerErrors.Count > 0)
+                        {
+                            <ul data-testid="program-server-errors">
+                                @foreach (var error in _programServerErrors)
                                 {
-                                    @foreach (var location in locations.Where(l => l.Id.HasValue))
-                                    {
-                                        <MudSelectItem T="Guid?" Value="@location.Id">@location.FullName</MudSelectItem>
-                                    }
+                                    <li>@error</li>
                                 }
-                            </MudSelect>
-                        </EventOptionRow>
-
-                        <EventOptionRow Title="Capacity"
-                                        Icon="@Icons.Material.Filled.Groups"
-                                        Summary="@(_inlineSessionCapacity is > 0 ? $"Up to {_inlineSessionCapacity} attendees" : "No capacity limit")"
-                                        Description="Optional single-session attendee cap.">
-                            <MudNumericField T="int?"
-                                             Label="Capacity"
-                                             Value="@_inlineSessionCapacity"
-                                             ValueChanged="@((int? value) => _inlineSessionCapacity = value)"
-                                             Variant="Variant.Text"
-                                             Margin="Margin.Dense"
-                                             Min="1"
-                                             Placeholder="Optional"
-                                             Class="create-event__option-select" />
-                        </EventOptionRow>
-
-                        <EventOptionRow Title="Multi-session event?"
-                                        Icon="@Icons.Material.Filled.AccountTree"
-                                        Summary="Save a draft and open the session composer."
-                                        Description="Use this only for events with multiple talks, tracks, workshops, or repeated sessions.">
-                            <MudButton Elevation="0" StartIcon="@Icons.Material.Filled.Add"
-                                       Variant="Variant.Text"
-                                       Color="Color.Primary"
-                                       OnClick="AddSessionAsync"
-                                       Disabled="@_submitState.IsSubmitting">
-                                Set up multiple sessions
-                            </MudButton>
-                        </EventOptionRow>
+                            </ul>
+                        }
+                        <ScheduleTimelineComposer Sessions="@sessions"
+                                                  TimezoneDisplay="@_selectedTimezoneDisplay"
+                                                   Disabled="@(_submitState.IsSubmitting || createdEventId != Guid.Empty || _programEdit is not null || _initialTimezoneError is not null)"
+                                                  OnAddSession="AddSessionAsync"
+                                                  OnAddItineraryItem="AddSessionToDayAsync"
+                                                  OnEditSession="EditSessionAsync"
+                                                  OnDuplicateSession="DuplicateSession"
+                                                  OnRemoveSession="RemoveSession"
+                                                  OnMoveSession="MoveSession" />
+                        @if (_programEdit is not null)
+                        {
+                            <section id="local-program-editor" aria-labelledby="local-program-title" class="mt-4">
+                                <MudText Typo="Typo.subtitle2" HtmlTag="h3" id="local-program-title">
+                                    @(_editingLocalId.HasValue ? "Edit prepared program item" : "Prepare program item")
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mb-2">
+                                    Dates use @_selectedTimezone.Id. Leave all date and time fields empty for an unscheduled draft item.
+                                </MudText>
+                                @if (_programEditError is not null)
+                                {
+                                    <MudAlert Severity="Severity.Error" aria-live="assertive">@_programEditError</MudAlert>
+                                }
+                                <MudSelect T="SessionEndTimeType" Label="Session ending"
+                                           Value="@_programEdit.EndTimeType" ValueChanged="OnLocalEndTypeChanged"
+                                           Variant="Variant.Outlined" Class="mb-2">
+                                    <MudSelectItem T="SessionEndTimeType" Value="@SessionEndTimeType.Fixed">Fixed end</MudSelectItem>
+                                    <MudSelectItem T="SessionEndTimeType" Value="@SessionEndTimeType.OpenEnded">Open ended</MudSelectItem>
+                                    @if (_programEdit.EndTimeType == SessionEndTimeType.RelativeToPrayer)
+                                    {
+                                        <MudSelectItem T="SessionEndTimeType" Value="@SessionEndTimeType.RelativeToPrayer">Existing prayer-relative end</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <EventSessionForm FormGridClass="d-flex flex-column gap-3"
+                                                  TimeGridClass="d-flex flex-wrap gap-3"
+                                                  Title="@_programEdit.Title" TitleChanged="@(value => _programEdit.Title = value)"
+                                                  Description="@_programEdit.Description" DescriptionChanged="@(value => _programEdit.Description = value)"
+                                                  SessionDate="@_programStartDate" SessionDateChanged="@(value => _programStartDate = value)"
+                                                  EndDate="@_programEndDate" EndDateChanged="@(value => _programEndDate = value)"
+                                                  StartTime="@_programStartTime" StartTimeChanged="@(value => _programStartTime = value)"
+                                                  EndTime="@_programEndTime" EndTimeChanged="@(value => _programEndTime = value)"
+                                                  AllowUnscheduled="true" IsOpenEnded="@(_programEdit.EndTimeType == SessionEndTimeType.OpenEnded)"
+                                                  LocationId="@_programEdit.LocationId" LocationIdChanged="OnLocalLocationChanged"
+                                                  RoomId="@_programEdit.RoomId" RoomDisabled="true"
+                                                  ProgramSectionDisabled="true"
+                                                  Capacity="@_programEdit.MaxAudienceAttendees" CapacityChanged="@(value => _programEdit.MaxAudienceAttendees = value)"
+                                                  RegistrationModeId="@_programEdit.RegistrationModeId" RegistrationModeIdChanged="@(value => _programEdit.RegistrationModeId = value)">
+                                    <LocationOptions>
+                                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">Uses event location</MudSelectItem>
+                                        @foreach (var location in locations ?? [])
+                                        {
+                                            <MudSelectItem T="Guid?" Value="@location.Id">@location.FullName</MudSelectItem>
+                                        }
+                                    </LocationOptions>
+                                    <RoomOptions>
+                                        <MudSelectItem T="Guid?" Value="@_programEdit.RoomId">@(_programEdit.RoomId.HasValue ? "Retained selected room" : "Assign rooms after saving")</MudSelectItem>
+                                    </RoomOptions>
+                                    <ProgramSectionOptions>
+                                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">Manage sections after saving</MudSelectItem>
+                                    </ProgramSectionOptions>
+                                    <RegistrationModeOptions>
+                                        @foreach (var mode in registrationModes ?? [])
+                                        {
+                                            <MudSelectItem T="int?" Value="@mode.Id">@mode.FullName</MudSelectItem>
+                                        }
+                                    </RegistrationModeOptions>
+                                </EventSessionForm>
+                                <MudSelect T="int" Label="Session languages" MultiSelection="true"
+                                           SelectedValues="@_programEdit.LanguageIds"
+                                           SelectedValuesChanged="@(values => _programEdit.LanguageIds = Array.AsReadOnly(values.ToArray()))"
+                                           Variant="Variant.Outlined" Class="mt-3">
+                                    @foreach (var language in languages ?? [])
+                                    {
+                                        @if (language.Id.HasValue)
+                                        {
+                                            <MudSelectItem T="int" Value="@language.Id.Value">@language.FullName</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect>
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <MudButton ButtonType="ButtonType.Button" data-testid="program-save" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SaveLocalSessionAsync(false))">Save program item</MudButton>
+                                    <MudButton ButtonType="ButtonType.Button" data-testid="program-save-another" Variant="Variant.Outlined" OnClick="@(() => SaveLocalSessionAsync(true))">Save and add another</MudButton>
+                                    <MudButton ButtonType="ButtonType.Button" data-testid="program-cancel" Variant="Variant.Text" OnClick="CancelLocalSessionAsync">Cancel</MudButton>
+                                </div>
+                            </section>
+                        }
                     </EventOptionsSection>
                     <div class="sr-only" aria-live="polite" aria-atomic="true">@_programAnnouncement</div>
 
@@ -622,7 +668,7 @@
                         <EventOptionRow Title="Languages"
                                         Icon="@Icons.Material.Filled.Translate"
                                         Summary="Set per session"
-                                        Description="Language hints are now configured on the dedicated session composer so each program item can differ."
+                                        Description="Language hints are configured on each prepared program item."
                                         Disabled="true" />
                     </EventOptionsSection>
 

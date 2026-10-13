@@ -3,6 +3,22 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-12
+
+- **Breaking: native draft program schedule nullability.** Nested event-creation
+  sessions accept absent `StartTime` and `EndTime` for genuine unscheduled
+  drafts. Metadata and valid graph references persist; no date, day or public
+  occurrence is invented. Fixed scheduled entries require a valid pair;
+  OpenEnded remains start-only and prayer-relative rules remain authoritative.
+- Publishing with any unscheduled nested entry rejects before rollups/writes.
+  Validation retains session index/property paths in ProblemDetails. Existing
+  tenant-qualified references, initial owner assignment and serializable
+  graph/publication-outbox persistence remain the authority.
+- Deploy the regenerated API/client contracts together. No database migration
+  is introduced. Once nullable drafts are stored, do not downgrade to code
+  that assumes every session has a start, erase retained programs, or
+  automatically retry an uncertain creation response.
+
 ## 2026-10-06
 
 - Tenant-owned external API-key creation without a resolved trusted tenant now

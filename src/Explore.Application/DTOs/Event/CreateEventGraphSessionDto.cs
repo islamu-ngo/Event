@@ -11,7 +11,7 @@ public sealed record CreateEventGraphSessionDto
     public string? TempKey { get; init; }
     public string? DayTempKey { get; init; }
     public string? RoomTempKey { get; init; }
-    public DateTimeOffset StartTime { get; init; }
+    public DateTimeOffset? StartTime { get; init; }
     public DateTimeOffset? EndTime { get; init; }
     public SessionEndTimeType EndTimeType { get; init; } = SessionEndTimeType.Fixed;
     public Guid? LocationId { get; init; }

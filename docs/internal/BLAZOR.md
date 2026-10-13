@@ -475,10 +475,138 @@ Event detail and profile surfaces are HAL-driven management views:
 1. `EventService.GetEventByIdAsync` tries public detail first. If the public route returns `404` for a hidden/moderated event, it falls back to authenticated `GetEventManagementDetailsAsync`; `401`, `403`, and `404` on the management route still fail closed.
 2. Actor profile event lists merge public actor events with `GetManagedEventsByActorAsync` results when the current principal is authorized. Managed duplicates win so status and HAL data stay authoritative.
 3. Event topbar actions must read link relations from the event DTO. Light moderation uses `moderate-light`, heavy redaction uses `moderate-heavy`, reversible restore uses `unmoderate`, and safe audit history uses `moderation-history`.
-4. Event session reads default to the anonymous-safe public program route. Management views may pass `includeManagedSessions: true` to `EventService.GetSessionsByEventAsync` only from a server-provided HAL management context; the service then merges public sessions with the authorized management collection and falls back to public data on `401`, `403`, or `404`.
+4. Event session reads default to the anonymous-safe public program route. Management views pass `includeManagedSessions: true` to `IEventSessionService.GetSessionsByEventAsync` only from a current server-provided HAL management context. That branch reads only the managed collection and returns no sessions on `401`, `403`, or `404`; it never merges or falls back to public program data.
 5. The Blazor service exposes explicit `ModerateEventLightAsync`, `ModerateEventHeavyAsync`, and `UnmoderateEventAsync` methods. Do not reintroduce a generic `ModerateEventAsync` compatibility alias; the API contract intentionally split light and heavy semantics.
 6. Moderated event cards and sidebars may show a red/error "Moderated" state only after the API returned the authorized management DTO. Public visitors should not receive moderated event data at all.
 7. Heavy redaction is destructive and must require explicit user confirmation in UI before calling the API. The API remains authoritative for redaction, deletion, notification, and authorization outcomes.
+
+### Canonical Studio Event Workspace
+
+Resource management uses the audience collection's `manage-resources` relation
+for both Overview actions and direct-route mounting. The event's public
+`resources` relation is not management authority. Collection results are
+accepted only for the captured current event/context generation. After a
+confirmed details save, the editor clears its old resource before reading fresh
+authority; denied or non-editable responses cannot revive the form. The saved
+receipt and workspace link remain outside that form.
+
+An initial proposal with an unavailable timezone retains its original session
+instants and metadata without converting them through a guessed timezone.
+Program editing and submission remain blocked until an explicit valid-zone
+selection reprojects those instants. Explicit graph days require unique local
+dates; duplicate dates return indexed `Days[index].LocalDate` validation before
+graph persistence rather than losing an admitted temp-key reference.
+
+Both confirmed Draft and Publish creation outcomes navigate to
+`/studio/events/{eventId}`. `Routes.razor` contains the actual Blazouter
+`RouteConfig` registrations; page attributes alone do not register these
+routes. The root renders `StudioEventOverview`, while `/details` reuses
+`EventEdit` for event details and appearance. Persisted session composers live
+at `/studio/events/{eventId}/sessions/create` and
+`/studio/events/{eventId}/sessions/{sessionId}/edit`, returning to `/schedule`
+after saving. `/resources` and `/analytics` are registered contextual modules;
+analytics means governed **Answer analytics**, not a general event report.
+Creation at `/events/create` and public session detail remain independent.
+The old edit/session management URLs, `/event-created/{eventId}` and redundant
+`/publication` destination have no aliases.
+
+The Overview consumes current `StudioEventContextState.Event`, the managed
+program summary, managed session collection and advertised publish-readiness
+contract. Program items and server warnings are rendered by the existing
+`EventProgramSummaryView`; each session's own `edit` relation gates its editor
+link. Readiness and publication use `publish-readiness` and `publish`, including
+the current concurrency stamp. Server HTTP links establish authority; browser
+links are explicitly mapped to canonical Studio routes. Public program links
+do not authorize a managed read, and failed managed reads never substitute a
+public program.
+
+`StudioEventShell` subscribes to context changes and reads the current resource
+instead of retaining a local DTO. Force reload and auth invalidation clear old
+authority immediately. Generation-keyed Overview, resources and analytics
+content is disposed when that authority changes. Overview sub-loads and publish
+callbacks compare the captured event and generation before accepting results;
+analytics additionally fences form/version requests. Cancellation bounds
+component lifetime but does not replace generation acceptance. The new
+Overview and canonical session content use `InteractiveAuto`; the existing
+shell is not migrated wholesale.
+
+Creation, event details and persisted session forms use native `NavigationLock`
+with browser confirmation for internal transitions. Dirty callbacks cover
+fields and local program edits; a confirmed save clears dirty state before
+navigation. Disposal removes the native registration. Overlapping
+confirmations use the navigation cancellation token, so an obsolete response
+cannot authorize a later destination. External `beforeunload` confirmation is
+advisory and browser-controlled, not a guarantee against process termination.
+Routed tests consume the actual `RouteConfig` list and subscribe to render
+signals before transitions and controlled completion; native interception
+must be verified by the current-binary test gate.
+
+A confirmed save remains saved even when destination navigation fails. The
+page presents a workspace link and does not create again. An unknown creation
+outcome remains a separate retained-input state requiring authoritative
+reconciliation. All events returns to the existing actor-scoped list without
+inventing new portfolio filters or changing active actor selection.
+
+### Inline Event Program Preparation
+
+`CreateEvent` owns the complete local program. Its existing
+`ScheduleTimelineComposer` renders scheduled and unscheduled rows and offers
+keyboard-operable edit, duplicate, remove and move actions.
+Move callbacks identify the adjacent local row within the displayed day group,
+not a direction in the flat list. The parent swaps those identities only when
+their local day matches, preserving dated and unscheduled group boundaries.
+`EventSessionForm` edits an isolated `SessionEditorModel` copy inline. Save replaces the row with
+the same local identity; Save and add another starts an empty editor; Cancel
+discards the copy. Duplicates receive distinct local identities and graph temp
+keys. None of these operations saves a parent, writes a persisted session or
+navigates.
+
+An optional generated `CreateEventDraftRequestDto` initialization input is
+captured once into local parent and session state. Source, AI proposal and
+template-associated rows retain their day/room/location temp references,
+kind, slug, image, template, languages, speakers and Islamic metadata. This
+initialization is not another AI confirmation or execution authority. Changing
+the event's property template does not erase session template metadata.
+
+`CreateEventProgramMapper` is the single submission mapper for both Draft and
+Publish. It snapshots the generated parent graph through the existing AOT
+`AppJsonSerializerContext`, clones each row and its mutable metadata, and emits
+the full generated `Sessions` collection with explicit list-order values.
+Collections are read-only and the submitted graph shares no mutable edit state.
+The generated transport input remains the existing protocol class, not a new
+public DTO. The component does not mutate or replay the submitted snapshot.
+
+Title-only rows retain null schedules. Drafts may have no rows or a mixture of
+scheduled and unscheduled rows; publishing checks every prepared row rather
+than selecting a scheduled subset. Fixed schedules require both instants and
+a later end. Open-ended schedules retain a start without an end. Start and end
+dates are separate, so an overnight interval does not depend on implicit
+rollover. Incomplete date/time pairs stay in the open editor with an error.
+All wall times are converted in the event timezone at submit, including after
+a timezone change. `DateTimeHelper` rejects nonexistent or newly ambiguous
+times, and preserves an unchanged saved ambiguous occurrence's offset.
+Persisted CreateSession/EditSession use the same end-date callbacks and pass
+their selected end date into the existing mapper.
+Their start-date callbacks shift an existing end date by the same whole-day
+interval, preserving explicit overnight duration when moving an item. Changing
+the end date remains an independent edit.
+
+The submission guard runs before form reset or validation, so a pending
+request cannot be replaced by another native form submission. A definite
+rejection keeps parent fields, local rows and indexed server errors available
+for correction. A missing response, unexpected server failure or post-send
+cancellation is an unknown save outcome: input remains, and this page disables
+creation rather than assuming rollback or automatically replaying. The
+existing managed-event list opens separately for authoritative reconciliation;
+there is no local reset or guessed verification that re-enables creation.
+
+A confirmed event ID is recorded before navigating. If navigation fails, the
+page still reports a saved event and exposes the existing destination link;
+another create is blocked. Both draft and published saves enter that event's
+canonical Studio Overview at `/studio/events/{eventId}`. The standalone
+EventCreated destination has been removed. Local keys and navigation links grant no
+server permission; existing provenance, native authorization and HAL
+affordances remain authoritative.
 
 ### AI Assistant Client Surface
 

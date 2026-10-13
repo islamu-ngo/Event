@@ -72,6 +72,30 @@ unverified and must not be inferred from the RTL toggle.
 
 ## Platform Rules
 
+### Canonical Studio Workspace And Unsaved Forms
+
+The event shell supplies the page title and single H1; Overview uses section
+headings beneath it, native links for canonical destinations and status regions
+for current readiness/save outcomes. Server warning fields and messages remain
+associated in the same list item. Overview actions use translation-service
+keys with readable fallbacks, and its scoped layout uses logical spacing so
+Arabic direction does not reorder the control flow.
+
+Native `NavigationLock` confirmations do not replace or reset the edited form
+when the visitor chooses Stay. The native browser confirmation preserves its
+own focus lifecycle; the page keeps the same field and value. Successful saves
+clear the internal guard before returning to the managed workspace. A failed
+navigation after confirmed save leaves a keyboard-operable workspace link in
+a status region, not an action to create the same event again.
+
+The external unload warning is advisory, requires browser support and prior
+interaction, and cannot preserve data through every mobile/process exit.
+Component/routed tests cover field identity, rendered callback behavior,
+headings, translated action names and RTL semantics. They do not certify
+native browser focus restoration, screen-reader output, zoom/reflow or all
+unload behavior. Keep those runtime/manual checks explicitly unverified when
+the workstream does not run a live browser.
+
 ### PR-1: Page Shell Contract
 
 Every page rendered through `MainLayout` automatically gets these accessibility features:

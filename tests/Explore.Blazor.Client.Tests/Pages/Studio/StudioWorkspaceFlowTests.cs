@@ -192,6 +192,31 @@ public sealed class StudioWorkspaceFlowTests : IDisposable
     }
 
     [Test]
+    [Arguments("Visibility")]
+    [Arguments("Audience gender")]
+    [Arguments("Audience age group")]
+    [Arguments("Registration policy")]
+    [Arguments("Event type")]
+    [Arguments("Madhab")]
+    public async Task ActualRouter_SelectorOnlyDetailsChange_StayRetainsEditor(string selectorName)
+    {
+        _ctx.JSInterop.Setup<bool>("confirm", _ => true).SetResult(false);
+        var router = await OpenRouteAsync($"/studio/events/{_eventId}/details", "form");
+        var editor = router.FindComponent<EventEdit>();
+        var selector = editor.FindComponents<MudSelect<int?>>()
+            .Single(component => component.Instance.UserAttributes?["aria-label"] as string == selectorName);
+        await editor.InvokeAsync(() => selector.Instance.ValueChanged.InvokeAsync((int?)2));
+
+        await router.InvokeAsync(() => _navigation.NavigateAsync($"/studio/events/{_eventId}"));
+
+        await Assert.That(_navigation.ToBaseRelativePath(_navigation.Uri)).IsEqualTo($"studio/events/{_eventId}/details");
+        await Assert.That(router.FindComponent<EventEdit>().Instance).IsSameReferenceAs(editor.Instance);
+        await Assert.That(router.FindComponent<EventEdit>().FindComponents<MudSelect<int?>>()
+            .Single(component => component.Instance.UserAttributes?["aria-label"] as string == selectorName)
+            .Instance.Value).IsEqualTo(2);
+    }
+
+    [Test]
     public async Task CanonicalRouteConfig_RegistersManagementAndKeepsPublicEntryIndependent()
     {
         var routes = ActualRoutes();

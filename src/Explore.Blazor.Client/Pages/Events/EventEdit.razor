@@ -231,7 +231,7 @@
                                         Summary="@VisibilitySummary"
                                         Description="Controls who can discover this event."
                                         Required="true">
-                            <MudSelect T="int?" @bind-Value="updateDto.VisibilityTypeId"
+                            <MudSelect T="int?" @bind-Value="updateDto.VisibilityTypeId" @bind-Value:after="MarkDirty"
                                        Variant="Variant.Text" Margin="Margin.Dense"
                                        AnchorOrigin="Origin.BottomCenter"
                                        Class="edit-event__option-select"
@@ -251,7 +251,7 @@
                                         Summary="@AudienceSummary"
                                         Description="Audience filters make expectations visible before publishing.">
                             <div class="edit-event__option-editor-group">
-                                <MudSelect T="int?" @bind-Value="updateDto.AudienceGenderId"
+                                <MudSelect T="int?" @bind-Value="updateDto.AudienceGenderId" @bind-Value:after="MarkDirty"
                                            Variant="Variant.Text" Margin="Margin.Dense"
                                            AnchorOrigin="Origin.BottomCenter"
                                            Class="edit-event__option-select"
@@ -266,7 +266,7 @@
                                         }
                                     }
                                 </MudSelect>
-                                <MudSelect T="int?" @bind-Value="updateDto.AudienceAgeId"
+                                <MudSelect T="int?" @bind-Value="updateDto.AudienceAgeId" @bind-Value:after="MarkDirty"
                                            Variant="Variant.Text" Margin="Margin.Dense"
                                            AnchorOrigin="Origin.BottomCenter"
                                            Class="edit-event__option-select"
@@ -288,7 +288,7 @@
                                         Icon="@Icons.Material.Filled.Policy"
                                         Summary="@RegistrationSummary"
                                         Description="Use this for RSVP flow. Capacity stays on each saved program item.">
-                            <MudSelect T="int?" @bind-Value="updateDto.RegistrationPolicyId"
+                            <MudSelect T="int?" @bind-Value="updateDto.RegistrationPolicyId" @bind-Value:after="MarkDirty"
                                        Variant="Variant.Text" Margin="Margin.Dense"
                                        AnchorOrigin="Origin.BottomCenter"
                                        Class="edit-event__option-select"
@@ -309,7 +309,7 @@
                                         Icon="@Icons.Material.Filled.Category"
                                         Summary="@EventTypeSummary"
                                         Description="Determines relevant templates and classification defaults.">
-                            <MudSelect T="int?" @bind-Value="updateDto.EventTypeId"
+                            <MudSelect T="int?" @bind-Value="updateDto.EventTypeId" @bind-Value:after="MarkDirty"
                                        Variant="Variant.Text" Margin="Margin.Dense"
                                        AnchorOrigin="Origin.BottomCenter"
                                        Class="edit-event__option-select"
@@ -329,7 +329,7 @@
                                         Icon="@Icons.Material.Filled.Mosque"
                                         Summary="@MadhabSummary"
                                         Description="Optional event-level madhab signal. More Islamic scheduling details are added from the detail page.">
-                            <MudSelect T="int?" @bind-Value="updateDto.MadhabId"
+                            <MudSelect T="int?" @bind-Value="updateDto.MadhabId" @bind-Value:after="MarkDirty"
                                        Variant="Variant.Text" Margin="Margin.Dense"
                                        AnchorOrigin="Origin.BottomCenter"
                                        Clearable="true"

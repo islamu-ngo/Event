@@ -1,6 +1,6 @@
 # Studio Authorized Portfolio — Deferred Delivery Contract
 
-Last Updated: 2026-10-12 Europe/Brussels
+Last Updated: 2026-10-13 Europe/Brussels
 
 > **Status:** Backlog; preserved user scope, not implementation approval.
 > **Origin:** Studio event workspace r1, narrowed by CTO review r2.
@@ -240,6 +240,74 @@ tests/Event.API.IntegrationTests/Features/StudioAttendeeScopeHttpTests.cs
 ```
 
 - Commit paths: changed E/N, changed G and exact native fragment. A single query/UI outcome stays together; do not also redesign orders, admission scanner, transfers or form answers.
+
+## Deferred delivery phase — Paged Orders Across Authorized Events — DEFERRED
+
+This is the third portfolio PR promised above, not an extension of the current creation/workspace implementation. It depends on the complete scope resolver and event portfolio delivery, and follows the attendee PR for independent review. All tasks, commands and commit metadata below remain deferred until separate activation; assign fresh executable phase/commit labels then. The existing event and attendee packet numbers remain historical.
+
+- [ ] **Specify order scope/privacy anchors and verify Red on incomplete or stale order reads after activation.**
+  - Files: proposed `StudioOrderQueryTests` and immutable native query criteria; bind exact existing backend owners through graph-first discovery before editing.
+  - Acceptance: S-SCOPE-2,4–5. Cover more than 100 events, overlapping actor/team grants, disjoint management/participant/order permissions, tenant/actor/event spoofing, denied rows/totals, provider outage and late prior-scope results. Preserve purchaser versus participant semantics and existing contact-sharing authority; assert returned data/errors, not mock call counts.
+  - Ring 1 (deferred): `rtk dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --no-build -- --treenode-filter "/*/*/*StudioOrderQueryTests/*"`.
+  - Effort: M; dependency: complete event scope delivery; guidance: auth/privacy/CQS and existing order-read authority.
+
+- [ ] **Implement the native authorized paged order read and verify scope/privacy anchors Green after activation.**
+  - Files: proposed `GetStudioOrdersQuery` / handler, immutable Studio order criteria and row/page DTOs, existing entity-returning order repository, private Studio API/HAL registration and generated contracts.
+  - Acceptance: evaluate order authority separately before count/page; deduplicate the complete tenant-qualified authorized scope. Apply event/actor, existing status and bounded search filters server-side; default page25/max100 and deterministic ordering with order UUID tie-breaker. Preserve globally ordered pages and distinct totals across provider parameter limits, accurate currencies/status snapshots, private no-store replies, cancellation and response-boundary permission revalidation. Refuse incomplete scope with explicit ProblemDetails under the existing ten-second deadline; no truncated totals or browser fan-out.
+  - Effort: L; dependency: order scope/privacy anchors; guidance: native providers/EF/CQS/HAL. No new refund or payment transitions, reporting store or assumed schema migration.
+
+- [ ] **Replace global order fan-out and verify generation-safe actor/event/filter changes after activation.**
+  - Files: `StudioOrders.razor`, `StudioOrderList.razor`, `StudioContextService.cs`, its existing interface, `StudioOrdersTests.cs` and public/internal docs.
+  - Acceptance: one server-paged portfolio read replaces first-100 event loading and per-event order requests. Reset paging, cancel prior loads, clear old rows immediately and ignore stale generations. Preserve distinct empty/loading/error/unavailable states and localized keyboard-accessible filters/table. Per-order/event actions use actual HAL capabilities; portfolio read access grants no refund capability.
+  - Effort: M; dependency: native paged order read; scenarios: S-SCOPE-5, S-SPACE-5, S-UX-1; guidance: Blazor/HAL/accessibility.
+
+### Deferred orders gate — verify the owning PR before executing its packet
+
+- [ ] After activation, run the client Release build and verify regenerated private order query contracts compile.
+- [ ] Run `rtk dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*StudioOrderQueryTests/*"` and verify complete order-authorized scope, denied totals and provider-unavailable outcomes.
+- [ ] Run the owning order query's selected-provider and HTTP contract gate, then its final affected provider matrix before PR creation. Include greater-than-100 completeness, parameter-limit-safe count/page ordering and unauthorized direct requests; do not defer these proofs to the separate reporting workstream.
+- [ ] Verify client actor/filter/event-change regressions, record the agreed cold/warm latency and query-count measurements, and settle API/generated contracts, UI, public/internal docs, refreshed I-VSD mapping and release evidence together.
+- [ ] Execute only the activated orders packet with independently reviewed owned changes; this backlog correction grants no implementation or commit approval.
+
+### Deferred orders packet — one vertical cross-event order-read outcome
+
+- Type/scope/title (proposed): `feat(registration): page orders across authorized events`
+- Description: `Organizers can search and page the complete order-authorized event portfolio without first-page event truncation or browser order fan-out. Resolve native order authority before globally ordered paging and totals, preserve current contact rights and currency/status context, and discard results from old actor or event scopes. Existing refund capabilities remain separate.`
+- Changelog: public feature/privacy/API; native fragment required upon activation.
+- Trailers: native `Change-Id` footer allocated with the fragment upon activation; no identifier is reserved here.
+- Message override: Not overridden.
+- Existing paths (E), retained from the verified ownership evidence above:
+
+```text
+src/Explore.Blazor.Client/Pages/Studio/StudioOrders.razor
+src/Explore.Blazor.Client/Pages/Studio/StudioOrderList.razor
+src/Explore.Blazor.Client/Services/StudioContextService.cs
+src/Explore.Blazor.Client/Contracts/Services/IStudioContextService.cs
+tests/Explore.Blazor.Client.Tests/Pages/Studio/StudioOrdersTests.cs
+src/Explore.API/Controllers/StudioController.cs
+src/Explore.API/Hateoas/Policies/StudioContextLinkPolicy.cs
+src/Explore.API/Hateoas/RouteNames.cs
+src/Explore.API/OpenApi/HalOpenApiSchemaCatalog.cs
+docs/internal/API.md
+docs/internal/API_CHANGELOG.md
+docs/internal/BLAZOR.md
+docs/public/documentation/readme/events-and-ticketing/studio-workspace.md
+docs/public/documentation/readme/events-and-ticketing/ticketing-and-check-in.md
+```
+
+- Proposed new paths (N), to confirm during activation rather than claiming existing implementation:
+
+```text
+src/Explore.Application/Specifications/Registration/StudioOrderQuerySpecification.cs
+src/Explore.Application/DTOs/Studio/StudioOrderQueryDto.cs
+src/Explore.Application/Features/Studio/Requests/Queries/GetStudioOrdersQuery.cs
+src/Explore.Application/Features/Studio/Handlers/Queries/GetStudioOrdersQueryHandler.cs
+tests/Event.Application.UnitTests/Features/Studio/StudioOrderQueryTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/StudioOrderQueryProviderTests.cs
+tests/Event.API.IntegrationTests/Features/StudioOrderScopeHttpTests.cs
+```
+
+- Commit paths: activated changed E/N, exact existing registration order read/query/entity repository owners bound by graph-first discovery, changed G and the exact generated native fragment. Keep this query/API/UI outcome together without redesigning refunds, payment transitions, refund campaigns, admission or contact sharing.
 
 ## I-VSD and scope limits
 

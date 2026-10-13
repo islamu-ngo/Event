@@ -466,6 +466,60 @@ public sealed class CreateEventProgramComposerTests : IDisposable
     }
 
     private IRenderedComponent<CreateEvent> Render() => _ctx.RenderMudComponent<CreateEvent>();
+
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task ImportedSession_ChangedVenueDropsCompetingLocationAndRoomReferences(bool graphVenue, bool eventDefault)
+    {
+        var originalLocationId = Guid.CreateVersion7();
+        var selectedLocationId = eventDefault ? (Guid?)null : Guid.CreateVersion7();
+        var originalRoomId = Guid.CreateVersion7();
+        var parent = Parent();
+        parent.Sessions = [new CreateEventGraphSessionDto
+        {
+            TempKey = "imported-session", Title = "Imported session",
+            LocationId = graphVenue ? null : originalLocationId,
+            LocationTempKey = graphVenue ? "imported-venue" : null,
+            RoomId = graphVenue ? null : originalRoomId,
+            RoomTempKey = graphVenue ? "imported-room" : null
+        }];
+        if (graphVenue)
+        {
+            parent.Locations = [new CreateEventLocationDto
+            {
+                TempKey = "imported-venue", FullName = "Imported venue", Address = "Test address",
+                Postcode = "1000", Country = "BE", City = "Test city", Timezone = "UTC"
+            }];
+            parent.Rooms = [new CreateEventRoomDto
+            {
+                TempKey = "imported-room", LocationTempKey = "imported-venue", Name = "Imported room"
+            }];
+        }
+        var cut = _ctx.RenderMudComponent<CreateEvent>(parameters => parameters.Add(component => component.InitialDraft, parent));
+        var localId = Timeline(cut).Instance.Sessions.Single().LocalId;
+        await cut.InvokeAsync(() => Timeline(cut).Instance.OnEditSession.InvokeAsync(localId));
+        await cut.InvokeAsync(() => cut.FindComponent<EventSessionForm>().Instance.LocationIdChanged.InvokeAsync(selectedLocationId));
+        await cut.Find("[data-testid='program-save']").ClickAsync(new MouseEventArgs());
+        var submission = cut.Find("button.create-event__draft-button").ClickAsync(new MouseEventArgs());
+        var sent = await _handler.Started.Task.WaitAsync(Timeout);
+        _handler.Response.SetResult(new HttpResponseMessage(HttpStatusCode.Created)
+        {
+            Content = JsonContent.Create(new BaseCommandResponseOfGuid { Success = true, Id = CreatedId })
+        });
+        await submission.WaitAsync(Timeout);
+
+        var saved = sent.Sessions!.Single();
+        await Assert.That(saved.LocationId).IsEqualTo(selectedLocationId);
+        await Assert.That(saved.LocationTempKey).IsNull();
+        await Assert.That(saved.RoomId).IsNull();
+        await Assert.That(saved.RoomTempKey).IsNull();
+        await Assert.That(parent.Sessions.Single().RoomId).IsEqualTo(graphVenue ? null : originalRoomId);
+        await Assert.That(parent.Sessions.Single().LocationTempKey).IsEqualTo(graphVenue ? "imported-venue" : null);
+    }
+
     private static IRenderedComponent<ScheduleTimelineComposer> Timeline(IRenderedComponent<CreateEvent> cut) =>
         cut.FindComponent<ScheduleTimelineComposer>();
     private static IRenderedComponent<MudTextField<string>> EventTitle(IRenderedComponent<CreateEvent> cut) =>

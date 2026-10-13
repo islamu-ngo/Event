@@ -333,7 +333,7 @@
                                                   StartTime="@_programStartTime" StartTimeChanged="@(value => _programStartTime = value)"
                                                   EndTime="@_programEndTime" EndTimeChanged="@(value => _programEndTime = value)"
                                                   AllowUnscheduled="true" IsOpenEnded="@(_programEdit.EndTimeType == SessionEndTimeType.OpenEnded)"
-                                                  LocationId="@_programEdit.LocationId" LocationIdChanged="@(value => _programEdit.LocationId = value)"
+                                                  LocationId="@_programEdit.LocationId" LocationIdChanged="OnLocalLocationChanged"
                                                   RoomId="@_programEdit.RoomId" RoomDisabled="true"
                                                   ProgramSectionDisabled="true"
                                                   Capacity="@_programEdit.MaxAudienceAttendees" CapacityChanged="@(value => _programEdit.MaxAudienceAttendees = value)"

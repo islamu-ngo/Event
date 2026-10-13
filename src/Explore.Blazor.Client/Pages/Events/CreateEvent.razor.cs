@@ -931,6 +931,16 @@ public partial class CreateEvent : IDisposable
         await AccessibilityFocusService.RestoreFocusAsync(".schedule-timeline__footer button");
     }
 
+    private void OnLocalLocationChanged(Guid? value)
+    {
+        if (_programEdit is null || (_programEdit.LocationId == value
+            && string.IsNullOrWhiteSpace(_programEdit.LocationTempKey))) return;
+        _programEdit.LocationId = value;
+        _programEdit.LocationTempKey = null;
+        _programEdit.RoomId = null;
+        _programEdit.RoomTempKey = null;
+    }
+
     private void OnLocalEndTypeChanged(SessionEndTimeType value)
     {
         if (_programEdit is null) return;

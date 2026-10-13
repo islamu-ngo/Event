@@ -143,6 +143,53 @@ public sealed partial class NativeEventProgramHttpTests
     }
 
     [Test]
+    public async Task SqliteCreationGraph_ChangedImportedVenuePersistsSelectedLocationWithoutOriginalRoom()
+    {
+        await using var factory = await ProgramFactory.CreateAsync(useSqlite: true);
+        using var owner = factory.Client(factory.OwnerId);
+        var selectedLocationId = Guid.CreateVersion7();
+        using (var setup = factory.Services.CreateScope())
+        {
+            setup.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
+            var setupDb = setup.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var original = await setupDb.Locations.AsNoTracking().SingleAsync(row => row.Id == factory.LocationId);
+            var selected = new Location
+            {
+                Id = selectedLocationId, TenantId = original.TenantId, Tenant = null!,
+                FullName = "Selected existing venue", City = original.City,
+                Country = original.Country, Timezone = original.Timezone
+            };
+            selected.ClassifyAs(LocationKindEnum.CommercialVenue);
+            selected.SetManualAddress("Selected test street", "Selected test postcode");
+            setupDb.Locations.Add(selected);
+            await setupDb.SaveChangesAsync();
+        }
+        var session = GraphSession("Changed venue discussion");
+        session["locationId"] = selectedLocationId;
+        var request = GraphRequest($"Changed imported venue {Guid.CreateVersion7():N}", [session]);
+        request["rooms"] = new[] { new
+        {
+            tempKey = "imported-room", locationId = factory.LocationId, name = "Original room"
+        } };
+
+        using var response = await owner.PostAsJsonAsync("/api/event", request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created)
+            .Because(await response.Content.ReadAsStringAsync());
+        var eventId = (await JsonAsync(response)).GetProperty("id").GetGuid();
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
+        var stored = (await scope.ServiceProvider.GetRequiredService<IEventSessionRepository>()
+            .GetSessionsByEvent(eventId)).Single();
+        await Assert.That(stored.LocationId).IsEqualTo(selectedLocationId);
+        await Assert.That(stored.RoomId).IsNull();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var placement = await db.EventLocations.AsNoTracking().SingleAsync(row => row.Id == stored.EventLocationId);
+        await Assert.That(placement.LocationId).IsEqualTo(selectedLocationId);
+        var originalRoom = await db.LocationRooms.AsNoTracking().SingleAsync(row => row.Name == "Original room");
+        await Assert.That(originalRoom.LocationId).IsEqualTo(factory.LocationId);
+    }
+
+    [Test]
     public async Task SqliteCreationGraph_PublicationWithUnscheduledChildRejectsBeforeAnyGraphWrite()
     {
         await using var factory = await ProgramFactory.CreateAsync(useSqlite: true);

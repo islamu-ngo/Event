@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4TXPK898QYJ0KK7BTBVPKKY
+Title: "Save the newly selected venue for imported program items"
+Type: fix
+Scope: events
+Summary: "Changing a local program item's venue clears competing imported location keys and incompatible room references, so the submitted graph uses the selected venue or event default."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

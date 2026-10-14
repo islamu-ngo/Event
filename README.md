@@ -371,7 +371,9 @@ We appreciate these generally available public-repository tools. They are not pr
 ## ISLAMU Solutions
 
 - [ISLAMU Event][github-repo-link]: Event Platform & Management System.
+- [ISLAMU Configurator][configurator-github-repo-link]: Offline Configuration Preparation Utility.
 - [I-VSD][ivsd-github-repo-link]: Islamic Value Sensitive Design: A Framework for Provider-Mediated Software Solutions
+- [SecretKit][secretkit-repo-link]: Unified secret management SDK for .NET
 
 ## 🙏 Acknowledgement
 
@@ -558,6 +560,8 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [stripe-oneoff-link]: https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200
 [stripe-donation-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201
 
+[configurator-github-repo-link]: https://github.com/islamu-ngo/Configurator
 [ivsd-github-repo-link]: https://github.com/islamu-ngo/Islamic-Value-Sensitive-Design
+[secretkit-repo-link]: https://github.com/islamu-ngo/SecretKit
 
 [cla-link]: legal/CLA.md

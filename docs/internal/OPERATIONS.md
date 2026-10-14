@@ -2469,7 +2469,7 @@ Prepared files are restricted, create-only native artifacts; unsupported output
 hosts fail closed. Do not introduce plaintext stdout, overwrite fallbacks,
 implicit secret custody or a claim that local success certifies Event readiness.
 The bundled source roots are removed; the literal disposition record is
-`eng/configurator/source-cutover-inventory.md`.
+`docs/internal/configurator-source-cutover-inventory.md`.
 
 ## External API Key Operations
 

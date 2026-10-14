@@ -45,7 +45,7 @@ jobs:
 
           is_build_test_ignored() {
             case "$1" in
-              .env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*|eng/configurator/*) return 1 ;;
+              .env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*) return 1 ;;
               schemas/configuration-manifest-v1alpha2.schema.json|schemas/tenant-configuration-package-v1alpha2.schema.json) return 1 ;;
               .agents/*|.claude/*|.codex/*|.copilot/*|.gemini/*|.opencode/*|.repomix/*|.sisyphus/*|.taskmaster/*) return 0 ;;
               _bmad/*|_bmad-output/*) return 0 ;;
@@ -185,7 +185,7 @@ jobs:
                   run_blazor="true"
                   run_arch="true"
                   ;;
-                NuGet.Config|.env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*|eng/configurator/*)
+                NuGet.Config|.env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*|tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/*)
                   run_arch="true"
                   run_setup="true"
                   ;;

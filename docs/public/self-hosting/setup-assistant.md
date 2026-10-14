@@ -17,6 +17,22 @@ The stable Event family is `a4bcfaa6-9979-43e5-b1f5-00d552618cdf`; native and
 browser definitions have the same identity. Reference answers are fictional
 interoperability vectors, not production credentials or approved legal templates.
 
+Event maintains one handwritten public `configurator.yaml`, reviewed against its
+catalogue, secret policy and host contracts. Maintainers use Configurator's portable
+`configurator-integrate` skill and standalone CLI to check, revise and build
+canonical JSON; clients consume the selected compiled `definition.json`.
+The YAML is not automatically generated or kept fresh. `release.json` records
+the selected release metadata; retained receipts do not prove edited source was
+compiled. Digests enable comparison, not publisher authentication, legal approval
+or release promotion. Revision 6 replaces
+traversal field numbers with semantic paths; synthetic answer keys changed, and
+real answer workspaces are not migrated implicitly. The delivery directory contains
+only this YAML source, `definition.json` and `release.json`. Synthetic inputs,
+answers and expected artifacts live under
+`tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`;
+they are test data, not deployment defaults. Event still accepts JSON/dotenv
+artifacts; YAML is only the authoring format.
+
 Configurator's [packaging guide](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/packaging.md)
 owns install/build instructions and host support. Copy the complete package
 directory, including license and third-party notices. CLI, terminal, desktop
@@ -78,20 +94,38 @@ authorized import workflow for promotion.
 
 ## Event shapes, identity and legal drafts
 
-The checked definition declares five generation-only artifacts and a finite
-reference shape. For other tenant/document cardinalities or nullability, Event
-maintainers use the retained exporter with bounded source shapes and a new
-definition revision. The profile supports 1-128 canonical trusted issuer fields
-via `trustedIssuerCount`; this is explicit metadata, not wildcard authority.
+The checked definition declares five generation-only artifacts and a bounded
+reference shape. Tenant row edits within its declared list change answers, not
+the definition revision. Changed document vocabulary, bounds, nullability or
+output policy requires a reviewed source edit and a new canonical revision.
+Trusted issuer fields are finite declarations, not wildcard authority.
 See [Event definition ownership](../../internal/CONFIGURATOR_DEFINITION_EXPORT.md).
 
-The retained Event exporter can prepare an integrity-protected identity manifest:
+Maintainers install the standalone CLI and copy the complete
+`skills/configurator-integrate/` directory from its package or
+[repository](https://github.com/ISLAMU/Configurator/blob/HEAD/skills/configurator-integrate/SKILL.md)
+into their agent's supported skill location. The agent reads Event's public
+configuration code/contracts and authors the supported compact source; it does
+not inspect private answers or launch Event. Confirm the installed v1 command
+and authoring contracts, then use native commands:
 
 ```bash
-dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration Release -- --prepare-identity operator-document.json source-identity.json
+islamu-configurator --help
+islamu-configurator definition --help
+islamu-configurator definition check --source configurator/definitions/islamu-event/configurator.yaml --machine
 ```
 
-It preserves the supplied server revision; it cannot invent target authority.
+For a new integration, `definition init` allocates identity once and requires an
+exact application version. For an existing release, retain its canonical JSON
+and run `definition revise --source PATH --against PRIOR_CANONICAL_JSON` after
+semantic source edits, then `definition build --source PATH`. Build creates an
+immutable revision under `dist/configurator/revisions/` relative to the source.
+Review actual results/digests and exercise complete and incomplete synthetic
+workspaces through the documented artifact commands before distributing a release.
+Fixtures remain test-owned; no current compilation is implied by these recipes.
+
+Export an integrity-protected operator identity through Event's authenticated
+manifest API, not an offline hashing helper.
 The checked generation-only definition is not an identity import request.
 `artifact import` requires a separately admitted import-semantic definition
 that explicitly projects the required target revision field. Do not invent a

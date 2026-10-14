@@ -1,7 +1,7 @@
 # Event configuration preparation and external runtime boundary
 
 > **Status:** External Configurator source cutover
-> **Source Anchors:** `eng/configurator/DefinitionExporter/`, `configurator/definitions/islamu-event/`, `src/Explore.Blazor.Client/Services/SetupLive/`, `src/Explore.Application/Features/ConfigurationManifest/Importing/`, `tests/Event.Architecture.Tests/SetupAssistantArchitectureTests.cs`
+> **Source Anchors:** `configurator/definitions/islamu-event/`, `src/Explore.Blazor.Client/Services/SetupLive/`, `src/Explore.Application/Features/ConfigurationManifest/Importing/`, `tests/Event.Architecture.Tests/SetupAssistantArchitectureTests.cs`
 
 ## External definition handoff
 
@@ -11,12 +11,14 @@ native writer. The seven bundled Event product and focused test roots and their
 engineering generators/release owners are removed. No compatibility alias or
 Event runtime dependency is retained in Configurator.
 
-Event owns `eng/configurator/DefinitionExporter/` and
-`configurator/definitions/islamu-event/`. The exporter references only Domain
-and Wire; environment catalogue/activation metadata, bounded dotenv handling
-and value-safe host diagnostics stay with that owner. Read-only CI checks use
-`--check-local` and `--check-environment`, with exporter-owned provenance.
-See [the exporter contract](CONFIGURATOR_DEFINITION_EXPORT.md) and
+Event owns `configurator/definitions/islamu-event/`. Maintainers install
+Configurator's portable `configurator-integrate` skill, inspect Event's public
+contracts and author one supported compact YAML source. Standalone
+`definition init/check/revise/build` commands allocate identity, admit metadata
+and build immutable public JSON. YAML is author-maintained, not automatically
+generated or refreshed. Independent synthetic fixtures remain test-owned.
+There is no Event-specific exporter or runtime dependency.
+See [the native authoring contract](CONFIGURATOR_DEFINITION_EXPORT.md) and
 [the ADR](adr/ADR-configurator-extraction.md).
 
 Stable family `a4bcfaa6-9979-43e5-b1f5-00d552618cdf`, revision and canonical digest
@@ -30,7 +32,7 @@ explicit new revision. A local registry/launch selector is not remote authority.
 | Owner | Responsibility |
 |---|---|
 | Configurator | Generic definition admission, answer workspace, bounded composition, confidential output, UI and package/native-host evidence |
-| Event exporter | Host-owned metadata, safe reference definitions, canonical receipts and actual host-parser vectors |
+| Event maintainers and tests | Reviewed public authoring source, selected canonical release metadata and independent host-parser vectors |
 | Event Domain/Application/Wire/Persistence | Bootstrap, issuer normalization, settings, identity/legal lifecycle, secret authority, tenant scope, revisions, imports and apply |
 | Event Blazor client | Generated SetupLive API transport, ephemeral capability custody and HAL affordances |
 
@@ -98,12 +100,12 @@ preview. No client invents mutation authority.
 
 ## Retained verification
 
-`SetupAssistantArchitectureTests` now verifies Event schemas, all 21 portability
-registry entries and exclusions, value-free target/revision bindings, exporter
-solution ownership and parsed read-only CI configuration. Portable runtime and
-release assertions moved to Configurator's compiled boundary/package suite.
-`ConfiguredAdministratorBootstrapArchitectureTests` keeps bootstrap invariants
-and now checks the exporter's Domain/Wire-only inward graph.
+Event architecture checks retain schema/portability boundaries, exclusions,
+value-free target/revision bindings and bootstrap invariants. Portable runtime
+and release assertions belong to Configurator's compiled boundary/package suite.
+Neither the definition data nor the skill creates an Event project dependency.
+Native CLI admission/build and Event host tests are separate evidence; retained
+release metadata does not prove edited YAML was compiled.
 
 Wire/generated-contract tests and relocated client security/apply tests remain.
 The retained `test_setup` CI step runs the serial 35-case

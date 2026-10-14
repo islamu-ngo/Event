@@ -128,9 +128,11 @@ packaging coverage belongs to Configurator. Event retains client adapter tests u
 `Explore.Blazor.Client.Tests/SetupLive/`, wire/generated-contract guards,
 bootstrap architecture tests and the serial 35-case
 `SetupLiveAuthoritySecurityTests` API lane with its TRX and optional coverage.
-Exporter checks are scoped to `--check-local` and `--check-environment`; they need
-no sibling runtime assembly. This cutover does not call for a broad suite or
-database-provider matrix; final workstream checks remain parent-owned.
+The integration source is maintained with the portable `configurator-integrate`
+skill and checked/built by the standalone Configurator CLI. Event has no exporter
+gate or sibling runtime assembly dependency. Its native contract tests validate
+synthetic interoperability vectors independently of Configurator compilation.
+This boundary change does not call for a database-provider matrix.
 
 The release-engine `SecurityChangeSelectionTests` exercise the actual native
 predicate consumed by `security-tests.yml`. They preserve existing selections

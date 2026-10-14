@@ -68,8 +68,8 @@ projects and their focused test/release owners are removed from this solution.
 
 | Retained Event owner | Responsibility |
 |---|---|
-| `eng/configurator/DefinitionExporter/DefinitionExporter.csproj` | Event metadata, host-wire reference vectors, `--check-local` and `--check-environment` gates |
-| `configurator/definitions/islamu-event/` | Data-only definition, identity receipt and parser reference artifacts |
+| `configurator/definitions/islamu-event/` | Maintainer-authored data-only YAML, canonical definition and historical release receipt; use the portable `configurator-integrate` skill and standalone Configurator CLI |
+| `tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/` | Synthetic interoperability vectors checked through Event's native contracts |
 | `src/Explore.Blazor.Client/Services/SetupLive/` | Generated API transport and server-issued capability handling |
 | `tests/Explore.Blazor.Client.Tests/SetupLive/` | Relocated adapter security and apply tests |
 | `tests/Event.API.IntegrationTests/Features/SetupLiveAuthoritySecurityTests.cs` | Retained serial 35-case backend authority lane, TRX and optional coverage |

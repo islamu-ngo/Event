@@ -20,25 +20,24 @@ The stored identity must be complete for public disclosure and paid commerce.
 Setup-secret authentication alone does not authorize portability routes.
 
 The JSON manifest contains `apiVersion`, `kind`, `settingKey`, `contentDigest`,
-`revisionHash` and `document`. Event's retained exporter can prepare this wire
-shape from a bounded persisted identity document with its server-generated
-UUIDv7 `operatorId` and `revision`:
-
-```bash
-dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration Release -- --prepare-identity operator-document.json source-identity.json
-dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration Release -- --verify operator-identity source-identity.json
-```
-
-This preserves the supplied revision and computes host-owned content/revision
-hashes. It does not authorize a write or establish legal completeness.
+`revisionHash` and `document`. The authenticated export route supplies Event's
+integrity-protected wire shape with its server-owned identity and revision.
+Configurator does not compute Event identity hashes or allocate server revisions.
+Do not substitute a locally assembled document for the authenticated export.
+Integrity alone does not authorize a write or establish legal completeness.
 The ordinary management API response also contains readiness metadata and is
 not interchangeable with the portable manifest.
 
 Configurator's checked reference definition projects an integrity-protected
-generation-only identity artifact. Changed document structure requires an
-Event-exported definition revision and corresponding answer workspace; arbitrary
+generation-only identity artifact. Changed document structure requires a
+maintainer-authored source edit, a native CLI-built definition revision and a
+corresponding answer workspace; arbitrary
 exports cannot be reverse-mapped into that fixed shape. Generic `--answers`
 proof does not replace Event's wire or semantic checks.
+Maintainers use the portable `configurator-integrate` skill and standalone
+`definition check/revise/build` workflow described in
+[Event definition ownership](../../internal/CONFIGURATOR_DEFINITION_EXPORT.md);
+the YAML remains author-maintained and synthetic fixtures remain test-owned.
 
 ## Prepare and apply an import
 

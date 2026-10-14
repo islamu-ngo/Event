@@ -46,9 +46,6 @@
     <Project Path="eng/dependency-submission/src/ISLAMU.DependencySubmission/ISLAMU.DependencySubmission.csproj" />
     <Project Path="eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj" />
   </Folder>
-  <Folder Name="/Tooling/Configurator Definitions/">
-    <Project Path="eng/configurator/DefinitionExporter/DefinitionExporter.csproj" />
-  </Folder>
   <Folder Name="/Tooling/OpenAPI/">
     <Project Path="eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj" />
   </Folder>

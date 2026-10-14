@@ -3,7 +3,6 @@ namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Diagnostics;
 using System.Security.Cryptography;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using ISLAMU.Wire.Contracts.Identity;
@@ -11,28 +10,33 @@ using ISLAMU.Wire.Contracts.Identity;
 public sealed class ConfiguratorDefinitionArtifactTests
 {
     [Test]
-    public async Task NativeAndBrowserShareImmutableDefinitionWithoutEmbeddedPrivateAnswers()
+    public async Task CanonicalDefinitionHasExpectedIdentityAndNoEmbeddedPrivateAnswers()
     {
         string directory = Path.Combine(Root(), "configurator", "definitions", "islamu-event");
-        byte[] nativeBytes = File.ReadAllBytes(Path.Combine(directory, "setup-definition.json"));
-        byte[] publicBytes = File.ReadAllBytes(Path.Combine(directory, "public-definition.json"));
+        byte[] nativeBytes = File.ReadAllBytes(Path.Combine(directory, "definition.json"));
         using JsonDocument native = JsonDocument.Parse(nativeBytes);
-        using JsonDocument projection = JsonDocument.Parse(publicBytes);
         using JsonDocument release = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(directory, "release.json")));
         await Assert.That(native.RootElement.GetProperty("familyId").GetGuid())
             .IsEqualTo(Guid.Parse("a4bcfaa6-9979-43e5-b1f5-00d552618cdf"));
-        await Assert.That(projection.RootElement.GetProperty("familyId").GetGuid())
-            .IsEqualTo(native.RootElement.GetProperty("familyId").GetGuid());
-        await Assert.That(projection.RootElement.GetProperty("revision").GetInt64())
+        await Assert.That(release.RootElement.GetProperty("revision").GetInt64())
             .IsEqualTo(native.RootElement.GetProperty("revision").GetInt64());
         await Assert.That(release.RootElement.GetProperty("definitionDigest").GetString())
             .IsEqualTo(Convert.ToHexStringLower(SHA256.HashData(nativeBytes)));
-        await Assert.That(release.RootElement.GetProperty("publicDefinitionDigest").GetString())
-            .IsEqualTo(Convert.ToHexStringLower(SHA256.HashData(publicBytes)));
-        await Assert.That(publicBytes.AsSpan().SequenceEqual(nativeBytes)).IsTrue();
+        await Assert.That(Directory.EnumerateFiles(directory).Select(path => Path.GetFileName(path)))
+            .IsEquivalentTo(["configurator.yaml", "definition.json", "release.json"]);
+        await Assert.That(Directory.EnumerateDirectories(directory)).IsEmpty();
+        var selectors = release.RootElement.GetProperty("browserLaunchFragment").GetString()!.Split('&')
+            .Select(part => part.Split('=', 2)).ToDictionary(parts => parts[0], parts => Uri.UnescapeDataString(parts[1]),
+                StringComparer.Ordinal);
+        await Assert.That(selectors.Keys).IsEquivalentTo(["src", "digest", "appVersion", "entry", "locale"]);
+        await Assert.That(selectors["digest"]).IsEqualTo(release.RootElement.GetProperty("definitionDigest").GetString());
+        await Assert.That(selectors["src"]).IsEqualTo(release.RootElement.GetProperty("definitionSource").GetString());
+        await Assert.That(selectors["appVersion"]).IsEqualTo("0.0.0-development");
+        await Assert.That(selectors["entry"]).IsEqualTo("configuration-manifest");
+        await Assert.That(selectors["locale"]).IsEqualTo("en");
         await Assert.That(native.RootElement.GetProperty("artifacts").GetArrayLength()).IsEqualTo(5);
-        await Assert.That(projection.RootElement.GetProperty("fields").GetArrayLength() > 1).IsTrue();
-        foreach (JsonElement field in projection.RootElement.GetProperty("fields").EnumerateArray())
+        await Assert.That(native.RootElement.GetProperty("fields").GetArrayLength() > 1).IsTrue();
+        foreach (JsonElement field in native.RootElement.GetProperty("fields").EnumerateArray())
         {
             if (field.GetProperty("sensitivity").GetString() is not "public")
             {
@@ -40,84 +44,63 @@ public sealed class ConfiguratorDefinitionArtifactTests
                 await Assert.That(field.TryGetProperty("recommendation", out _)).IsFalse();
             }
         }
-        await Assert.That(projection.RootElement.TryGetProperty("answers", out _)).IsFalse();
+        await Assert.That(native.RootElement.TryGetProperty("answers", out _)).IsFalse();
     }
 
     [Test]
-    public async Task ExporterFreshnessReplaysEventMetadataAndHostAcceptance()
+    public async Task TenantRowsAreBoundedObjectsWithOrdinalIdentityAndWholeRowProjection()
     {
-        (int code, string output) = await RunExporter("--check",
-            Path.GetFullPath(Path.Combine(Root(), "..", "Configurator")));
-        await Assert.That(code).IsEqualTo(0).Because(output);
+        using JsonDocument definition = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(
+            Root(), "configurator", "definitions", "islamu-event", "definition.json")));
+        JsonElement tenants = definition.RootElement.GetProperty("fields").EnumerateArray()
+            .Single(field => field.GetProperty("id").GetString() == "configuration-manifest.tenants");
+        await Assert.That(tenants.GetProperty("type").GetString()).IsEqualTo("list");
+        await Assert.That(tenants.GetProperty("itemType").GetString()).IsEqualTo("object");
+        await Assert.That(tenants.GetProperty("maxItems").GetInt32()).IsEqualTo(256);
+        await Assert.That(tenants.GetProperty("uniqueBy").EnumerateArray().Select(item => item.GetString()!))
+            .IsEquivalentTo(["metadata", "name"]);
+        JsonElement metadata = tenants.GetProperty("properties").EnumerateArray()
+            .Single(field => field.GetProperty("id").GetString() == "metadata");
+        JsonElement name = metadata.GetProperty("properties")[0];
+        await Assert.That(name.GetProperty("required").GetBoolean()).IsTrue();
+        await Assert.That(name.GetProperty("minLength").GetInt32()).IsEqualTo(1);
+        await Assert.That(name.GetProperty("maxLength").GetInt32()).IsEqualTo(100);
     }
 
     [Test]
-    public async Task ChangedShapeAtReleasedRevisionRejectsBeforePublishingAnyArtifact()
+    public async Task IndependentTenantVectorsKeepSelectedRowsAndRejectHostOverflow()
     {
-        string temporary = Path.Combine(Path.GetTempPath(), "event-definition-input-" + Guid.NewGuid().ToString("N"));
-        string inputs = Path.Combine(temporary, "inputs");
-        string destination = Path.Combine(temporary, "output");
-        Directory.CreateDirectory(inputs);
-        try
+        foreach (int count in new[] { 1, 2, 3 })
         {
-            string source = Path.Combine(Root(), "configurator", "definitions", "islamu-event", "inputs");
-            foreach (string file in Directory.EnumerateFiles(source))
-                File.Copy(file, Path.Combine(inputs, Path.GetFileName(file)));
-            string manifestPath = Path.Combine(inputs, "configuration-manifest.json");
-            JsonNode manifest = JsonNode.Parse(File.ReadAllBytes(manifestPath))!;
-            JsonArray tenants = manifest["spec"]!["tenants"]!.AsArray();
-            JsonNode extra = tenants[0]!.DeepClone();
-            extra["metadata"]!["name"] = "third-community";
-            tenants.Add(extra);
-            await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString());
-
-            (int code, string output) = await RunExporter("--export", inputs, destination);
-            await Assert.That(code).IsEqualTo(1).Because(output);
-            await Assert.That(output).Contains("definition-revision-conflict");
-            await Assert.That(Directory.Exists(destination)).IsFalse();
+            byte[] bytes = Artifact(count == 2 ? "configuration-manifest.json"
+                : "configuration-manifest-" + count + "-tenants.json");
+            ConfigurationManifestV1Alpha2 manifest = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(bytes);
+            await Assert.That(manifest.Spec.Tenants.Count).IsEqualTo(count);
+            await Assert.That(manifest.Spec.Tenants.Select(tenant => tenant.Metadata.Name))
+                .IsEquivalentTo(new[] { "community", "second-community", "third-community" }.Take(count));
+            await Assert.That(manifest.Spec.Tenants[0].Spec.Settings["events.require_approval"].GetBoolean()).IsTrue();
+            if (count == 1)
+                await Assert.That(Encoding.UTF8.GetString(bytes)).DoesNotContain("second-community");
         }
-        finally
+        JsonObject source = JsonNode.Parse(Artifact("configuration-manifest-1-tenants.json"))!.AsObject();
+        JsonArray tenants = source["spec"]!["tenants"]!.AsArray();
+        JsonNode first = tenants[0]!.DeepClone();
+        tenants.Clear();
+        await Assert.That(ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+            Encoding.UTF8.GetBytes(source.ToJsonString())).Spec.Tenants).IsEmpty();
+        for (int index = 0; index < 256; index++)
         {
-            Directory.Delete(temporary, recursive: true);
+            JsonNode tenant = first.DeepClone();
+            tenant["metadata"]!["name"] = "tenant-" + index;
+            tenants.Add(tenant);
         }
-    }
-
-    [Test]
-    public async Task NewRevisionCanDeclareBoundedCanonicalIssuerFieldsWithoutPrivateDefaults()
-    {
-        string temporary = Path.Combine(Path.GetTempPath(), "event-definition-issuers-" + Guid.NewGuid().ToString("N"));
-        string inputs = Path.Combine(temporary, "inputs");
-        string destination = Path.Combine(temporary, "output");
-        Directory.CreateDirectory(inputs);
-        try
-        {
-            string source = Path.Combine(Root(), "configurator", "definitions", "islamu-event", "inputs");
-            foreach (string file in Directory.EnumerateFiles(source))
-                File.Copy(file, Path.Combine(inputs, Path.GetFileName(file)));
-            string profilePath = Path.Combine(inputs, "profile.json");
-            JsonNode profile = JsonNode.Parse(File.ReadAllBytes(profilePath))!;
-            profile["revision"] = profile["revision"]!.GetValue<long>() + 1;
-            profile["trustedIssuerCount"] = 2;
-            await File.WriteAllTextAsync(profilePath, profile.ToJsonString());
-
-            (int code, string output) = await RunExporter("--export", inputs, destination);
-            await Assert.That(code).IsEqualTo(0).Because(output);
-            using JsonDocument definition = JsonDocument.Parse(
-                File.ReadAllBytes(Path.Combine(destination, "setup-definition.json")));
-            JsonElement issuer = definition.RootElement.GetProperty("fields").EnumerateArray()
-                .Single(field => field.GetProperty("id").GetString() == "env.IDENTITYCORRELATION__TRUSTEDISSUERS__1");
-            await Assert.That(issuer.GetProperty("sensitivity").GetString()).IsEqualTo("public");
-            await Assert.That(issuer.TryGetProperty("default", out _)).IsFalse();
-            profile["trustedIssuerCount"] = 129;
-            await File.WriteAllTextAsync(profilePath, profile.ToJsonString());
-            (code, output) = await RunExporter("--export", inputs, Path.Combine(temporary, "oversized"));
-            await Assert.That(code).IsEqualTo(1).Because(output);
-            await Assert.That(Directory.Exists(Path.Combine(temporary, "oversized"))).IsFalse();
-        }
-        finally
-        {
-            Directory.Delete(temporary, recursive: true);
-        }
+        await Assert.That(ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+            Encoding.UTF8.GetBytes(source.ToJsonString())).Spec.Tenants.Count).IsEqualTo(256);
+        JsonNode overflow = first.DeepClone();
+        overflow["metadata"]!["name"] = "tenant-overflow";
+        tenants.Add(overflow);
+        await Assert.That(() => ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+            Encoding.UTF8.GetBytes(source.ToJsonString()))).Throws<ConfigurationPortabilityContractException>();
     }
 
     [Test]
@@ -135,6 +118,13 @@ public sealed class ConfiguratorDefinitionArtifactTests
         await Assert.That(package.Spec.Documents["tenant.branding"].Payload.GetProperty("displayName").GetString())
             .IsEqualTo("Community");
         await Assert.That(package.Spec.LegalDocuments["TenantPrivacyNotice"].LifecycleIntent).IsEqualTo("Draft");
+        ConfigurationManifestV1Alpha2 roundTrip = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+            ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(manifest));
+        await Assert.That(roundTrip.Spec.Tenants.Select(tenant => tenant.Metadata.Name))
+            .IsEquivalentTo(["community", "second-community"]);
+        await Assert.That(roundTrip.Spec.Tenants[0].Spec.Settings["events.require_approval"].GetBoolean()).IsTrue();
+        await Assert.That(roundTrip.Spec.Tenants[0].Spec.Documents["tenant.branding"].Payload
+            .GetProperty("displayName").GetString()).IsEqualTo("Community");
         await Assert.That(ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(
             ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(package)).Spec.DisplayName)
             .IsEqualTo(package.Spec.DisplayName);
@@ -157,7 +147,7 @@ public sealed class ConfiguratorDefinitionArtifactTests
     }
 
     [Test]
-    public async Task IdentityCanonicalOrderingSnapshotAndValueFreeFailuresSurviveHandoff()
+    public async Task IdentityCanonicalOrderingSnapshotAndValueFreeFailuresSurviveWireRoundTrip()
     {
         OperatorIdentityManifest original = OperatorIdentityManifestJson.Parse(Artifact("operator-identity.json"));
         using JsonDocument reordered = JsonDocument.Parse("{" + string.Join(",",
@@ -231,131 +221,13 @@ public sealed class ConfiguratorDefinitionArtifactTests
             .Throws<ArgumentException>();
     }
 
-    [Test]
-    public async Task HostVerifierRejectsLegalAuthorityScopeProvenanceAndDuplicateLocales()
-    {
-        JsonObject source = JsonNode.Parse(Artifact("legal-drafts.json"))!.AsObject();
-        foreach (string mutation in new[] { "scope", "audience", "published", "effective", "identity", "template", "duplicate", "markdown" })
-        {
-            JsonObject changed = (JsonObject)source.DeepClone();
-            JsonObject documents = changed["spec"]!["instance"]!["legalDocuments"]!.AsObject();
-            JsonObject legal = documents["TermsOfService"]!.AsObject();
-            switch (mutation)
-            {
-                case "scope":
-                    legal["kind"] = "TenantTerms";
-                    documents.Remove("TermsOfService");
-                    documents["TenantTerms"] = legal;
-                    break;
-                case "audience": legal["audience"] = "UnknownAudience"; break;
-                case "published": legal["lifecycleIntent"] = "Published"; break;
-                case "effective": legal["proposedEffectiveAt"] = "2030-01-01T00:00:00Z"; break;
-                case "identity": legal["accountableIdentityReference"] = "private-sentinel"; break;
-                case "template":
-                    legal["templateProvenance"] = new JsonObject
-                    {
-                        ["sourceKind"] = "Unreviewed", ["templateId"] = "private-sentinel", ["templateVersion"] = "1",
-                        ["licenseExpression"] = "MIT", ["reviewReference"] = "example-review"
-                    };
-                    break;
-                case "duplicate":
-                    legal["localizations"]![1]!["languageTag"] = "EN";
-                    break;
-                case "markdown": legal["localizations"]![0]!["markdown"] = "<script>private-sentinel</script>"; break;
-            }
-            (int code, string output) = await Verify("legal-drafts", Encoding.UTF8.GetBytes(changed.ToJsonString()));
-            await Assert.That(code).IsEqualTo(1).Because(mutation);
-            await Assert.That(output).DoesNotContain("private-sentinel");
-        }
-        await Assert.That((await Verify("legal-drafts", Artifact("legal-drafts.json"))).Code).IsEqualTo(0);
-    }
-
-    [Test]
-    public async Task HostVerifierPreservesAllTwentyNineLegalKindScopeClassifications()
-    {
-        string[] instanceKinds =
-        [
-            "TermsOfService", "PrivacyNotice", "CookiePolicy", "AcceptableUsePolicy", "CommunityGuidelines",
-            "ModerationReportingAppealPolicy", "AccessibilityStatement", "LegalNotice", "SecurityDisclosurePolicy",
-            "RetentionErasurePortabilityNotice", "SubprocessorNotice", "OpenSourceAttribution", "ApiDeveloperTerms",
-            "FederationNotice", "PaymentResponsibilities", "SupportAvailabilityEolMigrationNotice"
-        ];
-        string[] tenantKinds =
-        [
-            "TenantTerms", "TenantPrivacyNotice", "TenantCodeOfConduct", "OrganizerSubmissionTerms",
-            "EventPublicationModerationPolicy", "CancellationRefundPolicy", "RegistrationParticipantPrivacyNotice",
-            "MediaPhotographyNotice", "SafeguardingMinorParticipationPolicy", "VenueAccessibilityPolicy",
-            "ComplaintCorrectionCopyrightNotice", "SponsorshipPartnerDisclosure", "TenantRetentionContactSharingNotice"
-        ];
-        foreach (string kind in instanceKinds.Concat(tenantKinds))
-        {
-            bool tenant = tenantKinds.Contains(kind, StringComparer.Ordinal);
-            JsonObject source = JsonNode.Parse(Artifact(tenant ? "tenant-package.json" : "legal-drafts.json"))!.AsObject();
-            JsonObject documents = (tenant ? source["spec"]!["legalDocuments"]!
-                : source["spec"]!["instance"]!["legalDocuments"]!).AsObject();
-            JsonNode document = documents.First().Value!.DeepClone();
-            documents.Clear();
-            document["kind"] = kind;
-            documents[kind] = document;
-            await Assert.That((await Verify(tenant ? "tenant-package" : "legal-drafts",
-                Encoding.UTF8.GetBytes(source.ToJsonString()))).Code).IsEqualTo(0).Because(kind);
-        }
-    }
-
-    [Test]
-    public async Task HostVerifierRejectsDuplicateIssuerAuthoritiesAndNoncanonicalIndices()
-    {
-        foreach (string invalid in new[]
-        {
-            "IDENTITYCORRELATION__TRUSTEDISSUERS__00=https://identity.example.test\n",
-            "IDENTITYCORRELATION__TRUSTEDISSUERS__-1=https://identity.example.test\n",
-            "IDENTITYCORRELATION__TRUSTEDISSUERS__0=https://identity.example.test/realm/\n"
-                + "IDENTITYCORRELATION__TRUSTEDISSUERS__1=https://identity.example.test/realm\n"
-        })
-            await Assert.That((await Verify("environment", Encoding.UTF8.GetBytes(invalid))).Code).IsEqualTo(1);
-        await Assert.That((await Verify("environment", Encoding.UTF8.GetBytes(
-            "IDENTITYCORRELATION__TRUSTEDISSUERS__0=https://identity.example.test/one\n"
-            + "IDENTITYCORRELATION__TRUSTEDISSUERS__1=https://identity.example.test/two\n"))).Code).IsEqualTo(0);
-    }
-
-    private static async Task<(int Code, string Output)> Verify(string artifact, byte[] bytes)
-    {
-        string path = Path.Combine(Path.GetTempPath(), "event-definition-" + Guid.NewGuid().ToString("N") + ".json");
-        try
-        {
-            await File.WriteAllBytesAsync(path, bytes);
-            return await RunExporter("--verify", artifact, path);
-        }
-        finally { File.Delete(path); }
-    }
-
-    private static async Task<(int Code, string Output)> RunExporter(params string[] args)
-    {
-        var start = new ProcessStartInfo("dotnet")
-        {
-            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false
-        };
-        start.ArgumentList.Add(Path.Combine(Root(), "eng", "configurator", "DefinitionExporter",
-            "bin", "Release", "net10.0", "DefinitionExporter.dll"));
-        foreach (string argument in args)
-            start.ArgumentList.Add(argument);
-        using Process process = Process.Start(start) ?? throw new InvalidOperationException("Exporter did not start.");
-        Task<string> output = process.StandardOutput.ReadToEndAsync();
-        Task<string> errors = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        try { await process.WaitForExitAsync(timeout.Token); }
-        catch (OperationCanceledException) { process.Kill(entireProcessTree: true); throw; }
-        return (process.ExitCode, await output + await errors);
-    }
-
     private static byte[] Artifact(string name)
     {
-        string? actual = Environment.GetEnvironmentVariable("EVENT_CONFIGURATOR_ARTIFACT_DIRECTORY");
-        if (actual is not null)
-            return File.ReadAllBytes(Path.Combine(actual, name));
-        return File.ReadAllBytes(Path.Combine(Root(),
-            "configurator", "definitions", "islamu-event", "expected", name));
+        return File.ReadAllBytes(Path.Combine(FixtureRoot(), "expected", name));
     }
+
+    private static string FixtureRoot() => Path.Combine(Root(), "tests", "Event.Wire.Contracts.UnitTests",
+        "Fixtures", "Configurator", "islamu-event");
 
     private static string Root()
     {

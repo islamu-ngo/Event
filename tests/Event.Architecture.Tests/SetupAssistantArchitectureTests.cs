@@ -92,23 +92,22 @@ public sealed class SetupAssistantArchitectureTests
     }
 
     [Test]
-    public async Task EventSolutionOwnsExporterWithoutExtractedEngineProjects()
+    public async Task EventSolutionExcludesIntegrationToolingAndExtractedEngineProjects()
     {
         XDocument solution = XDocument.Load(ContextSystemHelpers.RepoPath("Explore.slnx"));
         string[] paths = solution.Descendants("Project")
             .Select(element => (element.Attribute("Path")?.Value ?? string.Empty).Replace('\\', '/'))
             .ToArray();
-        await Assert.That(paths.Count(path => path ==
-            "eng/configurator/DefinitionExporter/DefinitionExporter.csproj")).IsEqualTo(1);
         await Assert.That(paths.Where(path =>
             path.StartsWith("src/Event.Setup", StringComparison.Ordinal)
             || path.StartsWith("tests/Event.Setup", StringComparison.Ordinal)
             || path.StartsWith("eng/setup-assistant/", StringComparison.Ordinal)
+            || path.StartsWith("eng/configurator/", StringComparison.Ordinal)
             || path.Contains("Configurator.Core", StringComparison.Ordinal))).IsEmpty();
     }
 
     [Test]
-    public async Task EventCiRetainsReadOnlyExporterAndSerialBackendSecurityLane()
+    public async Task EventCiRetainsReadOnlyAuthorityAndSerialBackendSecurityLane()
     {
         string caller = await File.ReadAllTextAsync(ContextSystemHelpers.RepoPath(
             ".github", "workflows", "test.yml"));
@@ -178,7 +177,7 @@ public sealed class SetupAssistantArchitectureTests
         string routingScript = ((YamlScalarNode)routing.Children[new YamlScalarNode("run")]).Value!;
         string[] routeInputs =
         [
-            "configurator/definitions/*", "eng/configurator/*",
+            "configurator/definitions/*", "tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/*",
             "src/Explore.Blazor.Client/Services/SetupLive/*",
             "tests/Explore.Blazor.Client.Tests/SetupLive/*",
             "src/Event.Wire.Contracts/SetupLive/*",
@@ -247,11 +246,6 @@ public sealed class SetupAssistantArchitectureTests
             .Where(step => step.Children.ContainsKey(new YamlScalarNode("run")))
             .Select(step => ((YamlScalarNode)step.Children[new YamlScalarNode("run")]).Value!)
             .ToArray();
-        foreach (string token in new[] { "--check-local", "--check-environment" })
-            if (!runCommands.Any(command => command.Contains(
-                $"DefinitionExporter.csproj --configuration \"$DOTNET_CONFIGURATION\" --no-restore -- {token}",
-                StringComparison.Ordinal)))
-                violations.Add($"missing read-only exporter gate: {token}");
         if (runCommands.Any(command => command.Contains("eng/setup-assistant/", StringComparison.Ordinal)))
             violations.Add("CI still owns extracted tools");
         YamlMappingNode coverage = steps.Children.OfType<YamlMappingNode>().Single(step =>

@@ -98,13 +98,6 @@ jobs:
         if: ${{ inputs.run-fast-tests }}
         run: dotnet tool restore
 
-      - name: Check Event-owned Configurator definitions
-        if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
-        run: |
-          dotnet restore eng/configurator/DefinitionExporter/DefinitionExporter.csproj --locked-mode
-          dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration "$DOTNET_CONFIGURATION" --no-restore -- --check-local
-          dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj --configuration "$DOTNET_CONFIGURATION" --no-restore -- --check-environment
-
       - name: NuGet Security Audit
         if: ${{ inputs.run-fast-tests }}
         env:

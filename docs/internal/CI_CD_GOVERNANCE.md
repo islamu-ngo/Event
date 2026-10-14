@@ -453,16 +453,17 @@ Dockerfiles must copy the root restore inputs (`global.json`, `Directory.Build.p
 ### Event Configurator and retained SetupLive CI boundary
 
 Offline runtime packaging and portable engine tests belong to the independent
-Configurator repository. Event retains definition generation, host acceptance,
+Configurator repository. Event retains definition authoring, host acceptance,
 bootstrap and live API authority. The change detector routes
-`configurator/definitions/*`, `eng/configurator/*`, `.env.example`, Compose and
+`configurator/definitions/*`, the Configurator test fixtures, `.env.example`, Compose and
 `docs/internal/CONFIGURATION.md` to architecture and setup checks. Exact
 cross-layer SetupLive routing remains in its second case statement.
 
-The exporter is restored with `--locked-mode` and checked in Event-only
-`--check-local` and `--check-environment` modes. It has no sibling checkout or
-Configurator assembly input. Metadata identifies its retained exporter owner,
-not `eng/setup-assistant/`. Relocated client transport and tests live under
+Maintainers author the integration with the portable `configurator-integrate`
+skill and validate/build it with the standalone Configurator CLI. Event has no
+bespoke exporter, compiler downloader or compiler wrapper. Its tests assert
+Event-owned wire and authority invariants; Configurator owns authoring/compiler
+behavior. Relocated client transport and tests live under
 `Explore.Blazor.Client/Services/SetupLive/` and
 `Explore.Blazor.Client.Tests/SetupLive/`, routed by the Blazor lane and explicit
 retained SetupLive security routing.

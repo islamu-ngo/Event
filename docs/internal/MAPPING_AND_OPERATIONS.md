@@ -95,12 +95,14 @@ notifications do not replace them.
 AutoMapper, MediatR and MediatR.Contracts are absent from the supported dependency
 graph. There is no edition-dependent C# define, commercial version group or
 vendor license binding. CI and both API/Blazor Dockerfiles require locked restore.
-The retained Event definition exporter owns supported environment metadata; its generator
-owns both the JSON catalogue and the public reference's generated section.
+Event owns supported environment declarations and the public reference.
+Configurator integration is separate: maintainers author its compact YAML using
+the portable skill, then check/revise/build it through the standalone CLI.
+It is not an environment-document generator or an automatically refreshed source.
+See [native definition authoring](CONFIGURATOR_DEFINITION_EXPORT.md).
 
 ```bash
 dotnet restore
-dotnet run --project eng/configurator/DefinitionExporter/DefinitionExporter.csproj -- --write-environment
 dotnet restore --locked-mode
 dotnet run .ci/scripts/validate-dependency-license-policy.cs -- .
 ```

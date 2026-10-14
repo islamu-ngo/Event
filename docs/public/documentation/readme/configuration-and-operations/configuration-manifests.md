@@ -14,6 +14,27 @@ Only allowlisted instance/tenant settings and approved typed documents belong in
 
 ---
 
+## Prepare Tenant Rows with Configurator
+
+The [Event README](https://github.com/ISLAMU/Event#self-hosting) provides the pinned
+definition source and digest for a complete workspace on your deployed
+Configurator origin. Load the matching local definition if the source cannot be
+fetched. The definition is public metadata; your answers remain local in memory.
+
+Choose the configuration-manifest workflow, then add or remove tenant rows and
+edit their identifiers, display names, allowlisted settings and declared typed
+documents. Removing a row removes that tenant from the prepared manifest. Tenant
+identifiers must be unique lowercase slugs. Event permits up to 256 tenants;
+complex inputs may reach Configurator's resource budgets sooner. Operators do
+not need to invoke a development exporter to change the tenant count.
+
+Review every artifact before use. Preparation checks the declared data shape;
+Event still owns semantic validation, authorization and deployment acceptance.
+Manifest tenants never carry secrets. The separate environment workflow may use
+explicit secret-entry consent or draft output for values you will fill later.
+
+---
+
 ## Event-Resource Policy Arrays
 
 Instance manifests and tenant configuration packages accept these settings as

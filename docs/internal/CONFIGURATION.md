@@ -11,21 +11,26 @@ This document owns configuration architecture, source anchors and invariants.
 ## External configuration preparation
 
 [Configurator](https://github.com/ISLAMU/Configurator) receives declarative
-Event-owned definitions from `eng/configurator/DefinitionExporter`, not Event
+Event-owned data-only definitions compiled by its standalone CLI, not Event
 configuration handlers or semantic apply authority. The stable family GUID is
 `a4bcfaa6-9979-43e5-b1f5-00d552618cdf`; a deployed Configurator origin can serve
 `/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` for public choices only.
 This contract introduces no Event URL key or runtime launch feature.
 
-The exporter reads Event-owned environment metadata and the portable schema,
-exports native/public JSON without a Configurator runtime dependency, and validates composed
-reference artifacts through Event's parsers. Event still owns issuer
+Maintainers install Configurator's portable `configurator-integrate` skill,
+review Event's public environment metadata and portable schema, and author one
+compact `configurator.yaml`. It is author-maintained, not automatically generated.
+Native `definition init/check/revise/build` commands own identity allocation,
+admission and immutable canonical JSON releases without an Event runtime dependency.
+Synthetic fixtures are test-owned and independently compared against Event's
+parsers. Event still owns issuer
 normalization, setting scope, identity integrity and concurrency, legal lifecycle
 and backend validation. New offline preparation uses separately installed
 Configurator with the local Event definition and a declared artifact ID. The
 bundled offline source owners are removed; generic rendering is not equivalent
-to every specialized Event workflow. CI checks retained generated
-data through exporter-owned `--check-local` and `--check-environment` gates.
+to every specialized Event workflow. A retained receipt does not prove current
+YAML compilation; record actual native CLI and host-test results separately.
+See [native definition authoring](CONFIGURATOR_DEFINITION_EXPORT.md).
 See [the architectural boundary](SETUP_ASSISTANT_ARCHITECTURE.md#external-definition-handoff)
 and [operator guidance](../public/self-hosting/setup-assistant.md#external-configurator-handoff).
 

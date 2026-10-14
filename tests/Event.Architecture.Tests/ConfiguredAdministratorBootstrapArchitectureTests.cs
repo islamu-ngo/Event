@@ -98,31 +98,6 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
     }
 
     [Test]
-    public async Task ConfiguratorDefinitionExporterReferencesOnlyEventDomainAndWire()
-    {
-        string exporterProject = ContextSystemHelpers.RepoPath(
-            "eng", "configurator", "DefinitionExporter", "DefinitionExporter.csproj");
-
-        await Assert.That(ProjectReferences(exporterProject))
-            .IsEquivalentTo(["Explore.Domain", "Event.Wire.Contracts"]);
-
-        string[] forbidden = ProjectClosure(exporterProject)
-            .Where(name => name is
-                "Explore.API" or
-                "Explore.Application" or
-                "Explore.Infrastructure" or
-                "Explore.Persistence" or
-                "Explore.Blazor" or
-                "Explore.Blazor.Client"
-                || name.StartsWith("Event.Setup", StringComparison.Ordinal)
-                || name.StartsWith("Configurator.", StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        await Assert.That(forbidden).IsEmpty();
-    }
-
-    [Test]
     public async Task ConfigurationManifestMachineContractExcludesBootstrapIdentityAuthority()
     {
         string[] forbiddenContractProperties = ReachableContractTypes(
@@ -513,15 +488,6 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
 
         return type;
     }
-
-    private static string[] ProjectReferences(string projectPath) =>
-        XDocument.Load(projectPath).Descendants()
-            .Where(element => element.Name.LocalName == "ProjectReference")
-            .Select(element => element.Attribute("Include")?.Value)
-            .OfType<string>()
-            .Select(path => Path.GetFileNameWithoutExtension(path.Replace('\\', '/')))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
 
     private static IEnumerable<string> ProjectClosure(params string[] projectPaths)
     {

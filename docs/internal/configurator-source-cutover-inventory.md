@@ -1,5 +1,10 @@
 # Event source cutover inventory
 
+Historical extraction record. The subsequently retained Event-specific exporter
+was removed on 2026-10-14. Native integration now uses the portable
+`configurator-integrate` skill and standalone Configurator CLI; references below
+describe the earlier cutover, not current tooling requirements.
+
 Status: destination readiness confirmed; this literal source allowlist was
 removed on develop. It is a disposition record, not a wildcard cleanup command.
 Unrelated edits were preserved. There are 201 literal deletions and 33 other
@@ -293,8 +298,12 @@ Do not remove a license-policy entry merely because one product caller moved.
 
 ## Retained owners and verification
 
-Keep `eng/configurator/DefinitionExporter/` and
-`configurator/definitions/islamu-event/` entirely. The existing unrelated
+Keep `eng/configurator/DefinitionExporter/` and the definition delivery owner
+`configurator/definitions/islamu-event/`. The later YAML ownership cleanup leaves
+only `configurator.yaml`, `definition.json` and `release.json` in that directory;
+synthetic inputs, answers, expected artifacts and catalogue/template snapshots
+now belong to `tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`.
+The existing unrelated
 `eng/configurator/DefinitionExporter/packages.lock.json` edit belongs to the
 parent and was not rewritten. Keep both relocated SetupLive source files and
 both client test files, `.env.example`, Compose, Event portable schemas, Domain,

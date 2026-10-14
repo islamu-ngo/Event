@@ -136,7 +136,7 @@ jobs:
 
       - name: Upload Cerbos Policy Evidence
         if: ${{ always() && steps.changes.outputs.run-policies == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cerbos-policy-evidence
           path: artifacts/cerbos-policy/**
@@ -223,7 +223,7 @@ jobs:
 
       - name: Upload Cerbos Publish Evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cerbos-policy-publish-evidence
           path: artifacts/cerbos-policy-publish/**

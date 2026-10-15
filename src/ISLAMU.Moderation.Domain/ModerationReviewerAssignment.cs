@@ -43,12 +43,13 @@ public sealed class ModerationReviewerAssignment
     {
         ArgumentNullException.ThrowIfNull(moderationCase);
         moderationCase.ValidatePersistedState();
-        if (id == Guid.Empty || id.Version != 7 || id.Variant is < 8 or > 11
+        var subject = moderationCase.Subject;
+        if (subject is null && moderationCase.Target is null
+            || id == Guid.Empty || id.Version != 7 || id.Variant is < 8 or > 11
             || reviewerHumanId == Guid.Empty || assignedByHumanId == Guid.Empty
             || moderationCase.State != ModerationCaseState.Open
             || moderationCase.Revision != expectedCaseRevision || now < moderationCase.UpdatedAt
-            || moderationCase.Subject.Kind == ModerationSubjectKind.Human
-                && moderationCase.Subject.Id == reviewerHumanId)
+            || subject is { Kind: ModerationSubjectKind.Human } && subject.Id == reviewerHumanId)
         {
             throw new ArgumentException("Assignment requires a current open case and a distinct canonical human.");
         }
@@ -59,8 +60,7 @@ public sealed class ModerationReviewerAssignment
             CaseId = moderationCase.Id,
             TrustDomainId = moderationCase.Scope.TrustDomainId,
             CaseTenantId = moderationCase.ScopeTenantId,
-            SubjectHumanId = moderationCase.Subject.Kind == ModerationSubjectKind.Human
-                ? moderationCase.Subject.Id : null,
+            SubjectHumanId = subject is { Kind: ModerationSubjectKind.Human } ? subject.Id : null,
             ReviewerHumanId = reviewerHumanId,
             AssignedByHumanId = assignedByHumanId,
             ConflictState = ModerationReviewerConflictState.Unresolved,

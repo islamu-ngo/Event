@@ -3,6 +3,18 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-15
+
+- **Breaking shared-model contract: target-owned allegations.**
+  `ISLAMU.Moderation.Domain.ModerationCase.Subject`, `SubjectKind`, `SubjectId`
+  and required subject-origin scalar fields are nullable for a material-owned
+  allegation. Shared-model consumers must require actual attribution before
+  adjudication rather than dereferencing a presumed subject. `Target` and retained
+  `Evidence` identify allegation material, not guilt or native permission.
+  Existing finding finalization still rejects an absent subject. This source
+  contract change does not enable an HTTP intake endpoint or certify schema,
+  generated clients, disclosure or provider/runtime behavior.
+
 ## 2026-10-09
 
 - Resource audience detail and collection responses now retain action-specific

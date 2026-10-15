@@ -87,9 +87,10 @@ public class ModerationFindingAuthorityInvariantTests
     public async Task AdjudicatorMustBeIndependentCanonicalHumanInTrustDomain(int defect)
     {
         var allegation = Case();
+        var subject = allegation.Subject ?? throw new InvalidOperationException("The fixture requires an attributed case.");
         var adjudicator = defect switch
         {
-            0 => SubjectReference.Create(ModerationSubjectKind.Human, allegation.Subject.Id, allegation.Scope),
+            0 => SubjectReference.Create(ModerationSubjectKind.Human, subject.Id, allegation.Scope),
             1 => SubjectReference.Create(ModerationSubjectKind.Service, Guid.CreateVersion7(), allegation.Scope),
             _ => Human(AuthorityScope.TrustDomain(Guid.CreateVersion7()))
         };
@@ -102,8 +103,9 @@ public class ModerationFindingAuthorityInvariantTests
     public async Task SameSubjectIdAtDifferentOriginDoesNotEvadeIndependence()
     {
         var allegation = Case();
+        var subject = allegation.Subject ?? throw new InvalidOperationException("The fixture requires an attributed case.");
         var adjudicator = SubjectReference.Create(ModerationSubjectKind.Human,
-            allegation.Subject.Id, allegation.Scope.Parent!);
+            subject.Id, allegation.Scope.Parent!);
 
         await Assert.That(() => Finalize(allegation, Rule(), adjudicator, Evidence(allegation)))
             .Throws<ArgumentException>();
@@ -250,7 +252,8 @@ public class ModerationFindingAuthorityInvariantTests
     {
         var allegation = Case();
         var finding = Finalize(allegation, Rule(), Human(allegation.Scope), Evidence(allegation));
-        var reverser = defect == 2 ? allegation.Subject : defect == 3
+        var subject = allegation.Subject ?? throw new InvalidOperationException("The fixture requires an attributed case.");
+        var reverser = defect == 2 ? subject : defect == 3
             ? Human(AuthorityScope.TrustDomain(Guid.CreateVersion7())) : Human(allegation.Scope);
         if (defect == 4)
         {

@@ -7,6 +7,32 @@ public class ModerationReviewerQualificationInvariantTests
     private static readonly DateTimeOffset Now = new(2026, 10, 8, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task TargetOwnedIntakeAssignmentDoesNotInventResponsibilityOrQualifiedReview()
+    {
+        var scope = AuthorityScope.Tenant(AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()),
+                Guid.CreateVersion7()), Guid.CreateVersion7()), Guid.CreateVersion7());
+        var evidence = ModerationEvidenceReference.Create(
+            ModerationCaseTarget.Create(ModerationCaseTargetKind.LocalIncident,
+                Guid.CreateVersion7(), scope, Guid.CreateVersion7()), scope,
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
+        var moderationCase = ModerationCase.OpenAllegation(Guid.CreateVersion7(), scope, evidence, Now);
+
+        var assignment = Assign(moderationCase);
+
+        await Assert.That(assignment.CaseId).IsEqualTo(moderationCase.Id);
+        await Assert.That(assignment.CaseTenantId).IsEqualTo(scope.Id);
+        await Assert.That(assignment.SubjectHumanId).IsNull();
+        await Assert.That(assignment.ConflictState).IsEqualTo(ModerationReviewerConflictState.Unresolved);
+        await Assert.That(assignment.IsQualifiedAt(Now)).IsFalse();
+        await Assert.That(moderationCase.Subject).IsNull();
+        await Assert.That(moderationCase.Target).IsEqualTo(evidence.Target);
+        await Assert.That(moderationCase.Revision).IsEqualTo(1L);
+        assignment.ValidatePersistedState();
+        moderationCase.ValidatePersistedState();
+    }
+
+    [Test]
     public async Task AssignmentPreservesTheActualCaseTenantForNativeFiltering()
     {
         var scope = AuthorityScope.Tenant(AuthorityScope.Instance(
@@ -100,11 +126,12 @@ public class ModerationReviewerQualificationInvariantTests
     public async Task SubjectAndItsKnownControllerCannotReviewTheCase()
     {
         var moderationCase = Case();
+        var subject = moderationCase.Subject ?? throw new InvalidOperationException("The fixture requires an attributed case.");
         await Assert.That(() => ModerationReviewerAssignment.Assign(Guid.CreateVersion7(),
-            moderationCase, 1, moderationCase.Subject.Id, Guid.CreateVersion7(), Now))
+            moderationCase, 1, subject.Id, Guid.CreateVersion7(), Now))
             .Throws<ArgumentException>();
         var assignment = Assign(moderationCase);
-        await Assert.That(() => assignment.QualifyController(1, moderationCase.Subject.Id,
+        await Assert.That(() => assignment.QualifyController(1, subject.Id,
             Guid.CreateVersion7(), Guid.CreateVersion7(), Now.AddHours(1), Now)).Throws<ArgumentException>();
         await Assert.That(assignment.Revision).IsEqualTo(1L);
     }

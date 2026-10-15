@@ -73,7 +73,8 @@ public class ModerationMaterializationInvariantTests
         Validate(row);
 
         await Assert.That(row.Scope).IsEqualTo(scope);
-        await Assert.That(row.Subject.Origin).IsEqualTo(scope);
+        var subject = row.Subject ?? throw new InvalidOperationException("The fixture requires an attributed case.");
+        await Assert.That(subject.Origin).IsEqualTo(scope);
     }
 
     [Test]
@@ -107,6 +108,7 @@ public class ModerationMaterializationInvariantTests
     }
 
     [Test]
+    [Arguments(0, "TargetOriginEventId")]
     [Arguments(1, "Approval1OriginEventId")]
     [Arguments(1, "Approval2OriginEventId")]
     [Arguments(3, "ReviewerOriginEventId")]
@@ -149,8 +151,9 @@ public class ModerationMaterializationInvariantTests
         Validate(row);
 
         await Assert.That(row.Scope).IsEqualTo(direct);
-        await Assert.That(row.Subject.Origin).IsEqualTo(nested);
-        await Assert.That(row.Scope.Contains(row.Subject.Origin)).IsFalse();
+        var subject = row.Subject ?? throw new InvalidOperationException("The fixture requires an attributed case.");
+        await Assert.That(subject.Origin).IsEqualTo(nested);
+        await Assert.That(row.Scope.Contains(subject.Origin)).IsFalse();
     }
 
     [Test]

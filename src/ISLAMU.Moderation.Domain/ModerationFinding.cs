@@ -247,7 +247,8 @@ public sealed class ModerationFinding
         ArgumentNullException.ThrowIfNull(adjudicator);
         ArgumentNullException.ThrowIfNull(evidence);
         moderationCase.ValidatePersistedState();
-        if (moderationCase.State != ModerationCaseState.Open || expectedCaseRevision != moderationCase.Revision
+        if (moderationCase.Subject is not { } subject
+            || moderationCase.State != ModerationCaseState.Open || expectedCaseRevision != moderationCase.Revision
             || now < moderationCase.UpdatedAt)
         {
             throw new InvalidOperationException("Finalization requires the current open case revision.");
@@ -260,7 +261,7 @@ public sealed class ModerationFinding
             throw new ArgumentException("Finding identity, exact adopted rule and case-bound evidence are required.");
         }
 
-        RequireIndependentHuman(adjudicator, moderationCase.Subject, moderationCase.Scope);
+        RequireIndependentHuman(adjudicator, subject, moderationCase.Scope);
         RequireJustification(justification);
         var finding = new ModerationFinding
         {
@@ -269,7 +270,7 @@ public sealed class ModerationFinding
             CaseOccurrenceId = moderationCase.OccurrenceId,
             CaseRevision = moderationCase.Revision,
             CaseCreatedAt = moderationCase.CreatedAt,
-            Subject = moderationCase.Subject,
+            Subject = subject,
             Scope = moderationCase.Scope,
             Rule = rule,
             Adjudicator = adjudicator,

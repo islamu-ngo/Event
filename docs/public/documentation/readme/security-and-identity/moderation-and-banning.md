@@ -11,6 +11,12 @@ classification correction is the only reference profile extended to Event scope.
 This model support does not enable a policy, authorize disclosure or certify
 provider migrations and native enforcement.
 
+An allegation can belong to reported material without naming a responsible
+person. An intake reviewer assignment is not a qualified misconduct finding.
+Additional material does not reopen a closed adjudication or transfer another
+person's responsibility. These source models do not enable confidential access
+or certify the native intake workflow.
+
 The shared moderation engine records decisions and minimized change intents in
 the local primary transaction. Retries preserve the accepted result instead of
 creating another restriction. Permission must remain current through that

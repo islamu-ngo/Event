@@ -13,6 +13,14 @@ or mixed leaf ancestry is rejected. Catalogue revision 2 adds Event only to CFG2
 classification correction. These definitions do not grant native authority or
 prove deployment, provider schema, disclosure or completed allegation intake.
 
+Target-owned allegations retain immutable native material provenance without
+inventing a responsible subject. `ModerationCase.Subject` and its scalar identity
+are nullable until a separate attributed owner is established. Intake assignments
+start unresolved and unqualified; absent attribution cannot create a final finding.
+New facts may append after closure without reopening adjudication or changing
+another subject's responsibility. These model checks do not qualify native
+sources, authorize narrative access or complete provider/runtime assurance.
+
 ## Canonical recognition token computation
 
 `ModerationRecognitionKey` adds the native computation primitive without

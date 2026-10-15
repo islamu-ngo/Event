@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZPKG07Y1HR6X87T8FBVFEQ
+Title: "Model native publication preparation and independent active selection"
+Type: feat
+Scope: access
+Summary: "Retain typed publication definitions and distinct finite preparation provenance, preserve prior active selection across inactive adoption, and reject stale or foreign selection tuples without asserting native permission or current deployment evidence."
+Group: moderation-publication-selection-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

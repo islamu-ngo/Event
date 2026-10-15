@@ -1,0 +1,26 @@
+Change-Id: CHG-01M50084FS6Q2RMASRSN5SFH2C
+Title: "Project final recognition contributions without mixing purposes"
+Type: feat
+Scope: privacy
+Summary: "Retain immutable finite recognition contribution coordinates from an effective final Human sanction, project action and enrollment capabilities separately, and invalidate retained matching on expiry, reversal or changed original meaning without acquiring identifiers or native recognition authority."
+Group: moderation-recognition-contribution
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

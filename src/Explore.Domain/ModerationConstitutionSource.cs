@@ -89,8 +89,8 @@ public sealed class ModerationConstitutionSource
         {
             if (OriginalEffectId is not { } effect || OriginalSnapshotHash is null
                 || OriginalEffectBindingHash is null || OriginalCustodyUntil is not { } custody
-                || !ModerationDeploymentSource.Digest(OriginalSnapshotHash)
-                || !ModerationDeploymentSource.Digest(OriginalEffectBindingHash)
+                || !Digest(OriginalSnapshotHash)
+                || !Digest(OriginalEffectBindingHash)
                 || ValidUntil > custody)
                 throw new ArgumentException("Original constitution requires complete immutable purpose coordinates within original custody.");
             ModerationHostBinding.RequireUuidV7(effect, nameof(OriginalEffectId));
@@ -98,7 +98,7 @@ public sealed class ModerationConstitutionSource
         }
         if (Revision != 1 || PolicyRevision is < 1 or long.MaxValue || ModeCode is < 1 or > 2
             || RecordedByHumanId == Guid.Empty || WriterGeneration is < 1 or long.MaxValue
-            || !ModerationDeploymentSource.Digest(ProposedStateDigest)
+            || !Digest(ProposedStateDigest)
             || Reviewers.Count < MinimumIndependentReviewers || Reviewers.Count > 32)
             throw new ArgumentException("Constitution requires exact native generations and sufficient independent reviewer coverage.");
         var controllers = new HashSet<Guid>();
@@ -119,6 +119,7 @@ public sealed class ModerationConstitutionSource
             throw new ArgumentException("Aliases cannot supply independent reviewer capacity.");
     }
 
+    private static bool Digest(string? value) => value is { Length: 64 } && value.All(char.IsAsciiHexDigit);
     public override string ToString() => nameof(ModerationConstitutionSource);
 }
 

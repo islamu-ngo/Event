@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZNM5RCM6RJBXC1QG1JBEV4
+Title: "Model attributed source advancement and exact renewal operation tuples"
+Type: feat
+Scope: access
+Summary: "Select consecutive finite attribution sources for one existing open subject case while preserving opening history, rejecting unchanged live renewal and retaining an immutable expected pre-advance tuple without native authority."
+Group: moderation-attribution-renewal-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

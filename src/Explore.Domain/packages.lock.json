@@ -20,6 +20,9 @@
       "event.wire.contracts": {
         "type": "Project"
       },
+      "islamu.moderation.domain": {
+        "type": "Project"
+      },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "CentralTransitive",
         "requested": "[10.0.10, )",

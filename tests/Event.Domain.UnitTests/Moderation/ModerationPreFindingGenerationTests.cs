@@ -197,6 +197,47 @@ public sealed class ModerationPreFindingGenerationTests
         }
     }
 
+    [Test]
+    [Arguments("minimum")]
+    [Arguments("maximum")]
+    [Arguments("non-UTC")]
+    public async Task Completion_receipt_requires_a_finite_UTC_timestamp(string defect)
+    {
+        var invalid = defect == "minimum" ? DateTimeOffset.MinValue
+            : defect == "maximum" ? DateTimeOffset.MaxValue
+            : Now.ToOffset(TimeSpan.FromHours(1));
+        await Assert.That(() => ModerationPreFindingReceipt.Complete(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), 1, new string('a', 64), invalid)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Completion_receipt_retains_exact_result_and_finite_completion_time()
+    {
+        var id = Guid.CreateVersion7();
+        var host = Guid.CreateVersion7();
+        var trust = Guid.CreateVersion7();
+        var tenant = Guid.CreateVersion7();
+        var caseId = Guid.CreateVersion7();
+        var actor = Guid.CreateVersion7();
+        var result = Guid.CreateVersion7();
+        var digest = new string('a', 64);
+        var receipt = ModerationPreFindingReceipt.Complete(
+            id, host, trust, tenant, caseId, actor, result, 2, digest, Now);
+
+        await Assert.That(receipt.Id).IsEqualTo(id);
+        await Assert.That(receipt.HostBindingId).IsEqualTo(host);
+        await Assert.That(receipt.TrustDomainId).IsEqualTo(trust);
+        await Assert.That(receipt.TenantId).IsEqualTo(tenant);
+        await Assert.That(receipt.CaseId).IsEqualTo(caseId);
+        await Assert.That(receipt.ActorHumanId).IsEqualTo(actor);
+        await Assert.That(receipt.ResultId).IsEqualTo(result);
+        await Assert.That(receipt.ResultRevision).IsEqualTo(2L);
+        await Assert.That(receipt.RequestDigest).IsEqualTo(digest);
+        await Assert.That(receipt.CompletedAt).IsEqualTo(Now);
+    }
+
     private static void Set(object row, string property, object value) =>
         row.GetType().GetProperty(property)!.SetValue(row, value);
 }

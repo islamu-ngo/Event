@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4Z0XBJ5GF01540H3CXNSEAW
+Title: Deduplicate scoped operational budget usage
+Type: feat
+Scope: access
+Summary: Add portable rolling-window capacity accounting by canonical subject, scope, mandate and action. Exact retries retain original occurrence time and do not consume another slot. Native policy qualification and command enforcement remain unfinished.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

@@ -141,6 +141,7 @@ public sealed class ModerationPolicy
     public Guid? JurisdictionTenantId { get; private set; }
     public Guid? JurisdictionCommunityId { get; private set; }
     public Guid? JurisdictionResourceId { get; private set; }
+    public Guid? JurisdictionEventId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public Guid PublicationId { get; private set; }
@@ -150,12 +151,12 @@ public sealed class ModerationPolicy
     public AuthorityScope Jurisdiction
     {
         get => AuthorityScope.FromCoordinates(JurisdictionKind, JurisdictionTrustDomainId, JurisdictionSolutionId,
-            JurisdictionInstanceId, JurisdictionTenantId, JurisdictionCommunityId, JurisdictionResourceId);
+            JurisdictionInstanceId, JurisdictionTenantId, JurisdictionCommunityId, JurisdictionResourceId, JurisdictionEventId);
         private set
         {
             JurisdictionId = value.Id;
             (JurisdictionKind, JurisdictionTrustDomainId, JurisdictionSolutionId,
-                JurisdictionInstanceId, JurisdictionTenantId, JurisdictionCommunityId, JurisdictionResourceId) = value.Coordinates;
+                JurisdictionInstanceId, JurisdictionTenantId, JurisdictionCommunityId, JurisdictionResourceId, JurisdictionEventId) = value.Coordinates;
         }
     }
 

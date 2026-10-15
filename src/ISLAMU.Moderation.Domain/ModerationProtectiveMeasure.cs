@@ -35,6 +35,7 @@ public sealed class ModerationProtectiveMeasure
     public Guid? SubjectOriginTenantId { get; private set; }
     public Guid? SubjectOriginCommunityId { get; private set; }
     public Guid? SubjectOriginResourceId { get; private set; }
+    public Guid? SubjectOriginEventId { get; private set; }
     public ModerationSubjectKind ProtectorKind { get; private set; }
     public Guid ProtectorId { get; private set; }
     public ModerationScopeKind ProtectorOriginKind { get; private set; }
@@ -44,6 +45,7 @@ public sealed class ModerationProtectiveMeasure
     public Guid? ProtectorOriginTenantId { get; private set; }
     public Guid? ProtectorOriginCommunityId { get; private set; }
     public Guid? ProtectorOriginResourceId { get; private set; }
+    public Guid? ProtectorOriginEventId { get; private set; }
     public ModerationScopeKind IssuingScopeKind { get; private set; }
     public Guid IssuingScopeTrustDomainId { get; private set; }
     public Guid? IssuingScopeSolutionId { get; private set; }
@@ -51,6 +53,7 @@ public sealed class ModerationProtectiveMeasure
     public Guid? IssuingScopeTenantId { get; private set; }
     public Guid? IssuingScopeCommunityId { get; private set; }
     public Guid? IssuingScopeResourceId { get; private set; }
+    public Guid? IssuingScopeEventId { get; private set; }
     public ModerationScopeKind ScopeKind { get; private set; }
     public Guid ScopeTrustDomainId { get; private set; }
     public Guid? ScopeSolutionId { get; private set; }
@@ -58,6 +61,7 @@ public sealed class ModerationProtectiveMeasure
     public Guid? ScopeTenantId { get; private set; }
     public Guid? ScopeCommunityId { get; private set; }
     public Guid? ScopeResourceId { get; private set; }
+    public Guid? ScopeEventId { get; private set; }
     public ModerationSubjectKind? ReviewerKind { get; private set; }
     public Guid? ReviewerId { get; private set; }
     public ModerationScopeKind? ReviewerOriginKind { get; private set; }
@@ -67,19 +71,20 @@ public sealed class ModerationProtectiveMeasure
     public Guid? ReviewerOriginTenantId { get; private set; }
     public Guid? ReviewerOriginCommunityId { get; private set; }
     public Guid? ReviewerOriginResourceId { get; private set; }
+    public Guid? ReviewerOriginEventId { get; private set; }
     public int CapabilityMask { get; private set; }
 
     public SubjectReference Subject
     {
         get => SubjectReference.Create(SubjectKind, SubjectId, AuthorityScope.FromCoordinates(
             SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId));
+            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId));
         private set
         {
             SubjectKind = value.Kind;
             SubjectId = value.Id;
             (SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId) = value.Origin.Coordinates;
+                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId) = value.Origin.Coordinates;
         }
     }
 
@@ -87,30 +92,30 @@ public sealed class ModerationProtectiveMeasure
     {
         get => SubjectReference.Create(ProtectorKind, ProtectorId, AuthorityScope.FromCoordinates(
             ProtectorOriginKind, ProtectorOriginTrustDomainId, ProtectorOriginSolutionId, ProtectorOriginInstanceId,
-            ProtectorOriginTenantId, ProtectorOriginCommunityId, ProtectorOriginResourceId));
+            ProtectorOriginTenantId, ProtectorOriginCommunityId, ProtectorOriginResourceId, ProtectorOriginEventId));
         private set
         {
             ProtectorKind = value.Kind;
             ProtectorId = value.Id;
             (ProtectorOriginKind, ProtectorOriginTrustDomainId, ProtectorOriginSolutionId, ProtectorOriginInstanceId,
-                ProtectorOriginTenantId, ProtectorOriginCommunityId, ProtectorOriginResourceId) = value.Origin.Coordinates;
+                ProtectorOriginTenantId, ProtectorOriginCommunityId, ProtectorOriginResourceId, ProtectorOriginEventId) = value.Origin.Coordinates;
         }
     }
 
     public AuthorityScope IssuingScope
     {
         get => AuthorityScope.FromCoordinates(IssuingScopeKind, IssuingScopeTrustDomainId, IssuingScopeSolutionId,
-            IssuingScopeInstanceId, IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId);
+            IssuingScopeInstanceId, IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId, IssuingScopeEventId);
         private set => (IssuingScopeKind, IssuingScopeTrustDomainId, IssuingScopeSolutionId, IssuingScopeInstanceId,
-            IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId) = value.Coordinates;
+            IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId, IssuingScopeEventId) = value.Coordinates;
     }
 
     public AuthorityScope Scope
     {
         get => AuthorityScope.FromCoordinates(ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId);
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId);
         private set => (ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId) = value.Coordinates;
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId) = value.Coordinates;
     }
 
     public IReadOnlySet<ModerationCapability> Capabilities => EffectiveRestrictions.FromCapabilityMask(CapabilityMask);
@@ -121,7 +126,7 @@ public sealed class ModerationProtectiveMeasure
     public DateTimeOffset? ReviewedAt { get; private set; }
     public SubjectReference? Reviewer => SubjectReference.FromOptionalCoordinates(
         ReviewerKind, ReviewerId, ReviewerOriginKind, ReviewerOriginTrustDomainId, ReviewerOriginSolutionId,
-        ReviewerOriginInstanceId, ReviewerOriginTenantId, ReviewerOriginCommunityId, ReviewerOriginResourceId);
+        ReviewerOriginInstanceId, ReviewerOriginTenantId, ReviewerOriginCommunityId, ReviewerOriginResourceId, ReviewerOriginEventId);
     public DateTimeOffset? RevokedAt { get; private set; }
     public long Revision { get; private set; }
 
@@ -198,7 +203,7 @@ public sealed class ModerationProtectiveMeasure
         ReviewerKind = reviewer.Kind;
         ReviewerId = reviewer.Id;
         (ReviewerOriginKind, ReviewerOriginTrustDomainId, ReviewerOriginSolutionId, ReviewerOriginInstanceId,
-            ReviewerOriginTenantId, ReviewerOriginCommunityId, ReviewerOriginResourceId) = reviewer.Origin.Coordinates;
+            ReviewerOriginTenantId, ReviewerOriginCommunityId, ReviewerOriginResourceId, ReviewerOriginEventId) = reviewer.Origin.Coordinates;
         ReviewedAt = now.ToUniversalTime();
         Revision = nextRevision;
     }

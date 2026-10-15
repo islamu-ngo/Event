@@ -63,6 +63,7 @@ public class ModerationMaterializationInvariantTests
     [Arguments(ModerationScopeKind.Tenant)]
     [Arguments(ModerationScopeKind.Community)]
     [Arguments(ModerationScopeKind.Resource)]
+    [Arguments(ModerationScopeKind.Event)]
     public async Task AllJurisdictionsReconstructWithCompleteAncestry(ModerationScopeKind kind)
     {
         var scope = Scope(kind);
@@ -73,6 +74,66 @@ public class ModerationMaterializationInvariantTests
 
         await Assert.That(row.Scope).IsEqualTo(scope);
         await Assert.That(row.Subject.Origin).IsEqualTo(scope);
+    }
+
+    [Test]
+    public async Task EventDecisionApprovalsAndSanctionSurviveScalarHydrationWithoutResourceAlias()
+    {
+        var scope = Scope(ModerationScopeKind.Event);
+        var decision = ModerationDecision.Propose(Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Human(scope), Human(scope), scope, scope,
+            ModerationRuleReference.Create(scope.Id, "event-risk", 1),
+            [ModerationCapability.Participate], Now, Now.AddDays(1), null, 2, Now);
+        decision.RecordResponse(1, Now);
+        decision.AcceptFinding(Guid.CreateVersion7(), 2, Now);
+        var first = Human(scope);
+        var second = Human(scope);
+        decision.Approve(first, scope, 3, Now);
+        decision.Approve(second, scope, 4, Now);
+        var restored = Hydrate(decision);
+        restored.ValidatePersistedState();
+        await Assert.That(restored.Subject).IsEqualTo(decision.Subject);
+        await Assert.That(restored.Issuer).IsEqualTo(decision.Issuer);
+        await Assert.That(restored.IssuingScope).IsEqualTo(scope);
+        await Assert.That(restored.Scope).IsEqualTo(scope);
+        await Assert.That(restored.Approvals).IsEquivalentTo(new[] { first, second });
+        var sanction = restored.Activate(Guid.CreateVersion7(), 5, Now);
+        var retained = Hydrate(sanction);
+        retained.ValidatePersistedState();
+        await Assert.That(retained.Scope).IsEqualTo(scope);
+        await Assert.That(retained.Subject).IsEqualTo(decision.Subject);
+        await Assert.That(retained.ScopeResourceId).IsNull();
+        await Assert.That(retained.ScopeEventId).IsEqualTo(scope.Id);
+    }
+
+    [Test]
+    [Arguments(1, "Approval1OriginEventId")]
+    [Arguments(1, "Approval2OriginEventId")]
+    [Arguments(3, "ReviewerOriginEventId")]
+    public async Task OrphanEventCoordinateCannotHideInsideAbsentOptionalCarrier(int kind, string property)
+    {
+        var row = Hydrate(CreateAggregate(kind));
+        Set(row, property, Guid.CreateVersion7());
+        await Reject(row);
+    }
+
+    [Test]
+    [Arguments("Scope")]
+    [Arguments("SubjectOrigin")]
+    public async Task EventHydrationRejectsResourceOrCommunityCoordinatesAndMissingEvent(string prefix)
+    {
+        var scope = Scope(ModerationScopeKind.Event);
+        var source = ModerationCase.Open(Guid.CreateVersion7(), Human(scope), scope, Guid.CreateVersion7(), Now);
+        foreach (var (coordinate, value) in new (string, object?)[]
+        {
+            ("ResourceId", scope.Id), ("CommunityId", Guid.CreateVersion7()),
+            ("EventId", null), ("EventId", Guid.Empty), ("Kind", ModerationScopeKind.Resource)
+        })
+        {
+            var row = Hydrate(source);
+            Set(row, prefix + coordinate, value);
+            await Reject(row);
+        }
     }
 
     [Test]
@@ -512,6 +573,7 @@ public class ModerationMaterializationInvariantTests
         if (kind == ModerationScopeKind.Instance) return instance;
         var tenant = AuthorityScope.Tenant(instance, Guid.CreateVersion7());
         if (kind == ModerationScopeKind.Tenant) return tenant;
+        if (kind == ModerationScopeKind.Event) return AuthorityScope.Event(tenant, Guid.CreateVersion7());
         var community = AuthorityScope.Community(tenant, Guid.CreateVersion7());
         return kind == ModerationScopeKind.Community
             ? community : AuthorityScope.Resource(community, Guid.CreateVersion7());

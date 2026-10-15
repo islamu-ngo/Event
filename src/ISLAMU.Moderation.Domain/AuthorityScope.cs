@@ -7,7 +7,8 @@ public enum ModerationScopeKind
     Instance = 3,
     Tenant = 4,
     Community = 5,
-    Resource = 6
+    Resource = 6,
+    Event = 7
 }
 
 /// <summary>A qualified jurisdiction whose ancestry remains part of its identity.</summary>
@@ -43,6 +44,9 @@ public sealed record AuthorityScope
     public static AuthorityScope Community(AuthorityScope parent, Guid id) =>
         CreateChild(ModerationScopeKind.Community, parent, id, ModerationScopeKind.Tenant);
 
+    public static AuthorityScope Event(AuthorityScope parent, Guid id) =>
+        CreateChild(ModerationScopeKind.Event, parent, id, ModerationScopeKind.Tenant);
+
     public static AuthorityScope Resource(AuthorityScope parent, Guid id)
     {
         ArgumentNullException.ThrowIfNull(parent);
@@ -70,30 +74,33 @@ public sealed record AuthorityScope
 
     public override string ToString() => Kind.ToString();
 
-    internal (ModerationScopeKind Kind, Guid TrustDomainId, Guid? SolutionId, Guid? InstanceId,
-        Guid? TenantId, Guid? CommunityId, Guid? ResourceId) Coordinates =>
+    public (ModerationScopeKind Kind, Guid TrustDomainId, Guid? SolutionId, Guid? InstanceId,
+        Guid? TenantId, Guid? CommunityId, Guid? ResourceId, Guid? EventId) Coordinates =>
         (Kind, TrustDomainId, AncestorId(ModerationScopeKind.Solution), AncestorId(ModerationScopeKind.Instance),
             AncestorId(ModerationScopeKind.Tenant), AncestorId(ModerationScopeKind.Community),
-            AncestorId(ModerationScopeKind.Resource));
+            AncestorId(ModerationScopeKind.Resource), AncestorId(ModerationScopeKind.Event));
 
-    internal static AuthorityScope FromCoordinates(
+    /// <summary>Restores only a valid complete ancestry shape; coordinates are not an authority grant.</summary>
+    public static AuthorityScope FromCoordinates(
         ModerationScopeKind kind, Guid trustDomainId, Guid? solutionId, Guid? instanceId,
-        Guid? tenantId, Guid? communityId, Guid? resourceId)
+        Guid? tenantId, Guid? communityId, Guid? resourceId, Guid? eventId)
     {
         var shapeIsValid = kind switch
         {
             ModerationScopeKind.TrustDomain => solutionId is null && instanceId is null
-                && tenantId is null && communityId is null && resourceId is null,
+                && tenantId is null && communityId is null && resourceId is null && eventId is null,
             ModerationScopeKind.Solution => solutionId is not null && instanceId is null
-                && tenantId is null && communityId is null && resourceId is null,
+                && tenantId is null && communityId is null && resourceId is null && eventId is null,
             ModerationScopeKind.Instance => solutionId is not null && instanceId is not null
-                && tenantId is null && communityId is null && resourceId is null,
+                && tenantId is null && communityId is null && resourceId is null && eventId is null,
             ModerationScopeKind.Tenant => solutionId is not null && instanceId is not null
-                && tenantId is not null && communityId is null && resourceId is null,
+                && tenantId is not null && communityId is null && resourceId is null && eventId is null,
             ModerationScopeKind.Community => solutionId is not null && instanceId is not null
-                && tenantId is not null && communityId is not null && resourceId is null,
+                && tenantId is not null && communityId is not null && resourceId is null && eventId is null,
             ModerationScopeKind.Resource => solutionId is not null && instanceId is not null
-                && tenantId is not null && resourceId is not null,
+                && tenantId is not null && resourceId is not null && eventId is null,
+            ModerationScopeKind.Event => solutionId is not null && instanceId is not null
+                && tenantId is not null && communityId is null && resourceId is null && eventId is not null,
             _ => false
         };
         if (!shapeIsValid)
@@ -107,6 +114,7 @@ public sealed record AuthorityScope
         if (tenantId is { } tenant) scope = Tenant(scope, tenant);
         if (communityId is { } community) scope = Community(scope, community);
         if (resourceId is { } resource) scope = Resource(scope, resource);
+        if (eventId is { } eventIdentifier) scope = Event(scope, eventIdentifier);
         return scope;
     }
 

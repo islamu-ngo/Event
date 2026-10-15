@@ -38,10 +38,11 @@ public sealed record SubjectReference
 
     internal static SubjectReference? FromOptionalCoordinates(
         ModerationSubjectKind? kind, Guid? id, ModerationScopeKind? originKind, Guid? trustDomainId,
-        Guid? solutionId, Guid? instanceId, Guid? tenantId, Guid? communityId, Guid? resourceId)
+        Guid? solutionId, Guid? instanceId, Guid? tenantId, Guid? communityId, Guid? resourceId, Guid? eventId)
     {
         if (kind is null && id is null && originKind is null && trustDomainId is null
-            && solutionId is null && instanceId is null && tenantId is null && communityId is null && resourceId is null)
+            && solutionId is null && instanceId is null && tenantId is null && communityId is null
+            && resourceId is null && eventId is null)
         {
             return null;
         }
@@ -52,6 +53,6 @@ public sealed record SubjectReference
         }
 
         return Create(kind.Value, id.Value, AuthorityScope.FromCoordinates(
-            originKind.Value, trustDomainId.Value, solutionId, instanceId, tenantId, communityId, resourceId));
+            originKind.Value, trustDomainId.Value, solutionId, instanceId, tenantId, communityId, resourceId, eventId));
     }
 }

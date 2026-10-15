@@ -35,6 +35,7 @@ public sealed class ModerationCase
     public Guid? SubjectOriginTenantId { get; private set; }
     public Guid? SubjectOriginCommunityId { get; private set; }
     public Guid? SubjectOriginResourceId { get; private set; }
+    public Guid? SubjectOriginEventId { get; private set; }
     public ModerationScopeKind ScopeKind { get; private set; }
     public Guid ScopeTrustDomainId { get; private set; }
     public Guid? ScopeSolutionId { get; private set; }
@@ -42,26 +43,27 @@ public sealed class ModerationCase
     public Guid? ScopeTenantId { get; private set; }
     public Guid? ScopeCommunityId { get; private set; }
     public Guid? ScopeResourceId { get; private set; }
+    public Guid? ScopeEventId { get; private set; }
     public SubjectReference Subject
     {
         get => SubjectReference.Create(SubjectKind, SubjectId, AuthorityScope.FromCoordinates(
             SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId));
+            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId));
         private set
         {
             SubjectKind = value.Kind;
             SubjectId = value.Id;
             (SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId) = value.Origin.Coordinates;
+                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId) = value.Origin.Coordinates;
         }
     }
 
     public AuthorityScope Scope
     {
         get => AuthorityScope.FromCoordinates(ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId);
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId);
         private set => (ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId) = value.Coordinates;
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId) = value.Coordinates;
     }
 
     public Guid OccurrenceId { get; private set; }

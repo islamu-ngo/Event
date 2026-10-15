@@ -6,6 +6,13 @@ store scalar ancestry coordinates and reconstruct checked semantic values.
 `Explore.Persistence` maps those same entities; it does not keep a second
 serialized interpretation of their state.
 
+The shared scope contract distinguishes `Event = 7` from Resource and preserves
+its eighth `EventId` coordinate through every scalar aggregate and optional
+subject carrier. Event is an exact Tenant child, never a Resource alias; malformed
+or mixed leaf ancestry is rejected. Catalogue revision 2 adds Event only to CFG29
+classification correction. These definitions do not grant native authority or
+prove deployment, provider schema, disclosure or completed allegation intake.
+
 ## Canonical recognition token computation
 
 `ModerationRecognitionKey` adds the native computation primitive without

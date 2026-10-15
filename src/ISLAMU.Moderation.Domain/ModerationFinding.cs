@@ -94,6 +94,7 @@ public sealed class ModerationFinding
     public Guid? SubjectOriginTenantId { get; private set; }
     public Guid? SubjectOriginCommunityId { get; private set; }
     public Guid? SubjectOriginResourceId { get; private set; }
+    public Guid? SubjectOriginEventId { get; private set; }
     public ModerationScopeKind ScopeKind { get; private set; }
     public Guid ScopeTrustDomainId { get; private set; }
     public Guid? ScopeSolutionId { get; private set; }
@@ -101,6 +102,7 @@ public sealed class ModerationFinding
     public Guid? ScopeTenantId { get; private set; }
     public Guid? ScopeCommunityId { get; private set; }
     public Guid? ScopeResourceId { get; private set; }
+    public Guid? ScopeEventId { get; private set; }
     public Guid RuleOwnerId { get; private set; }
     public string RuleCode { get; private set; } = string.Empty;
     public long RuleRevision { get; private set; }
@@ -113,6 +115,7 @@ public sealed class ModerationFinding
     public Guid? AdjudicatorOriginTenantId { get; private set; }
     public Guid? AdjudicatorOriginCommunityId { get; private set; }
     public Guid? AdjudicatorOriginResourceId { get; private set; }
+    public Guid? AdjudicatorOriginEventId { get; private set; }
     public ModerationFindingEvidencePurpose EvidencePurpose { get; private set; }
     public Guid EvidenceReferenceId { get; private set; }
     public Guid? UrgencyQualificationId { get; private set; }
@@ -132,6 +135,7 @@ public sealed class ModerationFinding
     public Guid? ReversedByOriginTenantId { get; private set; }
     public Guid? ReversedByOriginCommunityId { get; private set; }
     public Guid? ReversedByOriginResourceId { get; private set; }
+    public Guid? ReversedByOriginEventId { get; private set; }
     public string? ReversalJustification { get; private set; }
     public DateTimeOffset? ReversedAt { get; private set; }
 
@@ -139,22 +143,22 @@ public sealed class ModerationFinding
     {
         get => SubjectReference.Create(SubjectKind, SubjectId, AuthorityScope.FromCoordinates(
             SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId));
+            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId));
         private set
         {
             SubjectKind = value.Kind;
             SubjectId = value.Id;
             (SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId) = value.Origin.Coordinates;
+                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId) = value.Origin.Coordinates;
         }
     }
 
     public AuthorityScope Scope
     {
         get => AuthorityScope.FromCoordinates(ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId);
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId);
         private set => (ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId) = value.Coordinates;
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId) = value.Coordinates;
     }
 
     public ModerationRuleReference Rule
@@ -168,14 +172,14 @@ public sealed class ModerationFinding
         get => SubjectReference.Create(AdjudicatorKind, AdjudicatorId, AuthorityScope.FromCoordinates(
             AdjudicatorOriginKind, AdjudicatorOriginTrustDomainId, AdjudicatorOriginSolutionId,
             AdjudicatorOriginInstanceId, AdjudicatorOriginTenantId, AdjudicatorOriginCommunityId,
-            AdjudicatorOriginResourceId));
+            AdjudicatorOriginResourceId, AdjudicatorOriginEventId));
         private set
         {
             AdjudicatorKind = value.Kind;
             AdjudicatorId = value.Id;
             (AdjudicatorOriginKind, AdjudicatorOriginTrustDomainId, AdjudicatorOriginSolutionId,
                 AdjudicatorOriginInstanceId, AdjudicatorOriginTenantId, AdjudicatorOriginCommunityId,
-                AdjudicatorOriginResourceId) = value.Origin.Coordinates;
+                AdjudicatorOriginResourceId, AdjudicatorOriginEventId) = value.Origin.Coordinates;
         }
     }
 
@@ -185,7 +189,7 @@ public sealed class ModerationFinding
     public SubjectReference? ReversedBy => SubjectReference.FromOptionalCoordinates(
         ReversedByKind, ReversedById, ReversedByOriginKind, ReversedByOriginTrustDomainId,
         ReversedByOriginSolutionId, ReversedByOriginInstanceId, ReversedByOriginTenantId,
-        ReversedByOriginCommunityId, ReversedByOriginResourceId);
+        ReversedByOriginCommunityId, ReversedByOriginResourceId, ReversedByOriginEventId);
 
     /// <summary>
     /// The materialization boundary must invoke this after scalar hydration and before publishing the entity.
@@ -308,7 +312,7 @@ public sealed class ModerationFinding
         ReversedById = reversedBy.Id;
         (ReversedByOriginKind, ReversedByOriginTrustDomainId, ReversedByOriginSolutionId,
             ReversedByOriginInstanceId, ReversedByOriginTenantId, ReversedByOriginCommunityId,
-            ReversedByOriginResourceId) = reversedBy.Origin.Coordinates;
+            ReversedByOriginResourceId, ReversedByOriginEventId) = reversedBy.Origin.Coordinates;
         ReversalJustification = justification;
         ReversedAt = now.ToUniversalTime();
         UpdatedAt = ReversedAt.Value;

@@ -54,6 +54,7 @@ public sealed class ModerationDecision
     public Guid? SubjectOriginTenantId { get; private set; }
     public Guid? SubjectOriginCommunityId { get; private set; }
     public Guid? SubjectOriginResourceId { get; private set; }
+    public Guid? SubjectOriginEventId { get; private set; }
     public ModerationSubjectKind IssuerKind { get; private set; }
     public Guid IssuerId { get; private set; }
     public ModerationScopeKind IssuerOriginKind { get; private set; }
@@ -63,6 +64,7 @@ public sealed class ModerationDecision
     public Guid? IssuerOriginTenantId { get; private set; }
     public Guid? IssuerOriginCommunityId { get; private set; }
     public Guid? IssuerOriginResourceId { get; private set; }
+    public Guid? IssuerOriginEventId { get; private set; }
     public ModerationScopeKind IssuingScopeKind { get; private set; }
     public Guid IssuingScopeTrustDomainId { get; private set; }
     public Guid? IssuingScopeSolutionId { get; private set; }
@@ -70,6 +72,7 @@ public sealed class ModerationDecision
     public Guid? IssuingScopeTenantId { get; private set; }
     public Guid? IssuingScopeCommunityId { get; private set; }
     public Guid? IssuingScopeResourceId { get; private set; }
+    public Guid? IssuingScopeEventId { get; private set; }
     public ModerationScopeKind ScopeKind { get; private set; }
     public Guid ScopeTrustDomainId { get; private set; }
     public Guid? ScopeSolutionId { get; private set; }
@@ -77,6 +80,7 @@ public sealed class ModerationDecision
     public Guid? ScopeTenantId { get; private set; }
     public Guid? ScopeCommunityId { get; private set; }
     public Guid? ScopeResourceId { get; private set; }
+    public Guid? ScopeEventId { get; private set; }
     public Guid RuleOwnerId { get; private set; }
     public string RuleCode { get; private set; } = string.Empty;
     public long RuleRevision { get; private set; }
@@ -90,6 +94,7 @@ public sealed class ModerationDecision
     public Guid? Approval1OriginTenantId { get; private set; }
     public Guid? Approval1OriginCommunityId { get; private set; }
     public Guid? Approval1OriginResourceId { get; private set; }
+    public Guid? Approval1OriginEventId { get; private set; }
     public ModerationSubjectKind? Approval2Kind { get; private set; }
     public Guid? Approval2Id { get; private set; }
     public ModerationScopeKind? Approval2OriginKind { get; private set; }
@@ -99,18 +104,19 @@ public sealed class ModerationDecision
     public Guid? Approval2OriginTenantId { get; private set; }
     public Guid? Approval2OriginCommunityId { get; private set; }
     public Guid? Approval2OriginResourceId { get; private set; }
+    public Guid? Approval2OriginEventId { get; private set; }
 
     public SubjectReference Subject
     {
         get => SubjectReference.Create(SubjectKind, SubjectId, AuthorityScope.FromCoordinates(
             SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId));
+            SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId));
         private set
         {
             SubjectKind = value.Kind;
             SubjectId = value.Id;
             (SubjectOriginKind, SubjectOriginTrustDomainId, SubjectOriginSolutionId, SubjectOriginInstanceId,
-                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId) = value.Origin.Coordinates;
+                SubjectOriginTenantId, SubjectOriginCommunityId, SubjectOriginResourceId, SubjectOriginEventId) = value.Origin.Coordinates;
         }
     }
 
@@ -118,30 +124,30 @@ public sealed class ModerationDecision
     {
         get => SubjectReference.Create(IssuerKind, IssuerId, AuthorityScope.FromCoordinates(
             IssuerOriginKind, IssuerOriginTrustDomainId, IssuerOriginSolutionId, IssuerOriginInstanceId,
-            IssuerOriginTenantId, IssuerOriginCommunityId, IssuerOriginResourceId));
+            IssuerOriginTenantId, IssuerOriginCommunityId, IssuerOriginResourceId, IssuerOriginEventId));
         private set
         {
             IssuerKind = value.Kind;
             IssuerId = value.Id;
             (IssuerOriginKind, IssuerOriginTrustDomainId, IssuerOriginSolutionId, IssuerOriginInstanceId,
-                IssuerOriginTenantId, IssuerOriginCommunityId, IssuerOriginResourceId) = value.Origin.Coordinates;
+                IssuerOriginTenantId, IssuerOriginCommunityId, IssuerOriginResourceId, IssuerOriginEventId) = value.Origin.Coordinates;
         }
     }
 
     public AuthorityScope IssuingScope
     {
         get => AuthorityScope.FromCoordinates(IssuingScopeKind, IssuingScopeTrustDomainId, IssuingScopeSolutionId,
-            IssuingScopeInstanceId, IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId);
+            IssuingScopeInstanceId, IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId, IssuingScopeEventId);
         private set => (IssuingScopeKind, IssuingScopeTrustDomainId, IssuingScopeSolutionId, IssuingScopeInstanceId,
-            IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId) = value.Coordinates;
+            IssuingScopeTenantId, IssuingScopeCommunityId, IssuingScopeResourceId, IssuingScopeEventId) = value.Coordinates;
     }
 
     public AuthorityScope Scope
     {
         get => AuthorityScope.FromCoordinates(ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId);
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId);
         private set => (ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId) = value.Coordinates;
+            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId) = value.Coordinates;
     }
 
     public ModerationRuleReference Rule
@@ -164,10 +170,10 @@ public sealed class ModerationDecision
         {
             var first = SubjectReference.FromOptionalCoordinates(Approval1Kind, Approval1Id, Approval1OriginKind,
                 Approval1OriginTrustDomainId, Approval1OriginSolutionId, Approval1OriginInstanceId,
-                Approval1OriginTenantId, Approval1OriginCommunityId, Approval1OriginResourceId);
+                Approval1OriginTenantId, Approval1OriginCommunityId, Approval1OriginResourceId, Approval1OriginEventId);
             var second = SubjectReference.FromOptionalCoordinates(Approval2Kind, Approval2Id, Approval2OriginKind,
                 Approval2OriginTrustDomainId, Approval2OriginSolutionId, Approval2OriginInstanceId,
-                Approval2OriginTenantId, Approval2OriginCommunityId, Approval2OriginResourceId);
+                Approval2OriginTenantId, Approval2OriginCommunityId, Approval2OriginResourceId, Approval2OriginEventId);
             if (first is null && second is not null)
             {
                 throw new ArgumentException("Approval slots must preserve insertion order without gaps.");
@@ -315,14 +321,14 @@ public sealed class ModerationDecision
             Approval1Kind = controller.Kind;
             Approval1Id = controller.Id;
             (Approval1OriginKind, Approval1OriginTrustDomainId, Approval1OriginSolutionId, Approval1OriginInstanceId,
-                Approval1OriginTenantId, Approval1OriginCommunityId, Approval1OriginResourceId) = controller.Origin.Coordinates;
+                Approval1OriginTenantId, Approval1OriginCommunityId, Approval1OriginResourceId, Approval1OriginEventId) = controller.Origin.Coordinates;
         }
         else
         {
             Approval2Kind = controller.Kind;
             Approval2Id = controller.Id;
             (Approval2OriginKind, Approval2OriginTrustDomainId, Approval2OriginSolutionId, Approval2OriginInstanceId,
-                Approval2OriginTenantId, Approval2OriginCommunityId, Approval2OriginResourceId) = controller.Origin.Coordinates;
+                Approval2OriginTenantId, Approval2OriginCommunityId, Approval2OriginResourceId, Approval2OriginEventId) = controller.Origin.Coordinates;
         }
 
         State = Approvals.Count == RequiredApprovals

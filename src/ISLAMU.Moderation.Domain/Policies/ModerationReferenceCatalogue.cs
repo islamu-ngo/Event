@@ -28,7 +28,7 @@ public static partial class ModerationReferenceCatalogue
     }
 
     public static IReadOnlyDictionary<ModerationReferenceProfileId, ModerationReferenceProfile> Profiles { get; }
-    public static long Revision => 1;
+    public static long Revision => 2;
 
     public static ModerationReferenceProfile GetProfile(ModerationReferenceProfileId id) =>
         Profiles.TryGetValue(id, out var profile) ? profile : throw new ArgumentOutOfRangeException(nameof(id));
@@ -163,7 +163,7 @@ public static partial class ModerationReferenceCatalogue
         yield return Profile(ProfileId.CFG29, Ground.ClassificationMismatchOrHonestError, Basis.ClassificationCorrection, Bundle.Unaffected,
             effects: [Native(Effect.ClassificationAndMaterialApproval, Mode.RequireReview, Target.ClassifiedContentVersions, ModerationCapability.Publish),
                 Native(Effect.AudienceDisclosureAndDerivatives, Mode.Guard, Target.ClassifiedContentVersions, ModerationCapability.ReadResource)],
-            scopes: [ModerationScopeKind.Resource], responses: [Response(Grade.Control, Timing.CurrentControlUntilQualifiedResolution, 0)],
+            scopes: [ModerationScopeKind.Resource, ModerationScopeKind.Event], responses: [Response(Grade.Control, Timing.CurrentControlUntilQualifiedResolution, 0)],
             prerequisites: ClassificationPrerequisites(), recognition: Recognition.Never,
             strategies: [Strategy.ClassificationIntegrity], subjects: [ModerationSubjectKind.Content]);
         yield return Profile(ProfileId.CFG30, Ground.FirstFinalClassificationViolation, Basis.ConfirmedWarning, Bundle.Unaffected,

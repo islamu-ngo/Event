@@ -5,6 +5,12 @@ A publishing restriction is not an instance-wide login or admission ban.
 Independent contributions retain their original scopes and expiry; reversing
 one contribution does not remove another applicable restriction.
 
+The shared definitions distinguish an Event from an individual resource, even
+when their identifiers match. Stored Event ancestry retains its exact tenant;
+classification correction is the only reference profile extended to Event scope.
+This model support does not enable a policy, authorize disclosure or certify
+provider migrations and native enforcement.
+
 The shared moderation engine records decisions and minimized change intents in
 the local primary transaction. Retries preserve the accepted result instead of
 creating another restriction. Permission must remain current through that

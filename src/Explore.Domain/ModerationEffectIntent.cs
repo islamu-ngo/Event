@@ -93,8 +93,9 @@ public sealed class ModerationEffectIntent
     public void Claim(Guid leaseId, long expectedRevision, DateTimeOffset now, DateTimeOffset expiresAt)
     {
         ValidatePersistedState();
-        if (leaseId == Guid.Empty || leaseId.Version != 7 || leaseId.Variant is < 8 or > 11 || expiresAt <= now)
-            throw new ArgumentException("A claim requires a native fencing identity and a positive lease.", nameof(leaseId));
+        if (leaseId == Guid.Empty || leaseId.Version != 7 || leaseId.Variant is < 8 or > 11
+            || expiresAt <= now || expiresAt == DateTimeOffset.MaxValue)
+            throw new ArgumentException("A claim requires a native fencing identity and a finite positive lease.", nameof(leaseId));
         if (Revision != expectedRevision || CompletedAt is not null || now < CreatedAt
             || LeaseId == leaseId || LeaseExpiresAt > now)
             throw new InvalidOperationException("The effect intent is already owned or no longer current.");
@@ -209,7 +210,8 @@ public sealed class ModerationEffectIntent
             || (LeaseId is null) != (LeaseStartedAt is null) || (LeaseId is null) != (LeaseExpiresAt is null)
             || LeaseId is { } lease && (lease == Guid.Empty || lease.Version != 7 || lease.Variant is < 8 or > 11)
             || LeaseStartedAt is { } started && (started.Offset != TimeSpan.Zero || started < CreatedAt)
-            || LeaseExpiresAt is { } expires && (expires.Offset != TimeSpan.Zero || expires <= LeaseStartedAt)
+            || LeaseExpiresAt is { } expires && (expires.Offset != TimeSpan.Zero
+                || expires == DateTimeOffset.MaxValue || expires <= LeaseStartedAt)
             || CompletedAt is { } completed && (completed.Offset != TimeSpan.Zero || LeaseId is null
                 || completed < LeaseStartedAt || completed >= LeaseExpiresAt))
             throw new InvalidOperationException("The persisted effect lease is inconsistent.");

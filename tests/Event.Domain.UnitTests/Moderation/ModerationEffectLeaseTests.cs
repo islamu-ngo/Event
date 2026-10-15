@@ -105,6 +105,25 @@ public sealed class ModerationEffectLeaseTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task An_unbounded_deadline_cannot_claim_or_replace_an_expired_owner(bool reclaim)
+    {
+        var effect = Effect();
+        if (reclaim) effect.Claim(First, 1, Now, Now.AddMinutes(1));
+        var revision = effect.Revision;
+        var at = reclaim ? Now.AddMinutes(1) : Now;
+        await Assert.That(() => effect.Claim(Second, revision, at, DateTimeOffset.MaxValue))
+            .Throws<ArgumentException>();
+        await Assert.That(effect.Revision).IsEqualTo(revision);
+        await Assert.That(effect.LeaseId).IsEqualTo(reclaim ? First : (Guid?)null);
+        await Assert.That(effect.LeaseStartedAt).IsEqualTo(reclaim ? Now : (DateTimeOffset?)null);
+        await Assert.That(effect.LeaseExpiresAt).IsEqualTo(reclaim ? Now.AddMinutes(1) : (DateTimeOffset?)null);
+        await Assert.That(effect.CompletedAt).IsNull();
+        effect.ValidatePersistedState();
+    }
+
+    [Test]
     public async Task Reclaim_requires_a_fresh_fencing_identity()
     {
         var effect = Effect();

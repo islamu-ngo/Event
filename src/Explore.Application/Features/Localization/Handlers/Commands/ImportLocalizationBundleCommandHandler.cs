@@ -49,6 +49,17 @@ public class ImportLocalizationBundleCommandHandler : ICommandHandler<ImportLoca
                 new ValidationFailure(nameof(request.Dto.LanguageCode), "Language code is not supported."),
             ]);
 
+        try
+        {
+            LocalizationBundlePolicy.Validate(request.Dto.Translations);
+        }
+        catch (ArgumentException)
+        {
+            const string message = "Bundle import requires bounded flat translation text.";
+            _metrics.RecordStaticBundleOperation("import_static_bundle", culture.Code, "validation_failure");
+            return BaseCommandResponse.Validation<Guid>([message], message);
+        }
+
         if (request.Dto.Translations.Count == 0)
         {
             const string message = "Bundle import requires at least one translation.";
@@ -69,10 +80,10 @@ public class ImportLocalizationBundleCommandHandler : ICommandHandler<ImportLoca
             _metrics.RecordStaticBundleOperation("import_static_bundle", culture.Code, "success");
             return BaseCommandResponse.Success(Guid.CreateVersion7(), message);
         }
-        catch (BundleWriteException ex)
+        catch (BundleWriteException)
         {
-            _logger.LogError(ex, "[LOCALIZATION] Static bundle import failed for {Language}", culture.Code);
-            var message = $"Failed to import bundle for '{culture.Code}': {ex.Message}";
+            _logger.LogError("localization_static_bundle_import_failed");
+            const string message = "Translation bundle import failed.";
             _metrics.RecordStaticBundleOperation("import_static_bundle", culture.Code, "write_error");
             return BaseCommandResponse.Validation<Guid>([message], message);
         }

@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Static bundle imports reject oversized or invalid flat text even when invoked
+directly by an application command. Provider export and file-write failures
+return fixed messages without provider details or filesystem exception text;
+use their stable failure categories for troubleshooting.
+
 Tolgee and Weblate responses larger than 4 MiB are rejected before their bodies
 reach translation parsing or retry metadata processing. The limit also applies
 to error bodies and chunked responses. Reduce the provider response size when

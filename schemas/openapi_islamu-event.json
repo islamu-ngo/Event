@@ -166100,18 +166100,27 @@
         "additionalProperties": false
       },
       "ImportLocalizationBundleDto": {
+        "required": [
+          "languageCode",
+          "translations"
+        ],
         "type": "object",
         "properties": {
           "languageCode": {
+            "maxLength": 35,
+            "minLength": 1,
             "type": "string"
           },
           "translations": {
+            "maxProperties": 16384,
             "type": "object",
             "additionalProperties": {
+              "maxLength": 16384,
               "type": "string"
             }
           }
-        }
+        },
+        "additionalProperties": false
       },
       "IncomingWebhookEffectStatusDto": {
         "type": "object",
@@ -169195,8 +169204,6 @@
         "type": "object",
         "properties": {
           "newPassword": {
-            "maxLength": 128,
-            "minLength": 12,
             "type": "string"
           }
         },
@@ -169508,13 +169515,9 @@
         "type": "object",
         "properties": {
           "currentPassword": {
-            "maxLength": 128,
-            "minLength": 1,
             "type": "string"
           },
           "newPassword": {
-            "maxLength": 128,
-            "minLength": 12,
             "type": "string"
           }
         },
@@ -169562,8 +169565,6 @@
             "type": "string"
           },
           "newPassword": {
-            "maxLength": 128,
-            "minLength": 12,
             "type": "string"
           }
         },

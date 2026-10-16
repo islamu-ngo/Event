@@ -189677,19 +189677,13 @@ namespace Explore.Blazor.Client.Clients
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("languageCode")]
-        public string? LanguageCode { get; set; } = default!;
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.StringLength(35, MinimumLength = 1)]
+        public string LanguageCode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("translations")]
-        public System.Collections.Generic.IDictionary<string, string>? Translations { get; set; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IDictionary<string, string> Translations { get; set; } = new System.Collections.Generic.Dictionary<string, string>();
 
     }
 
@@ -192417,8 +192411,7 @@ namespace Explore.Blazor.Client.Clients
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("newPassword")]
-        [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.StringLength(128, MinimumLength = 12)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string NewPassword { get; set; } = default!;
 
     }
@@ -192732,13 +192725,11 @@ namespace Explore.Blazor.Client.Clients
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("currentPassword")]
-        [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.StringLength(128, MinimumLength = 1)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string CurrentPassword { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("newPassword")]
-        [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.StringLength(128, MinimumLength = 12)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string NewPassword { get; set; } = default!;
 
     }
@@ -192776,8 +192767,7 @@ namespace Explore.Blazor.Client.Clients
         public string Token { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("newPassword")]
-        [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.StringLength(128, MinimumLength = 12)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string NewPassword { get; set; } = default!;
 
     }

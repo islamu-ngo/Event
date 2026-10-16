@@ -5,6 +5,17 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+ImportLocalizationBundleCommandHandler independently applies LocalizationBundlePolicy
+to direct command candidates before file effects. Import and TMS export handlers
+return fixed failure responses and log stable categories without attaching provider
+or filesystem exceptions. Existing administrator checks remain mandatory; these
+changes do not introduce a transaction-bound publication authority.
+LocalizationImportSchemaTransformer publishes the strict converter's object shape
+explicitly: required languageCode and translations, no unknown outer properties,
+bounded language length, entry count and translation value length. This preserves
+the DTO members consumed by generated clients; runtime parsing also enforces
+the key-family and aggregate limits that this schema does not express.
+
 TolgeeClient and WeblateClient bound every response body to 4 MiB through
 TmsResponseBoundaryHandler, inside the resilience pipeline. Buffer admission
 precedes retry metadata readers and generated client deserialization, including

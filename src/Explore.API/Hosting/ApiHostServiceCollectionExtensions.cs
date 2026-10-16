@@ -349,6 +349,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddDocumentTransformer<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<HalDtoSchemaTransformer>();
             options.AddSchemaTransformer<ExternalApiKeyIssuanceSchemaTransformer>();
+            options.AddSchemaTransformer<LocalizationImportSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
             options.AddDocumentTransformer<OpenApiStringEnumDocumentTransformer>();
             options.AddDocumentTransformer<OperatorIdentityManifestSchemaTransformer>();

@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+The local-password backend captures a deployment-owned JSON blocklist once,
+verifies its configured SHA-256 before parsing, bounds input to 16 MiB and
+100,000 entries, and rejects malformed metadata or canonical duplicates. An
+unusable capture denies all new credentials. Registration configures IdentityV3
+PBKDF2 with 100,000..2,000,000 iterations (default 210,000), replaces hashing
+with NFC normalization and exposes readiness without credential/path data.
+LocalIdentityOptions declares PasswordBlocklistPath, PasswordBlocklistSha256 and
+PasswordHashIterations. No corpus is bundled. Startup attachment, request/lifecycle
+validation and deployment configuration wiring remain required before activation.
+
 LocalPasswordPolicy normalizes valid UTF-16 to NFC without trimming whitespace
 or changing case. New credentials require 15 through 128 normalized Unicode
 scalars; verification accepts shorter existing credential shapes while retaining

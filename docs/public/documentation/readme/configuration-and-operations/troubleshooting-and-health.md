@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+The local-password backend expects a deployment-owned, digest-pinned blocklist
+with version, revision, source, license and password entries. Missing or invalid
+snapshots deny new credentials and make required readiness unhealthy. Hashing
+uses native IdentityV3 with NFC normalization and configurable bounded cost.
+No blocklist corpus is bundled; choose appropriately licensed data. Production
+startup and deployment wiring remain separate and must complete before use.
+
 The local credential policy counts normalized Unicode characters rather than
 UTF-16 code units. It preserves spaces and case and rejects malformed text.
 New credentials require 15 to 128 normalized characters; shorter existing

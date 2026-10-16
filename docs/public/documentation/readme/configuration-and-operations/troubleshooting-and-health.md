@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Cross-tenant moderation proposal discovery is limited to one exact live event
+and requires current persisted instance administration. The conversation tenant
+stays selected, and ordinary event reads remain isolated. This source capability
+does not itself authorize a proposal; the request preparation and final admission
+checks remain required.
+
 Webhook resource checks bind persisted ownership and delivery lineage to the
 original request and transaction. Missing or changed parents cannot be replaced by
 tracked objects, audit identifiers or portal session values. These source

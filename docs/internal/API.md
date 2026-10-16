@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+The managed AI moderation proposal target source reads one exact cross-tenant
+event on the original selected conversation owner. Discovery requires current
+persisted instance administration; acquisition and final validation also retain
+the genuine principal lease. Target discovery does not change the selected
+tenant or open ordinary event reads. The assignment source epoch protects target
+facts; administrator continuity belongs to the principal source. These primitives
+are not a proposal authorization decision or production preparation registration.
+
 Managed webhook resource sources retain the original context, connection, human,
 selected tenant and closed command selector. Acquisition validates the source-set,
 principal and support leases before retaining provider locks; final reads use that

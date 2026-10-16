@@ -1,0 +1,29 @@
+Change-Id: CHG-01M533X3C0B2S65ADWSH3JJHWE
+Title: "Retain exact cross-tenant moderation targets on original owners"
+Type: feat
+Scope: access
+Summary: "Require current persisted instance administration and retain one exact cross-tenant target without changing selected tenancy."
+Group: managed-human-ai-target-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Exact target facts remain bound to the original Serializable owner and genuine current administrator principal lease.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Target discovery preserves ordinary tenant isolation; proposal preparation and final admission remain required.

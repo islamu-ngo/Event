@@ -131,7 +131,7 @@ internal static class RelationalNamedLock
         bool ownsConnection = connection.State != ConnectionState.Open;
         if (ownsConnection)
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await dbContext.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         }
 
         string providerResource = NormalizeProviderResource(providerName, resource);
@@ -147,11 +147,15 @@ internal static class RelationalNamedLock
                 ? await ExecuteNonQueryAsync(command, cancellationToken).ConfigureAwait(false)
                 : await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             EnsureAcquireSucceeded(providerName, result);
-            return new SessionLease(connection, providerName, providerResource, ownsConnection);
+            return new SessionLease(dbContext, connection, providerName, providerResource, ownsConnection);
         }
         catch
         {
-            if (connection.State != ConnectionState.Closed)
+            if (ownsConnection)
+            {
+                await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
+            }
+            else if (connection.State != ConnectionState.Closed)
             {
                 await connection.CloseAsync().ConfigureAwait(false);
             }
@@ -306,6 +310,7 @@ internal static class RelationalNamedLock
     }
 
     private sealed class SessionLease(
+        DbContext dbContext,
         DbConnection connection,
         string providerName,
         string resource,
@@ -322,7 +327,11 @@ internal static class RelationalNamedLock
 
             if (connection.State != ConnectionState.Open)
             {
-                if (connection.State != ConnectionState.Closed)
+                if (ownsConnection)
+                {
+                    await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
+                }
+                else if (connection.State != ConnectionState.Closed)
                 {
                     await connection.CloseAsync().ConfigureAwait(false);
                 }
@@ -344,9 +353,9 @@ internal static class RelationalNamedLock
             }
             finally
             {
-                if (ownsConnection && connection.State != ConnectionState.Closed)
+                if (ownsConnection)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
                 }
             }
         }

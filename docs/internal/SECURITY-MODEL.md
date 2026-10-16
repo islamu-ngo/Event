@@ -606,6 +606,19 @@ Some machine callbacks are intentionally anonymous because the provider signatur
 
 External registration embeds are browser-only presentation, not authority. The BFF route `/bff/registration-provider-embed/tenants/{tenantId}/events/{eventId}/workflows/{workflowId}/requirements/{requirementId}/channels/{channelId}/bindings/{bindingId}` is authenticated, same-origin, no-store, and accepts no query string. It fetches a server-generated launch descriptor via the generated API client, rejects lineage mismatches and non-approved HTTPS URLs, blocks local/private literal hosts, and emits a route-specific CSP: `default-src 'none'; frame-src {approved-origin}; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'none'; style-src 'none'`. The HTML contains only a sandboxed iframe (`allow-forms allow-same-origin allow-scripts`) and a `noopener noreferrer` new-tab fallback. Iframe load or navigation never completes a requirement; clients poll server-owned order/requirement status.
 
+## Session Lock Tenant Authority
+
+`RelationalNamedLock.AcquireSessionAsync` opens an owned relational connection
+through EF's `Database.OpenConnectionAsync`, not directly through the provider
+connection. PostgreSQL tenant-session interception therefore initializes and
+seals the original tenant before the lock protects any business work.
+
+The lease retains the context as well as the physical connection. Owned
+connections close through EF on acquisition failure, early connection loss and
+normal release so its ownership accounting remains consistent. Existing caller
+connections retain their original ownership; provider lock commands and the
+SQLite process-lock behavior are unchanged.
+
 ## Outgoing Webhook Egress
 
 Outgoing LocalProvider endpoints are user-configured URLs, so delivery is an SSRF-sensitive egress boundary.

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M529X5T5PZ1748ZNCRSZMNVM
+Title: "Initialize tenant authority before acquiring session locks"
+Type: fix
+Scope: access
+Summary: "Open and close owned named-lock connections through EF so tenant-session interception runs before protected business work."
+Group: named-lock-tenant-session-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Seal the original PostgreSQL tenant session when the named lock opens its connection rather than relying on a later business command.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

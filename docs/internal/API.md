@@ -5,6 +5,13 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+Localization TMS binding status uses ILocalizationSecretStatusReader rather than
+generic SecretBindingRepository queries. Native reads return only whether an
+unqualified binding exists for the selected tenant or instance fallback. They
+never return secret values or binding references. Native execution is a bounded
+data capability, not administrator authority; existing handler authorization
+remains mandatory.
+
 HierarchicalSettingsReader separates hierarchy resolution and local cache
 invalidation from mutation entrypoints. InstanceTenantSettingsReader obtains
 detached native instance and selected-tenant images through ordinary settings

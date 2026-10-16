@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Localization configuration reports only whether a TMS API-key binding exists,
+not whether the external secret is valid or reachable. A tenant binding or
+instance fallback can configure this status; another tenant's binding and
+qualified bindings do not. Install the native localization status contract
+instead of granting direct secret-binding table access.
+
 Settings reads require the installed ordinary-settings custody contract and its
 discovery-disclosure dependency. Retain the configured Runtime or Global scope;
 do not grant direct settings-table access to repair a failed native read.

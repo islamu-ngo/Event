@@ -54,7 +54,9 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         NativeQueueEnrollment = new PostgresNativeQueueEnrollment(
             "postgres",
             _nativeQueueLogins[PrimaryDatabaseRole.Global].Username,
-            _nativeQueueLogins[PrimaryDatabaseRole.Runtime].Username);
+            _nativeQueueLogins[PrimaryDatabaseRole.Runtime].Username,
+            _nativeQueueLogins[PrimaryDatabaseRole.EmailPolicyInstanceMutation].Username,
+            _nativeQueueLogins[PrimaryDatabaseRole.EmailPolicyTenantMutation].Username);
     }
 
     /// <summary>

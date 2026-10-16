@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+PostgresNativeQueueEnrollment binds Migrator, Global, Runtime and the existing
+EmailPolicyInstanceMutation/EmailPolicyTenantMutation login authorities together.
+All five must be distinct PostgreSQL identifiers within the unchanged 63-byte,
+trim/control-character boundary. The email role configuration already exists;
+enrollment now carries its original identities into source-owned native contracts
+instead of rediscovering role authority from current ACLs. No new secret source or
+database role configuration key is introduced by this enrollment expansion.
+
 ProvisioningSharedWriterAssertions.Writer is the executable catalog verifier
 shared by source-owned native compositions. Expected bodies, targets, role stamps
 and privilege contracts come from the owning implementation, never live ACLs.

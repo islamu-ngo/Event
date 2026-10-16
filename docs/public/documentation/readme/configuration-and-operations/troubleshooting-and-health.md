@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Native capability enrollment includes the existing email-policy instance and
+tenant mutation login identities as well as Migrator, Global and Runtime. Keep all
+five identities distinct; reusing one database login across those authorities is
+rejected. Existing role configuration and approved secret authorities remain the
+source of their usernames and credentials; enrollment introduces no new secret.
+
 Shared native writer admission verifies the installed body, triggers, roles and
 privileges against the source-owned contract. Restamping a changed body does not
 make it trusted. An entirely absent protocol is permitted only during its declared

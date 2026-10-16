@@ -11,6 +11,19 @@ ABOUTME: Keeps token handling, proxying, render policy, service state, and clien
 
 ## Scope
 
+### AI client diagnostics and fallback parsing
+
+`AiAssistantClientService` logs fixed failure categories and HTTP status codes,
+never API exception objects, response bodies, conversation IDs or run IDs.
+User-facing command results remain separate from diagnostic output.
+
+Fallback response parsing accepts at most 65,536 characters with JSON depth 16.
+Problem codes must be strings of at most 128 characters; raw problem responses
+must be objects with one unambiguous `code` property. Invalid or oversized
+fallbacks use the existing status-based failure result rather than exposing
+parser failures. Generated API clients and confirmation request contracts are
+unchanged by this boundary.
+
 This document is the contributor-facing guide for `Explore.Blazor` and `Explore.Blazor.Client`. It focuses on the BFF trust boundary, proxy behavior, embedded control-plane shell, render-policy consumption, service/state patterns, and generated API client workflow.
 
 Use the specialized docs for deep detail:

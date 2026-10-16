@@ -87,6 +87,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresDiscoveryDisclosureContract.ApplyAsync(migratorContext);
             await PostgresOrdinarySettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLocalizationSecretStatusContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresGlobalLookupCatalogueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTenantLookupContract.ApplyAsync(migratorContext);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""

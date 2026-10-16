@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -47,25 +49,27 @@ public class LookupDataCache : ILookupDataCache
         _logger.LogInformation("Initializing lookup data cache...");
 
         using var scope = _scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var enrollment = dbContext.Database.IsNpgsql()
+            ? scope.ServiceProvider.GetRequiredService<PostgresNativeQueueEnrollment>() : null;
 
-        await LoadLookupAsync<EventType>(dbContext, cancellationToken);
-        await LoadLookupAsync<EventFormat>(dbContext, cancellationToken);
-        await LoadLookupAsync<EventStatus>(dbContext, cancellationToken);
-        await LoadLookupAsync<AudienceAge>(dbContext, cancellationToken);
-        await LoadLookupAsync<AudienceGender>(dbContext, cancellationToken);
-        await LoadLookupAsync<Madhab>(dbContext, cancellationToken);
-        await LoadLookupAsync<Language>(dbContext, cancellationToken);
-        await LoadLookupAsync<VisibilityType>(dbContext, cancellationToken);
-        await LoadLookupAsync<ApprovalStatus>(dbContext, cancellationToken);
-        await LoadLookupAsync<RegistrationMode>(dbContext, cancellationToken);
-        await LoadLookupAsync<Role>(dbContext, cancellationToken);
-        await LoadLookupAsync<OrganizationPosition>(dbContext, cancellationToken);
-        await LoadLookupAsync<ActorType>(dbContext, cancellationToken);
-        await LoadLookupAsync<DidCustodyType>(dbContext, cancellationToken);
-        await LoadLookupAsync<FileType>(dbContext, cancellationToken);
-        await LoadLookupAsync<TagType>(dbContext, cancellationToken);
-        await LoadLookupAsync<OwnerType>(dbContext, cancellationToken);
+        await LoadLookupAsync<EventType>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<EventFormat>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<EventStatus>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<AudienceAge>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<AudienceGender>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<Madhab>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<Language>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<VisibilityType>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<ApprovalStatus>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<RegistrationMode>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<Role>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<OrganizationPosition>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<ActorType>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<DidCustodyType>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<FileType>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<TagType>(dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<OwnerType>(dbContext, enrollment, cancellationToken);
 
         _logger.LogInformation("Lookup data cache initialized with {Count} types", _cache.Count);
     }
@@ -76,11 +80,14 @@ public class LookupDataCache : ILookupDataCache
         await InitializeAsync(cancellationToken);
     }
 
-    private async Task LoadLookupAsync<T>(ExploreDbContext dbContext, CancellationToken cancellationToken) where T : class
+    private async Task LoadLookupAsync<T>(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? enrollment,
+        CancellationToken cancellationToken) where T : class
     {
         try
         {
-            var items = await dbContext.Set<T>().AsNoTracking().ToListAsync(cancellationToken);
+            var items = dbContext.Database.IsNpgsql()
+                ? await GlobalLookupCatalogueProviderOperations.ReadAsync<T>(dbContext, enrollment!, cancellationToken)
+                : await dbContext.Set<T>().AsNoTracking().ToListAsync(cancellationToken);
 
             var idProperty = typeof(T).GetProperty("Id");
             if (idProperty is null || idProperty.PropertyType != typeof(int))
@@ -94,9 +101,9 @@ public class LookupDataCache : ILookupDataCache
 
             _logger.LogDebug("Cached {Count} {Type} items", items.Count, typeof(T).Name);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Failed to load lookup data for {Type}", typeof(T).Name);
+            _logger.LogError("Failed to load lookup data for {Type}", typeof(T).Name);
         }
     }
 }

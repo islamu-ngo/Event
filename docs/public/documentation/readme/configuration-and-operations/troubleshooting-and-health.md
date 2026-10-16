@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Startup reference lookup caches require the native catalogue contract for the
+Runtime account. An empty role cache can make valid administrator checks fail
+closed. Verify catalogue readiness rather than granting direct role-table
+access or assigning the Global account. The projection excludes tenant-owned
+event types and does not grant user roles.
+
 Localization configuration reports only whether a TMS API-key binding exists,
 not whether the external secret is valid or reachable. A tenant binding or
 instance fallback can configure this status; another tenant's binding and

@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+LookupDataCache loads the closed reference catalogue through the native
+GlobalLookupCatalogueProviderOperations projection. Here "Global" names
+tenant-independent data, not the database login: only enrolled Runtime executes
+the catalogue function. Global, migration and email accounts are rejected.
+The seventeen declared selectors expose only declared lookup fields; EventType
+includes only tenant-null rows. Role definitions are reference data, not user
+membership or administrator authority. Direct source-table reads remain denied.
+
 Localization TMS binding status uses ILocalizationSecretStatusReader rather than
 generic SecretBindingRepository queries. Native reads return only whether an
 unqualified binding exists for the selected tenant or instance fallback. They

@@ -16,6 +16,9 @@ x-local-identity-runtime-env: &local-identity-runtime-env
   Authentication__Local__JwtKey: ${AUTHENTICATION_LOCAL_JWT_KEY:-}
   Authentication__Local__LockoutThreshold: ${AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD:-5}
   Authentication__Local__LockoutDurationMinutes: ${AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES:-15}
+  Authentication__Local__PasswordBlocklistPath: ${AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH:-}
+  Authentication__Local__PasswordBlocklistSha256: ${AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256:-}
+  Authentication__Local__PasswordHashIterations: ${AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS:-210000}
   IdentityDatabase__Topology: ${IDENTITY_DATABASE_TOPOLOGY:-colocated}
   IdentityDatabase__Provider: ${IDENTITY_DATABASE_PROVIDER:-}
   IdentityDatabase__ConnectionString: ${IDENTITY_DATABASE_CONNECTION_STRING:-}

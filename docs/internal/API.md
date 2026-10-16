@@ -5,6 +5,18 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+Password deployment settings are catalogued as public, startup-owned values:
+AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH and SHA256 are optional file
+identity inputs; AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS defaults to
+210000 and is validated against 100000..2000000. API normalization maps those
+flat keys to Authentication:Local options without overwriting explicit
+hierarchical values. The existing KEYCLOAK__AUDIENCE template setting is also
+catalogued; its authentication behavior is unchanged. Process restart captures
+a new immutable snapshot. The
+operator supplies a read-only JSON file with FormatVersion=1, Revision, Source,
+License and Passwords; its SHA-256 is checked before parsing. No corpus or
+credential value belongs in source configuration.
+
 ConfigurePersistenceServices now attaches AddLocalPasswordPolicy after native
 Identity registration. The shared validator replaces composition-based password
 checks, and the normalized IdentityV3 hasher uses the configured work factor.
@@ -12,8 +24,8 @@ Missing/unusable blocklist capture makes readiness unhealthy when the primary
 provider is local or not yet selected; external-provider readiness does not fail
 solely for absent local policy, but local credential mutation still fails closed.
 The startup tests invoke production composition without opening a database.
-Flat environment-key catalogue/normalization and lifecycle-store integration
-remain separate; hierarchical Authentication:Local configuration is bound here.
+Flat and hierarchical configuration are described above; lifecycle-store mutation
+integration remains a separate boundary.
 
 LocalPasswordAttribute and manually instantiated request validators now use the
 same domain normalization policy. Login and current-password checks use the
@@ -31,8 +43,9 @@ unusable capture denies all new credentials. Registration configures IdentityV3
 PBKDF2 with 100,000..2,000,000 iterations (default 210,000), replaces hashing
 with NFC normalization and exposes readiness without credential/path data.
 LocalIdentityOptions declares PasswordBlocklistPath, PasswordBlocklistSha256 and
-PasswordHashIterations. No corpus is bundled. Startup attachment, request/lifecycle
-validation and deployment configuration wiring remain required before activation.
+PasswordHashIterations. No corpus is bundled. Production startup, request and
+deployment wiring are described above; lifecycle-store mutation integration
+remains required.
 
 LocalPasswordPolicy normalizes valid UTF-16 to NFC without trimming whitespace
 or changing case. New credentials require 15 through 128 normalized Unicode
@@ -40,8 +53,8 @@ scalars; verification accepts shorter existing credential shapes while retaining
 the 128-scalar ceiling. A 1,024-code-unit input bound precedes normalization,
 and malformed UTF-16 is rejected rather than repaired. Deterministic tests use
 fixed ASCII and astral scalars to avoid normalization-dependent random boundaries.
-This domain prerequisite does not switch hashing, request validation or Identity
-configuration; those production integrations remain required.
+Request validation and production native hashing integration are described
+above; lifecycle mutation enforcement remains a separate boundary.
 
 CustomPropertyPatternPolicy admits at most 2,048 characters of .NET
 non-backtracking syntax with a finite 100 ms match deadline. Unsupported

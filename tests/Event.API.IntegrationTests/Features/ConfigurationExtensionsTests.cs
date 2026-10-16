@@ -10,6 +10,21 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class ConfigurationExtensionsTests
 {
     [Test]
+    public async Task AddSecretAuthorityConfiguration_MapsLocalPasswordPolicyWithoutOverwritingCanonicalInputs()
+    {
+        var mapped = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH"] = "/operator/password-policy.json",
+            ["AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256"] = new string('a', 64),
+            ["AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS"] = "240000",
+            ["Authentication:Local:PasswordHashIterations"] = "250000"
+        });
+        await Assert.That(mapped["Authentication:Local:PasswordBlocklistPath"]).IsEqualTo("/operator/password-policy.json");
+        await Assert.That(mapped["Authentication:Local:PasswordBlocklistSha256"]).IsEqualTo(new string('a', 64));
+        await Assert.That(mapped["Authentication:Local:PasswordHashIterations"]).IsEqualTo("250000");
+    }
+
+    [Test]
     public async Task AddSecretAuthorityConfiguration_MapsCerbosUsePolicyScopeFromAuthoritativeKey()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>

@@ -440,6 +440,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 
 | Variable | Category | Sensitivity | Default | Requirement | Restart |
 |---|---|---|---|---|---|
+| `KEYCLOAK__AUDIENCE` | security | public | islamu-event-api | defaulted | process |
 | `PUBLIC_BASE_URL` | platform | public | None | optional | process |
 | `API_HTTP_PORT` | deployment | public | None | optional | deployment |
 | `UI_HTTP_PORT` | deployment | public | None | optional | deployment |
@@ -478,6 +479,9 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `AUTHENTICATION_LOCAL_JWT_KEY` | security | secret | None (secret) | optional | process |
 | `AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD` | security | public | 5 | defaulted | process |
 | `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | security | public | 15 | defaulted | process |
+| `AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH` | security | public | None | optional | process |
+| `AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256` | security | public | None | optional | process |
+| `AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS` | security | public | 210000 | defaulted | process |
 | `IDENTITY_DATABASE_TOPOLOGY` | integration | public | colocated | defaulted | process |
 | `KEYCLOAK_ENDPOINT` | identity | secret | None (secret) | required | process |
 | `KEYCLOAK_REALM` | identity | secret | None (secret) | required | process |

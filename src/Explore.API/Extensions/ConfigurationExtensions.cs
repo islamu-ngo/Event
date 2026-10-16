@@ -393,6 +393,12 @@ public static class ConfigurationExtensions
             ReadFirst(config, "Authentication:Local:LockoutThreshold", "AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD"));
         TrySet(mappedConfig, config, "Authentication:Local:LockoutDurationMinutes",
             ReadFirst(config, "Authentication:Local:LockoutDurationMinutes", "AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES"));
+        TrySet(mappedConfig, config, "Authentication:Local:PasswordBlocklistPath",
+            ReadFirst(config, "Authentication:Local:PasswordBlocklistPath", "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH"));
+        TrySet(mappedConfig, config, "Authentication:Local:PasswordBlocklistSha256",
+            ReadFirst(config, "Authentication:Local:PasswordBlocklistSha256", "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256"));
+        TrySet(mappedConfig, config, "Authentication:Local:PasswordHashIterations",
+            ReadFirst(config, "Authentication:Local:PasswordHashIterations", "AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS"));
         TrySet(mappedConfig, config, "IdentityDatabase:Topology",
             ReadFirst(config, "IdentityDatabase:Topology", "IDENTITY_DATABASE_TOPOLOGY"));
         TrySet(mappedConfig, config, "IdentityDatabase:Provider",

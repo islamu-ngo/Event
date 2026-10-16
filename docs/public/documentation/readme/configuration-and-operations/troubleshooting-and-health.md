@@ -8,12 +8,22 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Set AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH to a mounted, read-only
+operator-owned JSON file and AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256
+to its SHA-256 digest. The file contains FormatVersion (1), Revision, Source,
+License and a Passwords array; supply licensed data rather than copying a corpus
+into application source. AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS defaults
+to 210000, accepts 100000..2000000 and should be calibrated on deployment
+hardware. Explicit Authentication:Local settings take precedence over flat keys.
+Restart after replacing the snapshot or configuration; invalid capture denies
+local credential mutation and fails readiness for local/unselected primary auth.
+
 Production Identity composition now captures the configured local password
 blocklist and selects the normalized native hasher. A missing or invalid snapshot
 blocks local credential mutation. Readiness also fails when local authentication
 is primary or no provider has been selected; external-provider deployments do
 not fail readiness solely for an absent local snapshot. Configure the hierarchical
-Authentication:Local options; flat environment-key wiring is a separate step.
+Authentication:Local options or the flat deployment keys described above.
 
 Local credential requests apply consistent Unicode-aware length rules. Login
 and current-password fields permit shorter existing credentials; new passwords
@@ -26,13 +36,14 @@ with version, revision, source, license and password entries. Missing or invalid
 snapshots deny new credentials and make required readiness unhealthy. Hashing
 uses native IdentityV3 with NFC normalization and configurable bounded cost.
 No blocklist corpus is bundled; choose appropriately licensed data. Production
-startup and deployment wiring remain separate and must complete before use.
+startup and deployment wiring are described above; lifecycle-store integration
+remains required.
 
 The local credential policy counts normalized Unicode characters rather than
 UTF-16 code units. It preserves spaces and case and rejects malformed text.
 New credentials require 15 to 128 normalized characters; shorter existing
-credentials remain eligible for verification. These domain rules take effect only
-when request, hashing and Identity configuration integration is complete.
+credentials remain eligible for verification. HTTP/manual request validation
+and production native hashing now use these rules.
 
 Custom-property patterns now require supported non-backtracking syntax and
 are limited to 2,048 characters. Backreferences, lookarounds and malformed

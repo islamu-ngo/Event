@@ -1,0 +1,30 @@
+Change-Id: CHG-01M536FQWFQCYX1CFGVKXJ2QE2
+Title: "Expose local password deployment settings with canonical precedence"
+Type: feat
+Scope: access
+Summary: "Catalogue local password blocklist and hashing environment keys and map them without overwriting explicit hierarchical configuration."
+Group: local-password-deployment-configuration
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Deployment supplies digest-pinned snapshot identity and bounded hash cost; canonical configuration keeps precedence.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Three flat keys map to password settings with canonical precedence; catalogue the existing audience setting and regenerate native artifacts.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Mount licensed operator-owned data read-only and restart to recapture the immutable snapshot; lifecycle mutation integration remains separate.

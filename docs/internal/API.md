@@ -1013,7 +1013,15 @@ Injected into native CQS handlers, not controllers. Provides in-memory L1 + dist
 - Computes SHA256-based weak ETags on `application/json` and `application/hal+json` responses.
 - Returns `304 Not Modified` when client sends `If-None-Match` header matching current ETag.
 - Applied globally after output cache in the pipeline.
-- Uses `RecyclableMemoryStream` for efficient memory handling. Bodies larger than 256 KB skip ETag computation.
+- Uses bounded response capture with a 256 KiB retention budget checked before
+  allocation. Crossing the budget drains the retained prefix once and permanently
+  forwards subsequent writes without computing an ETag. Flushes and ineligible
+  output also switch to forwarding; event streams and declared non-JSON output
+  bypass capture. Private-no-store endpoints remain excluded.
+- Only completely captured successful JSON receives a validator. Matching requests
+  return bodyless 304 responses; HEAD suppresses response bytes while retaining
+  the representation length when available. The original response stream is
+  restored even when downstream execution throws.
 
 ---
 

@@ -6,6 +6,15 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Conditional JSON responses
+
+Small successful JSON responses may return a weak ETag for conditional requests.
+Responses exceeding 256 KiB, streaming or flushed responses, non-JSON content
+and private-no-store endpoints do not receive middleware-generated validators.
+A missing ETag on those responses is intentional: the API forwards the content
+without retaining the entire response in memory. A matching If-None-Match returns
+a bodyless 304, allowing the client to reuse its cached representation.
+
 ## File response sandboxing
 
 Storage downloads, public storage images and event-resource content return a

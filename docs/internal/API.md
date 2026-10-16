@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+HumanCerbosPrincipalReader requires the original resolved human and authentic
+credential lifetime before observing persisted principal sources on the selected
+idle owner. It rejects machine callers and account mismatch, retains the same
+request/principal/tenant across the await, and validates current persisted human
+facts afterward. It does not retain mutation admission. The signed-source tests
+resolve subjects through the real identity query and exercise actual JWT lifetime
+and SQLite source checks; production scope-factory registration remains separate.
+
 CerbosPrincipalBuilder.BuildPrincipalFromSources projects immutable persisted
 human facts into the existing policy attribute schema. Administrator membership
 maps are deduplicated, while event permission arrays retain their original order

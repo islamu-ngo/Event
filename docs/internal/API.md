@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+EventLocationDisclosureAudit.BindCorrection retains one RFC UUIDv7 correction
+message, accepting an identical repeat but rejecting replacement and unrelated
+audit reasons. LocationPrivacyCorrectionReceipt pairs governance effects with
+the exact audit message and timestamp, or erasure effects with committed intent
+identity, positive authority sequence and location identity. Tenant ownership is
+immutable. These identity-only domain receipts do not retain address payloads or
+foreign keys to disposable sources. Persistence mappings, generated migrations
+and dispatch admission remain required before deployment.
+
 EventLocation.CaptureGovernanceState returns immutable policy identity,
 disclosure selection, version and concurrency facts without physical address
 payloads. Governance tightening creates its audit from those facts before

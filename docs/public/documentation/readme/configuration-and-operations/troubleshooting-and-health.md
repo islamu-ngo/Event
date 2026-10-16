@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Location correction receipts can retain their original audit or committed
+erasure authority even after disposable source data is removed. A different
+message cannot replace the original correction, and mismatched audit pairs are
+rejected. These domain receipts do not activate correction delivery until
+persistence and dispatcher integration are complete.
+
 Location governance tightening preserves organizer disclosure selections while
 advancing the policy review version and audit. Its retained snapshot contains
 policy facts rather than the physical address. Detached event locations cannot

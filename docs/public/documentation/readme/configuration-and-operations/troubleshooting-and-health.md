@@ -14,6 +14,13 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+Managed event-assignment checks now retain the original selected database owner
+and return fresh persisted facts after source-set exclusion. Ordinary assignment
+roles and time boundaries remain unchanged; organizer control is evaluated
+separately from persisted membership and placement state. Unflushed local edits do
+not become authorization evidence. Production registration and verified final
+parent admission remain required before the full mutation flow is active.
+
 Managed support checks now read persisted session and governance facts on the
 original selected owner, so a cached positive context cannot override revocation,
 disabled write mode or tenant mismatch. Boundary projection preserves support

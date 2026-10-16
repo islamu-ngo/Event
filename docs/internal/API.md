@@ -13,6 +13,16 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+HumanEventAssignmentSourceFence captures the original actor, tenant and bounded
+event set, acquires after the actual policy-source-set lease, and revalidates
+persisted facts on the same connection and Serializable transaction. Its pure
+HumanEventAssignmentProjection preserves ordinary owner/manager roles, active
+permission semantics, inclusive assignment start and exclusive expiry. Resource
+projection respects the required creating-actor soft-delete join; organizer control
+remains a separate persisted membership/placement predicate, without an administrator
+shortcut or a new gate on ordinary policy. Unflushed tracker edits are not source
+facts. Production factory registration and final parent admission remain separate.
+
 HumanSupportForwardingObservation captures validated in-process support metadata
 and the original canonical subject before selecting an owner. The managed support
 fence acquires only after policy-source-set and principal revalidation, then returns

@@ -4,9 +4,11 @@
        privacy-instrumented services, so no lane invents its own meter root. -->
   <ItemGroup>
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
+    <Compile Include="..\Explore.Infrastructure.Tests\Fixtures\CurrentHumanPrincipalFixture.cs" Link="Fixtures\CurrentHumanPrincipalFixture.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Explore.API\Explore.API.csproj" />
     <ProjectReference Include="..\..\src\Explore.Infrastructure\Explore.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Explore.Persistence\Explore.Persistence.csproj" />
     <ProjectReference Include="..\..\src\Explore.Persistence.Migrations.MySql\Explore.Persistence.Migrations.MySql.csproj" />

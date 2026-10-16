@@ -6,6 +6,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Server-owned correlation IDs
+
+Use the response's `X-Correlation-ID` when reporting a request failure. The API
+generates a fresh compact UUID for each request. Incoming `X-Correlation-ID`
+and `X-Request-ID` values are ignored, not echoed; clients must capture the
+returned ID instead of expecting their supplied value to appear in API logs.
+
 ## JWT failure diagnostics
 
 Invalid bearer tokens still receive a 401 challenge. Provider error descriptions

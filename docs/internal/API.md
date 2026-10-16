@@ -5,6 +5,12 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Diagnostic Scope Ownership
 
+`CorrelationIdMiddleware` creates a UUIDv7 in compact `N` format per request.
+It stores that server-owned value in request items and its logging context,
+then returns it through `X-Correlation-ID` when the response starts. Neither
+`X-Correlation-ID` nor `X-Request-ID` request headers confer diagnostic authority;
+even printable caller values are ignored rather than copied into responses.
+
 `ApiDiagnosticTraceProcessor` is registered before ServiceDefaults exporters.
 On export it clears inherited baggage and trace state. HTTP client spans retain
 status and a fixed dependency label; server spans retain authored route metadata

@@ -28,7 +28,7 @@ public class CorrelationIdTests
     }
 
     [Test]
-    public async Task Request_WithCorrelationId_ShouldEchoItBack()
+    public async Task Request_WithCorrelationId_ShouldUseServerOwnedId()
     {
         var expectedId = Guid.NewGuid().ToString();
 
@@ -41,11 +41,12 @@ public class CorrelationIdTests
         await Assert.That(response.Headers.Contains("X-Correlation-ID")).IsTrue();
 
         var returnedId = response.Headers.GetValues("X-Correlation-ID").First();
-        await Assert.That(returnedId).IsEqualTo(expectedId);
+        await Assert.That(returnedId).IsNotEqualTo(expectedId);
+        await Assert.That(Guid.TryParseExact(returnedId, "N", out _)).IsTrue();
     }
 
     [Test]
-    public async Task Request_WithXRequestId_ShouldUseAsCorrelationId()
+    public async Task Request_WithXRequestId_ShouldUseServerOwnedId()
     {
         var expectedId = Guid.NewGuid().ToString();
 
@@ -58,7 +59,8 @@ public class CorrelationIdTests
         await Assert.That(response.Headers.Contains("X-Correlation-ID")).IsTrue();
 
         var returnedId = response.Headers.GetValues("X-Correlation-ID").First();
-        await Assert.That(returnedId).IsEqualTo(expectedId);
+        await Assert.That(returnedId).IsNotEqualTo(expectedId);
+        await Assert.That(Guid.TryParseExact(returnedId, "N", out _)).IsTrue();
     }
 
     [Test]
@@ -79,7 +81,7 @@ public class CorrelationIdTests
     }
 
     [Test]
-    public async Task Request_WithUnsafeCorrelationIdAndSafeRequestId_ShouldUseRequestId()
+    public async Task Request_WithUnsafeCorrelationIdAndSafeRequestId_ShouldUseServerOwnedId()
     {
         var expectedId = Guid.NewGuid().ToString("N");
 
@@ -91,7 +93,8 @@ public class CorrelationIdTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var returnedId = response.Headers.GetValues("X-Correlation-ID").First();
-        await Assert.That(returnedId).IsEqualTo(expectedId);
+        await Assert.That(returnedId).IsNotEqualTo(expectedId);
+        await Assert.That(Guid.TryParseExact(returnedId, "N", out _)).IsTrue();
     }
 
     [Test]

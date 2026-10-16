@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+The dedicated Keycloak lifecycle client uses a minimal service-account grant:
+realm-management/manage-users, without extra management/client or realm roles
+and with interactive grants disabled. The profile is pinned to 26.1.2. Checks on
+a fresh authenticated token response are not general bearer-token validation.
+Provider bootstrap and lifecycle-send integration must complete before this
+domain profile can govern a production lifecycle action.
+
 Set AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH to a mounted, read-only
 operator-owned JSON file and AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256
 to its SHA-256 digest. The file contains FormatVersion (1), Revision, Source,

@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+KeycloakLifecycleGrantProfile defines the closed lifecycle-client grant
+contract for provider version 26.1.2: a confidential service-account client with
+interactive grants disabled, exactly realm-management/manage-users and no realm
+roles. Fresh response claims must retain expected issuer, client/service-account
+identity and an unexpired lifetime without excess grants. The helper accepts
+claims only after a transport-authenticated client-credentials exchange; it does
+not validate arbitrary caller bearer tokens or their signatures. Provider
+bootstrap, response admission and lifecycle send integration remain separate
+consumers; this domain profile alone grants no provider I/O permission.
+
 Password deployment settings are catalogued as public, startup-owned values:
 AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH and SHA256 are optional file
 identity inputs; AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS defaults to

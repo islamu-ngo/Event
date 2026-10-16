@@ -3,6 +3,23 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Human Commit Identity and Source Contracts
+
+HumanCommitSubject clones the authenticated principal before awaiting the
+existing user-resolution query, preserving provider-binding precedence and
+rejecting unresolved or empty identities. It captures account identity, not an
+authorization grant. IHumanCommitScopePreparation selects that observation before
+constructing consumers on their original committing database owner.
+
+The Application contracts separate observation from transaction-bound acquisition:
+IPolicySourceSetFence excludes policy-source membership changes;
+IHumanPrincipalSourceFence and IHumanAuthorizationRouteSource expose immutable
+facts and validating leases. Route facts contain the six fixed governance keys
+and retain raw system/tenant setting values and locks for provider-native merge
+semantics. IHumanActionCommitFinalizer registers source and timed-assignment
+validation for the actual committing owner. These contracts alone install no
+native locks, finalization hooks, registrations or active mutation admission.
+
 ## Persisted API-Key Authentication Evidence
 
 Successful persisted-key authentication stores a server feature containing the

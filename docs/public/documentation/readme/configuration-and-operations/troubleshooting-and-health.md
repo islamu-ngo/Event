@@ -6,6 +6,14 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Human mutation admission contracts
+
+Human commit identity and source-fence contracts are internal prerequisites for
+commit-time revalidation. They do not enable an operator setting, install database
+locks or activate new mutation protection by themselves. Native provider enrollment
+and each mutation consumer must be delivered and verified before that protection
+can be relied on. Existing request authentication remains the entry boundary.
+
 ## Persisted API-key evidence
 
 Persisted API-key authentication can supply server-owned evidence of the key row

@@ -9,6 +9,9 @@ public partial class ExploreDbContext : DbContext
 {
     private ITenantContext? _tenantContext;
     private string? _tenantFilterBypassReason;
+    private bool _tenantLeaseBound;
+    private Guid? _tenantLeaseId;
+    private ITenantContext? _tenantLeaseIdentity;
 
     /// <summary>
     /// Tenant context for multi-tenant data isolation.
@@ -17,9 +20,16 @@ public partial class ExploreDbContext : DbContext
     /// </summary>
     public ITenantContext? TenantContext
     {
-        get => _tenantContext;
+        get
+        {
+            ValidateTenantLease();
+            return _tenantLeaseBound ? _tenantLeaseIdentity : _tenantContext;
+        }
         set
         {
+            ValidateTenantLease();
+            if (_tenantLeaseBound && !ReferenceEquals(_tenantContext, value))
+                throw new InvalidOperationException("tenant_lease_identity_changed");
             _tenantContext = value;
             if (value is not null)
             {
@@ -31,7 +41,61 @@ public partial class ExploreDbContext : DbContext
     /// <summary>
     /// Tenant id consumed by global query filters. Null means no ambient tenant is bound.
     /// </summary>
-    public Guid? TenantFilterTenantId => TenantContext?.TenantId;
+    public Guid? TenantFilterTenantId
+    {
+        get
+        {
+            ValidateTenantLease();
+            return _tenantLeaseBound ? _tenantLeaseId : _tenantContext?.TenantId;
+        }
+    }
+
+    internal Guid? BindTenantLease()
+    {
+        ValidateTenantLease();
+        if (!_tenantLeaseBound)
+        {
+            _tenantLeaseId = NormalizeTenantId(_tenantContext?.TenantId);
+            _tenantLeaseIdentity = _tenantLeaseId is { } id ? new TenantLeaseIdentity(id) : null;
+            _tenantLeaseBound = true;
+        }
+        return _tenantLeaseId;
+    }
+
+    internal void ValidateTenantLease()
+    {
+        if (_tenantLeaseBound && NormalizeTenantId(_tenantContext?.TenantId) != _tenantLeaseId)
+            throw new InvalidOperationException("tenant_lease_identity_changed");
+    }
+
+    public override void Dispose()
+    {
+        ClearTenantLease();
+        base.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        ClearTenantLease();
+        GC.SuppressFinalize(this);
+        return base.DisposeAsync();
+    }
+
+    private void ClearTenantLease()
+    {
+        _tenantLeaseBound = false;
+        _tenantLeaseId = null;
+        _tenantLeaseIdentity = null;
+        _tenantContext = null;
+        _tenantFilterBypassReason = null;
+        CurrentUserService = null;
+    }
+
+    private static Guid? NormalizeTenantId(Guid? tenantId) =>
+        tenantId == Guid.Empty ? null : tenantId;
+
+    private sealed record TenantLeaseIdentity(Guid TenantId) : ITenantContext;
 
     /// <summary>
     /// True only for explicit system/admin flows that intentionally query across tenants.

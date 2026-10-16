@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Explore.Persistence.Security;
 
-public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor
+public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, IDbCommandInterceptor
 {
     public const string CurrentTenantSettingName = "app.current_tenant_id";
 
@@ -66,13 +66,62 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor
             return null;
         }
 
-        ITenantContext? tenantContext = exploreDbContext.TenantContext;
-        if (tenantContext is null)
-        {
-            return null;
-        }
+        return exploreDbContext.BindTenantLease();
+    }
 
-        var tenantId = tenantContext.TenantId;
-        return tenantId == Guid.Empty ? null : tenantId;
+    InterceptionResult<DbDataReader> IDbCommandInterceptor.ReaderExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+    {
+        Validate(eventData.Context);
+        return result;
+    }
+
+    ValueTask<InterceptionResult<DbDataReader>> IDbCommandInterceptor.ReaderExecutingAsync(
+        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(eventData.Context);
+        return ValueTask.FromResult(result);
+    }
+
+    InterceptionResult<int> IDbCommandInterceptor.NonQueryExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+    {
+        Validate(eventData.Context);
+        return result;
+    }
+
+    ValueTask<InterceptionResult<int>> IDbCommandInterceptor.NonQueryExecutingAsync(
+        DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(eventData.Context);
+        return ValueTask.FromResult(result);
+    }
+
+    InterceptionResult<object> IDbCommandInterceptor.ScalarExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
+    {
+        Validate(eventData.Context);
+        return result;
+    }
+
+    ValueTask<InterceptionResult<object>> IDbCommandInterceptor.ScalarExecutingAsync(
+        DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(eventData.Context);
+        return ValueTask.FromResult(result);
+    }
+
+    private void Validate(DbContext? context)
+    {
+        if (context is ExploreDbContext exploreDbContext)
+        {
+            exploreDbContext.ValidateTenantLease();
+        }
     }
 }

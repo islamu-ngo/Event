@@ -3,6 +3,11 @@ ABOUTME: Prioritizes runtime rules from TenantContext, query filters, and govern
 
 # Multi-Tenancy
 
+A PostgreSQL database context seals tenant identity for its connection lease.
+Each reader, scalar and nonquery command validates that identity before execution;
+replacing the tenant context or mutating its tenant ID fails closed. Disposal
+clears the sealed identity and request state before context-pool reuse.
+
 ## Tenant Directory-Operator Identity
 
  Every tenant has an authoritative typed directory-operator identity document,

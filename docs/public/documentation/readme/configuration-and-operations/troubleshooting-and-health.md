@@ -411,6 +411,10 @@ boundaries.
 
 ## Related Guides & Next Steps
 
+If `tenant_lease_identity_changed` rejects an operation, create a fresh database
+context for the newly selected tenant. Do not rebind an open context or retry the
+same context with a different tenant; its connection lease retains the original identity.
+
 Secrets audit logs retain bounded operation, provider and failure categories with
 validated correlation identifiers, not key paths, user identities or provider
 error payloads, even at Debug level. Failed secret-provider health probes report

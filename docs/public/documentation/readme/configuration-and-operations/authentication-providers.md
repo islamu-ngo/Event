@@ -137,6 +137,10 @@ email verified to work around sign-in failures.
 
 ## Safe Keycloak Connection And Inspection
 
+Freshly entered Keycloak administrator usernames and passwords are passed to
+Keycloak exactly as entered, including significant leading or trailing spaces.
+Empty or whitespace-only credentials are rejected rather than normalized.
+
 A correctly configured deployment connects with its existing runtime BFF
 credential. The application resolves the Keycloak endpoint, realm, client ID and
 client secret from the deployment's selected secret authority; it does not copy

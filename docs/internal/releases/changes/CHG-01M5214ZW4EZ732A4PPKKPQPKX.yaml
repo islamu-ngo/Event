@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5214ZW4EZ732A4PPKKPQPKX
+Title: "preserve exact Keycloak administrator credentials"
+Type: fix
+Scope: onboarding
+Summary: "Foreground Keycloak operations preserve significant whitespace in administrator usernames and passwords while rejecting blank inputs."
+Group: keycloak-exact-administrator-credentials
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Foreground Keycloak administrator credentials are validated for presence but are never normalized before provider authentication.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Significant whitespace in freshly entered administrator usernames and passwords is preserved; blank credentials remain invalid.

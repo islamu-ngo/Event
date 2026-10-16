@@ -821,6 +821,11 @@ not caller-supplied correlation headers.
 
 ## DI Registration
 
+Fresh Keycloak administrator usernames and passwords are opaque request values.
+`KeycloakOperationApplyContext` rejects null or whitespace-only inputs but
+preserves every character of a valid pair for provider authentication. Do not
+reuse metadata normalization for credentials.
+
 | Method | Purpose |
 |---|---|
 | `AddSecretProvider` | Core provider registration |

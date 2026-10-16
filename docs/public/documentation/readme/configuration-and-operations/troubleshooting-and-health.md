@@ -14,6 +14,14 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+The native administrator-authority prerequisite checks persisted instance or
+tenant administrator state on the original enrolled Serializable session. It
+locks the account, binding and authority contributors rather than trusting role
+claims. Tenant authority requires active membership and an unrevoked same-tenant
+administrator grant. The subject-only entry point proves account continuity, not
+administrator status. Drift is rejected without repair; production wiring and
+verified managed consumers are still required before relying on this capability.
+
 Managed route observation and leases now compose the separate route and
 source-set prerequisites on the same selected database owner. Acquisition requires
 the original Serializable transaction, and ending that transaction invalidates

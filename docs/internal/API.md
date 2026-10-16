@@ -13,6 +13,17 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PostgresHumanAdministratorCommitAuthorityContract supplies fixed boolean
+instance-administrator, tenant-administrator and subject-continuity fences. It
+borrows the enrolled business owner's original Serializable transaction. The
+nonlogin owner locks the original account, provider binding and role/membership
+contributors, with validated foreign keys preserving insertion exclusion. Tenant
+administration requires an active tenant/member and an unrevoked same-tenant
+administrator grant; instance administration requires the persisted platform.admin
+role. Primary and email mutation logins retain distinct declared purposes. Exact
+body, privilege, source and stamped tenant-policy admission rejects drift. Native
+installation is explicit; managed consumers and production wiring remain separate.
+
 PolicySourceSetFence and HumanAuthorizationRouteSource compose the native
 prerequisites on one selected physical connection and original Serializable
 transaction. They capture the context-pool lease and tenant/import-purpose binding,

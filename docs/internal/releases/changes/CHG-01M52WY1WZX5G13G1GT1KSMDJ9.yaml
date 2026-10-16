@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52WY1WZX5G13G1GT1KSMDJ9
+Title: "Add native persisted human administrator commit authority"
+Type: feat
+Scope: access
+Summary: "Fence persisted administrator or subject continuity on original enrolled Serializable sessions."
+Group: native-human-administrator-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Account, binding and authority contributors remain locked under source-owned roles with exact catalog admission.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Explicit migrator installation provides the native prerequisite without production wiring.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Subject continuity does not grant administrator status; managed consumers and production installation remain required.

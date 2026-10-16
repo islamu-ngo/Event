@@ -13,6 +13,18 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PolicySourceSetFence and HumanAuthorizationRouteSource compose the native
+prerequisites on one selected physical connection and original Serializable
+transaction. They capture the context-pool lease and tenant/import-purpose binding,
+acquire source-set exclusion first, and revalidate it around route reads. SQLite
+starts a physical write transaction; SQL Server and MySQL use fixed-order physical
+source locks, with InnoDB required for MySQL. PostgreSQL attests both native
+contracts before and after the six-key projection. AllowedValues JSON is preserved
+as serialized setting metadata instead of being deserialized as a JSON string.
+Configuration-import ownership binds only once on a fresh instance owner and is
+cleared with its context lease. Production registration and mutation consumers
+remain separate work.
+
 PostgresHumanSupportAccessSourceContract projects only the selected actor/session
 support record and the fixed support governance settings. Runtime requires its
 original tenant and matching resolved tenant; Global requires an instance purpose.

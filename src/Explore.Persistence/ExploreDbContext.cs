@@ -12,6 +12,14 @@ public partial class ExploreDbContext : DbContext
     private bool _tenantLeaseBound;
     private Guid? _tenantLeaseId;
     private ITenantContext? _tenantLeaseIdentity;
+    internal bool IsConfigurationInstanceImportOwner { get; private set; }
+
+    internal void BindConfigurationInstanceImportOwner()
+    {
+        if (BindTenantLease() is not null || IsConfigurationInstanceImportOwner)
+            throw new InvalidOperationException("An instance import requires a fresh sealed global owner.");
+        IsConfigurationInstanceImportOwner = true;
+    }
 
     /// <summary>
     /// Tenant context for multi-tenant data isolation.
@@ -84,6 +92,7 @@ public partial class ExploreDbContext : DbContext
 
     private void ClearTenantLease()
     {
+        IsConfigurationInstanceImportOwner = false;
         _tenantLeaseBound = false;
         _tenantLeaseId = null;
         _tenantLeaseIdentity = null;

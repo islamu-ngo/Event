@@ -14,6 +14,14 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+Managed route observation and leases now compose the separate route and
+source-set prerequisites on the same selected database owner. Acquisition requires
+the original Serializable transaction, and ending that transaction invalidates
+the lease. Revalidation reads current route facts without switching connections
+or promoting database privileges. PostgreSQL preserves non-null allowed-value
+metadata; portable providers use their physical source-lock contracts. This
+composition still needs production registration and verified mutation consumers.
+
 The support-source native prerequisite restricts facts to the selected actor,
 session and tenant plus declared support governance settings. Serializable
 acquisition excludes concurrent source writes through compulsory triggers and a

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M537D091HHZ6CSTNACGRXCV0
+Title: "Bound and retain flat localization import candidates"
+Type: fix
+Scope: access
+Summary: "Validate bounded flat localization JSON before duplicate names can be discarded and retain immutable original input."
+Group: localization-input-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Duplicate or unknown JSON names, nested translation values and unsupported key families are rejected.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Input bytes, entries, keys, values and aggregate characters are bounded before materialization.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Use bounded flat ui., lookup. and payment. translation text; publication admission and provider boundaries remain separate.

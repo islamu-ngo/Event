@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+LocalizationBundlePolicy bounds flat translation imports to 4 MiB input, 16,384
+entries, 512 key characters, 16,384 value characters and 524,288 aggregate characters.
+The import converter validates token structure before dictionary materialization,
+rejecting duplicate/unknown contract members, duplicate translation names, nested
+values and unsupported key families. ImportLocalizationBundleDto copies caller
+input into a read-only ordinal dictionary, preserving the original admitted
+candidate. This input boundary does not provide publication authority: handler
+commit admission, file/TMS provider bounds and OpenAPI integration remain
+separate required consumers.
+
 LocalStorageQuarantine retains physical custody independently of tenant
 attribution and metadata lifetime. Admission captures the local provider binding,
 bounded object key, canonical path hash and observed size/time evidence. Keys

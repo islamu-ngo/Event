@@ -1,7 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
+using Explore.Application.Serialization;
 
 namespace Explore.Application.DTOs.Localization;
 
+[JsonConverter(typeof(ImportLocalizationBundleJsonConverter))]
 public sealed record ImportLocalizationBundleDto
 {
     private IReadOnlyDictionary<string, string> _translations =

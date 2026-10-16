@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Localization imports accept bounded flat translation text under ui., lookup.
+and payment. key families. Duplicate names, unknown contract fields and nested
+values are rejected rather than silently discarded. Limits are 4 MiB input,
+16,384 entries, 512 characters per key, 16,384 per value and 524,288 aggregate
+characters. Input capture is immutable; publication authorization and provider
+file/TMS boundaries remain separate checks.
+
 Local quarantine work can retain physical ownership after tenant metadata is
 removed. A reclaimed worker cannot complete or retry a newer claim, and object
 keys must remain below the retained local root. Domain path normalization alone

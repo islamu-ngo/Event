@@ -14,6 +14,13 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+The native authorization-route prerequisite returns only the six declared route
+settings, scoped to the original Runtime tenant or Global instance purpose. It
+does not grant setting writes or make an authorization decision. Its Serializable
+entry point still needs the separate policy-source-set exclusion and verified
+consumer composition; installing it alone does not fence concurrent setting
+changes. Installation refuses drift rather than normalizing live objects.
+
 The principal-source native prerequisite observes actor-bound account facts and
 excludes concurrent principal changes during Serializable acquisition. Its Local
 session reader uses the original Runtime session; it does not grant Identity table

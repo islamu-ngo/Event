@@ -13,6 +13,15 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PostgresHumanAuthorizationRouteContract exposes only the six source-owned route
+setting keys through a SELECT-only nonlogin owner. Runtime reads require the
+selected tenant; Global reads require an instance purpose and null tenant. The
+acquisition entry point additionally requires Serializable isolation, but does
+not itself exclude source membership changes: policy-source-set exclusion must
+be composed by the managed consumer. Exact body, privilege, source-column and
+stamped tenant-policy admission rejects drift without repairing it. Installation
+and consumer wiring remain separate from this executable native prerequisite.
+
 PostgresHumanPrincipalSourceContract installs execute-only principal observation,
 Serializable acquisition and validated Local-session revocation reads on the
 original enrolled sessions. Fixed actor/account/tenant projections run under a

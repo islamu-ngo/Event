@@ -3,6 +3,27 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Diagnostic Scope Ownership
+
+`UseApiDiagnosticLogging` decorates Serilog's actual `ILoggerFactory`.
+Its loggers discard `BeginScope` before inherited properties can overwrite
+native event arguments. Logging, level checks, provider forwarding and disposal
+delegate to the original factory. `LoggerFilterOptions.CaptureScopes` alone
+cannot govern Serilog's replacement factory. Tests use this same production
+composition with both values of that option.
+
+The API Serilog pipeline also omits `FromLogContext` in both host composition and
+shipped configuration: inherited scopes can overwrite native event fields
+before a sink enricher can validate them. Do not re-enable scope ingestion.
+`ApiDiagnosticLogEnricher` removes contextual properties unless the event template
+binds that field, retaining `SourceContext` for producer attribution. Emitters
+must still use bounded arguments and omit private exception objects; enrichment
+does not sanitize template arguments or exception contents.
+
+Storage readiness reports `provider_unavailable` or `policy_unavailable`
+instead of exception subtype names. Sink tests exercise scheduler and startup
+worker outcomes with private canaries and colliding inherited field names.
+
 ## Structured Legal-Identity Contracts
 
 ### Value-Free Operator Form Metadata

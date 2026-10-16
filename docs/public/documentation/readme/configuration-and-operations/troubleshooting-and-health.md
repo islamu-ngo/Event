@@ -6,6 +6,18 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Storage readiness failure reasons
+
+The API no longer imports ambient logging scopes. Keep `FromLogContext` out of
+API Serilog configuration: scope fields can overwrite native diagnostic values.
+Events retain their own arguments and producer category.
+
+Storage readiness uses `provider_unavailable` when the selected provider cannot
+be resolved and `policy_unavailable` when its policy cannot be resolved. These
+stable reasons replace exception subtype names. Check the selected provider
+registration and storage policy respectively; private exception details are not
+part of the health response.
+
 This guide provides fast diagnostic procedures and step-by-step recovery recipes for common issues encountered during deployment, authentication, database migrations, and runtime operations.
 
 ---

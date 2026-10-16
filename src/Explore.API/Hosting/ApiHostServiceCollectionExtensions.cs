@@ -46,7 +46,7 @@ using Microsoft.IO;
 using ModelContextProtocol.Server;
 using OpenFeature;
 using OpenFeature.Hosting.Providers.Memory;
-using Serilog;
+using Explore.API.Telemetry;
 
 namespace Explore.API.Hosting;
 
@@ -366,15 +366,7 @@ public static class ApiHostServiceCollectionExtensions
             emailDispatchRabbitMqSettings);
 
         builder.Services.AddApiCors(builder.Configuration);
-        builder.Host.UseSerilog(
-            (context, services, loggerConfiguration) => loggerConfiguration
-                .ReadFrom.Configuration(context.Configuration)
-                .ReadFrom.Services(services)
-                .Enrich.FromLogContext()
-                // The framework's request-start/finish messages contain raw URLs
-                // before routing. RequestLoggingMiddleware owns safe HTTP events.
-                .MinimumLevel.Override("Microsoft.AspNetCore.Hosting.Diagnostics", Serilog.Events.LogEventLevel.Warning),
-            writeToProviders: true);
+        builder.Host.UseApiDiagnosticLogging();
         builder.Services.AddApiAuthentication(
             builder.Configuration,
             builder.Environment,

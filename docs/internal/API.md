@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+LocalPasswordAttribute and manually instantiated request validators now use the
+same domain normalization policy. Login and current-password checks use the
+verification shape, while onboarding, replacement, password change and recovery
+use new-credential scalar bounds. DTO annotations no longer impose UTF-16
+StringLength limits that reject valid supplementary characters. Real annotation
+validation and manual validation share deterministic boundary cases. These checks
+validate shape only: blocklist enforcement, startup attachment and lifecycle
+mutation guarantees remain separate backend responsibilities.
+
 The local-password backend captures a deployment-owned JSON blocklist once,
 verifies its configured SHA-256 before parsing, bounds input to 16 MiB and
 100,000 entries, and rejects malformed metadata or canonical duplicates. An

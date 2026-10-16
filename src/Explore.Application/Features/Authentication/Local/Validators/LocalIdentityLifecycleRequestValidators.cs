@@ -1,5 +1,5 @@
 
-using Explore.Application.Configuration;
+using Explore.Domain.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Models;
 using FluentValidation;
@@ -54,8 +54,7 @@ public sealed class LocalPasswordRecoveryCompletionRequestDtoValidator : Abstrac
         RuleFor(request => request.Generation).NotEmpty();
         RuleFor(request => request.Purpose).Equal(LocalIdentityLifecyclePurpose.PasswordRecovery);
         RuleFor(request => request.Token).NotEmpty().MaximumLength(8192);
-        RuleFor(request => request.NewPassword).NotEmpty()
-            .MinimumLength(LocalIdentityOptions.MinimumPasswordLength)
-            .MaximumLength(LocalIdentityOptions.MaximumPasswordLength);
+        RuleFor(request => request.NewPassword)
+            .Must(password => LocalPasswordPolicy.TryNormalizeNewCredential(password, out _));
     }
 }

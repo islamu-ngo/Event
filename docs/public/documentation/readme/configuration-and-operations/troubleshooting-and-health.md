@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Local credential requests apply consistent Unicode-aware length rules. Login
+and current-password fields permit shorter existing credentials; new passwords
+use the 15..128 normalized-character policy. Supplementary characters count
+once rather than twice. Request validation does not replace backend blocklist
+enforcement or credential-lifecycle checks.
+
 The local-password backend expects a deployment-owned, digest-pinned blocklist
 with version, revision, source, license and password entries. Missing or invalid
 snapshots deny new credentials and make required readiness unhealthy. Hashing

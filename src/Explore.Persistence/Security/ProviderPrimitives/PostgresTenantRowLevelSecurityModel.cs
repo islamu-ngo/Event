@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Security.Cryptography;
 using System.Text;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
@@ -114,6 +115,37 @@ public static class PostgresTenantRowLevelSecurityModel
     public static string BuildEnableRlsSql(TenantTableMetadata table, string? defaultSchema = null)
     {
         var tableIdentifier = FormatTableIdentifier(table.TableName, table.Schema, defaultSchema);
+        string condition = BuildCondition(table, defaultSchema);
+        string tableLiteral = tableIdentifier.Replace("'", "''", StringComparison.Ordinal);
+        string fingerprint = BuildPolicyFingerprintPrefix(table, defaultSchema);
+        return $"""
+            ALTER TABLE {tableIdentifier} ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE {tableIdentifier} FORCE ROW LEVEL SECURITY;
+            DROP POLICY IF EXISTS "{PolicyName}" ON {tableIdentifier};
+            CREATE POLICY "{PolicyName}" ON {tableIdentifier}
+                FOR ALL
+                USING ({condition})
+                WITH CHECK ({condition});
+            DO $tenant_policy_stamp$
+            BEGIN
+                EXECUTE (
+                    SELECT format('COMMENT ON POLICY %I ON %s IS %L',
+                        p.polname, '{tableLiteral}',
+                        '{fingerprint}' || md5(p.polqual::text)
+                            || ':' || md5(p.polwithcheck::text))
+                    FROM pg_policy p
+                    WHERE p.polrelid = '{tableLiteral}'::regclass AND p.polname = '{PolicyName}');
+            END $tenant_policy_stamp$;
+            """;
+    }
+
+    internal static string BuildPolicyFingerprintPrefix(TenantTableMetadata table, string? defaultSchema = null) =>
+        "event-tenant-policy:v2:" +
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(BuildCondition(table, defaultSchema)))) + ":";
+
+    private static string BuildCondition(TenantTableMetadata table, string? defaultSchema)
+    {
+        var tableIdentifier = FormatTableIdentifier(table.TableName, table.Schema, defaultSchema);
 
         string condition;
         if (table.ParentJoin is null)
@@ -133,15 +165,7 @@ public static class PostgresTenantRowLevelSecurityModel
             condition = $"EXISTS (SELECT 1 FROM {parentTable} AS \"p\" WHERE \"p\".\"{table.ParentJoin.ParentKeyColumn}\" = {tableIdentifier}.\"{table.ParentJoin.ForeignKeyColumn}\" AND {parentCondition})";
         }
 
-        return $"""
-            ALTER TABLE {tableIdentifier} ENABLE ROW LEVEL SECURITY;
-            ALTER TABLE {tableIdentifier} FORCE ROW LEVEL SECURITY;
-            DROP POLICY IF EXISTS "{PolicyName}" ON {tableIdentifier};
-            CREATE POLICY "{PolicyName}" ON {tableIdentifier}
-                FOR ALL
-                USING ({condition})
-                WITH CHECK ({condition});
-            """;
+        return condition;
     }
 
     /// <summary>

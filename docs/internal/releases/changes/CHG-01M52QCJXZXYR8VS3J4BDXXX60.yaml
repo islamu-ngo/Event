@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52QCJXZXYR8VS3J4BDXXX60
+Title: "Stamp generated tenant policies with mapped and native fingerprints"
+Type: feat
+Scope: access
+Summary: "Attach model condition and PostgreSQL expression-tree fingerprints to generated tenant RLS policies without changing their ownership predicates."
+Group: tenant-policy-fingerprints
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Policy identity stamps bind mapped conditions to installed USING and WITH CHECK expressions for downstream native admission.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Stamp generation alone is not admission enforcement and preserves existing tenant isolation semantics.

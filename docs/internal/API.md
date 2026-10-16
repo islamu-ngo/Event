@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+Generated tenant RLS policies carry an event-tenant-policy:v2 comment combining
+the SHA-256 of the mapped model condition with PostgreSQL expression-tree digests
+for USING and WITH CHECK. Native admission consumers can compare both model and
+installed policy identity without relying on search-path-sensitive deparsed SQL.
+Stamp generation itself is not drift admission: consumers must enforce the match.
+This extraction preserves existing ownership predicates and schema precedence;
+recursive navigation changes remain separate.
+
 PostgresPolicySourceSetContract provides an explicit native source-set exclusion
 capability, not yet production installation wiring. ApplyAsync borrows an existing
 transaction or commits its own. It installs a non-PII singleton and compulsory

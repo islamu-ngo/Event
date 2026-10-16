@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Generated PostgreSQL tenant policies include attestation comments for later native
+admission checks. Removing or changing a comment does not bypass row-level security,
+but consumers that require the original policy must reject a missing or mismatched
+stamp. Generating a stamp alone does not activate commit-time admission.
+
 The PostgreSQL source-set installer is a native prerequisite, not an enabled
 deployment feature by itself. It excludes concurrent permission and governance
 setting membership changes, including inserts where no matching row previously

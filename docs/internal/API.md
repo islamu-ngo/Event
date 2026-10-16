@@ -1019,6 +1019,13 @@ Injected into native CQS handlers, not controllers. Provides in-memory L1 + dist
 
 ## Security Headers
 
+File content actions declare trusted `SandboxedFileResponseAttribute` metadata.
+The central middleware composes their CSP at response start as
+`default-src 'none'; frame-ancestors 'none'; sandbox`. This preserves
+the sandbox directive instead of overwriting a controller's earlier file policy.
+Storage content, public storage images and event-resource content use this
+metadata; ordinary API endpoints retain the base policy below.
+
 Added by `SecurityHeadersMiddleware` to every response:
 
 | Header | Value |

@@ -1,3 +1,5 @@
+using Explore.API.Attributes;
+
 namespace Explore.API.Middleware;
 
 /// <summary>
@@ -35,7 +37,10 @@ public sealed class SecurityHeadersMiddleware
             headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()";
 
             // CSP for a REST API: deny all resource loading (API serves JSON, not HTML)
-            headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+            headers["Content-Security-Policy"] =
+                context.GetEndpoint()?.Metadata.GetMetadata<SandboxedFileResponseAttribute>() is not null
+                    ? "default-src 'none'; frame-ancestors 'none'; sandbox"
+                    : "default-src 'none'; frame-ancestors 'none'";
 
             // Prevent caching of sensitive responses (write operations)
             if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))

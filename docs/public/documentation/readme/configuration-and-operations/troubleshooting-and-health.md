@@ -6,6 +6,14 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## File response sandboxing
+
+Storage downloads, public storage images and event-resource content return a
+Content-Security-Policy that includes sandbox alongside resource-loading and
+framing restrictions. Reverse proxies must preserve this response policy rather
+than replacing it with a weaker generic API policy. Ordinary JSON endpoints
+retain the base API policy without the file sandbox directive.
+
 ## Support-access audit failures
 
 Support-access audit storage failures do not replace an already completed HTTP

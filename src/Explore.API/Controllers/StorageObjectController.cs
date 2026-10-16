@@ -152,6 +152,7 @@ public class StorageObjectController : ControllerBase
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpGet("{id:guid}/content", Name = RouteNames.GetStorageObjectContent)]
+    [SandboxedFileResponse]
     [EndpointSummary("Get Storage Object Content")]
     [EndpointDescription("Streams stored file content by stable storage object ID. Provider keys and local paths are never accepted from the browser.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -175,6 +176,7 @@ public class StorageObjectController : ControllerBase
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("{id:guid}/public", Name = RouteNames.GetPublicStorageObjectImage)]
+    [SandboxedFileResponse]
     [EndpointSummary("Get Public Image")]
     [EndpointDescription("Serves an image directly by storage object ID. Returns a stable, non-expiring URL " +
         "suitable for OG image tags and social media preview cards. Images are cached for 7 days.")]
@@ -376,7 +378,6 @@ public class StorageObjectController : ControllerBase
     private FileStreamResult ToFileResult(StorageObjectContentResult result)
     {
         Response.Headers["X-Content-Type-Options"] = "nosniff";
-        Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
 
         var fileResult = result.ShouldDownloadAsAttachment
             ? File(

@@ -7,12 +7,16 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
 
 [NotInParallel("IntegrationSyncOutboxRepository")]
 public sealed class IntegrationSyncOutboxRepositoryTests
 {
+    private sealed class QueueHealthGlobalFactory(DbContextOptions<ExploreDbContext> options)
+        : PooledDbContextFactory<ExploreDbContext>(options, poolSize: 1), IGlobalExploreDbContextFactory;
+
     [Test]
     public async Task StaleClaimIsReclaimedAndOnlyTheExactNewOwnerCanSettle()
     {
@@ -142,7 +146,9 @@ public sealed class IntegrationSyncOutboxRepositoryTests
         DateTime now = DateTime.UtcNow;
         await SeedAsync(context, now.AddMinutes(-10));
 
-        QueueDrainHealthSnapshot snapshot = await new QueueDrainHealthRepository(context).GetSnapshotAsync(
+        var globalFactory = new QueueHealthGlobalFactory(
+            (DbContextOptions<ExploreDbContext>)context.GetService<IDbContextOptions>());
+        QueueDrainHealthSnapshot snapshot = await new QueueDrainHealthRepository(globalFactory).GetSnapshotAsync(
             now,
             now.AddMinutes(-5),
             CancellationToken.None);

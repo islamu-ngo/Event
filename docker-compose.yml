@@ -88,6 +88,8 @@ x-database-env: &database-env
 x-database-runtime-env: &database-runtime-env
   Database__Runtime__Username: ${DATABASE_RUNTIME_USERNAME-explore}
   Database__Runtime__Password: ${DATABASE_RUNTIME_PASSWORD-explore}
+  Database__Global__Username: ${DATABASE_GLOBAL_USERNAME:-}
+  Database__Global__Password: ${DATABASE_GLOBAL_PASSWORD:-}
 
 x-database-migrator-env: &database-migrator-env
   Database__Migrator__Username: ${DATABASE_MIGRATOR_USERNAME-explore}

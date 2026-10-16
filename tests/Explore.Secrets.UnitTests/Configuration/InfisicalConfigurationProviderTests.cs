@@ -9,6 +9,19 @@ namespace Explore.Secrets.UnitTests.Configuration;
 [NotInParallel]
 public sealed class InfisicalConfigurationProviderTests
 {
+    [Test]
+    [Arguments("DATABASE_GLOBAL_USERNAME", "Database:Global:Username")]
+    [Arguments("DATABASE_GLOBAL_PASSWORD", "Database:Global:Password")]
+    [Arguments("GLOBAL_USERNAME", "Database:Global:Username")]
+    [Arguments("GLOBAL_PASSWORD", "Database:Global:Password")]
+    public async Task ConvertToConfigurationKey_GlobalCredentialsRemainRoleSpecific(
+        string secretKey, string expectedKey)
+    {
+        var key = await ConvertToConfigurationKey(secretKey, "/database");
+
+        await Assert.That(key).IsEqualTo(expectedKey);
+    }
+
     private static readonly string[] BootstrapKeys =
     [
         "SecretProvider__Infisical__Url",

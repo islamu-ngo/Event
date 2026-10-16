@@ -390,6 +390,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 "DATABASE_SCHEMA" or "SCHEMA" => "Database:Schema",
                 "DATABASE_RUNTIME_USERNAME" or "RUNTIME_USERNAME" => "Database:Runtime:Username",
                 "DATABASE_RUNTIME_PASSWORD" or "RUNTIME_PASSWORD" => "Database:Runtime:Password",
+                "DATABASE_GLOBAL_USERNAME" or "GLOBAL_USERNAME" => "Database:Global:Username",
+                "DATABASE_GLOBAL_PASSWORD" or "GLOBAL_PASSWORD" => "Database:Global:Password",
                 "DATABASE_MIGRATOR_USERNAME" or "MIGRATOR_USERNAME" => "Database:Migrator:Username",
                 "DATABASE_MIGRATOR_PASSWORD" or "MIGRATOR_PASSWORD" => "Database:Migrator:Password",
                 "DATABASE_TLS_MODE" or "TLS_MODE" => "Database:TlsMode",

@@ -12,6 +12,18 @@ grants, revokes or derives its allowlist from the live catalogue. Caller enrollm
 body fingerprints, RLS and business fences remain the owning capability's
 responsibility. Providing this helper does not imply adoption by every capability.
 
+Queue readiness uses `QueueDrainHealthRepository` with an identity-free
+`IGlobalExploreDbContextFactory` lease, never the request Runtime context.
+PostgreSQL executes `queue_drain_health_snapshot` through the
+`event_queue_drain_health_global` group. Its thirteen integer counts expose no
+queue identifiers or payloads. The function owner has only the predicate-column
+reads required for these counts and purpose-specific RLS policies; the Global
+executor has no direct table reads or writes. Routine ACL checks run during
+installation and invocation. Other providers retain the existing count predicates.
+The application migrator installs the function; operators separately enroll the
+configured Global login in the health executor group, not its owner or migrator.
+This contract does not attest every other capability sharing the Global pool.
+
 ## Identity Correlation Authority
 
 Token admission and account adoption are separate trust decisions. Only the

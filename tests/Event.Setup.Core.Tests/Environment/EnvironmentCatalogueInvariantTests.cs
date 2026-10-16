@@ -5,6 +5,27 @@ using ISLAMU.Event.Setup.Core.Environment;
 
 public sealed class EnvironmentCatalogueInvariantTests
 {
+    [Test]
+    [Arguments("DATABASE_GLOBAL_USERNAME", EnvironmentVariableSensitivity.Public)]
+    [Arguments("DATABASE_GLOBAL_PASSWORD", EnvironmentVariableSensitivity.Sensitive)]
+    public async Task GlobalDatabaseCredentialsAreExplicitStartupInputs(
+        string key, EnvironmentVariableSensitivity sensitivity)
+    {
+        var definition = PlatformEnvironmentCatalogue.Catalogue.Lookup(key);
+
+        await Assert.That(definition).IsNotNull();
+        await Assert.That(definition!.Category).IsEqualTo(EnvironmentVariableCategory.Database);
+        await Assert.That(definition.Sensitivity).IsEqualTo(sensitivity);
+        await Assert.That(definition.Requirement).IsEqualTo(EnvironmentVariableRequirement.Required);
+        await Assert.That(definition.SafeDefault).IsNull();
+        await Assert.That(definition.Generation.Surfaces.HasFlag(EnvironmentGenerationSurface.Startup)).IsTrue();
+        await Assert.That(definition.RestartBehavior).IsEqualTo(EnvironmentRestartBehavior.Process);
+        await Assert.That(definition.Activation.Kind).IsEqualTo(EnvironmentActivationKind.Feature);
+        await Assert.That(definition.Activation.Identifier).IsEqualTo("server-database-config");
+        await Assert.That(PlatformEnvironmentCatalogue.DotenvEnvironmentKeys.Contains(key)).IsTrue();
+        await Assert.That(PlatformEnvironmentCatalogue.SecretBindingEnvironmentKeys.Contains(key)).IsFalse();
+    }
+
     private readonly EnvironmentContractRuntime _runtime = new();
     private readonly string _repositoryRoot = EnvironmentMachineConfiguration.RepositoryRoot();
 

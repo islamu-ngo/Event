@@ -126,6 +126,7 @@ public static class ExploreDatabaseMigrator
 
         await db.Database.MigrateAsync(cancellationToken);
         await PostgresDiscoverySnapshotMaintenanceContract.ApplyAsync(db, cancellationToken);
+        await PostgresQueueDrainHealthContract.ApplyAsync(db, cancellationToken);
         await EventDiscoveryRankBackfill.ApplyAsync(db, cancellationToken);
     }
 

@@ -20,7 +20,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 0,
-        "composeOrder": 120,
+        "composeOrder": 122,
         "composeRequired": false
       },
       "documentation": {
@@ -46,7 +46,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 1,
-        "composeOrder": 239,
+        "composeOrder": 241,
         "composeRequired": false
       },
       "documentation": {
@@ -72,7 +72,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 2,
-        "composeOrder": 241,
+        "composeOrder": 243,
         "composeRequired": false
       },
       "documentation": {
@@ -98,7 +98,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 3,
-        "composeOrder": 228,
+        "composeOrder": 230,
         "composeRequired": false
       },
       "documentation": {
@@ -124,7 +124,7 @@
       "generation": {
         "surfaces": 3,
         "dotenvOrder": 4,
-        "composeOrder": 222,
+        "composeOrder": 224,
         "composeRequired": false
       },
       "documentation": {
@@ -150,7 +150,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 5,
-        "composeOrder": 83,
+        "composeOrder": 85,
         "composeRequired": false
       },
       "documentation": {
@@ -373,7 +373,7 @@
       }
     },
     {
-      "key": "DATABASE_MIGRATOR_USERNAME",
+      "key": "DATABASE_GLOBAL_USERNAME",
       "category": "database",
       "sensitivity": "public",
       "requirement": "required",
@@ -384,6 +384,58 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 14,
+        "composeOrder": 50,
+        "composeRequired": false
+      },
+      "documentation": {
+        "localizationKey": "environment.database.database_global_username",
+        "helpKey": "environment.help.database_global_username",
+        "anchor": "environment-database"
+      },
+      "activation": {
+        "kind": "feature",
+        "identifier": "server-database-config",
+        "operands": []
+      }
+    },
+    {
+      "key": "DATABASE_GLOBAL_PASSWORD",
+      "category": "database",
+      "sensitivity": "sensitive",
+      "requirement": "required",
+      "order": 15,
+      "hasSafeDefault": false,
+      "validatorId": "database-setting",
+      "restartBehavior": "process",
+      "generation": {
+        "surfaces": 7,
+        "dotenvOrder": 15,
+        "composeOrder": 51,
+        "composeRequired": false
+      },
+      "documentation": {
+        "localizationKey": "environment.database.database_global_password",
+        "helpKey": "environment.help.database_global_password",
+        "anchor": "environment-database"
+      },
+      "activation": {
+        "kind": "feature",
+        "identifier": "server-database-config",
+        "operands": []
+      }
+    },
+    {
+      "key": "DATABASE_MIGRATOR_USERNAME",
+      "category": "database",
+      "sensitivity": "public",
+      "requirement": "required",
+      "order": 16,
+      "hasSafeDefault": false,
+      "validatorId": "database-setting",
+      "restartBehavior": "process",
+      "generation": {
+        "surfaces": 7,
+        "dotenvOrder": 16,
         "composeOrder": 29,
         "composeRequired": false
       },
@@ -403,13 +455,13 @@
       "category": "database",
       "sensitivity": "sensitive",
       "requirement": "required",
-      "order": 15,
+      "order": 17,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 15,
+        "dotenvOrder": 17,
         "composeOrder": 30,
         "composeRequired": false
       },
@@ -429,13 +481,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 16,
+      "order": 18,
       "hasSafeDefault": true,
       "validatorId": "tls-mode",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 16,
+        "dotenvOrder": 18,
         "composeOrder": 45,
         "composeRequired": false
       },
@@ -455,13 +507,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 17,
+      "order": 19,
       "hasSafeDefault": false,
       "validatorId": "authentication-provider",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 17,
+        "dotenvOrder": 19,
         "composeOrder": 5,
         "composeRequired": false
       },
@@ -481,13 +533,13 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 18,
+      "order": 20,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 5,
-        "dotenvOrder": 18,
+        "dotenvOrder": 20,
         "composeRequired": false
       },
       "documentation": {
@@ -506,13 +558,13 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 19,
+      "order": 21,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 5,
-        "dotenvOrder": 19,
+        "dotenvOrder": 21,
         "composeRequired": false
       },
       "documentation": {
@@ -531,13 +583,13 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 20,
+      "order": 22,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 5,
-        "dotenvOrder": 20,
+        "dotenvOrder": 22,
         "composeRequired": false
       },
       "documentation": {
@@ -556,13 +608,13 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 21,
+      "order": 23,
       "hasSafeDefault": false,
       "validatorId": "identity-correlation-issuer",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 5,
-        "dotenvOrder": 21,
+        "dotenvOrder": 23,
         "composeRequired": false
       },
       "documentation": {
@@ -581,13 +633,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 22,
+      "order": 24,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 22,
+        "dotenvOrder": 24,
         "composeOrder": 6,
         "composeRequired": false
       },
@@ -607,14 +659,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 23,
+      "order": 25,
       "hasSafeDefault": false,
       "validatorId": "instance-bootstrap-provider",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 23,
-        "composeOrder": 89,
+        "dotenvOrder": 25,
+        "composeOrder": 91,
         "composeRequired": false
       },
       "documentation": {
@@ -633,14 +685,14 @@
       "category": "identity",
       "sensitivity": "sensitive",
       "requirement": "required",
-      "order": 24,
+      "order": 26,
       "hasSafeDefault": false,
       "validatorId": "identity-subject",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 24,
-        "composeOrder": 90,
+        "dotenvOrder": 26,
+        "composeOrder": 92,
         "composeRequired": false
       },
       "documentation": {
@@ -659,14 +711,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 25,
+      "order": 27,
       "hasSafeDefault": false,
       "validatorId": "positive-integer",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 25,
-        "composeOrder": 91,
+        "dotenvOrder": 27,
+        "composeOrder": 93,
         "composeRequired": false
       },
       "documentation": {
@@ -685,14 +737,14 @@
       "category": "identity",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 26,
+      "order": 28,
       "hasSafeDefault": false,
       "validatorId": "email-address",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 26,
-        "composeOrder": 92,
+        "dotenvOrder": 28,
+        "composeOrder": 94,
         "composeRequired": false
       },
       "documentation": {
@@ -711,14 +763,14 @@
       "category": "identity",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 27,
+      "order": 29,
       "hasSafeDefault": false,
       "validatorId": "profile-name",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 27,
-        "composeOrder": 93,
+        "dotenvOrder": 29,
+        "composeOrder": 95,
         "composeRequired": false
       },
       "documentation": {
@@ -737,14 +789,14 @@
       "category": "identity",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 28,
+      "order": 30,
       "hasSafeDefault": false,
       "validatorId": "profile-name",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 28,
-        "composeOrder": 94,
+        "dotenvOrder": 30,
+        "composeOrder": 96,
         "composeRequired": false
       },
       "documentation": {
@@ -763,14 +815,14 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 29,
+      "order": 31,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 29,
-        "composeOrder": 95,
+        "dotenvOrder": 31,
+        "composeOrder": 97,
         "composeRequired": false
       },
       "documentation": {
@@ -789,13 +841,13 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 30,
+      "order": 32,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 5,
-        "dotenvOrder": 30,
+        "dotenvOrder": 32,
         "composeRequired": false
       },
       "documentation": {
@@ -814,13 +866,13 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 31,
+      "order": 33,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 5,
-        "dotenvOrder": 31,
+        "dotenvOrder": 33,
         "composeRequired": false
       },
       "documentation": {
@@ -839,13 +891,13 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 32,
+      "order": 34,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 5,
-        "dotenvOrder": 32,
+        "dotenvOrder": 34,
         "composeRequired": false
       },
       "documentation": {
@@ -864,13 +916,13 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 33,
+      "order": 35,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 33,
+        "dotenvOrder": 35,
         "composeOrder": 7,
         "composeRequired": false
       },
@@ -890,13 +942,13 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 34,
+      "order": 36,
       "hasSafeDefault": true,
       "validatorId": "positive-integer",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 34,
+        "dotenvOrder": 36,
         "composeOrder": 8,
         "composeRequired": false
       },
@@ -916,13 +968,13 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 35,
+      "order": 37,
       "hasSafeDefault": true,
       "validatorId": "positive-integer",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 35,
+        "dotenvOrder": 37,
         "composeOrder": 9,
         "composeRequired": false
       },
@@ -942,13 +994,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 36,
+      "order": 38,
       "hasSafeDefault": true,
       "validatorId": "identity-database-topology",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 36,
+        "dotenvOrder": 38,
         "composeOrder": 10,
         "composeRequired": false
       },
@@ -968,13 +1020,13 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 37,
+      "order": 39,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 37,
+        "dotenvOrder": 39,
         "composeOrder": 1,
         "composeRequired": false
       },
@@ -994,13 +1046,13 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 38,
+      "order": 40,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 38,
+        "dotenvOrder": 40,
         "composeOrder": 0,
         "composeRequired": false
       },
@@ -1020,13 +1072,13 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 39,
+      "order": 41,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 39,
+        "dotenvOrder": 41,
         "composeOrder": 2,
         "composeRequired": false
       },
@@ -1046,13 +1098,13 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 40,
+      "order": 42,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 40,
+        "dotenvOrder": 42,
         "composeOrder": 3,
         "composeRequired": false
       },
@@ -1072,14 +1124,14 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 41,
+      "order": 43,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 3,
-        "dotenvOrder": 41,
-        "composeOrder": 225,
+        "dotenvOrder": 43,
+        "composeOrder": 227,
         "composeRequired": false
       },
       "documentation": {
@@ -1098,14 +1150,14 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 42,
+      "order": 44,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 3,
-        "dotenvOrder": 42,
-        "composeOrder": 223,
+        "dotenvOrder": 44,
+        "composeOrder": 225,
         "composeRequired": false
       },
       "documentation": {
@@ -1124,14 +1176,14 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 43,
+      "order": 45,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 3,
-        "dotenvOrder": 43,
-        "composeOrder": 224,
+        "dotenvOrder": 45,
+        "composeOrder": 226,
         "composeRequired": false
       },
       "documentation": {
@@ -1150,14 +1202,14 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 44,
+      "order": 46,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 3,
-        "dotenvOrder": 44,
-        "composeOrder": 226,
+        "dotenvOrder": 46,
+        "composeOrder": 228,
         "composeRequired": false
       },
       "documentation": {
@@ -1176,14 +1228,14 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 45,
+      "order": 47,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 3,
-        "dotenvOrder": 45,
-        "composeOrder": 227,
+        "dotenvOrder": 47,
+        "composeOrder": 229,
         "composeRequired": false
       },
       "documentation": {
@@ -1202,14 +1254,14 @@
       "category": "storage",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 46,
+      "order": 48,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 46,
-        "composeOrder": 212,
+        "dotenvOrder": 48,
+        "composeOrder": 214,
         "composeRequired": false
       },
       "documentation": {
@@ -1228,14 +1280,14 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 47,
+      "order": 49,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 47,
-        "composeOrder": 155,
+        "dotenvOrder": 49,
+        "composeOrder": 157,
         "composeRequired": false
       },
       "documentation": {
@@ -1254,14 +1306,14 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 48,
+      "order": 50,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 48,
-        "composeOrder": 50,
+        "dotenvOrder": 50,
+        "composeOrder": 52,
         "composeRequired": false
       },
       "documentation": {
@@ -1280,14 +1332,14 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 49,
+      "order": 51,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 49,
-        "composeOrder": 51,
+        "dotenvOrder": 51,
+        "composeOrder": 53,
         "composeRequired": false
       },
       "documentation": {
@@ -1306,14 +1358,14 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 50,
+      "order": 52,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 3,
-        "dotenvOrder": 50,
-        "composeOrder": 67,
+        "dotenvOrder": 52,
+        "composeOrder": 69,
         "composeRequired": false
       },
       "documentation": {
@@ -1332,14 +1384,14 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 51,
+      "order": 53,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 3,
-        "dotenvOrder": 51,
-        "composeOrder": 68,
+        "dotenvOrder": 53,
+        "composeOrder": 70,
         "composeRequired": false
       },
       "documentation": {
@@ -1358,14 +1410,14 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 52,
+      "order": 54,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 52,
-        "composeOrder": 85,
+        "dotenvOrder": 54,
+        "composeOrder": 87,
         "composeRequired": false
       },
       "documentation": {
@@ -1384,14 +1436,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 53,
+      "order": 55,
       "hasSafeDefault": false,
       "validatorId": "instance-bootstrap-mode",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 53,
-        "composeOrder": 88,
+        "dotenvOrder": 55,
+        "composeOrder": 90,
         "composeRequired": false
       },
       "documentation": {
@@ -1410,14 +1462,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 54,
+      "order": 56,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 54,
-        "composeOrder": 99,
+        "dotenvOrder": 56,
+        "composeOrder": 101,
         "composeRequired": false
       },
       "documentation": {
@@ -1436,14 +1488,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 55,
+      "order": 57,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 55,
-        "composeOrder": 100,
+        "dotenvOrder": 57,
+        "composeOrder": 102,
         "composeRequired": false
       },
       "documentation": {
@@ -1462,14 +1514,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 56,
+      "order": 58,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 56,
-        "composeOrder": 101,
+        "dotenvOrder": 58,
+        "composeOrder": 103,
         "composeRequired": false
       },
       "documentation": {
@@ -1488,14 +1540,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 57,
+      "order": 59,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 57,
-        "composeOrder": 102,
+        "dotenvOrder": 59,
+        "composeOrder": 104,
         "composeRequired": false
       },
       "documentation": {
@@ -1514,14 +1566,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 58,
+      "order": 60,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 58,
-        "composeOrder": 103,
+        "dotenvOrder": 60,
+        "composeOrder": 105,
         "composeRequired": false
       },
       "documentation": {
@@ -1540,14 +1592,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 59,
+      "order": 61,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 59,
-        "composeOrder": 104,
+        "dotenvOrder": 61,
+        "composeOrder": 106,
         "composeRequired": false
       },
       "documentation": {
@@ -1566,14 +1618,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "required",
-      "order": 60,
+      "order": 62,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 60,
-        "composeOrder": 105,
+        "dotenvOrder": 62,
+        "composeOrder": 107,
         "composeRequired": false
       },
       "documentation": {
@@ -1592,14 +1644,14 @@
       "category": "identity",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 61,
+      "order": 63,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 61,
-        "composeOrder": 107,
+        "dotenvOrder": 63,
+        "composeOrder": 109,
         "composeRequired": false
       },
       "documentation": {
@@ -1618,14 +1670,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 62,
+      "order": 64,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 62,
-        "composeOrder": 108,
+        "dotenvOrder": 64,
+        "composeOrder": 110,
         "composeRequired": false
       },
       "documentation": {
@@ -1644,14 +1696,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 63,
+      "order": 65,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 63,
-        "composeOrder": 109,
+        "dotenvOrder": 65,
+        "composeOrder": 111,
         "composeRequired": false
       },
       "documentation": {
@@ -1670,14 +1722,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 64,
+      "order": 66,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 64,
-        "composeOrder": 110,
+        "dotenvOrder": 66,
+        "composeOrder": 112,
         "composeRequired": false
       },
       "documentation": {
@@ -1696,14 +1748,14 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 65,
+      "order": 67,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 65,
-        "composeOrder": 111,
+        "dotenvOrder": 67,
+        "composeOrder": 113,
         "composeRequired": false
       },
       "documentation": {
@@ -1722,14 +1774,14 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 66,
+      "order": 68,
       "hasSafeDefault": true,
       "validatorId": "configuration-manifest-mode",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 66,
-        "composeOrder": 219,
+        "dotenvOrder": 68,
+        "composeOrder": 221,
         "composeRequired": false
       },
       "documentation": {
@@ -1748,14 +1800,14 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 67,
+      "order": 69,
       "hasSafeDefault": false,
       "validatorId": "deployment-setting",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 67,
-        "composeOrder": 220,
+        "dotenvOrder": 69,
+        "composeOrder": 222,
         "composeRequired": false
       },
       "documentation": {
@@ -1774,14 +1826,14 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 68,
+      "order": 70,
       "hasSafeDefault": false,
       "validatorId": "deployment-setting",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 7,
-        "dotenvOrder": 68,
-        "composeOrder": 221,
+        "dotenvOrder": 70,
+        "composeOrder": 223,
         "composeRequired": false
       },
       "documentation": {
@@ -1800,7 +1852,7 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 69,
+      "order": 71,
       "hasSafeDefault": false,
       "validatorId": "deployment-setting",
       "restartBehavior": "process",
@@ -1824,7 +1876,7 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 70,
+      "order": 72,
       "hasSafeDefault": false,
       "validatorId": "deployment-setting",
       "restartBehavior": "process",
@@ -1848,13 +1900,13 @@
       "category": "messaging",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 71,
+      "order": 73,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 147,
+        "composeOrder": 149,
         "composeRequired": false
       },
       "documentation": {
@@ -1873,13 +1925,13 @@
       "category": "messaging",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 72,
+      "order": 74,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 148,
+        "composeOrder": 150,
         "composeRequired": false
       },
       "documentation": {
@@ -1898,13 +1950,13 @@
       "category": "messaging",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 73,
+      "order": 75,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 152,
+        "composeOrder": 154,
         "composeRequired": false
       },
       "documentation": {
@@ -1923,13 +1975,13 @@
       "category": "messaging",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 74,
+      "order": 76,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 153,
+        "composeOrder": 155,
         "composeRequired": false
       },
       "documentation": {
@@ -1948,13 +2000,13 @@
       "category": "messaging",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 75,
+      "order": 77,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 149,
+        "composeOrder": 151,
         "composeRequired": false
       },
       "documentation": {
@@ -1973,13 +2025,13 @@
       "category": "messaging",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 76,
+      "order": 78,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 150,
+        "composeOrder": 152,
         "composeRequired": false
       },
       "documentation": {
@@ -1998,13 +2050,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 77,
+      "order": 79,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 151,
+        "composeOrder": 153,
         "composeRequired": false
       },
       "documentation": {
@@ -2023,13 +2075,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 78,
+      "order": 80,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 242,
+        "composeOrder": 244,
         "composeRequired": false
       },
       "documentation": {
@@ -2048,13 +2100,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 79,
+      "order": 81,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 243,
+        "composeOrder": 245,
         "composeRequired": false
       },
       "documentation": {
@@ -2073,13 +2125,13 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 80,
+      "order": 82,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 248,
+        "composeOrder": 250,
         "composeRequired": false
       },
       "documentation": {
@@ -2098,13 +2150,13 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 81,
+      "order": 83,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 249,
+        "composeOrder": 251,
         "composeRequired": false
       },
       "documentation": {
@@ -2123,13 +2175,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 82,
+      "order": 84,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 259,
+        "composeOrder": 261,
         "composeRequired": false
       },
       "documentation": {
@@ -2148,13 +2200,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 83,
+      "order": 85,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 268,
+        "composeOrder": 270,
         "composeRequired": false
       },
       "documentation": {
@@ -2173,13 +2225,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 84,
+      "order": 86,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 284,
+        "composeOrder": 286,
         "composeRequired": false
       },
       "documentation": {
@@ -2198,13 +2250,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 85,
+      "order": 87,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 287,
+        "composeOrder": 289,
         "composeRequired": false
       },
       "documentation": {
@@ -2223,13 +2275,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 86,
+      "order": 88,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 292,
+        "composeOrder": 294,
         "composeRequired": false
       },
       "documentation": {
@@ -2248,13 +2300,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 87,
+      "order": 89,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 293,
+        "composeOrder": 295,
         "composeRequired": false
       },
       "documentation": {
@@ -2273,13 +2325,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 88,
+      "order": 90,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 288,
+        "composeOrder": 290,
         "composeRequired": false
       },
       "documentation": {
@@ -2298,7 +2350,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 89,
+      "order": 91,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2323,7 +2375,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 90,
+      "order": 92,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2348,7 +2400,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 91,
+      "order": 93,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2373,7 +2425,7 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 92,
+      "order": 94,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2398,7 +2450,7 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "required",
-      "order": 93,
+      "order": 95,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2423,7 +2475,7 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "required",
-      "order": 94,
+      "order": 96,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2448,7 +2500,7 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "required",
-      "order": 95,
+      "order": 97,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2473,7 +2525,7 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "required",
-      "order": 96,
+      "order": 98,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2498,7 +2550,7 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "required",
-      "order": 97,
+      "order": 99,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
@@ -2523,7 +2575,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 98,
+      "order": 100,
       "hasSafeDefault": false,
       "validatorId": "secret-provider-setting",
       "restartBehavior": "process",
@@ -2548,7 +2600,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 99,
+      "order": 101,
       "hasSafeDefault": false,
       "validatorId": "secret-provider-setting",
       "restartBehavior": "process",
@@ -2573,7 +2625,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 100,
+      "order": 102,
       "hasSafeDefault": false,
       "validatorId": "secret-provider-setting",
       "restartBehavior": "process",
@@ -2598,7 +2650,7 @@
       "category": "security",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 101,
+      "order": 103,
       "hasSafeDefault": false,
       "validatorId": "secret-provider-setting",
       "restartBehavior": "process",
@@ -2623,7 +2675,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 102,
+      "order": 104,
       "hasSafeDefault": false,
       "validatorId": "secret-provider-setting",
       "restartBehavior": "process",
@@ -2648,7 +2700,7 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 103,
+      "order": 105,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "process",
@@ -2673,7 +2725,7 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 104,
+      "order": 106,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
@@ -2698,7 +2750,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 105,
+      "order": 107,
       "hasSafeDefault": false,
       "validatorId": "database-provider",
       "restartBehavior": "process",
@@ -2723,7 +2775,7 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 106,
+      "order": 108,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -2748,7 +2800,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 107,
+      "order": 109,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -2773,7 +2825,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 108,
+      "order": 110,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "process",
@@ -2798,7 +2850,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 109,
+      "order": 111,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -2823,7 +2875,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 110,
+      "order": 112,
       "hasSafeDefault": false,
       "validatorId": "database-schema",
       "restartBehavior": "process",
@@ -2848,7 +2900,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 111,
+      "order": 113,
       "hasSafeDefault": false,
       "validatorId": "tls-mode",
       "restartBehavior": "process",
@@ -2873,7 +2925,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 112,
+      "order": 114,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "process",
@@ -2898,7 +2950,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 113,
+      "order": 115,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -2923,7 +2975,7 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 114,
+      "order": 116,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -2948,7 +3000,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 115,
+      "order": 117,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -2973,7 +3025,7 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 116,
+      "order": 118,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -2998,13 +3050,13 @@
       "category": "platform",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 117,
+      "order": 119,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 87,
+        "composeOrder": 89,
         "composeRequired": false
       },
       "documentation": {
@@ -3023,13 +3075,13 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 118,
+      "order": 120,
       "hasSafeDefault": true,
       "validatorId": "positive-integer",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 96,
+        "composeOrder": 98,
         "composeRequired": false
       },
       "documentation": {
@@ -3048,13 +3100,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 119,
+      "order": 121,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 97,
+        "composeOrder": 99,
         "composeRequired": false
       },
       "documentation": {
@@ -3073,13 +3125,13 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 120,
+      "order": 122,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 98,
+        "composeOrder": 100,
         "composeRequired": false
       },
       "documentation": {
@@ -3098,7 +3150,7 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 121,
+      "order": 123,
       "hasSafeDefault": false,
       "validatorId": "managed-deployment-setting",
       "restartBehavior": "deployment",
@@ -3137,7 +3189,7 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 122,
+      "order": 124,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "deployment",
@@ -3176,7 +3228,7 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 123,
+      "order": 125,
       "hasSafeDefault": false,
       "validatorId": "managed-deployment-setting",
       "restartBehavior": "deployment",
@@ -3215,7 +3267,7 @@
       "category": "deployment",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 124,
+      "order": 126,
       "hasSafeDefault": false,
       "validatorId": "managed-deployment-setting",
       "restartBehavior": "deployment",
@@ -3254,7 +3306,7 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 125,
+      "order": 127,
       "hasSafeDefault": false,
       "validatorId": "managed-deployment-setting",
       "restartBehavior": "deployment",
@@ -3293,7 +3345,7 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 126,
+      "order": 128,
       "hasSafeDefault": false,
       "validatorId": "managed-deployment-setting",
       "restartBehavior": "deployment",
@@ -3332,13 +3384,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 127,
+      "order": 129,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 131,
+        "composeOrder": 133,
         "composeRequired": false
       },
       "documentation": {
@@ -3357,13 +3409,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 128,
+      "order": 130,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 132,
+        "composeOrder": 134,
         "composeRequired": false
       },
       "documentation": {
@@ -3382,13 +3434,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 129,
+      "order": 131,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 133,
+        "composeOrder": 135,
         "composeRequired": false
       },
       "documentation": {
@@ -3407,13 +3459,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 130,
+      "order": 132,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 134,
+        "composeOrder": 136,
         "composeRequired": false
       },
       "documentation": {
@@ -3432,13 +3484,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 131,
+      "order": 133,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 136,
+        "composeOrder": 138,
         "composeRequired": false
       },
       "documentation": {
@@ -3457,13 +3509,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 132,
+      "order": 134,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 137,
+        "composeOrder": 139,
         "composeRequired": false
       },
       "documentation": {
@@ -3482,13 +3534,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 133,
+      "order": 135,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 135,
+        "composeOrder": 137,
         "composeRequired": false
       },
       "documentation": {
@@ -3507,13 +3559,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 134,
+      "order": 136,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 138,
+        "composeOrder": 140,
         "composeRequired": false
       },
       "documentation": {
@@ -3532,13 +3584,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 135,
+      "order": 137,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 139,
+        "composeOrder": 141,
         "composeRequired": false
       },
       "documentation": {
@@ -3557,13 +3609,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 136,
+      "order": 138,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 140,
+        "composeOrder": 142,
         "composeRequired": false
       },
       "documentation": {
@@ -3582,13 +3634,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 137,
+      "order": 139,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 141,
+        "composeOrder": 143,
         "composeRequired": false
       },
       "documentation": {
@@ -3607,13 +3659,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 138,
+      "order": 140,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 142,
+        "composeOrder": 144,
         "composeRequired": false
       },
       "documentation": {
@@ -3632,7 +3684,7 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 139,
+      "order": 141,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -3656,7 +3708,7 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 140,
+      "order": 142,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -3680,7 +3732,7 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 141,
+      "order": 143,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -3704,7 +3756,7 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 142,
+      "order": 144,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -3728,13 +3780,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 143,
+      "order": 145,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 240,
+        "composeOrder": 242,
         "composeRequired": false
       },
       "documentation": {
@@ -3753,13 +3805,13 @@
       "category": "deployment",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 144,
+      "order": 146,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 84,
+        "composeOrder": 86,
         "composeRequired": false
       },
       "documentation": {
@@ -3793,13 +3845,13 @@
       "category": "identity",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 145,
+      "order": 147,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 106,
+        "composeOrder": 108,
         "composeRequired": false
       },
       "documentation": {
@@ -3818,13 +3870,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 146,
+      "order": 148,
       "hasSafeDefault": false,
       "validatorId": "payment-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 121,
+        "composeOrder": 123,
         "composeRequired": false
       },
       "documentation": {
@@ -3843,13 +3895,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 147,
+      "order": 149,
       "hasSafeDefault": false,
       "validatorId": "payment-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 122,
+        "composeOrder": 124,
         "composeRequired": false
       },
       "documentation": {
@@ -3868,13 +3920,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 148,
+      "order": 150,
       "hasSafeDefault": false,
       "validatorId": "payment-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 123,
+        "composeOrder": 125,
         "composeRequired": false
       },
       "documentation": {
@@ -3893,13 +3945,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 149,
+      "order": 151,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 112,
+        "composeOrder": 114,
         "composeRequired": false
       },
       "documentation": {
@@ -3918,13 +3970,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 150,
+      "order": 152,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 113,
+        "composeOrder": 115,
         "composeRequired": false
       },
       "documentation": {
@@ -3943,13 +3995,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 151,
+      "order": 153,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 114,
+        "composeOrder": 116,
         "composeRequired": false
       },
       "documentation": {
@@ -3968,13 +4020,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 152,
+      "order": 154,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 115,
+        "composeOrder": 117,
         "composeRequired": false
       },
       "documentation": {
@@ -3993,13 +4045,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 153,
+      "order": 155,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 116,
+        "composeOrder": 118,
         "composeRequired": false
       },
       "documentation": {
@@ -4018,13 +4070,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 154,
+      "order": 156,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 117,
+        "composeOrder": 119,
         "composeRequired": false
       },
       "documentation": {
@@ -4043,13 +4095,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 155,
+      "order": 157,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 118,
+        "composeOrder": 120,
         "composeRequired": false
       },
       "documentation": {
@@ -4068,13 +4120,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 156,
+      "order": 158,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 119,
+        "composeOrder": 121,
         "composeRequired": false
       },
       "documentation": {
@@ -4093,13 +4145,13 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 157,
+      "order": 159,
       "hasSafeDefault": false,
       "validatorId": "payment-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 124,
+        "composeOrder": 126,
         "composeRequired": false
       },
       "documentation": {
@@ -4118,13 +4170,13 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 158,
+      "order": 160,
       "hasSafeDefault": false,
       "validatorId": "payment-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 125,
+        "composeOrder": 127,
         "composeRequired": false
       },
       "documentation": {
@@ -4143,7 +4195,7 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 159,
+      "order": 161,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4167,7 +4219,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 160,
+      "order": 162,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4191,7 +4243,7 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 161,
+      "order": 163,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4215,7 +4267,7 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 162,
+      "order": 164,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4239,7 +4291,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 163,
+      "order": 165,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4263,7 +4315,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 164,
+      "order": 166,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4287,7 +4339,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 165,
+      "order": 167,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4311,7 +4363,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 166,
+      "order": 168,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4335,7 +4387,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 167,
+      "order": 169,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4359,7 +4411,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 168,
+      "order": 170,
       "hasSafeDefault": true,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4383,7 +4435,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 169,
+      "order": 171,
       "hasSafeDefault": true,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4407,7 +4459,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 170,
+      "order": 172,
       "hasSafeDefault": true,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4431,7 +4483,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 171,
+      "order": 173,
       "hasSafeDefault": true,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4455,7 +4507,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 172,
+      "order": 174,
       "hasSafeDefault": true,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4479,7 +4531,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 173,
+      "order": 175,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "process",
@@ -4503,7 +4555,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 174,
+      "order": 176,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4527,7 +4579,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 175,
+      "order": 177,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4551,7 +4603,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 176,
+      "order": 178,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4575,7 +4627,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 177,
+      "order": 179,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4599,7 +4651,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 178,
+      "order": 180,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4623,7 +4675,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 179,
+      "order": 181,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4647,7 +4699,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 180,
+      "order": 182,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4671,7 +4723,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 181,
+      "order": 183,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4695,7 +4747,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 182,
+      "order": 184,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4719,7 +4771,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 183,
+      "order": 185,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4743,7 +4795,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 184,
+      "order": 186,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4767,7 +4819,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 185,
+      "order": 187,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4791,7 +4843,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 186,
+      "order": 188,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4815,7 +4867,7 @@
       "category": "security",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 187,
+      "order": 189,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4839,7 +4891,7 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 188,
+      "order": 190,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -4863,13 +4915,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 189,
+      "order": 191,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 231,
+        "composeOrder": 233,
         "composeRequired": false
       },
       "documentation": {
@@ -4888,13 +4940,13 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 190,
+      "order": 192,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 232,
+        "composeOrder": 234,
         "composeRequired": false
       },
       "documentation": {
@@ -4913,13 +4965,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 191,
+      "order": 193,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 233,
+        "composeOrder": 235,
         "composeRequired": false
       },
       "documentation": {
@@ -4938,13 +4990,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 192,
+      "order": 194,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 234,
+        "composeOrder": 236,
         "composeRequired": false
       },
       "documentation": {
@@ -4963,13 +5015,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 193,
+      "order": 195,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 235,
+        "composeOrder": 237,
         "composeRequired": false
       },
       "documentation": {
@@ -4988,13 +5040,13 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 194,
+      "order": 196,
       "hasSafeDefault": false,
       "validatorId": "authorization-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 237,
+        "composeOrder": 239,
         "composeRequired": false
       },
       "documentation": {
@@ -5013,13 +5065,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 195,
+      "order": 197,
       "hasSafeDefault": false,
       "validatorId": "authorization-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 236,
+        "composeOrder": 238,
         "composeRequired": false
       },
       "documentation": {
@@ -5038,13 +5090,13 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 196,
+      "order": 198,
       "hasSafeDefault": false,
       "validatorId": "authorization-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 238,
+        "composeOrder": 240,
         "composeRequired": false
       },
       "documentation": {
@@ -5063,13 +5115,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 197,
+      "order": 199,
       "hasSafeDefault": false,
       "validatorId": "authorization-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 247,
+        "composeOrder": 249,
         "composeRequired": false
       },
       "documentation": {
@@ -5088,13 +5140,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 198,
+      "order": 200,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 244,
+        "composeOrder": 246,
         "composeRequired": false
       },
       "documentation": {
@@ -5113,13 +5165,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 199,
+      "order": 201,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 245,
+        "composeOrder": 247,
         "composeRequired": false
       },
       "documentation": {
@@ -5138,13 +5190,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 200,
+      "order": 202,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 246,
+        "composeOrder": 248,
         "composeRequired": false
       },
       "documentation": {
@@ -5163,13 +5215,13 @@
       "category": "storage",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 201,
+      "order": 203,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 77,
+        "composeOrder": 79,
         "composeRequired": false
       },
       "documentation": {
@@ -5188,13 +5240,13 @@
       "category": "storage",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 202,
+      "order": 204,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 78,
+        "composeOrder": 80,
         "composeRequired": false
       },
       "documentation": {
@@ -5213,13 +5265,13 @@
       "category": "storage",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 203,
+      "order": 205,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 79,
+        "composeOrder": 81,
         "composeRequired": false
       },
       "documentation": {
@@ -5238,13 +5290,13 @@
       "category": "storage",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 204,
+      "order": 206,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 80,
+        "composeOrder": 82,
         "composeRequired": false
       },
       "documentation": {
@@ -5263,13 +5315,13 @@
       "category": "storage",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 205,
+      "order": 207,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 81,
+        "composeOrder": 83,
         "composeRequired": false
       },
       "documentation": {
@@ -5288,13 +5340,13 @@
       "category": "storage",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 206,
+      "order": 208,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 82,
+        "composeOrder": 84,
         "composeRequired": false
       },
       "documentation": {
@@ -5313,13 +5365,13 @@
       "category": "storage",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 207,
+      "order": 209,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 213,
+        "composeOrder": 215,
         "composeRequired": false
       },
       "documentation": {
@@ -5338,13 +5390,13 @@
       "category": "storage",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 208,
+      "order": 210,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 214,
+        "composeOrder": 216,
         "composeRequired": false
       },
       "documentation": {
@@ -5363,13 +5415,13 @@
       "category": "storage",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 209,
+      "order": 211,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 215,
+        "composeOrder": 217,
         "composeRequired": false
       },
       "documentation": {
@@ -5388,13 +5440,13 @@
       "category": "storage",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 210,
+      "order": 212,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 216,
+        "composeOrder": 218,
         "composeRequired": false
       },
       "documentation": {
@@ -5413,13 +5465,13 @@
       "category": "storage",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 211,
+      "order": 213,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 217,
+        "composeOrder": 219,
         "composeRequired": false
       },
       "documentation": {
@@ -5438,13 +5490,13 @@
       "category": "storage",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 212,
+      "order": 214,
       "hasSafeDefault": false,
       "validatorId": "storage-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 218,
+        "composeOrder": 220,
         "composeRequired": false
       },
       "documentation": {
@@ -5463,13 +5515,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 213,
+      "order": 215,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 126,
+        "composeOrder": 128,
         "composeRequired": false
       },
       "documentation": {
@@ -5488,13 +5540,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 214,
+      "order": 216,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 127,
+        "composeOrder": 129,
         "composeRequired": false
       },
       "documentation": {
@@ -5513,13 +5565,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 215,
+      "order": 217,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 128,
+        "composeOrder": 130,
         "composeRequired": false
       },
       "documentation": {
@@ -5538,13 +5590,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 216,
+      "order": 218,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 129,
+        "composeOrder": 131,
         "composeRequired": false
       },
       "documentation": {
@@ -5563,13 +5615,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 217,
+      "order": 219,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 130,
+        "composeOrder": 132,
         "composeRequired": false
       },
       "documentation": {
@@ -5588,13 +5640,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 218,
+      "order": 220,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 143,
+        "composeOrder": 145,
         "composeRequired": false
       },
       "documentation": {
@@ -5613,13 +5665,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 219,
+      "order": 221,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 144,
+        "composeOrder": 146,
         "composeRequired": false
       },
       "documentation": {
@@ -5638,13 +5690,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 220,
+      "order": 222,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 145,
+        "composeOrder": 147,
         "composeRequired": false
       },
       "documentation": {
@@ -5663,13 +5715,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 221,
+      "order": 223,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 146,
+        "composeOrder": 148,
         "composeRequired": false
       },
       "documentation": {
@@ -5688,13 +5740,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 222,
+      "order": 224,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 176,
+        "composeOrder": 178,
         "composeRequired": false
       },
       "documentation": {
@@ -5713,13 +5765,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 223,
+      "order": 225,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 177,
+        "composeOrder": 179,
         "composeRequired": false
       },
       "documentation": {
@@ -5738,13 +5790,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 224,
+      "order": 226,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 178,
+        "composeOrder": 180,
         "composeRequired": false
       },
       "documentation": {
@@ -5763,13 +5815,13 @@
       "category": "messaging",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 225,
+      "order": 227,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 179,
+        "composeOrder": 181,
         "composeRequired": false
       },
       "documentation": {
@@ -5788,13 +5840,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 226,
+      "order": 228,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 154,
+        "composeOrder": 156,
         "composeRequired": false
       },
       "documentation": {
@@ -5813,13 +5865,13 @@
       "category": "messaging",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 227,
+      "order": 229,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 156,
+        "composeOrder": 158,
         "composeRequired": false
       },
       "documentation": {
@@ -5838,13 +5890,13 @@
       "category": "messaging",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 228,
+      "order": 230,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 157,
+        "composeOrder": 159,
         "composeRequired": false
       },
       "documentation": {
@@ -5863,13 +5915,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 229,
+      "order": 231,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 158,
+        "composeOrder": 160,
         "composeRequired": false
       },
       "documentation": {
@@ -5888,13 +5940,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 230,
+      "order": 232,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 159,
+        "composeOrder": 161,
         "composeRequired": false
       },
       "documentation": {
@@ -5913,13 +5965,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 231,
+      "order": 233,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 160,
+        "composeOrder": 162,
         "composeRequired": false
       },
       "documentation": {
@@ -5938,13 +5990,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 232,
+      "order": 234,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 161,
+        "composeOrder": 163,
         "composeRequired": false
       },
       "documentation": {
@@ -5963,13 +6015,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 233,
+      "order": 235,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 162,
+        "composeOrder": 164,
         "composeRequired": false
       },
       "documentation": {
@@ -5988,13 +6040,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 234,
+      "order": 236,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 163,
+        "composeOrder": 165,
         "composeRequired": false
       },
       "documentation": {
@@ -6013,13 +6065,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 235,
+      "order": 237,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 164,
+        "composeOrder": 166,
         "composeRequired": false
       },
       "documentation": {
@@ -6038,13 +6090,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 236,
+      "order": 238,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 165,
+        "composeOrder": 167,
         "composeRequired": false
       },
       "documentation": {
@@ -6063,13 +6115,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 237,
+      "order": 239,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 166,
+        "composeOrder": 168,
         "composeRequired": false
       },
       "documentation": {
@@ -6088,13 +6140,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 238,
+      "order": 240,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 167,
+        "composeOrder": 169,
         "composeRequired": false
       },
       "documentation": {
@@ -6113,13 +6165,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 239,
+      "order": 241,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 168,
+        "composeOrder": 170,
         "composeRequired": false
       },
       "documentation": {
@@ -6138,13 +6190,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 240,
+      "order": 242,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 169,
+        "composeOrder": 171,
         "composeRequired": false
       },
       "documentation": {
@@ -6163,13 +6215,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 241,
+      "order": 243,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 170,
+        "composeOrder": 172,
         "composeRequired": false
       },
       "documentation": {
@@ -6188,13 +6240,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 242,
+      "order": 244,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 171,
+        "composeOrder": 173,
         "composeRequired": false
       },
       "documentation": {
@@ -6213,13 +6265,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 243,
+      "order": 245,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 172,
+        "composeOrder": 174,
         "composeRequired": false
       },
       "documentation": {
@@ -6238,13 +6290,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 244,
+      "order": 246,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 173,
+        "composeOrder": 175,
         "composeRequired": false
       },
       "documentation": {
@@ -6263,13 +6315,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 245,
+      "order": 247,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 174,
+        "composeOrder": 176,
         "composeRequired": false
       },
       "documentation": {
@@ -6288,13 +6340,13 @@
       "category": "messaging",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 246,
+      "order": 248,
       "hasSafeDefault": false,
       "validatorId": "messaging-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 175,
+        "composeOrder": 177,
         "composeRequired": false
       },
       "documentation": {
@@ -6313,13 +6365,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 247,
+      "order": 249,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 195,
+        "composeOrder": 197,
         "composeRequired": false
       },
       "documentation": {
@@ -6338,13 +6390,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 248,
+      "order": 250,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 196,
+        "composeOrder": 198,
         "composeRequired": false
       },
       "documentation": {
@@ -6363,13 +6415,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 249,
+      "order": 251,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 197,
+        "composeOrder": 199,
         "composeRequired": false
       },
       "documentation": {
@@ -6388,13 +6440,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 250,
+      "order": 252,
       "hasSafeDefault": false,
       "validatorId": "webhook-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 198,
+        "composeOrder": 200,
         "composeRequired": false
       },
       "documentation": {
@@ -6413,13 +6465,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 251,
+      "order": 253,
       "hasSafeDefault": false,
       "validatorId": "webhook-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 199,
+        "composeOrder": 201,
         "composeRequired": false
       },
       "documentation": {
@@ -6438,13 +6490,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 252,
+      "order": 254,
       "hasSafeDefault": false,
       "validatorId": "webhook-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 200,
+        "composeOrder": 202,
         "composeRequired": false
       },
       "documentation": {
@@ -6463,13 +6515,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 253,
+      "order": 255,
       "hasSafeDefault": false,
       "validatorId": "webhook-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 201,
+        "composeOrder": 203,
         "composeRequired": false
       },
       "documentation": {
@@ -6488,13 +6540,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 254,
+      "order": 256,
       "hasSafeDefault": false,
       "validatorId": "webhook-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 202,
+        "composeOrder": 204,
         "composeRequired": false
       },
       "documentation": {
@@ -6513,13 +6565,13 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 255,
+      "order": 257,
       "hasSafeDefault": false,
       "validatorId": "webhook-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 203,
+        "composeOrder": 205,
         "composeRequired": false
       },
       "documentation": {
@@ -6538,13 +6590,13 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 256,
+      "order": 258,
       "hasSafeDefault": false,
       "validatorId": "webhook-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 204,
+        "composeOrder": 206,
         "composeRequired": false
       },
       "documentation": {
@@ -6563,13 +6615,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 257,
+      "order": 259,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 253,
+        "composeOrder": 255,
         "composeRequired": false
       },
       "documentation": {
@@ -6588,13 +6640,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 258,
+      "order": 260,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 252,
+        "composeOrder": 254,
         "composeRequired": false
       },
       "documentation": {
@@ -6613,13 +6665,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 259,
+      "order": 261,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 250,
+        "composeOrder": 252,
         "composeRequired": false
       },
       "documentation": {
@@ -6638,13 +6690,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 260,
+      "order": 262,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 251,
+        "composeOrder": 253,
         "composeRequired": false
       },
       "documentation": {
@@ -6663,13 +6715,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 261,
+      "order": 263,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 254,
+        "composeOrder": 256,
         "composeRequired": false
       },
       "documentation": {
@@ -6688,13 +6740,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 262,
+      "order": 264,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 255,
+        "composeOrder": 257,
         "composeRequired": false
       },
       "documentation": {
@@ -6713,13 +6765,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 263,
+      "order": 265,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 256,
+        "composeOrder": 258,
         "composeRequired": false
       },
       "documentation": {
@@ -6738,13 +6790,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 264,
+      "order": 266,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 257,
+        "composeOrder": 259,
         "composeRequired": false
       },
       "documentation": {
@@ -6763,13 +6815,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 265,
+      "order": 267,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 258,
+        "composeOrder": 260,
         "composeRequired": false
       },
       "documentation": {
@@ -6788,13 +6840,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 266,
+      "order": 268,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 263,
+        "composeOrder": 265,
         "composeRequired": false
       },
       "documentation": {
@@ -6813,13 +6865,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 267,
+      "order": 269,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 264,
+        "composeOrder": 266,
         "composeRequired": false
       },
       "documentation": {
@@ -6838,13 +6890,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 268,
+      "order": 270,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 265,
+        "composeOrder": 267,
         "composeRequired": false
       },
       "documentation": {
@@ -6863,13 +6915,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 269,
+      "order": 271,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 266,
+        "composeOrder": 268,
         "composeRequired": false
       },
       "documentation": {
@@ -6888,13 +6940,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 270,
+      "order": 272,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 267,
+        "composeOrder": 269,
         "composeRequired": false
       },
       "documentation": {
@@ -6913,13 +6965,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 271,
+      "order": 273,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 260,
+        "composeOrder": 262,
         "composeRequired": false
       },
       "documentation": {
@@ -6938,13 +6990,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 272,
+      "order": 274,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 261,
+        "composeOrder": 263,
         "composeRequired": false
       },
       "documentation": {
@@ -6963,13 +7015,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 273,
+      "order": 275,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 262,
+        "composeOrder": 264,
         "composeRequired": false
       },
       "documentation": {
@@ -6988,13 +7040,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 274,
+      "order": 276,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 180,
+        "composeOrder": 182,
         "composeRequired": false
       },
       "documentation": {
@@ -7013,13 +7065,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 275,
+      "order": 277,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 181,
+        "composeOrder": 183,
         "composeRequired": false
       },
       "documentation": {
@@ -7038,13 +7090,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 276,
+      "order": 278,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 182,
+        "composeOrder": 184,
         "composeRequired": false
       },
       "documentation": {
@@ -7063,13 +7115,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 277,
+      "order": 279,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 183,
+        "composeOrder": 185,
         "composeRequired": false
       },
       "documentation": {
@@ -7088,13 +7140,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 278,
+      "order": 280,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 184,
+        "composeOrder": 186,
         "composeRequired": false
       },
       "documentation": {
@@ -7113,13 +7165,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 279,
+      "order": 281,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 185,
+        "composeOrder": 187,
         "composeRequired": false
       },
       "documentation": {
@@ -7138,7 +7190,7 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 280,
+      "order": 282,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -7162,7 +7214,7 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 281,
+      "order": 283,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -7186,13 +7238,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 282,
+      "order": 284,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 186,
+        "composeOrder": 188,
         "composeRequired": false
       },
       "documentation": {
@@ -7211,13 +7263,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 283,
+      "order": 285,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 187,
+        "composeOrder": 189,
         "composeRequired": false
       },
       "documentation": {
@@ -7236,13 +7288,13 @@
       "category": "observability",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 284,
+      "order": 286,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 188,
+        "composeOrder": 190,
         "composeRequired": false
       },
       "documentation": {
@@ -7261,13 +7313,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 285,
+      "order": 287,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 189,
+        "composeOrder": 191,
         "composeRequired": false
       },
       "documentation": {
@@ -7286,13 +7338,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 286,
+      "order": 288,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 190,
+        "composeOrder": 192,
         "composeRequired": false
       },
       "documentation": {
@@ -7311,13 +7363,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 287,
+      "order": 289,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 191,
+        "composeOrder": 193,
         "composeRequired": false
       },
       "documentation": {
@@ -7336,13 +7388,13 @@
       "category": "observability",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 288,
+      "order": 290,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 192,
+        "composeOrder": 194,
         "composeRequired": false
       },
       "documentation": {
@@ -7361,13 +7413,13 @@
       "category": "observability",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 289,
+      "order": 291,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 193,
+        "composeOrder": 195,
         "composeRequired": false
       },
       "documentation": {
@@ -7386,13 +7438,13 @@
       "category": "observability",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 290,
+      "order": 292,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 194,
+        "composeOrder": 196,
         "composeRequired": false
       },
       "documentation": {
@@ -7411,13 +7463,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 291,
+      "order": 293,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 269,
+        "composeOrder": 271,
         "composeRequired": false
       },
       "documentation": {
@@ -7436,13 +7488,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 292,
+      "order": 294,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 285,
+        "composeOrder": 287,
         "composeRequired": false
       },
       "documentation": {
@@ -7461,13 +7513,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 293,
+      "order": 295,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 286,
+        "composeOrder": 288,
         "composeRequired": false
       },
       "documentation": {
@@ -7486,13 +7538,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 294,
+      "order": 296,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 270,
+        "composeOrder": 272,
         "composeRequired": false
       },
       "documentation": {
@@ -7511,13 +7563,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 295,
+      "order": 297,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 271,
+        "composeOrder": 273,
         "composeRequired": false
       },
       "documentation": {
@@ -7536,13 +7588,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 296,
+      "order": 298,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 272,
+        "composeOrder": 274,
         "composeRequired": false
       },
       "documentation": {
@@ -7561,13 +7613,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 297,
+      "order": 299,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 273,
+        "composeOrder": 275,
         "composeRequired": false
       },
       "documentation": {
@@ -7586,13 +7638,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 298,
+      "order": 300,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 274,
+        "composeOrder": 276,
         "composeRequired": false
       },
       "documentation": {
@@ -7611,13 +7663,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 299,
+      "order": 301,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 275,
+        "composeOrder": 277,
         "composeRequired": false
       },
       "documentation": {
@@ -7636,13 +7688,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 300,
+      "order": 302,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 276,
+        "composeOrder": 278,
         "composeRequired": false
       },
       "documentation": {
@@ -7661,13 +7713,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 301,
+      "order": 303,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 277,
+        "composeOrder": 279,
         "composeRequired": false
       },
       "documentation": {
@@ -7686,13 +7738,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 302,
+      "order": 304,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 278,
+        "composeOrder": 280,
         "composeRequired": false
       },
       "documentation": {
@@ -7711,13 +7763,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 303,
+      "order": 305,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 279,
+        "composeOrder": 281,
         "composeRequired": false
       },
       "documentation": {
@@ -7736,13 +7788,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 304,
+      "order": 306,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 280,
+        "composeOrder": 282,
         "composeRequired": false
       },
       "documentation": {
@@ -7761,13 +7813,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 305,
+      "order": 307,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 281,
+        "composeOrder": 283,
         "composeRequired": false
       },
       "documentation": {
@@ -7786,13 +7838,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 306,
+      "order": 308,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 282,
+        "composeOrder": 284,
         "composeRequired": false
       },
       "documentation": {
@@ -7811,13 +7863,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 307,
+      "order": 309,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 283,
+        "composeOrder": 285,
         "composeRequired": false
       },
       "documentation": {
@@ -7836,13 +7888,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 308,
+      "order": 310,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 289,
+        "composeOrder": 291,
         "composeRequired": false
       },
       "documentation": {
@@ -7861,13 +7913,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 309,
+      "order": 311,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 290,
+        "composeOrder": 292,
         "composeRequired": false
       },
       "documentation": {
@@ -7886,13 +7938,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 310,
+      "order": 312,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 291,
+        "composeOrder": 293,
         "composeRequired": false
       },
       "documentation": {
@@ -7911,13 +7963,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "defaulted",
-      "order": 311,
+      "order": 313,
       "hasSafeDefault": true,
       "validatorId": "boolean",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 205,
+        "composeOrder": 207,
         "composeRequired": false
       },
       "documentation": {
@@ -7936,13 +7988,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 312,
+      "order": 314,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 206,
+        "composeOrder": 208,
         "composeRequired": false
       },
       "documentation": {
@@ -7961,13 +8013,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 313,
+      "order": 315,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 207,
+        "composeOrder": 209,
         "composeRequired": false
       },
       "documentation": {
@@ -7986,13 +8038,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 314,
+      "order": 316,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 208,
+        "composeOrder": 210,
         "composeRequired": false
       },
       "documentation": {
@@ -8011,13 +8063,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 315,
+      "order": 317,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 209,
+        "composeOrder": 211,
         "composeRequired": false
       },
       "documentation": {
@@ -8036,13 +8088,13 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 316,
+      "order": 318,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 210,
+        "composeOrder": 212,
         "composeRequired": false
       },
       "documentation": {
@@ -8061,13 +8113,13 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 317,
+      "order": 319,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 211,
+        "composeOrder": 213,
         "composeRequired": false
       },
       "documentation": {
@@ -8086,13 +8138,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 318,
+      "order": 320,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 53,
+        "composeOrder": 55,
         "composeRequired": false
       },
       "documentation": {
@@ -8111,13 +8163,13 @@
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 319,
+      "order": 321,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 55,
+        "composeOrder": 57,
         "composeRequired": false
       },
       "documentation": {
@@ -8136,13 +8188,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 320,
+      "order": 322,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 57,
+        "composeOrder": 59,
         "composeRequired": false
       },
       "documentation": {
@@ -8161,13 +8213,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 321,
+      "order": 323,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 59,
+        "composeOrder": 61,
         "composeRequired": false
       },
       "documentation": {
@@ -8186,13 +8238,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 322,
+      "order": 324,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 61,
+        "composeOrder": 63,
         "composeRequired": false
       },
       "documentation": {
@@ -8211,13 +8263,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 323,
+      "order": 325,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 69,
+        "composeOrder": 71,
         "composeRequired": false
       },
       "documentation": {
@@ -8236,13 +8288,13 @@
       "category": "database",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 324,
+      "order": 326,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 71,
+        "composeOrder": 73,
         "composeRequired": false
       },
       "documentation": {
@@ -8261,13 +8313,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 325,
+      "order": 327,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 73,
+        "composeOrder": 75,
         "composeRequired": false
       },
       "documentation": {
@@ -8286,13 +8338,13 @@
       "category": "database",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 326,
+      "order": 328,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 75,
+        "composeOrder": 77,
         "composeRequired": false
       },
       "documentation": {
@@ -8311,13 +8363,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 327,
+      "order": 329,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 63,
+        "composeOrder": 65,
         "composeRequired": false
       },
       "documentation": {
@@ -8336,13 +8388,13 @@
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 328,
+      "order": 330,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 65,
+        "composeOrder": 67,
         "composeRequired": false
       },
       "documentation": {
@@ -8361,7 +8413,7 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 329,
+      "order": 331,
       "hasSafeDefault": false,
       "validatorId": "server-version",
       "restartBehavior": "deployment",
@@ -8386,13 +8438,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 330,
+      "order": 332,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 52,
+        "composeOrder": 54,
         "composeRequired": false
       },
       "documentation": {
@@ -8411,13 +8463,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 331,
+      "order": 333,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 54,
+        "composeOrder": 56,
         "composeRequired": false
       },
       "documentation": {
@@ -8436,13 +8488,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 332,
+      "order": 334,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 56,
+        "composeOrder": 58,
         "composeRequired": false
       },
       "documentation": {
@@ -8461,13 +8513,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 333,
+      "order": 335,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 58,
+        "composeOrder": 60,
         "composeRequired": false
       },
       "documentation": {
@@ -8486,13 +8538,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 334,
+      "order": 336,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 60,
+        "composeOrder": 62,
         "composeRequired": false
       },
       "documentation": {
@@ -8511,13 +8563,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 335,
+      "order": 337,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 62,
+        "composeOrder": 64,
         "composeRequired": false
       },
       "documentation": {
@@ -8536,13 +8588,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 336,
+      "order": 338,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 64,
+        "composeOrder": 66,
         "composeRequired": false
       },
       "documentation": {
@@ -8561,13 +8613,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 337,
+      "order": 339,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 66,
+        "composeOrder": 68,
         "composeRequired": false
       },
       "documentation": {
@@ -8586,13 +8638,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 338,
+      "order": 340,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 70,
+        "composeOrder": 72,
         "composeRequired": false
       },
       "documentation": {
@@ -8611,13 +8663,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 339,
+      "order": 341,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 72,
+        "composeOrder": 74,
         "composeRequired": false
       },
       "documentation": {
@@ -8636,13 +8688,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 340,
+      "order": 342,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 74,
+        "composeOrder": 76,
         "composeRequired": false
       },
       "documentation": {
@@ -8661,13 +8713,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 341,
+      "order": 343,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 76,
+        "composeOrder": 78,
         "composeRequired": false
       },
       "documentation": {
@@ -8686,13 +8738,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 342,
+      "order": 344,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 86,
+        "composeOrder": 88,
         "composeRequired": false
       },
       "documentation": {
@@ -8711,13 +8763,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 343,
+      "order": 345,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 229,
+        "composeOrder": 231,
         "composeRequired": false
       },
       "documentation": {
@@ -8736,13 +8788,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 344,
+      "order": 346,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 230,
+        "composeOrder": 232,
         "composeRequired": false
       },
       "documentation": {
@@ -8761,7 +8813,7 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 345,
+      "order": 347,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -8785,7 +8837,7 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 346,
+      "order": 348,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
@@ -8809,7 +8861,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 347,
+      "order": 349,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -8833,7 +8885,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 348,
+      "order": 350,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -8857,7 +8909,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 349,
+      "order": 351,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -8881,7 +8933,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 350,
+      "order": 352,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -8905,7 +8957,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 351,
+      "order": 353,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -8929,7 +8981,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 352,
+      "order": 354,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -8953,7 +9005,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 353,
+      "order": 355,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "process",
@@ -8977,7 +9029,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 354,
+      "order": 356,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -9001,7 +9053,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 355,
+      "order": 357,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -9025,7 +9077,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 356,
+      "order": 358,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -9049,7 +9101,7 @@
       "category": "observability",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 357,
+      "order": 359,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -9073,7 +9125,7 @@
       "category": "observability",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 358,
+      "order": 360,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -9097,7 +9149,7 @@
       "category": "observability",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 359,
+      "order": 361,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -9121,7 +9173,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 360,
+      "order": 362,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -9145,7 +9197,7 @@
       "category": "deployment",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 361,
+      "order": 363,
       "hasSafeDefault": false,
       "validatorId": "managed-deployment-setting",
       "restartBehavior": "deployment",
@@ -9184,7 +9236,7 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 362,
+      "order": 364,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
@@ -9208,7 +9260,7 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 363,
+      "order": 365,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
@@ -9304,6 +9356,8 @@
     "DATABASE_SCHEMA",
     "DATABASE_RUNTIME_USERNAME",
     "DATABASE_RUNTIME_PASSWORD",
+    "DATABASE_GLOBAL_USERNAME",
+    "DATABASE_GLOBAL_PASSWORD",
     "DATABASE_MIGRATOR_USERNAME",
     "DATABASE_MIGRATOR_PASSWORD",
     "DATABASE_TLS_MODE",
@@ -9411,6 +9465,8 @@
     "DATABASE_SERVER_VERSION",
     "DATABASE_RUNTIME_USERNAME",
     "DATABASE_RUNTIME_PASSWORD",
+    "DATABASE_GLOBAL_USERNAME",
+    "DATABASE_GLOBAL_PASSWORD",
     "ERASURE_DATABASE_TOPOLOGY",
     "ERASURE_EMBEDDED_PATH",
     "PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH",
@@ -9673,6 +9729,8 @@
     "DATABASE_SCHEMA",
     "DATABASE_RUNTIME_USERNAME",
     "DATABASE_RUNTIME_PASSWORD",
+    "DATABASE_GLOBAL_USERNAME",
+    "DATABASE_GLOBAL_PASSWORD",
     "DATABASE_MIGRATOR_USERNAME",
     "DATABASE_MIGRATOR_PASSWORD",
     "DATABASE_TLS_MODE",

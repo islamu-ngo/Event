@@ -40,6 +40,16 @@ namespace Explore.Persistence;
 
 public static class PersistenceServicesRegistration
 {
+    /// <summary>Registers the identity-free Global pool for native queue health.</summary>
+    public static IServiceCollection AddGlobalExploreDbContextFactory(
+        this IServiceCollection services, PrimaryDatabaseConnectionOptions options)
+    {
+        services.AddSingleton(new GlobalExploreDbContextFactory(options));
+        services.AddSingleton<IGlobalExploreDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        return services;
+    }
+
     // didn't implement aspire integration trough passing the builder cause it will require to install aspnetcore nuget package in persistence project and i want to keep it clean so let this dependency in API project only
     //public static IServiceCollection ConfigurePersistenceServices(this IServiceCollection services,
     //    WebApplicationBuilder builder) // Pass the builder instead of just configuration
@@ -75,6 +85,14 @@ public static class PersistenceServicesRegistration
             applicationConnectionString = runtimeDatabase.ConnectionString;
             applicationProvider = runtimeDatabase.Provider;
             applicationRuntimeOptions = runtimeDatabaseOptions;
+
+            var globalDatabaseOptions = PrimaryDatabaseConfiguration.BindGlobal(configuration);
+            if (globalDatabaseOptions.Provider != PrimaryDatabaseProvider.Sqlite
+                && string.Equals(globalDatabaseOptions.Username, runtimeDatabaseOptions.Username, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Global and Runtime database logins must remain separate.");
+            }
+            services.AddGlobalExploreDbContextFactory(globalDatabaseOptions);
 
             services.AddDbContext<DataProtectionKeyContext>(options =>
                 PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, runtimeDatabaseOptions));

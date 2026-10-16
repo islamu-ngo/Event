@@ -73,6 +73,21 @@ after changing it on the database server. Startup rejects those values rather
 than replacing them. Other password whitespace is significant and is preserved.
 SQLite does not require server credentials.
 
+Queue readiness now uses a separate Global database login. For server databases,
+set `DATABASE_GLOBAL_USERNAME` and `DATABASE_GLOBAL_PASSWORD` (or
+`Database:Global:Username` and `Database:Global:Password`) in the selected secret
+authority. The Global username must differ from Runtime. SQLite uses a separate
+context lease without server credentials.
+
+On PostgreSQL, run application migrations before starting readiness checks, then
+have the database administrator grant `event_queue_drain_health_global` to that
+Global login with inherited execution and no role switching. Never grant the
+health owner or migrator group, private-table reads or queue writes to this login.
+The health function returns thirteen queue counts, not private rows or identifiers.
+Review and narrow any existing broad Global grants separately; migration does not
+replace that operator review. After rotating Global credentials in the database
+and selected secret authority, restart API processes to replace their pool.
+
 | Variable | Status | Default | Description |
 |---|---|---|---|
 | `DATABASE_PROVIDER` | **Baseline** | `PostgreSql` | Selected provider: `PostgreSql`, `Sqlite`, `SqlServer`, `MariaDb`, or `MySql`. |
@@ -412,6 +427,8 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `DATABASE_SCHEMA` | database | public | islamu_event | defaulted | process |
 | `DATABASE_RUNTIME_USERNAME` | database | public | None | required | process |
 | `DATABASE_RUNTIME_PASSWORD` | database | sensitive | None | required | process |
+| `DATABASE_GLOBAL_USERNAME` | database | public | None | required | process |
+| `DATABASE_GLOBAL_PASSWORD` | database | sensitive | None | required | process |
 | `DATABASE_MIGRATOR_USERNAME` | database | public | None | required | process |
 | `DATABASE_MIGRATOR_PASSWORD` | database | sensitive | None | required | process |
 | `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |

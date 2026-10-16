@@ -5,6 +5,13 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+TenantLifecycleAccessService checks public eligibility through ITenantLookupSource.
+The directory owns an independent Global context and exposes only active tenant
+identifiers, slugs and public domain reservations. PostgreSQL projects these fields
+through a security-definer function with column-limited owner reads and active-only
+RLS policies. Global receives function execution, not direct tenant table access.
+Unknown routine executors are rejected before reads or installer replacement.
+
 SetupSecretProvider and DeploymentModeProvider read committed bootstrap evidence
 through IInstanceBootstrapStateReader rather than a Runtime mutation repository.
 The reader owns an independent Global context. PostgreSQL obtains the selected

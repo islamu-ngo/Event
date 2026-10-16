@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Public tenant routing requires the independent Global account and installed
+public-directory function. Suspended tenants and their domain reservations are
+excluded. Do not resolve Runtime permission failures by granting direct tenant
+table access; verify the selected Global account and directory execution group.
+
 Startup setup and deployment-mode reads require the independent Global database
 capability and installed native provider-configuration contract. A Runtime
 permission-denied error on bootstrap state is not a reason to grant that account

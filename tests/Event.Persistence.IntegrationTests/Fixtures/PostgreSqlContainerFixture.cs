@@ -84,6 +84,13 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresStorageProbeSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresStorageConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresProviderConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresTenantLookupContract.ApplyAsync(migratorContext);
+            await migratorContext.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresTenantLookupContract.GlobalRole}"
+                TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """);
         }
 
         await using (var runtimeContext = CreateDbContextInternal(PrimaryDatabaseRole.Runtime))
@@ -344,6 +351,9 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 
     private static readonly Table[] UnqualifiedLookupTables =
     [
+        new("storage_probe_source"),
+        new("storage_configuration_source"),
+        new("provider_configuration_source"),
         new("__EFMigrationsHistory"),
         new("account_authority_kinds"),
         new("ai_conversation_statuses"),

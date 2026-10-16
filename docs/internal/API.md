@@ -3,6 +3,20 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Persisted API-Key Authentication Evidence
+
+Successful persisted-key authentication stores a server feature containing the
+authenticated row identity, owner, tenant, status, expiry and immutable scope
+snapshot. PersistedApiKeyAuthenticationProof binds that snapshot to the exact
+API-key ClaimsIdentity. Copied claims, additional authenticated identities and
+human subject/session claims cannot substitute for that identity.
+
+MachinePrincipalAccessor exposes IPersistedApiKeyProofAccessor only when the
+current key, owner, tenant and scopes still match. An internal execution principal
+or configured client has no persisted-key proof. All three accessor interfaces
+share one scoped instance. The proof establishes authentication provenance;
+mutation commit-time authority and source-row revalidation are separate consumers.
+
 ## Validated Human Credential Lifetime
 
 The API captures signed credential bounds only after native JWT or ATProto

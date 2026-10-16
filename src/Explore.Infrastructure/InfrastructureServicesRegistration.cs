@@ -484,6 +484,7 @@ public static class InfrastructureServicesRegistration
         // Required so authorization providers (Cerbos + fallback) treat external API-key callers consistently with human users.
         services.AddScoped<MachinePrincipalAccessor>();
         services.AddScoped<IMachinePrincipalAccessor>(provider => provider.GetRequiredService<MachinePrincipalAccessor>());
+        services.AddScoped<IPersistedApiKeyProofAccessor>(provider => provider.GetRequiredService<MachinePrincipalAccessor>());
         services.AddScoped<IMachinePrincipalExecutionAccessor>(provider => provider.GetRequiredService<MachinePrincipalAccessor>());
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.AddScoped<ILocalJwtTokenGenerator, LocalJwtTokenGenerator>();

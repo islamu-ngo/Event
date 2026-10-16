@@ -6,6 +6,14 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Persisted API-key evidence
+
+Persisted API-key authentication can supply server-owned evidence of the key row
+and its authenticated scope snapshot. Configured clients and internal machine
+execution do not have this evidence, even if their claims look equivalent.
+Copying or editing claims cannot transfer persisted-key authentication custody.
+This evidence does not itself grant a mutation or replace commit-time checks.
+
 ## Credential lifetime evidence
 
 The API can retain request-local evidence of a validated human credential's

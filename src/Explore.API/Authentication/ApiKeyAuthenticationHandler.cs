@@ -6,6 +6,7 @@ using Explore.API.Middleware;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
+using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -137,7 +138,8 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             persistedClient.OwnerType.ToString(),
             persistedClient.OwnerId.ToString(),
             SplitScopes(persistedClient.Scopes),
-            "persisted");
+            "persisted",
+            persistedClient);
     }
 
     private AuthenticateResult BuildSuccessResult(
@@ -146,7 +148,8 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         string ownerType,
         string ownerId,
         IEnumerable<string> scopes,
-        string source)
+        string source,
+        ExternalApiKey? persistedClient = null)
     {
         var claims = new List<Claim>
         {
@@ -176,6 +179,9 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         var identity = new ClaimsIdentity(claims, ApiAuthenticationSchemeNames.ApiKey, ClaimTypes.Name, ClaimTypes.Role);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, ApiAuthenticationSchemeNames.ApiKey);
+        Context.Features.Set<PersistedApiKeyAuthenticationProof>(persistedClient is null
+            ? null
+            : new PersistedApiKeyAuthenticationProof(identity, persistedClient));
 
         _metrics.RecordExternalApiKeyAuthentication("success", tenantId?.ToString() ?? "platform", ownerType);
         LogAuthentication("success", "accepted", source, tenantId.HasValue);

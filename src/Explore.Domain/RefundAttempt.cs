@@ -1,7 +1,18 @@
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Explore.Domain;
+
+public enum RefundDispatchPhase
+{
+    Ready = 0,
+    BuyerHandoffCommitted = 1,
+    BuyerObserved = 2,
+    ApplicationFeeHandoffCommitted = 3,
+    Settled = 4
+}
 
 public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrencyAware
 {
@@ -28,6 +39,14 @@ public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrenc
     public string CurrencyCode { get; private set; } = string.Empty;
     public string ProviderPaymentId { get; private set; } = string.Empty;
     public string ProviderIdempotencyKey { get; private set; } = string.Empty;
+    public string NativeOperationKey { get; private set; } = string.Empty;
+    public string NativeInputDigest { get; private set; } = string.Empty;
+    public long? RequestedAmountMinor { get; private set; }
+    public RefundDispatchPhase DispatchPhase { get; private set; }
+    public Guid? DispatchToken { get; private set; }
+    public DateTime? ProviderMutationExpiresAt { get; private set; }
+    public DateTime? DispatchCommittedAt { get; private set; }
+    public DateTime? NoProviderHandoffProvenAt { get; private set; }
     public RefundAllocation Allocation { get; private set; } = null!;
     public RefundAttemptStatusEnum Status { get; private set; }
     public string? ProviderRefundId { get; private set; }
@@ -46,6 +65,51 @@ public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrenc
 
     public bool ReservesCapacity => BuyerRefundSucceededAt.HasValue ||
         Status is not (RefundAttemptStatusEnum.Failed or RefundAttemptStatusEnum.Cancelled);
+
+    public bool CanDispatchBuyer => DispatchPhase == RefundDispatchPhase.Ready &&
+        ProviderRefundId is null && !BuyerRefundSucceededAt.HasValue && FailureCode is null &&
+        (Status == RefundAttemptStatusEnum.Requested && DispatchToken is null ||
+         NoProviderHandoffProvenAt.HasValue &&
+         Status is RefundAttemptStatusEnum.DispatchPending or RefundAttemptStatusEnum.Unknown);
+
+    public bool CanDispatchApplicationFee => DispatchPhase == RefundDispatchPhase.BuyerObserved &&
+        BuyerRefundSucceededAt.HasValue && ProviderRefundId is not null && FailureCode is null &&
+        Status != RefundAttemptStatusEnum.Succeeded;
+
+    /// <summary>
+    /// Persist this fence and its recovery trigger before provider I/O. A committed fence
+    /// never becomes retry permission merely because a process, request or lease ended.
+    /// </summary>
+    public void BeginDispatch(Guid token, bool applicationFee, DateTime committedAt, DateTime mutationExpiresAt)
+    {
+        if (token == Guid.Empty || committedAt.Kind != DateTimeKind.Utc ||
+            mutationExpiresAt.Kind != DateTimeKind.Utc || committedAt < LastObservedAt ||
+            mutationExpiresAt <= committedAt || ProviderMutationExpiresAt <= committedAt ||
+            (applicationFee ? !CanDispatchApplicationFee : !CanDispatchBuyer))
+            throw new InvalidOperationException("Refund handoff requires fresh native ownership and a live provider window.");
+
+        ProviderMutationExpiresAt ??= mutationExpiresAt;
+        DispatchToken = token;
+        DispatchCommittedAt = committedAt;
+        NoProviderHandoffProvenAt = null;
+        DispatchPhase = applicationFee
+            ? RefundDispatchPhase.ApplicationFeeHandoffCommitted
+            : RefundDispatchPhase.BuyerHandoffCommitted;
+        Advance(RefundAttemptStatusEnum.Unknown, ProviderRefundId, committedAt, null);
+    }
+
+    public void ProveNoProviderHandoff(Guid token, DateTime observedAt)
+    {
+        if (DispatchToken != token ||
+            DispatchPhase is not (RefundDispatchPhase.BuyerHandoffCommitted or RefundDispatchPhase.ApplicationFeeHandoffCommitted))
+            throw new InvalidOperationException("Only the current provider invocation can prove no handoff.");
+
+        bool applicationFee = DispatchPhase == RefundDispatchPhase.ApplicationFeeHandoffCommitted;
+        Advance(applicationFee ? RefundAttemptStatusEnum.Unknown : RefundAttemptStatusEnum.DispatchPending,
+            ProviderRefundId, observedAt, null);
+        DispatchPhase = applicationFee ? RefundDispatchPhase.BuyerObserved : RefundDispatchPhase.Ready;
+        NoProviderHandoffProvenAt = observedAt;
+    }
 
     public static RefundAttempt Create(
         Guid id,
@@ -98,6 +162,11 @@ public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrenc
             CurrencyCode = acceptance.CurrencyCode,
             ProviderPaymentId = providerPaymentId.Trim(),
             ProviderIdempotencyKey = providerIdempotencyKey.Trim(),
+            NativeOperationKey = providerIdempotencyKey.Trim(),
+            NativeInputDigest = ComputeInputDigest(
+                tenantId, paymentAttemptId, acceptance.RegistrationOrderId, requestedTotalMinor,
+                null, authorityCode, reasonCode),
+            RequestedAmountMinor = requestedTotalMinor,
             Allocation = allocation,
             Status = RefundAttemptStatusEnum.Requested,
             LastObservedAt = createdAt,
@@ -106,6 +175,42 @@ public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrenc
         };
         attempt._lines.AddRange(RefundLineAllocation.Allocate(tenantId, id, allocation, acceptance.Lines));
         return attempt;
+    }
+
+    public static string ComputeInputDigest(
+        Guid tenantId, Guid paymentAttemptId, Guid orderId, long? requestedAmountMinor,
+        Guid? actorId, string authorityCode, string reasonCode)
+    {
+        using var input = new MemoryStream();
+        using (var writer = new BinaryWriter(input, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write("registration-refund:v1");
+            writer.Write(tenantId.ToByteArray());
+            writer.Write(paymentAttemptId.ToByteArray());
+            writer.Write(orderId.ToByteArray());
+            writer.Write(requestedAmountMinor.HasValue);
+            if (requestedAmountMinor.HasValue)
+                writer.Write(requestedAmountMinor.Value);
+            writer.Write(actorId.HasValue);
+            if (actorId.HasValue)
+                writer.Write(actorId.Value.ToByteArray());
+            writer.Write(authorityCode);
+            writer.Write(reasonCode);
+        }
+        return Convert.ToHexString(SHA256.HashData(input.ToArray())).ToLowerInvariant();
+    }
+
+    public void BindNativeInput(long? requestedAmountMinor, Guid actorId, string authorityCode, string reasonCode)
+    {
+        if (Status != RefundAttemptStatusEnum.Requested || actorId == Guid.Empty ||
+            CreatedBy.HasValue || requestedAmountMinor.HasValue && requestedAmountMinor != Allocation.TotalMinor ||
+            authorityCode.Trim().ToLowerInvariant() != AuthorityCode || reasonCode.Trim().ToLowerInvariant() != ReasonCode)
+            throw new InvalidOperationException("Native refund input can only be bound before reservation.");
+
+        CreatedBy = actorId;
+        RequestedAmountMinor = requestedAmountMinor;
+        NativeInputDigest = ComputeInputDigest(
+            TenantId, PaymentAttemptId, RegistrationOrderId, requestedAmountMinor, actorId, authorityCode, reasonCode);
     }
 
     public void ReallocateForReservation(
@@ -121,7 +226,8 @@ public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrenc
             throw new ArgumentException("Refund reallocation requires matching captured authority.", nameof(acceptance));
         }
 
-        long requestedTotalMinor = Allocation.TotalMinor;
+        long requestedTotalMinor = RequestedAmountMinor ??
+            checked(acceptance.TotalMinor - active.Sum(existing => existing.Allocation.TotalMinor));
         Allocation = RefundAllocation.AllocateReservationDelta(
             active.Sum(existing => existing.Allocation.TotalMinor),
             requestedTotalMinor,
@@ -172,6 +278,9 @@ public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrenc
 
         PinProviderRefundId(providerRefundId);
         BuyerRefundSucceededAt ??= observedAt;
+        if (DispatchPhase != RefundDispatchPhase.ApplicationFeeHandoffCommitted &&
+            DispatchPhase != RefundDispatchPhase.Settled)
+            DispatchPhase = RefundDispatchPhase.BuyerObserved;
         LastObservedAt = observedAt;
         LastProviderRequestId = string.IsNullOrWhiteSpace(providerRequestId)
             ? LastProviderRequestId
@@ -246,6 +355,8 @@ public sealed class RefundAttempt : ITenantEntity, IAuditableEntity, IConcurrenc
         }
 
         Status = status;
+        if (status is RefundAttemptStatusEnum.Succeeded or RefundAttemptStatusEnum.Failed or RefundAttemptStatusEnum.Cancelled)
+            DispatchPhase = RefundDispatchPhase.Settled;
         FailureCode = null;
         LastObservedAt = observedAt;
         LastProviderRequestId = string.IsNullOrWhiteSpace(providerRequestId) ? LastProviderRequestId : providerRequestId.Trim();

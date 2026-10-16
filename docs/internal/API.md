@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+RefundAttempt retains a native operation/input digest and separates Ready,
+buyer handoff, buyer observation, application-fee handoff and settlement phases.
+BeginDispatch fences a provider invocation with a token and the original bounded
+mutation window; process or lease expiry alone cannot reopen dispatch. Only the
+current invocation token can prove no provider handoff. Buyer success keeps
+capacity reserved and cannot be undone by fee recovery. Nullable full-refund
+selection is retained for reservation-time reallocation. Persistence mappings,
+generated migration parity and native dispatcher integration remain required;
+these domain primitives alone must not be treated as provider I/O admission.
+
 EventLocationDisclosureAudit.BindCorrection retains one RFC UUIDv7 correction
 message, accepting an identical repeat but rejecting replacement and unrelated
 audit reasons. LocationPrivacyCorrectionReceipt pairs governance effects with

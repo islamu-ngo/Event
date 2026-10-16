@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Refund recovery distinguishes a committed provider handoff from positive
+evidence that no handoff occurred. Buyer and application-fee recovery cannot
+restart each other, and recovery does not extend the original provider mutation
+window. This domain state machine requires persistence and dispatcher integration
+before deployment; no provider retry is enabled by this slice alone.
+
 Location correction receipts can retain their original audit or committed
 erasure authority even after disposable source data is removed. A different
 message cannot replace the original correction, and mismatched audit pairs are

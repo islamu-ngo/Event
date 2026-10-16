@@ -5,6 +5,13 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+HierarchicalSettingMerge accepts immutable SettingMergeFacts as well as entity
+maps. Entity reads adapt to facts and share one precedence evaluator with source
+observations: instance locks, tenant locks, registered scope bounds and child
+overrides retain their ordering. HasTenantContext remains distinct from a present
+tenant override; missing SMTP delegation therefore locks even an empty tenant
+context, while instance-only evaluation is unaffected.
+
 HumanCommitSubject clones the authenticated principal before awaiting the
 existing user-resolution query, preserving provider-binding precedence and
 rejecting unresolved or empty identities. It captures account identity, not an

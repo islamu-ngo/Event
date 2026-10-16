@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Source observations use the normal hierarchical setting precedence rules.
+An empty tenant override set still counts as tenant context: missing SMTP
+delegation keeps tenant SMTP changes locked, rather than granting delegation
+because no override row exists. Instance-only settings evaluation is separate.
+
 Human commit identity and source-fence contracts are internal prerequisites for
 commit-time revalidation. They do not enable an operator setting, install database
 locks or activate new mutation protection by themselves. Native provider enrollment

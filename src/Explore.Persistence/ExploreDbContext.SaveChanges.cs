@@ -629,6 +629,13 @@ public partial class ExploreDbContext
 
     private Guid? GetCurrentUserId()
     {
+        if (HasHumanCommitContextLease)
+        {
+            ValidateTenantLease();
+            return (HumanCommitAuditSubject
+                ?? throw new InvalidOperationException("Human audit attribution requires its original canonical subject."))
+                .PrincipalId;
+        }
         return CurrentUserService?.UserId;
     }
 

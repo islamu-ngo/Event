@@ -92,12 +92,17 @@ public partial class ExploreDbContext : DbContext
 
     private void ClearTenantLease()
     {
+        _nativePaymentReconciliationOwner = null;
+        _nativeHumanTenantOwner = null;
+        ResetHumanCommitAdmissions();
         IsConfigurationInstanceImportOwner = false;
         _tenantLeaseBound = false;
         _tenantLeaseId = null;
         _tenantLeaseIdentity = null;
         _tenantContext = null;
         _tenantFilterBypassReason = null;
+        HumanCommitContextLease = null;
+        HumanCommitAuditSubject = null;
         CurrentUserService = null;
     }
 

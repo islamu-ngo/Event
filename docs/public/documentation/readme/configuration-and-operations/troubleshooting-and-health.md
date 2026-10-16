@@ -14,6 +14,13 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+Managed principal observation and leases retain the original database owner and
+canonical human subject through transaction revalidation. Save operations validate
+tracked tenant references before persistence, and human-owned audit records use
+the canonical account identifier. Disposing the context clears attempt ownership
+and retained subject state. These primitives still need verified production scope
+registration and mutation-consumer composition before the full flow is active.
+
 AI execution domain reservations now bind confirmed action identity to one
 primary event and immutable image custody. Recovery may reuse a linked effect but
 cannot substitute another event or reopen a settled failure. Preview comparison

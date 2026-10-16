@@ -13,6 +13,17 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+HumanPrincipalSourceFence observes fixed account, binding and membership inputs
+on the selected connection, acquires policy-source-set exclusion first, and retains
+the original Serializable transaction through revalidation. Native tenant-owner
+proof binds the canonical human subject, connection and transaction; tracked-write
+validation consumes that proof only for its declared tenant foreign key. All save
+paths run the shared validator, preserving its existing AI, checkout and payment
+reconciliation branches and persisted-visibility fallback. Human audit attribution
+uses the original canonical subject, not a mutable current-user service. Context
+disposal clears retained human proofs and admission state as well as the subject.
+This supplies custody primitives; production scope registration remains separate.
+
 AiToolExecution reserves a confirmed event-draft action against its exact
 conversation, principal, acting actor, payload digest and one event identifier.
 Primary linking is lifetime-bounded and cannot switch targets; already linked

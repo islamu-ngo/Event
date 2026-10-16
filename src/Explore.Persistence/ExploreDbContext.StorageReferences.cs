@@ -74,9 +74,13 @@ public partial class ExploreDbContext
             throw StorageReferenceConflict();
         var carriers = StorageReferenceCarriers();
         if (!Database.IsRelational())
+        {
+            await ValidateTrackedTenantAuthorityAsync(cancellationToken);
             return await persist(acceptAllChangesOnSuccess);
+        }
         if (Database.CurrentTransaction is not null)
         {
+            await ValidateTrackedTenantAuthorityAsync(cancellationToken);
             await DisclosureMutations.CaptureAsync(cancellationToken);
             return await PersistStorageReferencesAsync(
                 carriers, () => persist(acceptAllChangesOnSuccess), cancellationToken);
@@ -93,6 +97,7 @@ public partial class ExploreDbContext
                     commitStamps = [];
                     RestoreTrackedStorageStamps(stamps);
                     ResetDisclosureMutations();
+                    await ValidateTrackedTenantAuthorityAsync(token);
                     await DisclosureMutations.CaptureAsync(token);
                     int saved = await PersistStorageReferencesAsync(carriers, () => persist(false), token);
                     await FlushDisclosureAsync(token);

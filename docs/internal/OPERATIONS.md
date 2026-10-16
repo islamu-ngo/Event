@@ -2265,6 +2265,15 @@ the pass. Acquisition does not install or repair the discovery capability.
 
 For an IntegrationSync row reported as ambiguous by `/health` under `queue-drains`, establish provider evidence before acting. Use the tenant-authenticated `POST /api/integrations/listmonk/queue/{outboxId}/resolve` endpoint with an opaque incident/evidence reference. `ConfirmAccepted` settles without replay; `RetryDefinitelyNotAccepted` schedules a retry only after proof the provider did not accept the POST; `DeadLetter` preserves the terminal refusal. Never select retry from timeout or response-loss evidence alone.
 
+#### Startup worker diagnostic confidentiality
+
+Managed control-plane registration exports completion or the fixed categories
+`registration_pending` and `registration_retry_failed`, not attempt IDs,
+provider state, failure codes or exception subtypes. Its existing retry and
+shutdown behavior remain unchanged. Svix event-type synchronization exports
+aggregate synced/failure counts or `event_type_sync_failed`, without provider
+failure details. Cancellation remains a shutdown outcome, not a provider failure.
+
 #### Scheduler diagnostic confidentiality
 
 Scheduler failure logs retain fixed categories: `scheduled_job_failed`,

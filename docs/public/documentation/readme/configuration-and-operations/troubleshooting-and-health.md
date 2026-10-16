@@ -325,6 +325,12 @@ Default scheduler-control logs omit operator identity and caller correlation;
 deploy a separate access-controlled scheduler audit sink if identity-bearing
 accountability records are required.
 
+Startup registration logs expose completion, `registration_pending`, or
+`registration_retry_failed` without provider diagnostics or registration attempt
+identifiers. Svix event-type synchronization reports aggregate counts or
+`event_type_sync_failed`. Shutdown cancellation is not reported as a provider
+failure; these diagnostic changes do not change worker retries or sync results.
+
 When delivery is disabled or its configuration is unavailable, optional notifications
 are recorded as skipped rather than kept for a later flood of email. In-app delivery
 continues. Required email can be parked while its delivery requirements are unavailable;

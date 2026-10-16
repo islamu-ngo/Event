@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+CustomPropertyPatternPolicy admits at most 2,048 characters of .NET
+non-backtracking syntax with a finite 100 ms match deadline. Unsupported
+backreferences/lookarounds and malformed patterns fail closed. Definition
+validators share this policy across general, event and session families, validate
+bounds/defaults and reject null option collections/items. Runtime validation
+checks input length before matching and omits rejected URL schemes from errors.
+All five definition storage mappings share the same ceiling; provider-model tests
+guard the admitted/storage boundary. Generated migration parity is still required
+before deployment. This intentionally rejects previously accepted unsafe syntax.
+
 RefundAttempt retains a native operation/input digest and separates Ready,
 buyer handoff, buyer observation, application-fee handoff and settlement phases.
 BeginDispatch fences a provider invocation with a token and the original bounded

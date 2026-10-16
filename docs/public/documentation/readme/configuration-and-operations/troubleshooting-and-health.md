@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Custom-property patterns now require supported non-backtracking syntax and
+are limited to 2,048 characters. Backreferences, lookarounds and malformed
+patterns are rejected; defaults must satisfy configured bounds and patterns.
+Null option collections/items are rejected rather than coerced. Existing
+definitions using unsupported syntax need correction. All definition mappings
+use the same ceiling; generated migrations remain required before deployment.
+
 Refund recovery distinguishes a committed provider handoff from positive
 evidence that no handoff occurred. Buyer and application-fee recovery cannot
 restart each other, and recovery does not extend the original provider mutation

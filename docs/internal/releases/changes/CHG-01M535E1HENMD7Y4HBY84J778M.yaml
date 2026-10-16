@@ -1,0 +1,31 @@
+Change-Id: CHG-01M535E1HENMD7Y4HBY84J778M
+Title: "Bound custom-property patterns and validate complete candidates"
+Type: fix
+Scope: access
+Summary: "Share bounded non-backtracking matching across definition and runtime validation and align all definition storage limits."
+Group: custom-property-input-validation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Unsupported regex syntax and null option collections or items are rejected; existing definitions require correction.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Pattern size, non-backtracking syntax, input bounds and finite match deadline prevent unbounded matching.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: All five pattern mappings use 2048 characters; generated migration parity remains required before deployment.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Correct unsupported patterns and invalid defaults before deployment; no compatibility fallback is retained.

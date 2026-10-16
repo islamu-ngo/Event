@@ -63,9 +63,10 @@ public sealed class AnonymousRegistrationChallengeHttpTests
         await AssertNoDisclosureAsync(failed);
         await using (AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope())
         {
-            IdempotencyRecord record = (await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-                .FindAsync(host.Key, PlatformDefaults.DefaultTenantId))!;
-            await Assert.That(record.StatusCode).IsEqualTo(0);
+            IdempotencyRecord record = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .IdempotencyRecords.AsNoTracking().SingleAsync(row =>
+                    row.Key == host.Key && row.TenantId == PlatformDefaults.DefaultTenantId);
+            await Assert.That(record.StatusCode).IsEqualTo(IdempotencyRecord.ResponseUnavailableStatusCode);
             await Assert.That(record.ResponseBody).IsNull();
         }
 
@@ -110,8 +111,9 @@ public sealed class AnonymousRegistrationChallengeHttpTests
         string capability = started.Headers.GetValues("X-Registration-Order-Capability").Single();
         await using (AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope())
         {
-            IdempotencyRecord record = (await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-                .FindAsync(host.Key, PlatformDefaults.DefaultTenantId))!;
+            IdempotencyRecord record = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .IdempotencyRecords.AsNoTracking().SingleAsync(row =>
+                    row.Key == host.Key && row.TenantId == PlatformDefaults.DefaultTenantId);
             await Assert.That(record.ResponseBody!).StartsWith("dp:v1:");
             await Assert.That(record.ResponseBody!.Contains(capability, StringComparison.Ordinal)).IsFalse();
         }
@@ -142,9 +144,12 @@ public sealed class AnonymousRegistrationChallengeHttpTests
         await Assert.That(await ReadIdAsync(afterCacheExpiry)).IsEqualTo(orderId);
         await using (AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope())
         {
-            IdempotencyRecord record = (await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-                .FindAsync(host.Key, PlatformDefaults.DefaultTenantId))!;
-            await Assert.That(record.ExpiresAt - host.Clock.GetUtcNow().UtcDateTime).IsEqualTo(TimeSpan.FromSeconds(90));
+            IdempotencyRecord record = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .IdempotencyRecords.AsNoTracking().SingleAsync(row =>
+                    row.Key == host.Key && row.TenantId == PlatformDefaults.DefaultTenantId);
+            await Assert.That(record.ExpiresAt).IsEqualTo(record.CreatedAt.AddHours(24));
+            await Assert.That(record.StatusCode).IsEqualTo(IdempotencyRecord.ResponseUnavailableStatusCode);
+            await Assert.That(record.ResponseBody).IsNull();
         }
         await Assert.That(await host.OrdersAsync()).Count().IsEqualTo(1);
         host.Clock.Advance(TimeSpan.FromMinutes(2));

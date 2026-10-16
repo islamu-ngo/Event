@@ -664,19 +664,21 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
         var idempotencyKey = $"provider-contract-{suffix}";
         var now = DateTime.UtcNow;
         var ownerRecord = NewIdempotencyRecord(idempotencyKey, tenantId, now);
-        await using (var context = fixture.CreateSystemContext())
+        await using (var context = fixture.CreateReceiptContext(tenantId))
         {
-            var repository = new IdempotencyRepository(context);
+            var repository = new IdempotencyRepository(context, enrollment: fixture.ReceiptEnrollment);
             var claim = await repository.TryClaimAsync(ownerRecord);
+            using var owner = claim.Owner;
             await Assert.That(claim.IsOwner).IsTrue();
-            await Assert.That(await repository.CompleteAsync(ownerRecord.Id, 201, "{\"result\":\"created\"}", "application/json")).IsTrue();
+            await Assert.That(await repository.CompleteAsync(owner!, 201, "{\"result\":\"created\"}", "application/json")).IsTrue();
         }
 
-        await using (var context = fixture.CreateSystemContext())
+        await using (var context = fixture.CreateReceiptContext(tenantId))
         {
-            var repository = new IdempotencyRepository(context);
+            var repository = new IdempotencyRepository(context, enrollment: fixture.ReceiptEnrollment);
             var replay = await repository.TryClaimAsync(NewIdempotencyRecord(idempotencyKey, tenantId, now.AddSeconds(1)));
-            var persisted = await repository.FindAsync(idempotencyKey, tenantId);
+            var persisted = (await repository.LookupAsync(
+                IdempotencyRequestDescriptor.FromRecord(ownerRecord), now.AddSeconds(1))).Record;
 
             await Assert.That(replay.IsOwner).IsFalse();
             await Assert.That(replay.Record.Id).IsEqualTo(ownerRecord.Id);

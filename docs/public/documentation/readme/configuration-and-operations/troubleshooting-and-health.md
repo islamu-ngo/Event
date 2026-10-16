@@ -422,6 +422,25 @@ boundaries.
 
 ---
 
+## Idempotency Receipt Payload Scrubbing
+
+Expired replay receipts cannot be reacquired. Cleanup removes retained response
+payloads while keeping the operation identity and request fingerprint as replay
+rejection fences. An unavailable response returns conflict; it does not authorize
+the original write to execute again. Do not delete receipts to recover a replay.
+
+Subject erasure removes attribution and request fingerprint material without
+reopening the original receipt identity.
+
+On PostgreSQL, install the current native receipt capability before enabling
+traffic or cleanup. Discovery exposes only tenant identities; each tenant's
+scrubbing uses separate ordinary database authority. Dry-run and scrub mode
+share one bounded pass budget, including suspended owners and receipts whose
+tenant-directory row no longer exists. Invalid cleanup settings fail startup.
+Intentionally disabled cleanup is `Degraded`; payloads remain stored, but expired
+responses remain unavailable. Monitor cleanup run outcomes and eligible/scrubbed
+row counts without exporting keys, response bodies or provider exceptions.
+
 ## Email Content Retention
 
 Retention discovers bounded tenant identities through Global authority, then

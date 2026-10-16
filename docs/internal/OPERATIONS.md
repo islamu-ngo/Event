@@ -3071,15 +3071,38 @@ Rollback posture:
 
 The `idempotency-cleanup` readiness check reports the current cleanup posture:
 
-- `Healthy` when cleanup is enabled in delete mode or dry-run mode.
+- `Healthy` when cleanup is enabled in scrub mode or dry-run mode.
 - `Degraded` when cleanup is intentionally disabled.
 
-The worker is explicitly instance/system-scoped because `idempotency_records` are an ephemeral replay cache. It does not delete protected audit, dead-letter, email-dispatch, notification, export, or source-of-truth rows. Use `IdempotencyCleanup:DryRun=true` before first enabling destructive cleanup in an environment, then watch logs and `Explore.Business` metrics:
+Global authority discovers only bounded expired-receipt tenant identities.
+Every tenant gets a fresh Runtime scope, and all scopes share one pass budget
+of at most 1,000 rows. Discovery bounds rows before deduplicating tenants, so
+directory membership is not required and suspended or orphaned owners remain
+eligible. Dry-run counts eligible rows within that same budget.
+
+Cleanup clears response body and content type, then sets the response-unavailable
+sentinel. It preserves the receipt key and request fingerprint permanently.
+Claims never delete expired receipts or reopen scrubbed identities. Only the
+original opaque claim owner can complete or release its receipt; expiry, release,
+lost backend/transaction custody or disposal cannot reopen execution or restore
+discarded response content. Middleware returns conflict when replay is no longer
+available instead of executing the operation again.
+
+Subject erasure clears attribution and request fingerprint material while
+retaining the original tenant/key identity and timestamps as unavailable fences.
+The erasure transaction must roll back those changes with the rest of its work.
+
+PostgreSQL requires `PostgresIdempotencyReceiptContract` installed after tenant
+RLS. Runtime uses guarded receipt operations without direct table access; Global
+uses identity-only discovery. Missing or drifted authority fails closed rather
+than repairing grants during acquisition. No EF entity-shape migration is
+needed; the native installer owns its private claim table and expiry indexes.
+Use `IdempotencyCleanup:DryRun=true` before enabling scrubbing and monitor:
 
 | Metric | Bounded tags | Meaning |
 |---|---|---|
-| `explore.idempotency.cleanup_runs` | `mode`, `outcome` | One cleanup attempt in `dry_run` or `delete` mode, with `succeeded` or `failed` outcome. |
-| `explore.idempotency.cleanup_rows` | `mode`, `outcome` | Eligible row count in dry-run mode or deleted row count in delete mode. |
+| `explore.idempotency.cleanup_runs` | `mode`, `outcome` | One cleanup attempt in `dry_run` or `scrub` mode, with `succeeded` or `failed` outcome. |
+| `explore.idempotency.cleanup_rows` | `mode`, `outcome` | Eligible row count in dry-run mode or scrubbed row count in scrub mode. |
 
 Metric tags and logs intentionally exclude raw idempotency keys, request paths, response bodies, tenant IDs, and exception text.
 

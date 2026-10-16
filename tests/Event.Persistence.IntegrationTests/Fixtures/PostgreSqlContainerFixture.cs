@@ -43,7 +43,11 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
             .Build();
         string suffix = Guid.CreateVersion7().ToString("N");
-        _nativeQueueLogins = new[] { PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime }
+        _nativeQueueLogins = new[]
+            {
+                PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime,
+                PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation
+            }
             .ToDictionary(role => role, role => (
                 Username: $"queue_{(int)role}_{suffix}",
                 Password: Convert.ToHexString(RandomNumberGenerator.GetBytes(24))));
@@ -74,6 +78,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresEmailRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventResourceAuditRetentionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresIdempotencyReceiptContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
         await using (var runtimeContext = CreateDbContextInternal(PrimaryDatabaseRole.Runtime))
@@ -272,7 +277,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         return new ExploreDbContext(optionsBuilder.Options);
     }
 
-    /// <summary>Stable declared purpose accounts; test-specific grants never extend this enrollment.</summary>
+    /// <summary>Enrolled queue accounts and isolated, unenrolled purpose accounts for denial tests.</summary>
     public PrimaryDatabaseConnectionOptions GetNativeQueueOptions(PrimaryDatabaseRole role, string? schema = null)
     {
         PrimaryDatabaseConnectionOptions options = CreateDatabaseOptions(role, schema);

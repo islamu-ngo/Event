@@ -554,7 +554,8 @@ public sealed class ProviderCredentialHttpBoundaryTests
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.IdempotencyRecords.RemoveRange(db.IdempotencyRecords);
             await db.SaveChangesAsync();
-            await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>().SaveAsync(new IdempotencyRecord
+            var repository = scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>();
+            IdempotencyClaim claim = await repository.TryClaimAsync(new IdempotencyRecord
             {
                 Id = Guid.CreateVersion7(),
                 Key = key,
@@ -567,15 +568,19 @@ public sealed class ProviderCredentialHttpBoundaryTests
                 RequestBodyHash = identity.BodyHash,
                 PrincipalFingerprint =
                     identity.PrincipalFingerprint,
-                StatusCode = StatusCodes.Status200OK,
-                ContentType = "application/json",
-                ResponseBody = JsonSerializer.Serialize(
-                    new { credential = marker }),
+                StatusCode = IdempotencyRecord.InProgressStatusCode,
                 CreatedAt =
                     DateTime.UtcNow.AddMinutes(-1),
                 ExpiresAt =
                     DateTime.UtcNow.AddHours(1)
             });
+            using IIdempotencyClaimOwner owner = claim.Owner
+                ?? throw new InvalidOperationException("The historical receipt seed did not acquire its original owner.");
+            await Assert.That(await repository.CompleteAsync(
+                owner,
+                StatusCodes.Status200OK,
+                JsonSerializer.Serialize(new { credential = marker }),
+                "application/json")).IsTrue();
         }
 
         public async ValueTask DisposeAsync()

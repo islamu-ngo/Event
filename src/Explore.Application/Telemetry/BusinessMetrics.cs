@@ -1250,15 +1250,15 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
     public void RecordIdempotencyCleanupRun(string mode, string outcome)
     {
         _idempotencyCleanupRuns.Add(1,
-            new KeyValuePair<string, object?>("mode", NormalizeTag(mode)),
-            new KeyValuePair<string, object?>("outcome", NormalizeTag(outcome)));
+            new KeyValuePair<string, object?>("mode", mode is "dry_run" or "scrub" ? mode : "unknown"),
+            new KeyValuePair<string, object?>("outcome", outcome is "succeeded" or "failed" ? outcome : "unknown"));
     }
 
     public void RecordIdempotencyCleanupRows(long rowCount, string mode, string outcome)
     {
         _idempotencyCleanupRows.Add(rowCount,
-            new KeyValuePair<string, object?>("mode", NormalizeTag(mode)),
-            new KeyValuePair<string, object?>("outcome", NormalizeTag(outcome)));
+            new KeyValuePair<string, object?>("mode", mode is "dry_run" or "scrub" ? mode : "unknown"),
+            new KeyValuePair<string, object?>("outcome", outcome is "eligible" or "scrubbed" ? outcome : "unknown"));
     }
 
     public void RecordAtprotoTransientCleanup(bool succeeded, int transientRows = 0, int replayRows = 0)

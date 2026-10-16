@@ -107,8 +107,8 @@ public sealed class AnonymousRegistrationReplayTests
         await Assert.That(hold.ConcurrencyStamp).IsEqualTo(originalHold.ConcurrencyStamp);
         await Assert.That(await inventory.GetAllocatedQuantityAsync(hold.CapacityPoolId, fixture.TenantId, CancellationToken.None)).IsEqualTo(1);
         await Assert.That(deadline.CallCount).IsEqualTo(1);
-        var durableClaim = await observer.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-            .FindAsync(proof.Binding.IdempotencyKey, fixture.TenantId);
+        var durableClaim = (await observer.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
+            .LookupAsync(IdempotencyRequestDescriptor.FromRecord(claim.Record), DateTime.UtcNow)).Record;
         await Assert.That(durableClaim!.StatusCode).IsEqualTo(IdempotencyRecord.InProgressStatusCode);
         await Assert.That(durableClaim.ResponseBody).IsNull();
         var database = observer.ServiceProvider.GetRequiredService<ExploreDbContext>();

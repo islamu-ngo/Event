@@ -693,6 +693,10 @@ public static class PersistenceServicesRegistration
 
         // Idempotency Repository
         services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
+        if (!skipDbContextRegistration && applicationProvider == PrimaryDatabaseProvider.PostgreSql)
+            services.TryAddSingleton(PostgresNativeQueueEnrollment.Bind(configuration));
+        services.AddScoped<IIdempotencyCleanupTenantDiscoveryRepository, IdempotencyCleanupTenantDiscoveryRepository>();
+        services.AddScoped<IIdempotencyCleanupExecutionScopeFactory, IdempotencyCleanupExecutionScopeFactory>();
         services.AddScoped<IAtprotoBootstrapReplayRepository, AtprotoBootstrapReplayRepository>();
         services.AddScoped<IAtprotoTransientStoreRepository, AtprotoTransientStoreRepository>();
         services.AddScoped<IAtprotoTransientAssertionReplayRepository, AtprotoTransientAssertionReplayRepository>();

@@ -1,9 +1,12 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Security;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class AtprotoBootstrapReplayRepository(ExploreDbContext dbContext) : IAtprotoBootstrapReplayRepository
+public sealed class AtprotoBootstrapReplayRepository(
+    ExploreDbContext dbContext, TimeProvider? clock = null,
+    PostgresNativeQueueEnrollment? enrollment = null) : IAtprotoBootstrapReplayRepository
 {
     private const string KeyPrefix = "atproto-bootstrap:";
 
@@ -19,15 +22,16 @@ public sealed class AtprotoBootstrapReplayRepository(ExploreDbContext dbContext)
         }
 
         var key = KeyPrefix + jti;
-        var now = DateTime.UtcNow;
+        var now = (clock ?? TimeProvider.System).GetUtcNow().UtcDateTime;
         if (expiresAt <= now)
         {
             return false;
         }
 
-        var claim = await new IdempotencyRepository(dbContext).TryClaimAsync(
+        var claim = await new IdempotencyRepository(dbContext, clock, enrollment).TryClaimAsync(
             CreateRecord(key, tenantId, now, expiresAt.UtcDateTime),
             cancellationToken).ConfigureAwait(false);
+        using var owner = claim.Owner;
         return claim.IsOwner;
     }
 

@@ -39,10 +39,8 @@ internal static class IdempotencyRequestIdentityFactory
         var method = context.Request.Method.ToUpperInvariant();
         var requestTarget = ResolveRequestTarget(context);
         var contentType = NormalizeContentType(context.Request.ContentType);
-        ClaimsIdentity? identity = ResolveAuthenticatedIdentity(context.User);
         var userId = context.User.GetPlatformUserId()?.ToString("D");
-        var principalFingerprint = ComputeSha256Hex(
-            $"{ResolvePrincipalScope(context.User, identity, userId)}|capabilities:{CapabilityScope(context.Request)}");
+        var principalFingerprint = ComputePrincipalFingerprint(context);
         var bodyHash = await ComputeBodyHashAsync(context.Request, streamManager,
             preserveAmbiguousMemberOrder || context.GetEndpoint()?.Metadata
                 .GetMetadata<RequireAnonymousRegistrationChallengeAttribute>() is not null,
@@ -56,6 +54,10 @@ internal static class IdempotencyRequestIdentityFactory
             principalFingerprint,
             userId);
     }
+
+    internal static string ComputePrincipalFingerprint(HttpContext context) =>
+        ComputeSha256Hex(
+            $"{ResolvePrincipalScope(context.User, ResolveAuthenticatedIdentity(context.User), context.User.GetPlatformUserId()?.ToString("D"))}|capabilities:{CapabilityScope(context.Request)}");
 
     internal static async Task<IdempotencyRequestIdentity> CreateIntendedGuestStartAsync(
         HttpContext context,

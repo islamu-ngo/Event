@@ -2,7 +2,6 @@
 using System.Data.Common;
 using System.Net;
 using System.Text.Json;
-using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Persistence;
@@ -19,98 +18,127 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
 {
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task HistoricalClaimCrossingDeadlineCannotDiscloseCachedOrStatusZeroRecovery(bool statusZero)
+    [Arguments(201)]
+    [Arguments(IdempotencyRecord.InProgressStatusCode)]
+    [Arguments(IdempotencyRecord.ResponseUnavailableStatusCode)]
+    public async Task HistoricalClaimCrossingDeadlineCannotDiscloseCachedOrIncompleteRecovery(int receiptStatus)
     {
         await using var host = await NativeHost.CreateAsync();
         DateTimeOffset recoverUntil = host.Clock.GetUtcNow().AddSeconds(120).AddHours(24);
         SolvedProof proof = await host.IssueAsync(host.Key);
-        using HttpResponseMessage started = await host.StartAsync(host.Key, proof);
-        await Assert.That(started.StatusCode).IsEqualTo(HttpStatusCode.Created);
-        RegistrationOrder original = (await host.OrdersAsync()).Single();
-        RegistrationInventoryHold hold = (await host.HoldsAsync(original.Id)).Single();
-        string capability = started.Headers.GetValues("X-Registration-Order-Capability").Single();
-
-        // The ordinary 24h cache has elapsed, but the original proof still has 119 seconds of recovery.
-        host.Clock.Advance(TimeSpan.FromHours(24).Add(TimeSpan.FromSeconds(1)));
-        if (statusZero)
+        var completion = new ReplayDatabaseBarrier(responseStore: true);
+        await using var ownerReplica = WithBarrier(host, completion);
+        using HttpClient ownerClient = ownerReplica.CreateClient();
+        if (receiptStatus == IdempotencyRecord.InProgressStatusCode)
+            completion.Arm();
+        Task<HttpResponseMessage> owner = host.StartAsync(host.Key, proof, client: ownerClient);
+        try
         {
-            var failure = new DatabaseBarrier(responseStore: true);
-            await using var failureHost = WithBarrier(host, failure);
-            using HttpClient client = failureHost.CreateClient();
-            Task<HttpResponseMessage> replacement = host.StartAsync(host.Key, proof, client: client);
-            try { await failure.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30)); }
-            finally { failure.Release.TrySetResult(); }
-            using HttpResponseMessage failed = await replacement.WaitAsync(TimeSpan.FromSeconds(30));
-            await Assert.That(failed.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
-        }
-        else
-        {
-            using HttpResponseMessage replacement = await host.StartAsync(host.Key, proof);
-            await Assert.That(replacement.StatusCode).IsEqualTo(HttpStatusCode.Created);
-            await Assert.That(string.Equals(replacement.Headers.GetValues("X-Registration-Order-Capability").Single(),
-                capability, StringComparison.Ordinal)).IsTrue();
-        }
+            if (receiptStatus == IdempotencyRecord.InProgressStatusCode)
+                await completion.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            else
+            {
+                HttpResponseMessage started = await owner.WaitAsync(TimeSpan.FromSeconds(30));
+                await Assert.That(started.StatusCode).IsEqualTo(HttpStatusCode.Created);
+            }
+            RegistrationOrder original = (await host.OrdersAsync()).Single();
+            RegistrationInventoryHold hold = (await host.HoldsAsync(original.Id)).Single();
+            IdempotencyRecord initial = await ReadRecordAsync(host);
+            await Assert.That(initial.ExpiresAt).IsEqualTo(initial.CreatedAt.AddHours(24));
 
-        IdempotencyRecord before = await ReadRecordAsync(host);
-        await Assert.That(before.StatusCode).IsEqualTo(statusZero ? 0 : 201);
-        await Assert.That(before.ExpiresAt).IsEqualTo(recoverUntil.UtcDateTime);
-        host.Clock.Advance(recoverUntil - host.Clock.GetUtcNow() - TimeSpan.FromTicks(1));
-        var barrier = new ReplayDatabaseBarrier(responseStore: false);
+            if (receiptStatus == IdempotencyRecord.ResponseUnavailableStatusCode)
+                host.Clock.Advance(TimeSpan.FromHours(24).Add(TimeSpan.FromSeconds(1)));
+            using HttpResponseMessage recovered = await host.StartAsync(host.Key, proof);
+            await Assert.That(recovered.StatusCode).IsEqualTo(HttpStatusCode.Created);
+            string capability = recovered.Headers.GetValues("X-Registration-Order-Capability").Single();
+
+            IdempotencyRecord before = await ReadRecordAsync(host);
+            await Assert.That(before.Id).IsEqualTo(initial.Id);
+            await Assert.That(before.CreatedAt).IsEqualTo(initial.CreatedAt);
+            await Assert.That(before.ExpiresAt).IsEqualTo(initial.ExpiresAt);
+            await Assert.That(before.StatusCode).IsEqualTo(receiptStatus);
+            if (receiptStatus == 201)
+                await Assert.That(before.ResponseBody!).StartsWith("dp:v1:");
+            else
+                await Assert.That(before.ResponseBody).IsNull();
+
+            // A cached response or live original claim must be read before cache expiry.
+            // An expired receipt instead stays scrubbed; recovery never renews its lease.
+            DateTimeOffset readAt = receiptStatus == IdempotencyRecord.ResponseUnavailableStatusCode
+                ? recoverUntil.AddTicks(-1)
+                : new DateTimeOffset(before.ExpiresAt, TimeSpan.Zero).AddTicks(-1);
+            host.Clock.Advance(readAt - host.Clock.GetUtcNow());
+            var barrier = new ReplayDatabaseBarrier(responseStore: false);
+            await using var replica = WithBarrier(host, barrier);
+            using HttpClient retryClient = replica.CreateClient();
+            barrier.Arm();
+            Task<HttpResponseMessage> pending = host.StartAsync(host.Key, proof, client: retryClient);
+            try
+            {
+                await barrier.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                await Assert.That(pending.IsCompleted).IsFalse();
+                host.Clock.Advance(recoverUntil - host.Clock.GetUtcNow());
+                await Assert.That(host.Clock.GetUtcNow()).IsEqualTo(recoverUntil);
+            }
+            finally { barrier.Release.TrySetResult(); }
+            using HttpResponseMessage denied = await pending.WaitAsync(TimeSpan.FromSeconds(30));
+            await AssertDeniedAsync(denied, original.Id, capability);
+            IdempotencyRecord after = await ReadRecordAsync(host);
+            await Assert.That(after.Id).IsEqualTo(before.Id);
+            await Assert.That(after.CreatedAt).IsEqualTo(before.CreatedAt);
+            await Assert.That(after.ExpiresAt).IsEqualTo(before.ExpiresAt);
+            await Assert.That(after.StatusCode).IsEqualTo(before.StatusCode);
+            await Assert.That(after.ResponseBody == before.ResponseBody).IsTrue();
+            await AssertUnchangedAllocationAsync(host, original, hold);
+        }
+        finally
+        {
+            completion.Release.TrySetResult();
+            using HttpResponseMessage completed = await owner.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+    }
+
+    [Test]
+    public async Task OriginalResponseCompletionCrossingDeadlineCannotDiscloseCommittedCapability()
+    {
+        await using var host = await NativeHost.CreateAsync();
+        DateTimeOffset recoverUntil = host.Clock.GetUtcNow().AddSeconds(120).AddHours(24);
+        SolvedProof proof = await host.IssueAsync(host.Key);
+        var barrier = new ReplayDatabaseBarrier(responseStore: true);
         await using var replica = WithBarrier(host, barrier);
-        using HttpClient retryClient = replica.CreateClient();
+        using HttpClient client = replica.CreateClient();
         barrier.Arm();
-        Task<HttpResponseMessage> pending = host.StartAsync(host.Key, proof, client: retryClient);
+        Task<HttpResponseMessage> pending = host.StartAsync(host.Key, proof, client: client);
+        RegistrationOrder original;
+        RegistrationInventoryHold hold;
+        string capability;
+        IdempotencyRecord inProgress;
         try
         {
             await barrier.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
             await Assert.That(pending.IsCompleted).IsFalse();
-            host.Clock.Advance(TimeSpan.FromTicks(1));
+            original = (await host.OrdersAsync()).Single();
+            hold = (await host.HoldsAsync(original.Id)).Single();
+            using HttpResponseMessage recovered = await host.StartAsync(host.Key, proof);
+            await Assert.That(recovered.StatusCode).IsEqualTo(HttpStatusCode.Created);
+            capability = recovered.Headers.GetValues("X-Registration-Order-Capability").Single();
+            inProgress = await ReadRecordAsync(host);
+            await Assert.That(inProgress.StatusCode).IsEqualTo(0);
+            await Assert.That(inProgress.ResponseBody).IsNull();
+            await Assert.That(inProgress.ExpiresAt).IsEqualTo(inProgress.CreatedAt.AddHours(24));
+            host.Clock.Advance(recoverUntil - host.Clock.GetUtcNow());
             await Assert.That(host.Clock.GetUtcNow()).IsEqualTo(recoverUntil);
         }
         finally { barrier.Release.TrySetResult(); }
         using HttpResponseMessage denied = await pending.WaitAsync(TimeSpan.FromSeconds(30));
         await AssertDeniedAsync(denied, original.Id, capability);
         IdempotencyRecord after = await ReadRecordAsync(host);
-        await Assert.That(after.Id).IsEqualTo(before.Id);
-        await Assert.That(after.CreatedAt).IsEqualTo(before.CreatedAt);
-        await Assert.That(after.ExpiresAt).IsEqualTo(before.ExpiresAt);
-        await Assert.That(after.StatusCode).IsEqualTo(before.StatusCode);
-        await Assert.That(after.ResponseBody == before.ResponseBody).IsTrue();
-        await AssertUnchangedAllocationAsync(host, original, hold);
-    }
-
-    [Test]
-    public async Task HistoricalResponseCompletionCrossingDeadlineCannotDiscloseRecoveredCapability()
-    {
-        await using var host = await NativeHost.CreateAsync();
-        DateTimeOffset recoverUntil = host.Clock.GetUtcNow().AddSeconds(120).AddHours(24);
-        SolvedProof proof = await host.IssueAsync(host.Key);
-        using HttpResponseMessage started = await host.StartAsync(host.Key, proof);
-        await Assert.That(started.StatusCode).IsEqualTo(HttpStatusCode.Created);
-        RegistrationOrder original = (await host.OrdersAsync()).Single();
-        RegistrationInventoryHold hold = (await host.HoldsAsync(original.Id)).Single();
-        string capability = started.Headers.GetValues("X-Registration-Order-Capability").Single();
-        host.Clock.Advance(recoverUntil - host.Clock.GetUtcNow() - TimeSpan.FromTicks(1));
-        var barrier = new ReplayDatabaseBarrier(responseStore: true);
-        await using var replica = WithBarrier(host, barrier);
-        using HttpClient client = replica.CreateClient();
-        barrier.Arm();
-        Task<HttpResponseMessage> pending = host.StartAsync(host.Key, proof, client: client);
-        try
-        {
-            await barrier.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
-            await Assert.That(pending.IsCompleted).IsFalse();
-            IdempotencyRecord inProgress = await ReadRecordAsync(host);
-            await Assert.That(inProgress.StatusCode).IsEqualTo(0);
-            await Assert.That(inProgress.ExpiresAt).IsEqualTo(recoverUntil.UtcDateTime);
-            host.Clock.Advance(TimeSpan.FromTicks(1));
-        }
-        finally { barrier.Release.TrySetResult(); }
-        using HttpResponseMessage denied = await pending.WaitAsync(TimeSpan.FromSeconds(30));
-        await AssertDeniedAsync(denied, original.Id, capability);
-        await Assert.That((await ReadRecordAsync(host)).ExpiresAt).IsEqualTo(recoverUntil.UtcDateTime);
+        await Assert.That(after.Id).IsEqualTo(inProgress.Id);
+        await Assert.That(after.CreatedAt).IsEqualTo(inProgress.CreatedAt);
+        await Assert.That(after.ExpiresAt).IsEqualTo(inProgress.ExpiresAt);
+        await Assert.That(after.StatusCode).IsEqualTo(201);
+        await Assert.That(after.ResponseBody!).StartsWith("dp:v1:");
+        await Assert.That(after.ResponseBody!.Contains(capability, StringComparison.Ordinal)).IsFalse();
         await AssertUnchangedAllocationAsync(host, original, hold);
     }
 
@@ -121,8 +149,9 @@ public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
     private static async Task<IdempotencyRecord> ReadRecordAsync(NativeHost host)
     {
         await using AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope();
-        return (await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-            .FindAsync(host.Key, PlatformDefaults.DefaultTenantId))!;
+        return await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+            .IdempotencyRecords.AsNoTracking().SingleAsync(record =>
+                record.Key == host.Key && record.TenantId == PlatformDefaults.DefaultTenantId);
     }
 
     private static async Task AssertDeniedAsync(HttpResponseMessage response, Guid orderId, string capability)

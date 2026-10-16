@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Explore.API.Middleware;
@@ -125,6 +126,15 @@ public sealed class IdempotencyMiddleware
         var repository = context.RequestServices.GetRequiredService<IIdempotencyRepository>();
         var replayProtection = context.GetEndpoint()?.Metadata
             .GetMetadata<ProtectIdempotencyReplayAttribute>();
+        if (replayProtection is not null)
+        {
+            context.Response.Headers.CacheControl = "private, no-store";
+            context.Response.OnStarting(() =>
+            {
+                context.Response.Headers.CacheControl = "private, no-store";
+                return Task.CompletedTask;
+            });
+        }
         var revalidateReplay = context.GetEndpoint()?.Metadata
             .GetMetadata<RevalidateIdempotencyReplayAttribute>() is not null;
         var tenantId = tenantContext.TenantId;
@@ -183,22 +193,33 @@ public sealed class IdempotencyMiddleware
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Unable to claim idempotency request state.");
+            _logger.LogError("Unable to claim idempotency request state.");
             await WritePersistenceFailureAsync(context);
             return;
         }
 
+        using var claimOwner = claim.Owner;
+        if (claim.Lookup.Outcome == IdempotencyLookupOutcome.RequestMismatch)
+        {
+            await WriteKeyReuseConflictAsync(context);
+            return;
+        }
+        record = claim.Record ?? throw new InvalidOperationException("A receipt acquisition must retain its result.");
         if (!claim.IsOwner)
         {
-            if (!MatchesRequestIdentity(claim.Record, requestIdentity))
+            if (!MatchesRequestIdentity(record, requestIdentity))
             {
                 await WriteKeyReuseConflictAsync(context);
                 return;
             }
 
-            if (claim.Record.StatusCode == IdempotencyRecord.InProgressStatusCode)
+            if (record.StatusCode is IdempotencyRecord.InProgressStatusCode
+                or IdempotencyRecord.ResponseUnavailableStatusCode
+                || record.ExpiresAt <= (requiresChallenge
+                    ? context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime
+                    : DateTime.UtcNow))
             {
                 // A committed exact order is independent of HTTP response-store completion.
                 // This read-only branch never acquires or releases the still-live claim.
@@ -213,11 +234,18 @@ public sealed class IdempotencyMiddleware
                     return;
                 }
 
-                await WriteInProgressConflictAsync(context);
+                if (record.StatusCode != IdempotencyRecord.InProgressStatusCode)
+                {
+                    await WriteResponseUnavailableAsync(context);
+                }
+                else
+                {
+                    await WriteInProgressConflictAsync(context);
+                }
                 return;
             }
 
-            if (challenge is not null && claim.Record.StatusCode is >= 200 and < 300 && committedGuest is null)
+            if (challenge is not null && record.StatusCode is >= 200 and < 300 && committedGuest is null)
             {
                 await WriteKeyReuseConflictAsync(context);
                 return;
@@ -229,24 +257,24 @@ public sealed class IdempotencyMiddleware
                 return;
             }
 
-            context.Response.StatusCode = claim.Record.StatusCode;
+            context.Response.StatusCode = record.StatusCode;
             context.Response.Headers[ReplayHeader] = "true";
 
-            if (!string.IsNullOrEmpty(claim.Record.ContentType))
+            if (!string.IsNullOrEmpty(record.ContentType))
             {
-                context.Response.ContentType = claim.Record.ContentType;
+                context.Response.ContentType = record.ContentType;
             }
 
-            string? replayBody = claim.Record.ResponseBody;
+            string? replayBody = record.ResponseBody;
             if (replayProtection is not null)
             {
-                if (!TryUnprotectReplay(replayBody, out ProtectedReplayEnvelope? replay))
+                if (!TryUnprotectReplay(record, replayBody, out ProtectedReplayEnvelope? replay))
                 {
                     await WritePersistenceFailureAsync(context);
                     return;
                 }
 
-                if (challenge is not null && claim.Record.StatusCode is >= 200 and < 300
+                if (challenge is not null && record.StatusCode is >= 200 and < 300
                     && (!replay.Headers.TryGetValue("X-Registration-Order-Capability", out string? capability)
                         || !string.Equals(capability, challenge.GuestCapabilityToken, StringComparison.Ordinal)))
                 {
@@ -275,7 +303,17 @@ public sealed class IdempotencyMiddleware
                 return;
             }
 
-            if (!string.IsNullOrEmpty(replayBody))
+            if (record.ExpiresAt <= (requiresChallenge
+                ? context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime
+                : DateTime.UtcNow))
+            {
+                context.Response.Clear();
+                await WriteResponseUnavailableAsync(context);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(replayBody)
+                && context.Response.StatusCode is not (StatusCodes.Status204NoContent or StatusCodes.Status304NotModified))
             {
                 await context.Response.WriteAsync(replayBody, context.RequestAborted);
             }
@@ -283,76 +321,104 @@ public sealed class IdempotencyMiddleware
             return;
         }
 
-        // Capture the response body
+        var owner = claimOwner ?? throw new InvalidOperationException("The original receipt acquisition is required.");
         var originalBodyStream = context.Response.Body;
-        using var bufferStream = _streamManager.GetStream("idempotency-middleware");
-        context.Response.Body = bufferStream;
+        var produces = context.GetEndpoint()?.Metadata.GetMetadata<ProducesAttribute>();
+        bool declaredIneligible = produces?.ContentTypes.Contains("text/event-stream", StringComparer.OrdinalIgnoreCase) is true
+            || produces is { ContentTypes.Count: > 0 } && !produces.ContentTypes.Any(IsReplayContentType);
+        using var capture = new BoundedResponseCaptureStream(
+            originalBodyStream,
+            MaxStoredResponseBodyBytes,
+            () => !declaredIneligible && !context.Response.HasStarted
+                && context.Response.ContentLength is not > MaxStoredResponseBodyBytes
+                && ShouldPersistResponse(context.Response, 0),
+            () =>
+            {
+                if (challenge is not null
+                    && context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow() >= challenge.RecoverUntil)
+                {
+                    if (!context.Response.HasStarted)
+                    {
+                        context.Response.Clear();
+                        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        context.Response.Headers.CacheControl = "private, no-store";
+                    }
+                    return true;
+                }
+                return context.Response.StatusCode is StatusCodes.Status204NoContent or StatusCodes.Status304NotModified;
+            },
+            // Recovery capabilities must remain private until receipt completion succeeds.
+            deferFlush: challenge is not null);
+        // Declared streams must keep their native body/flush/start semantics.
+        if (!declaredIneligible)
+        {
+            context.Response.Body = capture;
+        }
 
         try
         {
             await _next(context);
-        }
-        catch
-        {
             context.Response.Body = originalBodyStream;
-            await TryReleaseAsync(repository, record.Id, context.RequestAborted);
-            throw;
-        }
-
-        context.Response.Body = originalBodyStream;
-
-        // Read captured response
-        bufferStream.Position = 0;
-        string? responseBody = null;
-        if (bufferStream.Length > 0)
-        {
-            using var reader = new StreamReader(bufferStream, leaveOpen: true);
-            responseBody = await reader.ReadToEndAsync(context.RequestAborted);
-        }
-
-        if (ShouldPersistResponse(context.Response, bufferStream.Length))
-        {
-            try
+            if (!declaredIneligible && capture.IsCaptured
+                && !context.Response.HasStarted
+                && ShouldPersistResponse(context.Response, capture.Length)
+                && context.Response.ContentLength is not > MaxStoredResponseBodyBytes)
             {
+                string? responseBody = capture.Length == 0
+                    || context.Response.StatusCode is StatusCodes.Status204NoContent or StatusCodes.Status304NotModified
+                    ? null : Encoding.UTF8.GetString(capture.CapturedBody.Span);
                 string? persistedResponseBody = replayProtection is null
                     ? responseBody
-                    : ProtectReplay(responseBody, context.Response, replayProtection);
-                if (!await repository.CompleteAsync(
-                        record.Id,
+                    : ProtectReplay(record, responseBody, context.Response, replayProtection);
+                bool completed;
+                try
+                {
+                    completed = await repository.CompleteAsync(
+                        owner,
                         context.Response.StatusCode,
                         persistedResponseBody,
                         context.Response.ContentType,
-                        context.RequestAborted))
+                        context.RequestAborted);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
+                    _logger.LogError("Unable to complete idempotency request state.");
+                    await RetainUnavailableAsync(repository, owner);
+                    context.Response.Body = originalBodyStream;
+                    await WritePersistenceFailureAsync(context);
+                    return;
+                }
+                if (!completed)
+                {
+                    await RetainUnavailableAsync(repository, owner);
+                    context.Response.Body = originalBodyStream;
                     await WritePersistenceFailureAsync(context);
                     return;
                 }
             }
-            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            else
             {
-                throw;
+                await RetainUnavailableAsync(repository, owner);
             }
-            catch (Exception ex)
+
+            if (!context.Response.HasStarted && await RejectExpiredRecoveryAsync(context, challenge))
             {
-                _logger.LogError(ex, "Unable to complete idempotency request state.");
-                await WritePersistenceFailureAsync(context);
                 return;
             }
-        }
-        else if (!await TryReleaseAsync(repository, record.Id, context.RequestAborted))
-        {
-            await WritePersistenceFailureAsync(context);
-            return;
-        }
 
-        if (await RejectExpiredRecoveryAsync(context, challenge))
-        {
-            return;
+            await capture.ForwardPrefixAsync(context.RequestAborted);
         }
-
-        // Write the captured response to the original stream
-        bufferStream.Position = 0;
-        await bufferStream.CopyToAsync(originalBodyStream, context.RequestAborted);
+        catch
+        {
+            // Even if this update fails, the original status-zero claim is a durable
+            // fence. A disconnected client cannot turn transport failure into rollback.
+            await RetainUnavailableAsync(repository, owner);
+            throw;
+        }
+        finally
+        {
+            context.Response.Body = originalBodyStream;
+        }
     }
 
     private static async Task<bool> RejectExpiredRecoveryAsync(
@@ -370,6 +436,7 @@ public sealed class IdempotencyMiddleware
     }
 
     private string ProtectReplay(
+        IdempotencyRecord record,
         string? responseBody,
         HttpResponse response,
         ProtectIdempotencyReplayAttribute metadata)
@@ -384,10 +451,11 @@ public sealed class IdempotencyMiddleware
         }
 
         var envelope = new ProtectedReplayEnvelope(1, responseBody, headers);
-        return ProtectedReplayPrefix + _replayProtector.Protect(JsonSerializer.Serialize(envelope));
+        return ProtectedReplayPrefix + _replayProtector.CreateProtector(record.Id.ToString("D"))
+            .Protect(JsonSerializer.Serialize(envelope));
     }
 
-    private bool TryUnprotectReplay(string? storedBody, out ProtectedReplayEnvelope replay)
+    private bool TryUnprotectReplay(IdempotencyRecord record, string? storedBody, out ProtectedReplayEnvelope replay)
     {
         replay = null!;
         if (storedBody?.StartsWith(ProtectedReplayPrefix, StringComparison.Ordinal) != true)
@@ -398,7 +466,8 @@ public sealed class IdempotencyMiddleware
         try
         {
             replay = JsonSerializer.Deserialize<ProtectedReplayEnvelope>(
-                _replayProtector.Unprotect(storedBody[ProtectedReplayPrefix.Length..]))!;
+                _replayProtector.CreateProtector(record.Id.ToString("D"))
+                    .Unprotect(storedBody[ProtectedReplayPrefix.Length..]))!;
             return replay is { Version: 1, Headers: not null };
         }
         catch (CryptographicException)
@@ -504,23 +573,36 @@ public sealed class IdempotencyMiddleware
         });
     }
 
-    private static async Task<bool> TryReleaseAsync(
-        IIdempotencyRepository repository,
-        Guid recordId,
-        CancellationToken cancellationToken)
+    private async Task RetainUnavailableAsync(IIdempotencyRepository repository, IIdempotencyClaimOwner owner)
     {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         try
         {
-            return await repository.ReleaseAsync(recordId, cancellationToken);
+            await repository.CompleteAsync(owner,
+                IdempotencyRecord.ResponseUnavailableStatusCode, null, null, deadline.Token);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (Exception)
         {
-            throw;
+            _logger.LogError("Unable to mark idempotency response unavailable; the original claim remains fenced.");
         }
-        catch
-        {
-            return false;
-        }
+    }
+
+    private static async Task WriteResponseUnavailableAsync(HttpContext context)
+    {
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        context.Response.Headers.CacheControl = "private, no-store";
+        await context.RequestServices.GetRequiredService<IProblemDetailsService>()
+            .TryWriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = context,
+                ProblemDetails = new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Operation outcome requires reconciliation",
+                    Detail = "This operation may have completed, but its response is unavailable. Reconcile current state before submitting another operation.",
+                    Extensions = { ["code"] = "idempotency_response_unavailable" }
+                }
+            });
     }
 
     private static async Task WriteBadRequestAsync(HttpContext context, string detail)
@@ -558,8 +640,14 @@ public sealed class IdempotencyMiddleware
             return false;
         }
 
-        return string.IsNullOrWhiteSpace(response.ContentType)
-            || response.ContentType.StartsWith("application/json", StringComparison.OrdinalIgnoreCase)
-            || response.ContentType.StartsWith("application/problem+json", StringComparison.OrdinalIgnoreCase);
+        return IsReplayContentType(response.ContentType);
+    }
+
+    private static bool IsReplayContentType(string? contentType)
+    {
+        string? mediaType = contentType?.Split(';', 2)[0].Trim();
+        return string.IsNullOrWhiteSpace(mediaType)
+            || mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("application/problem+json", StringComparison.OrdinalIgnoreCase);
     }
 }

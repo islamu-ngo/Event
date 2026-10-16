@@ -642,79 +642,88 @@ public sealed class AiAssistantApiFlowTests
     {
         private readonly Dictionary<(Guid TenantId, string Key), IdempotencyRecord> _records = [];
 
-        public Task<IdempotencyRecord?> FindAsync(string key, Guid tenantId, CancellationToken cancellationToken = default)
-            => Task.FromResult(_records.GetValueOrDefault((tenantId, key)));
-
-        public Task SaveAsync(IdempotencyRecord record, CancellationToken cancellationToken = default)
+        public Task<IdempotencyLookup> LookupAsync(
+            IdempotencyRequestDescriptor request, DateTime utcNow, CancellationToken cancellationToken = default)
         {
-            _records[(record.TenantId, record.Key)] = record;
-            return Task.CompletedTask;
+            lock (_records)
+                return Task.FromResult(Lookup(request));
         }
+
+        private IdempotencyLookup Lookup(IdempotencyRequestDescriptor request) =>
+            !_records.TryGetValue((request.TenantId, request.Key), out var record)
+                ? new(IdempotencyLookupOutcome.Absent, null)
+                : IdempotencyRequestDescriptor.FromRecord(record) == request
+                    ? new(IdempotencyLookupOutcome.Existing, record)
+                    : new(IdempotencyLookupOutcome.RequestMismatch, null);
 
         public Task<IdempotencyClaim> TryClaimAsync(
             IdempotencyRecord record,
             CancellationToken cancellationToken = default)
         {
-            if (_records.TryGetValue((record.TenantId, record.Key), out var existing))
+            lock (_records)
             {
-                return Task.FromResult(new IdempotencyClaim(existing, IsOwner: false));
+                var lookup = Lookup(IdempotencyRequestDescriptor.FromRecord(record));
+                if (lookup.Outcome != IdempotencyLookupOutcome.Absent)
+                    return Task.FromResult(new IdempotencyClaim(lookup, null));
+                _records[(record.TenantId, record.Key)] = record;
+                return Task.FromResult(new IdempotencyClaim(
+                    new(IdempotencyLookupOutcome.Existing, record), new Owner(this, record)));
             }
-
-            _records[(record.TenantId, record.Key)] = record;
-            return Task.FromResult(new IdempotencyClaim(record, IsOwner: true));
         }
 
         public Task<bool> CompleteAsync(
-            Guid recordId,
+            IIdempotencyClaimOwner owner,
             int statusCode,
             string? responseBody,
             string? contentType,
             CancellationToken cancellationToken = default)
         {
-            var record = _records.Values.FirstOrDefault(candidate => candidate.Id == recordId);
-            if (record is null || record.StatusCode != IdempotencyRecord.InProgressStatusCode)
+            lock (_records)
             {
-                return Task.FromResult(false);
+                if (owner is not Owner captured || captured.Repository != this || captured.Used
+                    || !_records.TryGetValue((captured.Record.TenantId, captured.Record.Key), out var record)
+                    || !ReferenceEquals(record, captured.Record)
+                    || record.StatusCode != IdempotencyRecord.InProgressStatusCode
+                    || record.ExpiresAt <= DateTime.UtcNow)
+                    return Task.FromResult(false);
+                captured.Used = true;
+                record.StatusCode = statusCode;
+                record.ResponseBody = statusCode == IdempotencyRecord.ResponseUnavailableStatusCode ? null : responseBody;
+                record.ContentType = statusCode == IdempotencyRecord.ResponseUnavailableStatusCode ? null : contentType;
+                return Task.FromResult(true);
             }
-
-            record.StatusCode = statusCode;
-            record.ResponseBody = responseBody;
-            record.ContentType = contentType;
-            return Task.FromResult(true);
         }
 
-        public Task<bool> ReleaseAsync(Guid recordId, CancellationToken cancellationToken = default)
+        private sealed class Owner(InMemoryIdempotencyRepository repository, IdempotencyRecord record) : IIdempotencyClaimOwner
         {
-            var pair = _records.FirstOrDefault(candidate => candidate.Value.Id == recordId);
-            if (pair.Value is null || pair.Value.StatusCode != IdempotencyRecord.InProgressStatusCode)
-            {
-                return Task.FromResult(false);
-            }
-
-            _records.Remove(pair.Key);
-            return Task.FromResult(true);
+            public InMemoryIdempotencyRepository Repository { get; } = repository;
+            public IdempotencyRecord Record { get; } = record;
+            public bool Used { get; set; }
+            public void Dispose() => Used = true;
         }
 
         public Task<int> CountExpiredAsync(DateTime expiresBeforeUtc, int batchSize, CancellationToken cancellationToken = default)
         {
-            var count = _records.Values.Count(record => record.ExpiresAt < expiresBeforeUtc);
-            return Task.FromResult(Math.Min(count, batchSize));
+            lock (_records)
+                return Task.FromResult(_records.Values.Where(record =>
+                    record.ExpiresAt <= expiresBeforeUtc && record.StatusCode != IdempotencyRecord.ResponseUnavailableStatusCode)
+                    .Take(batchSize).Count());
         }
 
-        public Task<int> DeleteExpiredAsync(DateTime expiresBeforeUtc, int batchSize, CancellationToken cancellationToken = default)
+        public Task<int> ScrubExpiredAsync(DateTime expiresBeforeUtc, int batchSize, CancellationToken cancellationToken = default)
         {
-            var expired = _records
-                .Where(pair => pair.Value.ExpiresAt < expiresBeforeUtc)
-                .Take(batchSize)
-                .Select(pair => pair.Key)
-                .ToList();
-
-            foreach (var key in expired)
+            lock (_records)
             {
-                _records.Remove(key);
+                var expired = _records.Values.Where(record => record.ExpiresAt <= expiresBeforeUtc
+                    && record.StatusCode != IdempotencyRecord.ResponseUnavailableStatusCode).Take(batchSize).ToArray();
+                foreach (var record in expired)
+                {
+                    record.StatusCode = IdempotencyRecord.ResponseUnavailableStatusCode;
+                    record.ResponseBody = null;
+                    record.ContentType = null;
+                }
+                return Task.FromResult(expired.Length);
             }
-
-            return Task.FromResult(expired.Count);
         }
     }
 

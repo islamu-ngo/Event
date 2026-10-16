@@ -1,0 +1,31 @@
+Change-Id: CHG-01M52D91SB2CDWZ6RX30BNC90D
+Title: "Preserve idempotency identity fences while scrubbing replay payloads"
+Type: fix
+Scope: access
+Summary: "Bind receipt completion to original claim custody, reject unavailable replay, and scrub expired response payloads through bounded tenant execution."
+Group: idempotency-receipt-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Expired or response-unavailable receipts cannot be reacquired; install the PostgreSQL receipt capability before traffic.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Original opaque claim custody fences completion and release while Global cleanup sees tenant identities only.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Native installation owns the private claim table and receipt expiry indexes after tenant RLS.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Dry-run and scrub share one bounded budget; disabling cleanup retains payloads but cannot reopen expired operations.

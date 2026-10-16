@@ -2,6 +2,8 @@ namespace Explore.Persistence.QueryFilters;
 
 public static class TenantFilterBypassReasons
 {
+    public const string IdempotencyCleanupTenantDiscovery =
+        "Global cleanup discovers bounded expired receipt owner identities without exposing replay payloads.";
     public const string DiscoveryRankMigration =
         "Migration authority backfills bounded exact-tenant source keysets, including suppressed rows, before API readiness.";
     public const string DiscoverySnapshotRetention =

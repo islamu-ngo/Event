@@ -15,6 +15,10 @@ internal static class ApiDiagnosticLoggingExtensions
                     .ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
                     .Enrich.With(new ApiDiagnosticLogEnricher())
+                    .Filter.ByExcluding(logEvent =>
+                        logEvent.Properties.TryGetValue("SourceContext", out var source)
+                        && source is Serilog.Events.ScalarValue { Value: string category }
+                        && ApiDiagnosticLogEnricher.IsFrameworkCategory(category))
                     // RequestLoggingMiddleware owns safe HTTP events; framework
                     // request-start/finish messages contain raw URLs before routing.
                     .MinimumLevel.Override("Microsoft.AspNetCore.Hosting.Diagnostics", Serilog.Events.LogEventLevel.Warning),

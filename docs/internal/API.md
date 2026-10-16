@@ -5,6 +5,11 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Diagnostic Scope Ownership
 
+The final Serilog filter excludes ASP.NET Core, IdentityModel, HTTP/gRPC client,
+EF Core and host lifecycle categories. Their framework-authored events can carry
+raw URLs, SQL, identifiers and exceptions. Native API diagnostic categories
+remain available; severity overrides alone do not establish confidentiality.
+
 `UseApiDiagnosticLogging` decorates Serilog's actual `ILoggerFactory`.
 Its loggers discard `BeginScope` before inherited properties can overwrite
 native event arguments. Logging, level checks, provider forwarding and disposal

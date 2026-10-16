@@ -30,6 +30,36 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class SecuritySinkConfidentialityTests
 {
     [Test]
+    [Arguments("Microsoft.AspNetCore.Hosting.Diagnostics")]
+    [Arguments("Microsoft.IdentityModel.Protocols.OpenIdConnect")]
+    [Arguments("System.Net.Http.HttpClient.Provider")]
+    [Arguments("Grpc.Net.Client.Internal.GrpcCall")]
+    [Arguments("Microsoft.EntityFrameworkCore.Database.Command")]
+    [Arguments("Microsoft.Extensions.Hosting.Internal.Host")]
+    [Arguments("Microsoft.Hosting.Lifetime")]
+    public async Task FrameworkDiagnosticsAreExcludedWhileNativeEventsReachConfiguredSink(string category)
+    {
+        string canary = Guid.CreateVersion7().ToString("N");
+        var collector = new Collector();
+        using var host = CreateLogHost(collector);
+        var factory = host.Services.GetRequiredService<ILoggerFactory>();
+
+        factory.CreateLogger(category).LogWarning(
+            new PrivateProviderCredentialFailure(canary), "Framework detail {Detail}", canary);
+        factory.CreateLogger("Explore.API.NativeProbe").LogWarning(
+            "Native diagnostic. FailureCategory={FailureCategory}", "native_probe");
+
+        LogEvent exported = collector.Events.Single();
+        await Assert.That(exported.Exception).IsNull();
+        await Assert.That(((ScalarValue)exported.Properties["SourceContext"]).Value)
+            .IsEqualTo("Explore.API.NativeProbe");
+        await Assert.That(((ScalarValue)exported.Properties["FailureCategory"]).Value)
+            .IsEqualTo("native_probe");
+        await Assert.That(exported.RenderMessage() + string.Join(' ', exported.Properties.Values))
+            .DoesNotContain(canary);
+    }
+
+    [Test]
     [Arguments(false, false)]
     [Arguments(false, true)]
     [Arguments(true, false)]

@@ -18,17 +18,6 @@ public sealed record RefundReservationResult(
     RefundReservationDisposition Disposition,
     RefundAttempt? Attempt);
 
-public sealed record RefundReconciliationHealth(
-    int Pending,
-    int Unknown,
-    int RequiresAction,
-    int Failed,
-    int CampaignsRequiringOperator,
-    int DisputesDueSoon,
-    int DisputesDueWithin72Hours,
-    int DisputesOverdue,
-    DateTime? OldestNonTerminalAt);
-
 public interface IRefundAttemptRepository
 {
     Task<RefundReservationResult> ReserveAsync(
@@ -83,10 +72,6 @@ public interface IRefundAttemptRepository
     Task<PaidOrderAcceptanceSnapshot?> GetAcceptanceAsync(
         Guid tenantId,
         Guid paidOrderAcceptanceSnapshotId,
-        CancellationToken cancellationToken);
-
-    Task<RefundReconciliationHealth> GetReconciliationHealthAsync(
-        DateTime observedAt,
         CancellationToken cancellationToken);
 
     Task<PaymentDispute> ObserveDisputeAsync(

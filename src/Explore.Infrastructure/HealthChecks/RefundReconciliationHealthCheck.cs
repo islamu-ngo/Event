@@ -19,7 +19,7 @@ public sealed class RefundReconciliationHealthCheck(
             await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
             DateTime observedAt = timeProvider.GetUtcNow().UtcDateTime;
             RefundReconciliationHealth health = await scope.ServiceProvider
-                .GetRequiredService<IRefundAttemptRepository>()
+                .GetRequiredService<IRefundReconciliationHealthObserver>()
                 .GetReconciliationHealthAsync(observedAt, cancellationToken);
             bool stale = health.OldestNonTerminalAt.HasValue && observedAt - health.OldestNonTerminalAt.Value >= StaleAfter;
             var data = new Dictionary<string, object>

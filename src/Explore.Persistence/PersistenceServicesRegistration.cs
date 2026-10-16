@@ -315,6 +315,7 @@ public static class PersistenceServicesRegistration
 
         // Event Repositories
         services.AddScoped<IEventRepository, EventRepository>();
+        services.AddRefundReconciliationHealthPersistence();
         services.AddScoped<IEventParticipationConfigurationRepository, EventParticipationConfigurationRepository>();
         services.AddScoped<IRegistrationFormAuthoringRepository, RegistrationFormAuthoringRepository>();
         services.AddScoped<IRegistrationFormTemplateRepository, RegistrationFormTemplateRepository>();

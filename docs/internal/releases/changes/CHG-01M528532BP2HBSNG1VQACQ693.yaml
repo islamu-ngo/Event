@@ -1,0 +1,32 @@
+Change-Id: CHG-01M528532BP2HBSNG1VQACQ693
+Title: "Observe refund readiness through independent aggregate authority"
+Type: fix
+Scope: observability
+Summary: "Read refund fleet health through a fresh Global context and a PostgreSQL aggregate-only function instead of the request-scoped refund repository."
+Group: refund-health-native-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Migrate the refund observation function and its declared Global executor enrollment before restarting API readiness checks.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Restrict fleet observation to eight counts and one oldest timestamp without private-table grants; missing authority remains Unhealthy.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Install the refund native contract after forced tenant RLS in the configured target schema.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Use distinct configured Migrator, Global and Runtime login names for native enrollment.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Provision native roles with administrator authority and preserve inherited execution without role switching or administration authority.

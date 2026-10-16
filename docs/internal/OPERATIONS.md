@@ -1723,6 +1723,23 @@ Payment reconciliation currently uses the bounded `/health` projection and struc
 
 ### Refund Reconciliation And Campaign Recovery
 
+`AddRefundReconciliationHealthPersistence` registers an aggregate observer that
+acquires a fresh identity-free Global context for each observation. PostgreSQL
+returns eight counts and one oldest timestamp through an execute-only function;
+its nonlogin owner reads predicate columns only. Portable providers retain the
+same status and observation-clock predicates on the separately acquired context.
+Missing authority produces Unhealthy, never an empty Healthy fleet.
+
+Migration installs this refund contract after forced tenant RLS in the target
+schema. `PostgresNativeQueueEnrollment` binds distinct Migrator, Global and
+Runtime login names from explicit purpose configuration without loading the
+migrator password. Initial native-role provisioning requires administrator
+authority; reinstall must preserve the exact declared graph. The Global
+`refund_health_executor` edge has INHERIT true, SET false and ADMIN false.
+Do not grant Global private-table access, owner membership or migration authority.
+Drift is rejected rather than normalized; restore the declared grants and
+policies before retrying migration or readiness.
+
 Readiness exposes `refund-reconciliation` with aggregate `pending`, `unknown`, `requiresAction`, `failed`, `campaignsRequiringOperator`, `disputesDueSoon`, `disputesDueWithin72Hours`, `disputesOverdue`, and `oldestNonTerminalAtUtc` facts only. `failed` covers definitive failures observed within the last 24 hours; older terminal history does not keep readiness degraded forever. It degrades immediately for ambiguity, provider action, recent definitive failure, operator-required campaigns, any open dispute deadline within 72 hours or overdue, or non-terminal work older than 15 minutes. The `explore.refunds.operations` and `explore.refunds.campaign_operations` counters admit only closed operation/kind/status/outcome labels; tenant, event, order, payment, refund, amount, provider request, and personal-data labels are forbidden.
 
 Alert and recovery policy:

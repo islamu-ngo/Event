@@ -88,6 +88,16 @@ Review and narrow any existing broad Global grants separately; migration does no
 replace that operator review. After rotating Global credentials in the database
 and selected secret authority, restart API processes to replace their pool.
 
+Refund readiness also uses the independent Global login. On PostgreSQL,
+application migration installs its forced-RLS observation contract and enrolls
+the configured Global login in `refund_health_executor` with inheritance enabled,
+role switching disabled and no administration option. Provision the native roles
+with database-administrator authority first, and migrate before restarting API
+readiness checks. The function returns eight counts and an oldest timestamp,
+not refund, tenant, payment or provider identities. Do not add private-table
+grants or owner/migrator memberships. Missing or altered authority reports
+Unhealthy rather than an empty Healthy fleet.
+
 | Variable | Status | Default | Description |
 |---|---|---|---|
 | `DATABASE_PROVIDER` | **Baseline** | `PostgreSql` | Selected provider: `PostgreSql`, `Sqlite`, `SqlServer`, `MariaDb`, or `MySql`. |

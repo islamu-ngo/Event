@@ -5,6 +5,7 @@ using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -128,6 +129,26 @@ public static class ExploreDatabaseMigrator
         await PostgresDiscoverySnapshotMaintenanceContract.ApplyAsync(db, cancellationToken);
         await PostgresQueueDrainHealthContract.ApplyAsync(db, cancellationToken);
         await EventDiscoveryRankBackfill.ApplyAsync(db, cancellationToken);
+        if (db.Database.IsNpgsql())
+        {
+            await using var executionDatabase = CreateNamespaceExecutionContext(db);
+            await PostgresTenantRowLevelSecurityModel.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresRefundReconciliationHealthContract.ApplyAsync(
+                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
+        }
+    }
+
+    private static ExploreDbContext CreateNamespaceExecutionContext(ExploreDbContext migrationDatabase)
+    {
+        var originalOptions = migrationDatabase.GetService<IDbContextOptions>();
+        var options = new DbContextOptionsBuilder<ExploreDbContext>(
+            (DbContextOptions<ExploreDbContext>)originalOptions);
+        if (originalOptions.FindExtension<RelationalNamespaceOptionsExtension>() is { } mapping)
+        {
+            ((IDbContextOptionsBuilderInfrastructure)options).AddOrUpdateExtension(
+                new RelationalNamespaceOptionsExtension(mapping.TargetSchema, mapping.TargetSchema));
+        }
+        return new ExploreDbContext(options.Options);
     }
 
     private static async Task MigratePrivacyErasureAuthorityAsync(

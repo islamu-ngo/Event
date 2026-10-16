@@ -32,6 +32,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
     private Respawner? _respawner;
+    private readonly IReadOnlyDictionary<PrimaryDatabaseRole, (string Username, string Password)> _nativeQueueLogins;
+    public PostgresNativeQueueEnrollment NativeQueueEnrollment { get; }
 
     public PostgreSqlContainerFixture()
     {
@@ -40,6 +42,15 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             .WithUsername("postgres")
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
             .Build();
+        string suffix = Guid.CreateVersion7().ToString("N");
+        _nativeQueueLogins = new[] { PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime }
+            .ToDictionary(role => role, role => (
+                Username: $"queue_{(int)role}_{suffix}",
+                Password: Convert.ToHexString(RandomNumberGenerator.GetBytes(24))));
+        NativeQueueEnrollment = new PostgresNativeQueueEnrollment(
+            "postgres",
+            _nativeQueueLogins[PrimaryDatabaseRole.Global].Username,
+            _nativeQueueLogins[PrimaryDatabaseRole.Runtime].Username);
     }
 
     /// <summary>
@@ -50,6 +61,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
+        await ProvisionNativeQueueLoginsAsync();
 
         // Apply all migrations for production-faithful schema
         await using (var migratorContext = CreateDbContextInternal(PrimaryDatabaseRole.Migrator))
@@ -57,6 +69,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await migratorContext.Database.MigrateAsync();
             await PostgresModelConstraintApplier.ApplyAsync(migratorContext);
             await PostgresTenantRowLevelSecurityModel.ApplyAsync(migratorContext);
+            await PostgresRefundReconciliationHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
         await using (var runtimeContext = CreateDbContextInternal(PrimaryDatabaseRole.Runtime))
@@ -253,6 +266,32 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         }
 
         return new ExploreDbContext(optionsBuilder.Options);
+    }
+
+    /// <summary>Stable declared purpose accounts; test-specific grants never extend this enrollment.</summary>
+    public PrimaryDatabaseConnectionOptions GetNativeQueueOptions(PrimaryDatabaseRole role, string? schema = null)
+    {
+        PrimaryDatabaseConnectionOptions options = CreateDatabaseOptions(role, schema);
+        if (role == PrimaryDatabaseRole.Migrator)
+            return options;
+        if (!_nativeQueueLogins.TryGetValue(role, out var login))
+            throw new ArgumentOutOfRangeException(nameof(role), role, null);
+        return options with { Username = login.Username, Password = login.Password };
+    }
+
+    private async Task ProvisionNativeQueueLoginsAsync()
+    {
+        NativeQueueEnrollment.Validate();
+        await using var connection = new NpgsqlConnection(_container.GetConnectionString());
+        await connection.OpenAsync();
+        foreach (var login in _nativeQueueLogins.Values)
+        {
+            await using var command = connection.CreateCommand();
+            string username = "\"" + login.Username.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+            string password = "'" + login.Password.Replace("'", "''", StringComparison.Ordinal) + "'";
+            command.CommandText = $"CREATE ROLE {username} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD {password}";
+            await command.ExecuteNonQueryAsync();
+        }
     }
 
     private PrimaryDatabaseConnectionOptions CreateDatabaseOptions(

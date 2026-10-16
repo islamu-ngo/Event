@@ -66,6 +66,13 @@ your deployment selects. Use that role's structured username/password fields or
 explicit environment aliases; generic or sibling credentials cannot fill missing
 values. An explicitly empty structured value blocks its environment alias.
 
+Before restarting with this version, rotate any server database role password
+that is `explore` (ignoring case and surrounding whitespace) or matches its login
+name ignoring case. Update that role's password in the selected secret authority
+after changing it on the database server. Startup rejects those values rather
+than replacing them. Other password whitespace is significant and is preserved.
+SQLite does not require server credentials.
+
 | Variable | Status | Default | Description |
 |---|---|---|---|
 | `DATABASE_PROVIDER` | **Baseline** | `PostgreSql` | Selected provider: `PostgreSql`, `Sqlite`, `SqlServer`, `MariaDb`, or `MySql`. |

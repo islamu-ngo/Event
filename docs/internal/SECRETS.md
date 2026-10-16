@@ -827,6 +827,13 @@ Generic root credentials and sibling roles are never fallback authorities.
 An explicit empty structured value masks its alias; valid password bytes are
 preserved. `BindUsername` resolves a selected login without acquiring its password.
 
+Server-provider validation rejects the retired `explore` password after
+case-insensitive, whitespace-trimmed comparison, and passwords equal to the role
+username ignoring case. Other password bytes remain unchanged. This validation
+also applies when constructing a connection string. SQLite remains credential-free.
+Rotate affected database passwords and update the selected secret authority
+before restarting; Event does not rotate database credentials automatically.
+
 The Keycloak operator component clears its administrator credential fields and
 apply confirmation on navigation and disposal. Disposal removes the navigation
 subscription; a queued navigation render checks disposal before updating UI.

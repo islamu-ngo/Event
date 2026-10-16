@@ -126,6 +126,11 @@ public static partial class PrimaryDatabaseConfiguration
         var hasFlavor = options.ServerFlavor is not null;
         var hasVersion = options.ServerVersion is not null;
 
+        if (options.Provider != PrimaryDatabaseProvider.Sqlite && hasPassword
+            && (string.Equals(options.Password!.Trim(), "explore", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(options.Password, options.Username, StringComparison.OrdinalIgnoreCase)))
+            errors.Add("Database role password must not be a retired deployment default or the role username.");
+
         if (string.IsNullOrWhiteSpace(options.Schema) || !PortableSchemaName().IsMatch(options.Schema))
         {
             errors.Add("Database:Schema must start with a letter or underscore, contain only ASCII letters, digits, or underscores, and be at most 63 characters.");

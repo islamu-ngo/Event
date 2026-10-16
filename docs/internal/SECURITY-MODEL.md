@@ -3,6 +3,15 @@
 
 # Security
 
+`PostgresPrivilegeGuard` generates read-only PostgreSQL assertions from a trusted,
+source-declared contract of dedicated roles, routines, relations and memberships.
+It checks effective table/column privileges, grant options, role attributes,
+routine ownership/ACLs and fixed search paths, including inherited and PUBLIC
+authority. `BuildAssertSql` rejects drift with SQLSTATE `55000`; the guard never
+grants, revokes or derives its allowlist from the live catalogue. Caller enrollment,
+body fingerprints, RLS and business fences remain the owning capability's
+responsibility. Providing this helper does not imply adoption by every capability.
+
 ## Identity Correlation Authority
 
 Token admission and account adoption are separate trust decisions. Only the

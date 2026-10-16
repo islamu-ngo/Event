@@ -1,0 +1,28 @@
+Change-Id: CHG-01M522BANMKNV76P2HTDYRA4WK
+Title: "detect undeclared native database privileges"
+Type: feat
+Scope: database
+Summary: "Provide closed, executable PostgreSQL contract assertions for role attributes, effective privileges, memberships and routine authority without granting or repairing permissions."
+Group: native-privilege-contract-assertions
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Provide source-declared, fail-closed native privilege assertions without granting permissions or normalizing drift; capability adoption and business authority remain separate.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

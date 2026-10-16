@@ -13,6 +13,16 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PostgresHumanWebhookResourceSourceContract projects fixed webhook resource
+lineage for a selected actor, tenant, operation, consumer kind and target. Its
+nonlogin owner reads declared columns only; original Runtime and Global sessions
+retain separate purpose/tenant rules. Serializable acquisition and compulsory
+contributor writers share a private epoch, including absent target ranges. Exact
+source, body, role, privilege, trigger and stamped tenant-policy admission rejects
+drift without repairing it. These are persisted resource facts, not provider
+receipts, delivery approval or authorization decisions. Production installation
+and verified managed consumers remain separate work.
+
 PostgresHumanEventAssignmentSourceContract projects fixed assignment and team
 facts for a selected actor, tenant and at most 128 event identifiers. Serializable
 acquisition and compulsory contributor writers share a dedicated epoch, including

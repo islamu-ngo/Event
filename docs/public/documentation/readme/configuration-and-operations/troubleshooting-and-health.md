@@ -14,6 +14,13 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+The native webhook resource prerequisite reads declared resource lineage under
+the original enrolled database session. Acquisition excludes concurrent changes
+to its contributor set, including new rows, and admission refuses catalog or
+function drift. Resource facts do not authorize delivery, replay or configuration
+changes and do not replace provider receipts. Production installation and verified
+managed consumers are still required before relying on this protection.
+
 The native event-assignment prerequisite returns declared assignment/team facts
 for a selected tenant and bounded event list. Its acquisition excludes concurrent
 contributor writes, including newly inserted assignments. Installation also adds

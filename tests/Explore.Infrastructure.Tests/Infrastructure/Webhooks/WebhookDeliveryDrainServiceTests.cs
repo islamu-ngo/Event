@@ -20,6 +20,22 @@ namespace Explore.Infrastructure.Tests.Infrastructure.Webhooks;
 public sealed class WebhookDeliveryDrainServiceTests
 {
     [Test]
+    public async Task ProcessBatchAsync_WhenConnectionPolicyRejects_DoesNotScheduleRetry()
+    {
+        var handler = new RecordingMessageHandler(_ =>
+            throw new HttpRequestException("Connection rejected.",
+                new Explore.Infrastructure.Http.OutboundEndpointDeniedException("private_network_blocked")));
+        var fixture = new Fixture(handler);
+        fixture.ConfigureTargetClaim(CreateTargetClaim());
+
+        var result = await fixture.Service.ProcessBatchAsync(CancellationToken.None);
+
+        await Assert.That(result.SucceededCount).IsEqualTo(0);
+        await Assert.That(fixture.LastTargetClaim!.Target.DeliveryStatus)
+            .IsEqualTo(WebhookLocalDeliveryStatus.Abandoned);
+    }
+
+    [Test]
     public async Task ProcessBatchAsync_WhenPrimaryTargetIsPending_DrainsImmutableTarget()
     {
         var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));

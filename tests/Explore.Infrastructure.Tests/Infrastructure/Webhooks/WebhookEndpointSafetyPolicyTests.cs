@@ -67,6 +67,22 @@ public sealed class WebhookEndpointSafetyPolicyTests
         await Assert.That(result.FailureCategory).IsEqualTo("cloud_metadata_blocked");
     }
 
+    [Test]
+    [Arguments("http://169.254.169.254/latest/meta-data")]
+    [Arguments("http://[::ffff:169.254.169.254]/latest/meta-data")]
+    [Arguments("http://[fd00:ec2::254]/latest/meta-data")]
+    [Arguments("http://100.100.100.200/latest/meta-data")]
+    public async Task ValidateAsync_WhenPrivateBlockingDisabled_StillRejectsMetadata(string url)
+    {
+        var policy = CreatePolicy(new WebhookOptions
+        {
+            Local = new WebhookLocalOptions { BlockPrivateNetworks = false }
+        });
+        var result = await policy.ValidateAsync(new Uri(url), CancellationToken.None);
+        await Assert.That(result.IsAllowed).IsFalse();
+        await Assert.That(result.FailureCategory).IsEqualTo("cloud_metadata_blocked");
+    }
+
     private static WebhookEndpointSafetyPolicy CreatePolicy(WebhookOptions options) =>
         new(new StaticOptionsMonitor<WebhookOptions>(options));
 

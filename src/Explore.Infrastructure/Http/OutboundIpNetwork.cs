@@ -1,13 +1,13 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace Explore.Infrastructure.Webhooks;
+namespace Explore.Infrastructure.Http;
 
-internal sealed class WebhookIpNetwork
+internal sealed class OutboundIpNetwork
 {
     private readonly byte[] _networkBytes;
 
-    private WebhookIpNetwork(IPAddress networkAddress, int prefixLength)
+    private OutboundIpNetwork(IPAddress networkAddress, int prefixLength)
     {
         NetworkAddress = Normalize(networkAddress);
         PrefixLength = prefixLength;
@@ -17,7 +17,7 @@ internal sealed class WebhookIpNetwork
     public IPAddress NetworkAddress { get; }
     public int PrefixLength { get; }
 
-    public static bool TryParse(string? value, out WebhookIpNetwork? network)
+    public static bool TryParse(string? value, out OutboundIpNetwork? network)
     {
         network = null;
         if (string.IsNullOrWhiteSpace(value))
@@ -41,7 +41,7 @@ internal sealed class WebhookIpNetwork
             return false;
         }
 
-        network = new WebhookIpNetwork(address, prefixLength);
+        network = new OutboundIpNetwork(address, prefixLength);
         return true;
     }
 

@@ -335,12 +335,9 @@ public static class InfrastructureServicesRegistration
         {
             client.Timeout = TimeSpan.FromSeconds(15);
         })
-        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            ConnectTimeout = TimeSpan.FromSeconds(10)
-        });
+        .ConfigurePrimaryHttpMessageHandler(sp =>
+            sp.GetRequiredService<WebhookEndpointSafetyPolicy>()
+                .CreateHttpMessageHandler(TimeSpan.FromSeconds(10)));
         services.AddScoped<WebhookRegistrationProviderSubmissionSink>(sp => new WebhookRegistrationProviderSubmissionSink(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(WebhookRegistrationProviderSubmissionSink.HttpClientName),
             sp.GetRequiredService<Explore.Application.Contracts.Secrets.ISecretResolver>(),
@@ -446,12 +443,8 @@ public static class InfrastructureServicesRegistration
         .ConfigurePrimaryHttpMessageHandler(sp =>
         {
             var options = sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>().CurrentValue;
-            return new SocketsHttpHandler
-            {
-                AllowAutoRedirect = false,
-                ConnectTimeout = TimeSpan.FromSeconds(options.Local.ConnectTimeoutSeconds),
-                UseCookies = false
-            };
+            return sp.GetRequiredService<WebhookEndpointSafetyPolicy>()
+                .CreateHttpMessageHandler(TimeSpan.FromSeconds(options.Local.ConnectTimeoutSeconds));
         });
         services.AddScoped<ISvixWebhookClient, SvixWebhookClient>();
         services.AddScoped<WebhookProviderPublicationDispatcher>();

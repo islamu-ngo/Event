@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using Explore.Infrastructure.Http;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -459,6 +460,20 @@ public sealed class WebhookDeliveryDrainService(
                 null,
                 GetDurationMilliseconds(startedTimestamp),
                 retryable: true,
+                disableEndpointOnAbandon: true,
+                cancellationToken);
+        }
+        catch (Exception exception) when (OutboundEndpointDeniedException.Find(exception) is { } denied)
+        {
+            return await SettleTargetFailureAsync(
+                claim,
+                deliveryPolicy,
+                startedAt,
+                DateTimeOffset.UtcNow,
+                denied.FailureCategory,
+                null,
+                GetDurationMilliseconds(startedTimestamp),
+                retryable: false,
                 disableEndpointOnAbandon: true,
                 cancellationToken);
         }

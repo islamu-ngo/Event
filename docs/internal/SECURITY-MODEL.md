@@ -612,7 +612,20 @@ Outgoing LocalProvider endpoints are user-configured URLs, so delivery is an SSR
 
 - Block loopback, localhost, RFC1918/private, link-local, metadata, and internal DNS destinations by default.
 - Allow private CIDRs only through explicit operator configuration for deliberate self-hosted/internal delivery.
-- Disable redirects and use bounded connect/request timeouts.
+- Both Local delivery and registration-provider webhook submission use
+  `VettedAddressConnector`: resolve the complete connection-time A/AAAA set,
+  reject any forbidden answer, then connect to a vetted literal address.
+  Preserve the original hostname for TLS certificate validation, SNI and HTTP
+  Host; the socket never performs another hostname lookup.
+- Disable redirects, cookies and proxies and bound connect/request timeouts.
+  Do not reuse connections across requests: changed DNS answers and operator
+  policy must be checked before the next body or signature handoff.
+- Metadata addresses and hostnames remain denied even when private-network
+  blocking is disabled or broad private CIDRs are permitted. Normalize
+  IPv4-mapped IPv6 before applying the address policy.
+- Connection-policy rejection abandons Local delivery without scheduling retry.
+  Registration submission reports `PermanentBeforeHandoff` with the fixed
+  `provider_endpoint_blocked` code rather than a retryable transport error.
 - Sign LocalProvider requests with Svix-compatible `svix-id`, `svix-timestamp`, and `svix-signature` headers over the raw body.
 - Store endpoint signing material through secret refs and rotate through the endpoint rotation route; never return old or current secret material after the allowed one-time reveal path.
 - Health checks and metrics may report provider mode, queue counts, bounded failure categories, and secret-resolution booleans only. They must not expose endpoint URLs, query strings, payload JSON, secret refs, tokens, authorization headers, full responses, or raw transport exceptions.

@@ -20,6 +20,35 @@ namespace Explore.Infrastructure.Tests.Registration.SubmissionSinks;
 public sealed class RegistrationProviderSubmissionSinkAdapterTests
 {
     [Test]
+    public async Task WebhookConnectionPolicyDenialIsPermanentBeforeHandoff()
+    {
+        var secrets = Substitute.For<ISecretResolver>();
+        secrets.ResolveTenantBindingAsync(TenantId, WebhookSecretBindingId, Arg.Any<CancellationToken>())
+            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
+                "webhook", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+                SecretSourceType.EnvironmentVariable, SecretScope.Tenant, TenantId, DateTimeOffset.UtcNow)));
+        using var client = new HttpClient(new PolicyDeniedHandler());
+        var options = Options.Create(new WebhookOptions()).ToMonitor();
+        var sink = new WebhookRegistrationProviderSubmissionSink(
+            client, secrets, new WebhookEndpointSafetyPolicy(options), options);
+
+        var rejected = await Assert.ThrowsAsync<RegistrationProviderSubmissionDeliveryException>(() =>
+            sink.AcceptAsync(Request(WebhookRegistrationProviderSubmissionSink.SupportedTuple,
+                Guid.CreateVersion7(), "https://93.184.216.34/registration"), CancellationToken.None));
+
+        await Assert.That(rejected!.FailureKind)
+            .IsEqualTo(RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff);
+        await Assert.That(rejected.FailureCode).IsEqualTo("provider_endpoint_blocked");
+    }
+
+    private sealed class PolicyDeniedHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("Connection rejected.",
+                new Explore.Infrastructure.Http.OutboundEndpointDeniedException("private_network_blocked"));
+    }
+
+    [Test]
     public async Task CsvSinkStoresStableSubmissionFileAndMetadata()
     {
         await using var environment = await StorageTestEnvironment.CreateAsync();
@@ -55,6 +84,7 @@ public sealed class RegistrationProviderSubmissionSinkAdapterTests
     [Test]
     public async Task WebhookSinkUsesSafeEndpointSecretSignatureAndNoUrlInPayload()
     {
+        const string endpoint = "https://93.184.216.34/registration";
         Guid submissionId = Guid.CreateVersion7();
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Accepted));
         var secrets = Substitute.For<ISecretResolver>();
@@ -62,16 +92,16 @@ public sealed class RegistrationProviderSubmissionSinkAdapterTests
         var sink = new WebhookRegistrationProviderSubmissionSink(
             new HttpClient(handler),
             secrets,
-            new WebhookEndpointSafetyPolicy(Options.Create(new WebhookOptions { Local = { BlockPrivateNetworks = false } }).ToMonitor()),
+            new WebhookEndpointSafetyPolicy(Options.Create(new WebhookOptions()).ToMonitor()),
             Options.Create(new WebhookOptions()).ToMonitor());
 
-        await sink.AcceptAsync(Request(WebhookRegistrationProviderSubmissionSink.SupportedTuple, submissionId), CancellationToken.None);
+        await sink.AcceptAsync(Request(WebhookRegistrationProviderSubmissionSink.SupportedTuple, submissionId, endpoint), CancellationToken.None);
 
         string body = handler.Body!;
         await Assert.That(handler.Request.Headers.GetValues("Idempotency-Key").Single()).IsEqualTo(submissionId.ToString("N"));
         await Assert.That(handler.Request.Headers.GetValues("X-Islamu-Signature").Single()).StartsWith("sha256=");
         await Assert.That(body).Contains("approved.email");
-        await Assert.That(body).DoesNotContain("https://webhook.example.test");
+        await Assert.That(body).DoesNotContain(endpoint);
         await Assert.That(body).DoesNotContain("blocked@example.test");
     }
 
@@ -79,7 +109,10 @@ public sealed class RegistrationProviderSubmissionSinkAdapterTests
     private static readonly Guid ApiSecretBindingId = Guid.CreateVersion7();
     private static readonly Guid WebhookSecretBindingId = Guid.CreateVersion7();
 
-    private static RegistrationProviderSubmissionSinkRequest Request(RegistrationProviderTuple tuple, Guid submissionId)
+    private static RegistrationProviderSubmissionSinkRequest Request(
+        RegistrationProviderTuple tuple,
+        Guid submissionId,
+        string webhookEndpoint = "https://webhook.example.test/registration")
     {
         RegistrationProviderConnection connection = RegistrationProviderConnection.Create(
             TenantId,
@@ -91,8 +124,8 @@ public sealed class RegistrationProviderSubmissionSinkAdapterTests
             tuple.ApiVersion,
             tuple.AdapterPolicyVersion,
             tuple.ConformanceEvidenceRevision,
-            tuple.ProviderCode == "GOOGLE_SHEETS" ? "https://sheets.googleapis.com/v4" : "https://webhook.example.test",
-            "https://webhook.example.test/registration",
+            tuple.ProviderCode == "GOOGLE_SHEETS" ? "https://sheets.googleapis.com/v4" : new Uri(webhookEndpoint).GetLeftPart(UriPartial.Authority),
+            webhookEndpoint,
             tuple.ProviderCode == "EXCEL_COMPATIBLE" ? StorageProviders.Local : "Sheet1!A:ZZ",
             ApiSecretBindingId,
             WebhookSecretBindingId,

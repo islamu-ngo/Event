@@ -348,6 +348,23 @@ These variables are optional and apply when using external Cerbos authorization 
 
 ## 11. Advanced Outgoing Webhooks (Svix Infrastructure)
 
+### Local webhook destination policy
+
+Local delivery and registration-provider webhook submission check every DNS
+answer immediately before opening a connection. One forbidden answer rejects
+the whole set before sending a body or signature. The connector uses an approved
+literal address while retaining the original hostname for TLS validation.
+
+Private destinations are blocked by default. Configure deliberate internal
+delivery through `Webhooks:Local:AllowedPrivateCidrs`; the broader
+`Webhooks:Local:BlockPrivateNetworks=false` option still cannot authorize cloud
+metadata addresses or metadata hostnames. Redirects, cookies and system proxies
+are disabled. Connections are not reused across requests so updated DNS and
+policy apply at the next handoff; expect the additional connection/TLS cost.
+Connection-policy denial is permanent for Local delivery and
+`PermanentBeforeHandoff` for registration submission. Correct the destination
+or operator policy instead of retrying the unchanged blocked target.
+
 Optional dials when operating the `webhooks` Compose profile with self-hosted Svix:
 
 | Variable | Status | Default | Description |

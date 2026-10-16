@@ -14,6 +14,15 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+The native event-assignment prerequisite returns declared assignment/team facts
+for a selected tenant and bounded event list. Its acquisition excludes concurrent
+contributor writes, including newly inserted assignments. Installation also adds
+the mandatory AI exact-event target reader, restricted to persisted instance
+administrators and a requested event outside the selected tenant. Target discovery
+does not authorize moderation; administrator continuity still requires the parent
+principal lease. Production installation and verified managed consumers remain
+necessary before relying on this protection.
+
 The native administrator-authority prerequisite checks persisted instance or
 tenant administrator state on the original enrolled Serializable session. It
 locks the account, binding and authority contributors rather than trusting role

@@ -13,6 +13,19 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PostgresHumanEventAssignmentSourceContract projects fixed assignment and team
+facts for a selected actor, tenant and at most 128 event identifiers. Serializable
+acquisition and compulsory contributor writers share a dedicated epoch, including
+empty assignment ranges. ApplyAsync installs the assignment capability and the
+mandatory AI moderation proposal target capability in the same original migration
+transaction; the latter reuses that epoch for one exact cross-tenant event.
+AI target discovery requires a current persisted platform.admin account and an
+original Runtime tenant, rejects selected-tenant/deleted/missing targets, and does
+not itself grant moderation authority. Administrator continuity through commit is
+owned by the preceding principal lease, not by the assignment epoch. Exact source,
+body, privilege, trigger and stamped tenant-policy admission rejects drift.
+Production registration and managed-consumer wiring remain separate work.
+
 PostgresHumanAdministratorCommitAuthorityContract supplies fixed boolean
 instance-administrator, tenant-administrator and subject-continuity fences. It
 borrows the enrolled business owner's original Serializable transaction. The

@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Production Identity composition now captures the configured local password
+blocklist and selects the normalized native hasher. A missing or invalid snapshot
+blocks local credential mutation. Readiness also fails when local authentication
+is primary or no provider has been selected; external-provider deployments do
+not fail readiness solely for an absent local snapshot. Configure the hierarchical
+Authentication:Local options; flat environment-key wiring is a separate step.
+
 Local credential requests apply consistent Unicode-aware length rules. Login
 and current-password fields permit shorter existing credentials; new passwords
 use the 15..128 normalized-character policy. Supplementary characters count

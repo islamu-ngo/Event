@@ -145,6 +145,8 @@ public static class PersistenceServicesRegistration
         LocalIdentityOptions localIdentityOptions =
             configuration.GetSection(LocalIdentityOptions.SectionName).Get<LocalIdentityOptions>()
             ?? new LocalIdentityOptions();
+        string? primaryProvider = configuration.GetSection(AuthenticationProviderDeploymentOptions.SectionName)
+            .Get<AuthenticationProviderDeploymentOptions>()?.GetProvider();
         IdentityBuilder identityBuilder = services.AddIdentityCore<LocalIdentityUser>(options =>
             {
                 options.User.RequireUniqueEmail = false;
@@ -152,7 +154,7 @@ public static class PersistenceServicesRegistration
                 options.Lockout.MaxFailedAccessAttempts = localIdentityOptions.LockoutThreshold;
                 options.Lockout.DefaultLockoutTimeSpan =
                     TimeSpan.FromMinutes(localIdentityOptions.LockoutDurationMinutes);
-                options.Password.RequiredLength = LocalIdentityOptions.MinimumPasswordLength;
+                options.Password.RequiredLength = 1;
                 options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireDigit = false;
                 options.Password.RequireLowercase = false;
@@ -161,6 +163,8 @@ public static class PersistenceServicesRegistration
             })
             .AddRoles<LocalIdentityRole>()
             .AddUserValidator<OptionalEmailLocalIdentityUserValidator>();
+        services.AddLocalPasswordPolicy(localIdentityOptions,
+            required: primaryProvider is null or AuthenticationProviderDeploymentOptions.LocalProvider);
 
         IdentityDatabaseTopology identityTopology = IdentityDatabaseConfiguration.GetTopology(configuration);
         if (identityTopology == IdentityDatabaseTopology.External)

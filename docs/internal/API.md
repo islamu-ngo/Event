@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+ConfigurePersistenceServices now attaches AddLocalPasswordPolicy after native
+Identity registration. The shared validator replaces composition-based password
+checks, and the normalized IdentityV3 hasher uses the configured work factor.
+Missing/unusable blocklist capture makes readiness unhealthy when the primary
+provider is local or not yet selected; external-provider readiness does not fail
+solely for absent local policy, but local credential mutation still fails closed.
+The startup tests invoke production composition without opening a database.
+Flat environment-key catalogue/normalization and lifecycle-store integration
+remain separate; hierarchical Authentication:Local configuration is bound here.
+
 LocalPasswordAttribute and manually instantiated request validators now use the
 same domain normalization policy. Login and current-password checks use the
 verification shape, while onboarding, replacement, password change and recovery

@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Report submission receipts can retain the original case version and payload
+digest even after moderation advances the case. Mismatched, already changed or
+previously bound submissions are rejected without replacing their receipt.
+These domain guards do not enable provider synchronization until persistence and
+publication integration are complete.
+
 Paid-event evaluation can retain the persisted policy identity and version
 when reconstructing policy values, so evaluations do not silently receive a new
 policy identity. Existing policy normalization remains in force. This domain

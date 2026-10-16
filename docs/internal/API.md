@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+EventReport.RetainProviderSubmission binds one original provider submission
+tuple: outbox ID, case ID, historical case concurrency stamp, UTC report creation
+time and uppercase SHA-256 payload digest. Only an unchanged Submitted report
+and its unchanged Open case with matching tenant/report identity can bind.
+Validation precedes assignment of every field, preventing partial custody. Later
+case version changes do not rewrite the historical tuple. Persistence mappings,
+generated migrations and provider publication consumers remain required.
+
 PaidEventPolicyVersion.RestoreActiveForPolicyEvaluation reconstructs an active
 evaluation aggregate with its stored policy ID, scope and positive version. It
 uses the same organizer, currency, refund-protection and risk-limit normalization

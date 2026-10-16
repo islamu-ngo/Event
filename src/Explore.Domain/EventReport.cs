@@ -92,7 +92,40 @@ public class EventReport : ITenantEntity, IAuditableEntity, ISoftDeletable, ICon
     public Guid? DeletedBy { get; set; }
     public Guid ConcurrencyStamp { get; set; }
 
+    /// <summary>
+    /// Submission custody is captured once before the report and its outbox are committed.
+    /// The retained case version remains historical when later case changes rotate its stamp.
+    /// </summary>
+    public Guid? ProviderSyncOutboxId { get; private set; }
+    public Guid? ProviderSyncCaseId { get; private set; }
+    public Guid? ProviderSyncCaseConcurrencyStamp { get; private set; }
+    public DateTime? ProviderSyncSubmittedAtUtc { get; private set; }
+    public string? ProviderSyncPayloadDigest { get; private set; }
+
     public bool IsTerminal => IsTerminalStatus(Status);
+
+    public void RetainProviderSubmission(Guid outboxId, EventReportCase reportCase, string payloadDigest)
+    {
+        ArgumentNullException.ThrowIfNull(reportCase);
+        ArgumentException.ThrowIfNullOrEmpty(payloadDigest);
+        EventReportGuards.RequireGuid(outboxId, nameof(outboxId), "Submission outbox id is required.");
+        if (ProviderSyncOutboxId.HasValue
+            || Status != EventReportStatus.Submitted || UpdatedAt.HasValue
+            || reportCase.TenantId != TenantId || reportCase.ReportId != Id
+            || reportCase.Status != EventReportCaseStatus.Open || reportCase.UpdatedAt.HasValue
+            || reportCase.ConcurrencyStamp == Guid.Empty
+            || CreatedAt == default || CreatedAt.Kind != DateTimeKind.Utc
+            || payloadDigest.Length != 64 || !payloadDigest.All(char.IsAsciiHexDigitUpper))
+        {
+            throw new InvalidOperationException("event_report_submission_custody_invalid");
+        }
+
+        ProviderSyncOutboxId = outboxId;
+        ProviderSyncCaseId = reportCase.Id;
+        ProviderSyncCaseConcurrencyStamp = reportCase.ConcurrencyStamp;
+        ProviderSyncSubmittedAtUtc = CreatedAt;
+        ProviderSyncPayloadDigest = payloadDigest;
+    }
 
     public static EventReport Create(
         Guid tenantId,

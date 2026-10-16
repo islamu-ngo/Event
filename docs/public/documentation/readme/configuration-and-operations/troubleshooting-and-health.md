@@ -409,6 +409,23 @@ boundaries.
 
 ---
 
+## Inventory Hold Expiry
+
+Run application migrations before enabling hold-expiry jobs so the PostgreSQL
+identity-only discovery function and Global executor enrollment exist. Global
+discovery must not receive private business-table grants.
+
+Each sweep discovers at most 100 due holds and 100 interrupted recoveries.
+Each order runs in a fresh Runtime scope bound to its original tenant before
+inventory and lifecycle services are resolved. A scheduled pointer cannot
+retarget an existing request or reuse another tenant's database context.
+
+If discovery fails closed, repair the declared grants and source policies rather
+than granting Global broad reads. If work remains after an interruption, rerun the
+reconciliation sweep: expiry is conditional, payment ambiguity is preserved and
+lifecycle recovery can complete previously expired holds without expiring live
+or foreign-tenant work.
+
 ## Related Guides & Next Steps
 
 If `tenant_lease_identity_changed` rejects an operation, create a fresh database

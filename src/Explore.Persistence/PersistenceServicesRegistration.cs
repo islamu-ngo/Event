@@ -84,6 +84,8 @@ public static class PersistenceServicesRegistration
             var runtimeDatabase = PrimaryDatabaseConfiguration.BuildConnectionString(runtimeDatabaseOptions);
             applicationConnectionString = runtimeDatabase.ConnectionString;
             applicationProvider = runtimeDatabase.Provider;
+            services.TryAddSingleton<ITenantExploreDbContextFactory>(
+                new TenantExploreDbContextFactory(runtimeDatabaseOptions));
             applicationRuntimeOptions = runtimeDatabaseOptions;
 
             var globalDatabaseOptions = PrimaryDatabaseConfiguration.BindGlobal(configuration);
@@ -124,6 +126,8 @@ public static class PersistenceServicesRegistration
             // This follows EF Core's recommended pattern for pooled contexts with scoped dependencies
             services.AddScoped(sp =>
             {
+                if (InventoryHoldExpiryExecutionScopeFactory.GetSelectedRuntimeContext(sp) is { } selected)
+                    return selected;
                 var factory = sp.GetRequiredService<IDbContextFactory<ExploreDbContext>>();
                 var context = factory.CreateDbContext();
 
@@ -324,6 +328,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IParticipationRequirementAttachmentRepository, ParticipationRequirementAttachmentRepository>();
         services.AddScoped<IEventTicketCatalogRepository, EventTicketCatalogRepository>();
         services.AddScoped<IRegistrationInventoryRepository, RegistrationInventoryRepository>();
+        services.AddInventoryHoldExpiryWorker();
         services.AddScoped<IGuestRegistrationCapabilityRepository, GuestRegistrationCapabilityRepository>();
         services.AddScoped<IEventAddOnRepository, EventAddOnRepository>();
         services.AddScoped<TicketingRecoveryRepository>();

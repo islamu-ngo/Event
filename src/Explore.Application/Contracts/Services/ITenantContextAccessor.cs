@@ -8,5 +8,8 @@ public interface ITenantContextAccessor
 
     void SetTenant(Guid tenantId);
 
+    /// <summary>Binds immutable child-execution facts without changing the ambient HTTP request.</summary>
+    void BindExecutionTenant(Guid tenantId);
+
     void Clear();
 }

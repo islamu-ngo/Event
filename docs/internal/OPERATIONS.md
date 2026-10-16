@@ -219,6 +219,27 @@ This page is the operational reference for implemented runtime behavior. Task pr
 
 Reconciliation claims at most 50 rows in stable `next_attempt_at/created_at/id` order through `ix_payment_reconciliation_effects_worker_poll`; the PostgreSQL path claims one batch in one command, provider reads occur after claims, and each decision settles separately. `explore.payments.checkout_activation` emits only `allowed|blocked` outcomes and closed `reason_category` values. Logs and metrics never contain buyer contacts, acceptance text, account IDs, or provider payloads.
 
+## Inventory Hold Expiry
+
+`AddInventoryHoldExpiryWorker` separates bounded fleet discovery from mutation.
+Global discovery exports only `(TenantId, OrderId, HoldId)` pointers: up to 100
+due holds and 100 interrupted order recoveries per sweep, not one shared 100-row
+limit. PostgreSQL exposes this through the declared execute-only discovery
+function; portable providers retain identity-only Global queries.
+
+Both deadline and reconciliation jobs acquire a fresh tenant-selected Runtime
+scope before resolving inventory or lifecycle services. The scoped hold-expiry
+lease supplies that same context to downstream repositories. Execution tenant
+binding is immutable: changing or clearing it fails, as does retargeting an
+already-bound null or different context lease.
+
+Discovery does not authorize a write. `TryExpireDueHoldAsync` retains its lock,
+payment-ambiguity checks and conditional expiry; `RecoverExpiredHoldAsync`
+completes an interrupted lifecycle transition. Replay preserves already-settled
+holds, live holds and foreign-tenant work. Apply the PostgreSQL discovery contract
+after forced RLS, using distinct declared Migrator, Global and Runtime identities;
+do not grant business-table reads to Global.
+
 ## Operational Runbooks
 
 | Task | Runbook | Use When |

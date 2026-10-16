@@ -135,6 +135,8 @@ public partial class ExploreDbContext
                 foreach (var carrier in group)
                     CollectStorageReference(references, carrier.Entry, carrier.Property, persisted);
             }
+            if (references.Count == 0)
+                return await persist();
             var sources = await StorageReferenceSources(references.Keys).ToListAsync(cancellationToken);
             ValidateMissingStorageReferences(references, sources);
             await FenceStorageReferenceRowsAsync(sources, cancellationToken);

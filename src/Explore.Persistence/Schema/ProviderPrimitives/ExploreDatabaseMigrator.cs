@@ -135,6 +135,8 @@ public static class ExploreDatabaseMigrator
             await PostgresTenantRowLevelSecurityModel.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresRefundReconciliationHealthContract.ApplyAsync(
                 executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
+            await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(
+                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
         }
     }
 

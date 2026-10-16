@@ -9,6 +9,7 @@ public class TenantContextAccessor : ITenantContextAccessor
 
     private readonly IHttpContextAccessor _httpContextAccessor;
     private Guid? _tenantId;
+    private Guid? _executionTenantId;
 
     public TenantContextAccessor(IHttpContextAccessor httpContextAccessor)
     {
@@ -19,6 +20,8 @@ public class TenantContextAccessor : ITenantContextAccessor
     {
         get
         {
+            if (_executionTenantId is { } executionTenant)
+                return executionTenant;
             var httpContext = _httpContextAccessor.HttpContext;
             if (httpContext?.Items.TryGetValue(TenantIdItemKey, out var value) == true && value is Guid tenantId && tenantId != Guid.Empty)
             {
@@ -33,6 +36,8 @@ public class TenantContextAccessor : ITenantContextAccessor
 
     public void SetTenant(Guid tenantId)
     {
+        if (_executionTenantId.HasValue)
+            throw new InvalidOperationException("Execution tenant facts cannot be replaced by ambient request facts.");
         if (tenantId == Guid.Empty)
         {
             return;
@@ -47,8 +52,18 @@ public class TenantContextAccessor : ITenantContextAccessor
         }
     }
 
+    public void BindExecutionTenant(Guid tenantId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
+        if (_executionTenantId.HasValue)
+            throw new InvalidOperationException("Execution tenant facts are single-assignment.");
+        _executionTenantId = tenantId;
+    }
+
     public void Clear()
     {
+        if (_executionTenantId.HasValue)
+            throw new InvalidOperationException("Execution tenant facts cannot be cleared.");
         _tenantId = null;
 
         var httpContext = _httpContextAccessor.HttpContext;

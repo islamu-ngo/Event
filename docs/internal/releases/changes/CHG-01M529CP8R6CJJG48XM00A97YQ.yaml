@@ -1,0 +1,32 @@
+Change-Id: CHG-01M529CP8R6CJJG48XM00A97YQ
+Title: "Isolate inventory expiry work by its original tenant"
+Type: fix
+Scope: access
+Summary: "Discover bounded identity-only fleet pointers through Global authority, then construct each hold-expiry execution graph inside a fresh immutable tenant Runtime scope."
+Group: inventory-hold-expiry-tenant-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Install the PostgreSQL hold-expiry discovery function and its declared Global executor enrollment before enabling scheduled expiry.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Discovery grants no mutation authority; each order resolves inventory and lifecycle services only after immutable tenant selection.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Install identity-only hold discovery after forced tenant RLS using the declared Migrator, Global and Runtime enrollment.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Keep Global discovery independent of the ordinary Runtime pool and do not grant Global private-table reads.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Reconciliation discovers up to 100 due holds and 100 interrupted recoveries; existing conditional expiry and lifecycle recovery preserve replay safety.

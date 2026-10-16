@@ -35,6 +35,7 @@
     <!-- The combined host is the only topology where Blazor and the scheduler share a process, so it is the
          only project that may reference the dashboard. -->
     <PackageReference Include="Quartz.Dashboard" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 
   <Target Name="PublishStandaloneConfiguration" AfterTargets="ComputeResolvedFilesToPublishList">

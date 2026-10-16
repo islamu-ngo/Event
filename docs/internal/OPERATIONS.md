@@ -2265,6 +2265,18 @@ the pass. Acquisition does not install or repair the discovery capability.
 
 For an IntegrationSync row reported as ambiguous by `/health` under `queue-drains`, establish provider evidence before acting. Use the tenant-authenticated `POST /api/integrations/listmonk/queue/{outboxId}/resolve` endpoint with an opaque incident/evidence reference. `ConfirmAccepted` settles without replay; `RetryDefinitelyNotAccepted` schedules a retry only after proof the provider did not accept the POST; `DeadLetter` preserves the terminal refusal. Never select retry from timeout or response-loss evidence alone.
 
+#### Scheduler diagnostic confidentiality
+
+Scheduler failure logs retain fixed categories: `scheduled_job_failed`,
+`telemetry_listener_failed`, `scheduler_unavailable` and
+`unknown_scheduled_job`. They omit job/group identities and runtime exception
+subtypes. Default scheduler-control diagnostics retain the closed action token,
+target category and outcome, not operator identity, job keys or caller correlation.
+The full `SchedulerAdminAuditRecord` remains available to a separately registered
+access-controlled audit sink. Metrics retain their existing vocabulary.
+Listener elapsed time uses the injected `TimeProvider` timestamp clock;
+deterministic tests advance that clock without sleeping.
+
 #### Discovery snapshot retention
 
 Apply the current provider's `EventDiscoveryTraversal` migration, then run normal

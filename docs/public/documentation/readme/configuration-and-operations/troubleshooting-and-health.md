@@ -318,6 +318,13 @@ The SMTP readiness probe and instance connection test use **instance SMTP settin
 
 The `email-dispatch` check is `Healthy` when its worker is intentionally disabled. A selected but disabled scheduler is `Degraded`, while failures reading the dispatch database remain `Unhealthy`. HTTP 200 alone does not confirm that email can be delivered.
 
+Scheduler failure diagnostics use fixed categories rather than job keys or
+provider exception details. `scheduler_unavailable` leaves deadline registration
+unscheduled and cancellation unsuccessful, preserving the existing sweep fallback.
+Default scheduler-control logs omit operator identity and caller correlation;
+deploy a separate access-controlled scheduler audit sink if identity-bearing
+accountability records are required.
+
 When delivery is disabled or its configuration is unavailable, optional notifications
 are recorded as skipped rather than kept for a later flood of email. In-app delivery
 continues. Required email can be parked while its delivery requirements are unavailable;

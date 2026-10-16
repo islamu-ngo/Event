@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Registration creation evidence can outlive account, order or HTTP-response
+cleanup without retaining request or credential payloads. Replay identity stays
+bound to the original tenant, account, principal scope and operation key; a new
+account or scope cannot reuse that identity. This domain receipt alone does not
+enable replay handling; persistence retention and creation admission integration
+remain required.
+
 The dedicated Keycloak lifecycle client uses a minimal service-account grant:
 realm-management/manage-users, without extra management/client or realm roles
 and with interactive grants disabled. The profile is pinned to 26.1.2. Checks on

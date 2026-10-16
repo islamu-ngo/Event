@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+RegistrationOrderCreationReceipt retains authenticated order-creation evidence
+independent of account, order and HTTP-response retention. Its operation
+fingerprint hashes the family discriminator, original tenant, account, trusted
+principal-scope digest and exact closed ASCII operation key. Digests normalize
+to lowercase; tenant attribution cannot change. The receipt contains identity
+digests rather than recoverable request or credential payloads. This domain
+primitive does not query a receipt or admit a replay: repository retention,
+generated persistence mappings and native creation admission remain required.
+
 KeycloakLifecycleGrantProfile defines the closed lifecycle-client grant
 contract for provider version 26.1.2: a confidential service-account client with
 interactive grants disabled, exactly realm-management/manage-users and no realm

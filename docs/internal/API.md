@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+PaidEventPolicyVersion.RestoreActiveForPolicyEvaluation reconstructs an active
+evaluation aggregate with its stored policy ID, scope and positive version. It
+uses the same organizer, currency, refund-protection and risk-limit normalization
+as normal creation, and rejects missing identity or an empty tenant. The
+restoration factory does not load or track persistence state; repository callers
+must supply verified active persisted facts, and mutations retain their separate
+tracked aggregate. Native reader integration remains a separate prerequisite.
+
 ConfigurationImportOperation binds one SHA-256 UTF-8 effect payload digest only
 after an applied or forward-rollback receipt has an outbox identity. Failed
 operations cannot bind it, and a second binding cannot replace the digest.

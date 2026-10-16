@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Paid-event evaluation can retain the persisted policy identity and version
+when reconstructing policy values, so evaluations do not silently receive a new
+policy identity. Existing policy normalization remains in force. This domain
+factory does not activate a policy or change payment configuration; persistence
+read integration remains required.
+
 Configuration effect receipts can retain an immutable publication identity or
 payload digest after successful application. Failed operations cannot claim such
 a receipt, and existing bindings cannot be replaced. These domain prerequisites

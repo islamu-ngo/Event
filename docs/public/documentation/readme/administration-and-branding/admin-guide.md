@@ -191,6 +191,13 @@ retention zero removes existing rows on the next sweep. Subject erasure clears
 manager attribution without deleting shared event resources. Keep the scheduler
 enabled while retained audit data remains.
 
+On PostgreSQL, install the current audit-owner discovery capability before
+enabling cleanup. Discovery returns tenant identities only; every deletion batch
+uses that tenant's ordinary database authority and current retention policy.
+Suspended tenants remain eligible when they own audit rows. A missing capability
+or invalid policy fails cleanup visibly; restore the declared authority or
+policy rather than granting broad Global access to private audit data.
+
 ### Resource-policy deployment activation (operator API)
 
 Remote event-resource policies use a deployment-level activation fence. This

@@ -222,11 +222,10 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await Assert.That(await context.StorageObjects.IgnoreQueryFilters().AnyAsync(item => item.Id == objectId)).IsFalse();
         await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
 
-        var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
-        governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(EventResourceGovernancePolicy.Default(long.MaxValue));
-        var retention = new EventResourceAuditRetentionService(new EventResourceAuditRetentionRepository(context),
-            governance, unit, clock);
+        var retentionFactory = new EventResourceAuditRetentionManualContextFactory(() => database.CreateContext());
+        var retention = new EventResourceAuditRetentionService(
+            new EventResourceAuditOwnerDiscoveryRepository(retentionFactory),
+            new Explore.Persistence.Services.EventResourceAuditRetentionExecutionScopeFactory(retentionFactory), clock);
         await retention.CleanupAsync(default);
         var auditAfterExpiry = await context.EventResourceAuditEntries.AsNoTracking()
             .SingleAsync(item => item.EventResourceId == resource.Id);

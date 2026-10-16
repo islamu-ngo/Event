@@ -1,11 +1,12 @@
-using Explore.Application.Contracts.Services;
+using Explore.Persistence.Services;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Services;
 using Explore.Domain;
-using Explore.Domain.ValueObjects;
+using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -27,19 +28,20 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
         await using (var seed = database.CreateContext())
         {
             seed.AddRange(first, second, expired, retained, disabled);
+            seed.TenantSettingOverrides.Add(new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantBId,
+                Tenant = null!,
+                SettingKey = GovernanceSettingKeys.EventResources.AuditRetentionDays,
+                Value = "0"
+            });
             await seed.SaveChangesAsync();
         }
-        var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
-        governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            var policy = EventResourceGovernancePolicy.Default(long.MaxValue);
-            return EventResourceGovernancePolicy.Create(policy.EnabledDeliveryTypes, policy.EnabledAudiences,
-                policy.PermittedFileTypes, policy.MaxUploadBytes, false, [],
-                call.Arg<Guid>() == scope.TenantBId ? 0 : 30, policy.MaxActiveResources, long.MaxValue);
-        });
-        await using var context = database.CreateContext();
-        var repository = new EventResourceAuditRetentionRepository(context);
-        var service = new EventResourceAuditRetentionService(repository, governance, new EfCoreUnitOfWork(context), new Clock());
+        var factory = new EventResourceAuditRetentionManualContextFactory(() => database.CreateContext());
+        var service = new EventResourceAuditRetentionService(
+            new EventResourceAuditOwnerDiscoveryRepository(factory),
+            new EventResourceAuditRetentionExecutionScopeFactory(factory), new Clock());
         await Assert.That(await service.CleanupAsync(default)).IsEqualTo(2L);
         await using var verification = database.CreateContext();
         var remaining = await verification.Set<EventResourceAuditEntry>().AsNoTracking()
@@ -47,6 +49,38 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
         await Assert.That(remaining.Select(row => row.Id)).IsEquivalentTo([retained.Id]);
         await Assert.That(remaining.Single().ResponsibleManagerUserId).IsEqualTo(retained.ResponsibleManagerUserId);
         await Assert.That(await verification.EventResources.CountAsync(row => row.Id == first.Id || row.Id == second.Id)).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task ZeroRetentionContinuesAcrossFreshTenantDeleteBatches()
+    {
+        var scope = await database.SeedScopeAsync();
+        var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantBId, scope.EventBId);
+        var rows = Enumerable.Range(0, EventResourceAuditRetentionService.DeleteBatchSize + 1)
+            .Select(_ => Audit(resource, Now.AddDays(1))).ToArray();
+        await using (var seed = database.CreateContext())
+        {
+            seed.Add(resource);
+            seed.AddRange(rows);
+            seed.TenantSettingOverrides.Add(new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantBId,
+                Tenant = null!,
+                SettingKey = GovernanceSettingKeys.EventResources.AuditRetentionDays,
+                Value = "0"
+            });
+            await seed.SaveChangesAsync();
+        }
+        var factory = new EventResourceAuditRetentionManualContextFactory(() => database.CreateContext());
+        var service = new EventResourceAuditRetentionService(
+            new EventResourceAuditOwnerDiscoveryRepository(factory),
+            new EventResourceAuditRetentionExecutionScopeFactory(factory), new Clock());
+        await Assert.That(await service.CleanupAsync(default)).IsEqualTo(1001L);
+        await using var verification = database.CreateContext();
+        await Assert.That(await verification.Set<EventResourceAuditEntry>()
+            .CountAsync(row => row.EventResourceId == resource.Id)).IsEqualTo(0);
+        await Assert.That(await verification.EventResources.CountAsync(row => row.Id == resource.Id)).IsEqualTo(1);
     }
 
     [Test]
@@ -109,4 +143,27 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
     {
         public override DateTimeOffset GetUtcNow() => new(Now);
     }
+}
+
+internal sealed class EventResourceAuditRetentionManualContextFactory(Func<ExploreDbContext> createContext)
+    : IGlobalExploreDbContextFactory, ITenantExploreDbContextFactory
+{
+    public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(createContext());
+    }
+
+    public Task<ExploreDbContext> CreateDbContextAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var context = createContext();
+        context.ClearTenantFilterBypass();
+        context.TenantContext = new FixedTenant(tenantId);
+        context.BindTenantLease();
+        return Task.FromResult(context);
+    }
+
+    private sealed record FixedTenant(Guid TenantId) : ITenantContext;
 }

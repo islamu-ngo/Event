@@ -1,0 +1,31 @@
+Change-Id: CHG-01M52C19N4BXDGTZT4X25QZTRM
+Title: "Separate resource audit discovery from tenant retention execution"
+Type: fix
+Scope: access
+Summary: "Discover bounded audit owner identities through independent Global authority and apply current governance within fresh tenant Runtime deletion transactions."
+Group: resource-audit-retention-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Install the PostgreSQL audit-owner discovery capability before enabling cleanup.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Global discovery exposes only tenant identities; governance and deletion remain tenant Runtime work.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Install the bounded native discovery function after tenant RLS under declared migration authority.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Keep cleanup active for suspended owners; invalid governance fails without deleting audit evidence.

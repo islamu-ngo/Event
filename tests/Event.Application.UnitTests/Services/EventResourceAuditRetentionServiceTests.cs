@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
@@ -49,6 +50,16 @@ public sealed class EventResourceAuditRetentionServiceTests
         await Assert.That(fixture.Rows.Any(row => row.TenantId == tenants[^1])).IsFalse();
     }
 
+    [Test]
+    public async Task InvalidCurrentGovernanceFailsWithoutDeletingAuditEvidence()
+    {
+        var tenant = Guid.CreateVersion7();
+        var expired = Audit(tenant, Now.AddDays(-90));
+        var fixture = new Fixture([expired], new() { [tenant] = 30 }, invalidPolicy: true);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.CleanupAsync(default));
+        await Assert.That(fixture.Rows.Select(row => row.Id)).IsEquivalentTo([expired.Id]);
+    }
+
     private static EventResourceAuditEntry Audit(Guid tenant, DateTime occurredAt) =>
         EventResourceAuditEntry.Create(tenant, Guid.CreateVersion7(), Guid.CreateVersion7(),
             EventResourceAuditAction.UpdateMetadata, EventResourceAuditOutcome.Succeeded,
@@ -59,20 +70,16 @@ public sealed class EventResourceAuditRetentionServiceTests
         public List<EventResourceAuditEntry> Rows { get; }
         public EventResourceAuditRetentionService Service { get; }
 
-        public Fixture(IEnumerable<EventResourceAuditEntry> rows, Dictionary<Guid, int> retention)
+        public Fixture(IEnumerable<EventResourceAuditEntry> rows, Dictionary<Guid, int> retention,
+            bool invalidPolicy = false)
         {
             Rows = rows.ToList();
+            var owners = Substitute.For<IEventResourceAuditOwnerDiscoveryRepository>();
             var repository = Substitute.For<IEventResourceAuditRetentionRepository>();
-            repository.GetTenantsWithAuditAsync(Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            owners.GetTenantIdsWithAuditAsync(Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(call => Rows.Select(row => row.TenantId).Distinct().OrderBy(id => id)
                     .Where(id => call.Arg<Guid?>() is not { } cursor || id.CompareTo(cursor) > 0)
-                    .Take(call.Arg<int>()).Select(id => new Tenant
-                    {
-                        Id = id,
-                        FullName = "Audit tenant",
-                        Slug = $"audit-{id:N}",
-                        TenantStatus = null!
-                    }).ToArray());
+                    .Take(call.Arg<int>()).ToArray());
             repository.DeleteExpiredBatchAsync(Arg.Any<Guid>(), Arg.Any<DateTime?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(call =>
                 {
@@ -84,6 +91,7 @@ public sealed class EventResourceAuditRetentionServiceTests
             var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
             governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(call =>
             {
+                if (invalidPolicy) return null;
                 var defaults = EventResourceGovernancePolicy.Default(long.MaxValue);
                 return EventResourceGovernancePolicy.Create(defaults.EnabledDeliveryTypes, defaults.EnabledAudiences,
                     defaults.PermittedFileTypes, defaults.MaxUploadBytes, false, [], retention[call.Arg<Guid>()],
@@ -97,8 +105,22 @@ public sealed class EventResourceAuditRetentionServiceTests
                     ArgumentNullException.ThrowIfNull(operation);
                     return operation(call.Arg<CancellationToken>());
                 });
-            Service = new(repository, governance, unit, new Clock());
+            var factory = Substitute.For<IEventResourceAuditRetentionExecutionScopeFactory>();
+            factory.CreateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(_ => new ExecutionScope(repository, governance, unit));
+            Service = new(owners, factory, new Clock());
         }
+    }
+
+    private sealed class ExecutionScope(
+        IEventResourceAuditRetentionRepository repository,
+        IEventResourceGovernancePolicyReader governance,
+        IUnitOfWork unitOfWork) : IEventResourceAuditRetentionExecutionScope
+    {
+        public IEventResourceAuditRetentionRepository Repository { get; } = repository;
+        public IEventResourceGovernancePolicyReader Governance { get; } = governance;
+        public IUnitOfWork UnitOfWork { get; } = unitOfWork;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class Clock : TimeProvider

@@ -73,6 +73,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEmailRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEventResourceAuditRetentionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
         await using (var runtimeContext = CreateDbContextInternal(PrimaryDatabaseRole.Runtime))

@@ -2250,6 +2250,15 @@ manager, title or destination data in Quartz and uses the standard
 `Scheduled job {JobName} completed.` event. Keep the scheduler enabled until
 retained audit rows have expired or been purged.
 
+Owner discovery uses an independent Global context and returns only tenant IDs,
+including suspended tenants that still own audit rows. PostgreSQL requires
+`PostgresEventResourceAuditRetentionContract` after tenant RLS; its function
+owner reads only audit tenant keys and directory IDs. Global does not receive
+audit content or deletion authority. Each deletion batch creates a fresh
+ordinary Runtime tenant context, reads current governance and deletes within
+one serializable transaction. Invalid governance preserves evidence and fails
+the pass. Acquisition does not install or repair the discovery capability.
+
 `payment-reconciliation-drain` performs a dispatch/reconcile/dispatch pass. Missing or invalid `PublicBaseUrl` defers only new Checkout handoff; provider reconciliation still runs. Keep the scheduler enabled after disabling paid sales so retained attempts and late signed evidence can settle.
 
 `fair-return-orchestration` claims at most 10,000 effects per pass using stable cursor order and bounded round-robin tenant selection. Its Quartz payload may contain only `effect_id`; payment, refund, participant, provider payload, and bearer data remain durable and are never scheduled. The health check publishes fixed pending, processing, unknown, dead-letter, and oldest-age fields. Keep this job running after stopping new waitlist allocation so ambiguous replacement payments and refunds can reconcile forward.

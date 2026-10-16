@@ -431,6 +431,18 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
             parameters => parameters
                 .Add(component => component.Service, _service));
 
+    [Test]
+    public async Task NavigationClearsBothCredentialsBeforeAnotherOperation()
+    {
+        _service.GetKeycloakConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Connection("inspect"));
+        var cut = Render();
+        await SetCredentialsAsync(cut, Guid.CreateVersion7().ToString("N"), Guid.CreateVersion7().ToString("N"));
+        var navigation = _context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        await cut.InvokeAsync(() => navigation.NavigateTo("/different-operator-context"));
+        await Assert.That(CredentialValues(cut).All(string.IsNullOrEmpty)).IsTrue();
+    }
+
     private static async Task SetCredentialsAsync(
         IRenderedComponent<KeycloakOperatorPanel> cut,
         string username,

@@ -1,8 +1,11 @@
 @using Explore.Blazor.Client.Contracts.Services
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @using Explore.Blazor.Client.Services
+@using Microsoft.AspNetCore.Components.Routing
+@implements IDisposable
 @inject ITranslationService TranslationService
 @inject IAccessibilityAnnouncerService AccessibilityAnnouncer
+@inject NavigationManager Navigation
 
 <section class="keycloak-operator-panel"
          aria-labelledby="@HeadingId"
@@ -329,6 +332,7 @@
     private bool _loading = true;
     private bool _busy;
     private bool _ambiguousApplyFailure;
+    private bool _disposed;
 
     private bool HasCredentials =>
         !string.IsNullOrWhiteSpace(_administratorUsername)
@@ -390,8 +394,30 @@
             _ => Color.Info
         };
 
-    protected override Task OnInitializedAsync() =>
-        LoadConnectionAsync();
+    protected override Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        return LoadConnectionAsync();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        ClearCredentials();
+        ClearConfirmation();
+        _ = InvokeAsync(() =>
+        {
+            if (!_disposed)
+                StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Navigation.LocationChanged -= OnLocationChanged;
+        ClearCredentials();
+        ClearConfirmation();
+    }
 
     private async Task LoadConnectionAsync()
     {

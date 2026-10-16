@@ -821,6 +821,10 @@ not caller-supplied correlation headers.
 
 ## DI Registration
 
+The Keycloak operator component clears its administrator credential fields and
+apply confirmation on navigation and disposal. Disposal removes the navigation
+subscription; a queued navigation render checks disposal before updating UI.
+
 Fresh Keycloak administrator usernames and passwords are opaque request values.
 `KeycloakOperationApplyContext` rejects null or whitespace-only inputs but
 preserves every character of a valid pair for provider authentication. Do not

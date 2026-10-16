@@ -1,0 +1,29 @@
+Change-Id: CHG-01M521B7VKY096DVSKDET52FQG
+Title: "clear Keycloak credentials on navigation and disposal"
+Type: fix
+Scope: onboarding
+Summary: "Leaving the Keycloak operator component clears entered administrator credentials and apply confirmation without rendering after disposal."
+Group: keycloak-request-credential-lifetime
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: The Keycloak operator component clears fresh administrator credentials and apply confirmation on navigation and disposal and unsubscribes its navigation callback.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Returning after navigation requires fresh administrator credentials and a new apply confirmation.

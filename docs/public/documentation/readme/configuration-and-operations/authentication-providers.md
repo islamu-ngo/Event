@@ -137,6 +137,9 @@ email verified to work around sign-in failures.
 
 ## Safe Keycloak Connection And Inspection
 
+Leaving the Keycloak operator panel clears entered administrator credentials and
+apply confirmation. Re-enter them and confirm the operation again after returning.
+
 Freshly entered Keycloak administrator usernames and passwords are passed to
 Keycloak exactly as entered, including significant leading or trailing spaces.
 Empty or whitespace-only credentials are rejected rather than normalized.

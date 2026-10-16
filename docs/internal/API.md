@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+Managed webhook resource sources retain the original context, connection, human,
+selected tenant and closed command selector. Acquisition validates the source-set,
+principal and support leases before retaining provider locks; final reads use that
+same Serializable owner and see persisted writes rather than tracked changes.
+The pure projection resolves endpoint ownership and attempt/message/plan lineage
+without treating an audit identity, portal session or requested ID as authority.
+Immutable portal custody records retain provider evidence only. Production factory
+registration, provider-service release checks and final parent admission are
+separate consumers and remain required.
+
 PostgresNativeQueueEnrollment binds Migrator, Global, Runtime and the existing
 EmailPolicyInstanceMutation/EmailPolicyTenantMutation login authorities together.
 All five must be distinct PostgreSQL identifiers within the unchanged 63-byte,

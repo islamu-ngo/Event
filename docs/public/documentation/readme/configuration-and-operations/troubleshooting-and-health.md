@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Webhook resource checks bind persisted ownership and delivery lineage to the
+original request and transaction. Missing or changed parents cannot be replaced by
+tracked objects, audit identifiers or portal session values. These source
+primitives do not by themselves enable portal access or provider delivery; final
+request admission and provider release checks remain required.
+
 Native capability enrollment includes the existing email-policy instance and
 tenant mutation login identities as well as Migrator, Global and Runtime. Keep all
 five identities distinct; reusing one database login across those authorities is

@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+BoundProgrammeModelCandidates records the committed recovery model in generated
+migrations: refund dispatch ownership, AI execution identity and effect linkage,
+report synchronization custody, location correction messages and configuration
+effect references. Five regex columns widen from 1,000 to 2,048 characters.
+Generated defaults on historical rows do not reconstruct authenticated recovery
+authority. Existing rows require the native recovery policy, not inference from
+empty digests or zero identifiers. Down migration removes recovery evidence and
+narrows regex columns; it is not a safe operational rollback after new writes.
+
 ImportLocalizationBundleCommandHandler independently applies LocalizationBundlePolicy
 to direct command candidates before file effects. Import and TMS export handlers
 return fixed failure responses and log stable categories without attaching provider

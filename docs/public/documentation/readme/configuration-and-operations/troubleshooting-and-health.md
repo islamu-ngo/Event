@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Apply the generated programme model migrations before starting updated services.
+They add recovery evidence fields and widen custom-property regex storage.
+Back up the database first. Historical rows do not gain trustworthy recovery
+evidence from generated empty defaults. Do not downgrade after writing new recovery
+records: the Down migration removes those fields and narrows regex storage.
+Use a coordinated application/database backup restoration if rollback is required.
+
 Static bundle imports reject oversized or invalid flat text even when invoked
 directly by an application command. Provider export and file-write failures
 return fixed messages without provider details or filesystem exception text;

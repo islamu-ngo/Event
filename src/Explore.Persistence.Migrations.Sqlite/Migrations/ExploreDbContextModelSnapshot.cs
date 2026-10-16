@@ -2609,9 +2609,33 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("ActingActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("acting_actor_id");
+
+                    b.Property<DateTime>("ActionConfirmedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("action_confirmed_at");
+
+                    b.Property<DateTime>("ActionCreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("action_created_at");
+
+                    b.Property<Guid?>("ActionMessageId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("action_message_id");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("completed_at");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("conversation_id");
 
                     b.Property<string>("FailureCode")
                         .HasMaxLength(100)
@@ -2623,9 +2647,50 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("failure_message");
 
+                    b.Property<string>("ImageSourceDigest")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("image_source_digest");
+
+                    b.Property<Guid?>("ImageSourceMessageId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("image_source_message_id");
+
+                    b.Property<Guid?>("ImageStorageObjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("image_storage_object_id");
+
+                    b.Property<string>("ImageUploadOperationKey")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("image_upload_operation_key");
+
+                    b.Property<Guid?>("ImageUploadSessionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("image_upload_session_id");
+
+                    b.Property<string>("PayloadDigest")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("payload_digest");
+
+                    b.Property<DateTime?>("PrimaryEffectLinkedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("primary_effect_linked_at");
+
+                    b.Property<Guid?>("PrimaryEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("primary_event_id");
+
+                    b.Property<Guid>("PrincipalUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("principal_user_id");
+
                     b.Property<Guid>("ProposedActionId")
                         .HasColumnType("TEXT")
                         .HasColumnName("proposed_action_id");
+
+                    b.Property<Guid?>("ReservedEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reserved_event_id");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("TEXT")
@@ -3986,6 +4051,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("effect_outbox_id");
 
+                    b.Property<string>("EffectPayloadDigest")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_payload_digest");
+
                     b.Property<string>("FailureCode")
                         .HasMaxLength(200)
                         .HasColumnType("TEXT")
@@ -4221,6 +4290,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("digest")
                         .IsFixedLength();
+
+                    b.Property<Guid?>("EffectOutboxId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_outbox_id");
 
                     b.Property<int>("FailedTenantCount")
                         .HasColumnType("INTEGER")
@@ -4572,7 +4645,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -7347,7 +7420,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -8405,6 +8478,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("actor_user_id");
 
+                    b.Property<Guid?>("CorrectionMessageId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("correction_message_id");
+
                     b.Property<Guid>("EventLocationId")
                         .HasColumnType("TEXT")
                         .HasColumnName("event_location_id");
@@ -9271,6 +9348,26 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("INTEGER")
                         .HasColumnName("priority");
+
+                    b.Property<Guid?>("ProviderSyncCaseConcurrencyStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_sync_case_concurrency_stamp");
+
+                    b.Property<Guid?>("ProviderSyncCaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_sync_case_id");
+
+                    b.Property<Guid?>("ProviderSyncOutboxId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_sync_outbox_id");
+
+                    b.Property<string>("ProviderSyncPayloadDigest")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_sync_payload_digest");
+
+                    b.Property<DateTime?>("ProviderSyncSubmittedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_sync_submitted_at_utc");
 
                     b.Property<string>("ReasonCode")
                         .IsRequired()
@@ -11346,7 +11443,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -12442,7 +12539,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -12982,7 +13079,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -23875,6 +23972,18 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("currency_code");
 
+                    b.Property<DateTime?>("DispatchCommittedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("dispatch_committed_at");
+
+                    b.Property<int>("DispatchPhase")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("dispatch_phase");
+
+                    b.Property<Guid?>("DispatchToken")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("dispatch_token");
+
                     b.Property<string>("ExternalAccountId")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -23895,6 +24004,20 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("last_provider_request_id");
 
+                    b.Property<string>("NativeInputDigest")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_input_digest");
+
+                    b.Property<string>("NativeOperationKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_operation_key");
+
+                    b.Property<DateTime?>("NoProviderHandoffProvenAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("no_provider_handoff_proven_at");
+
                     b.Property<Guid>("PaidOrderAcceptanceSnapshotId")
                         .HasColumnType("TEXT")
                         .HasColumnName("paid_order_acceptance_snapshot_id");
@@ -23914,6 +24037,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("TEXT")
                         .HasColumnName("provider_idempotency_key");
+
+                    b.Property<DateTime?>("ProviderMutationExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_mutation_expires_at");
 
                     b.Property<string>("ProviderPaymentId")
                         .IsRequired()
@@ -23951,6 +24078,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid>("RegistrationOrderId")
                         .HasColumnType("TEXT")
                         .HasColumnName("registration_order_id");
+
+                    b.Property<long?>("RequestedAmountMinor")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("requested_amount_minor");
 
                     b.Property<string>("ReservationSourceKey")
                         .IsRequired()

@@ -2612,9 +2612,33 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("ActingActorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("acting_actor_id");
+
+                    b.Property<DateTime>("ActionConfirmedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("action_confirmed_at");
+
+                    b.Property<DateTime>("ActionCreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("action_created_at");
+
+                    b.Property<Guid?>("ActionMessageId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("action_message_id");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("completed_at");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("conversation_id");
 
                     b.Property<string>("FailureCode")
                         .HasMaxLength(100)
@@ -2626,9 +2650,50 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("nvarchar(1000)")
                         .HasColumnName("failure_message");
 
+                    b.Property<string>("ImageSourceDigest")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("image_source_digest");
+
+                    b.Property<Guid?>("ImageSourceMessageId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("image_source_message_id");
+
+                    b.Property<Guid?>("ImageStorageObjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("image_storage_object_id");
+
+                    b.Property<string>("ImageUploadOperationKey")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("image_upload_operation_key");
+
+                    b.Property<Guid?>("ImageUploadSessionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("image_upload_session_id");
+
+                    b.Property<string>("PayloadDigest")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("payload_digest");
+
+                    b.Property<DateTime?>("PrimaryEffectLinkedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("primary_effect_linked_at");
+
+                    b.Property<Guid?>("PrimaryEventId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("primary_event_id");
+
+                    b.Property<Guid>("PrincipalUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("principal_user_id");
+
                     b.Property<Guid>("ProposedActionId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("proposed_action_id");
+
+                    b.Property<Guid?>("ReservedEventId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("reserved_event_id");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("datetime2")
@@ -3989,6 +4054,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("effect_outbox_id");
 
+                    b.Property<string>("EffectPayloadDigest")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("effect_payload_digest");
+
                     b.Property<string>("FailureCode")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)")
@@ -4225,6 +4294,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("nchar(64)")
                         .HasColumnName("digest")
                         .IsFixedLength();
+
+                    b.Property<Guid?>("EffectOutboxId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("effect_outbox_id");
 
                     b.Property<int>("FailedTenantCount")
                         .HasColumnType("int")
@@ -4576,8 +4649,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -7354,8 +7427,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -8412,6 +8485,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("actor_user_id");
 
+                    b.Property<Guid?>("CorrectionMessageId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("correction_message_id");
+
                     b.Property<Guid>("EventLocationId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("event_location_id");
@@ -9279,6 +9356,26 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("int")
                         .HasColumnName("priority");
+
+                    b.Property<Guid?>("ProviderSyncCaseConcurrencyStamp")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("provider_sync_case_concurrency_stamp");
+
+                    b.Property<Guid?>("ProviderSyncCaseId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("provider_sync_case_id");
+
+                    b.Property<Guid?>("ProviderSyncOutboxId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("provider_sync_outbox_id");
+
+                    b.Property<string>("ProviderSyncPayloadDigest")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("provider_sync_payload_digest");
+
+                    b.Property<DateTime?>("ProviderSyncSubmittedAtUtc")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("provider_sync_submitted_at_utc");
 
                     b.Property<string>("ReasonCode")
                         .IsRequired()
@@ -11356,8 +11453,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -12451,8 +12548,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -12991,8 +13088,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -23893,6 +23990,18 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("nvarchar(3)")
                         .HasColumnName("currency_code");
 
+                    b.Property<DateTime?>("DispatchCommittedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("dispatch_committed_at");
+
+                    b.Property<int>("DispatchPhase")
+                        .HasColumnType("int")
+                        .HasColumnName("dispatch_phase");
+
+                    b.Property<Guid?>("DispatchToken")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("dispatch_token");
+
                     b.Property<string>("ExternalAccountId")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -23913,6 +24022,20 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("nvarchar(120)")
                         .HasColumnName("last_provider_request_id");
 
+                    b.Property<string>("NativeInputDigest")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("native_input_digest");
+
+                    b.Property<string>("NativeOperationKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("native_operation_key");
+
+                    b.Property<DateTime?>("NoProviderHandoffProvenAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("no_provider_handoff_proven_at");
+
                     b.Property<Guid>("PaidOrderAcceptanceSnapshotId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("paid_order_acceptance_snapshot_id");
@@ -23932,6 +24055,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("nvarchar(160)")
                         .HasColumnName("provider_idempotency_key");
+
+                    b.Property<DateTime?>("ProviderMutationExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("provider_mutation_expires_at");
 
                     b.Property<string>("ProviderPaymentId")
                         .IsRequired()
@@ -23969,6 +24096,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.Property<Guid>("RegistrationOrderId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("registration_order_id");
+
+                    b.Property<long?>("RequestedAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_amount_minor");
 
                     b.Property<string>("ReservationSourceKey")
                         .IsRequired()

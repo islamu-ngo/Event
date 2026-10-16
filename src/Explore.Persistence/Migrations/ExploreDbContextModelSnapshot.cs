@@ -2626,9 +2626,33 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("ActingActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("acting_actor_id");
+
+                    b.Property<DateTime>("ActionConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("action_confirmed_at");
+
+                    b.Property<DateTime>("ActionCreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("action_created_at");
+
+                    b.Property<Guid?>("ActionMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("action_message_id");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
 
                     b.Property<string>("FailureCode")
                         .HasMaxLength(100)
@@ -2640,9 +2664,50 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("failure_message");
 
+                    b.Property<string>("ImageSourceDigest")
+                        .HasColumnType("text")
+                        .HasColumnName("image_source_digest");
+
+                    b.Property<Guid?>("ImageSourceMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("image_source_message_id");
+
+                    b.Property<Guid?>("ImageStorageObjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("image_storage_object_id");
+
+                    b.Property<string>("ImageUploadOperationKey")
+                        .HasColumnType("text")
+                        .HasColumnName("image_upload_operation_key");
+
+                    b.Property<Guid?>("ImageUploadSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("image_upload_session_id");
+
+                    b.Property<string>("PayloadDigest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payload_digest");
+
+                    b.Property<DateTime?>("PrimaryEffectLinkedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("primary_effect_linked_at");
+
+                    b.Property<Guid?>("PrimaryEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("primary_event_id");
+
+                    b.Property<Guid>("PrincipalUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("principal_user_id");
+
                     b.Property<Guid>("ProposedActionId")
                         .HasColumnType("uuid")
                         .HasColumnName("proposed_action_id");
+
+                    b.Property<Guid?>("ReservedEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reserved_event_id");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone")
@@ -4005,6 +4070,10 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("effect_outbox_id");
 
+                    b.Property<string>("EffectPayloadDigest")
+                        .HasColumnType("text")
+                        .HasColumnName("effect_payload_digest");
+
                     b.Property<string>("FailureCode")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -4240,6 +4309,10 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("character(64)")
                         .HasColumnName("digest")
                         .IsFixedLength();
+
+                    b.Property<Guid?>("EffectOutboxId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("effect_outbox_id");
 
                     b.Property<int>("FailedTenantCount")
                         .HasColumnType("integer")
@@ -4591,8 +4664,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -7371,8 +7444,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -8431,6 +8504,10 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("actor_user_id");
 
+                    b.Property<Guid?>("CorrectionMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correction_message_id");
+
                     b.Property<Guid>("EventLocationId")
                         .HasColumnType("uuid")
                         .HasColumnName("event_location_id");
@@ -9301,6 +9378,26 @@ namespace Explore.Persistence.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("integer")
                         .HasColumnName("priority");
+
+                    b.Property<Guid?>("ProviderSyncCaseConcurrencyStamp")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provider_sync_case_concurrency_stamp");
+
+                    b.Property<Guid?>("ProviderSyncCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provider_sync_case_id");
+
+                    b.Property<Guid?>("ProviderSyncOutboxId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provider_sync_outbox_id");
+
+                    b.Property<string>("ProviderSyncPayloadDigest")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_sync_payload_digest");
+
+                    b.Property<DateTime?>("ProviderSyncSubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("provider_sync_submitted_at_utc");
 
                     b.Property<string>("ReasonCode")
                         .IsRequired()
@@ -11383,8 +11480,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -12482,8 +12579,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -13022,8 +13119,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -23948,6 +24045,18 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency_code");
 
+                    b.Property<DateTime?>("DispatchCommittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dispatch_committed_at");
+
+                    b.Property<int>("DispatchPhase")
+                        .HasColumnType("integer")
+                        .HasColumnName("dispatch_phase");
+
+                    b.Property<Guid?>("DispatchToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dispatch_token");
+
                     b.Property<string>("ExternalAccountId")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -23968,6 +24077,20 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("last_provider_request_id");
 
+                    b.Property<string>("NativeInputDigest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("native_input_digest");
+
+                    b.Property<string>("NativeOperationKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("native_operation_key");
+
+                    b.Property<DateTime?>("NoProviderHandoffProvenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("no_provider_handoff_proven_at");
+
                     b.Property<Guid>("PaidOrderAcceptanceSnapshotId")
                         .HasColumnType("uuid")
                         .HasColumnName("paid_order_acceptance_snapshot_id");
@@ -23987,6 +24110,10 @@ namespace Explore.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)")
                         .HasColumnName("provider_idempotency_key");
+
+                    b.Property<DateTime?>("ProviderMutationExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("provider_mutation_expires_at");
 
                     b.Property<string>("ProviderPaymentId")
                         .IsRequired()
@@ -24024,6 +24151,10 @@ namespace Explore.Persistence.Migrations
                     b.Property<Guid>("RegistrationOrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("registration_order_id");
+
+                    b.Property<long?>("RequestedAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_amount_minor");
 
                     b.Property<string>("ReservationSourceKey")
                         .IsRequired()

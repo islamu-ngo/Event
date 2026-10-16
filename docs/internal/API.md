@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+LocalPasswordPolicy normalizes valid UTF-16 to NFC without trimming whitespace
+or changing case. New credentials require 15 through 128 normalized Unicode
+scalars; verification accepts shorter existing credential shapes while retaining
+the 128-scalar ceiling. A 1,024-code-unit input bound precedes normalization,
+and malformed UTF-16 is rejected rather than repaired. Deterministic tests use
+fixed ASCII and astral scalars to avoid normalization-dependent random boundaries.
+This domain prerequisite does not switch hashing, request validation or Identity
+configuration; those production integrations remain required.
+
 CustomPropertyPatternPolicy admits at most 2,048 characters of .NET
 non-backtracking syntax with a finite 100 ms match deadline. Unsupported
 backreferences/lookarounds and malformed patterns fail closed. Definition

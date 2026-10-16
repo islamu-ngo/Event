@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+The local credential policy counts normalized Unicode characters rather than
+UTF-16 code units. It preserves spaces and case and rejects malformed text.
+New credentials require 15 to 128 normalized characters; shorter existing
+credentials remain eligible for verification. These domain rules take effect only
+when request, hashing and Identity configuration integration is complete.
+
 Custom-property patterns now require supported non-backtracking syntax and
 are limited to 2,048 characters. Backreferences, lookarounds and malformed
 patterns are rejected; defaults must satisfy configured bounds and patterns.

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52RPDCDMSH97G48JBMH8923
+Title: "Provide exact source-owned shared-writer catalog verification"
+Type: feat
+Scope: access
+Summary: "Verify native writer bodies, privileges, role stamps and compulsory trigger targets against source-owned expectations."
+Group: shared-writer-verification
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Restamped bodies and partial native footprints cannot substitute for the source-owned writer and privilege contract.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Only the declared migrator installation window accepts whole absence; production writer composition remains separate.

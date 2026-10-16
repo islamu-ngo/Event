@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+ProvisioningSharedWriterAssertions.Writer is the executable catalog verifier
+shared by source-owned native compositions. Expected bodies, targets, role stamps
+and privilege contracts come from the owning implementation, never live ACLs.
+It verifies exact SECURITY DEFINER routine shape, body hash/comment, compulsory
+trigger flags and relation targets, rejecting extra trigger attachment as drift.
+Assertions read catalogs and do not repair native objects. Entire protocol absence
+is allowed only in the declared migrator's installation window; partial footprints
+must satisfy the complete assertion. The inventory and owner bridges remain separate
+composition work, not substitutes for this verifier.
+
 For navigation-owned tenant tables, RLS metadata follows the one mapped ownership
 path referenced by the named tenant filter instead of selecting the first foreign
 key. Intermediate joins must be required dependent-to-principal navigations with

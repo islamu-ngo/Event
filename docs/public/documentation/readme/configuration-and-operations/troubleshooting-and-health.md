@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Shared native writer admission verifies the installed body, triggers, roles and
+privileges against the source-owned contract. Restamping a changed body does not
+make it trusted. An entirely absent protocol is permitted only during its declared
+migrator installation window; partial installation is not accepted as absence.
+This verifier alone does not install or wire the provisioning protocol.
+
 Generated RLS ownership joins follow the tenant filter's mapped navigation path,
 including required intermediate relations. Unsupported or ambiguous paths stop
 generation rather than guessing a parent. An explicit installation target schema

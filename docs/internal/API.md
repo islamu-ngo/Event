@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+BundleSchema bounds incoming file bytes before parsing and rejects the entire
+override on duplicate, nested or oversized translation data. Offline reads retain
+embedded defaults rather than publishing a partial invalid override. BundleFileWriter
+validates before creating output directories or replacing an existing file,
+serializes with safe JSON escaping, bounds output size and publishes through a
+temporary file plus rename. Logs retain counts and stable event codes, not paths,
+translation contents or raw exceptions. TMS transport bounds and final publication
+admission remain separate integrations.
+
 LocalizationBundlePolicy bounds flat translation imports to 4 MiB input, 16,384
 entries, 512 key characters, 16,384 value characters and 524,288 aggregate characters.
 The import converter validates token structure before dictionary materialization,

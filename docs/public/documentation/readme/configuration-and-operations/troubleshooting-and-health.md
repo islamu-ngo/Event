@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Invalid localization override files are rejected as a whole, leaving embedded
+defaults in place. Invalid write candidates do not create output directories or
+replace existing bundles; valid flat text is safely JSON-escaped and atomically
+published. File diagnostics omit translation contents, filesystem paths and raw
+exception details. TMS transport and publication authorization remain separate
+boundaries.
+
 Localization imports accept bounded flat translation text under ui., lookup.
 and payment. key families. Duplicate names, unknown contract fields and nested
 values are rejected rather than silently discarded. Limits are 4 MiB input,

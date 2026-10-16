@@ -12,6 +12,23 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class AdmissionRequestLoggingTests
 {
     [Test]
+    public async Task UnknownMethodAndUnmatchedPathUseBoundedClassifications()
+    {
+        string canary = Guid.CreateVersion7().ToString("N");
+        var logger = new RecordingLogger<RequestLoggingMiddleware>();
+        var context = new DefaultHttpContext();
+        context.Request.Method = canary;
+        context.Request.Path = "/private/" + canary;
+        var middleware = new RequestLoggingMiddleware(_ => Task.CompletedTask, logger);
+
+        await middleware.InvokeAsync(context, Substitute.For<ITenantContextAccessor>());
+
+        await Assert.That(logger.Messages.Single()).DoesNotContain(canary);
+        await Assert.That(logger.Fields).Contains(new KeyValuePair<string, string?>("Method", "OTHER"));
+        await Assert.That(logger.Fields).Contains(new KeyValuePair<string, string?>("Route", "route-unresolved"));
+    }
+
+    [Test]
     public async Task AdmissionRequestLogUsesNormalizedRouteIdentityWithoutSensitiveIdentifiers()
     {
         Guid eventId = Guid.CreateVersion7();
@@ -53,7 +70,7 @@ public sealed class AdmissionRequestLoggingTests
     }
 
     [Test]
-    public async Task OrdinaryRequestLogRetainsItsConcreteNonSensitivePath()
+    public async Task OrdinaryRequestLogRetainsItsAuthoredNonSensitiveRoute()
     {
         const string path = "/api/category";
         var logger = new RecordingLogger<RequestLoggingMiddleware>();
@@ -71,7 +88,7 @@ public sealed class AdmissionRequestLoggingTests
         var middleware = new RequestLoggingMiddleware(_ => Task.CompletedTask, logger);
         await middleware.InvokeAsync(context, tenant);
 
-        await Assert.That(logger.Fields).Contains(new KeyValuePair<string, string?>("Path", path));
+        await Assert.That(logger.Fields).Contains(new KeyValuePair<string, string?>("Route", path));
     }
 
     [Test]

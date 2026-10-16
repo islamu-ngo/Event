@@ -1,0 +1,28 @@
+Change-Id: CHG-01M52HQ17S8YFZGYVKCPD9KGMR
+Title: "Bound HTTP request and trace diagnostic metadata"
+Type: fix
+Scope: privacy
+Summary: "Sanitize HTTP spans before export and restrict request diagnostics to safe route identities and bounded methods."
+Group: api-http-trace-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Remove inherited trace context and HTTP URL or failure content before exporters observe spans.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable

@@ -47,6 +47,7 @@ using ModelContextProtocol.Server;
 using OpenFeature;
 using OpenFeature.Hosting.Providers.Memory;
 using Explore.API.Telemetry;
+using OpenTelemetry.Trace;
 
 namespace Explore.API.Hosting;
 
@@ -106,7 +107,14 @@ public static class ApiHostServiceCollectionExtensions
                 TimeSpan.FromSeconds(ApiHostStartupExtensions.GracefulShutdownSeconds + 5);
         });
 
+        // Sanitize before ServiceDefaults registers its exporters.
+        builder.Services.AddOpenTelemetry().WithTracing(tracing =>
+            tracing.AddProcessor(new ApiDiagnosticTraceProcessor()));
         builder.AddServiceDefaults();
+        builder.Services.Configure<OpenTelemetry.Instrumentation.AspNetCore.AspNetCoreTraceInstrumentationOptions>(
+            options => options.RecordException = false);
+        builder.Services.Configure<OpenTelemetry.Instrumentation.Http.HttpClientTraceInstrumentationOptions>(
+            options => options.RecordException = false);
         if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("cache")))
         {
             builder.AddRedisDistributedCache(connectionName: "cache");

@@ -5,6 +5,17 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Diagnostic Scope Ownership
 
+`ApiDiagnosticTraceProcessor` is registered before ServiceDefaults exporters.
+On export it clears inherited baggage and trace state. HTTP client spans retain
+status and a fixed dependency label; server spans retain authored route metadata
+instead of caller-selected URL segments. Exception descriptions and arbitrary
+HTTP tags are removed while non-HTTP business counts remain intact. Instrumentation
+exception recording is disabled for ASP.NET Core and HTTP clients.
+
+Request completion logs use the safe route identity and a closed HTTP-method
+set, falling back to `route-unresolved` and `OTHER`. The active request span's
+URL tags are redacted before request completion reaches downstream exporters.
+
 The final Serilog filter excludes ASP.NET Core, IdentityModel, HTTP/gRPC client,
 EF Core and host lifecycle categories. Their framework-authored events can carry
 raw URLs, SQL, identifiers and exceptions. Native API diagnostic categories

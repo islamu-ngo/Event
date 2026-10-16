@@ -812,7 +812,12 @@ A `BackgroundService` using `PeriodicTimer` that:
 
 Wraps `ISecretProvider` for value-free provider lifecycle mutations only. Secret reads do not create a persistent audit trail.
 
-Audit entries track: Operation, ProviderType, KeyPattern (redacted), Timestamp, UserId (extracted via `sub` → `nameidentifier` → `sid` fallback), CorrelationId.
+The in-process audit entry can carry lifecycle context, but the default structured
+sink exports only bounded operation, provider, status, failure reason and validated
+correlation identifiers. It does not export key paths, user identities or raw
+provider error messages, including at Debug level. The decorator accepts
+server-issued GUID correlation from request items or the trace identifier,
+not caller-supplied correlation headers.
 
 ## DI Registration
 

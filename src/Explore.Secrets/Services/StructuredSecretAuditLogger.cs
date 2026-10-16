@@ -46,48 +46,29 @@ public sealed class StructuredSecretAuditLogger : ISecretAuditLogger
     private void LogEntry(SecretAuditEntry entry)
     {
         var level = entry.Success ? SuccessLevel : FailureLevel;
-
-        // Use structured logging with semantic property names
-        // These will be indexed by Loki when exported via OpenTelemetry
+        var operation = Enum.IsDefined(entry.Operation) ? entry.Operation.ToString() : "Unknown";
+        var provider = Enum.IsDefined(entry.ProviderType) ? entry.ProviderType.ToString() : "Unknown";
+        var correlation = entry.CorrelationId is { Length: <= 38 } &&
+            Guid.TryParse(entry.CorrelationId, out var correlationId)
+            ? correlationId.ToString("N")
+            : "none";
+        var reason = entry.Success ? "none" : entry.Operation switch
+        {
+            SecretOperation.InitializeFailed => "secret_provider_initialization_failed",
+            SecretOperation.RefreshFailed => "secret_provider_refresh_failed",
+            _ => "secret_operation_failed"
+        };
         _logger.Log(
             logLevel: level,
-            eventId: new EventId((int)entry.Operation, entry.Operation.ToString()),
-            message: "SecretAudit: {Operation} on {ProviderType} {Status}. Key: {KeyPattern}",
+            eventId: new EventId(Enum.IsDefined(entry.Operation) ? (int)entry.Operation : -1, operation),
+            message: "SecretAudit: {Operation} on {ProviderType} {Status}. Reason: {ReasonCode}. CorrelationId: {CorrelationId}",
             args:
             [
-                entry.Operation.ToString(),
-                entry.ProviderType.ToString(),
+                operation,
+                provider,
                 entry.Success ? "succeeded" : "failed",
-                entry.KeyPattern ?? "(none)"
+                reason,
+                correlation
             ]);
-
-        // Log additional context as a separate structured log for detailed querying
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug(
-                "SecretAudit details - Operation: {Operation}, Provider: {ProviderType}, " +
-                "Key: {KeyPattern}, Success: {Success}, UserId: {UserId}, " +
-                "CorrelationId: {CorrelationId}, Timestamp: {Timestamp}, Error: {ErrorMessage}",
-                entry.Operation,
-                entry.ProviderType,
-                entry.KeyPattern,
-                entry.Success,
-                entry.UserId ?? "anonymous",
-                entry.CorrelationId ?? "none",
-                entry.Timestamp.ToString("O"),
-                entry.ErrorMessage ?? "none");
-        }
-
-        // Log errors at warning level with full context
-        if (!entry.Success && !string.IsNullOrEmpty(entry.ErrorMessage))
-        {
-            _logger.LogWarning(
-                "SecretAudit FAILURE - Operation: {Operation}, Provider: {ProviderType}, " +
-                "Error: {ErrorMessage}, CorrelationId: {CorrelationId}",
-                entry.Operation,
-                entry.ProviderType,
-                entry.ErrorMessage,
-                entry.CorrelationId ?? "none");
-        }
     }
 }

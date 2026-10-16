@@ -411,6 +411,12 @@ boundaries.
 
 ## Related Guides & Next Steps
 
+Secrets audit logs retain bounded operation, provider and failure categories with
+validated correlation identifiers, not key paths, user identities or provider
+error payloads, even at Debug level. Failed secret-provider health probes report
+`provider_unavailable` without private exception types or content. Use these
+categories and current provider readiness to diagnose failures.
+
 * **[Environment Variables Reference](environment-variables.md)** — Fix missing legal identity keys or secret provider errors.
 * **[Docker Compose Runbook](../self-hosting/docker-compose.md)** — Production container restart and migration lifecycle.
 * **[Keycloak Authentication](../security-and-identity/authentication.md)** — Configure reverse-proxy redirect URIs and client origins.

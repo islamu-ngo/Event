@@ -13,6 +13,20 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PostgresHumanPrincipalSourceContract installs execute-only principal observation,
+Serializable acquisition and validated Local-session revocation reads on the
+original enrolled sessions. Fixed actor/account/tenant projections run under a
+nonlogin owner with column-scoped privileges. Acquisition and compulsory source
+writers update one private anchor, closing absent-row insertion races; existing
+rows are locked on acquisition. Admission compares exact routine bodies, roles,
+ACLs, triggers, foreign keys, uniqueness and stamped tenant RLS policies.
+
+The provisioning shared-writer leaf retains its owning source inventory, privilege
+contract and exact changed-trigger body without importing provisioning execution.
+Whole absence does not create a reverse installation dependency; any footprint
+requires the complete source-owned assertion. These primitives do not wire
+production authentication, mutation leases or provisioning installation.
+
 ProvisioningSharedWriterAssertions.Writer is the executable catalog verifier
 shared by source-owned native compositions. Expected bodies, targets, role stamps
 and privilege contracts come from the owning implementation, never live ACLs.

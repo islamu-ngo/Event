@@ -14,6 +14,14 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+The principal-source native prerequisite observes actor-bound account facts and
+excludes concurrent principal changes during Serializable acquisition. Its Local
+session reader uses the original Runtime session; it does not grant Identity table
+access to that login. Catalog, body, trigger and tenant-policy drift fail admission
+rather than being repaired. A partially installed provisioning writer is rejected,
+not treated as absent. Production installation and mutation consumers must still
+be wired before operators can rely on this prerequisite as active protection.
+
 Shared native writer admission verifies the installed body, triggers, roles and
 privileges against the source-owned contract. Restamping a changed body does not
 make it trusted. An entirely absent protocol is permitted only during its declared

@@ -6,6 +6,14 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## JWT failure diagnostics
+
+Invalid bearer tokens still receive a 401 challenge. Provider error descriptions
+and error URLs are omitted; failed authentication uses the generic `invalid_token`
+challenge code. Operators can correlate the native `authentication_failed` and
+`authentication_challenge` events without exposing token contents or private
+request paths in logs.
+
 ## Storage readiness failure reasons
 
 The API no longer imports ambient logging scopes. Keep `FromLogContext` out of

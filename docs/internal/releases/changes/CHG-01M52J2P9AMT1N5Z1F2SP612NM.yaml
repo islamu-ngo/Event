@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52J2P9AMT1N5Z1F2SP612NM
+Title: "Bound JWT failure diagnostics and challenge details"
+Type: fix
+Scope: privacy
+Summary: "Preserve generic authentication challenges while excluding provider exception contents and raw request paths."
+Group: jwt-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: JWT callbacks export fixed event codes and safe routes; challenge descriptions and provider error URLs are cleared.
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: A failed JWT still returns 401 with a generic invalid_token challenge instead of provider descriptions.

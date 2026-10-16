@@ -483,6 +483,13 @@ Evidence API and HAL representations expose bounded document display metadata, r
 
 ## Auth Diagnostic Safety
 
+Keycloak JWT failure and challenge callbacks use the native JWT diagnostic
+category with fixed event codes, bounded methods and safe route identities.
+They do not export provider exception text or raw request paths.
+`IncludeErrorDetails` is disabled; challenge descriptions and provider error
+URIs are cleared, with `invalid_token` only when authentication failed.
+This diagnostic boundary does not change audience or principal validation.
+
 Application return destinations are rooted local paths validated with ASP.NET
 Core `RedirectHttpResult.IsLocalUrl`, not prefix checks or relative-URI parsing
 alone. Query-based returns, Local login responses and posted ATProto return paths

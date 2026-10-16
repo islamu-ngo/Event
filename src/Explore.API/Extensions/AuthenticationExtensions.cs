@@ -8,6 +8,8 @@ using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.API.ExceptionHandling;
 using Explore.API.Mcp;
+using Explore.API.Middleware;
+using Explore.API.Telemetry;
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Configuration;
@@ -88,6 +90,7 @@ public static class AuthenticationExtensions
             .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 options.MapInboundClaims = false;
+                options.IncludeErrorDetails = false;
                 options.RequireHttpsMetadata = string.Equals(
                     configuration["Keycloak:RequireHttpsMetadata"],
                     "true",
@@ -161,7 +164,7 @@ public static class AuthenticationExtensions
                     }
                 };
 
-                // Security: PII-safe logging — only exception messages, never token claims or raw values
+                // Diagnostics are fixed categories, never token/provider exception contents.
                 options.Events = new JwtBearerEvents
                 {
                     // Performance: skip JWT token validation entirely for onboarding paths.
@@ -182,23 +185,32 @@ public static class AuthenticationExtensions
 
                     OnAuthenticationFailed = context =>
                     {
-                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                            .CreateLogger(ApiDiagnosticLogEnricher.JwtCategory);
                         logger.LogWarning(
-                            "[JWT] Authentication failed for {Method} {Path}: {Error}",
-                            context.Request.Method,
-                            context.Request.Path,
-                            context.Exception?.Message);
+                            "JWT {Code} for {Method} {Route} | TraceId={TraceId} CorrelationId={CorrelationId}",
+                            "authentication_failed",
+                            SafeRouteMetadata.GetMethod(context.HttpContext),
+                            SafeRouteMetadata.GetRouteIdentityOrClassification(context.HttpContext),
+                            context.HttpContext.TraceIdentifier,
+                            context.HttpContext.Items["CorrelationId"] as string);
                         return Task.CompletedTask;
                     },
 
                     OnChallenge = context =>
                     {
-                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                        context.ErrorDescription = null;
+                        context.ErrorUri = null;
+                        context.Error = context.AuthenticateFailure is null ? null : "invalid_token";
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                            .CreateLogger(ApiDiagnosticLogEnricher.JwtCategory);
                         logger.LogDebug(
-                            "[JWT] Challenge issued for {Path}. Error: {Error}, Description: {Desc}",
-                            context.Request.Path,
-                            context.Error,
-                            context.ErrorDescription);
+                            "JWT {Code} for {Method} {Route} | TraceId={TraceId} CorrelationId={CorrelationId}",
+                            "authentication_challenge",
+                            SafeRouteMetadata.GetMethod(context.HttpContext),
+                            SafeRouteMetadata.GetRouteIdentityOrClassification(context.HttpContext),
+                            context.HttpContext.TraceIdentifier,
+                            context.HttpContext.Items["CorrelationId"] as string);
                         return Task.CompletedTask;
                     }
                 };

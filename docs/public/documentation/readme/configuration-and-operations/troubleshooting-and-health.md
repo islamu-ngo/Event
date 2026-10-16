@@ -14,6 +14,13 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+The support-source native prerequisite restricts facts to the selected actor,
+session and tenant plus declared support governance settings. Serializable
+acquisition excludes concurrent source writes through compulsory triggers and a
+private anchor. Catalog or function drift stops admission instead of being repaired.
+These facts do not grant support access, and the prerequisite needs production
+installation and verified mutation-consumer wiring before protection is active.
+
 The native authorization-route prerequisite returns only the six declared route
 settings, scoped to the original Runtime tenant or Global instance purpose. It
 does not grant setting writes or make an authorization decision. Its Serializable

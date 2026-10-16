@@ -13,6 +13,15 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PostgresHumanSupportAccessSourceContract projects only the selected actor/session
+support record and the fixed support governance settings. Runtime requires its
+original tenant and matching resolved tenant; Global requires an instance purpose.
+Serializable acquisition updates a private anchor and locks matching source rows.
+Compulsory source writers touch the same anchor, excluding concurrent inserts even
+when observation found no session. Exact body, role, privilege, trigger, source
+column and stamped tenant-policy checks reject drift rather than repairing it.
+This native prerequisite does not install production wiring or grant support access.
+
 PostgresHumanAuthorizationRouteContract exposes only the six source-owned route
 setting keys through a SELECT-only nonlogin owner. Runtime reads require the
 selected tenant; Global reads require an instance purpose and null tenant. The

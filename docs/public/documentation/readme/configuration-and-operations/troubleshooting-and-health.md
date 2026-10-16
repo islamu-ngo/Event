@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Tolgee and Weblate responses larger than 4 MiB are rejected before their bodies
+reach translation parsing or retry metadata processing. The limit also applies
+to error bodies and chunked responses. Reduce the provider response size when
+this boundary is reached; publication authorization remains a separate check.
+
 Localization failures retain useful operational categories while omitting raw
 provider exceptions, caller language input and translation contents. Metrics keep
 counts and timings with bounded labels. Cache fallback behavior remains active;

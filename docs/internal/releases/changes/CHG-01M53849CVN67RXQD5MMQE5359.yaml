@@ -1,0 +1,29 @@
+Change-Id: CHG-01M53849CVN67RXQD5MMQE5359
+Title: "Bound TMS response bodies before generated parsing"
+Type: fix
+Scope: access
+Summary: "Bound Tolgee and Weblate response buffering before retry readers and generated clients consume bodies."
+Group: localization-tms-response-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Response admission bounds unknown-length and error bodies and disposes rejected responses.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Provider responses exceeding 4 MiB are rejected before parsing.

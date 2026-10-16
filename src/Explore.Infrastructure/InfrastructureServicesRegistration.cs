@@ -735,6 +735,7 @@ public static class InfrastructureServicesRegistration
         // Translation Management System providers (runtime-switchable via GovernanceSettings "localization.tms_provider")
         // All concrete providers are always registered; RuntimeTranslationProvider delegates at runtime.
         // None → OfflineTranslationProvider (bundled .json files), Tolgee → TolgeeTranslationProvider, Weblate → WeblateTranslationProvider
+        services.AddTransient<TmsResponseBoundaryHandler>();
         services.AddHttpClient("TolgeeClient", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -749,6 +750,7 @@ public static class InfrastructureServicesRegistration
                 }
                 return null;
             }));
+        services.AddHttpClient("TolgeeClient").AddHttpMessageHandler<TmsResponseBoundaryHandler>();
         services.AddScoped<TolgeeTranslationProvider>();
 
         services.AddHttpClient("WeblateClient", client =>
@@ -765,6 +767,7 @@ public static class InfrastructureServicesRegistration
                 }
                 return ValueTask.FromResult<TimeSpan?>(null);
             }));
+        services.AddHttpClient("WeblateClient").AddHttpMessageHandler<TmsResponseBoundaryHandler>();
         services.AddScoped<WeblateTranslationProvider>();
         services.AddSingleton<OfflineTranslationProvider>();
         services.AddSingleton<IStaticTranslationBundleReader>(sp => sp.GetRequiredService<OfflineTranslationProvider>());

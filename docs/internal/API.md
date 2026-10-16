@@ -5,6 +5,13 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+TolgeeClient and WeblateClient bound every response body to 4 MiB through
+TmsResponseBoundaryHandler, inside the resilience pipeline. Buffer admission
+precedes retry metadata readers and generated client deserialization, including
+error responses and responses without Content-Length. Failed admission disposes
+the response; cancellation flows through buffering. This transport limit does
+not supply translation schema validation or publication authority.
+
 Localization provider, resolver and cache diagnostics retain stable event
 codes and useful failure categories without provider exception bodies, caller
 language strings, configuration coordinates or translation values. Translation

@@ -6,6 +6,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Support-access audit failures
+
+Support-access audit storage failures do not replace an already completed HTTP
+response. Watch the audit persistence failure metric and warning to detect gaps;
+warnings intentionally omit provider exceptions and their private details.
+
 ## Server-owned correlation IDs
 
 Use the response's `X-Correlation-ID` when reporting a request failure. The API

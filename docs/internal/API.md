@@ -5,6 +5,11 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Diagnostic Scope Ownership
 
+Support-access request auditing preserves the completed HTTP response when
+context retrieval or audit persistence fails. Its warning omits the exception
+object, so provider messages and inner exceptions cannot enter diagnostic sinks.
+The failure metric category remains `support_access_audit_persistence_failed`.
+
 `CorrelationIdMiddleware` creates a UUIDv7 in compact `N` format per request.
 It stores that server-owned value in request items and its logging context,
 then returns it through `X-Correlation-ID` when the response starts. Neither

@@ -14,6 +14,13 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+AI execution domain reservations now bind confirmed action identity to one
+primary event and immutable image custody. Recovery may reuse a linked effect but
+cannot substitute another event or reopen a settled failure. Preview comparison
+versions bind source and owner inputs; they do not authorize execution. These
+domain primitives still require persistence mappings, generated migrations and
+verified production tool wiring before the full recovery flow is deployable.
+
 The native storage-probe prerequisite excludes changes to settings, secret
 bindings and bootstrap state through a private generation sentinel. It includes
 new, renamed and absent source ranges rather than only known storage keys.

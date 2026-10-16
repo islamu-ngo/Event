@@ -13,6 +13,17 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+AiToolExecution reserves a confirmed event-draft action against its exact
+conversation, principal, acting actor, payload digest and one event identifier.
+Primary linking is lifetime-bounded and cannot switch targets; already linked
+recovery is idempotent. Image upload/storage custody cannot replace the original
+source, session or object. Success requires the linked primary effect, and settled
+failure cannot reopen. AiProposedAction consent versions bind displayed source and
+owner inputs while excluding mutable status for recovery. These are domain state
+primitives, not authorization or durable deployment by themselves. Persistence
+configuration, generated migration parity and production tool callers are separate
+programme dependencies and remain pending.
+
 PostgresStorageProbeSourceContract adds a dedicated generation sentinel for the
 actual storage probe. Whole-relation BEFORE-statement writers on SystemSetting,
 TenantSetting, SecretBinding and InstanceBootstrapState advance that sentinel for

@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Generated RLS ownership joins follow the tenant filter's mapped navigation path,
+including required intermediate relations. Unsupported or ambiguous paths stop
+generation rather than guessing a parent. An explicit installation target schema
+applies to the child and every ownership parent; deploy the full relation chain
+in that schema before enabling its policies.
+
 Generated PostgreSQL tenant policies include attestation comments for later native
 admission checks. Removing or changing a comment does not bypass row-level security,
 but consumers that require the original policy must reject a missing or mismatched

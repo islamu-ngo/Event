@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52QWF4ZV1TDXYHRVYJE07V5
+Title: "Follow mapped tenant ownership paths in generated RLS"
+Type: fix
+Scope: access
+Summary: "Generate tenant policy joins from mapped filter navigation paths and apply explicit target schemas throughout the ownership chain."
+Group: mapped-tenant-ownership
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Tenant isolation cannot select an unrelated foreign key or cross into a mapped source schema during explicit-schema installation.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Deploy the complete ownership relation chain in the explicit target schema; unsupported or ambiguous paths fail generation.

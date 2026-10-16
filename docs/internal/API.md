@@ -5,13 +5,21 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+For navigation-owned tenant tables, RLS metadata follows the one mapped ownership
+path referenced by the named tenant filter instead of selecting the first foreign
+key. Intermediate joins must be required dependent-to-principal navigations with
+single-column keys; missing, ambiguous or cyclic paths fail closed. Predicates
+recursively join until the mapped tenant column, with distinct aliases per hop.
+An explicit target schema overrides mapped schemas at every level, so isolated
+native installations cannot accidentally bind parent relations in another schema.
+
 Generated tenant RLS policies carry an event-tenant-policy:v2 comment combining
 the SHA-256 of the mapped model condition with PostgreSQL expression-tree digests
 for USING and WITH CHECK. Native admission consumers can compare both model and
 installed policy identity without relying on search-path-sensitive deparsed SQL.
 Stamp generation itself is not drift admission: consumers must enforce the match.
-This extraction preserves existing ownership predicates and schema precedence;
-recursive navigation changes remain separate.
+Fingerprint generation uses the same mapped ownership predicate as the installed
+policy, including recursive joins and explicit target schema selection.
 
 PostgresPolicySourceSetContract provides an explicit native source-set exclusion
 capability, not yet production installation wiring. ApplyAsync borrows an existing

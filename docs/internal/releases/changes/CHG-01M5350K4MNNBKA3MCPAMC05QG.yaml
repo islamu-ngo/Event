@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5350K4MNNBKA3MCPAMC05QG
+Title: "Capture address-free location governance policy facts"
+Type: feat
+Scope: access
+Summary: "Capture immutable location policy facts and preserve disclosure selections while advancing governance tightening audits."
+Group: location-governance-domain-state
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Governance snapshots omit physical address payloads and reject tightening detached locations.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Disclosure fields, audience and reveal time are preserved; native readers and correction publication remain separate.

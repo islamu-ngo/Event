@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+EventLocation.CaptureGovernanceState returns immutable policy identity,
+disclosure selection, version and concurrency facts without physical address
+payloads. Governance tightening creates its audit from those facts before
+updating the aggregate, preserves the selected fields, audience and reveal time,
+and advances version/audit metadata once. Detached locations remain rejected.
+Native governance readers and correction-publication custody are separate
+consumers; this domain snapshot adds no stored column or provider authority.
+
 EventReport.RetainProviderSubmission binds one original provider submission
 tuple: outbox ID, case ID, historical case concurrency stamp, UTC report creation
 time and uppercase SHA-256 payload digest. Only an unchanged Submitted report

@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Location governance tightening preserves organizer disclosure selections while
+advancing the policy review version and audit. Its retained snapshot contains
+policy facts rather than the physical address. Detached event locations cannot
+be tightened; provider read and correction-publication integration remain
+separate from these domain operations.
+
 Report submission receipts can retain the original case version and payload
 digest even after moderation advances the case. Mismatched, already changed or
 previously bound submissions are rejected without replacing their receipt.

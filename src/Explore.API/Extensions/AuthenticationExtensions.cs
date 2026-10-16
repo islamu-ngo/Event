@@ -28,9 +28,6 @@ namespace Explore.API.Extensions;
 
 public static class AuthenticationExtensions
 {
-    // Security: audiences validated in both 'aud' and 'azp' claims (Keycloak BFF pattern)
-    private static readonly string[] DefaultValidAudiences = ["islamu-event-api", "islamu-event-blazor"];
-
     public static IServiceCollection AddApiAuthentication(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -41,10 +38,14 @@ public static class AuthenticationExtensions
         // by DynamicJwtBearerPostConfigureOptions from env + DB (IAuthProviderConfigurationService).
         // Handlers call IJwtAuthorityRefreshNotifier.ReloadAsync() after onboarding/save-config
         // to hot-swap Keycloak metadata without restarting the API.
-        var validAudiences = configuration.GetSection("Keycloak:ValidAudiences").Get<string[]>()
-            ?? configuration.GetSection("Authentication:ValidAudiences").Get<string[]>()
-            ?? DefaultValidAudiences;
-        var validAudienceSet = new HashSet<string>(validAudiences.Where(audience => !string.IsNullOrWhiteSpace(audience)), StringComparer.Ordinal);
+        string audience = configuration["Keycloak:Audience"] ?? "islamu-event-api";
+        string[] permittedClients = configuration.GetSection("Keycloak:PermittedClients").Get<string[]>() ?? [];
+        if (string.IsNullOrWhiteSpace(audience)
+            || permittedClients.Any(string.IsNullOrWhiteSpace)
+            || permittedClients.Distinct(StringComparer.Ordinal).Count() != permittedClients.Length)
+            throw new InvalidOperationException("Keycloak resource audience and permitted clients must be nonempty, distinct identifiers.");
+        var tokenContext = new KeycloakTokenContextPolicy(
+            audience, new HashSet<string>(permittedClients, StringComparer.Ordinal));
 
         services.AddSingleton<DynamicJwtConfigurationService>();
         services.AddSingleton<IJwtAuthorityRefreshNotifier>(sp =>
@@ -99,29 +100,10 @@ public static class AuthenticationExtensions
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    // Security: custom audience check covers both 'aud' and 'azp' claims
-                    // because Keycloak puts the client ID in 'azp' rather than 'aud'
                     ValidateAudience = true,
-                    AudienceValidator = (audiences, securityToken, _) =>
-                    {
-                        var audienceList = audiences?.ToList() ?? new List<string>();
-
-                        if (audienceList.Exists(validAudienceSet.Contains))
-                        {
-                            return true;
-                        }
-
-                        if (securityToken is System.IdentityModel.Tokens.Jwt.JwtSecurityToken jwtToken)
-                        {
-                            var azp = jwtToken.Claims.FirstOrDefault(c => c.Type == "azp")?.Value;
-                            if (!string.IsNullOrEmpty(azp) && validAudienceSet.Contains(azp))
-                            {
-                                return true;
-                            }
-                        }
-
-                        return false;
-                    },
+                    ValidAudience = audience,
+                    RequireSignedTokens = true,
+                    ValidTypes = ["JWT"],
 
                     ValidateIssuer = true,
 
@@ -167,6 +149,15 @@ public static class AuthenticationExtensions
                 // Diagnostics are fixed categories, never token/provider exception contents.
                 options.Events = new JwtBearerEvents
                 {
+                    OnTokenValidated = context =>
+                    {
+                        if (!tokenContext.Accepts(context.SecurityToken))
+                        {
+                            context.Fail("Keycloak access-token context is invalid.");
+                            return Task.CompletedTask;
+                        }
+                        return Task.CompletedTask;
+                    },
                     // Performance: skip JWT token validation entirely for onboarding paths.
                     // When Keycloak is unreachable, OIDC metadata discovery times out (3+ minutes),
                     // blocking [AllowAnonymous] endpoints that don't need authentication at all.

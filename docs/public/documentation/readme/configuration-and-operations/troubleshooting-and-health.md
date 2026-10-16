@@ -6,6 +6,20 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Keycloak token audience and purpose
+
+API requests require an access token whose aud contains KEYCLOAK__AUDIENCE
+(default islamu-event-api) and whose signed payload typ is Bearer. ID tokens
+and tokens addressed only to the browser client are rejected even when azp
+names an approved client. Update the realm resource-audience mapper before
+rollout; the retired ValidAudiences arrays no longer grant acceptance.
+
+Optionally set Keycloak:PermittedClients through indexed configuration such as
+KEYCLOAK__PERMITTEDCLIENTS__0 to restrict originating clients as well. This list
+does not replace the API audience. Omit it for no client restriction; do not
+use a blank placeholder entry. Direct-process indexed environment variables
+must be explicitly forwarded by a container deployment to reach the API.
+
 ## Conditional JSON responses
 
 Small successful JSON responses may return a weak ETag for conditional requests.

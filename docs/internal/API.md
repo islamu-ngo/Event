@@ -1054,8 +1054,17 @@ Non-GET responses additionally receive:
 
 ### JWT Bearer Configuration
 - Authority: Keycloak OIDC metadata endpoint.
-- Multi-client audience validation: `islamu-event-api`, `islamu-event-blazor`.
-- Custom `AudienceValidator`: checks both `aud` claim and `azp` (Keycloak authorized party) claim.
+- One resource audience: Keycloak:Audience defaults to islamu-event-api; an
+  explicit deployment value replaces that default. The signed aud must contain
+  the resource; azp never substitutes for it. Retired ValidAudiences arrays are
+  not consulted.
+- KeycloakTokenContextPolicy runs after cryptographic JWT validation for both
+  supported token representations. JOSE typ must be JWT and signed payload typ
+  must be Bearer. Duplicate/malformed audience, purpose or client fields fail
+  closed. Audience arrays must contain distinct nonempty strings.
+- Keycloak:PermittedClients optionally restricts azp independently. Without a
+  restriction azp may be absent, but a present value must still be one nonempty
+  string. Configured client entries must be nonempty and distinct.
 - Clock skew tolerance: 5 minutes.
 - Dev mode: accepts self-signed certificates.
 - Minimal JWT event logging: `OnAuthenticationFailed` (Warning), `OnChallenge` (Debug). PII-leaking handlers removed.

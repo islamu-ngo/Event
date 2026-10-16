@@ -5,6 +5,20 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+PostgresPolicySourceSetContract provides an explicit native source-set exclusion
+capability, not yet production installation wiring. ApplyAsync borrows an existing
+transaction or commits its own. It installs a non-PII singleton and compulsory
+writer triggers on RolePermission plus the six governance setting keys. Acquisition
+and matching writers update the same sentinel, excluding membership changes even
+when no relevant source row existed when observation began.
+
+The execute-only acquisition entry point requires Serializable isolation and the
+enrolled login, purpose and tenant context. Its nonlogin owner can modify only the
+private sentinel, not the policy sources. Exact role/ACL/table/trigger/routine-body
+attestation rejects drift rather than repairing it. Existing migrator ownership
+installs the capability before traffic; production enrollment and managed lease
+consumers remain separate work.
+
 HumanPrincipalSourceValidation requires one current undeleted account and its
 original provider binding. Local sessions additionally require ready credential
 state, matching validated stamp/email state and completed operation/personal actor

@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+The PostgreSQL source-set installer is a native prerequisite, not an enabled
+deployment feature by itself. It excludes concurrent permission and governance
+setting membership changes, including inserts where no matching row previously
+existed. Installation must reject ownership, privilege, trigger or function drift;
+an operator must not treat automatic repair or missing production wiring as proof
+of active commit-time protection.
+
 Pure route projection keeps platform settings governance separate from tenant
 BYO authorization endpoints. Ordinary tenant-resource projection may select BYO
 before instance mode, while Local projection requires co-located decision sources.

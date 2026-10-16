@@ -5,6 +5,22 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+SetupSecretProvider and DeploymentModeProvider read committed bootstrap evidence
+through IInstanceBootstrapStateReader rather than a Runtime mutation repository.
+The reader owns an independent Global context. PostgreSQL obtains the selected
+bootstrap image through the provider configuration contract; other providers use
+an untracked query ordered by generation, creation time and identifier.
+Native provider configuration custody covers original settings, secret bindings,
+bootstrap, user/login and event configuration rows. Enrollment and source images
+do not confer human or setup authority. Failed readiness checks do not repair drift
+or broaden Runtime table access.
+
+The provider source anchor serializes changes to the original source relations
+until physical transaction completion. Installation and admission attest exact
+routine bodies, ownership, privileges, policies and triggers. Storage source
+custody is installed alongside provider custody so their statement triggers
+coexist; neither contract substitutes for request authorization.
+
 BoundProgrammeModelCandidates records the committed recovery model in generated
 migrations: refund dispatch ownership, AI execution identity and effect linkage,
 report synchronization custody, location correction messages and configuration

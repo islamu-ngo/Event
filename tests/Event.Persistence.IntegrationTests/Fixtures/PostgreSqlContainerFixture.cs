@@ -81,6 +81,9 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventResourceAuditRetentionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresIdempotencyReceiptContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresStorageProbeSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresStorageConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresProviderConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
         await using (var runtimeContext = CreateDbContextInternal(PrimaryDatabaseRole.Runtime))

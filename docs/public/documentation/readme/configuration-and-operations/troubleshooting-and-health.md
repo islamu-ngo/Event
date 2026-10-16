@@ -8,6 +8,16 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Startup setup and deployment-mode reads require the independent Global database
+capability and installed native provider-configuration contract. A Runtime
+permission-denied error on bootstrap state is not a reason to grant that account
+direct table access. Check the selected Global credentials and native readiness
+evidence; admission does not repair missing or altered contract objects.
+
+Provider and storage configuration contracts must coexist in the selected
+database. Their native source guards protect configuration observations against
+concurrent changes; they do not grant permission to change configuration.
+
 Apply the generated programme model migrations before starting updated services.
 They add recovery evidence fields and widen custom-property regex storage.
 Back up the database first. Historical rows do not gain trustworthy recovery

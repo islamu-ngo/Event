@@ -104,7 +104,7 @@ public class SetupSecretProvider : ISetupSecretProvider, IDisposable
             return false;
 
         using var scope = _scopeFactory.CreateScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IInstanceBootstrapStateRepository>();
+        var repository = scope.ServiceProvider.GetRequiredService<IInstanceBootstrapStateReader>();
         var bootstrapState = await repository.GetCurrent(cancellationToken);
         var isCompleted = bootstrapState?.Status == InstanceBootstrapStatus.Completed;
         _isBootstrapComplete = isCompleted;
@@ -135,7 +135,7 @@ public class SetupSecretProvider : ISetupSecretProvider, IDisposable
                 return;
 
             using var scope = _scopeFactory.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IInstanceBootstrapStateRepository>();
+            var repository = scope.ServiceProvider.GetRequiredService<IInstanceBootstrapStateReader>();
             var bootstrapState = await repository.GetCurrent(cancellationToken);
             _isBootstrapComplete = bootstrapState?.Status == InstanceBootstrapStatus.Completed;
 

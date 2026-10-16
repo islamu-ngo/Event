@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Configuration effect receipts can retain an immutable publication identity or
+payload digest after successful application. Failed operations cannot claim such
+a receipt, and existing bindings cannot be replaced. These domain prerequisites
+do not change deployment or enable publication until persistence and publication
+integration are complete.
+
 Current human policy inputs require the original signed account and a current
 credential lifetime. Signed-out, deleted or mismatched humans cannot supply those
 inputs, and an already-open transaction is rejected for idle observation. Reading

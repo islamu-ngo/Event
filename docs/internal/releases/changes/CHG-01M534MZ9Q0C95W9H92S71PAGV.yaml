@@ -1,0 +1,29 @@
+Change-Id: CHG-01M534MZ9Q0C95W9H92S71PAGV
+Title: "Bind configuration operation effects to immutable receipts"
+Type: feat
+Scope: self-hosting
+Summary: "Bind successful import payload digests and applied manifest outbox identities once through domain state guards."
+Group: configuration-effect-domain-receipts
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Failed states cannot bind successful effect receipts and existing bindings cannot be replaced.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Domain prerequisites only; persistence mappings, generated migrations and publication consumers remain required.

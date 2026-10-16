@@ -6,6 +6,29 @@ public sealed class ConfigurationManifestAuditTests
     private static readonly DateTime CompletedAt = StartedAt.AddSeconds(1);
 
     [Test]
+    public async Task EffectReceiptBindsOnceToAnAppliedManifest()
+    {
+        var operation = CreateApplied(1, 1, 0);
+        Guid message = Guid.CreateVersion7();
+        operation.BindEffectOutbox(message);
+        await Assert.That(operation.EffectOutboxId).IsEqualTo(message);
+        await Assert.That(() => operation.BindEffectOutbox(Guid.CreateVersion7()))
+            .Throws<InvalidOperationException>();
+        await Assert.That(operation.EffectOutboxId).IsEqualTo(message);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task EffectReceiptRejectsEmptyOrNonVersionSevenIdentity(bool nonVersionSeven)
+    {
+        var operation = CreateApplied(1, 1, 0);
+        await Assert.That(() => operation.BindEffectOutbox(nonVersionSeven ? Guid.NewGuid() : Guid.Empty))
+            .Throws<InvalidOperationException>();
+        await Assert.That(operation.EffectOutboxId).IsNull();
+    }
+
+    [Test]
     public async Task CreateApplied_UsesUuidV7AndAcceptsOnlyCompleteCounts()
     {
         ConfigurationManifestOperation operation = CreateApplied(requested: 2, created: 1, skipped: 1);
@@ -55,6 +78,8 @@ public sealed class ConfigurationManifestAuditTests
             CompletedAt);
 
         await Assert.That(validated.RequestedTenantCount).IsEqualTo(3);
+        await Assert.That(() => validated.BindEffectOutbox(Guid.CreateVersion7()))
+            .Throws<InvalidOperationException>();
         await Assert.That(() => ConfigurationManifestOperation.Create(
                 ConfigurationManifestAuditMode.Bootstrap,
                 validated.ApiVersion,

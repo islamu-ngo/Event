@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+ConfigurationImportOperation binds one SHA-256 UTF-8 effect payload digest only
+after an applied or forward-rollback receipt has an outbox identity. Failed
+operations cannot bind it, and a second binding cannot replace the digest.
+ConfigurationManifestOperation binds one nonempty UUIDv7 outbox identity only in
+the Applied state. These are domain receipt primitives: persistence mappings,
+generated migration parity and publication-consumer wiring remain required
+before deployment; no new storage contract is claimed by this slice.
+
 HumanCerbosPrincipalReader requires the original resolved human and authentic
 credential lifetime before observing persisted principal sources on the selected
 idle owner. It rejects machine callers and account mismatch, retains the same

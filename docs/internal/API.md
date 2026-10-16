@@ -13,6 +13,19 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+HumanSupportForwardingObservation captures validated in-process support metadata
+and the original canonical subject before selecting an owner. The managed support
+fence acquires only after policy-source-set and principal revalidation, then returns
+fresh persisted session/governance facts on the same Serializable connection.
+HumanSupportAccessProjection applies original defaults, inactivity, lifetime,
+read-only compatibility and target-tenant boundary denials after final reads using
+the caller's trusted time sample. It never grants the requested operation. Native
+AllowedValues arrays remain serialized metadata at the managed boundary. Production
+factory registration and parent final admission remain separate work. SQLite
+session readers preserve actor/session/tenant bounds and compare UTC offsets at
+full tick precision, avoiding unsupported DateTimeOffset LINQ comparisons and
+millisecond rounding at the exclusive expiry boundary.
+
 HumanPrincipalSourceFence observes fixed account, binding and membership inputs
 on the selected connection, acquires policy-source-set exclusion first, and retains
 the original Serializable transaction through revalidation. Native tenant-owner

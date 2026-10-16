@@ -14,6 +14,14 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+Managed support checks now read persisted session and governance facts on the
+original selected owner, so a cached positive context cannot override revocation,
+disabled write mode or tenant mismatch. Boundary projection preserves support
+lifetimes, read-only compatibility and original defaults; it is a denial check,
+not an operation grant. Native allowed-value metadata remains intact. Production
+registration and verified parent final admission are still required. SQLite
+session lookups preserve UTC offsets and the exact exclusive expiry boundary.
+
 Managed principal observation and leases retain the original database owner and
 canonical human subject through transaction revalidation. Save operations validate
 tracked tenant references before persistence, and human-owned audit records use

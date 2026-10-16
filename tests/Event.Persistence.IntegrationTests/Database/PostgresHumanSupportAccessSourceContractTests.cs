@@ -23,6 +23,36 @@ namespace Event.Persistence.IntegrationTests.Database;
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 public sealed class PostgresHumanSupportAccessSourceContractTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    public async Task ManagedObservationPreservesAllowedValuesJson()
+    {
+        await using var ingress = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        var (subject, forwarding, _) =
+            await global::Event.Persistence.IntegrationTests.HumanSupportAccessSourceFenceTests.CaptureAsync(ingress, null);
+        await using var database = await SupportDatabase.CreateAsync(fixture);
+        await database.SeedAsync();
+        await SupportDatabase.ExecuteAsync(database.Migration, $"""
+            UPDATE {database.Sql.Table(typeof(SystemSetting))}
+            SET {database.Sql.Column(typeof(SystemSetting), "AllowedValues")} = '["true","false"]'::jsonb
+            WHERE {database.Sql.Column(typeof(SystemSetting), "SettingKey")} =
+                '{GovernanceSettingKeys.SupportAccess.Enabled}'
+            """);
+        await using var context = await database.OpenAsync(PrimaryDatabaseRole.Runtime);
+        context.TenantContext = ingress;
+        await database.SetTenantAsync(context, ingress.TenantId);
+        var source = new HumanSupportAccessSourceFence(context, subject, forwarding,
+            PolicySourceSetPurpose.RuntimeTenant, fixture.NativeQueueEnrollment);
+
+        var facts = await source.ObserveAsync();
+
+        using var allowed = JsonDocument.Parse(facts.Settings.Single(row =>
+            row.SettingKey == GovernanceSettingKeys.SupportAccess.Enabled).AllowedValues!);
+        await Assert.That(allowed.RootElement.GetArrayLength()).IsEqualTo(2);
+        await Assert.That(allowed.RootElement[0].GetString()).IsEqualTo("true");
+        await Assert.That(allowed.RootElement[1].GetString()).IsEqualTo("false");
+        await Assert.That(facts.Sessions.Length).IsEqualTo(0);
+    }
+
     private static readonly string[] SupportKeys =
     [
         GovernanceSettingKeys.SupportAccess.Enabled,

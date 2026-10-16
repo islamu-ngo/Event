@@ -1,6 +1,6 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
-using Explore.Domain.Enums;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -39,36 +39,18 @@ public class SupportAccessSessionRepository : ISupportAccessSessionRepository
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.SupportAccessSessions
-            .Where(session => session.ActorUserId == actorUserId)
-            .Where(session => session.StatusId == (int)SupportAccessSessionStatusEnum.Active)
-            .Where(session => session.EndedAtUtc == null)
-            .Where(session => session.StartedAtUtc <= nowUtc && nowUtc < session.ExpiresAtUtc)
-            .OrderByDescending(session => session.StartedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+        return SupportAccessTemporalQueries.GetActiveForActorAsync(_dbContext, actorUserId, nowUtc, cancellationToken);
     }
 
-    public Task<SupportAccessSession?> GetActiveOwnedSessionAsync(
+    public async Task<SupportAccessSession?> GetActiveOwnedSessionAsync(
         Guid sessionId,
         Guid actorUserId,
         Guid? targetTenantId,
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default)
     {
-        IQueryable<SupportAccessSession> query = _dbContext.SupportAccessSessions
-            .AsNoTracking()
-            .Where(session => session.Id == sessionId)
-            .Where(session => session.ActorUserId == actorUserId)
-            .Where(session => session.StatusId == (int)SupportAccessSessionStatusEnum.Active)
-            .Where(session => session.EndedAtUtc == null)
-            .Where(session => session.StartedAtUtc <= nowUtc && nowUtc < session.ExpiresAtUtc);
-
-        if (targetTenantId.HasValue)
-        {
-            query = query.Where(session => session.TargetTenantId == targetTenantId.Value);
-        }
-
-        return query.FirstOrDefaultAsync(cancellationToken);
+        return await SupportAccessTemporalQueries.GetActiveOwnedSessionAsync(
+            _dbContext, sessionId, actorUserId, targetTenantId, nowUtc, cancellationToken);
     }
 
     public Task<SupportAccessSession?> GetOwnedSessionAsync(
@@ -82,16 +64,10 @@ public class SupportAccessSessionRepository : ISupportAccessSessionRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<bool> HasActiveSessionForActorAsync(Guid actorUserId, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+    public async Task<bool> HasActiveSessionForActorAsync(Guid actorUserId, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
     {
-        return _dbContext.SupportAccessSessions
-            .AnyAsync(
-                session => session.ActorUserId == actorUserId
-                    && session.StatusId == (int)SupportAccessSessionStatusEnum.Active
-                    && session.EndedAtUtc == null
-                    && session.StartedAtUtc <= nowUtc
-                    && nowUtc < session.ExpiresAtUtc,
-                cancellationToken);
+        return await SupportAccessTemporalQueries.HasActiveSessionForActorAsync(
+            _dbContext, actorUserId, nowUtc, cancellationToken);
     }
 
     public async Task<IReadOnlyList<SupportAccessSession>> ListForTargetTenantAsync(
@@ -101,11 +77,7 @@ public class SupportAccessSessionRepository : ISupportAccessSessionRepository
     {
         int boundedLimit = Math.Clamp(limit, 1, MaxListLimit);
 
-        return await _dbContext.SupportAccessSessions
-            .AsNoTracking()
-            .Where(session => session.TargetTenantId == targetTenantId)
-            .OrderByDescending(session => session.StartedAtUtc)
-            .Take(boundedLimit)
-            .ToListAsync(cancellationToken);
+        return await SupportAccessTemporalQueries.ListSessionsForTargetTenantAsync(
+            _dbContext, targetTenantId, boundedLimit, cancellationToken);
     }
 }

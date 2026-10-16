@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52M9XYAC2KP1H0KAJ3Q18D6
+Title: "Capture request-local validated credential lifetime evidence"
+Type: feat
+Scope: access
+Summary: "Bind signed credential bounds to final authentication scheme and exact request identity without exposing private evidence."
+Group: validated-credential-lifetime
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Signed credential lifetime evidence cannot be extended through mutable claims or reused by a replaced principal.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Credential evidence retains provider clock skew and does not itself change configured lifetimes or grant administrative access.

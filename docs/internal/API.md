@@ -3,6 +3,24 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Validated Human Credential Lifetime
+
+The API captures signed credential bounds only after native JWT or ATProto
+session validation. HumanAuthenticationLifetimeObserver returns immutable
+request-local evidence, not an authorization grant. It requires final successful
+authentication, the same selected scheme, the exact authenticated identity and
+the original provider account key. Replaced principals and unrelated requests
+cannot inherit the observation.
+
+Expiry and optional not-before come from the authenticated raw token payload,
+not mutable claims or ticket properties. Duplicate, malformed or overflowing
+bounds produce no evidence. IsValidAt preserves the validating scheme's inclusive
+clock skew anchored to signed expiry. Local evidence also retains the originally
+validated session authority. Mutation consumers must bind the account and recheck
+the evidence after their final blocking operation; consumer adoption is separate
+from this capture mechanism. Serialization ignores evidence fields and ToString
+returns only the type name.
+
 ## Diagnostic Scope Ownership
 
 Support-access request auditing preserves the completed HTTP response when

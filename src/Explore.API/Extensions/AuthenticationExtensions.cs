@@ -21,6 +21,7 @@ using Explore.Domain.Constants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -47,6 +48,9 @@ public static class AuthenticationExtensions
         var tokenContext = new KeycloakTokenContextPolicy(
             audience, new HashSet<string>(permittedClients, StringComparer.Ordinal));
 
+        services.AddHttpContextAccessor();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddScoped<IHumanAuthenticationLifetimeObserver, HumanAuthenticationLifetimeObserver>();
         services.AddSingleton<DynamicJwtConfigurationService>();
         services.AddSingleton<IJwtAuthorityRefreshNotifier>(sp =>
             sp.GetRequiredService<DynamicJwtConfigurationService>());
@@ -156,6 +160,7 @@ public static class AuthenticationExtensions
                             context.Fail("Keycloak access-token context is invalid.");
                             return Task.CompletedTask;
                         }
+                        HumanAuthenticationLifetimeObserver.CaptureJwt(context);
                         return Task.CompletedTask;
                     },
                     // Performance: skip JWT token validation entirely for onboarding paths.
@@ -248,7 +253,9 @@ public static class AuthenticationExtensions
                         if (outcome != LocalSessionValidationOutcome.Valid)
                         {
                             context.Fail("Local session authority is invalid.");
+                            return;
                         }
+                        HumanAuthenticationLifetimeObserver.CaptureJwt(context);
                     }
                 };
             })

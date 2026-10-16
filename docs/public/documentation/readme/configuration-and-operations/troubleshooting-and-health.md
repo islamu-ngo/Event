@@ -6,6 +6,14 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+## Credential lifetime evidence
+
+The API can retain request-local evidence of a validated human credential's
+original expiry. Editing claims or authentication ticket expiry does not renew
+that credential, and copying a principal does not transfer its evidence. This
+capture mechanism preserves existing provider clock skew; it does not itself
+change token lifetime configuration or authorize an administrative action.
+
 ## Keycloak token audience and purpose
 
 API requests require an access token whose aud contains KEYCLOAK__AUDIENCE

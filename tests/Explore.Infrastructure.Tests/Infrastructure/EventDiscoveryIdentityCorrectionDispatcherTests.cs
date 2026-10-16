@@ -73,16 +73,31 @@ public sealed class EventDiscoveryIdentityCorrectionDispatcherTests
 
     private sealed class RecordingTenantContextAccessor(Guid? tenantId) : ITenantContextAccessor
     {
+        private bool _executionBound;
         public List<Guid> ObservedTenants { get; } = [];
         public Guid? TenantId { get; private set; } = tenantId;
         public bool IsResolved => TenantId.HasValue;
 
+        public void BindExecutionTenant(Guid value)
+        {
+            ArgumentOutOfRangeException.ThrowIfEqual(value, Guid.Empty);
+            SetTenant(value);
+            _executionBound = true;
+        }
+
         public void SetTenant(Guid value)
         {
+            if (_executionBound)
+                throw new InvalidOperationException("Execution tenant facts cannot be changed.");
             TenantId = value;
             ObservedTenants.Add(value);
         }
 
-        public void Clear() => TenantId = null;
+        public void Clear()
+        {
+            if (_executionBound)
+                throw new InvalidOperationException("Execution tenant facts cannot be cleared.");
+            TenantId = null;
+        }
     }
 }

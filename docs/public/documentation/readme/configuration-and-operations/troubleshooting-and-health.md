@@ -409,6 +409,20 @@ boundaries.
 
 ---
 
+## Email Content Retention
+
+Retention discovers bounded tenant identities through Global authority, then
+redacts each tenant through a separate Runtime scope. Migrate the PostgreSQL
+discovery capability before enabling cleanup. Missing discovery authority fails
+the pass; restore the declared grants instead of giving Global email-table reads.
+
+Dry-run uses the same selected-tenant scope. Each tenant's outbox, attempts,
+receipts and notification deliveries redact in one transaction. A failed tenant
+remains counted while other tenants continue; cancellation still propagates.
+Sent/skipped cutoffs, batch limits and unresolved-message preservation remain
+unchanged. Failure warnings expose only `retention_cleanup_failed`, not exception
+types, provider text or recipient details.
+
 ## Inventory Hold Expiry
 
 Run application migrations before enabling hold-expiry jobs so the PostgreSQL

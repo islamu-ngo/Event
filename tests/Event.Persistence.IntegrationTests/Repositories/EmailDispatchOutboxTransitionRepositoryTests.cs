@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models;
@@ -509,12 +510,13 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         receipt.FailureMessage = "retained receipt detail";
         await context.SaveChangesAsync();
 
-        var redacted = await repository.RedactRetentionEligible(
+        context.TenantContext = new RetentionTenantIdentity(graph.Dispatch.TenantId);
+        var redacted = await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(ct => repository.RedactRetentionEligible(
             graph.Dispatch.TenantId,
             utcNow.AddDays(-180),
             utcNow,
             10,
-            CancellationToken.None);
+            ct), CancellationToken.None);
 
         context.ChangeTracker.Clear();
         dispatch = await context.EmailDispatchOutbox.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == graph.Dispatch.Id);
@@ -540,6 +542,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         await using var context = fixture.CreateDbContext();
         var tenant = await SeedTenantAsync(context, "retention-resolution");
         var dispatch = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.DeadLettered);
+        context.TenantContext = new RetentionTenantIdentity(tenant.Id);
         var repository = new EmailDispatchOutboxRepository(context);
         var utcNow = AtPostgresPrecision(DateTime.UtcNow);
 
@@ -555,12 +558,12 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
             Guid.CreateVersion7(),
             utcNow.AddDays(-181),
             CancellationToken.None);
-        var redacted = await repository.RedactRetentionEligible(
+        var redacted = await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(ct => repository.RedactRetentionEligible(
             tenant.Id,
             utcNow.AddDays(-180),
             utcNow,
             10,
-            CancellationToken.None);
+            ct), CancellationToken.None);
         var replayed = await repository.TryReplayForOperator(
             tenant.Id,
             dispatch.Id,
@@ -1635,6 +1638,8 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         await Assert.That(dispatch.NextAttemptAt).IsNull();
         await Assert.That(delivery.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Unknown);
     }
+
+    private sealed record RetentionTenantIdentity(Guid TenantId) : ITenantContext;
 
     private static async Task<Tenant> SeedTenantAsync(ExploreDbContext context, string slugPrefix)
     {

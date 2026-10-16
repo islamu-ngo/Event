@@ -131,11 +131,6 @@ public interface IEmailDispatchOutboxRepository
         DateTime reconciledAt,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Guid>> GetRetentionTenantIds(
-        DateTime cutoffUtc,
-        int maxTenants,
-        CancellationToken cancellationToken);
-
     Task<int> CountRetentionRedactionEligible(
         Guid tenantId,
         DateTime cutoffUtc,

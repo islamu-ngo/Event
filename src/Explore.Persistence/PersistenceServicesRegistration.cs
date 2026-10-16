@@ -18,6 +18,7 @@ using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Domain;
 using Explore.Persistence.Caching;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
@@ -637,6 +638,8 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddScoped<IConfigurationManifestEffectOutboxRepository, OutboxRepository>();
         services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+        services.AddScoped<IEmailRetentionTenantDiscoveryRepository, EmailRetentionTenantDiscoveryRepository>();
+        services.AddScoped<IEmailRetentionExecutionScopeFactory, EmailRetentionExecutionScopeFactory>();
         services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();
         services.AddScoped<IEmailDeliveryDisableImpactReader, EmailDeliveryDisableImpactReader>();
         services.AddScoped<IEmailDeliverySettingsWriter, EmailDeliverySettingsWriter>();

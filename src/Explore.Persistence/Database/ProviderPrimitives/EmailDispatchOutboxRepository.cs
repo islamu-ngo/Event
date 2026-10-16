@@ -1143,31 +1143,13 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         return true;
     }
 
-    public async Task<IReadOnlyList<Guid>> GetRetentionTenantIds(
-        DateTime cutoffUtc,
-        int maxTenants,
-        CancellationToken cancellationToken)
-    {
-        return await RetentionRedactionEligible(cutoffUtc)
-            .GroupBy(outbox => outbox.TenantId)
-            .Select(group => new
-            {
-                TenantId = group.Key,
-                OldestCreatedAt = group.Min(outbox => outbox.CreatedAt)
-            })
-            .OrderBy(row => row.OldestCreatedAt)
-            .ThenBy(row => row.TenantId)
-            .Take(maxTenants)
-            .Select(row => row.TenantId)
-            .ToListAsync(cancellationToken);
-    }
-
     public Task<int> CountRetentionRedactionEligible(
         Guid tenantId,
         DateTime cutoffUtc,
         int batchSize,
         CancellationToken cancellationToken)
     {
+        EnsureRetentionTenant(tenantId, batchSize);
         return RetentionRedactionEligible(cutoffUtc)
             .Where(outbox => outbox.TenantId == tenantId)
             .OrderBy(e => e.CreatedAt)
@@ -1182,6 +1164,9 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         int batchSize,
         CancellationToken cancellationToken)
     {
+        EnsureRetentionTenant(tenantId, batchSize);
+        if (_dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("email_retention_requires_transaction");
         var rows = await RetentionRedactionEligible(cutoffUtc)
             .Where(outbox => outbox.TenantId == tenantId)
             .OrderBy(e => e.CreatedAt)
@@ -1196,8 +1181,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
 
         var ids = rows.ToArray();
         await _dbContext.EmailDispatchAttempts
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
-            .Where(attempt => ids.Contains(attempt.EmailDispatchOutboxId))
+            .Where(attempt => attempt.TenantId == tenantId && ids.Contains(attempt.EmailDispatchOutboxId))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(attempt => attempt.Provider, (string?)null)
                 .SetProperty(attempt => attempt.SanitizedErrorMessage, (string?)null)
@@ -1206,8 +1190,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(attempt => attempt.UpdatedAt, redactedAt), cancellationToken);
 
         await _dbContext.EmailDispatchReceipts
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
-            .Where(receipt => ids.Contains(receipt.EmailDispatchOutboxId))
+            .Where(receipt => receipt.TenantId == tenantId && ids.Contains(receipt.EmailDispatchOutboxId))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(receipt => receipt.ConsumerId, (string?)null)
                 .SetProperty(receipt => receipt.FailureMessage, (string?)null)
@@ -1215,7 +1198,6 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(receipt => receipt.UpdatedAt, redactedAt), cancellationToken);
 
         await _dbContext.NotificationDeliveries
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
             .Where(delivery => delivery.TenantId == tenantId
                 && delivery.EmailDispatchOutboxId != null
                 && ids.Contains(delivery.EmailDispatchOutboxId.Value))
@@ -1225,8 +1207,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(delivery => delivery.UpdatedAt, redactedAt), cancellationToken);
 
         var redactedCount = await _dbContext.EmailDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
-            .Where(outbox => ids.Contains(outbox.Id) && outbox.ContentRedactedAt == null)
+            .Where(outbox => outbox.TenantId == tenantId && ids.Contains(outbox.Id) && outbox.ContentRedactedAt == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(outbox => outbox.RecipientEmail, string.Empty)
                 .SetProperty(outbox => outbox.Subject, string.Empty)
@@ -3346,11 +3327,17 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
     private IQueryable<EmailDispatchOutbox> RetentionRedactionEligible(DateTime cutoffUtc)
     {
         return _dbContext.EmailDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
             .AsNoTracking()
             .Where(outbox => outbox.ContentRedactedAt == null
                 && ((outbox.Status == EmailDispatchStatus.Sent && outbox.SentAt <= cutoffUtc)
                     || (outbox.Status == EmailDispatchStatus.Skipped && outbox.LastFailureAt <= cutoffUtc)));
+    }
+
+    private void EnsureRetentionTenant(Guid tenantId, int batchSize)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(batchSize, 1);
+        if (tenantId == Guid.Empty || _dbContext.IsTenantFilterBypassed || _dbContext.BindTenantLease() != tenantId)
+            throw new InvalidOperationException("email_retention_runtime_tenant_not_selected");
     }
 
     private static void EnsureExactlyOne(int affectedRows, string ledger)

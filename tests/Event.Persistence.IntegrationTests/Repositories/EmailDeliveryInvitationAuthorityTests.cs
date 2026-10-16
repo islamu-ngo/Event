@@ -27,6 +27,8 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [NotInParallel("SqliteEmailDispatchEligibility")]
 public sealed class EmailDeliveryInvitationAuthorityTests
 {
+    private sealed record RetentionTenantIdentity(Guid TenantId) : ITenantContext;
+
     public enum GrantScenario { Active, Missing, Revoked, WrongUser, WrongTenant, Moderator }
 
     [Test]
@@ -211,8 +213,13 @@ public sealed class EmailDeliveryInvitationAuthorityTests
                 .IsEqualTo(EmailDispatchDrainOutcome.AlreadySettled);
 
             DateTime redactedAt = DateTime.UtcNow;
-            await Assert.That(await new EfCoreUnitOfWork(observer).ExecuteInTransactionAsync(token =>
-                repositoryAfter.RedactRetentionEligible(dispatch.TenantId, redactedAt, redactedAt, 10, token))).IsEqualTo(1);
+            await using (var retention = CreateContext(databasePath))
+            {
+                retention.TenantContext = new RetentionTenantIdentity(dispatch.TenantId);
+                await Assert.That(await new EfCoreUnitOfWork(retention).ExecuteInTransactionAsync(token =>
+                    new EmailDispatchOutboxRepository(retention).RedactRetentionEligible(
+                        dispatch.TenantId, redactedAt, redactedAt, 10, token))).IsEqualTo(1);
+            }
             var redacted = (await repositoryAfter.GetByTenantAndId(dispatch.TenantId, dispatch.OutboxId, CancellationToken.None))!;
             await Assert.That(redacted.ContentRedactedAt).IsEqualTo(redactedAt);
             await Assert.That(redacted.RecipientEmail).IsEqualTo(string.Empty);

@@ -101,8 +101,8 @@ completes asynchronously. Custom clients that worked around the former malformed
 is retained. Inspecting status does not send or replay email.
 
 Retention cleanup reports aggregate success/failure counts. A per-tenant cleanup
-warning includes the exception type, not recipient information or raw provider
-details. Investigate database availability and the cleanup configuration when
+warning includes only the fixed `retention_cleanup_failed` category, not exception
+types, recipient information or raw provider details. Investigate database availability and the cleanup configuration when
 failures recur; a failed cleanup is not permission to resend an email.
 
 ---

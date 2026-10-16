@@ -137,6 +137,8 @@ public static class ExploreDatabaseMigrator
                 executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
             await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(
                 executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
+            await PostgresEmailRetentionDiscoveryContract.ApplyAsync(
+                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
         }
     }
 

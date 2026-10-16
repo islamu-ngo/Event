@@ -2370,7 +2370,21 @@ stops.
 
 ### Lifecycle-Email Operations
 
-The selected primary database remains the email delivery ledger. Parent-aware content retention is implemented by the `email-dispatch-retention-cleanup` Quartz job (`EmailDispatchRetentionCleanupJob`): it runs bounded transactional passes, supports dry-run, and records only counts and cutoff timestamps in summary logs. Per-tenant failure warnings retain only the exception type, never the exception object or provider message. Failed tenants remain counted, cancellation still propagates, and this diagnostic boundary does not change transaction or retry behavior.
+The selected primary database remains the email delivery ledger. Parent-aware content retention is implemented by the `email-dispatch-retention-cleanup` Quartz job (`EmailDispatchRetentionCleanupJob`): it runs bounded transactional passes, supports dry-run, and records only counts and cutoff timestamps in summary logs. Per-tenant failure warnings retain only the fixed `retention_cleanup_failed` category, never the exception object or provider message. Failed tenants remain counted, cancellation still propagates, and this diagnostic boundary does not change transaction or retry behavior.
+
+`IEmailRetentionTenantDiscoveryRepository` acquires bounded tenant UUIDs through
+a fresh identity-free Global context. PostgreSQL uses the column-only
+`PostgresEmailRetentionDiscoveryContract`; portable providers use the same
+identity projection. Missing discovery authority fails the pass rather than
+reporting an empty successful fleet.
+
+`IEmailRetentionExecutionScopeFactory` acquires a fresh selected-tenant Runtime
+lease before constructing the repository and unit of work. Counting and all
+four redaction relations retain normal tenant/soft-delete filters and explicit
+tenant predicates. Redaction requires an active transaction; outbox, attempts,
+receipts and notification deliveries change together. Global receives no
+private-content reads or redaction authority. Install the discovery contract
+after forced RLS before enabling retention cleanup.
 
 - Sent and skipped content redacts after the configured 180-day default; attempt and receipt free text/provider IDs follow the selected parent in the same transaction.
 - Dead-lettered, `Unknown`, and parked replay material remains until its explicit resolution timestamp, then follows the same retention clock. `ContentRedactedAt` permanently removes replay authority.

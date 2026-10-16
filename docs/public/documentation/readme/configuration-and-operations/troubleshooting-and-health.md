@@ -14,6 +14,14 @@ five identities distinct; reusing one database login across those authorities is
 rejected. Existing role configuration and approved secret authorities remain the
 source of their usernames and credentials; enrollment introduces no new secret.
 
+The native storage-probe prerequisite excludes changes to settings, secret
+bindings and bootstrap state through a private generation sentinel. It includes
+new, renamed and absent source ranges rather than only known storage keys.
+Acquisition retains the original enrolled Serializable session and does not grant
+access to source values. Drift stops admission without repair. Managed probe
+sessions and production installation still need verified wiring before this
+prerequisite protects an actual probe.
+
 The native webhook resource prerequisite reads declared resource lineage under
 the original enrolled database session. Acquisition excludes concurrent changes
 to its contributor set, including new rows, and admission refuses catalog or

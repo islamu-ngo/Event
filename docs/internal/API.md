@@ -13,6 +13,17 @@ enrollment now carries its original identities into source-owned native contract
 instead of rediscovering role authority from current ACLs. No new secret source or
 database role configuration key is introduced by this enrollment expansion.
 
+PostgresStorageProbeSourceContract adds a dedicated generation sentinel for the
+actual storage probe. Whole-relation BEFORE-statement writers on SystemSetting,
+TenantSetting, SecretBinding and InstanceBootstrapState advance that sentinel for
+inserts, updates, deletes and truncation, including empty ranges and unrelated
+metadata keys. Acquisition holds it on the original Serializable Runtime-tenant
+or Global-instance session; observation returns only the generation. The capability
+adds no original source-table access. Exact source, role, privilege, trigger and
+body admission, including the optional provisioning writer footprint, rejects
+drift without repairing it. Managed probe sessions and production wiring remain
+separate work.
+
 PostgresHumanWebhookResourceSourceContract projects fixed webhook resource
 lineage for a selected actor, tenant, operation, consumer kind and target. Its
 nonlogin owner reads declared columns only; original Runtime and Global sessions

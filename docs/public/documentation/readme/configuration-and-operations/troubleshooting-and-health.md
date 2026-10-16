@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Settings reads require the installed ordinary-settings custody contract and its
+discovery-disclosure dependency. Retain the configured Runtime or Global scope;
+do not grant direct settings-table access to repair a failed native read.
+Native control anchors must survive integration-fixture resets and deployment
+maintenance. Missing or altered custody objects require operator diagnosis,
+not automatic privilege expansion during a request.
+
 Public tenant routing requires the independent Global account and installed
 public-directory function. Suspended tenants and their domain reservations are
 excluded. Do not resolve Runtime permission failures by granting direct tenant

@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+HierarchicalSettingsReader separates hierarchy resolution and local cache
+invalidation from mutation entrypoints. InstanceTenantSettingsReader obtains
+detached native instance and selected-tenant images through ordinary settings
+custody. Reads retain the original context, tenant selection, connection and
+enclosing transaction; they do not acquire human mutation authority or grant
+direct access to settings tables. Ordinary native custody retains its source,
+completion and discovery-disclosure settlement guards.
+
 TenantLifecycleAccessService checks public eligibility through ITenantLookupSource.
 The directory owns an independent Global context and exposes only active tenant
 identifiers, slugs and public domain reservations. PostgreSQL projects these fields

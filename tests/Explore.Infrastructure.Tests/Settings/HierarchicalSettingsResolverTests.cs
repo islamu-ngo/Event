@@ -36,6 +36,13 @@ public class HierarchicalSettingsResolverTests : IDisposable
     {
         _systemRepo = Substitute.For<ISystemSettingRepository>();
         _tenantRepo = Substitute.For<ITenantSettingRepository>();
+        _systemRepo.GetAllSettings(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new List<SystemSetting>());
+        _tenantRepo.GetAllForTenant(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<TenantSetting>());
+        _tenantRepo.GetByTenantAndKeys(
+                Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<TenantSetting>());
         _orgRepo = Substitute.For<IOrganizationSettingRepository>();
         _groupRepo = Substitute.For<IGroupSettingRepository>();
         _groupTenantRepo = Substitute.For<IGroupTenantRepository>();
@@ -1170,12 +1177,16 @@ public class HierarchicalSettingsResolverTests : IDisposable
 
     private void SetupSystemSettings(params SystemSetting[] settings)
     {
-        _systemRepo.GetAllSettings(Arg.Any<string?>()).Returns(settings.ToList());
+        _systemRepo.GetAllSettings(Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(settings.ToList());
     }
 
     private void SetupTenantSettings(Guid tenantId, params TenantSetting[] settings)
     {
-        _tenantRepo.GetAllForTenant(tenantId).Returns(settings.ToList());
+        _tenantRepo.GetAllForTenant(tenantId, Arg.Any<CancellationToken>()).Returns(settings.ToList());
+        _tenantRepo.GetByTenantAndKeys(
+                tenantId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call => settings.Where(setting =>
+                call.Arg<IReadOnlyCollection<string>>().Contains(setting.SettingKey, StringComparer.Ordinal)).ToList());
     }
 
     private void SetupOrgSettings(

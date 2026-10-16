@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53EYNDCKVV3DMVHHFXEGJ46
+Title: "Admit hierarchical settings reads through native custody"
+Type: fix
+Scope: access
+Summary: "Separate read-only hierarchy resolution and consume detached native settings images without direct table privileges."
+Group: admitted-hierarchical-settings-reader
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Native hierarchy reads retain selected context and transaction without acquiring human mutation authority.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Requires ordinary settings custody and its discovery disclosure dependency.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose native settings readiness without broadening Runtime or Global table privileges.

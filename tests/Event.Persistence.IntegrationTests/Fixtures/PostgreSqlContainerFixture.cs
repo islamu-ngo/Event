@@ -84,6 +84,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresStorageProbeSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresStorageConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresProviderConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresDiscoveryDisclosureContract.ApplyAsync(migratorContext);
+            await PostgresOrdinarySettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTenantLookupContract.ApplyAsync(migratorContext);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""
@@ -354,6 +356,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         new("storage_probe_source"),
         new("storage_configuration_source"),
         new("provider_configuration_source"),
+        new("ordinary_settings_source"),
         new("__EFMigrationsHistory"),
         new("account_authority_kinds"),
         new("ai_conversation_statuses"),

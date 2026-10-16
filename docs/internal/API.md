@@ -5,6 +5,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+LocalStorageQuarantine retains physical custody independently of tenant
+attribution and metadata lifetime. Admission captures the local provider binding,
+bounded object key, canonical path hash and observed size/time evidence. Keys
+cannot escape the captured root or enter quarantine namespaces; non-Linux hosts
+conservatively collapse supported ASCII case aliases. Claims compare the original
+concurrency stamp and require a live lease for completion/block/retry. Reclaimed
+workers cannot settle newer claims. Lexical identity is not a filesystem effect
+check: persistence live-slot uniqueness, native admission and provider symlink/
+rename custody remain separate required integrations.
+
 RegistrationOrderCreationReceipt retains authenticated order-creation evidence
 independent of account, order and HTTP-response retention. Its operation
 fingerprint hashes the family discriminator, original tenant, account, trusted

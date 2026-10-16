@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5378DY9SDWRR00AS9WQF627
+Title: "Retain physical quarantine identity and fence reclaimed workers"
+Type: feat
+Scope: access
+Summary: "Model retained local quarantine custody with canonical physical identity and live claim-stamp fencing."
+Group: local-quarantine-domain-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Stale workers cannot settle reclaimed work; lexical object keys cannot escape the retained root.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Domain custody only; persistence exclusion, generated migration parity and provider filesystem admission remain required.

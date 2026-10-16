@@ -8,6 +8,13 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Local quarantine work can retain physical ownership after tenant metadata is
+removed. A reclaimed worker cannot complete or retry a newer claim, and object
+keys must remain below the retained local root. Domain path normalization alone
+does not authorize a filesystem move; database exclusion and provider path checks
+remain required. Verification here runs on Linux and does not claim a Windows
+filesystem execution result.
+
 Registration creation evidence can outlive account, order or HTTP-response
 cleanup without retaining request or credential payloads. Replay identity stays
 bound to the original tenant, account, principal scope and operation key; a new

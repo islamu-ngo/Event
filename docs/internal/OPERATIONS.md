@@ -108,6 +108,29 @@ an original bound is unavailable; changing the current event schedule cannot
 restore it. Prefer a verified forward correction over removing privacy metadata
 to reopen access. Existing user-erasure authority and backup obligations remain.
 
+### Registration Retention Execution Authority
+
+`RegistrationRetentionCleanupJob` discovers at most 128 active tenant UUIDs per
+page through an independent Global context. PostgreSQL uses
+`PostgresRegistrationRetentionDiscoveryContract`: its nonlogin owner can read
+only tenant identity/status keys and `TenantStatus.IsActiveState`, with no
+registration-data grants. Other relational providers use a bounded identity
+projection; EF InMemory is rejected visibly rather than reporting success.
+The seeded Suspended status remains ineligible.
+
+Each selected UUID opens a fresh ordinary Runtime tenant lease before the
+cleanup repository and unit of work are constructed. Existing 500-row bounds,
+immutable deadlines, provider-claim fencing, storage retirement checks and
+consent/audit boundaries remain the deletion authority.
+
+Install the PostgreSQL discovery contract after tenant RLS through declared
+migration authority. Acquisition never repairs grants. Unexpected role edges,
+routine ACLs, source-column privileges, directory RLS or direct Global access
+to retention rows fail discovery. Do not restore cleanup by granting Global
+broad SELECT/DELETE or looping tenant IDs on an unbound Runtime context.
+Read-time expiry remains effective while physical cleanup is unavailable;
+diagnose failed scheduled jobs and restore declared authority.
+
 ## Instance Bootstrap Lifecycle
 
 Startup runs in one order, in Split and Standalone alike: migrations and

@@ -638,6 +638,8 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddScoped<IConfigurationManifestEffectOutboxRepository, OutboxRepository>();
         services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+        services.AddScoped<IRegistrationRetentionTenantDiscoveryRepository, RegistrationRetentionTenantDiscoveryRepository>();
+        services.AddScoped<IRegistrationRetentionExecutionScopeFactory, RegistrationRetentionExecutionScopeFactory>();
         services.AddScoped<IEmailRetentionTenantDiscoveryRepository, EmailRetentionTenantDiscoveryRepository>();
         services.AddScoped<IEmailRetentionExecutionScopeFactory, EmailRetentionExecutionScopeFactory>();
         services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();

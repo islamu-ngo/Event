@@ -26,7 +26,7 @@ public class NullTranslationProvider : ITranslationManagementProvider
 
     public Task<IEnumerable<TranslationExport>> ExportTranslationsAsync(string languageCode, CancellationToken ct = default)
     {
-        _logger.LogDebug("NullTranslationProvider: ExportTranslations returning empty for {Language}", languageCode);
+        _logger.LogDebug("localization_export_disabled");
         return Task.FromResult(Enumerable.Empty<TranslationExport>());
     }
 

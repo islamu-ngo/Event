@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+Localization provider, resolver and cache diagnostics retain stable event
+codes and useful failure categories without provider exception bodies, caller
+language strings, configuration coordinates or translation values. Translation
+metrics retain counters/durations while mapping labels through supported culture
+and closed provider/category sets; unknown values cannot become unbounded metric
+labels. Tests exercise real provider failure/fallback paths and an isolated meter
+collector. This confidentiality change does not establish TMS response-size bounds
+or final publication admission; those gates remain open.
+
 BundleSchema bounds incoming file bytes before parsing and rejects the entire
 override on duplicate, nested or oversized translation data. Offline reads retain
 embedded defaults rather than publishing a partial invalid override. BundleFileWriter

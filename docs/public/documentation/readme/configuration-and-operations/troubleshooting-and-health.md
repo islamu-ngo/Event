@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Localization failures retain useful operational categories while omitting raw
+provider exceptions, caller language input and translation contents. Metrics keep
+counts and timings with bounded labels. Cache fallback behavior remains active;
+confidential diagnostics do not replace TMS transport limits or publication
+authorization.
+
 Invalid localization override files are rejected as a whole, leaving embedded
 defaults in place. Invalid write candidates do not create output directories or
 replace existing bundles; valid flat text is safely JSON-escaped and atomically

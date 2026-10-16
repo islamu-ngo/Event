@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Pure route projection keeps platform settings governance separate from tenant
+BYO authorization endpoints. Ordinary tenant-resource projection may select BYO
+before instance mode, while Local projection requires co-located decision sources.
+These projections describe evaluator selection, not an authorization grant or
+proof that native commit-time admission has been installed.
+
 Source observations use the normal hierarchical setting precedence rules.
 An empty tenant override set still counts as tenant context: missing SMTP
 delegation keeps tenant SMTP changes locked, rather than granting delegation

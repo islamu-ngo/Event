@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52NT8C0N1252AP1GNJ8MDR2
+Title: "Project current human principal and authorization route facts"
+Type: feat
+Scope: access
+Summary: "Validate human account continuity and select authorization evaluator routes from immutable fresh source observations."
+Group: human-source-projections
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Principal continuity fails closed and platform settings governance excludes tenant BYO evaluator routing.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Pure projections grant no action and install no native locks; Local decisions require co-located sources.

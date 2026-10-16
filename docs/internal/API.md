@@ -5,6 +5,19 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+HumanPrincipalSourceValidation requires one current undeleted account and its
+original provider binding. Local sessions additionally require ready credential
+state, matching validated stamp/email state and completed operation/personal actor
+continuity. Non-Local identities cannot borrow Local session facts.
+
+HumanAuthorizationRouteProjector selects an immutable route from the six fixed
+fresh setting facts and captured deployment scalars. Tenant BYO precedes instance
+mode for ordinary resources; platform settings governance never routes to tenant
+BYO. Local decisions require co-located decision sources. Route equivalence compares
+decision inputs, excluding the observed admin endpoint. These pure projections
+provide neither source locks nor policy decisions; native acquisition and final
+consumer admission remain separate prerequisites.
+
 HierarchicalSettingMerge accepts immutable SettingMergeFacts as well as entity
 maps. Entity reads adapt to facts and share one precedence evaluator with source
 observations: instance locks, tenant locks, registered scope bounds and child

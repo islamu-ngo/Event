@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\src\Event.MigrationService\Event.MigrationService.csproj"
                       Aliases="migrationservice" />
     <ProjectReference Include="..\..\src\Explore.Infrastructure\Explore.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Explore.API\Explore.API.csproj" />
     <ProjectReference Include="..\..\src\Explore.Persistence\Explore.Persistence.csproj" />
   </ItemGroup>
 

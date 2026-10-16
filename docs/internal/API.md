@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+CerbosPrincipalBuilder.BuildPrincipalFromSources projects immutable persisted
+human facts into the existing policy attribute schema. Administrator membership
+maps are deduplicated, while event permission arrays retain their original order
+and multiplicity. CapturePrincipal clones the protobuf principal so later SDK
+mutation cannot alter retained comparison evidence. These pure operations do not
+validate a credential, acquire a source lease or authorize a commit. The existing
+reader constructor and production read path are not switched by this slice.
+
 The managed AI moderation proposal target source reads one exact cross-tenant
 event on the original selected conversation owner. Discovery requires current
 persisted instance administration; acquisition and final validation also retain

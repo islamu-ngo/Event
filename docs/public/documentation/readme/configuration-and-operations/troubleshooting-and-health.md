@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Human policy inputs can be projected from persisted source facts without
+changing policy attribute names. Retained principal snapshots are independent of
+later SDK object changes. This projection is not a grant of authority; original
+credential checks, source retention and final request admission remain required.
+
 Cross-tenant moderation proposal discovery is limited to one exact live event
 and requires current persisted instance administration. The conversation tenant
 stays selected, and ordinary event reads remain isolated. This source capability

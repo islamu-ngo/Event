@@ -61,6 +61,11 @@ are unchanged; no database migration is required for this removal.
 
 ## 2. Database & Relational Persistence
 
+Before upgrading, configure credentials independently for every database role
+your deployment selects. Use that role's structured username/password fields or
+explicit environment aliases; generic or sibling credentials cannot fill missing
+values. An explicitly empty structured value blocks its environment alias.
+
 | Variable | Status | Default | Description |
 |---|---|---|---|
 | `DATABASE_PROVIDER` | **Baseline** | `PostgreSql` | Selected provider: `PostgreSql`, `Sqlite`, `SqlServer`, `MariaDb`, or `MySql`. |

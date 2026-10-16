@@ -30,6 +30,19 @@ public static partial class PrimaryDatabaseConfiguration
     public static PrimaryDatabaseConnectionOptions BindMigrator(IConfiguration configuration)
         => Bind(configuration, PrimaryDatabaseRole.Migrator);
 
+    public static PrimaryDatabaseConnectionOptions BindGlobal(IConfiguration configuration)
+        => Bind(configuration, PrimaryDatabaseRole.Global);
+
+    /// <summary>Resolves an explicitly declared login without loading its password or another purpose's credentials.</summary>
+    public static string BindUsername(IConfiguration configuration, PrimaryDatabaseRole role)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        if (!Enum.IsDefined(role))
+            throw new ArgumentOutOfRangeException(nameof(role), role, null);
+        return ReadRoleCredential(configuration, configuration.GetSection(SectionName).GetSection(role.ToString()),
+            "Username", role) ?? throw new InvalidOperationException($"Missing explicit Database:{role}:Username authority.");
+    }
+
     public static PrimaryDatabaseConnectionOptions Bind(IConfiguration configuration, PrimaryDatabaseRole role)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -37,7 +50,19 @@ public static partial class PrimaryDatabaseConfiguration
         RejectUnsupportedPrefixAlias(configuration);
 
         var root = configuration.GetSection(SectionName);
-        var roleSection = root.GetSection(role == PrimaryDatabaseRole.Runtime ? RuntimeSectionName : MigratorSectionName);
+        var roleSection = root.GetSection(role switch
+        {
+            PrimaryDatabaseRole.Runtime => RuntimeSectionName,
+            PrimaryDatabaseRole.Migrator => MigratorSectionName,
+            PrimaryDatabaseRole.Global => "Global",
+            PrimaryDatabaseRole.InstanceKeyRead => nameof(PrimaryDatabaseRole.InstanceKeyRead),
+            PrimaryDatabaseRole.InstanceKeyWrite => nameof(PrimaryDatabaseRole.InstanceKeyWrite),
+            PrimaryDatabaseRole.InstanceKeyIssuance => nameof(PrimaryDatabaseRole.InstanceKeyIssuance),
+            PrimaryDatabaseRole.PlatformKeyReport => nameof(PrimaryDatabaseRole.PlatformKeyReport),
+            PrimaryDatabaseRole.EmailPolicyInstanceMutation => nameof(PrimaryDatabaseRole.EmailPolicyInstanceMutation),
+            PrimaryDatabaseRole.EmailPolicyTenantMutation => nameof(PrimaryDatabaseRole.EmailPolicyTenantMutation),
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
+        });
         var providerValue = ReadRequired(configuration, root, roleSection, "Provider", role);
         if (!TryParseNamedEnum(providerValue, out PrimaryDatabaseProvider provider))
         {
@@ -53,8 +78,12 @@ public static partial class PrimaryDatabaseConfiguration
             Port = ReadOptionalInt(configuration, root, roleSection, "Port", role),
             Database = ReadDatabaseName(configuration, root, roleSection),
             Schema = ReadSchema(configuration, root),
-            Username = ReadOptional(configuration, root, roleSection, "Username", role),
-            Password = ReadOptional(configuration, root, roleSection, "Password", role),
+            Username = role == PrimaryDatabaseRole.Global
+                ? ReadGlobalCredential(configuration, roleSection, "Username", provider)
+                : ReadRoleCredential(configuration, roleSection, "Username", role),
+            Password = role == PrimaryDatabaseRole.Global
+                ? ReadGlobalCredential(configuration, roleSection, "Password", provider)
+                : ReadRoleCredential(configuration, roleSection, "Password", role),
             TlsMode = ReadOptionalEnum(
                 configuration,
                 root,
@@ -442,6 +471,38 @@ public static partial class PrimaryDatabaseConfiguration
 
     private static string ReadRequired(IConfiguration configuration, IConfiguration root, IConfiguration role, string key, PrimaryDatabaseRole? databaseRole = null)
         => ReadOptional(configuration, root, role, key, databaseRole) ?? throw new InvalidOperationException($"Missing structured database configuration section '{SectionName}' or required setting Database:{key}.");
+
+    private static string? ReadGlobalCredential(
+        IConfiguration configuration, IConfiguration role, string key, PrimaryDatabaseProvider provider)
+    {
+        string? value = role[key] ?? configuration[$"DATABASE_GLOBAL_{key.ToUpperInvariant()}"];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (provider != PrimaryDatabaseProvider.Sqlite)
+                throw new InvalidOperationException($"Missing explicit Database:Global:{key} authority.");
+            return null;
+        }
+        return key == "Password" ? value : value.Trim();
+    }
+
+    private static string? ReadRoleCredential(
+        IConfiguration configuration, IConfiguration role, string key, PrimaryDatabaseRole databaseRole)
+    {
+        // Explicit empty values fail closed; a role cannot inherit shared or another role's credentials.
+        string environmentRole = databaseRole switch
+        {
+            PrimaryDatabaseRole.InstanceKeyRead => "INSTANCE_KEY_READ",
+            PrimaryDatabaseRole.InstanceKeyWrite => "INSTANCE_KEY_WRITE",
+            PrimaryDatabaseRole.InstanceKeyIssuance => "INSTANCE_KEY_ISSUANCE",
+            PrimaryDatabaseRole.PlatformKeyReport => "PLATFORM_KEY_REPORT",
+            PrimaryDatabaseRole.EmailPolicyInstanceMutation => "EMAIL_POLICY_INSTANCE_MUTATION",
+            PrimaryDatabaseRole.EmailPolicyTenantMutation => "EMAIL_POLICY_TENANT_MUTATION",
+            _ => databaseRole.ToString().ToUpperInvariant()
+        };
+        string? value = role[key] ?? configuration[$"DATABASE_{environmentRole}_{key.ToUpperInvariant()}"];
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return key == "Password" ? value : value.Trim();
+    }
 
     private static string? ReadOptional(IConfiguration configuration, IConfiguration root, IConfiguration role, string key, PrimaryDatabaseRole? databaseRole = null)
     {

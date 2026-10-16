@@ -821,6 +821,12 @@ not caller-supplied correlation headers.
 
 ## DI Registration
 
+Database role credentials bind only from `Database:<Role>:Username` and
+`Database:<Role>:Password` or that role's explicit `DATABASE_<ROLE>_*` aliases.
+Generic root credentials and sibling roles are never fallback authorities.
+An explicit empty structured value masks its alias; valid password bytes are
+preserved. `BindUsername` resolves a selected login without acquiring its password.
+
 The Keycloak operator component clears its administrator credential fields and
 apply confirmation on navigation and disposal. Disposal removes the navigation
 subscription; a queued navigation render checks disposal before updating UI.

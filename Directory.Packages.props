@@ -152,6 +152,8 @@
     <PackageVersion Include="Svix" Version="1.99.1" />
     <PackageVersion Include="Stripe.net" Version="52.3.0" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageVersion Include="Testcontainers.Keycloak" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.RabbitMq" Version="4.13.0" />

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M526QMP5WZ4SBT66XD4V549B
+Title: "Resolve patched cryptography dependencies for server persistence"
+Type: fix
+Scope: dependencies
+Summary: "Select Microsoft cryptography PKCS and XML 10.0.13 explicitly at their existing consumer projects so transitive SQL and Data Protection graphs do not restore vulnerable older versions."
+Group: cryptography-package-baseline
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/legal/dependencies/dotnet-cryptography.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Select PKCS and XML cryptography 10.0.13 explicitly in their existing server consumer graphs instead of restoring vulnerable older transitive versions.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

@@ -217,6 +217,7 @@ public sealed class AiAssistantClientService(
     public async Task<AiAssistantCommandResult> ConfirmProposedActionAsync(
         Guid conversationId,
         Guid proposedActionId,
+        string expectedVersion,
         string? idempotencyKey = null,
         CancellationToken cancellationToken = default)
     {
@@ -225,6 +226,7 @@ public sealed class AiAssistantClientService(
             var response = await apiClient.ConfirmAiProposedActionAsync(
                 conversationId,
                 proposedActionId,
+                new ConfirmAiProposedActionRequestDto { ExpectedVersion = expectedVersion },
                 idempotencyKey,
                 cancellationToken: cancellationToken);
 
@@ -278,7 +280,20 @@ public sealed class AiAssistantClientService(
     {
         var message = FirstNonEmpty(ex.Result?.Detail, ex.Result?.Title, fallbackMessage);
         var failureCode = FirstNonEmpty(TryGetProblemCode(ex.Result), TryGetProblemCode(ex.Response), FailureCodeFor(ex));
-        return AiAssistantCommandResult.Failure(failureCode, message);
+        Guid? originalDraftId = null;
+        if (failureCode == "ai_draft_recovery_required"
+            && ex.Result?.AdditionalProperties.TryGetValue("id", out var retained) == true)
+        {
+            originalDraftId = retained switch
+            {
+                Guid id when id != Guid.Empty => id,
+                string value when Guid.TryParse(value, out var id) && id != Guid.Empty => id,
+                JsonElement { ValueKind: JsonValueKind.String } json
+                    when json.TryGetGuid(out var id) && id != Guid.Empty => id,
+                _ => null
+            };
+        }
+        return AiAssistantCommandResult.Failure(failureCode, message) with { Id = originalDraftId };
     }
 
     private static bool TryMapLegacySuccess(ApiException ex, out AiAssistantCommandResult result)

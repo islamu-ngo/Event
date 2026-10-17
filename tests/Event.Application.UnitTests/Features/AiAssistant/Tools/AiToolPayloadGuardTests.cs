@@ -1,9 +1,73 @@
 using Explore.Application.Features.AiAssistant.Tools;
+using Explore.Domain.Ai;
+using System.Text;
 
 namespace Event.Application.UnitTests.Features.AiAssistant.Tools;
 
 public sealed class AiToolPayloadGuardTests
 {
+    [Test]
+    public async Task ArgumentByteBoundaryAcceptsExactBudgetAndRejectsTheNextByte()
+    {
+        const string prefix = "{\"title\":\"";
+        const string suffix = "\"}";
+        string payload = prefix + new string('a', AiToolPayloadGuard.MaximumArgumentBytes - prefix.Length - suffix.Length) + suffix;
+        await Assert.That(Encoding.UTF8.GetByteCount(payload)).IsEqualTo(AiToolPayloadGuard.MaximumArgumentBytes);
+        await Assert.That(AiToolPayloadGuard.ValidateJsonObject(payload, AllowedFields).Succeeded).IsTrue();
+        var rejected = AiToolPayloadGuard.ValidateJsonObject(payload + " ", AllowedFields);
+        await Assert.That(rejected.FailureCode).IsEqualTo("tool_arguments_too_large");
+    }
+
+    [Test]
+    public async Task ArgumentBudgetCountsUtf8BytesRatherThanCharacters()
+    {
+        string payload = "{\"title\":\"" + new string('\u00e9', 33_000) + "\"}";
+        await Assert.That(payload.Length < AiToolPayloadGuard.MaximumArgumentBytes).IsTrue();
+        var result = AiToolPayloadGuard.ValidateJsonObject(payload, AllowedFields);
+        await Assert.That(result.FailureCode).IsEqualTo("tool_arguments_too_large");
+    }
+
+    [Test]
+    public async Task ArgumentDepthBoundaryAcceptsSixteenContainersAndRejectsSeventeen()
+    {
+        var fields = new HashSet<string>(StringComparer.Ordinal) { "metadata" };
+        string payload = "{\"metadata\":" + new string('[', 15) + "0" + new string(']', 15) + "}";
+        await Assert.That(AiToolPayloadGuard.ValidateJsonObject(payload, fields).Succeeded).IsTrue();
+        string deeper = "{\"metadata\":" + new string('[', 16) + "0" + new string(']', 16) + "}";
+        await Assert.That(AiToolPayloadGuard.ValidateJsonObject(deeper, fields).FailureCode).IsEqualTo("invalid_tool_arguments");
+    }
+
+    [Test]
+    [Arguments("{\"title\":\"first\",\"title\":\"second\"}")]
+    [Arguments("{\"title\":\"first\",\"t\\u0069tle\":\"second\"}")]
+    [Arguments("{\"title\":\"first\",\"metadata\":[{\"source\":1,\"source\":2}]}")]
+    public async Task DuplicateDecodedMembersAreRejectedAtEveryObjectDepth(string payload)
+    {
+        var fields = new HashSet<string>(StringComparer.Ordinal) { "title", "metadata" };
+        var result = AiToolPayloadGuard.ValidateJsonObject(payload, fields);
+        await Assert.That(result.FailureCode).IsEqualTo("ambiguous_tool_arguments");
+    }
+
+    [Test]
+    [Arguments("bytes", "tool_arguments_too_large")]
+    [Arguments("depth", "invalid_tool_arguments")]
+    [Arguments("duplicate", "ambiguous_tool_arguments")]
+    public async Task ProviderAliasNormalizationCannotReopenStructuralRejection(string shape, string code)
+    {
+        string payload = shape switch
+        {
+            "bytes" => "{\"eventName\":\"" + new string('a', AiToolPayloadGuard.MaximumArgumentBytes) + "\"}",
+            "depth" => "{\"eventName\":" + new string('[', 16) + "0" + new string(']', 16) + "}",
+            "duplicate" => "{\"eventName\":\"first\",\"eventName\":\"second\"}",
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        var result = AiToolContractRegistry.CreateDefault().ValidatePayload(
+            AiProposedActionKind.CreateEventDraft, payload, allowProviderNormalization: true);
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo(code);
+        await Assert.That(result.NormalizedPayloadJson).IsNull();
+    }
+
     private static readonly HashSet<string> AllowedFields = new(StringComparer.OrdinalIgnoreCase)
     {
         "title",

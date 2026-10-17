@@ -99,6 +99,7 @@ public sealed record AiProposedActionDto
 
     public Guid Id { get; init; }
     public Guid? MessageId { get; init; }
+    public string Version { get; init; } = string.Empty;
     public string Kind { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public string PayloadJson { get; init; } = string.Empty;

@@ -6,8 +6,8 @@ using Explore.Application.Features.AiAssistant;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Ai;
-using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.Constants;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Ai;
@@ -22,8 +22,7 @@ public sealed class AiProviderConfigurationResolver(
     public async Task<AiProviderCapability> ResolveAsync(
         AiAssistantSettingGroup group, CancellationToken cancellationToken = default)
     {
-        var result = await ResolveSelectedAsync(
-            FromGroup(group, group.ModelId ?? ""), group.TenantOwnedTransport, cancellationToken);
+        var result = await ResolveSelectedAsync(FromGroup(group, group.ModelId ?? ""), group.TenantOwnedTransport, cancellationToken);
         return new(result.Configuration is not null, result.FailureCode);
     }
 
@@ -40,8 +39,8 @@ public sealed class AiProviderConfigurationResolver(
             || configuration.CredentialScope != group.CredentialScope)
             return new(null, "provider_configuration_changed");
 
-        return await ResolveSelectedAsync(
-            FromGroup(group, configuration.ModelId.Trim()), group.TenantOwnedTransport, cancellationToken);
+        return await ResolveSelectedAsync(FromGroup(group, configuration.ModelId.Trim()),
+            group.TenantOwnedTransport, cancellationToken);
     }
 
     internal async Task<AiProviderConfigurationResolution> ResolveDiscoveryAsync(
@@ -50,7 +49,6 @@ public sealed class AiProviderConfigurationResolver(
         if (!Enum.IsDefined(request.Scope) || !Enum.IsDefined(request.CredentialScope)
             || !Uri.TryCreate(request.EndpointUrl.Trim(), UriKind.Absolute, out var endpoint))
             return new(null, "invalid_settings");
-
         bool instance = request.Scope == AiModelDiscoveryScope.Instance;
         var defaults = options.Value;
         if (instance && (defaults.Provider != AiProviderSettings.ProviderOpenAiCompatible
@@ -101,14 +99,13 @@ public sealed class AiProviderConfigurationResolver(
         AiProviderSettings selected, bool tenantOwnedTransport, CancellationToken cancellationToken)
     {
         if (!selected.Enabled)
-            return new(null, "provider_not_configured");
+            return new(null, "provider_disabled");
         if (!validator.Validate(null, selected).Succeeded)
             return new(null, "invalid_settings");
         if ((tenantOwnedTransport || selected.CredentialScope == AiCredentialScope.Tenant)
             && await settings.ResolveAsync<bool>(GovernanceSettingKeys.TenantDelegation.LockAiAssistant,
                 new SettingContext(), cancellationToken))
             return new(null, "credential_scope_invalid");
-
         bool instanceTransport = !tenantOwnedTransport
             && selected.Provider != AiProviderSettings.ProviderFake
             && options.Value.Provider == selected.Provider
@@ -118,9 +115,8 @@ public sealed class AiProviderConfigurationResolver(
             && string.Equals(selected.AzureCredentialMode, AiProviderSettings.AzureCredentialModeDefaultAzureCredential,
                 StringComparison.OrdinalIgnoreCase))
             return selected.CredentialScope == AiCredentialScope.None && !tenantOwnedTransport
-                ? new(new ResolvedAiProviderConfiguration(selected, "", instanceTransport: true), null)
+                ? new(new ResolvedAiProviderConfiguration(selected, "", true), null)
                 : new(null, "credential_scope_invalid");
-
         string provider = AiProviderDefaults.ProviderIdToLabel(selected.Provider);
         if (!AiCredentialReference.TryCreate(provider, selected.CredentialScope, tenant.TenantId,
             tenantOwnedTransport, out var reference))

@@ -9,47 +9,49 @@ namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
 public sealed class CancelAiRunCommandHandler(
     IAiConversationRepository conversationRepository,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IUnitOfWork unitOfWork)
     : ICommandHandler<CancelAiRunCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CancelAiRunCommand request,
-        CancellationToken cancellationToken)
-    {
-        if (!currentUserService.IsAuthenticated || currentUserService.UserId is not { } userId)
+        CancellationToken requestToken) =>
+        unitOfWork.ExecuteSerializableAsync(async cancellationToken =>
         {
-            return Failure("AI run cancellation requires an authenticated user.", "unauthenticated");
-        }
+            if (!currentUserService.IsAuthenticated || currentUserService.UserId is not { } userId)
+            {
+                return Failure("AI run cancellation requires an authenticated user.", "unauthenticated");
+            }
 
-        var conversation = await conversationRepository.GetByIdForUpdateAsync(request.ConversationId, cancellationToken);
+            var conversation = await conversationRepository.GetByIdForUpdateAsync(request.ConversationId, cancellationToken);
 
-        if (conversation is null || conversation.UserId != userId)
-        {
-            return Failure("AI run was not found.", "run_not_found");
-        }
+            if (conversation is null || conversation.UserId != userId)
+            {
+                return Failure("AI run was not found.", "run_not_found");
+            }
 
-        var run = conversation.Runs.FirstOrDefault(candidate => candidate.Id == request.RunId);
+            var run = conversation.Runs.FirstOrDefault(candidate => candidate.Id == request.RunId);
 
-        if (run is null)
-        {
-            return Failure("AI run was not found.", "run_not_found");
-        }
+            if (run is null)
+            {
+                return Failure("AI run was not found.", "run_not_found");
+            }
 
-        if (run.Status == AiRunStatus.Cancelled)
-        {
-            return Success(run.Id, "AI run was already cancelled.");
-        }
+            if (run.Status == AiRunStatus.Cancelled)
+            {
+                return Success(run.Id, "AI run was already cancelled.");
+            }
 
-        if (run.Status is AiRunStatus.Succeeded or AiRunStatus.Failed)
-        {
-            return Failure("Completed AI runs cannot be cancelled.", "run_not_cancellable", run.Id);
-        }
+            if (run.Status is AiRunStatus.Succeeded or AiRunStatus.Failed)
+            {
+                return Failure("Completed AI runs cannot be cancelled.", "run_not_cancellable", run.Id);
+            }
 
-        conversation.CancelRun(run, DateTime.UtcNow);
-        await conversationRepository.Update(conversation);
+            conversation.CancelRun(run, DateTime.UtcNow);
+            await conversationRepository.Update(conversation);
 
-        return Success(run.Id, "AI run cancelled.");
-    }
+            return Success(run.Id, "AI run cancelled.");
+        }, requestToken);
 
     private static BaseCommandResponse<Guid> Success(Guid id, string message) =>
         BaseCommandResponse.Success(id, message);

@@ -34,13 +34,13 @@ public sealed class RuntimeAiChatProvider : IAiChatProvider, IAiModelCatalog
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (request.ProviderConfiguration is { } configuration)
+        if (request.ProviderConfiguration is not null)
         {
-            var overrideStrategy = _resolver.Resolve(configuration.Provider);
-            return overrideStrategy is not null
-                ? overrideStrategy.SendAsync(request, cancellationToken)
-                : Task.FromResult(AiChatProviderResult.Failure(
-                    "provider_not_configured", "No runnable AI provider is configured."));
+            var overrideStrategy = _resolver.Resolve(request.ProviderConfiguration.Provider);
+            if (overrideStrategy is not null)
+                return overrideStrategy.SendAsync(request, cancellationToken);
+            return Task.FromResult(AiChatProviderResult.Failure(
+                "provider_not_configured", "The requested tenant AI provider is not configured."));
         }
 
         if (!TryResolveStrategy(out var strategy, out var failure))

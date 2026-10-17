@@ -20,6 +20,7 @@ public sealed class CreateAiConversationCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAiAssistantActorContextService _actorContextService;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IAiProviderCapabilityResolver _capabilityResolver;
 
     public CreateAiConversationCommandHandler(
@@ -28,6 +29,7 @@ public sealed class CreateAiConversationCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IAiAssistantActorContextService actorContextService,
+        IUnitOfWork unitOfWork,
         IAiProviderCapabilityResolver capabilityResolver)
     {
         _conversationRepository = conversationRepository;
@@ -35,6 +37,7 @@ public sealed class CreateAiConversationCommandHandler
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
         _actorContextService = actorContextService;
+        _unitOfWork = unitOfWork;
         _capabilityResolver = capabilityResolver;
     }
 
@@ -99,7 +102,8 @@ public sealed class CreateAiConversationCommandHandler
             ConcurrencyStamp = Guid.CreateVersion7()
         };
 
-        var created = await _conversationRepository.Create(conversation);
+        var created = await _unitOfWork.ExecuteSerializableAsync(
+            _ => _conversationRepository.Create(conversation), cancellationToken);
 
         return BaseCommandResponse.Success(created.Id, "AI conversation created.");
     }

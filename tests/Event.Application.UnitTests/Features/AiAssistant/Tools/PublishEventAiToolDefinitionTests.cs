@@ -19,7 +19,7 @@ public sealed class PublishEventAiToolDefinitionTests
         await Assert.That(definition.PayloadMapperType).IsEqualTo(typeof(PublishEventAiActionMapper));
         await Assert.That(definition.RequiredAuthorization).IsNotNull();
         await Assert.That(definition.RequiredAuthorization!.ResourceKind).IsEqualTo(ResourceKinds.Event);
-        await Assert.That(definition.RequiredAuthorization.Action).IsEqualTo(AuthorizationActions.Update);
+        await Assert.That(definition.RequiredAuthorization.Action).IsEqualTo(AuthorizationActions.Events.Publish);
         await Assert.That(definition.ExposeToProvider).IsFalse();
         await Assert.That(definition.ExposeToMcp).IsTrue();
         await Assert.That(definition.EffectiveAgentMetadata.RiskClass).IsEqualTo(AiToolRiskClass.High);

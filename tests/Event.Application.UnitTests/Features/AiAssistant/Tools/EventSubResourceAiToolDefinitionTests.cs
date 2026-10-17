@@ -1,12 +1,48 @@
 using System.Text.Json;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Tools;
+using Explore.Application.Authorization;
+using Explore.Application.Features.EventCustomProperties.Requests.Commands;
+using Explore.Application.Features.EventTemplates.Requests.Commands;
+using Explore.Application.Features.EventSessionTemplates.Requests.Commands;
+using Explore.Application.Features.Events.Requests.Commands;
+using System.Reflection;
 using Explore.Domain.Ai;
 
 namespace Event.Application.UnitTests.Features.AiAssistant.Tools;
 
 public sealed class EventSubResourceAiToolDefinitionTests
 {
+    [Test]
+    public async Task ProposalCapabilitiesMatchTheNativePublicationAndAdministrativeAuthorizationContracts()
+    {
+        var registry = AiToolContractRegistry.CreateDefault();
+        var owners = new (AiProposedActionKind Kind, Type Request)[]
+        {
+            (AiProposedActionKind.PublishEvent, typeof(PublishEventCommand)),
+            (AiProposedActionKind.CreateEventCustomPropertyDefinition, typeof(CreateEventCustomPropertyDefinitionCommand)),
+            (AiProposedActionKind.UpdateEventCustomPropertyDefinition, typeof(UpdateEventCustomPropertyDefinitionCommand)),
+            (AiProposedActionKind.DeleteEventCustomPropertyDefinition, typeof(DeleteEventCustomPropertyDefinitionCommand)),
+            (AiProposedActionKind.PurgeEventCustomPropertyDefinition, typeof(PurgeEventCustomPropertyDefinitionCommand)),
+            (AiProposedActionKind.SetEventCustomPropertyValue, typeof(SetEventCustomPropertyValueCommand)),
+            (AiProposedActionKind.SetEventCustomPropertyMultiValues, typeof(SetEventCustomPropertyMultiValuesCommand)),
+            (AiProposedActionKind.CreateEventTemplate, typeof(CreateEventTemplateCommand)),
+            (AiProposedActionKind.UpdateEventTemplate, typeof(UpdateEventTemplateCommand)),
+            (AiProposedActionKind.DeleteEventTemplate, typeof(DeleteEventTemplateCommand)),
+            (AiProposedActionKind.CreateEventSessionTemplate, typeof(CreateEventSessionTemplateCommand)),
+            (AiProposedActionKind.UpdateEventSessionTemplate, typeof(UpdateEventSessionTemplateCommand)),
+            (AiProposedActionKind.DeleteEventSessionTemplate, typeof(DeleteEventSessionTemplateCommand))
+        };
+        foreach (var owner in owners)
+        {
+            var requirement = registry.FindDefinition(owner.Kind)!.RequiredAuthorization;
+            var native = owner.Request.GetCustomAttribute<AuthorizeResourceAttribute>();
+            await Assert.That(native).IsNotNull();
+            await Assert.That(requirement!.ResourceKind).IsEqualTo(native!.Resource);
+            await Assert.That(requirement.Action).IsEqualTo(native.Action);
+        }
+    }
+
     [Test]
     public async Task CreateAll_ReturnsPhaseFiveDefinitionsWithSharedMapper()
     {

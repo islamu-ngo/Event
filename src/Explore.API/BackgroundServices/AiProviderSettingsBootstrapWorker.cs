@@ -3,7 +3,6 @@ using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
-using Explore.Infrastructure.Ai;
 using Microsoft.Extensions.Options;
 
 namespace Explore.API.BackgroundServices;
@@ -24,9 +23,11 @@ public sealed class AiProviderSettingsBootstrapWorker(
         {
             logger.LogDebug("AI provider settings bootstrap worker stopped before seeding defaults");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogWarning(ex, "AI provider settings bootstrap worker failed to seed defaults");
+            logger.LogWarning(
+                "AI provider settings bootstrap worker failed to seed defaults. FailureCategory={FailureCategory}",
+                "defaults_seed_failed");
         }
     }
 

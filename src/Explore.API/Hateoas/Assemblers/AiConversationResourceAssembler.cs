@@ -8,12 +8,16 @@ using Microsoft.AspNetCore.Http;
 
 public sealed class AiConversationResourceAssembler : ResourceAssemblerBase<AiConversationDto, AiConversationSummaryDto>
 {
+    private readonly TimeProvider _timeProvider;
+
     public AiConversationResourceAssembler(
         IHateoasLinkGenerator linkGenerator,
         ILinkPolicy<AiConversationDto> detailLinkPolicy,
-        ICollectionLinkPolicy<AiConversationSummaryDto> collectionLinkPolicy)
+        ICollectionLinkPolicy<AiConversationSummaryDto> collectionLinkPolicy,
+        TimeProvider timeProvider)
         : base(linkGenerator, detailLinkPolicy, collectionLinkPolicy)
     {
+        _timeProvider = timeProvider;
     }
 
     public override async Task<HalResource<AiConversationDto>> ToResource(AiConversationDto dto, HttpContext httpContext)
@@ -26,7 +30,8 @@ public sealed class AiConversationResourceAssembler : ResourceAssemblerBase<AiCo
 
         foreach (var action in dto.ProposedActions)
         {
-            var links = await GenerateLinks(AiProposedActionLinkPolicy.GetLinks(dto, action), httpContext.User, httpContext);
+            var links = await GenerateLinks(AiProposedActionLinkPolicy.GetLinks(dto, action,
+                _timeProvider.GetUtcNow().UtcDateTime), httpContext.User, httpContext);
             action.Links = links.Count == 0 ? null : links;
         }
 

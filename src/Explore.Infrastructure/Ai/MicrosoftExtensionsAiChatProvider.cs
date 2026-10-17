@@ -19,7 +19,7 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
 
     private readonly AiProviderConfigurationResolver _configuration;
     private readonly BusinessMetrics _metrics;
-    private readonly Func<ResolvedAiProviderConfiguration, IChatClient> _createClient;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public MicrosoftExtensionsAiChatProvider(
         AiProviderConfigurationResolver configuration,
@@ -28,21 +28,7 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
     {
         _configuration = configuration;
         _metrics = metrics;
-        _createClient = resolved => InfrastructureServicesRegistration.CreateSdkBackedChatClient(
-            resolved.Settings,
-            resolved.ApiKey,
-            httpClientFactory.CreateClient(
-                HttpClientName + (resolved.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty)));
-    }
-
-    internal MicrosoftExtensionsAiChatProvider(
-        AiProviderConfigurationResolver configuration,
-        BusinessMetrics metrics,
-        Func<AiProviderSettings, IChatClient> createClient)
-    {
-        _configuration = configuration;
-        _metrics = metrics;
-        _createClient = resolved => createClient(resolved.Settings);
+        _httpClientFactory = httpClientFactory;
     }
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListAvailableModelsAsync(CancellationToken cancellationToken = default)
@@ -148,7 +134,9 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
 
         try
         {
-            using var sdkClient = _createClient(configuration);
+            using var sdkClient = InfrastructureServicesRegistration.CreateSdkBackedChatClient(
+                settings, configuration.ApiKey, _httpClientFactory.CreateClient(HttpClientName
+                    + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : "")));
             var response = await sdkClient.GetResponseAsync(
                 messages!,
                 chatOptions,

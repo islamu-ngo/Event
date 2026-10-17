@@ -263,12 +263,10 @@ public sealed class OpenAiResponsesChatProviderTests : AiProviderTestBase
               ]
             }
             """));
-        var provider = CreateProvider(handler, CreateSettings(modelId: "static-model"));
-        Fixture.BindProvider(
-            AiProviderSettings.ProviderOpenAi, AiCredentialScope.Instance, Guid.CreateVersion7().ToString("N"));
-        await Fixture.SelectTenantAsync(
-            AiProviderSettings.ProviderOpenAi, string.Empty, AiCredentialScope.Tenant, "tenant-model");
-        Fixture.BindProvider(AiProviderSettings.ProviderOpenAi, AiCredentialScope.Tenant, Fixture.Credential);
+        var settings = CreateSettings(modelId: "static-model");
+        settings.CredentialScope = AiCredentialScope.Tenant;
+        await Fixture.SelectTenantAsync(AiProviderSettings.ProviderOpenAi, "", AiCredentialScope.Tenant, "tenant-model");
+        var provider = CreateProvider(handler, settings);
 
         var result = await provider.SendAsync(CreateRequest(
             "Hello",

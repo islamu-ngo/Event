@@ -3,7 +3,7 @@ namespace Explore.Application.DTOs.Instance;
 public sealed record AiAssistantGovernanceSettingsDto
 {
     public bool Enabled { get; set; }
-    public string Provider { get; set; } = "openai";
+    public string Provider { get; set; } = "none";
     public string EndpointUrl { get; set; } = string.Empty;
     public string CredentialScope { get; set; } = "none";
     public string ModelId { get; set; } = string.Empty;

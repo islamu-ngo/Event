@@ -79,12 +79,12 @@ public sealed class AiContextGateway : IAiContextGateway
         {
             return SanitizeCore(request);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return AiContextSanitizedEnvelope.Failed(
                 request.EntityName,
                 InternalFailureCode,
-                $"Gateway threw while sanitizing entity '{request.EntityName}': {ex.Message}");
+                "AI context is unavailable.");
         }
     }
 

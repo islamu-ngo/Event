@@ -126,7 +126,7 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
             ? AiAssistantAvailability.ResolveModelId(settings)
             : requestedModelId;
         var provider = AiAssistantAvailability.NormalizeProvider(settings.Provider);
-        if (!UsesTenantConfiguredExternalProvider(settings))
+        if (provider == AiProviderDefaults.ProviderFake)
         {
             var availableModels = await _modelCatalog.ListAvailableModelsAsync(cancellationToken);
 
@@ -169,128 +169,79 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
             modelId,
             interactionMode,
             actorResolution.ActorId);
-        var utcNow = DateTime.UtcNow;
-        var receiptProposal = CreateReceiptProposal(
-            idempotencyKey, tenantId, userId, requestTarget, requestBodyHash, principalFingerprint, utcNow);
         return await _unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            var conversation = await _conversationRepository.GetByIdForUpdateAsync(request.ConversationId, token);
+            var conversation = await _conversationRepository.GetByIdForUpdateAsync(request.ConversationId, actorResolution.ActorId, token);
             if (conversation is null || conversation.UserId != userId || conversation.ActorId != candidate.ActorId)
-            {
-                return Failure("AI conversation authority changed before message commit.",
-                    ["No message was queued."], "conversation_authority_changed");
-            }
-
+                return Failure("AI conversation authority changed before message commit.", ["No message was queued."], "conversation_authority_changed");
             var replay = await TryReplayIdempotencyAsync(
                 idempotencyKey, tenantId, userId, requestTarget, requestBodyHash, principalFingerprint, token);
             if (replay is not null)
-            {
                 return replay;
-            }
 
+            var utcNow = DateTime.UtcNow;
             await _conversationRepository.ReleaseStaleRunningConversationsForUserAsync(
                 userId, ResolveStaleRunCutoffUtc(utcNow, settings), StaleRunFailureCode,
                 StaleRunFailureMessage, utcNow, token);
-            conversation = await _conversationRepository.GetByIdForUpdateAsync(request.ConversationId, token);
-            if (conversation is null || conversation.UserId != userId || conversation.ActorId != candidate.ActorId)
-            {
+            conversation = await _conversationRepository.GetByIdForUpdateAsync(request.ConversationId, actorResolution.ActorId, token);
+            if (conversation is null || conversation.UserId != userId)
                 throw new InvalidOperationException("AI message authority changed during stale-run recovery.");
-            }
-
-            var retryableBlock = conversation.Status == AiConversationStatus.Blocked
+            bool retryableBlock = conversation.Status == AiConversationStatus.Blocked
                 && IsRetryableProviderBlock(conversation.BlockedReason);
             if (conversation.Status != AiConversationStatus.Active && !retryableBlock)
             {
-                return Failure(
-                    "AI conversation is not ready for a new message.",
-                    [$"Conversation status is {conversation.Status}."],
-                    "conversation_not_active");
+                return Failure("AI conversation is not ready for a new message.",
+                    [$"Conversation status is {conversation.Status}."], "conversation_not_active");
             }
-
             var todayUtc = utcNow.Date;
             var messageCount = await _conversationRepository.CountUserMessagesSinceAsync(userId, todayUtc, token);
             if (messageCount >= settings.DailyMessageLimit)
             {
-                return BaseCommandResponse.Quota<Guid>(
-                    "AI daily message limit exceeded.",
-                    new QuotaExceededDetails(
-                        GovernanceSettingKeys.AiAssistant.DailyMessageLimit,
-                        settings.DailyMessageLimit,
-                        messageCount,
-                        messageCount + 1,
-                        UserDailyQuotaScope,
-                        tenantId),
+                return BaseCommandResponse.Quota<Guid>("AI daily message limit exceeded.",
+                    new QuotaExceededDetails(GovernanceSettingKeys.AiAssistant.DailyMessageLimit,
+                        settings.DailyMessageLimit, messageCount, messageCount + 1, UserDailyQuotaScope, tenantId),
                     "Daily AI message quota exceeded.");
             }
-
             var tenantMessageCount = await _conversationRepository.CountTenantMessagesSinceAsync(todayUtc, token);
             if (tenantMessageCount >= settings.DailyTenantMessageLimit)
             {
-                return BaseCommandResponse.Quota<Guid>(
-                    "AI tenant daily message limit exceeded.",
-                    new QuotaExceededDetails(
-                        GovernanceSettingKeys.AiAssistant.DailyTenantMessageLimit,
-                        settings.DailyTenantMessageLimit,
-                        tenantMessageCount,
-                        tenantMessageCount + 1,
-                        TenantDailyQuotaScope,
-                        tenantId),
+                return BaseCommandResponse.Quota<Guid>("AI tenant daily message limit exceeded.",
+                    new QuotaExceededDetails(GovernanceSettingKeys.AiAssistant.DailyTenantMessageLimit,
+                        settings.DailyTenantMessageLimit, tenantMessageCount, tenantMessageCount + 1, TenantDailyQuotaScope, tenantId),
                     "Daily tenant AI message quota exceeded.");
             }
-
             var runningConversationCount = await _conversationRepository.CountRunningConversationsForUserAsync(userId, token);
             if (runningConversationCount >= settings.ConcurrentRunLimit)
             {
-                return BaseCommandResponse.Quota<Guid>(
-                    "AI concurrent run limit exceeded.",
-                    new QuotaExceededDetails(
-                        GovernanceSettingKeys.AiAssistant.ConcurrentRunLimit,
-                        settings.ConcurrentRunLimit,
-                        runningConversationCount,
-                        runningConversationCount + 1,
-                        UserConcurrentQuotaScope,
-                        tenantId),
+                return BaseCommandResponse.Quota<Guid>("AI concurrent run limit exceeded.",
+                    new QuotaExceededDetails(GovernanceSettingKeys.AiAssistant.ConcurrentRunLimit,
+                        settings.ConcurrentRunLimit, runningConversationCount, runningConversationCount + 1, UserConcurrentQuotaScope, tenantId),
                     "Concurrent AI run quota exceeded.");
             }
-
-            var claim = await _idempotencyRepository.TryClaimAsync(receiptProposal, token);
+            var claim = await _idempotencyRepository.TryClaimAsync(CreateReceiptProposal(
+                idempotencyKey, tenantId, userId, requestTarget, requestBodyHash, principalFingerprint, utcNow), token);
             using var receiptOwner = claim.Owner;
             if (receiptOwner is null)
-            {
-                return await TryReplayIdempotencyAsync(
-                    idempotencyKey, tenantId, userId, requestTarget, requestBodyHash, principalFingerprint, token)
+                return await TryReplayIdempotencyAsync(idempotencyKey, tenantId, userId,
+                    requestTarget, requestBodyHash, principalFingerprint, token)
                     ?? Failure("AI receipt acquisition changed.", ["No message was queued."], "idempotency_key_conflict");
-            }
-
-            if (retryableBlock)
-            {
-                conversation.Activate(utcNow);
-            }
+            if (retryableBlock) conversation.Activate(utcNow);
             conversation.ActorId = actorResolution.ActorId;
             foreach (var selectedReference in selectedReferences)
             {
-                if (!conversation.References.Any(existing =>
-                        existing.Kind == selectedReference.Kind
-                        && existing.ReferenceId == selectedReference.ReferenceId))
+                if (!conversation.References.Any(existing => existing.Kind == selectedReference.Kind
+                    && existing.ReferenceId == selectedReference.ReferenceId))
                 {
-                    conversation.AddReference(
-                        selectedReference.Kind,
-                        selectedReference.ReferenceId,
-                        selectedReference.DisplayName,
-                        selectedReference.Summary,
-                        userId,
-                        utcNow);
+                    conversation.AddReference(selectedReference.Kind, selectedReference.ReferenceId,
+                        selectedReference.DisplayName, selectedReference.Summary, userId, utcNow);
                 }
             }
             conversation.AddMessage(AiMessageRole.User, content, userId, utcNow, imageAttachmentsJson);
             var run = conversation.QueueRun(provider, modelId, utcNow);
             await _conversationRepository.Update(conversation);
-            if (!await _idempotencyRepository.CompleteAsync(
-                receiptOwner, 202, run.Id.ToString("D", CultureInfo.InvariantCulture), TextContentType, token))
-            {
+            if (!await _idempotencyRepository.CompleteAsync(receiptOwner, 202,
+                run.Id.ToString("D", CultureInfo.InvariantCulture), TextContentType, token))
                 throw new InvalidOperationException("The original AI receipt could not be completed.");
-            }
-
             return BaseCommandResponse.Success(run.Id, "AI message queued.");
         }, cancellationToken);
     }
@@ -304,18 +255,24 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
         string principalFingerprint,
         CancellationToken cancellationToken)
     {
-        var utcNow = DateTime.UtcNow;
-        var lookup = await _idempotencyRepository.LookupAsync(new(
-            tenantId, idempotencyKey, userId.ToString("N", CultureInfo.InvariantCulture),
-            IdempotencyMethod, requestTarget, JsonContentType, requestBodyHash, principalFingerprint),
-            utcNow, cancellationToken);
+        var lookup = await _idempotencyRepository.LookupAsync(new(tenantId, idempotencyKey,
+            userId.ToString("N", CultureInfo.InvariantCulture), IdempotencyMethod, requestTarget,
+            JsonContentType, requestBodyHash, principalFingerprint), DateTime.UtcNow, cancellationToken);
+        if (lookup.Outcome == IdempotencyLookupOutcome.RequestMismatch)
+            return Failure("Idempotency key conflicts with a previous AI request.",
+                ["Idempotency key was already used for a different request."], "idempotency_key_conflict");
+        var existing = lookup.Record;
 
-        if (lookup.Outcome == IdempotencyLookupOutcome.Absent)
+        if (existing is null)
         {
             return null;
         }
 
-        if (lookup.Outcome == IdempotencyLookupOutcome.RequestMismatch)
+        if (existing.UserId != userId.ToString("N", CultureInfo.InvariantCulture) ||
+            existing.RequestMethod != IdempotencyMethod ||
+            existing.RequestTarget != requestTarget ||
+            existing.RequestBodyHash != requestBodyHash ||
+            existing.PrincipalFingerprint != principalFingerprint)
         {
             return Failure(
                 "Idempotency key conflicts with a previous AI request.",
@@ -323,9 +280,7 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
                 "idempotency_key_conflict");
         }
 
-        var existing = lookup.Record;
-        if (existing is { StatusCode: 202 } && existing.ExpiresAt > utcNow
-            && Guid.TryParse(existing.ResponseBody, out var runId))
+        if (existing.StatusCode == 202 && Guid.TryParse(existing.ResponseBody, out var runId))
         {
             return BaseCommandResponse.Success(runId, "AI message send already processed.");
         }
@@ -434,19 +389,6 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
     private static string ComputePrincipalFingerprint(Guid userId)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userId.ToString("N", CultureInfo.InvariantCulture))))
             .ToLowerInvariant();
-
-    private static bool UsesTenantConfiguredExternalProvider(AiAssistantSettingGroup settings)
-    {
-        var provider = AiAssistantAvailability.NormalizeProvider(settings.Provider);
-        return provider switch
-        {
-            AiProviderDefaults.ProviderOpenAi or AiProviderDefaults.ProviderAnthropic =>
-                settings.CredentialScope is AiCredentialScope.Instance or AiCredentialScope.Tenant,
-            AiProviderDefaults.ProviderOpenAiCompatible or AiProviderDefaults.ProviderAnthropicCompatible =>
-                !string.IsNullOrWhiteSpace(settings.EndpointUrl),
-            _ => false
-        };
-    }
 
     private static DateTime ResolveStaleRunCutoffUtc(DateTime utcNow, AiAssistantSettingGroup settings)
     {

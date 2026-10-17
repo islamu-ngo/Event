@@ -54,15 +54,16 @@ public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
             }
             """));
         using var client = new HttpClient(handler);
+        string credential = Guid.CreateVersion7().ToString("N");
 
         var models = await OpenAiCompatibleChatProvider.DiscoverModelsAsync(
             client,
             "https://ai.example.test/v1/chat/completions",
-            Fixture.Credential);
+            credential);
 
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://ai.example.test/v1/models"));
         await Assert.That(handler.Authorization?.Scheme).IsEqualTo("Bearer");
-        await Assert.That(handler.Authorization?.Parameter).IsEqualTo(Fixture.Credential);
+        await Assert.That(handler.Authorization?.Parameter).IsEqualTo(credential);
         await Assert.That(models.Select(model => model.Id).ToArray()).IsEquivalentTo(["gpt-a", "gpt-z"]);
     }
 
@@ -443,7 +444,7 @@ public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
         var result = await provider.SendAsync(CreateRequest("Hello"));
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.Error!.Code).IsEqualTo("provider_not_configured");
+        await Assert.That(result.Error!.Code).IsEqualTo("provider_disabled");
         await Assert.That(handler.Calls).IsEqualTo(0);
     }
 

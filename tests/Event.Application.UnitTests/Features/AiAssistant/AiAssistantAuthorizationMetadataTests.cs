@@ -32,8 +32,16 @@ public sealed class AiAssistantAuthorizationMetadataTests
             ConversationId = conversationId,
             Message = new SendAiMessageRequestDto { Content = "hello", IdempotencyKey = "key" }
         };
-        ISecureRequest confirm = new ConfirmAiProposedActionCommand { ProposedActionId = conversationId };
-        ISecureRequest reject = new RejectAiProposedActionCommand { ProposedActionId = conversationId };
+        ISecureRequest confirm = new ConfirmAiProposedActionCommand
+        {
+            ConversationId = conversationId,
+            ProposedActionId = Guid.CreateVersion7()
+        };
+        ISecureRequest reject = new RejectAiProposedActionCommand
+        {
+            ConversationId = conversationId,
+            ProposedActionId = Guid.CreateVersion7()
+        };
         ISecureRequest cancel = new CancelAiRunCommand { ConversationId = conversationId, RunId = Guid.CreateVersion7() };
         ISecureRequest propose = new ProposeAiToolActionCommand { ConversationId = conversationId, ToolName = "CreateEventDraft", PayloadJson = "{}" };
         ISecureRequest detail = new GetAiConversationDetailQuery { ConversationId = conversationId };

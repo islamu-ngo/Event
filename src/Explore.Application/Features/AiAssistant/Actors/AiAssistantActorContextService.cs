@@ -1,16 +1,12 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Domain;
-using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.AiAssistant.Actors;
 
 public sealed class AiAssistantActorContextService(
-    IActorRepository actorRepository,
-    ITenantUserRepository tenantUserRepository,
-    IOrganizationMemberRepository organizationMemberRepository,
-    IGroupMemberRepository groupMemberRepository)
+    IHumanActorContextReader reader)
     : IAiAssistantActorContextService
 {
     public async Task<IReadOnlyList<AiAssistantActorContextDto>> ListAuthorizedActorContextsAsync(
@@ -26,51 +22,33 @@ public sealed class AiAssistantActorContextService(
         var contexts = new List<AiAssistantActorContextDto>();
         var seenActorIds = new HashSet<Guid>();
 
-        var tenantUser = await tenantUserRepository.GetByTenantAndUserAsync(tenantId, userId, cancellationToken);
-        var userActor = tenantUser?.ActorId is Guid tenantUserActorId
-            ? await actorRepository.GetActorWithDetails(tenantUserActorId, cancellationToken)
-            : await actorRepository.GetActorByUserIdAndTenantId(userId, tenantId, cancellationToken);
+        var actors = await reader.ReadAsync(tenantId, userId, cancellationToken);
+        var userActor = actors.FirstOrDefault(actor => actor.ActorTypeId == (int)ActorTypeEnum.User);
 
         AddActorContext(contexts, seenActorIds, userActor, nameof(ActorTypeEnum.User));
 
-        var allowedOrganizationIds = (await organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventCreate,
-            cancellationToken)).ToHashSet();
-        var organizationMemberships = await organizationMemberRepository.GetMembershipsByUser(userId, cancellationToken);
-        foreach (var membership in organizationMemberships
-                     .Where(membership => membership.TenantId == tenantId
-                         && membership.OrganizationTenant.Organization.Actor is not null
-                         && allowedOrganizationIds.Contains(membership.OrganizationTenant.OrganizationId))
-                     .OrderBy(membership => membership.OrganizationTenant.Organization.FullName, StringComparer.OrdinalIgnoreCase))
+        foreach (var actor in actors.Where(actor => actor.ActorTypeId == (int)ActorTypeEnum.Organization)
+                     .OrderBy(actor => actor.Organization?.FullName, StringComparer.OrdinalIgnoreCase))
         {
             AddActorContext(
                 contexts,
                 seenActorIds,
-                membership.OrganizationTenant.Organization.Actor!.Id,
+                actor.Id,
                 nameof(ActorTypeEnum.Organization),
-                membership.OrganizationTenant.Organization.FullName,
-                membership.OrganizationTenant.OrganizationId);
+                actor.Organization?.FullName,
+                actor.OrganizationId);
         }
 
-        var allowedGroupIds = (await groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventCreate,
-            cancellationToken)).ToHashSet();
-        var groupMemberships = await groupMemberRepository.GetMembershipsByUser(userId, cancellationToken);
-        foreach (var membership in groupMemberships
-                     .Where(membership => membership.TenantId == tenantId
-                         && membership.GroupTenant.Group.Actor is not null
-                         && allowedGroupIds.Contains(membership.GroupTenant.GroupId))
-                     .OrderBy(membership => membership.GroupTenant.Group.FullName, StringComparer.OrdinalIgnoreCase))
+        foreach (var actor in actors.Where(actor => actor.ActorTypeId == (int)ActorTypeEnum.Group)
+                     .OrderBy(actor => actor.Group?.FullName, StringComparer.OrdinalIgnoreCase))
         {
             AddActorContext(
                 contexts,
                 seenActorIds,
-                membership.GroupTenant.Group.Actor!.Id,
+                actor.Id,
                 nameof(ActorTypeEnum.Group),
-                membership.GroupTenant.Group.FullName,
-                membership.GroupTenant.GroupId);
+                actor.Group?.FullName,
+                actor.GroupId);
         }
 
         return contexts;

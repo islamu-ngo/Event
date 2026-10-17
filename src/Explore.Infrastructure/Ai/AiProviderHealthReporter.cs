@@ -56,7 +56,6 @@ public sealed class AiProviderHealthReporter(
                 Description: "AI provider integration is enabled but no runnable provider is configured.",
                 Data: data);
         }
-
         var resolved = await configuration.ResolveInstanceAsync(settings, cancellationToken);
         if (resolved.Configuration is null)
         {
@@ -64,10 +63,9 @@ public sealed class AiProviderHealthReporter(
             return new AiProviderHealth(true, false, resolved.FailureCode!,
                 "AI provider configuration or credential is unavailable.", data);
         }
-        data["credentialConfigured"] = !string.IsNullOrWhiteSpace(resolved.Configuration.ApiKey);
+        data["credentialConfigured"] = !string.IsNullOrEmpty(resolved.Configuration.ApiKey);
 
         return strategy.CheckHealth(data);
-
     }
 
 }

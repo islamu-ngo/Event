@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Operations;
@@ -10,7 +11,6 @@ using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Features.Events.Requests.Queries;
-using Explore.Application.Models;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Ai;
@@ -24,31 +24,31 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
     private const string PrivacyErasureFencedFailureMessage = "AI assistant processing is unavailable.";
 
     private readonly IAiConversationRepository _conversationRepository;
-    private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
     private readonly IQueryHandler<GetEventDetailsRequest, EventDto?> _eventDetailsHandler;
     private readonly AiPromptContextBuilder _promptContextBuilder;
     private readonly AiProviderResponseResolver _providerResponseResolver;
     private readonly IAiContextGateway _contextGateway;
     private readonly IAiProviderTrustResolver _providerTrustResolver;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IAiProviderCapabilityResolver _capabilityResolver;
 
     public ProcessAiRunCommandHandler(
         IAiConversationRepository conversationRepository,
-        IPrivacyErasureStateRepository privacyErasureStateRepository,
         IHierarchicalSettingsResolver settingsResolver,
         IAiChatProvider chatProvider,
         IQueryHandler<GetEventDetailsRequest, EventDto?> eventDetailsHandler,
         IAiContextGateway contextGateway,
         IAiProviderTrustResolver providerTrustResolver,
+        IUnitOfWork unitOfWork,
         IAiProviderCapabilityResolver capabilityResolver)
     {
         _conversationRepository = conversationRepository;
-        _privacyErasureStateRepository = privacyErasureStateRepository;
         _settingsResolver = settingsResolver;
         _eventDetailsHandler = eventDetailsHandler;
         _contextGateway = contextGateway;
         _providerTrustResolver = providerTrustResolver;
+        _unitOfWork = unitOfWork;
         _capabilityResolver = capabilityResolver;
         var toolRegistry = AiToolContractRegistry.CreateDefault();
         _promptContextBuilder = new AiPromptContextBuilder(new AiSystemPromptFactory(toolRegistry));
@@ -69,53 +69,40 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
             cancellationToken);
         var allowToolProposals = AiAssistantInteractionModes.AllowsToolProposals(request.Mode);
 
-        var conversation = await _conversationRepository.GetByIdForUpdateAsync(
-            request.ConversationId,
-            cancellationToken);
-
-        if (!TryGetQueuedRun(conversation, request.TenantId, request.RunId, out var run))
-        {
-            return;
-        }
-
-        if (await IsFencedAsync(conversation!.UserId, cancellationToken))
-        {
-            await FailAndActivateAsync(
-                conversation,
-                run!,
-                PrivacyErasureFencedFailureCode,
-                PrivacyErasureFencedFailureMessage,
-                cancellationToken);
-            return;
-        }
-
+        var candidate = await _conversationRepository.GetByIdWithDetailsAsync(request.ConversationId, cancellationToken);
+        if (!TryGetQueuedRun(candidate, request.TenantId, request.RunId, out _)) return;
         var disabledReason = await AiAssistantAvailability.ResolveDisabledReasonAsync(
             settings, _capabilityResolver, cancellationToken);
-        if (disabledReason is not null)
+        var conversation = await _unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            await FailAndActivateAsync(
-                conversation!,
-                run!,
-                disabledReason,
-                $"AI assistant is unavailable: {disabledReason}.",
-                cancellationToken);
-            return;
-        }
-
-        if (!AiAssistantAvailability.IsModelAllowed(settings, run!.ModelId))
-        {
-            await FailAndActivateAsync(
-                conversation!,
-                run,
-                AiAssistantAvailability.ModelNotAllowedFailureCode,
-                AiAssistantAvailability.ModelNotAllowedFailureMessage,
-                cancellationToken);
-            return;
-        }
-
-        var startedAt = DateTime.UtcNow;
-        run.Start(startedAt);
-        await _conversationRepository.Update(conversation!);
+            var current = await _conversationRepository.GetByIdForUpdateAsync(request.ConversationId, candidate!.ActorId, token);
+            if (!TryGetQueuedRun(current, request.TenantId, request.RunId, out var queuedRun)
+                || current!.UserId != candidate.UserId || current.ActorId != candidate.ActorId) return null;
+            if (await _conversationRepository.IsPrivacyFencedAsync(current, token))
+            {
+                await FailAndActivateAsync(current, queuedRun!, PrivacyErasureFencedFailureCode,
+                    PrivacyErasureFencedFailureMessage, token);
+                return null;
+            }
+            if (disabledReason is not null)
+            {
+                await FailAndActivateAsync(current, queuedRun!, disabledReason,
+                    $"AI assistant is unavailable: {disabledReason}.", token);
+                return null;
+            }
+            if (!AiAssistantAvailability.IsModelAllowed(settings, queuedRun!.ModelId))
+            {
+                await FailAndActivateAsync(current, queuedRun, AiAssistantAvailability.ModelNotAllowedFailureCode,
+                    AiAssistantAvailability.ModelNotAllowedFailureMessage, token);
+                return null;
+            }
+            queuedRun.Start(DateTime.UtcNow);
+            await _conversationRepository.Update(current);
+            return current;
+        }, cancellationToken);
+        if (conversation is null) return;
+        conversation = await _conversationRepository.GetByIdWithDetailsAsync(request.ConversationId, cancellationToken);
+        if (!TryGetInProgressRun(conversation, request.TenantId, request.RunId, out var run)) return;
 
         var selectedReferences = await BuildSelectedReferenceContextAsync(
             conversation!,
@@ -134,6 +121,7 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
             providerResolution = await _providerResponseResolver.ResolveAsync(
                 providerPayload,
                 cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException)
         {
@@ -145,58 +133,41 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
             return;
         }
 
-        var latestConversation = await _conversationRepository.GetByIdForUpdateAsync(
-            request.ConversationId,
-            CancellationToken.None);
-
-        if (!TryGetInProgressRun(latestConversation, request.TenantId, request.RunId, out var latestRun))
+        await _unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            return;
-        }
-
-        if (await IsFencedAsync(latestConversation!.UserId, CancellationToken.None))
-        {
-            await FailAndActivateAsync(
-                latestConversation,
-                latestRun!,
-                PrivacyErasureFencedFailureCode,
-                PrivacyErasureFencedFailureMessage,
-                CancellationToken.None);
-            return;
-        }
-
-        if (!providerResolution.Succeeded || providerResolution.Response is null || providerResolution.ParseResult is null)
-        {
-            var errorCode = providerResolution.FailureCode ?? "provider_failure";
-            var errorMessage = providerResolution.FailureMessage ?? "AI provider failed.";
-            await FailAndActivateAsync(
-                latestConversation!,
-                latestRun!,
-                errorCode,
-                errorMessage,
-                CancellationToken.None);
-            return;
-        }
-
-        var assistantText = BuildAssistantMessage(providerResolution.Response);
-        var utcNow = DateTime.UtcNow;
-        var assistantMessage = latestConversation!.AddMessage(AiMessageRole.Assistant, assistantText, null, utcNow);
-        IReadOnlyList<AiParsedProposedAction> proposedActions = allowToolProposals
-            ? providerResolution.ParseResult.Actions
-            : Array.Empty<AiParsedProposedAction>();
-
-        foreach (var proposedAction in proposedActions)
-        {
-            latestConversation.ProposeAction(
-                proposedAction.Kind,
-                proposedAction.PayloadJson,
-                assistantMessage.Id,
-                latestConversation.UserId,
-                DateTime.UtcNow);
-        }
-
-        latestConversation.CompleteRun(latestRun!, DateTime.UtcNow);
-        await _conversationRepository.Update(latestConversation);
+            var latestConversation = await _conversationRepository.GetByIdForUpdateAsync(
+                request.ConversationId, conversation.ActorId, token);
+            if (!TryGetInProgressRun(latestConversation, request.TenantId, request.RunId, out var latestRun)
+                || latestConversation.UserId != conversation.UserId || latestConversation.ActorId != conversation.ActorId
+                || latestRun.StartedAt != run.StartedAt || latestRun.ModelId != run.ModelId)
+                return false;
+            if (await _conversationRepository.IsPrivacyFencedAsync(latestConversation, token))
+            {
+                await FailAndActivateAsync(latestConversation, latestRun, PrivacyErasureFencedFailureCode,
+                    PrivacyErasureFencedFailureMessage, token);
+                return false;
+            }
+            if (!providerResolution.Succeeded || providerResolution.Response is null || providerResolution.ParseResult is null)
+            {
+                await FailAndActivateAsync(latestConversation, latestRun,
+                    providerResolution.FailureCode ?? "provider_failure",
+                    providerResolution.FailureMessage ?? "AI provider failed.", token);
+                return false;
+            }
+            var utcNow = DateTime.UtcNow;
+            var assistantMessage = latestConversation.AddMessage(
+                AiMessageRole.Assistant, BuildAssistantMessage(providerResolution.Response), null, utcNow);
+            IReadOnlyList<AiParsedProposedAction> proposedActions = allowToolProposals
+                ? providerResolution.ParseResult.Actions : Array.Empty<AiParsedProposedAction>();
+            foreach (var proposedAction in proposedActions)
+            {
+                latestConversation.ProposeAction(proposedAction.Kind, proposedAction.PayloadJson,
+                    assistantMessage.Id, latestConversation.UserId, utcNow);
+            }
+            latestConversation.CompleteRun(latestRun, utcNow);
+            await _conversationRepository.Update(latestConversation);
+            return true;
+        }, cancellationToken);
     }
 
     private async Task FailLatestRunAndActivateAsync(
@@ -205,16 +176,14 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
         string failureMessage,
         CancellationToken cancellationToken)
     {
-        var conversation = await _conversationRepository.GetByIdForUpdateAsync(
-            request.ConversationId,
-            cancellationToken);
-
-        if (!TryGetActiveRun(conversation, request.TenantId, request.RunId, out var run))
+        await _unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            return;
-        }
-
-        await FailAndActivateAsync(conversation!, run!, failureCode, failureMessage, cancellationToken);
+            var conversation = await _conversationRepository.GetByIdForUpdateAsync(request.ConversationId, token);
+            if (!TryGetActiveRun(conversation, request.TenantId, request.RunId, out var run))
+                return false;
+            await FailAndActivateAsync(conversation, run, failureCode, failureMessage, token);
+            return true;
+        }, cancellationToken);
     }
 
     private async Task FailAndActivateAsync(
@@ -230,14 +199,11 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
         await _conversationRepository.Update(conversation);
     }
 
-    private async Task<bool> IsFencedAsync(Guid userId, CancellationToken cancellationToken) =>
-        await _privacyErasureStateRepository.GetBySubjectAsync(userId, cancellationToken) is not null;
-
     private static bool TryGetQueuedRun(
-        AiConversation? conversation,
+        [NotNullWhen(true)] AiConversation? conversation,
         Guid tenantId,
         Guid runId,
-        out AiRun? run)
+        [NotNullWhen(true)] out AiRun? run)
     {
         run = null;
         if (conversation is null || conversation.TenantId != tenantId)
@@ -250,10 +216,10 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
     }
 
     private static bool TryGetInProgressRun(
-        AiConversation? conversation,
+        [NotNullWhen(true)] AiConversation? conversation,
         Guid tenantId,
         Guid runId,
-        out AiRun? run)
+        [NotNullWhen(true)] out AiRun? run)
     {
         run = null;
         if (conversation is null || conversation.TenantId != tenantId)
@@ -266,10 +232,10 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
     }
 
     private static bool TryGetActiveRun(
-        AiConversation? conversation,
+        [NotNullWhen(true)] AiConversation? conversation,
         Guid tenantId,
         Guid runId,
-        out AiRun? run)
+        [NotNullWhen(true)] out AiRun? run)
     {
         run = null;
         if (conversation is null || conversation.TenantId != tenantId)
@@ -405,7 +371,7 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
     {
         if (!envelope.Succeeded)
         {
-            return envelope.FailureMessage ?? envelope.FailureCode ?? "context_unavailable";
+            return "context_unavailable";
         }
 
         var parts = new List<string>(envelope.DisclosedFields.Count);

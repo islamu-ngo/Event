@@ -7,6 +7,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Hateoas;
+using Explore.Domain.Ai;
 
 public sealed class AiConversationDetailLinkPolicy : ILinkPolicy<AiConversationDto>
 {
@@ -49,16 +50,24 @@ public sealed class AiConversationDetailLinkPolicy : ILinkPolicy<AiConversationD
 
 public static class AiProposedActionLinkPolicy
 {
-    public static IEnumerable<LinkDefinition> GetLinks(AiConversationDto conversation, AiProposedActionDto action)
+    public static IEnumerable<LinkDefinition> GetLinks(AiConversationDto conversation, AiProposedActionDto action, DateTime utcNow)
     {
-        if (!IsActive(conversation.Status) || !IsProposed(action.Status))
+        if (!IsActive(conversation.Status))
         {
             yield break;
         }
 
         var routeValues = new { conversationId = conversation.Id, proposedActionId = action.Id };
 
-        yield return new LinkDefinition(
+        bool proposed = IsProposed(action.Status);
+        bool confirmed = string.Equals(action.Status, nameof(AiProposedActionStatus.Confirmed), StringComparison.OrdinalIgnoreCase)
+            && action.ConfirmedBy == conversation.UserId
+            && action.ConfirmedAt is { } confirmedAt && confirmedAt >= action.CreatedAt && confirmedAt <= utcNow;
+        // Only the native draft owner is executable today. Registry/catalog visibility is not execution authority.
+        if ((proposed || confirmed) && action.Kind == nameof(AiProposedActionKind.CreateEventDraft)
+            && !string.IsNullOrEmpty(action.Version)
+            && AiProposedAction.IsWithinLifetime(action.CreatedAt, utcNow))
+            yield return new LinkDefinition(
             LinkRelations.ConfirmAction,
             RouteNames.ConfirmAiProposedAction,
             routeValues,
@@ -67,7 +76,8 @@ public static class AiProposedActionLinkPolicy
             RequiresAuth: true)
             .RequirePermission(AuthorizationActions.AiConversations.ConfirmAction, ResourceDescriptors.AiConversation, conversation);
 
-        yield return new LinkDefinition(
+        if (proposed)
+            yield return new LinkDefinition(
             LinkRelations.RejectAction,
             RouteNames.RejectAiProposedAction,
             routeValues,

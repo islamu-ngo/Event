@@ -1,26 +1,20 @@
-using System.Text.Json;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.BackgroundServices;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
-using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
-using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
-using Explore.Application.Features.TenantOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using Explore.Infrastructure.Ai;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Options;
 
 namespace Explore.API.Controllers;
 
@@ -298,6 +292,7 @@ public sealed class AiAssistantController : ControllerBase
     }
 
     [HttpPost("conversations/{conversationId:guid}/proposed-actions/{proposedActionId:guid}/confirm", Name = RouteNames.ConfirmAiProposedAction)]
+    [SuppressIdempotencyResponseStorage]
     [EndpointSummary("Confirm AI proposed action")]
     [EndpointDescription("Confirms one owned AI-proposed action and executes it through the governed Application tool executor path.")]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
@@ -312,13 +307,15 @@ public sealed class AiAssistantController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ConfirmProposedAction(
         Guid conversationId,
         Guid proposedActionId,
+        [FromBody] ConfirmAiProposedActionRequestDto request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        _ = conversationId;
         var response = await _confirmProposedActionHandler.ExecuteAsync(new ConfirmAiProposedActionCommand
         {
+            ConversationId = conversationId,
             ProposedActionId = proposedActionId,
+            ExpectedVersion = request.ExpectedVersion,
             IdempotencyKey = idempotencyKey
         }, cancellationToken);
 
@@ -346,9 +343,9 @@ public sealed class AiAssistantController : ControllerBase
         Guid proposedActionId,
         CancellationToken cancellationToken = default)
     {
-        _ = conversationId;
         var response = await _rejectProposedActionHandler.ExecuteAsync(new RejectAiProposedActionCommand
         {
+            ConversationId = conversationId,
             ProposedActionId = proposedActionId
         }, cancellationToken);
 

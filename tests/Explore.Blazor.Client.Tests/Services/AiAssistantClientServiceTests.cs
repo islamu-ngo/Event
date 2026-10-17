@@ -75,6 +75,52 @@ public sealed class AiAssistantClientServiceTests
     }
 
     [Test]
+    [Arguments("typed")]
+    [Arguments("json")]
+    [Arguments("invalid")]
+    [Arguments("unrelated")]
+    public async Task ConfirmationRecoveryRetainsOnlyTheTypedOriginalDraftAndExportsNoPrivateException(string representation)
+    {
+        Guid draftId = Guid.CreateVersion7();
+        Guid conversationId = Guid.CreateVersion7();
+        Guid actionId = Guid.CreateVersion7();
+        string canary = Guid.CreateVersion7().ToString("N");
+        string code = representation == "unrelated" ? "proposed_action_authority_changed" : "ai_draft_recovery_required";
+        object wireId = representation switch
+        {
+            "json" => System.Text.Json.JsonSerializer.SerializeToElement(draftId.ToString()),
+            "invalid" => "not-an-id",
+            _ => draftId
+        };
+        _apiClient.ConfirmAiProposedActionAsync(conversationId, actionId,
+                Arg.Is<ConfirmAiProposedActionRequestDto>(body => body.ExpectedVersion == "displayed-version"), Arg.Any<string?>(),
+                null, null, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new ApiException<ProblemDetails>(canary, 409, canary,
+                new Dictionary<string, IEnumerable<string>>(),
+                new ProblemDetails
+                {
+                    Status = 409,
+                    Detail = "The original draft needs recovery.",
+                    AdditionalProperties = { ["code"] = code, ["id"] = wireId }
+                }, new InvalidOperationException(canary)));
+        var logs = new ConfirmationCollector();
+        var service = new AiAssistantClientService(_apiClient, logs);
+
+        var result = await service.ConfirmProposedActionAsync(
+            conversationId, actionId, "displayed-version", "original-confirmation");
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo(code);
+        await Assert.That(result.Id).IsEqualTo(representation is "typed" or "json" ? draftId : (Guid?)null);
+        var exported = logs.Entries.Single();
+        await Assert.That(exported.Exception).IsNull();
+        await Assert.That(exported.Message).DoesNotContain(canary);
+        await Assert.That(exported.Message).DoesNotContain(conversationId.ToString());
+        await Assert.That(exported.Message).DoesNotContain(actionId.ToString());
+        await Assert.That(exported.Message).DoesNotContain(draftId.ToString());
+    }
+
+    [Test]
     [Arguments("bootstrap")]
     [Arguments("list")]
     [Arguments("conversation")]
@@ -103,7 +149,8 @@ public sealed class AiAssistantClientServiceTests
         _apiClient.SendAiMessageAsync(conversationId, Arg.Any<SendAiMessageRequestDto>(), null,
             cancellationToken: Arg.Any<CancellationToken>()).ThrowsAsync(failure);
         _apiClient.CancelAiRunAsync(conversationId, runId, cancellationToken: Arg.Any<CancellationToken>()).ThrowsAsync(failure);
-        _apiClient.ConfirmAiProposedActionAsync(conversationId, runId, null,
+        _apiClient.ConfirmAiProposedActionAsync(conversationId, runId,
+            Arg.Any<ConfirmAiProposedActionRequestDto>(), null,
             cancellationToken: Arg.Any<CancellationToken>()).ThrowsAsync(failure);
         _apiClient.RejectAiProposedActionAsync(conversationId, runId,
             cancellationToken: Arg.Any<CancellationToken>()).ThrowsAsync(failure);
@@ -137,7 +184,7 @@ public sealed class AiAssistantClientServiceTests
                 await Assert.That((await service.CancelRunAsync(conversationId, runId)).Success).IsFalse();
                 break;
             case "confirm":
-                await Assert.That((await service.ConfirmProposedActionAsync(conversationId, runId)).Success).IsFalse();
+                await Assert.That((await service.ConfirmProposedActionAsync(conversationId, runId, "displayed-version")).Success).IsFalse();
                 break;
             case "reject":
                 await Assert.That((await service.RejectProposedActionAsync(conversationId, runId)).Success).IsFalse();
@@ -376,33 +423,76 @@ public sealed class AiAssistantClientServiceTests
     }
 
     [Test]
-    public async Task ConfirmProposedActionAsync_PropagatesIdempotencyKey()
+    public async Task ConfirmProposedActionAsync_SendsExactPreviewBodyOnFirstConfirmationAndReplay()
     {
         var conversationId = Guid.CreateVersion7();
         var proposedActionId = Guid.CreateVersion7();
         var eventId = Guid.CreateVersion7();
-        _apiClient.ConfirmAiProposedActionAsync(
-                conversationId,
-                proposedActionId,
-                "confirm-key",
-                null,
-                null,
-                Arg.Any<CancellationToken>())
-            .Returns(new BaseCommandResponseOfGuid { Success = true, Id = eventId });
+        string displayedVersion = new string('c', 64);
+        using var handler = new ConfirmationHttpHandler(System.Net.HttpStatusCode.OK,
+            $$"""{"id":"{{eventId}}","success":true,"errors":[]}""");
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://event.test/") };
+        var service = new AiAssistantClientService(new AiAssistantClient(http), _logger);
 
-        var service = CreateService();
-
-        var result = await service.ConfirmProposedActionAsync(conversationId, proposedActionId, "confirm-key");
+        var result = await service.ConfirmProposedActionAsync(
+            conversationId, proposedActionId, displayedVersion, "confirm-key");
+        var replay = await service.ConfirmProposedActionAsync(
+            conversationId, proposedActionId, displayedVersion, "replay-key");
 
         await Assert.That(result.Success).IsTrue();
         await Assert.That(result.Id).IsEqualTo(eventId);
-        await _apiClient.Received(1).ConfirmAiProposedActionAsync(
-            conversationId,
-            proposedActionId,
-            "confirm-key",
-            null,
-            null,
-            Arg.Any<CancellationToken>());
+        await Assert.That(replay.Success).IsTrue();
+        await Assert.That(replay.Id).IsEqualTo(eventId);
+        await Assert.That(handler.Requests.Count).IsEqualTo(2);
+        for (int index = 0; index < handler.Requests.Count; index++)
+        {
+            var sent = handler.Requests[index];
+            await Assert.That(sent.Method).IsEqualTo(HttpMethod.Post);
+            await Assert.That(sent.Path).IsEqualTo(
+                $"/api/ai/assistant/conversations/{conversationId}/proposed-actions/{proposedActionId}/confirm");
+            await Assert.That(sent.IdempotencyKey).IsEqualTo(index == 0 ? "confirm-key" : "replay-key");
+            using var body = System.Text.Json.JsonDocument.Parse(sent.Body);
+            await Assert.That(body.RootElement.GetProperty("expectedVersion").GetString()).IsEqualTo(displayedVersion);
+        }
+    }
+
+    [Test]
+    public async Task ConfirmProposedActionAsync_WhenPreviewIsStale_ReturnsConflictWithoutRetryOrSubstitution()
+    {
+        var conversationId = Guid.CreateVersion7();
+        var actionId = Guid.CreateVersion7();
+        string displayedVersion = new string('d', 64);
+        using var handler = new ConfirmationHttpHandler(System.Net.HttpStatusCode.Conflict,
+            """{"status":409,"title":"AI action conflict","code":"proposed_action_version_changed"}""");
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://event.test/") };
+        var service = new AiAssistantClientService(new AiAssistantClient(http), _logger);
+
+        var result = await service.ConfirmProposedActionAsync(
+            conversationId, actionId, displayedVersion, "confirm-key");
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo("proposed_action_version_changed");
+        await Assert.That(handler.Requests.Count).IsEqualTo(1);
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Requests[0].Body);
+        await Assert.That(body.RootElement.GetProperty("expectedVersion").GetString()).IsEqualTo(displayedVersion);
+    }
+
+    private sealed class ConfirmationHttpHandler(System.Net.HttpStatusCode status, string responseBody)
+        : HttpMessageHandler
+    {
+        public List<(HttpMethod Method, string Path, string? IdempotencyKey, string Body)> Requests { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add((request.Method, request.RequestUri!.AbsolutePath,
+                request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null,
+                await request.Content!.ReadAsStringAsync(cancellationToken)));
+            return new HttpResponseMessage(status)
+            {
+                Content = new StringContent(responseBody, System.Text.Encoding.UTF8, "application/json")
+            };
+        }
     }
 
     [Test]
@@ -413,6 +503,7 @@ public sealed class AiAssistantClientServiceTests
         _apiClient.ConfirmAiProposedActionAsync(
                 conversationId,
                 proposedActionId,
+                Arg.Any<ConfirmAiProposedActionRequestDto>(),
                 Arg.Any<string?>(),
                 null,
                 null,
@@ -432,7 +523,8 @@ public sealed class AiAssistantClientServiceTests
 
         var service = CreateService();
 
-        var result = await service.ConfirmProposedActionAsync(conversationId, proposedActionId, "confirm-key");
+        var result = await service.ConfirmProposedActionAsync(
+            conversationId, proposedActionId, "displayed-version", "confirm-key");
 
         await Assert.That(result.Success).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("invalid_organization_scope");
@@ -447,6 +539,7 @@ public sealed class AiAssistantClientServiceTests
         _apiClient.ConfirmAiProposedActionAsync(
                 conversationId,
                 proposedActionId,
+                Arg.Any<ConfirmAiProposedActionRequestDto>(),
                 Arg.Any<string?>(),
                 null,
                 null,
@@ -466,7 +559,8 @@ public sealed class AiAssistantClientServiceTests
 
         var service = CreateService();
 
-        var result = await service.ConfirmProposedActionAsync(conversationId, proposedActionId, "confirm-key");
+        var result = await service.ConfirmProposedActionAsync(
+            conversationId, proposedActionId, "displayed-version", "confirm-key");
 
         await Assert.That(result.Success).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("actor_context_not_allowed");

@@ -183,23 +183,28 @@ public sealed class RuntimeAiChatProviderTests : AiProviderTestBase
             CredentialScope = AiCredentialScope.Instance,
             ModelId = "gpt-test"
         };
-        var handler = new RecordingMessageHandler(_ => JsonResponse("""
+        var transport = new RecordingMessageHandler(_ => JsonResponse("""
             {
-              "id": "resp_test",
+              "id": "sdk_response",
+              "object": "chat.completion",
+              "created": 1,
               "model": "gpt-test",
               "choices": [
-                { "message": { "role": "assistant", "content": "SDK response" }, "finish_reason": "stop" }
-              ]
+                { "index": 0, "message": { "role": "assistant", "content": "SDK response" }, "finish_reason": "stop" }
+              ],
+              "usage": { "prompt_tokens": 8, "completion_tokens": 4, "total_tokens": 12 }
             }
             """));
-        var sdkProvider = CreateMicrosoftExtensionsProvider(settings, handler);
+        var sdkProvider = CreateMicrosoftExtensionsProvider(settings, transport);
         var provider = CreateProvider(settings, microsoftExtensionsProvider: sdkProvider);
 
         var result = await provider.SendAsync(CreateRequest("Hello"));
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(result.Response!.AssistantMessage).IsEqualTo("SDK response");
-        await Assert.That(handler.Calls).IsEqualTo(1);
+        await Assert.That(transport.Calls).IsEqualTo(1);
+        await Assert.That(transport.RequestUri!.AbsolutePath).IsEqualTo("/openai/deployments/gpt-test/chat/completions");
+        await Assert.That(transport.ApiKey).IsEqualTo(Fixture.Credential);
     }
 
     [Test]
@@ -262,12 +267,12 @@ public sealed class RuntimeAiChatProviderTests : AiProviderTestBase
 
     private MicrosoftExtensionsAiChatProvider CreateMicrosoftExtensionsProvider(
         AiProviderSettings settings,
-        RecordingMessageHandler handler)
+        RecordingMessageHandler transport)
     {
         return new MicrosoftExtensionsAiChatProvider(
             Fixture.Configuration(settings),
             Fixture.Metrics,
-            new StaticHttpClientFactory(Fixture.CreateClient(handler)));
+            new StaticHttpClientFactory(Fixture.CreateClient(transport)));
     }
 
     private static AiProviderSettings CreateOpenAiResponsesSettings() => new()
@@ -338,11 +343,13 @@ public sealed class RuntimeAiChatProviderTests : AiProviderTestBase
 
         public int Calls { get; private set; }
         public Uri? RequestUri { get; private set; }
+        public string? ApiKey { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Calls++;
             RequestUri = request.RequestUri;
+            ApiKey = request.Headers.TryGetValues("api-key", out var values) ? values.Single() : null;
             return Task.FromResult(_responseFactory(request));
         }
     }

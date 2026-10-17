@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54MVB05P8455A78R6P1GZG2
+Title: "Keep webhook publication failure types out of diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Export closed publication failure categories while preserving cancellation and governed recovery state."
+Group: security
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Prevent private provider exception types from entering publication worker diagnostic exports.
+  Migration:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/webhooks.md
+    Disposition: documented
+    Detail: Diagnose worker failures using fixed categories and governed publication state.

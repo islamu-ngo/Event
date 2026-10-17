@@ -312,6 +312,12 @@ Environment variables used by local profiles:
 
 ## Health, Metrics, And Retention
 
+Provider-publication drain failures export only closed failure categories:
+`publication_dispatch_failed`, `publication_terminal_reconciliation_failed`,
+or `publication_reconciliation_failed`. Exception types and contents do not
+enter diagnostic state. Caller cancellation still propagates without a failure log;
+publication outcomes, reconciliation authority, and retry ownership are unchanged.
+
 Readiness checks:
 
 - `webhook-local-delivery` reports LocalProvider queue backlog, stale sending leases, and processor settings.

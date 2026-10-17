@@ -85,7 +85,7 @@ public sealed class WebhookProviderPublicationDrainService(
             {
                 throw;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 failed++;
                 metrics.RecordWebhookProcessingOutcome(
@@ -93,8 +93,8 @@ public sealed class WebhookProviderPublicationDrainService(
                     WebhookTelemetryOperation.Publication,
                     WebhookTelemetryOutcome.Failed);
                 logger.LogError(
-                    "Provider publication dispatch failed. FailureType={FailureType}",
-                    exception.GetType().Name);
+                    "Provider publication dispatch failed. FailureCategory={FailureCategory}",
+                    "publication_dispatch_failed");
             }
         }
 
@@ -145,7 +145,7 @@ public sealed class WebhookProviderPublicationDrainService(
             {
                 throw;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 failed++;
                 metrics.RecordWebhookProcessingOutcome(
@@ -153,8 +153,8 @@ public sealed class WebhookProviderPublicationDrainService(
                     WebhookTelemetryOperation.Reconciliation,
                     WebhookTelemetryOutcome.Failed);
                 logger.LogError(
-                    "Provider publication terminal reconciliation failed. FailureType={FailureType}",
-                    exception.GetType().Name);
+                    "Provider publication terminal reconciliation failed. FailureCategory={FailureCategory}",
+                    "publication_terminal_reconciliation_failed");
             }
         }
 
@@ -219,7 +219,7 @@ public sealed class WebhookProviderPublicationDrainService(
             {
                 throw;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 failed++;
                 metrics.RecordWebhookProcessingOutcome(
@@ -227,8 +227,8 @@ public sealed class WebhookProviderPublicationDrainService(
                     WebhookTelemetryOperation.Reconciliation,
                     WebhookTelemetryOutcome.Failed);
                 logger.LogError(
-                    "Provider publication reconciliation failed. FailureType={FailureType}",
-                    exception.GetType().Name);
+                    "Provider publication reconciliation failed. FailureCategory={FailureCategory}",
+                    "publication_reconciliation_failed");
             }
         }
 

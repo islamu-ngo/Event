@@ -47,6 +47,11 @@ Every incoming callback verifies HMAC signatures, evaluates idempotency keys, an
 
 ## Related Guides & Next Steps
 
+Publication-worker diagnostics identify dispatch and reconciliation failures by
+fixed categories rather than provider exception types or details. Inspect governed
+publication state for recovery decisions; raw provider failures are not exported
+through technical logs. Canceling a worker operation does not emit a failure log.
+
 * **[Docker Compose Runbook](../self-hosting/docker-compose.md#optional-service-profiles)** — Launch the Svix webhook container profile.
 * **[Paid Events & Payouts](../events-and-ticketing/paid-events-and-payouts.md)** — Learn how Stripe webhooks settle ticket sales.
 * **[Environment Variables Reference](../configuration-and-operations/environment-variables.md#11-advanced-outgoing-webhooks-svix-infrastructure)** — Configure Svix Redis, DSN, and JWT signing keys.

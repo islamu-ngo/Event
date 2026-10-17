@@ -8,6 +8,8 @@ public interface IInstanceAdministratorCommitAuthority
 {
     /// <remarks>
     /// The principal is resolved by the trusted authentication owner, never from a request body.
+    /// It must equal the immutable HumanCommitSubject bound before the selected scope starts
+    /// its transaction. A missing subject binding denies rather than consulting audit fields.
     /// Invoke in the same serializable transaction as the consequential action and retain
     /// the fences through commit. A fresh retry must reacquire all authority.
     /// </remarks>

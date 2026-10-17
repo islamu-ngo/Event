@@ -64,19 +64,6 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         return await IsActiveTenantUserAsync(tenantId, userId, cancellationToken);
     }
 
-    public async Task<List<TenantUser>> GetActiveTenantsForUserAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.TenantUsers
-            .IgnoreTenantFilter(TenantFilterBypassReasons.UserTenantMembershipEnumeration)
-            .Include(x => x.Tenant)
-                .ThenInclude(t => t.TenantStatus)
-            .Where(x => x.UserId == userId
-                && x.StatusId == (int)TenantUserStatusEnum.Active
-                && !x.IsDeleted
-                && x.Tenant.TenantStatusId == (int)TenantStatusEnum.Active)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<bool> TryRemoveMembershipAsync(
         Guid tenantId,
         Guid userId,

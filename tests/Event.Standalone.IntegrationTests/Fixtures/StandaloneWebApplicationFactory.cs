@@ -8,7 +8,7 @@ using Explore.Blazor.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
-using Explore.Infrastructure.ConfigurationManifest;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Event.Standalone.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -65,6 +65,8 @@ public sealed class StandaloneWebApplicationFactory : WebApplicationFactory<Stan
                 ["Testing:SkipJwtAuthorityWarmup"] = "true",
                 ["ForwardedHeadersTrust:TrustLoopbackProxy"] = "true",
                 ["Bff:AdminHosts:0"] = "admin.proxy.test",
+                ["EffectiveHostAuthority:InstanceHosts:0"] = "admin.proxy.test",
+                ["EffectiveHostAuthority:InstanceHosts:1"] = "tenant.proxy.test",
                 ["Bff:AdminHostAllowedIpRanges:0"] = "203.0.113.0/24",
                 ["Instance:OperatorIdentity:OperatorId"] =
                     "0198e2a4-5340-7f89-8abc-b8bdf43e0ea8",

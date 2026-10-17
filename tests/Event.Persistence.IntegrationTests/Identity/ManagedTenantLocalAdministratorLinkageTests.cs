@@ -1,21 +1,17 @@
 
-using System.Security.Claims;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Infrastructure;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.Features.ManagedProviderProvisioning.Handlers.Commands;
 using Explore.Application.Features.Management.Handlers.Commands;
 using Explore.Application.Features.Management.Requests.Commands;
 using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Management;
-using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
@@ -24,13 +20,11 @@ using Explore.Application.Features.Management;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
-using Explore.Infrastructure.Identity;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
-using Explore.Persistence.Services;
 using Explore.Persistence.Repositories;
-using Microsoft.AspNetCore.Http;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -43,109 +37,13 @@ namespace Event.Persistence.IntegrationTests.Identity;
 public sealed class ManagedTenantLocalAdministratorLinkageTests
 {
     [Test]
-    [Arguments(IdentityDatabaseTopology.Colocated)]
-    [Arguments(IdentityDatabaseTopology.External)]
-    public async Task ExistingEmailLessLocalAdministratorCanBeReferencedWithoutCredentialOperation(IdentityDatabaseTopology topology)
+    public async Task WorkerOnlyHandlerCannotLendRegistrationAuthorityToHumanProvisioning()
     {
-        await using var fixture = await Fixture.CreateAsync(topology);
+        await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
         await using var scope = fixture.Provider.CreateAsyncScope();
-        var identities = await fixture.Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), fixture.Token);
-        await Assert.That(identities.Items.Single().HasExactBinding).IsTrue();
-        await Assert.That(identities.Items.Single().Email).IsNull();
-        var request = fixture.Request();
-        using var snapshot = JsonDocument.Parse(ManagedTenantProvisioningRequestCodec.Serialize(request));
-        await Assert.That(snapshot.RootElement.GetProperty("administrator").GetProperty("localIdentity")
-            .GetProperty("localSubjectId").GetGuid()).IsEqualTo(fixture.Receipt.LocalSubjectId);
-        var before = await fixture.CredentialSnapshotAsync();
-        var result = await fixture.EnsureAsync();
-        await Assert.That(result.IsSuccess).IsTrue();
-        await fixture.AssertLinkedAsync(result.Id!);
-        await Assert.That(await fixture.CredentialSnapshotAsync()).IsEqualTo(before);
-    }
-
-    [Test]
-    public async Task SubjectPossessionCannotAuthorizeLinkage()
-    {
-        await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
-        fixture.SignIn(fixture.Receipt.LocalSubjectId);
-        var result = await fixture.EnsureAsync();
-        await Assert.That(result.FailureCode).IsEqualTo("authorization_denied");
-        await fixture.AssertNoTenantAsync();
-    }
-
-    [Test]
-    public async Task CurrentAdministratorCanLinkAfterOriginalIssuerLosesAuthority()
-    {
-        await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
-        await fixture.ReplaceAdministratorAsync();
-        var result = await fixture.EnsureAsync();
-        await Assert.That(result.IsSuccess).IsTrue();
-        await fixture.AssertLinkedAsync(result.Id!);
-    }
-
-    [Test]
-    public async Task ResetAndPasswordReplacementDoNotInvalidateIdempotentLinkage()
-    {
-        await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
-        var first = await fixture.EnsureAsync();
-        await Assert.That(first.IsSuccess).IsTrue();
-        await using (var reset = fixture.Provider.CreateAsyncScope())
-        {
-            var current = (await fixture.Store(reset).ReadOperationAsync(fixture.Receipt.OperationId, fixture.Token))!;
-            var outcome = await fixture.Store(reset).ResetAsync(new LocalCredentialResetRequest(Guid.CreateVersion7(),
-                fixture.Administrator, fixture.Receipt.LocalSubjectId, current.Receipt.OperationId,
-                current.OperationConcurrencyStamp, "Operator-approved reset"), fixture.Token);
-            await Assert.That(outcome.Outcome).IsEqualTo(LocalCredentialResetOutcome.Reset);
-        }
-        var afterReset = await fixture.EnsureAsync();
-        await Assert.That(afterReset.Id!.TenantId).IsEqualTo(first.Id!.TenantId);
-        await using (var replace = fixture.Provider.CreateAsyncScope())
-        {
-            var current = await fixture.Identity(replace).Set<LocalIdentityUser>().AsNoTracking().SingleAsync(fixture.Token);
-            var subject = await fixture.Store(replace).ReadReplacementSubjectAsync(current.Id, current.SecurityStamp!, fixture.Token);
-            var now = DateTimeOffset.UtcNow;
-            var outcome = await fixture.Store(replace).ReplaceAsync(new LocalCredentialReplacementRequest(
-                new LocalCredentialReplacementAuthority(subject!, now, now.AddMinutes(5)),
-                $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}"), fixture.Token);
-            await Assert.That(outcome).IsEqualTo(LocalCredentialReplacementOutcome.Replaced);
-        }
-        var ready = await fixture.CredentialSnapshotAsync();
-        var afterReplacement = await fixture.EnsureAsync();
-        await Assert.That(afterReplacement.Id!.TenantId).IsEqualTo(first.Id!.TenantId);
-        await fixture.AssertLinkedAsync(afterReplacement.Id);
-        await Assert.That(await fixture.CredentialSnapshotAsync()).IsEqualTo(ready);
-    }
-
-    [Test]
-    [Arguments("pending")]
-    [Arguments("malformed")]
-    [Arguments("mismatch")]
-    [Arguments("suspended")]
-    [Arguments("login")]
-    public async Task IncompleteOrMismatchedLiveBindingFailsClosed(string damage)
-    {
-        await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
-        await using (var corrupt = fixture.Provider.CreateAsyncScope())
-        {
-            var identity = fixture.Identity(corrupt);
-            if (damage == "suspended")
-                await fixture.Application(corrupt).Actors.Where(actor => actor.Id == fixture.Receipt.PersonalActorId)
-                    .ExecuteUpdateAsync(update => update.SetProperty(actor => actor.IsSuspended, true), fixture.Token);
-            else if (damage == "login")
-                await fixture.Application(corrupt).UserExternalLogins.Where(login => login.Id == fixture.Receipt.ExternalLoginId)
-                    .ExecuteUpdateAsync(update => update.SetProperty(login => login.ProviderKey, Guid.CreateVersion7().ToString("D")), fixture.Token);
-            else
-            {
-                string value = damage == "malformed" ? "{}" : JsonSerializer.Serialize(new LocalCredentialStateMetadata(
-                    LocalCredentialStateMetadata.CurrentVersion, damage == "pending" ? LocalCredentialState.ProvisioningPending : LocalCredentialState.ChangeRequired,
-                    fixture.Receipt.OperationId, damage == "mismatch" ? Guid.CreateVersion7() : fixture.Receipt.LocalSubjectId));
-                await identity.Set<IdentityUserToken<Guid>>().Where(token => token.UserId == fixture.Receipt.LocalSubjectId)
-                    .ExecuteUpdateAsync(update => update.SetProperty(token => token.Value, value), fixture.Token);
-            }
-            await Assert.That(await fixture.Store(corrupt).ReadLinkedIdentityAsync(fixture.Receipt.LocalSubjectId, fixture.Token)).IsNull();
-        }
-        var result = await fixture.EnsureAsync();
-        await Assert.That(result.FailureCode).IsEqualTo("tenant_local_administrator_unavailable");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Handler(scope).EnsureAsync(
+            ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(fixture.Request()),
+            managementRequest: null, operationId: null, expectedOutboxMessageId: null, fixture.Token));
         await fixture.AssertNoTenantAsync();
     }
 
@@ -174,7 +72,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
     {
         await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
         var operation = await fixture.ScheduleAsync();
-        fixture.SignIn(fixture.Receipt.LocalSubjectId); // A worker has registration authority, not this user or the original issuer.
+        // This worker has no human coordinator or credential; its persisted registration owns execution.
         await fixture.ProcessAsync(operation);
         await using var observe = fixture.Provider.CreateAsyncScope();
         var terminal = await new ManagedTenantProvisioningOperationRepository(fixture.Application(observe))
@@ -188,20 +86,6 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         await Assert.That(await fixture.Application(observe).Set<EmailDispatchOutbox>().CountAsync(fixture.Token)).IsEqualTo(0);
     }
 
-    [Test]
-    public async Task TenantGrantFailureRollsBackOnlyTenantStateAndRetryLinksOnce()
-    {
-        await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
-        var before = await fixture.CredentialSnapshotAsync();
-        fixture.GrantFault.Armed = true;
-        await Assert.That(async () => { await fixture.EnsureAsync(); }).Throws<InjectedGrantFailure>();
-        await fixture.AssertNoTenantAsync();
-        await Assert.That(await fixture.CredentialSnapshotAsync()).IsEqualTo(before);
-        var retry = await fixture.EnsureAsync();
-        await Assert.That(retry.IsSuccess).IsTrue();
-        await fixture.AssertLinkedAsync(retry.Id!);
-    }
-
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"managed-local-app-{Guid.CreateVersion7():N}.db");
@@ -213,9 +97,6 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         internal LocalCredentialOperationReceipt Receipt { get; private set; } = null!;
         internal Guid Administrator { get; } = Guid.CreateVersion7();
         internal CancellationToken Token => _timeout.Token;
-        internal HttpContextAccessor Http { get; } = new();
-        private Guid _currentUserId;
-        internal GrantWriteFault GrantFault { get; } = new();
         internal Guid ManagedInstanceId { get; } = Guid.CreateVersion7();
         private readonly IOptions<ManagedControlPlaneOptions> _managedOptions = Options.Create(new ManagedControlPlaneOptions
         { Enabled = true, MaximumTenantCount = 10 });
@@ -233,12 +114,6 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope);
         internal LocalIdentityCredentialStateStore Store(AsyncServiceScope scope) => new(Identity(scope), Application(scope),
             scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
-        internal AdminContext Admin(AsyncServiceScope scope) => new(new HttpContextAccessor
-        { HttpContext = PrincipalContext(_currentUserId) },
-            new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Application(scope))),
-            new OrganizationMemberRepository(Application(scope)), new GroupMemberRepository(Application(scope)),
-            new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Application(scope))),
-            NullLogger<AdminContext>.Instance);
 
         internal ManagementTenantProvisioningRequestDto Request() => ManagedTenantProvisioningRequestCodec.Deserialize($$$"""
             {"externalRequestId":"managed-1","externalCustomerReference":"customer-1","tenantName":"Managed Tenant","tenantSlug":"managed-tenant",
@@ -249,20 +124,14 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
              "legalNoticeUrl":"https://example.test/legal","termsUrl":"https://example.test/terms","privacyUrl":"https://example.test/privacy"}}
             """);
 
-        internal void SignIn(Guid userId) => _currentUserId = userId;
-        private static DefaultHttpContext PrincipalContext(Guid userId) => new()
-        {
-            User = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, userId.ToString("D"))], "test"))
-        };
-
         internal ManagedTenantProvisioningPreflight Preflight(AsyncServiceScope scope)
         {
             var app = Application(scope);
             var mutation = new RelationalSettingMutationLock(app, new EfCoreUnitOfWork(app));
-            var settings = new SystemSettingRepository(app, mutation);
+            var settings = SystemSettingRepository.CreateReadOnly(app, mutation);
             return new(new TenantRepository(app), new TenantPlanRepository(app), new ModuleDefinitionRepository(app),
-                new TenantSettingRepository(app, mutation), settings, new TenantBrandingSettingsDocumentLockService(settings),
+                new ManagedTenantDomainRepository(Provider.GetRequiredService<IGlobalExploreDbContextFactory>()),
+                settings, new TenantBrandingSettingsDocumentLockService(settings, mutation),
                 new TenantPlanStorageQuotaCeilingPolicy(settings), Store(scope));
         }
 
@@ -272,39 +141,28 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             var tenants = new TenantRepository(app);
             var unit = new EfCoreUnitOfWork(app);
             var mutation = new RelationalSettingMutationLock(app, unit);
-            var settings = new SystemSettingRepository(app, mutation);
-            var tenantSettings = new TenantSettingRepository(app, mutation);
+            var settings = SystemSettingRepository.CreateReadOnly(app, mutation);
+            var tenantSettings = TenantSettingRepository.CreateReadOnly(app, mutation);
             var documents = new TenantSettingsDocumentRepository(app);
             var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
             var typed = new TypedSettingsDocumentResolver(documents, cache);
-            var accessor = new TenantContextAccessor(Http);
-            var tenantContext = new TenantContext(accessor, new TenantResolverService([], accessor, Options.Create(new DeploymentSettings())));
-            var hierarchy = new HierarchicalSettingsResolver(settings, tenantSettings, new OrganizationSettingRepository(app),
-                new GroupSettingRepository(app), new GroupTenantRepository(app), new UserPreferenceRepository(app), tenantContext,
-                mutation, cache, NullLogger<HierarchicalSettingsResolver>.Instance,
-                EmailDispatchSqliteFixture.CreateEmailSettingsWriter(app, mutation),
-                new EventResourceSettingsWriter(app, mutation, unit));
+            var hierarchy = new HierarchicalSettingsReader(settings, tenantSettings, new OrganizationSettingRepository(app),
+                new GroupSettingRepository(app), UserPreferenceRepository.CreateReadOnly(app), cache);
             return new(tenants, new UserRepository(app), new ActorRepository(app), new UserExternalLoginRepository(app),
                 new TenantUserRepository(app), new TenantUserProfileRepository(app), new TenantUserRoleGrantRepository(app),
                 new RoleRepository(app), new OrganizationRepository(app), new OrganizationTenantRepository(app),
                 new OrganizationMemberRepository(app), new GroupRepository(app), new GroupTenantRepository(app),
                 new GroupMemberRepository(app), new ExternalBindingRepository(app), new TenantOnboardingStateRepository(app),
                 new ManagedTenantProvisioningOperationRepository(app), new TenantPlanRepository(app), new TenantCapabilityRepository(app),
-                tenantSettings, documents, new TenantCreationService(tenants, documents), Store(scope), Admin(scope),
-                new PlatformUserRoleRepository(app), new ManagedControlPlaneRegistrationRepository(app),
+                tenantSettings, documents, new TenantCreationService(tenants, documents), Store(scope),
+                new ManagedControlPlaneRegistrationRepository(app),
                 Provider.GetRequiredService<IDeploymentModeProvider>(), new AuditLogRepository(app),
                 new TenantBrandingSettingsDocumentProvisioningService(tenants, documents, typed), typed, hierarchy, Preflight(scope),
                 new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(app), tenants,
                     new ManagedTenantProvisioningOperationRepository(app), _managedOptions), _managedOptions,
-                mutation, unit, NullLogger<EnsureManagedProviderClientProvisionedCommandHandler>.Instance,
+                mutation, NullLogger<EnsureManagedProviderClientProvisionedCommandHandler>.Instance,
                 new PrivacyIdentityFenceOperation(
                     NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()));
-        }
-
-        internal async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> EnsureAsync()
-        {
-            await using var scope = Provider.CreateAsyncScope();
-            return await Handler(scope).EnsureAsync(ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(Request()), null, null, null, Token);
         }
 
         internal async Task<ManagedTenantProvisioningOperation> ScheduleAsync()
@@ -331,69 +189,11 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 .ExecuteAsync(new ProcessManagedTenantProvisioningOperationCommand(operation.Id, operation.CurrentOutboxMessageId), Token);
         }
 
-        internal async Task<string> CredentialSnapshotAsync()
-        {
-            await using var scope = Provider.CreateAsyncScope();
-            var user = await Identity(scope).Set<LocalIdentityUser>().AsNoTracking().SingleAsync(Token);
-            var token = await Identity(scope).Set<IdentityUserToken<Guid>>().AsNoTracking().SingleAsync(Token);
-            var summary = (await Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), Token)).Items.Single();
-            return JsonSerializer.Serialize(new
-            {
-                user.PasswordHash,
-                user.SecurityStamp,
-                user.ConcurrencyStamp,
-                token.Value,
-                summary.CurrentOperationId,
-                summary.CurrentOperationConcurrencyStamp
-            });
-        }
-
         internal async Task AssertNoTenantAsync()
         {
             await using var scope = Provider.CreateAsyncScope();
             await Assert.That(await new TenantRepository(Application(scope)).GetTenantBySlug("managed-tenant")).IsNull();
             await Assert.That(await Application(scope).Set<ExternalBinding>().CountAsync(Token)).IsEqualTo(0);
-        }
-
-        internal async Task AssertLinkedAsync(ManagedProviderClientProvisioningResultDto result)
-        {
-            await using var scope = Provider.CreateAsyncScope();
-            var app = Application(scope);
-            await Assert.That(result.UserId).IsEqualTo(Receipt.LocalSubjectId);
-            await Assert.That(result.UserActorId).IsEqualTo(Receipt.PersonalActorId);
-            await Assert.That(result.UserExternalLoginId).IsEqualTo(Receipt.ExternalLoginId);
-            var membership = await new TenantUserRepository(app).GetByTenantAndUserAsync(result.TenantId, Receipt.LocalSubjectId);
-            await Assert.That(membership!.ActorId).IsEqualTo(Receipt.PersonalActorId);
-            var grants = await new TenantUserRoleGrantRepository(app).GetByTenant(result.TenantId);
-            await Assert.That(grants.Count).IsEqualTo(1);
-            await Assert.That(grants.Single().Role.MasterCode).IsEqualTo("tenant.admin");
-            await Assert.That(await new PlatformUserRoleRepository(app).IsUserPlatformAdmin(Receipt.LocalSubjectId)).IsFalse();
-            await Assert.That(await app.Set<EmailDispatchOutbox>().CountAsync(Token)).IsEqualTo(0);
-        }
-
-        internal async Task ReplaceAdministratorAsync()
-        {
-            await using var scope = Provider.CreateAsyncScope();
-            var app = Application(scope);
-            await app.Set<PlatformUserRole>().Where(role => role.UserId == Administrator).ExecuteDeleteAsync(Token);
-            Guid successor = Guid.CreateVersion7();
-            await new UserRepository(app).Create(new User
-            {
-                Id = successor,
-                Pii = new UserPii { Email = string.Empty, FirstName = "Successor", LastName = "Administrator" },
-                CreatedAt = DateTime.UtcNow
-            });
-            Role platformAdmin = (await new RoleRepository(app).GetByMasterCodeAsync("platform.admin"))!;
-            await new PlatformUserRoleRepository(app).Create(new PlatformUserRole
-            {
-                Id = Guid.CreateVersion7(),
-                UserId = successor,
-                User = null!,
-                Role = null!,
-                RoleId = platformAdmin.Id,
-                GrantedAt = DateTime.UtcNow
-            });
-            SignIn(successor);
         }
 
         private async Task InitializeAsync()
@@ -405,11 +205,15 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
             services.Configure<DeploymentSettings>(settings => settings.Mode = DeploymentMode.MultiTenant);
             services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
-            services.AddScoped<Explore.Persistence.Database.IGlobalExploreDbContextFactory>(provider =>
-                new SecurityTestSupport.AdministrativeAuthorityTestFactory(provider.GetRequiredService<ExploreDbContext>()));
-            services.AddScoped<IInstanceBootstrapStateReader, InstanceBootstrapStateReader>();
             services.AddSingleton<IDeploymentModeProvider, DeploymentModeProvider>();
-            services.AddDbContext<ExploreDbContext>(options => Configure(options, _applicationPath).AddInterceptors(GrantFault));
+            services.AddDbContext<ExploreDbContext>(options => Configure(options, _applicationPath));
+            services.AddSingleton<IGlobalExploreDbContextFactory>(_ => new GlobalExploreDbContextFactory(
+                new PrimaryDatabaseConnectionOptions
+                {
+                    Provider = PrimaryDatabaseProvider.Sqlite,
+                    Role = PrimaryDatabaseRole.Global,
+                    Database = _applicationPath
+                }));
             var identity = services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>()
                 .AddUserValidator<OptionalEmailLocalIdentityUserValidator>();
             if (_topology == IdentityDatabaseTopology.External)
@@ -421,7 +225,6 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             Provider = services.BuildIsolatedServiceProvider();
             await LocalIdentitySqliteTemplate.CopyAsync(_applicationPath,
                 _topology == IdentityDatabaseTopology.External ? _identityPath : null, seedLookups: true, Token);
-            SignIn(Administrator);
             await using (var seed = Provider.CreateAsyncScope())
             {
                 var app = Application(seed);
@@ -577,16 +380,4 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         }
     }
 
-    private sealed class InjectedGrantFailure : Exception;
-    private sealed class GrantWriteFault : SaveChangesInterceptor
-    {
-        internal bool Armed { get; set; }
-        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
-            InterceptionResult<int> result, CancellationToken cancellationToken = default)
-        {
-            if (Armed && eventData.Context!.ChangeTracker.Entries<TenantUserRoleGrant>().Any(entry => entry.State == EntityState.Added))
-            { Armed = false; throw new InjectedGrantFailure(); }
-            return base.SavingChangesAsync(eventData, result, cancellationToken);
-        }
-    }
 }

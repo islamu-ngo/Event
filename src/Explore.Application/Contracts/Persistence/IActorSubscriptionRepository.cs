@@ -4,11 +4,11 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IActorSubscriptionRepository : IGenericRepository<ActorSubscription, Guid>
 {
+    /// <summary>Reads current scalar state in the exact execution tenant, never a tracked or retired subscription.</summary>
     Task<ActorSubscription?> GetBySubscriberAndTargetAsync(
         Guid tenantId,
         Guid subscriberTenantUserId,
         Guid targetActorId,
-        bool trackChanges = false,
         CancellationToken cancellationToken = default);
 
     Task<ActorSubscription?> GetDiscoverableBySubscriberAndTargetAsync(

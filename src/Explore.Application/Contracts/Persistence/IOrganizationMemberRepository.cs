@@ -10,7 +10,7 @@ public interface IOrganizationMemberRepository : IGenericRepository<Organization
     Task<List<User>> GetUsersByOrganization(Guid organizationId);
     Task<List<Organization>> GetOrganizationsByUser(Guid userId);
     Task<bool> Exists(Guid organizationId, Guid userId);
-    Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id);
+    Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id, CancellationToken cancellationToken = default);
     Task<List<OrganizationMember>> GetOrganizationMembersWithDetails();
     Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId);
     Task<List<OrganizationMember>> GetInvitesByEmail(string email);

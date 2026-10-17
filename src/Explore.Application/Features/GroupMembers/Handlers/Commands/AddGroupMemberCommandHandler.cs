@@ -22,6 +22,8 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
     private readonly IUserRepository _userRepository;
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
+    private readonly ISerializableAttemptOwner _owner;
 
     public AddGroupMemberCommandHandler(
         IGroupRepository groupRepository,
@@ -29,7 +31,9 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
         IGroupMemberRepository groupMemberRepository,
         IUserRepository userRepository,
         IUserContext userContext,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IHumanAccountAdministrativeActionPreparation preparation,
+        ISerializableAttemptOwner owner)
     {
         _groupRepository = groupRepository;
         _groupTenantRepository = groupTenantRepository;
@@ -37,9 +41,23 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
         _userRepository = userRepository;
         _userContext = userContext;
         _tenantContext = tenantContext;
+        _preparation = preparation;
+        _owner = owner;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddGroupMemberCommand request, CancellationToken cancellationToken)
+    {
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            var result = await ExecuteBodyAsync(request, token);
+            if (result.IsSuccess) prepared.Complete(result.Id);
+            return result;
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(AddGroupMemberCommand request, CancellationToken cancellationToken)
     {
         var dto = request.AddGroupMemberDto;
 

@@ -1,15 +1,13 @@
 using System.IO.Compression;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
-using Explore.Domain.Secrets;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Refit;
@@ -22,7 +20,7 @@ namespace Explore.Infrastructure.Services;
 /// <summary>
 /// Builds policy package manifests from the bundled Cerbos policy directory.
 /// </summary>
-public sealed class CerbosPolicyPackageService : IPolicyPackageService
+public sealed partial class CerbosPolicyPackageService : IPolicyPackageService
 {
     private const string SchemaDirectoryName = "_schemas";
     private const string DerivedRolesPolicyFileName = "derived_roles.yaml";
@@ -46,39 +44,44 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
     private readonly CerbosPolicyPackageOptions _options;
     private readonly CerbosAdminApiSettings _adminApiSettings;
     private readonly ICerbosConfigResolver _cerbosConfigResolver;
-    private readonly ISecretResolver _secretResolver;
     private readonly CerbosAdminEndpointValidator _adminEndpointValidator;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CerbosPolicyPackageService> _logger;
     private readonly IEventResourcePolicyPublicationFence _resourcePublicationFence;
     private readonly CerbosSettings _instanceCerbosSettings;
+    private readonly IServiceProvider _services;
+    private readonly AuthorizationProviderDeploymentOptions _authorizationDeployment;
 
     public CerbosPolicyPackageService(
         IOptions<CerbosPolicyPackageOptions> options,
         IOptions<CerbosAdminApiSettings> adminApiSettings,
         ICerbosConfigResolver cerbosConfigResolver,
-        ISecretResolver secretResolver,
         CerbosAdminEndpointValidator adminEndpointValidator,
         IHttpClientFactory httpClientFactory,
         ILogger<CerbosPolicyPackageService> logger,
         IEventResourcePolicyPublicationFence resourcePublicationFence,
-        IOptions<CerbosSettings> instanceCerbosSettings)
+        IOptions<CerbosSettings> instanceCerbosSettings,
+        IServiceProvider services,
+        IOptions<AuthorizationProviderDeploymentOptions> authorizationOptions)
     {
         _options = options.Value;
         _adminApiSettings = adminApiSettings.Value;
         _cerbosConfigResolver = cerbosConfigResolver;
-        _secretResolver = secretResolver;
         _adminEndpointValidator = adminEndpointValidator;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _resourcePublicationFence = resourcePublicationFence;
         _instanceCerbosSettings = instanceCerbosSettings.Value;
+        _services = services;
+        _authorizationDeployment = authorizationOptions.Value;
     }
 
     /// <inheritdoc />
-    public async Task<PolicyPackageManifest> BuildManifestAsync(CancellationToken cancellationToken = default)
+    public async Task<PolicyPackageManifest> BuildManifestAsync(CancellationToken cancellationToken = default) =>
+        await BuildManifestAtAsync(ResolvePolicyRoot(), cancellationToken);
+
+    private async Task<PolicyPackageManifest> BuildManifestAtAsync(string packageRoot, CancellationToken cancellationToken)
     {
-        var packageRoot = ResolvePolicyRoot();
         var artifacts = new List<PolicyPackageArtifact>();
 
         foreach (var policyFile in EnumeratePolicyFiles(packageRoot))
@@ -146,55 +149,104 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             Artifacts: orderedArtifacts);
     }
 
+    /// <summary>
+    /// Closed provider-configuration observation. Both successful selection and original
+    /// absence retain this compiler and declaration; rechecks never adopt a replacement root.
+    /// All file work is performed by the provider coordinator while its selected writer is idle.
+    /// </summary>
+    internal Task<ProviderConfigurationPublication> ObserveProviderConfigurationPublicationAsync(CancellationToken token) =>
+        ProviderConfigurationPublication.CaptureAsync(this, token);
+
+    internal sealed class ProviderConfigurationPublication
+    {
+        private readonly CerbosPolicyPackageService owner;
+        private readonly string declarations;
+        private readonly string? root;
+        private readonly string image;
+        internal PolicyPackageManifest? Manifest { get; }
+
+        private ProviderConfigurationPublication(CerbosPolicyPackageService owner, string declarations,
+            string? root, PolicyPackageManifest? manifest)
+        {
+            this.owner = owner;
+            this.declarations = declarations;
+            this.root = root;
+            Manifest = manifest;
+            image = Image(manifest);
+        }
+
+        internal static async Task<ProviderConfigurationPublication> CaptureAsync(CerbosPolicyPackageService owner, CancellationToken token)
+        {
+            string declarations = JsonSerializer.Serialize(owner._options);
+            string? root = null;
+            PolicyPackageManifest? manifest = null;
+            try
+            {
+                root = owner.ResolvePolicyRoot();
+                manifest = await owner.BuildManifestAtAsync(root, token);
+            }
+            catch (PolicyPackageUnavailableException) { }
+            if (JsonSerializer.Serialize(owner._options) != declarations)
+                throw new UnauthorizedAccessException("The original provider publication declaration changed.");
+            return new(owner, declarations, root, manifest);
+        }
+
+        internal async Task RequireOriginalAsync(CancellationToken token)
+        {
+            if (JsonSerializer.Serialize(owner._options) != declarations)
+                throw new UnauthorizedAccessException("The original provider publication declaration changed.");
+            string? selected = null;
+            PolicyPackageManifest? current = null;
+            try
+            {
+                selected = owner.ResolvePolicyRoot();
+                if (!string.Equals(root, selected, StringComparison.Ordinal))
+                    throw new UnauthorizedAccessException("The original provider publication root changed.");
+                current = await owner.BuildManifestAtAsync(root!, token);
+            }
+            catch (PolicyPackageUnavailableException) { }
+            if (!string.Equals(root, selected, StringComparison.Ordinal) || Image(current) != image
+                || JsonSerializer.Serialize(owner._options) != declarations)
+                throw new UnauthorizedAccessException("The original provider publication material or absence changed.");
+        }
+
+        private static string Image(PolicyPackageManifest? value) => JsonSerializer.Serialize(value is null ? null : new
+        { value.PackageId, value.Version, value.ContentHash, value.Artifacts });
+        public override string ToString() => nameof(ProviderConfigurationPublication);
+    }
+
     /// <inheritdoc />
     public Task<PolicyPackagePublishResult> PublishAsync(
-        CancellationToken cancellationToken = default,
-        PolicyPackageAdminCredentials? oneTimeCredentials = null) =>
-        PublishCoreAsync(instanceTargetOnly: false, oneTimeCredentials, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<PolicyPackagePublishResult> PublishInstanceAsync(
-        CancellationToken cancellationToken = default,
-        PolicyPackageAdminCredentials? oneTimeCredentials = null) =>
-        PublishCoreAsync(instanceTargetOnly: true, oneTimeCredentials, cancellationToken);
+        SyncAuthorizationPolicyPackageCommand command, CancellationToken cancellationToken = default) =>
+        PublishCoreAsync(command, cancellationToken);
 
     private async Task<PolicyPackagePublishResult> PublishCoreAsync(
-        bool instanceTargetOnly,
-        PolicyPackageAdminCredentials? oneTimeCredentials,
+        SyncAuthorizationPolicyPackageCommand command,
         CancellationToken cancellationToken)
     {
         var manifest = CreateUnavailableManifest();
+        if (command.Request.InspectOnly || string.IsNullOrWhiteSpace(command.Request.AdminUsername)
+            || string.IsNullOrWhiteSpace(command.Request.AdminPassword))
+        {
+            return new PolicyPackagePublishResult(false, manifest.PackageId, manifest.ContentHash,
+                "A fresh complete administrator pair is required for this foreground operation.",
+                DateTimeOffset.UtcNow, [])
+            {
+                IssueCode = PolicyPackageIssueCode.AdminApiNotConfigured
+            };
+        }
 
         try
         {
             var packageRoot = ResolvePolicyRoot();
             manifest = await BuildManifestAsync(cancellationToken);
-            var targetResolution = instanceTargetOnly
-                ? await ResolveInstanceAdminApiTargetAsync(oneTimeCredentials, cancellationToken)
-                : await ResolveAdminApiTargetAsync(oneTimeCredentials, cancellationToken);
-            if (!targetResolution.Succeeded || targetResolution.Target is null)
-            {
-                return new PolicyPackagePublishResult(
-                    Succeeded: false,
-                    PackageId: manifest.PackageId,
-                    ContentHash: manifest.ContentHash,
-                    Message: targetResolution.IssueCode == PolicyPackageIssueCode.AdminApiUnavailable
-                        ? "Policy package publishing skipped because the Cerbos credential authority is unavailable."
-                        : "Policy package publishing skipped because no safe Cerbos Admin API target is configured.",
-                    PublishedAt: DateTimeOffset.UtcNow,
-                    Warnings: targetResolution.Warnings)
-                {
-                    IssueCode = targetResolution.IssueCode
-                };
-            }
-
-            var target = targetResolution.Target;
             var schemas = await BuildSchemaDefinitionsAsync(packageRoot, manifest, cancellationToken);
             var policies = await BuildPolicyDocumentsAsync(packageRoot, manifest, cancellationToken);
 
             // This commit precedes the first remote write. Upload/reload success is not evidence
             // that older writers stopped or every reachable PDP serves the declared policy.
-            await _resourcePublicationFence.BeginPublicationAsync(target.GrpcEndpoint, cancellationToken);
+            var selection = await SelectPublicationForWriteAsync(command, cancellationToken);
+            var target = ClaimCommittedSelection(command, selection);
 
             if (schemas.Count > 0)
                 await PushSchemasAsync(target, schemas, cancellationToken);
@@ -293,10 +345,35 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 IssueCode = PolicyPackageIssueCode.PublishFailed
             };
         }
+        finally { _issuedPublication?.Close(); }
     }
 
     /// <inheritdoc />
-    public async Task<PolicyPackageStatusResult> GetStatusAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> IsPublicationReadyAsync(CancellationToken cancellationToken = default)
+    {
+        var publication = _options.Publication;
+        if (publication.ReceiptBase64.Length is 0 or > 12000
+            || publication.SignatureBase64.Length is 0 or > 1500)
+            return false;
+        try
+        {
+            var manifest = await BuildManifestAsync(cancellationToken);
+            return new CerbosPublicationReceiptVerifier().Verify(
+                Convert.FromBase64String(publication.ReceiptBase64),
+                Convert.FromBase64String(publication.SignatureBase64),
+                publication.PublicKeyPem, publication.Revision, manifest.ContentHash,
+                publication.Environment, _instanceCerbosSettings.GrpcEndpoint, DateTimeOffset.UtcNow);
+        }
+        catch (Exception exception) when (exception is FormatException or PolicyPackageUnavailableException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<PolicyPackageStatusResult> GetStatusAsync(
+        CancellationToken cancellationToken = default,
+        PolicyPackageAdminCredentials? oneTimeCredentials = null,
+        bool instanceTargetOnly = false)
     {
         PolicyPackageManifest manifest;
         try
@@ -317,7 +394,17 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 Warnings: [ex.Message]);
         }
 
-        var targetResolution = await ResolveAdminApiTargetAsync(null, cancellationToken);
+        if (oneTimeCredentials is null)
+        {
+            return new PolicyPackageStatusResult(manifest.PackageId, manifest.ContentHash,
+                DateTimeOffset.UtcNow, PolicyPackageIssueCode.PackageStatusUnknown,
+                "Live-store status requires a fresh complete administrator pair.",
+                ["A signed publication receipt describes historical publication, not current store equality."]);
+        }
+
+        var targetResolution = instanceTargetOnly
+            ? await ResolveInstanceAdminApiTargetAsync(oneTimeCredentials, cancellationToken)
+            : await ResolveAdminApiTargetAsync(oneTimeCredentials, cancellationToken);
 
         if (!targetResolution.Succeeded || targetResolution.Target is null)
         {
@@ -540,8 +627,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                     "BYO Cerbos Admin API endpoint must be configured before publishing.");
             }
 
-            var username = oneTimeCredentials?.Username ?? configuration.AdminUsername;
-            var password = oneTimeCredentials?.Password ?? configuration.AdminPassword;
+            var username = oneTimeCredentials?.Username;
+            var password = oneTimeCredentials?.Password;
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
                 return AdminApiTargetResolution.Failed(
@@ -559,64 +646,41 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 GrpcEndpoint: configuration.Endpoint));
         }
 
-        return await ResolveInstanceAdminApiTargetAsync(oneTimeCredentials, cancellationToken);
+        return configuration is { IsInstanceDefault: true, Mode: CerbosMode.Instance }
+            ? await ResolveInstanceAdminApiTargetAsync(oneTimeCredentials, cancellationToken)
+            : AdminApiTargetResolution.Failed("The authorized Cerbos target could not be resolved.");
     }
 
-    private async Task<AdminApiTargetResolution> ResolveInstanceAdminApiTargetAsync(
+    private Task<AdminApiTargetResolution> ResolveInstanceAdminApiTargetAsync(
         PolicyPackageAdminCredentials? oneTimeCredentials,
         CancellationToken cancellationToken)
     {
         if (_adminApiSettings.Endpoints.Count == 0)
-            return AdminApiTargetResolution.Failed("Configure Cerbos:AdminApi:Endpoints before publishing the policy package.");
+            return Task.FromResult(AdminApiTargetResolution.Failed("Configure Cerbos:AdminApi:Endpoints before publishing the policy package."));
 
         var endpoints = new List<Uri>();
         foreach (var configuredEndpoint in _adminApiSettings.Endpoints)
         {
             if (!_adminEndpointValidator.TryNormalize(configuredEndpoint, isByo: false, out var endpoint, out var warning))
-                return AdminApiTargetResolution.Failed(warning);
+                return Task.FromResult(AdminApiTargetResolution.Failed(warning));
 
             endpoints.Add(endpoint);
         }
 
         var username = oneTimeCredentials?.Username;
         var password = oneTimeCredentials?.Password;
-        if (oneTimeCredentials is null)
-        {
-            var usernameResolution = await _secretResolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername,
-                null,
-                cancellationToken);
-            var passwordResolution = await _secretResolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword,
-                null,
-                cancellationToken);
-            if (usernameResolution.Status is SecretResolutionStatus.Unavailable
-                    or SecretResolutionStatus.Unauthorized
-                    or SecretResolutionStatus.Invalid
-                || passwordResolution.Status is SecretResolutionStatus.Unavailable
-                    or SecretResolutionStatus.Unauthorized
-                    or SecretResolutionStatus.Invalid)
-            {
-                return AdminApiTargetResolution.Failed(
-                    "Configured Cerbos Admin API credentials could not be resolved from the selected secret authority.",
-                    PolicyPackageIssueCode.AdminApiUnavailable);
-            }
-
-            username = usernameResolution.Value;
-            password = passwordResolution.Value;
-        }
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
-            return AdminApiTargetResolution.Failed(
-                "Configure Cerbos Admin API credentials or provide a complete one-time credential pair before publishing.");
+            return Task.FromResult(AdminApiTargetResolution.Failed(
+                "Provide a fresh complete one-time administrator pair before publishing."));
         }
 
-        return AdminApiTargetResolution.Success(new AdminApiTarget(
+        return Task.FromResult(AdminApiTargetResolution.Success(new AdminApiTarget(
             Endpoints: endpoints,
             AdminUsername: username,
             AdminPassword: password,
             Source: AdminApiTargetSource.Instance,
-            GrpcEndpoint: _instanceCerbosSettings.GrpcEndpoint));
+            GrpcEndpoint: _instanceCerbosSettings.GrpcEndpoint)));
     }
 
     private string ResolvePolicyRoot()
@@ -1066,17 +1130,20 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         builder.AppendLine($"Content hash: `{manifest.ContentHash}`");
         builder.AppendLine();
         builder.AppendLine("This archive contains the bundled authorization policies and schemas used by the application.");
-        builder.AppendLine("Use it when automated Admin API package sync is unavailable or credentials are not configured.");
+        builder.AppendLine("Publication is operator-owned. Supply fresh credentials only for the foreground operation.");
         builder.AppendLine();
         builder.AppendLine("1. Extract this ZIP to a temporary directory.");
         builder.AppendLine("2. Review `manifest.json` and the policy/schema files before applying them.");
-        builder.AppendLine("3. Recommended for Docker Compose: mount the extracted policies directory read-only and run:");
-        builder.AppendLine("   docker compose --profile authz run --rm cerbos-policy-sync");
+        builder.AppendLine("   Keep manifest.json and INSTRUCTIONS.md outside the policy directory before recursive upload or mounting it as the runtime package.");
+        builder.AppendLine("3. For Docker Compose, mount the extracted directory at /policies, export fresh CERBOS_USERNAME/CERBOS_PASSWORD for this shell, then run:");
+        builder.AppendLine("   docker compose --profile authz --profile cerbos-publication run --rm cerbos-policy-sync");
         builder.AppendLine("4. Manual fallback from the extracted directory:");
-        builder.AppendLine("   cerbosctl put policy --recursive .");
         builder.AppendLine("   cerbosctl put schema --recursive _schemas");
+        builder.AppendLine("   cerbosctl put policy --recursive .");
         builder.AppendLine("   cerbosctl store reload --wait");
         builder.AppendLine("5. Restart Cerbos if your storage driver does not support Admin API reloads.");
+        builder.AppendLine("6. Verify the target installation, then sign a cerbos-publication.v1 receipt binding this content hash, the candidate revision, environment, exact PDP endpoint, publication time and expiry.");
+        builder.AppendLine("7. Unset the administrator variables. Never save them in Event configuration or CI secrets.");
         builder.AppendLine();
         builder.AppendLine("The archive intentionally does not include Admin API credentials or runtime secrets.");
         return builder.ToString();
@@ -1107,7 +1174,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             || exception is TaskCanceledException && !cancellationToken.IsCancellationRequested;
     }
 
-    private static string ComputeManifestHash(IReadOnlyList<PolicyPackageArtifact> artifacts)
+    /// <summary>Hashes artifacts already sorted by ordinal logical ID for both runtime and deployment verification.</summary>
+    public static string ComputeManifestHash(IReadOnlyList<PolicyPackageArtifact> artifacts)
     {
         var builder = new StringBuilder();
         foreach (var artifact in artifacts)

@@ -5,8 +5,6 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Features.Organizations.Requests.Commands;
-using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Models;
 using Explore.Application.Settings;
 using Explore.Application.Telemetry;
@@ -261,12 +259,11 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         {
             byoConfig = await ResolveTenantByoConfigAsync(cancellationToken);
         }
-        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogError(
-                "Failed to resolve tenant BYO Cerbos config for batch ({Count} checks). Activating safe mode to avoid local RBAC bypass. FailureType={FailureType}",
-                effectiveChecks.Count,
-                ex.GetType().Name);
+                "Failed to resolve tenant BYO Cerbos config for batch ({Count} checks). Activating safe mode to avoid local RBAC bypass.",
+                effectiveChecks.Count);
             evaluatedResults = await ExecuteSafeModeAsync(effectiveChecks, cancellationToken);
             return evaluatedResults;
         }
@@ -357,7 +354,7 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
 
             return await _cerbosProvider.AuthorizeBatchWithUnavailableSignalAsync(checks, cancellationToken);
         }
-        catch (Exception ex) when (provider == _cerbosProvider)
+        catch (Exception) when (provider == _cerbosProvider)
         {
             // When Cerbos is the configured instance authorization provider and is unavailable,
             // deny all checks. Falling back to a potentially more permissive local RBAC
@@ -365,9 +362,8 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
             _logger.LogError(
                 "Instance Cerbos provider unavailable for batch ({Count} checks). " +
                 "Denying all — Cerbos is the configured authorization provider. " +
-                "Restore Cerbos connectivity or switch authorization.provider setting to resolve. FailureType={FailureType}",
-                checks.Count,
-                ex.GetType().Name);
+                "Restore Cerbos connectivity or switch authorization.provider setting to resolve.",
+                checks.Count);
             return checks
                 .Select(_ => AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos, AuthorizationDecisionReasonCodes.ProviderUnavailable))
                 .ToArray();
@@ -588,11 +584,10 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
             _logger.LogDebug("Routing {Count} auth checks to BYO Cerbos endpoint", checks.Count);
             return await _cerbosProvider.AuthorizeBatchWithEndpointAsync(config.Endpoint, checks, cancellationToken);
         }
-        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(
-                "BYO Cerbos PDP unreachable. Activating safe mode. FailureType={FailureType}",
-                ex.GetType().Name);
+                "BYO Cerbos PDP unreachable. Activating safe mode.");
 
             return await ExecuteSafeModeAsync(checks, cancellationToken);
         }
@@ -659,14 +654,13 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
                     return "cerbos";
                 }
 
-                _logger.LogDebug("Authorization provider resolved to: Local (setting={Value})", value ?? "null");
+                _logger.LogDebug("Authorization provider resolved to: Local (from SystemSetting)");
                 return "local";
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 _logger.LogWarning(
-                    "Failed to read authorization provider setting. Using Cerbos fail-closed path. FailureType={FailureType}",
-                    ex.GetType().Name);
+                    "Failed to read authorization provider setting. Using Cerbos fail-closed path.");
                 return "cerbos";
             }
         });

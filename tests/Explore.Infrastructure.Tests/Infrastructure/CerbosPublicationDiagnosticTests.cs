@@ -3,7 +3,6 @@ using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
 using Explore.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
@@ -37,8 +36,6 @@ public sealed class CerbosPublicationDiagnosticTests
                 Endpoint = "https://operator-pdp.example:3592",
                 AdminEndpoint = endpoint,
                 Mode = CerbosMode.CustomEndpoint,
-                AdminUsername = canary,
-                AdminPassword = canary,
                 IsInstanceDefault = false
             });
             var settings = Options.Create(new CerbosAdminApiSettings { Endpoints = [endpoint] });
@@ -53,13 +50,12 @@ public sealed class CerbosPublicationDiagnosticTests
             var transport = new PrivateTransport(canary, failedPath);
             using var client = new HttpClient(transport);
             var logger = new Collector();
-            var packageOptions = Options.Create(new CerbosPolicyPackageOptions { PoliciesPath = directory });
-            var publisher = new CerbosPolicyPackageService(
-                packageOptions, settings, configuration, Substitute.For<ISecretResolver>(),
-                new CerbosAdminEndpointValidator(), new ClientFactory(client), logger,
-                Substitute.For<IEventResourcePolicyPublicationFence>(),
+            var publisher = new AuthenticatedPolicyPackageTestService(
+                Options.Create(new CerbosPolicyPackageOptions { PoliciesPath = directory }),
+                settings, configuration, new CerbosAdminEndpointValidator(),
+                new ClientFactory(client), logger,
                 Options.Create(new CerbosSettings { GrpcEndpoint = "https://instance.example:3593" }));
-            // Bound the native HTTP failure path; no external provider or vault is contacted.
+            // This deadline includes real Local authentication and native custody setup.
             using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
 
             var credentials = new PolicyPackageAdminCredentials(canary, canary);
@@ -74,7 +70,7 @@ public sealed class CerbosPublicationDiagnosticTests
             }
             else
             {
-                var result = await publisher.GetStatusAsync(deadline.Token);
+                var result = await publisher.GetStatusAsync(deadline.Token, credentials);
                 await Assert.That(result.IssueCode).IsEqualTo(operation == 2
                     ? PolicyPackageIssueCode.PackageStatusUnknown : PolicyPackageIssueCode.None);
                 await Assert.That(result.ObservedRevision).IsNull();

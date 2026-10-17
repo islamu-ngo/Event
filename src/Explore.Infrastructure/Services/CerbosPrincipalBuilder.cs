@@ -29,21 +29,18 @@ public class CerbosPrincipalBuilder
     private readonly IAdminContext _adminContext;
     private readonly IMachinePrincipalAccessor _machinePrincipalAccessor;
     private readonly IEventAuthoritySnapshotService _eventAuthoritySnapshotService;
-    private readonly IOrganizationMemberRepository _organizationMemberRepository;
-    private readonly IGroupMemberRepository _groupMemberRepository;
+    private readonly IHumanCerbosPrincipalReader _humanPrincipalReader;
 
     public CerbosPrincipalBuilder(
         IAdminContext adminContext,
         IMachinePrincipalAccessor machinePrincipalAccessor,
         IEventAuthoritySnapshotService eventAuthoritySnapshotService,
-        IOrganizationMemberRepository organizationMemberRepository,
-        IGroupMemberRepository groupMemberRepository)
+        IHumanCerbosPrincipalReader humanPrincipalReader)
     {
         _adminContext = adminContext;
         _machinePrincipalAccessor = machinePrincipalAccessor;
         _eventAuthoritySnapshotService = eventAuthoritySnapshotService;
-        _organizationMemberRepository = organizationMemberRepository;
-        _groupMemberRepository = groupMemberRepository;
+        _humanPrincipalReader = humanPrincipalReader;
     }
 
     /// <summary>
@@ -69,34 +66,13 @@ public class CerbosPrincipalBuilder
     }
 
     /// <summary>
-    /// Builds a Cerbos SDK <see cref="Principal"/> for the given user by querying their
-    /// administrative authority across instance, tenant, and organization scopes.
+    /// Builds the original human's Cerbos principal from current native source facts.
+    /// This idle observation is not authority to commit a later mutation.
     /// </summary>
     public async Task<Principal> BuildSdkPrincipalAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(userId, cancellationToken);
-        var adminTenantIds = await _adminContext.GetAdminTenantIdsAsync(userId, cancellationToken);
-        var adminOrgIds = await _adminContext.GetAdminOrganizationIdsAsync(userId, cancellationToken);
-        var adminGroupIds = await _adminContext.GetAdminGroupIdsAsync(userId, cancellationToken);
-        var eventCreateOrganizationIds = await _organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventCreate,
-            cancellationToken) ?? [];
-        var eventCreateGroupIds = await _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventCreate,
-            cancellationToken) ?? [];
-        var eventFinanceOrganizationIds = await _organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventManageFinance,
-            cancellationToken) ?? [];
-        var eventFinanceGroupIds = await _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventManageFinance,
-            cancellationToken) ?? [];
-
-        return BuildHumanPrincipal(userId, isInstanceAdmin, adminTenantIds, adminOrgIds, adminGroupIds,
-            eventCreateOrganizationIds, eventCreateGroupIds, eventFinanceOrganizationIds, eventFinanceGroupIds);
+        var facts = await _humanPrincipalReader.ReadAsync(userId, cancellationToken);
+        return BuildPrincipalFromSources(facts);
     }
 
     public static Principal BuildPrincipalFromSources(HumanPrincipalSourceFacts facts)

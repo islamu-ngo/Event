@@ -237,19 +237,67 @@ public class CerbosAuthorizationService : IAuthorizationProvider
         }
     }
 
+    internal async Task<AuthorizationDecision> AuthorizePreparedHumanAsync(
+        Principal principal, AuthorizationRequest check, Guid? ambientTenantId,
+        bool usePolicyScope, string endpoint, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (IsLocallyDeniedCheck(check) || string.IsNullOrWhiteSpace(check.ResourceId))
+            return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos);
+        if (string.IsNullOrWhiteSpace(endpoint))
+            return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos,
+                AuthorizationDecisionReasonCodes.ProviderUnavailable);
+
+        // The caller has already projected the principal, route and resource. No ambient
+        // identity resolution, assignment enrichment or policy-router fallback belongs here.
+        var snapshot = CerbosPrincipalBuilder.CapturePrincipal(principal);
+        var frozenPrincipal = Principal.NewInstance(snapshot.Id, snapshot.Roles.ToArray());
+        var frozenMessage = frozenPrincipal.ToPrincipal();
+        frozenMessage.Roles.Clear();
+        frozenMessage.MergeFrom(snapshot);
+        var request = CerbosCheckResourcesRequest.NewInstance()
+            .WithRequestId(RequestId.Generate())
+            .WithPrincipal(frozenPrincipal)
+            .WithResourceEntries(BuildResourceEntries([check], false, ambientTenantId, usePolicyScope));
+        var sent = request.ToCheckResourcesRequest();
+        try
+        {
+            var response = await _clientFactory.GetOrCreate(endpoint).CheckResourcesAsync(request, null);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(response.Raw.RequestId, sent.RequestId, StringComparison.Ordinal)
+                || response.Raw.Results.Count != 1
+                || !MatchesResult(response.Raw.Results[0], check)
+                || response.Raw.Results[0].Actions.Count != 1
+                || !response.Raw.Results[0].Actions.TryGetValue(check.Action, out var effect))
+                return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos,
+                    AuthorizationDecisionReasonCodes.ProviderError);
+            return effect == Effect.Allow
+                ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Cerbos)
+                : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos);
+        }
+        catch (Grpc.Core.RpcException)
+        {
+            return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos,
+                AuthorizationDecisionReasonCodes.ProviderUnavailable);
+        }
+    }
+
     private CerbosResourceEntry[] BuildResourceEntries(
         IReadOnlyList<AuthorizationRequest> checks,
-        bool isMachine)
-    {
-        var ambientTenantId = _tenantContext.TenantId;
+        bool isMachine) =>
+        BuildResourceEntries(checks, isMachine, _tenantContext.TenantId, _settings.UsePolicyScope);
 
+    private static CerbosResourceEntry[] BuildResourceEntries(
+        IReadOnlyList<AuthorizationRequest> checks, bool isMachine,
+        Guid? ambientTenantId, bool usePolicyScope)
+    {
         return checks
             .Select(check =>
             {
                 // Resolve tenant ID: prefer explicit scope from the check, fall back to ambient tenant context.
                 var effectiveTenantId = !string.IsNullOrEmpty(check.Scope?.TenantId)
                     ? check.Scope.TenantId
-                    : ambientTenantId != Guid.Empty
+                    : ambientTenantId.HasValue && ambientTenantId != Guid.Empty
                         ? ambientTenantId.ToString()
                         : null;
 
@@ -257,7 +305,7 @@ public class CerbosAuthorizationService : IAuthorizationProvider
                     .NewInstance(check.ResourceKind, check.ResourceId)
                     .WithActions(check.Action);
 
-                if (_settings.UsePolicyScope && effectiveTenantId is not null)
+                if (usePolicyScope && effectiveTenantId is not null)
                     entry = entry.WithScope(effectiveTenantId);
 
                 // Map resource attributes to Cerbos AttributeValue types

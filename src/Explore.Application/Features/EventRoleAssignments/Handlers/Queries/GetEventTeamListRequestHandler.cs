@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
+using Explore.Domain;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Queries;
 
@@ -9,7 +10,6 @@ public sealed class GetEventTeamListRequestHandler
     : IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>>
 {
     private readonly IEventRoleAssignmentRepository _eventRoleAssignmentRepository;
-
     public GetEventTeamListRequestHandler(IEventRoleAssignmentRepository eventRoleAssignmentRepository)
     {
         _eventRoleAssignmentRepository = eventRoleAssignmentRepository;
@@ -27,7 +27,11 @@ public sealed class GetEventTeamListRequestHandler
 
         var utcNow = DateTime.UtcNow;
 
-        return assignments
+        return Map(assignments, utcNow);
+    }
+
+    internal static List<EventTeamMemberDto> Map(IEnumerable<EventRoleAssignment> assignments, DateTime utcNow) =>
+        assignments
             .Select(a => new EventTeamMemberDto
             {
                 TenantId = a.TenantId,
@@ -47,5 +51,4 @@ public sealed class GetEventTeamListRequestHandler
                 CreatedBy = a.CreatedBy
             })
             .ToList();
-    }
 }

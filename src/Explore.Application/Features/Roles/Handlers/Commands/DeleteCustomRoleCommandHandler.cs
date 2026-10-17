@@ -4,7 +4,6 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Roles.Requests.Commands;
 using Explore.Application.Responses;
-using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Roles.Handlers.Commands;
 
@@ -12,22 +11,16 @@ public class DeleteCustomRoleCommandHandler : ICommandHandler<DeleteCustomRoleCo
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ICapabilityCeilingService _capabilityCeiling;
-    private readonly IPolicySyncService _policySyncService;
     private readonly IPermissionRegistryService _permissionRegistry;
-    private readonly ILogger<DeleteCustomRoleCommandHandler> _logger;
 
     public DeleteCustomRoleCommandHandler(
         IRoleRepository roleRepository,
         ICapabilityCeilingService capabilityCeiling,
-        IPolicySyncService policySyncService,
-        IPermissionRegistryService permissionRegistry,
-        ILogger<DeleteCustomRoleCommandHandler> logger)
+        IPermissionRegistryService permissionRegistry)
     {
         _roleRepository = roleRepository;
         _capabilityCeiling = capabilityCeiling;
-        _policySyncService = policySyncService;
         _permissionRegistry = permissionRegistry;
-        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<int>> ExecuteAsync(DeleteCustomRoleCommand request, CancellationToken cancellationToken)
@@ -57,16 +50,6 @@ public class DeleteCustomRoleCommandHandler : ICommandHandler<DeleteCustomRoleCo
         await _roleRepository.RemoveAllPermissionsAsync(request.RoleId);
 
         await _roleRepository.Delete(role);
-
-        // Trigger Cerbos policy sync to remove policies for this role
-        try
-        {
-            await _policySyncService.SyncRolePoliciesAsync(request.RoleId, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Policy sync failed after deleting role {RoleId}, will retry on next sync", request.RoleId);
-        }
 
         // Invalidate permission cache
         _permissionRegistry.InvalidateCache();

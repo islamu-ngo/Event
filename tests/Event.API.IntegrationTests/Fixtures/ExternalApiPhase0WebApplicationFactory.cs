@@ -2,19 +2,20 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Channels;
 using System.Threading.RateLimiting;
+using Event.Testing.DataProtection;
 using Explore.API.Authentication;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Infrastructure;
 using Explore.Persistence;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -38,6 +39,7 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
     public const string TestIssuer = "https://phase0-auth.test";
 
     private readonly byte[] _jwtSigningKey = RandomNumberGenerator.GetBytes(64);
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
     private readonly string _databaseName = $"InMemoryDbForExternalApiPhase0_{Guid.NewGuid():N}";
 
     public DeploymentMode DeploymentMode { get; init; } = DeploymentMode.MultiTenant;
@@ -221,6 +223,8 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             TestHostServicePruner.RemoveNoisyHostedServices(services);
 
             if (SetupSecretProviderOverride is not null)
@@ -346,7 +350,6 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
                     IssuerSigningKey = signingKey,
                     NameClaimType = ClaimTypes.NameIdentifier
                 };
-                options.Events = new JwtBearerEvents();
             });
         });
     }
@@ -358,6 +361,7 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
         var claims = new List<Claim>
         {
             new("sub", userId.ToString()),
+            new("typ", "Bearer"),
             new(ClaimTypes.NameIdentifier, userId.ToString()),
             new(ClaimTypes.Name, "Phase0 User")
         };
@@ -437,13 +441,11 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
             return Task.FromResult(_configuration);
         }
 
-        public Task ApplyConfigurationAsync(
-            PatchResolverConfigurationDto patch,
-            ResolverConfigurationDto configuration,
-            Guid? actorUserId,
+        public Task<BaseCommandResponse<Guid>> ApplyConfigurationAsync(
+            UpdateResolverConfigurationCommand command,
             CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
+            throw new UnauthorizedAccessException("The external API routing fixture cannot mutate resolver configuration.");
         }
 
         public void InvalidateCache()

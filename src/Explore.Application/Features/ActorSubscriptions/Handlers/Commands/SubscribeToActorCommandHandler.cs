@@ -64,7 +64,6 @@ public class SubscribeToActorCommandHandler : ICommandHandler<SubscribeToActorCo
             _tenantContext.TenantId,
             tenantUser.Id,
             targetActor.Id,
-            trackChanges: true,
             cancellationToken);
 
         if (subscription is null)

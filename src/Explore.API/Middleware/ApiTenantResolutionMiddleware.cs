@@ -3,7 +3,6 @@ using Explore.API.Attributes;
 using Explore.API.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Onboarding;
 using Explore.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -75,14 +74,12 @@ public sealed class ApiTenantResolutionMiddleware
         {
             var tenantSlugCache = routingScope.ServiceProvider.GetRequiredService<ITenantSlugCache>();
             resolvedTenantId = await ResolveFromSlugHeaderAsync(context, tenantSlugCache);
-            if (!explicitlySelectedSessionTenant && resolvedTenantId is null)
-            {
-                var configuration = await routingScope.ServiceProvider
-                    .GetRequiredService<IResolverConfigService>().GetConfigurationAsync(context.RequestAborted);
-                resolvedTenantId = await ResolveFromHostAsync(context, configuration, tenantSlugCache);
-            }
+            if (!explicitlySelectedSessionTenant && resolvedTenantId is null
+                && context.Items.TryGetValue(EffectiveHostAuthorityMiddleware.TenantItemKey, out var hostTenant)
+                && hostTenant is Guid verifiedTenant)
+                resolvedTenantId = verifiedTenant;
 
-            // Preliminary routing owns a disposable scope, never the ordinary request lease.
+            // The public routing cache excludes unpublished tenants. This directory binding grants no authority.
             if (resolvedTenantId is null && !hasApiKeyHeader && !string.IsNullOrWhiteSpace(requestedSlug)
                 && (TenantLifecycleAccessMiddleware.IsUserSynchronization(context.GetEndpoint())
                     || TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint())))
@@ -159,43 +156,6 @@ public sealed class ApiTenantResolutionMiddleware
         return await tenantSlugCache.GetTenantIdBySlugAsync(tenantSlug, context.RequestAborted);
     }
 
-    private static async Task<Guid?> ResolveFromHostAsync(HttpContext context, ResolverConfigurationDto configuration, ITenantSlugCache tenantSlugCache)
-    {
-        var host = GetRequestHost(context);
-        if (string.IsNullOrWhiteSpace(host))
-        {
-            return null;
-        }
-
-        if (configuration.CustomDomainEnabled && configuration.AllowTenantCustomDomains)
-        {
-            var customDomainTenantId = await tenantSlugCache.GetTenantIdByDomainAsync(host, context.RequestAborted);
-            if (customDomainTenantId is Guid resolvedCustomDomainTenantId && resolvedCustomDomainTenantId != Guid.Empty)
-            {
-                return resolvedCustomDomainTenantId;
-            }
-        }
-
-        if (!configuration.SubdomainEnabled || string.IsNullOrWhiteSpace(configuration.InstanceBaseDomain))
-        {
-            return null;
-        }
-
-        var baseDomain = NormalizeHost(configuration.InstanceBaseDomain);
-        var subdomain = ExtractSubdomain(host, baseDomain);
-        if (string.IsNullOrWhiteSpace(subdomain))
-        {
-            return null;
-        }
-
-        return await tenantSlugCache.GetTenantIdByDomainAsync(subdomain, context.RequestAborted);
-    }
-
-    private static string GetRequestHost(HttpContext context)
-    {
-        return NormalizeHost(context.Request.Host.Host) ?? string.Empty;
-    }
-
     internal static bool IsTenantExemptPath(HttpRequest request)
     {
         PathString path = request.Path;
@@ -233,35 +193,6 @@ public sealed class ApiTenantResolutionMiddleware
                context.Request.Path.StartsWithSegments(
                    settings.EndpointPath,
                    StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string? NormalizeHost(string? host)
-    {
-        return string.IsNullOrWhiteSpace(host)
-            ? null
-            : host.Trim().TrimEnd('.').ToLowerInvariant();
-    }
-
-    private static string? ExtractSubdomain(string host, string? baseDomain)
-    {
-        if (string.IsNullOrWhiteSpace(baseDomain) || string.Equals(host, baseDomain, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var suffix = "." + baseDomain;
-        if (!host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var prefix = host[..^suffix.Length];
-        if (string.IsNullOrWhiteSpace(prefix))
-        {
-            return null;
-        }
-
-        return prefix.Split('.', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim().ToLowerInvariant();
     }
 
 }

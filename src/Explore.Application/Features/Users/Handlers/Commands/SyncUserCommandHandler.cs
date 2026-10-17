@@ -328,11 +328,9 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         {
             throw;
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            _logger.LogError(
-                "User synchronization failed with exception type {ExceptionType}.",
-                exception.GetType().FullName);
+            _logger.LogError("User synchronization failed.");
             const string message = "User synchronization failed.";
             return BaseCommandResponse.Validation<Guid>([message], message);
         }

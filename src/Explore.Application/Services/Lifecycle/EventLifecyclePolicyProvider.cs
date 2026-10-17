@@ -4,26 +4,29 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Services.Federation;
+using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
+using Explore.Domain.Constants;
 
 namespace Explore.Application.Services.Lifecycle;
 
 /// <summary>
 /// Default implementation of <see cref="IEventLifecyclePolicyProvider"/>.
 /// Composes hard invariants with optional tenant/instance policy overrides via
-/// <see cref="ITenantPolicySettingService"/> and the governed ATProto publication profile.
+/// the tenant-only settings hierarchy and the governed ATProto publication profile.
 /// </summary>
 public sealed class EventLifecyclePolicyProvider : IEventLifecyclePolicyProvider
 {
-    private readonly ITenantPolicySettingService _tenantPolicySettingService;
+    private readonly IHierarchicalSettingsReader _settingsReader;
     private readonly AtprotoEventGovernanceResolver _atprotoGovernanceResolver;
 
     public EventLifecyclePolicyProvider(
-        ITenantPolicySettingService tenantPolicySettingService,
+        IHierarchicalSettingsReader settingsReader,
         AtprotoEventGovernanceResolver atprotoGovernanceResolver)
     {
-        _tenantPolicySettingService = tenantPolicySettingService;
+        _settingsReader = settingsReader;
         _atprotoGovernanceResolver = atprotoGovernanceResolver;
     }
 
@@ -55,11 +58,14 @@ public sealed class EventLifecyclePolicyProvider : IEventLifecyclePolicyProvider
         }
 
         EventLifecyclePolicy basePolicy = BuildHardInvariantPolicy(effectiveProfile);
-        var tenantPolicy = await _tenantPolicySettingService.ReadEffectiveTenantSettingsAsync(tenantId.Value);
+        bool requiresApproval = await _settingsReader.ResolveAsync<bool>(
+            GovernanceSettingKeys.Events.RequireApproval,
+            new SettingContext(TenantId: tenantId.Value, RequireAuthoritativeReads: true),
+            cancellationToken);
 
         return basePolicy with
         {
-            RequiresApproval = tenantPolicy.RequireEventApproval,
+            RequiresApproval = requiresApproval,
             Source = "tenant-aware"
         };
     }

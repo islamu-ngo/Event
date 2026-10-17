@@ -1,7 +1,7 @@
 
 using System.Data;
 using System.Data.Common;
-using Explore.Application.Configuration;
+using Explore.Domain.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Identity;
@@ -47,7 +47,7 @@ internal sealed class LocalIdentityLifecycleStore(
         LocalIdentityUser? user = await credentialStates.ReadReadySessionAsync(request.Authority, cancellationToken);
         LocalIdentityBinding? binding = await credentialStates.ReadLinkedIdentityAsync(request.Authority.LocalSubjectId, cancellationToken);
         if (user is null || binding is null || binding.PersonalActorId != request.PersonalActorId || binding.ExternalLoginId != request.ExternalLoginId
-            || request.CurrentPassword.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength
+            || !LocalPasswordPolicy.TryNormalizeForVerification(request.CurrentPassword, out _)
             || userManager.PasswordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.CurrentPassword) == PasswordVerificationResult.Failed)
             return LocalIdentityLifecycleOutcome.Invalid;
         LocalIdentityLifecycleOutcome? invalid = await ValidatePasswordAsync(user, request.NewPassword, cancellationToken);
@@ -129,15 +129,27 @@ internal sealed class LocalIdentityLifecycleStore(
         finally { applicationDbContext.ChangeTracker.Clear(); }
     }
 
-    public Task<LocalIdentityLifecyclePointer?> BeginAsync(LocalIdentityLifecycleRequest request, CancellationToken cancellationToken)
+    public async Task<LocalIdentityLifecyclePointer?> BeginAsync(LocalIdentityLifecycleRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         EnsureIdle();
-        return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => BeginAttemptAsync(request, cancellationToken), cancellationToken));
+        bool durableOwnershipPossible = false;
+        try
+        {
+            return await identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
+                EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => BeginAttemptAsync(
+                    request, () => durableOwnershipPossible = true, cancellationToken), cancellationToken));
+        }
+        catch (Exception exception) when (request.Purpose == LocalIdentityLifecyclePurpose.PasswordRecovery
+            && !durableOwnershipPossible && LocalIdentityIntakeStoreFailureClassifier.Classify(identityDbContext, exception) is not null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new LocalIdentityIntakeException(LocalIdentityIntakeStoreFailureClassifier.Classify(identityDbContext, exception)!.Value);
+        }
     }
 
-    private async Task<LocalIdentityLifecyclePointer?> BeginAttemptAsync(LocalIdentityLifecycleRequest request, CancellationToken cancellationToken)
+    private async Task<LocalIdentityLifecyclePointer?> BeginAttemptAsync(LocalIdentityLifecycleRequest request,
+        Action observeDurableOwnership, CancellationToken cancellationToken)
     {
         await using var transaction = await identityDbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         LocalIdentityBinding? binding = await credentialStates.ReadLinkedIdentityAsync(request.LocalSubjectId, cancellationToken);
@@ -175,6 +187,7 @@ internal sealed class LocalIdentityLifecycleStore(
         if (pending is not null)
         {
             // A different proposed address cannot silently revoke an in-flight link, either.
+            observeDurableOwnership();
             return string.Equals(userManager.NormalizeEmail(pending.PendingAddress), normalizedAddress, StringComparison.Ordinal)
                 ? pending.Pointer() : null;
         }
@@ -194,6 +207,9 @@ internal sealed class LocalIdentityLifecycleStore(
         try
         {
             await identityDbContext.SaveChangesAsync(cancellationToken);
+            // This latch survives execution-strategy retries. A failed commit acknowledgement
+            // cannot be reported as uncommitted intake, even if a later attempt also fails.
+            observeDurableOwnership();
             await transaction.CommitAsync(cancellationToken);
         }
         finally { identityDbContext.Entry(operation).State = EntityState.Detached; }
@@ -345,9 +361,9 @@ internal sealed class LocalIdentityLifecycleStore(
 
     private async Task<LocalIdentityLifecycleOutcome?> ValidatePasswordAsync(LocalIdentityUser user, string? password, CancellationToken cancellationToken)
     {
-        if (password is null || password.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+        if (!LocalPasswordPolicy.TryNormalizeNewCredential(password, out _))
             return LocalIdentityLifecycleOutcome.InvalidPassword;
-        if (userManager.PasswordHasher.VerifyHashedPassword(user, user.PasswordHash!, password) != PasswordVerificationResult.Failed)
+        if (userManager.PasswordHasher.VerifyHashedPassword(user, user.PasswordHash!, password!) != PasswordVerificationResult.Failed)
             return LocalIdentityLifecycleOutcome.SamePassword;
         foreach (IPasswordValidator<LocalIdentityUser> validator in userManager.PasswordValidators)
         {

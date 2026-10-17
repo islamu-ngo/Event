@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Hateoas;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -19,7 +20,9 @@ using TUnit.Core;
 
 namespace ApiIntegrationTests.Features;
 
-public sealed class EventManagementMcpAuthenticatedReadTests
+[NotInParallel]
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerClass)]
+public sealed class EventManagementMcpAuthenticatedReadTests(PostgreSqlContainerFixture postgres)
 {
     private static readonly string[] ManagementActionRelations =
     [
@@ -37,22 +40,21 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     [Test]
     public async Task ListMyEvents_MatchesRestOwnershipAndCapsPageSize()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var client = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
+        await using var factory = await CreateMcpEnabledFactory();
+        using var client = factory.Client;
+        var userId = factory.UserId;
         var marker = Guid.NewGuid().ToString("N");
         var ownedTitle = $"MCP Owned Draft {marker}";
         var otherTitle = $"MCP Other Draft {marker}";
 
         await SeedOwnedEventsAsync(factory, userId, ownedTitle, otherTitle);
 
-        using var restRequest = CreateAuthenticatedRequest(
+        using var restRequest = new HttpRequestMessage(
             HttpMethod.Get,
-            "/api/event/my?pageNumber=1&pageSize=50",
-            userId);
+            "/api/event/my?pageNumber=1&pageSize=50");
         using var restResponse = await client.SendAsync(restRequest);
         var restText = await restResponse.Content.ReadAsStringAsync();
-        var mcp = McpProtocolClient.Authenticated(client, userId);
+        var mcp = new McpProtocolClient(client);
 
         using var mcpResponse = await mcp.CallToolAsync("list_my_events", new JsonObject
         {
@@ -76,17 +78,16 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     [Test]
     public async Task GetEventCreationContext_MatchesRestPolicyAndOmitsInternalRoleData()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var client = factory.CreateClient();
+        await using var factory = await CreateMcpEnabledFactory();
+        using var client = factory.Client;
         var seed = await SeedOrganizationPublisherAsync(factory);
 
-        using var restRequest = CreateAuthenticatedRequest(
+        using var restRequest = new HttpRequestMessage(
             HttpMethod.Get,
-            "/api/event/creation-context",
-            seed.UserId);
+            "/api/event/creation-context");
         using var restResponse = await client.SendAsync(restRequest);
         var restText = await restResponse.Content.ReadAsStringAsync();
-        var mcp = McpProtocolClient.Authenticated(client, seed.UserId);
+        var mcp = new McpProtocolClient(client);
 
         using var mcpResponse = await mcp.CallToolAsync("get_event_creation_context", new JsonObject());
         var mcpText = await GetFirstTextContent(GetResult(mcpResponse));
@@ -119,17 +120,17 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     [Test]
     public async Task EventManagementContext_DerivesActionAvailabilityFromRestHalLinks()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var client = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
+        await using var factory = await CreateMcpEnabledFactory();
+        using var client = factory.Client;
+        var userId = factory.UserId;
         var title = $"MCP Managed Draft {Guid.NewGuid():N}";
         var seed = await SeedOwnedDraftEventAsync(factory, userId, title);
 
-        using var restRequest = CreateAuthenticatedRequest(HttpMethod.Get, $"/api/event/{seed.EventId}/management-detail", userId);
+        using var restRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/event/{seed.EventId}/management-detail");
         using var restResponse = await client.SendAsync(restRequest);
         using var restDocument = await JsonDocument.ParseAsync(await restResponse.Content.ReadAsStreamAsync());
         var restLinks = ReadRestLinks(restDocument.RootElement);
-        var mcp = McpProtocolClient.Authenticated(client, userId);
+        var mcp = new McpProtocolClient(client);
 
         using var resourceResponse = await mcp.ReadResourceAsync(
             $"islamu-event://events/{seed.EventId}/management-context");
@@ -180,21 +181,21 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     [Test]
     public async Task GetEventPublishReadiness_MatchesRestReadinessWhenHalAffordanceIsAvailable()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var client = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
+        await using var factory = await CreateMcpEnabledFactory();
+        using var client = factory.Client;
+        var userId = factory.UserId;
         var title = $"MCP Readiness Draft {Guid.NewGuid():N}";
         var seed = await SeedOwnedDraftEventAsync(factory, userId, title);
 
-        using var restDetailRequest = CreateAuthenticatedRequest(HttpMethod.Get, $"/api/event/{seed.EventId}/management-detail", userId);
+        using var restDetailRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/event/{seed.EventId}/management-detail");
         using var restDetailResponse = await client.SendAsync(restDetailRequest);
         using var restDetailDocument = await JsonDocument.ParseAsync(await restDetailResponse.Content.ReadAsStreamAsync());
         var restLinks = ReadRestLinks(restDetailDocument.RootElement);
 
-        using var restReadinessRequest = CreateAuthenticatedRequest(HttpMethod.Get, $"/api/event/{seed.EventId}/publish-readiness", userId);
+        using var restReadinessRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/event/{seed.EventId}/publish-readiness");
         using var restReadinessResponse = await client.SendAsync(restReadinessRequest);
         using var restReadiness = await JsonDocument.ParseAsync(await restReadinessResponse.Content.ReadAsStreamAsync());
-        var mcp = McpProtocolClient.Authenticated(client, userId);
+        var mcp = new McpProtocolClient(client);
 
         using var mcpResponse = await mcp.CallToolAsync("get_event_publish_readiness", new JsonObject
         {
@@ -241,18 +242,18 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     [Test]
     public async Task GetEventPublishReadiness_ReturnsUnavailableWhenHalAffordanceIsAbsent()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var client = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
+        await using var factory = await CreateMcpEnabledFactory();
+        using var client = factory.Client;
+        var userId = factory.UserId;
         var title = $"MCP Readiness Published {Guid.NewGuid():N}";
         var seed = await SeedOwnedDraftEventAsync(factory, userId, title);
         await PublishEventAsync(factory, seed.EventId);
 
-        using var restDetailRequest = CreateAuthenticatedRequest(HttpMethod.Get, $"/api/event/{seed.EventId}/management-detail", userId);
+        using var restDetailRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/event/{seed.EventId}/management-detail");
         using var restDetailResponse = await client.SendAsync(restDetailRequest);
         using var restDetailDocument = await JsonDocument.ParseAsync(await restDetailResponse.Content.ReadAsStreamAsync());
         var restLinks = ReadRestLinks(restDetailDocument.RootElement);
-        var mcp = McpProtocolClient.Authenticated(client, userId);
+        var mcp = new McpProtocolClient(client);
 
         using var mcpResponse = await mcp.CallToolAsync("get_event_publish_readiness", new JsonObject
         {
@@ -271,13 +272,13 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     [Test]
     public async Task AuthenticatedSubResourceReadTools_ReturnBoundedHalGatedContexts()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var client = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
+        await using var factory = await CreateMcpEnabledFactory();
+        using var client = factory.Client;
+        var userId = factory.UserId;
         var title = $"MCP Subresource Draft {Guid.NewGuid():N}";
         var seed = await SeedOwnedDraftEventAsync(factory, userId, title);
         var sessionId = await SeedManagedSubResourcesAsync(factory, seed.EventId);
-        var mcp = McpProtocolClient.Authenticated(client, userId);
+        var mcp = new McpProtocolClient(client);
 
         using var programResponse = await mcp.CallToolAsync("get_event_program_management_context", new JsonObject
         {
@@ -405,65 +406,29 @@ public sealed class EventManagementMcpAuthenticatedReadTests
         await Assert.That(sessionTemplateSyncText).DoesNotContain("UserId");
     }
 
-    private static AuthenticatedWebApplicationFactory CreateMcpEnabledFactory()
-    {
-        var factory = new AuthenticatedWebApplicationFactory
-        {
-            AuthorizationProviderOverride = new StubAuthorizationProvider()
-        };
-        factory.AdditionalConfiguration["Mcp:Enabled"] = "true";
-        factory.AdditionalConfiguration["Mcp:EndpointPath"] = "/mcp";
-        factory.AdditionalConfiguration["Mcp:Stateless"] = "true";
-        factory.AdditionalConfiguration["Mcp:EnableLegacySse"] = "false";
-        return factory;
-    }
-
-    private static HttpRequestMessage CreateAuthenticatedRequest(HttpMethod method, string url, Guid userId)
-    {
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(userId));
-        return request;
-    }
+    private Task<EventManagementMcpAuthenticatedFixture> CreateMcpEnabledFactory()
+        => EventManagementMcpAuthenticatedFixture.CreateAsync(postgres);
 
     private static async Task SeedOwnedEventsAsync(
-        AuthenticatedWebApplicationFactory factory,
+        EventManagementMcpAuthenticatedFixture factory,
         Guid userId,
         string ownedTitle,
         string otherTitle)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var tenant = await context.Tenants.FindAsync(PlatformDefaults.DefaultTenantId);
-        if (tenant is null)
-        {
-            tenant = new TenantBuilder()
-                .WithId(PlatformDefaults.DefaultTenantId)
-                .WithFullName("Default MCP Authenticated Event Tenant")
-                .WithSlug("default-mcp-authenticated-event")
-                .Build();
-            context.Tenants.Add(tenant);
-            await context.SaveChangesAsync();
-        }
-
-        var owner = new UserBuilder()
-            .WithId(userId)
-            .Build();
+        await using var context = factory.CreateMigratorContext();
+        var tenant = await context.Tenants.SingleAsync(value => value.Id == factory.TenantId);
+        var owner = await context.Users.SingleAsync(value => value.Id == userId);
         var otherUser = new UserBuilder().Build();
-        context.Users.AddRange(owner, otherUser);
+        context.Users.Add(otherUser);
         await context.SaveChangesAsync();
 
-        var ownerActor = new ActorBuilder()
-            .WithUserId(owner.Id)
-            .WithDisplayName("MCP Authenticated Owner")
-            .Build();
+        var ownerActor = await context.Actors.SingleAsync(value => value.UserId == owner.Id);
         var otherActor = new ActorBuilder()
             .WithUserId(otherUser.Id)
             .WithDisplayName("MCP Authenticated Other")
             .Build();
-        context.Actors.AddRange(ownerActor, otherActor);
-        context.TenantUsers.AddRange(
-            CreateActiveTenantUser(tenant, owner, ownerActor),
-            CreateActiveTenantUser(tenant, otherUser, otherActor));
+        context.Actors.Add(otherActor);
+        context.TenantUsers.Add(CreateActiveTenantUser(tenant, otherUser, otherActor));
         await context.SaveChangesAsync();
 
         context.Events.AddRange(
@@ -493,42 +458,13 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     }
 
     private static async Task<OwnedDraftEventSeed> SeedOwnedDraftEventAsync(
-        AuthenticatedWebApplicationFactory factory,
+        EventManagementMcpAuthenticatedFixture factory,
         Guid userId,
         string title)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var tenant = await context.Tenants.FindAsync(PlatformDefaults.DefaultTenantId);
-        if (tenant is null)
-        {
-            tenant = new TenantBuilder()
-                .WithId(PlatformDefaults.DefaultTenantId)
-                .WithFullName("Default MCP Management Event Tenant")
-                .WithSlug("default-mcp-management-event")
-                .Build();
-            context.Tenants.Add(tenant);
-            await context.SaveChangesAsync();
-        }
-
-        var owner = new UserBuilder()
-            .WithId(userId)
-            .Build();
-        context.Users.Add(owner);
-        await context.SaveChangesAsync();
-
-        var ownerActor = await context.Actors
-            .SingleOrDefaultAsync(actor => actor.UserId == owner.Id);
-        if (ownerActor is null)
-        {
-            ownerActor = new ActorBuilder()
-                .WithUserId(owner.Id)
-                .WithDisplayName("MCP Management Owner")
-                .Build();
-            context.Actors.Add(ownerActor);
-            context.TenantUsers.Add(CreateActiveTenantUser(tenant, owner, ownerActor));
-            await context.SaveChangesAsync();
-        }
+        await using var context = factory.CreateMigratorContext();
+        var tenant = await context.Tenants.SingleAsync(value => value.Id == factory.TenantId);
+        var ownerActor = await context.Actors.SingleAsync(actor => actor.UserId == userId);
 
         var @event = new EventBuilder()
             .WithTitle(title)
@@ -565,11 +501,10 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     };
 
     private static async Task PublishEventAsync(
-        AuthenticatedWebApplicationFactory factory,
+        EventManagementMcpAuthenticatedFixture factory,
         Guid eventId)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var context = factory.CreateMigratorContext();
         var @event = await context.Events.FindAsync(eventId);
         await Assert.That(@event).IsNotNull();
         @event!.Publish(DateTime.UtcNow);
@@ -577,14 +512,14 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     }
 
     private static async Task<Guid> SeedManagedSubResourcesAsync(
-        AuthenticatedWebApplicationFactory factory,
+        EventManagementMcpAuthenticatedFixture factory,
         Guid eventId)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var context = factory.CreateMigratorContext();
         var @event = await context.Events.FindAsync(eventId);
         await Assert.That(@event).IsNotNull();
         @event!.Timezone = "UTC";
+        @event.OrganizerActorId = @event.ActorId;
         var tenantId = @event.TenantId;
         var start = DateTimeOffset.UtcNow.AddDays(10);
         var calculator = new EventScheduleProjectionCalculator();
@@ -743,11 +678,66 @@ public sealed class EventManagementMcpAuthenticatedReadTests
     }
 
     private static async Task<TenantScenarioSeed.TenantOrganizationScenarioResult> SeedOrganizationPublisherAsync(
-        AuthenticatedWebApplicationFactory factory)
+        EventManagementMcpAuthenticatedFixture factory)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        return await TenantScenarioSeed.SeedActiveTenantWithOrganizationPublisherAsync(context);
+        await using var context = factory.CreateMigratorContext();
+        var tenant = await context.Tenants.SingleAsync(value => value.Id == factory.TenantId);
+        var user = await context.Users.SingleAsync(value => value.Id == factory.UserId);
+        var actor = await context.Actors.SingleAsync(value => value.UserId == user.Id);
+        var permission = await context.Permissions.SingleAsync(value => value.MasterCode == PermissionCodes.EventCreate);
+        if (!await context.RolePermissions.AnyAsync(value =>
+                value.RoleId == (int)RoleEnum.OrgAdmin && value.PermissionId == permission.Id))
+        {
+            context.RolePermissions.Add(new RolePermission
+            {
+                RoleId = (int)RoleEnum.OrgAdmin,
+                Role = null!,
+                PermissionId = permission.Id,
+                Permission = permission,
+                GrantedAt = DateTime.UtcNow
+            });
+        }
+        var organization = new Organization
+        {
+            Id = Guid.CreateVersion7(),
+            Pii = new OrganizationPii { FullName = "AI Test Publisher Organization" },
+            CreatedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.CreateVersion7()
+        };
+        var placement = new OrganizationTenant
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            OrganizationId = organization.Id,
+            Organization = organization,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!,
+            IsVisible = true,
+            IsOrganizerEligible = true,
+            ApprovedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.CreateVersion7()
+        };
+        var organizationActor = new ActorBuilder()
+            .WithActorType(ActorTypeEnum.Organization)
+            .WithDisplayName("AI Test Publisher Organization")
+            .Build();
+        organizationActor.OrganizationId = organization.Id;
+        context.AddRange(organization, placement, organizationActor, new OrganizationMember
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            OrganizationTenantId = placement.Id,
+            OrganizationTenant = placement,
+            UserId = user.Id,
+            User = user,
+            RoleId = (int)RoleEnum.OrgAdmin,
+            Role = null!,
+            CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+        return new(tenant.Id, user.Id, actor.Id, organization.Id, organizationActor.Id);
     }
 
     private static JsonElement GetResult(JsonDocument document)
@@ -789,12 +779,9 @@ public sealed class EventManagementMcpAuthenticatedReadTests
 
     private sealed record RestHalLink(string? Href, string? Method);
 
-    private sealed class McpProtocolClient(HttpClient client, Guid userId)
+    private sealed class McpProtocolClient(HttpClient client)
     {
         private int _nextId;
-
-        public static McpProtocolClient Authenticated(HttpClient client, Guid userId)
-            => new(client, userId);
 
         public Task<JsonDocument> CallToolAsync(string toolName, JsonObject arguments)
             => SendJsonRpcAsync("tools/call", new JsonObject
@@ -834,7 +821,6 @@ public sealed class EventManagementMcpAuthenticatedReadTests
         private async Task<HttpResponseMessage> SendRawAsync(string json)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "/mcp");
-            request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(userId));
             request.Headers.Add("ProtocolVersion", "2025-06-18");
             request.Headers.Add("MCP-Protocol-Version", "2025-06-18");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));

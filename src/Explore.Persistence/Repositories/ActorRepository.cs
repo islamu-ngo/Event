@@ -15,6 +15,11 @@ public class ActorRepository : GenericRepository<Actor, Guid>, IActorRepository
         _dbContext = dbContext;
     }
 
+    public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _dbContext.Actors
+            .IgnoreAutoIncludes()
+            .FirstOrDefaultAsync(actor => actor.Id == id, cancellationToken);
+
     public new async Task<Actor?> GetById(Guid id)
     {
         return await _dbContext.Actors

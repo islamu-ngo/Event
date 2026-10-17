@@ -1,8 +1,9 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -14,46 +15,6 @@ public class ExternalApiKeyRepository : GenericRepository<ExternalApiKey, Guid>,
         : base(dbContext)
     {
         _dbContext = dbContext;
-    }
-
-    public async Task<ExternalApiKey?> GetByKeyIdForAuthentication(string keyId, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.ExternalApiKeys
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyAuthentication)
-            .AsNoTracking()
-            .FirstOrDefaultAsync(apiKey => apiKey.KeyId == keyId, cancellationToken);
-    }
-
-    public async Task<bool> TouchUsageMetadata(Guid id, DateTime usedAtUtc, string? lastUsedIp, TimeSpan minUpdateInterval, CancellationToken cancellationToken = default)
-    {
-        var effectiveThreshold = usedAtUtc.Subtract(minUpdateInterval);
-
-        if (!_dbContext.Database.IsRelational())
-        {
-            var apiKey = await _dbContext.ExternalApiKeys
-                .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyAuthentication)
-                .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
-
-            if (apiKey is null || (apiKey.LastUsedAt is DateTime lastUsedAt && lastUsedAt >= effectiveThreshold))
-            {
-                return false;
-            }
-
-            apiKey.LastUsedAt = usedAtUtc;
-            apiKey.LastUsedIp = lastUsedIp;
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-
-        var rowsAffected = await _dbContext.ExternalApiKeys
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyAuthentication)
-            .Where(apiKey => apiKey.Id == id &&
-                (apiKey.LastUsedAt == null || apiKey.LastUsedAt < effectiveThreshold))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(apiKey => apiKey.LastUsedAt, usedAtUtc)
-                .SetProperty(apiKey => apiKey.LastUsedIp, lastUsedIp), cancellationToken);
-
-        return rowsAffected > 0;
     }
 
     public async Task<List<ExternalApiKey>> GetByOwner(ExternalApiKeyOwnerType ownerType, Guid ownerId, CancellationToken cancellationToken = default)
@@ -92,27 +53,28 @@ public class ExternalApiKeyRepository : GenericRepository<ExternalApiKey, Guid>,
             .AnyAsync(apiKey => apiKey.ExternalApiKeyOwnerTypeId == (int)ownerType && apiKey.OwnerId == ownerId && apiKey.Name == name, cancellationToken);
     }
 
-    public async Task<ExternalApiKey?> GetByIdIgnoringTenantFilter(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ExternalApiKey?> GetForTenantAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.ExternalApiKeys
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyPlatformManagement)
+        return await ManagementKeys().AsNoTracking()
             .FirstOrDefaultAsync(apiKey => apiKey.Id == id, cancellationToken);
     }
 
-    public async Task<List<ExternalApiKey>> GetByOwnerIgnoringTenantFilter(ExternalApiKeyOwnerType ownerType, Guid ownerId, CancellationToken cancellationToken = default)
+    public async Task<ExternalApiKey?> GetForManagementAsync(Guid id, CancellationToken cancellationToken)
     {
-        return await _dbContext.ExternalApiKeys
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyPlatformManagement)
-            .AsNoTracking()
-            .Where(apiKey => apiKey.ExternalApiKeyOwnerTypeId == (int)ownerType && apiKey.OwnerId == ownerId)
-            .ToListAsync(cancellationToken);
+        if (_dbContext.Database.IsRelational()
+            && _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Key management requires the caller's Serializable transaction.");
+        if (_dbContext.Database.IsRelational()
+            && await ManagementKeys().Where(key => key.Id == id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(key => key.Id, key => key.Id), cancellationToken) != 1)
+            return null;
+        return await GetForTenantAsync(id, cancellationToken);
     }
 
-    public async Task<bool> ExistsByOwnerAndNameIgnoringTenantFilter(ExternalApiKeyOwnerType ownerType, Guid ownerId, string name, CancellationToken cancellationToken = default)
+    private IQueryable<ExternalApiKey> ManagementKeys()
     {
-        return await _dbContext.ExternalApiKeys
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyPlatformManagement)
-            .AsNoTracking()
-            .AnyAsync(apiKey => apiKey.ExternalApiKeyOwnerTypeId == (int)ownerType && apiKey.OwnerId == ownerId && apiKey.Name == name, cancellationToken);
+        Guid? tenantId = _dbContext.TenantFilterTenantId;
+        return _dbContext.ExternalApiKeys
+            .Where(key => !_dbContext.IsTenantFilterBypassed && tenantId != null && key.TenantId == tenantId);
     }
 }

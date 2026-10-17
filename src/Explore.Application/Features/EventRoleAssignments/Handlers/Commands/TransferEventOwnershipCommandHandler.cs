@@ -62,12 +62,7 @@ public sealed class TransferEventOwnershipCommandHandler
         {
             _metrics.RecordEventRoleAssignmentChanged("transfer-ownership", "denied", RoleCodeFor((int)RoleEnum.EventOwner));
             _logger.LogWarning(
-                "Event ownership transfer denied TenantId={TenantId} EventId={EventId} CurrentOwnerAssignmentId={CurrentOwnerAssignmentId} NewOwnerUserId={NewOwnerUserId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                request.CurrentOwnerAssignmentId,
-                request.NewOwnerUserId,
-                request.ActorUserId,
+                "Event ownership transfer denied: {DenyReason}",
                 "event_ownership_transfer_forbidden");
             await WriteAuditAsync(
                 _auditLogRepository,
@@ -181,26 +176,14 @@ public sealed class TransferEventOwnershipCommandHandler
             }, cancellationToken);
 
             _metrics.RecordEventRoleAssignmentChanged("transfer-ownership", "allowed", RoleCodeFor((int)RoleEnum.EventOwner));
-            _logger.LogInformation(
-                "Event ownership transferred TenantId={TenantId} EventId={EventId} CurrentOwnerAssignmentId={CurrentOwnerAssignmentId} NewOwnerAssignmentId={NewOwnerAssignmentId} NewOwnerUserId={NewOwnerUserId} ActorUserId={ActorUserId}",
-                request.TenantId,
-                request.EventId,
-                request.CurrentOwnerAssignmentId,
-                newOwnerAssignmentId,
-                request.NewOwnerUserId,
-                request.ActorUserId);
+            _logger.LogInformation("Event ownership transferred.");
             return Success(newOwnerAssignmentId, "Event ownership transferred successfully.");
         }
         catch (InvalidOperationException ex)
         {
             _metrics.RecordEventRoleAssignmentChanged("transfer-ownership", "denied", RoleCodeFor((int)RoleEnum.EventOwner));
             _logger.LogWarning(
-                "Event ownership transfer invalid TenantId={TenantId} EventId={EventId} CurrentOwnerAssignmentId={CurrentOwnerAssignmentId} NewOwnerUserId={NewOwnerUserId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                request.CurrentOwnerAssignmentId,
-                request.NewOwnerUserId,
-                request.ActorUserId,
+                "Event ownership transfer invalid DenyReason={DenyReason}",
                 "event_ownership_transfer_invalid");
             await WriteAuditAsync(
                 _auditLogRepository,

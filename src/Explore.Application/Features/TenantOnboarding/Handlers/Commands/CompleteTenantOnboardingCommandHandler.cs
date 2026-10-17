@@ -10,6 +10,7 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.ValueObjects;
+using Explore.Application.Features.Settings;
 
 namespace Explore.Application.Features.TenantOnboarding.Handlers.Commands;
 
@@ -22,7 +23,8 @@ public class CompleteTenantOnboardingCommandHandler : ICommandHandler<CompleteTe
     private readonly ITenantBrandingSettingsDocumentProvisioningService _tenantBrandingProvisioningService;
     private readonly ITenantSettingsDocumentRepository _tenantSettingsDocumentRepository;
     private readonly ITypedSettingsDocumentResolver _typedSettingsDocumentResolver;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IHumanSettingsMutationPreparation _preparation;
+    private readonly ITypedSettingsOriginalStore _originalStore;
     private readonly IHierarchicalSettingsResolver _hierarchicalSettingsResolver;
     private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
@@ -34,7 +36,8 @@ public class CompleteTenantOnboardingCommandHandler : ICommandHandler<CompleteTe
         ITenantBrandingSettingsDocumentProvisioningService tenantBrandingProvisioningService,
         ITenantSettingsDocumentRepository tenantSettingsDocumentRepository,
         ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
-        IUnitOfWork unitOfWork,
+        IHumanSettingsMutationPreparation preparation,
+        ITypedSettingsOriginalStore originalStore,
         IHierarchicalSettingsResolver hierarchicalSettingsResolver,
         IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
     {
@@ -45,7 +48,8 @@ public class CompleteTenantOnboardingCommandHandler : ICommandHandler<CompleteTe
         _tenantBrandingProvisioningService = tenantBrandingProvisioningService;
         _tenantSettingsDocumentRepository = tenantSettingsDocumentRepository;
         _typedSettingsDocumentResolver = typedSettingsDocumentResolver;
-        _unitOfWork = unitOfWork;
+        _preparation = preparation;
+        _originalStore = originalStore;
         _hierarchicalSettingsResolver = hierarchicalSettingsResolver;
         _notificationHandlers = notificationHandlers;
     }
@@ -84,17 +88,22 @@ public class CompleteTenantOnboardingCommandHandler : ICommandHandler<CompleteTe
 
         // The identity revision is checked before any write; its mandatory save remains last so a
         // failure proves every preceding write participates in this transaction.
-        var outcome = await _unitOfWork.ExecuteInTransactionAsync(async ct =>
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        var outcome = await _preparation.ExecutePreparedAsync(prepared, async (_, ct) =>
         {
+            var original = _preparation.CurrentTypedOriginal
+                ?? throw new UnauthorizedAccessException("The original onboarding owner is required.");
+            var command = original.Onboarding
+                ?? throw new UnauthorizedAccessException("The original onboarding request is required.");
             (TenantSettingsDocument Document, bool IsNew) identityWrite =
                 await PrepareDirectoryOperatorIdentityWriteAsync(
                     tenantId,
-                    request.UserId,
-                    request.ExpectedDirectoryOperatorIdentityConcurrencyStamp,
+                    command.UserId,
+                    command.ExpectedDirectoryOperatorIdentityConcurrencyStamp,
                     identityReadiness.Identity!,
                     ct);
             IReadOnlyList<SettingChangedNotification> notifications =
-                await _policySettingService.ApplyTenantSettingsAsync(tenantId, request.UserId, request.Settings, ct);
+                await _policySettingService.ApplyTenantSettingsAsync(original, _originalStore, ct);
             await _tenantBrandingProvisioningService.EnsureTenantBrandingDocumentAsync(tenantId, cancellationToken: ct);
 
             if (existingState == null)
@@ -109,7 +118,7 @@ public class CompleteTenantOnboardingCommandHandler : ICommandHandler<CompleteTe
                     CompletedStepsJson = "[\"Identity\",\"Policies\",\"Branding\",\"Review\"]",
                     CreatedAt = DateTime.UtcNow,
                     CompletedAt = DateTime.UtcNow,
-                    CompletedByUserId = request.UserId
+                    CompletedByUserId = command.UserId
                 });
                 await PersistIdentityWriteAsync(identityWrite);
                 return (OnboardingStateId: created.Id, Notifications: notifications);
@@ -121,7 +130,7 @@ public class CompleteTenantOnboardingCommandHandler : ICommandHandler<CompleteTe
             if (string.IsNullOrWhiteSpace(existingState.CompletedStepsJson))
                 existingState.CompletedStepsJson = "[\"Identity\",\"Policies\",\"Branding\",\"Review\"]";
             existingState.CompletedAt = DateTime.UtcNow;
-            existingState.CompletedByUserId = request.UserId;
+            existingState.CompletedByUserId = command.UserId;
             await _tenantOnboardingStateRepository.Update(existingState);
             await PersistIdentityWriteAsync(identityWrite);
             return (OnboardingStateId: existingState.Id, Notifications: notifications);

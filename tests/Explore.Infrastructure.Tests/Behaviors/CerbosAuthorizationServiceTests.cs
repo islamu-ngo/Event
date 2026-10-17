@@ -8,12 +8,16 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
-using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
+using Explore.Infrastructure.Identity;
+using Explore.Infrastructure.Tests.Fixtures;
+using Explore.Application.Contracts.Operations;
+using Explore.Persistence.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,12 +28,19 @@ using System.Text.Json;
 
 namespace Explore.Infrastructure.Tests.Behaviors;
 
-public class CerbosAuthorizationServiceTests
+public class CerbosAuthorizationServiceTests : IAsyncDisposable
 {
     private const string ArtifactRelativePath = ".omo/start-work/artifacts/authorization-platform-redesign/phase0-task02/cerbos-provider-scenarios.json";
     private const string FixedUserId = "11111111-1111-1111-1111-111111111111";
     private const string FixedTenantId = "22222222-2222-2222-2222-222222222222";
     private const string FixedEventId = "33333333-3333-3333-3333-333333333333";
+    private readonly CurrentHumanPrincipalFixture _human = new(Guid.Parse(FixedUserId), Guid.Parse(FixedTenantId));
+
+    [Before(Test)]
+    public Task InitializeHuman() => _human.InitializeAsync();
+
+    [After(Test)]
+    public ValueTask DisposeAsync() => _human.DisposeAsync();
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -61,9 +72,7 @@ public class CerbosAuthorizationServiceTests
     ];
 
     private readonly IAdminContext _adminContext;
-    private readonly IMachinePrincipalAccessor _machinePrincipalAccessor;
-    private readonly IOrganizationMemberRepository _organizationMemberRepository;
-    private readonly IGroupMemberRepository _groupMemberRepository;
+    private readonly MachinePrincipalAccessor _machinePrincipalAccessor;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<CerbosAuthorizationService> _logger;
@@ -72,34 +81,21 @@ public class CerbosAuthorizationServiceTests
 
     public CerbosAuthorizationServiceTests()
     {
-        _adminContext = Substitute.For<IAdminContext>();
-        _machinePrincipalAccessor = Substitute.For<IMachinePrincipalAccessor>();
-        _organizationMemberRepository = Substitute.For<IOrganizationMemberRepository>();
-        _groupMemberRepository = Substitute.For<IGroupMemberRepository>();
+        _adminContext = _human.Admin;
+        _machinePrincipalAccessor = _human.Machine;
         _settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
-        _tenantContext = Substitute.For<ITenantContext>();
+        _tenantContext = _human.Tenant;
         _logger = Substitute.For<ILogger<CerbosAuthorizationService>>();
         _cerbosClient = Substitute.For<ICerbosClient>();
         _clientFactory = Substitute.For<ICerbosClientFactory>();
 
-        _machinePrincipalAccessor.IsMachineCaller.Returns(false);
-        _machinePrincipalAccessor.Current.Returns((Explore.Application.Authentication.ApiKeyPrincipalContext?)null);
-        _organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-                Arg.Any<Guid>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns([]);
-        _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-                Arg.Any<Guid>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns([]);
+        _clientFactory.GetOrCreate(Arg.Any<string>()).Returns(_cerbosClient);
     }
 
     [Test]
     public async Task IsAllowedBatchAsync_NoUserId_DeniesAllWithoutGrpcCall()
     {
-        _adminContext.UserId.Returns((Guid?)null);
+        _human.SignOut();
 
         var service = CreateService();
         var checks = new List<AuthorizationRequest>
@@ -141,7 +137,8 @@ public class CerbosAuthorizationServiceTests
         var results = new List<Phase0ScenarioResult>();
         foreach (var scenario in Phase0Scenarios)
         {
-            var test = new CerbosAuthorizationServiceTests();
+            await using var test = new CerbosAuthorizationServiceTests();
+            await test.InitializeHuman();
             results.Add(await test.ExecutePhase0ScenarioAsync(scenario.Id));
         }
 
@@ -166,12 +163,6 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_MapsAllowAndDenyFromCerbosResponse()
     {
-        var userId = Guid.NewGuid();
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
         protoResponse.Results.Add(CreateResultEntry("org-1", "islamuevent_organization", "update", Effect.Allow));
         protoResponse.Results.Add(CreateResultEntry("org-2", "islamuevent_organization", "delete", Effect.Deny));
@@ -198,12 +189,6 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_MapsRepeatedResourceEntriesByAction()
     {
-        var userId = Guid.NewGuid();
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-
         const string eventId = "event-1";
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
         protoResponse.Results.Add(CreateResultEntry(eventId, ResourceKinds.Event, AuthorizationActions.Events.ManageTeam, Effect.Deny));
@@ -232,12 +217,9 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_UserIdClaimMissingButResolvable_UsesResolvedUserIdForCerbosPrincipal()
     {
-        var resolvedUserId = Guid.NewGuid();
-        _adminContext.UserId.Returns((Guid?)null);
-        _adminContext.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns(resolvedUserId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var resolvedUserId = _human.UserId;
+        _human.EnterRequest();
+        await Assert.That(_adminContext.UserId).IsNull();
 
         Cerbos.Api.V1.Request.CheckResourcesRequest? capturedRequest = null;
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
@@ -247,6 +229,7 @@ public class CerbosAuthorizationServiceTests
             .Returns(call =>
             {
                 capturedRequest = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                protoResponse.RequestId = capturedRequest.RequestId;
                 return new CheckResourcesResponse(protoResponse);
             });
 
@@ -261,8 +244,7 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_StorageUploadTypedFacts_FailsClosedWithoutGrpcCall()
     {
-        var userId = Guid.NewGuid();
-        _adminContext.UserId.Returns(userId);
+        var userId = _human.UserId;
 
         var service = CreateService();
         var checks = new[]
@@ -290,29 +272,11 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_EventTypedFacts_ProjectToCerbosResourceAttributes()
     {
-        var userId = Guid.NewGuid();
+        var userId = _human.UserId;
         var tenantId = Guid.NewGuid();
         var eventId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
         var organizerOrganizationId = Guid.NewGuid();
-
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminGroupIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _tenantContext.TenantId.Returns(tenantId);
-        var eventAuthoritySnapshotService = Substitute.For<IEventAuthoritySnapshotService>();
-        eventAuthoritySnapshotService.GetForUserAndEventsAsync(
-                tenantId,
-                userId,
-                Arg.Is<IReadOnlyCollection<Guid>>(ids => ids != null && ids.Contains(eventId)),
-                Arg.Any<DateTime>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new EventAuthoritySnapshot(
-                tenantId,
-                userId,
-                new Dictionary<Guid, EventAuthorityForUser>()));
 
         Cerbos.Api.V1.Request.CheckResourcesRequest? capturedRequest = null;
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
@@ -322,11 +286,13 @@ public class CerbosAuthorizationServiceTests
             .Returns(call =>
             {
                 capturedRequest = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                protoResponse.RequestId = capturedRequest.RequestId;
                 return new CheckResourcesResponse(protoResponse);
             });
 
-        var service = CreateService(eventAuthoritySnapshotService: eventAuthoritySnapshotService);
-        var result = await service.AuthorizeBatchAsync([
+        var service = CreateService();
+        var decision = await service.AuthorizePreparedHumanAsync(
+            CerbosPrincipalBuilder.BuildPrincipalFromSources(ProjectionFacts(userId)),
             TestAuthorizationRequest.Create(
                 ResourceKinds.Event,
                 eventId.ToString("D"),
@@ -343,10 +309,8 @@ public class CerbosAuthorizationServiceTests
                     organizerOrganizationId,
                     null,
                     "LOCAL",
-                    userId))
-        ]);
-
-        var decision = result.Single();
+                    userId)),
+            tenantId, usePolicyScope: false, "http://localhost:3593", CancellationToken.None);
         await Assert.That(decision.IsAllowed).IsTrue();
         await Assert.That(decision.Provider.ProviderId).IsEqualTo("cerbos");
         await Assert.That(decision.Provider.ObservedRevision).IsNull();
@@ -361,52 +325,41 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_EventTicketManagement_EnrichesPrincipalWithExactEventPermission()
     {
-        var userId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
+        var tenantId = _human.Tenant.TenantId;
         var eventId = Guid.NewGuid();
         var eventCreateOrganizationId = Guid.NewGuid();
         var eventCreateGroupId = Guid.NewGuid();
-        var eventAuthoritySnapshotService = Substitute.For<IEventAuthoritySnapshotService>();
-
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminGroupIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _tenantContext.TenantId.Returns(tenantId);
-        _organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-                userId,
-                PermissionCodes.EventCreate,
-                Arg.Any<CancellationToken>())
-            .Returns([eventCreateOrganizationId]);
-        _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-                userId,
-                PermissionCodes.EventCreate,
-                Arg.Any<CancellationToken>())
-            .Returns([eventCreateGroupId]);
-
-        eventAuthoritySnapshotService.GetForUserAndEventsAsync(
-                tenantId,
-                userId,
-                Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Contains(eventId)),
-                Arg.Any<DateTime>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new EventAuthoritySnapshot(
-                tenantId,
-                userId,
-                new Dictionary<Guid, EventAuthorityForUser>
-                {
-                    [eventId] = new(
-                        new HashSet<string>(StringComparer.Ordinal) { "event.owner" },
-                        new HashSet<string>(StringComparer.Ordinal)
-                        {
-                            PermissionCodes.EventUpdate,
-                            PermissionCodes.EventPublish,
-                            PermissionCodes.EventManageTickets
-                        },
-                        IsOwner: true,
-                        IsManager: false)
-                }));
+        await _human.GrantOrganizationAdminAsync(eventCreateOrganizationId);
+        await _human.GrantGroupAdminAsync(eventCreateGroupId);
+        await _human.GrantEventOwnerAsync(eventId);
+        int publishPermission = await _human.Context.Permissions.MaxAsync(permission => permission.Id) + 1;
+        _human.Context.Permissions.Add(new Permission
+        {
+            Id = publishPermission,
+            MasterCode = PermissionCodes.EventPublish,
+            ResourceKind = "event",
+            Action = "publish",
+            FullName = "Publish the fixture event",
+            GroupName = "Events",
+            RoleScopeId = (int)RoleScopeEnum.Event,
+            RoleScope = null!,
+            IsActive = true
+        });
+        _human.Context.RolePermissions.Add(new RolePermission
+        {
+            RoleId = (int)RoleEnum.EventOwner,
+            Role = null!,
+            PermissionId = publishPermission,
+            Permission = null!
+        });
+        int createPermission = await _human.Context.Permissions
+            .Where(permission => permission.MasterCode == PermissionCodes.EventCreate)
+            .Select(permission => permission.Id).SingleAsync();
+        _human.Context.RolePermissions.AddRange(
+            new RolePermission { RoleId = (int)RoleEnum.OrgAdmin, Role = null!, PermissionId = createPermission, Permission = null! },
+            new RolePermission { RoleId = (int)RoleEnum.GroupAdmin, Role = null!, PermissionId = createPermission, Permission = null! });
+        await _human.Context.SaveChangesAsync();
+        _human.Context.ChangeTracker.Clear();
 
         Cerbos.Api.V1.Request.CheckResourcesRequest? capturedRequest = null;
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
@@ -420,10 +373,11 @@ public class CerbosAuthorizationServiceTests
             .Returns(call =>
             {
                 capturedRequest = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                protoResponse.RequestId = capturedRequest.RequestId;
                 return new CheckResourcesResponse(protoResponse);
             });
 
-        var service = CreateService(eventAuthoritySnapshotService: eventAuthoritySnapshotService);
+        var service = CreateService();
         var allowed = await service.IsAllowedAsync(
             ResourceKinds.Event,
             eventId.ToString(),
@@ -457,14 +411,9 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_ScopedCheck_DefaultsToTenantAttributeWithoutCerbosPolicyScope()
     {
-        var userId = Guid.NewGuid();
+        var userId = _human.UserId;
         var tenantId = Guid.NewGuid().ToString();
         const string eventId = "event-policy-scope-default";
-
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
 
         Cerbos.Api.V1.Request.CheckResourcesRequest? capturedRequest = null;
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
@@ -474,6 +423,7 @@ public class CerbosAuthorizationServiceTests
             .Returns(call =>
             {
                 capturedRequest = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                protoResponse.RequestId = capturedRequest.RequestId;
                 return new CheckResourcesResponse(protoResponse);
             });
 
@@ -500,14 +450,9 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_WhenPolicyScopeEnabled_SendsTenantAsCerbosResourceScope()
     {
-        var userId = Guid.NewGuid();
+        var userId = _human.UserId;
         var tenantId = Guid.NewGuid().ToString();
         const string eventId = "event-policy-scope-enabled";
-
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
 
         Cerbos.Api.V1.Request.CheckResourcesRequest? capturedRequest = null;
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
@@ -517,6 +462,7 @@ public class CerbosAuthorizationServiceTests
             .Returns(call =>
             {
                 capturedRequest = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                protoResponse.RequestId = capturedRequest.RequestId;
                 return new CheckResourcesResponse(protoResponse);
             });
 
@@ -541,12 +487,6 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_WithSameResourceIdAcrossKinds_MapsDecisionByKindAndId()
     {
-        var userId = Guid.NewGuid();
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-
         const string sharedId = "shared-1";
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
         protoResponse.Results.Add(CreateResultEntry(sharedId, "islamuevent_tenant", "update", Effect.Allow));
@@ -572,12 +512,6 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_GrpcFailure_DeniesAll()
     {
-        var userId = Guid.NewGuid();
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-
         _cerbosClient.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
             .ThrowsAsync(new RpcException(new Status(StatusCode.Unavailable, "PDP unreachable")));
 
@@ -598,14 +532,9 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task IsAllowedBatchAsync_GrpcFailure_LogsOnlySafeFailureMetadata()
     {
-        var userId = Guid.NewGuid();
         const string rawEndpoint = "https://tenant-pdp.example.com:443";
         const string exceptionMessage = "PDP unreachable at https://secret-pdp.example.com:443 with token abc123";
 
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
         _cerbosClient.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
             .ThrowsAsync(new RpcException(new Status(StatusCode.Unavailable, exceptionMessage)));
 
@@ -621,9 +550,9 @@ public class CerbosAuthorizationServiceTests
             Arg.Any<Func<object, Exception?, string>>());
     }
 
-    private static bool LogStateIsRedacted(object state, string rawEndpoint, string exceptionMessage)
+    private static bool LogStateIsRedacted(object? state, string rawEndpoint, string exceptionMessage)
     {
-        var rendered = state.ToString();
+        var rendered = state?.ToString();
         return rendered is not null &&
                rendered.Contains("FailureType=RpcException", StringComparison.Ordinal) &&
                !rendered.Contains(rawEndpoint, StringComparison.Ordinal) &&
@@ -635,13 +564,9 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task CheckSettingAccessAsync_TenantScope_SendsLockAndTenantAttributes()
     {
-        var userId = Guid.NewGuid();
+        var userId = _human.UserId;
         var tenantId = Guid.NewGuid();
 
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([tenantId]);
-        _adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
         Cerbos.Api.V1.Request.CheckResourcesRequest? capturedRequest = null;
 
         var protoResponse = new Cerbos.Api.V1.Response.CheckResourcesResponse();
@@ -651,21 +576,25 @@ public class CerbosAuthorizationServiceTests
             .Returns(call =>
             {
                 capturedRequest = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                protoResponse.RequestId = capturedRequest.RequestId;
                 return new CheckResourcesResponse(protoResponse);
             });
 
         var service = CreateService();
-        var decision = await service.AuthorizeAsync(TestAuthorizationRequest.Create(
-            ResourceKinds.TenantSetting,
-            "events.require_approval",
-            AuthorizationActions.Update,
-            new Dictionary<string, object>
-            {
-                ["settingKey"] = "events.require_approval",
-                ["tenantId"] = tenantId.ToString("D"),
-                ["isLockedByInstance"] = true
-            },
-            new AuthorizationScope(TenantId: tenantId.ToString("D"))));
+        var decision = await service.AuthorizePreparedHumanAsync(
+            CerbosPrincipalBuilder.BuildPrincipalFromSources(ProjectionFacts(userId, tenantId)),
+            TestAuthorizationRequest.Create(
+                ResourceKinds.TenantSetting,
+                "events.require_approval",
+                AuthorizationActions.Update,
+                new Dictionary<string, object>
+                {
+                    ["settingKey"] = "events.require_approval",
+                    ["tenantId"] = tenantId.ToString("D"),
+                    ["isLockedByInstance"] = true
+                },
+                new AuthorizationScope(TenantId: tenantId.ToString("D"))),
+            ambientTenantId: null, usePolicyScope: false, "http://localhost:3593", CancellationToken.None);
 
         await Assert.That(decision.IsAllowed).IsFalse();
         await Assert.That(decision.Provider.ProviderId).IsEqualTo("cerbos");
@@ -687,26 +616,26 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task GenericEventResource_AdminPrincipalCannotBypassFrozenAdapter()
     {
-        var userId = Guid.NewGuid();
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(userId, Arg.Any<CancellationToken>()).Returns(true);
+        await _human.GrantInstanceAdminAsync();
         var response = new Cerbos.Api.V1.Response.CheckResourcesResponse();
         response.Results.Add(CreateResultEntry("resource-1", ResourceKinds.EventResource, AuthorizationActions.View, Effect.Allow));
         _cerbosClient.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
             .Returns(new CheckResourcesResponse(response));
 
+        int commandsBeforeCheck = _human.DatabaseCommands;
         var decision = await CreateService().AuthorizeAsync(TestAuthorizationRequest.Create(
             ResourceKinds.EventResource, "resource-1", AuthorizationActions.View, null));
 
         await Assert.That(decision.IsAllowed).IsFalse();
         await _cerbosClient.DidNotReceive().CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>());
-        await _adminContext.DidNotReceive().IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await Assert.That(_human.DatabaseCommands).IsEqualTo(commandsBeforeCheck);
+        await Assert.That(_human.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject).IsNull();
     }
 
     [Test]
     public async Task GenericEventResource_MachinePrincipalCannotBypassFrozenAdapter()
     {
-        _machinePrincipalAccessor.Current.Returns(new ApiKeyPrincipalContext(
+        _machinePrincipalAccessor.SetPrincipal(new ApiKeyPrincipalContext(
             "key-1", Guid.NewGuid(), ExternalApiKeyOwnerType.InstanceAdmin, Guid.NewGuid(), ["*"]));
         var response = new Cerbos.Api.V1.Response.CheckResourcesResponse();
         response.Results.Add(CreateResultEntry("resource-1", ResourceKinds.EventResource, AuthorizationActions.View, Effect.Allow));
@@ -723,7 +652,6 @@ public class CerbosAuthorizationServiceTests
     [Test]
     public async Task GenericEventResource_MixedBatchDeniesProtectedKindAndPreservesOtherPositions()
     {
-        _adminContext.UserId.Returns(Guid.NewGuid());
         var response = new Cerbos.Api.V1.Response.CheckResourcesResponse();
         response.Results.Add(CreateResultEntry("org-1", ResourceKinds.Organization, AuthorizationActions.Update, Effect.Allow));
         Cerbos.Api.V1.Request.CheckResourcesRequest? captured = null;
@@ -757,6 +685,7 @@ public class CerbosAuthorizationServiceTests
         var check = TestAuthorizationRequest.Create(
             ResourceKinds.EventResource, "resource-1", AuthorizationActions.View, null);
         var service = CreateService();
+        int commandsBeforeChecks = _human.DatabaseCommands;
 
         var unavailableSignal = await service.AuthorizeBatchWithUnavailableSignalAsync([check]);
         var explicitEndpoint = await service.AuthorizeBatchWithEndpointAsync("https://pdp.example.test", [check]);
@@ -765,7 +694,8 @@ public class CerbosAuthorizationServiceTests
         await Assert.That(explicitEndpoint.Single().IsAllowed).IsFalse();
         await _cerbosClient.DidNotReceive().CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>());
         _clientFactory.DidNotReceive().GetOrCreate(Arg.Any<string>());
-        await _adminContext.DidNotReceive().ResolveUserIdAsync(Arg.Any<CancellationToken>());
+        await Assert.That(_human.DatabaseCommands).IsEqualTo(commandsBeforeChecks);
+        await Assert.That(_human.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject).IsNull();
     }
 
     [Test]
@@ -796,26 +726,12 @@ public class CerbosAuthorizationServiceTests
     {
         var scenario = Phase0Scenarios.Single(item => item.Id == scenarioId);
         Cerbos.Api.V1.Request.CheckResourcesRequest? capturedRequest = null;
-        var eventAuthoritySnapshotService = Substitute.For<IEventAuthoritySnapshotService>();
-        eventAuthoritySnapshotService.GetForUserAndEventsAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<Guid>(),
-                Arg.Any<IReadOnlyCollection<Guid>>(),
-                Arg.Any<DateTime>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => new EventAuthoritySnapshot(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<Guid>(1),
-                new Dictionary<Guid, EventAuthorityForUser>()));
-
         if (scenario.MissingFact == "subject")
         {
-            _adminContext.UserId.Returns((Guid?)null);
-            _adminContext.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns((Guid?)null);
+            _human.SignOut();
         }
         else
         {
-            ConfigureAuthenticatedUser();
             if (scenario.ProviderOutcome == "failure")
             {
                 _cerbosClient.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
@@ -829,13 +745,19 @@ public class CerbosAuthorizationServiceTests
                     .Returns(call =>
                     {
                         capturedRequest = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                        protoResponse.RequestId = capturedRequest.RequestId;
                         return new CheckResourcesResponse(protoResponse);
                     });
             }
         }
 
-        var service = CreateService(eventAuthoritySnapshotService: eventAuthoritySnapshotService);
-        var result = await service.IsAllowedBatchAsync([CreateScenarioCheck(scenario)]);
+        var service = CreateService();
+        var check = CreateScenarioCheck(scenario);
+        var result = scenario.MissingFact == "subject"
+            ? await service.AuthorizeAsync(check)
+            : await service.AuthorizePreparedHumanAsync(
+                CerbosPrincipalBuilder.BuildPrincipalFromSources(ProjectionFacts(Guid.Parse(FixedUserId))),
+                check, ambientTenantId: null, usePolicyScope: false, "http://localhost:3593", CancellationToken.None);
         var grpcCallObserved = await DidObserveGrpcCallAsync();
         await Assert.That(grpcCallObserved).IsEqualTo(scenario.ExpectedGrpcCall);
 
@@ -856,19 +778,54 @@ public class CerbosAuthorizationServiceTests
             MissingFact: scenario.MissingFact,
             ProviderOutcome: scenario.ProviderOutcome,
             ExpectedAllowed: scenario.ExpectedAllowed,
-            Allowed: result.Single(),
+            Allowed: result.IsAllowed,
             ExpectedGrpcCall: scenario.ExpectedGrpcCall,
             GrpcCallObserved: grpcCallObserved);
     }
 
-    private void ConfigureAuthenticatedUser()
+    [Test]
+    [Arguments("allow")]
+    [Arguments("missing")]
+    [Arguments("duplicate")]
+    [Arguments("wrong_request")]
+    [Arguments("wrong_resource")]
+    [Arguments("unavailable")]
+    public async Task PreparedHumanTransportUsesFrozenPrincipalAndRequiresExactResponse(string outcome)
     {
-        var userId = Guid.Parse(FixedUserId);
-        _adminContext.UserId.Returns(userId);
-        _adminContext.IsInstanceAdminAsync(userId, Arg.Any<CancellationToken>()).Returns(false);
-        _adminContext.GetAdminTenantIdsAsync(userId, Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminOrganizationIdsAsync(userId, Arg.Any<CancellationToken>()).Returns([]);
-        _adminContext.GetAdminGroupIdsAsync(userId, Arg.Any<CancellationToken>()).Returns([]);
+        var principal = CerbosPrincipalBuilder.BuildPrincipalFromSources(ProjectionFacts(Guid.Parse(FixedUserId)));
+        Cerbos.Api.V1.Request.CheckResourcesRequest? captured = null;
+        _clientFactory.GetOrCreate("http://prepared.pdp.test:3593").Returns(_cerbosClient);
+        _cerbosClient.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
+            .Returns(call =>
+            {
+                principal.ToPrincipal().Attr["isInstanceAdmin"] = new Google.Protobuf.WellKnownTypes.Value { BoolValue = true };
+                captured = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                if (outcome == "unavailable")
+                    throw new RpcException(new Status(StatusCode.Unavailable, "unavailable"));
+                var response = new Cerbos.Api.V1.Response.CheckResourcesResponse
+                {
+                    RequestId = outcome == "wrong_request" ? Guid.NewGuid().ToString() : captured.RequestId
+                };
+                if (outcome != "missing")
+                    response.Results.Add(CreateResultEntry(
+                        outcome == "wrong_resource" ? FixedEventId : FixedTenantId,
+                        ResourceKinds.Tenant, AuthorizationActions.Delete, Effect.Allow));
+                if (outcome == "duplicate")
+                    response.Results.Add(response.Results[0].Clone());
+                return new CheckResourcesResponse(response);
+            });
+        // Ambient administrator resolution is intentionally absent: prepared input is the source.
+        var check = TestAuthorizationRequest.Create(ResourceKinds.Tenant, FixedTenantId,
+            AuthorizationActions.Delete, null, new AuthorizationScope(FixedTenantId),
+            new TenantScopedAuthorizationFacts(Guid.Parse(FixedTenantId)));
+        var result = await CreateService().AuthorizePreparedHumanAsync(principal, check,
+            Guid.Parse(FixedEventId), usePolicyScope: true, "http://prepared.pdp.test:3593",
+            CancellationToken.None);
+        await Assert.That(result.IsAllowed).IsEqualTo(outcome == "allow");
+        await Assert.That(principal.ToPrincipal().Attr["isInstanceAdmin"].BoolValue).IsTrue();
+        await Assert.That(captured!.Principal.Attr["isInstanceAdmin"].BoolValue).IsFalse();
+        await Assert.That(captured.Resources[0].Resource.Scope).IsEqualTo(FixedTenantId);
+        await Assert.That(captured.Resources[0].Resource.PolicyVersion).IsEqualTo(string.Empty);
     }
 
     private static AuthorizationRequest CreateScenarioCheck(Phase0Scenario scenario)
@@ -923,17 +880,16 @@ public class CerbosAuthorizationServiceTests
 
     private CerbosAuthorizationService CreateService(
         string grpcEndpoint = "http://localhost:3593",
-        IEventAuthoritySnapshotService? eventAuthoritySnapshotService = null,
         bool usePolicyScope = false)
     {
+        _human.EnterRequest();
         return new CerbosAuthorizationService(
             _cerbosClient,
             new CerbosPrincipalBuilder(
                 _adminContext,
                 _machinePrincipalAccessor,
-                eventAuthoritySnapshotService ?? Substitute.For<IEventAuthoritySnapshotService>(),
-                _organizationMemberRepository,
-                _groupMemberRepository),
+                new EventAuthoritySnapshotService(_human.Context),
+                _human.Reader),
             _adminContext,
             _machinePrincipalAccessor,
             _settingsResolver,
@@ -946,6 +902,17 @@ public class CerbosAuthorizationServiceTests
                 UsePolicyScope = usePolicyScope
             }),
             _logger);
+    }
+
+    // Only SDK input vectors: these are never supplied as a current-human source or commit admission.
+    private static HumanPrincipalSourceFacts ProjectionFacts(Guid userId, Guid? adminTenant = null)
+    {
+        Guid membership = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        return new(userId, adminTenant, [], [], [], [],
+            adminTenant is { } tenant ? [new(membership, tenant, (int)TenantUserStatusEnum.Active, false)] : [],
+            adminTenant is { } target ? [new(Guid.Parse("88888888-8888-8888-8888-888888888888"),
+                target, membership, (int)RoleEnum.TenantAdmin, (int)RoleScopeEnum.Tenant, null)] : [],
+            [], [], [], [], false, [], [], [], [], null);
     }
 
     private static Cerbos.Api.V1.Response.CheckResourcesResponse.Types.ResultEntry CreateResultEntry(

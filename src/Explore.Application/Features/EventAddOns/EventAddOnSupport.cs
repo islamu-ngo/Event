@@ -112,6 +112,16 @@ internal static class EventAddOnMapper
                 order.EventId,
                 order.Id,
                 cancellationToken);
+        return Order(order, fulfillments, refunds, canReserve, canManage);
+    }
+
+    internal static RegistrationOrderAddOnSummaryDto Order(
+        RegistrationOrder order,
+        IReadOnlyList<EventAddOnFulfillment> fulfillments,
+        IReadOnlyList<EventAddOnRefundAllocation> refunds,
+        bool canReserve,
+        bool canManage)
+    {
         HashSet<Guid> fulfilledLines = fulfillments
             .Select(value => value.RegistrationOrderAddOnLineId)
             .ToHashSet();

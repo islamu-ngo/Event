@@ -1,9 +1,7 @@
-using System.Linq.Expressions;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
-using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -125,24 +123,6 @@ public sealed class AdmissionScannerCapabilityRepository(ExploreDbContext dbCont
                     (int)ParticipationHandlingModeEnum.PlatformManaged),
             cancellationToken);
 
-    public Task<AdmissionScannerCapability?> FindByDigestCandidatesAsync(
-        IReadOnlyList<AdmissionScannerCapabilityDigestCandidate> candidates,
-        CancellationToken cancellationToken)
-    {
-        if (!AreValidDigestCandidates(candidates))
-        {
-            return Task.FromResult<AdmissionScannerCapability?>(null);
-        }
-
-        Expression<Func<AdmissionScannerCapability, bool>> predicate =
-            BuildDigestCandidatePredicate(candidates);
-        return dbContext.AdmissionScannerCapabilities
-            .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ScannerCapabilityAuthentication)
-            .Where(predicate)
-            .SingleOrDefaultAsync(cancellationToken);
-    }
-
     public async Task<AdmissionScannerCapability> UpdateAsync(
         AdmissionScannerCapability capability,
         CancellationToken cancellationToken)
@@ -164,42 +144,6 @@ public sealed class AdmissionScannerCapabilityRepository(ExploreDbContext dbCont
         await dbContext.SaveChangesAsync(cancellationToken);
         return capability;
     }
-
-    private static Expression<Func<AdmissionScannerCapability, bool>> BuildDigestCandidatePredicate(
-        IReadOnlyList<AdmissionScannerCapabilityDigestCandidate> candidates)
-    {
-        ParameterExpression capability = Expression.Parameter(
-            typeof(AdmissionScannerCapability),
-            "capability");
-        Expression candidateMatch = Expression.Constant(false);
-        foreach (AdmissionScannerCapabilityDigestCandidate candidate in candidates)
-        {
-            Expression keyMatch = Expression.Equal(
-                Expression.Property(capability, nameof(AdmissionScannerCapability.LookupKeyVersion)),
-                Expression.Constant(candidate.KeyVersion));
-            Expression digestMatch = Expression.Equal(
-                Expression.Property(capability, nameof(AdmissionScannerCapability.LookupDigest)),
-                Expression.Constant(candidate.LookupDigest));
-            candidateMatch = Expression.OrElse(
-                candidateMatch,
-                Expression.AndAlso(keyMatch, digestMatch));
-        }
-
-        return Expression.Lambda<Func<AdmissionScannerCapability, bool>>(
-            candidateMatch,
-            capability);
-    }
-
-    private static bool AreValidDigestCandidates(
-        IReadOnlyList<AdmissionScannerCapabilityDigestCandidate>? candidates) =>
-        candidates is { Count: > 0 and <= AdmissionScannerCapabilityDigestOptions.MaximumKeyVersions } &&
-        candidates.All(candidate =>
-            candidate.KeyVersion > 0 &&
-            !string.IsNullOrWhiteSpace(candidate.LookupDigest) &&
-            candidate.LookupDigest.Length <= 256) &&
-        candidates.Select(candidate => (candidate.KeyVersion, candidate.LookupDigest))
-            .Distinct()
-            .Count() == candidates.Count;
 
     private Task<AdmissionScannerCapability?> FindByIssueRequestAsync(
         Guid tenantId,

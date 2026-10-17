@@ -6,7 +6,6 @@ using Explore.Application.Features.Roles.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Roles.Handlers.Commands;
 
@@ -14,22 +13,16 @@ public class CreateCustomRoleCommandHandler : ICommandHandler<CreateCustomRoleCo
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ICapabilityCeilingService _capabilityCeiling;
-    private readonly IPolicySyncService _policySyncService;
     private readonly IPermissionRegistryService _permissionRegistry;
-    private readonly ILogger<CreateCustomRoleCommandHandler> _logger;
 
     public CreateCustomRoleCommandHandler(
         IRoleRepository roleRepository,
         ICapabilityCeilingService capabilityCeiling,
-        IPolicySyncService policySyncService,
-        IPermissionRegistryService permissionRegistry,
-        ILogger<CreateCustomRoleCommandHandler> logger)
+        IPermissionRegistryService permissionRegistry)
     {
         _roleRepository = roleRepository;
         _capabilityCeiling = capabilityCeiling;
-        _policySyncService = policySyncService;
         _permissionRegistry = permissionRegistry;
-        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<int>> ExecuteAsync(CreateCustomRoleCommand request, CancellationToken cancellationToken)
@@ -96,16 +89,6 @@ public class CreateCustomRoleCommandHandler : ICommandHandler<CreateCustomRoleCo
         if (request.PermissionIds.Count > 0)
         {
             await _roleRepository.AssignPermissionsAsync(role.Id, request.PermissionIds);
-        }
-
-        // Trigger Cerbos policy sync
-        try
-        {
-            await _policySyncService.SyncRolePoliciesAsync(role.Id, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Policy sync failed for new role {RoleId}, will retry on next sync", role.Id);
         }
 
         // Invalidate permission cache

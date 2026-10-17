@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Event.Testing.DataProtection;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Models;
@@ -11,6 +12,7 @@ using Explore.Domain.Constants;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +26,11 @@ namespace Event.Api.IntegrationTests.Fixtures;
 
 internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
 {
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority;
+
+    private LocalIdentityLifecycleHttpFixture() =>
+        _dataProtectionAuthority = new("api", Clock);
+
     internal LocalAdmissionWebApplicationFactory Native { get; private set; } = null!;
     internal WebApplicationFactory<Program> Host { get; private set; } = null!;
     internal HttpClient Client { get; private set; } = null!;
@@ -36,7 +43,8 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
     internal static async Task<LocalIdentityLifecycleHttpFixture> CreateAsync(
         bool verified = true, bool emailEnabled = true,
         IdentityDatabaseTopology topology = IdentityDatabaseTopology.Colocated,
-        IInterceptor? interceptor = null, bool rateLimiting = false)
+        IInterceptor? interceptor = null, bool rateLimiting = false,
+        Action<IServiceCollection>? configureServices = null)
     {
         var fixture = new LocalIdentityLifecycleHttpFixture();
         try
@@ -57,7 +65,11 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
             fixture.Host = fixture.Native.WithWebHostBuilder(builder =>
             {
                 builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-                    new Dictionary<string, string?> { ["PublicBaseUrl"] = "https://lifecycle.test" }));
+                    new Dictionary<string, string?>
+                    {
+                        ["PublicBaseUrl"] = "https://lifecycle.test",
+                        ["EffectiveHostAuthority:CanonicalOrigin"] = "https://localhost"
+                    }));
                 builder.ConfigureTestServices(services =>
                 {
                     // Disable timer scheduling, not the production processor. Tests explicitly drain admitted work
@@ -69,6 +81,9 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
                     services.AddSingleton<ILocalIdentityLifecycleSmtpTransport>(fixture.Smtp);
                     services.RemoveAll<TimeProvider>();
                     services.AddSingleton<TimeProvider>(fixture.Clock);
+                    services.RemoveAll<IExternalDataProtectionSource>();
+                    services.AddSingleton<IExternalDataProtectionSource>(fixture._dataProtectionAuthority);
+                    configureServices?.Invoke(services);
                 });
             });
             fixture.Client = fixture.Host.CreateClient(new WebApplicationFactoryClientOptions

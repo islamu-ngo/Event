@@ -4,6 +4,8 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IActorRepository : IGenericRepository<Actor, Guid>
 {
+    /// <summary>Gets the tracked scalar aggregate without private profile or related-owner graphs.</summary>
+    Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Actor?> GetActorWithDetails(Guid id, CancellationToken cancellationToken = default);
     Task<Actor?> GetPublicActorProfileAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Actor?> GetPublicActorProfileByTenantAsync(

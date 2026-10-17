@@ -18,7 +18,7 @@ public class AdminContext : IAdminContext
     private readonly IAdministrativeAuthorityRepository _administrativeAuthorityRepository;
     private readonly IOrganizationMemberRepository _orgMemberRepo;
     private readonly IGroupMemberRepository _groupMemberRepo;
-    private readonly IExternalLoginAuthenticationRepository _userExternalLoginRepository;
+    private readonly IExternalLoginAuthenticationRepository _externalLoginAuthenticationRepository;
     private readonly ILogger<AdminContext> _logger;
 
     public AdminContext(
@@ -26,14 +26,14 @@ public class AdminContext : IAdminContext
         IAdministrativeAuthorityRepository administrativeAuthorityRepository,
         IOrganizationMemberRepository orgMemberRepo,
         IGroupMemberRepository groupMemberRepo,
-        IExternalLoginAuthenticationRepository userExternalLoginRepository,
+        IExternalLoginAuthenticationRepository externalLoginAuthenticationRepository,
         ILogger<AdminContext> logger)
     {
         _httpContextAccessor = httpContextAccessor;
         _administrativeAuthorityRepository = administrativeAuthorityRepository;
         _orgMemberRepo = orgMemberRepo;
         _groupMemberRepo = groupMemberRepo;
-        _userExternalLoginRepository = userExternalLoginRepository;
+        _externalLoginAuthenticationRepository = externalLoginAuthenticationRepository;
         _logger = logger;
     }
 
@@ -65,7 +65,7 @@ public class AdminContext : IAdminContext
         if (providerIdentity is null)
             return user.GetPlatformUserId();
 
-        var externalLogin = await _userExternalLoginRepository.GetByProviderAndKey(
+        var externalLogin = await _externalLoginAuthenticationRepository.GetByProviderAndKey(
             providerIdentity.AccountKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return externalLogin?.UserId;

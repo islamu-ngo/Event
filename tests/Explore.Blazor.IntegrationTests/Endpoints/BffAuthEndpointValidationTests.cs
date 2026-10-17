@@ -15,6 +15,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Explore.Blazor.Hosting;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 
 namespace Explore.Blazor.IntegrationTests.Endpoints;
 
@@ -188,6 +192,11 @@ public sealed class BffAuthEndpointValidationTests
     public async Task ConfidentialOidcColdStartRequiresAcquiredSecret(
         string provider, string secretState, bool explicitPrimary, bool occupied)
     {
+        string canary = Guid.CreateVersion7().ToString("N");
+        var sink = new ConfigurationSink();
+        using var serilog = new LoggerConfiguration().MinimumLevel.Debug().Enrich.FromLogContext()
+            .WithBffDiagnosticConfidentiality().WriteTo.Sink(sink).CreateLogger();
+        using var logs = LoggerFactory.Create(builder => builder.AddSerilog(serilog, dispose: false));
         string? secret = secretState switch
         {
             "missing" => null,
@@ -200,10 +209,10 @@ public sealed class BffAuthEndpointValidationTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Authentication:Provider"] = explicitPrimary ? isKeycloak ? "keycloak" : "local" : null,
-                ["Keycloak:Authority"] = isKeycloak ? "https://identity.example.test/realms/operators" : null,
-                ["Keycloak:ClientId"] = isKeycloak ? "replacement-keycloak-client" : null,
+                ["Keycloak:Authority"] = isKeycloak ? $"https://identity.example.test/realms/{canary}" : null,
+                ["Keycloak:ClientId"] = isKeycloak ? canary : null,
                 ["Keycloak:ClientSecret"] = isKeycloak ? secret : null,
-                ["Google:ClientId"] = isKeycloak ? null : "replacement-google-client",
+                ["Google:ClientId"] = isKeycloak ? null : canary,
                 ["Google:ClientSecret"] = isKeycloak ? null : secret
             })
             .Build();
@@ -233,7 +242,7 @@ public sealed class BffAuthEndpointValidationTests
             new EphemeralDataProtectionProvider(),
             new EventBffOidcOptionsFactory(
                 environment, Substitute.For<ISafeAuthDiagnosticsPolicy>()),
-            Substitute.For<ILogger<DynamicAuthSchemeManager>>(), receipts);
+            logs.CreateLogger<DynamicAuthSchemeManager>(), receipts);
 
         await manager.InitializeAsync();
 
@@ -245,6 +254,20 @@ public sealed class BffAuthEndpointValidationTests
             .IsEqualTo(isKeycloak ? "keycloak" : "local");
         await Assert.That(receipts.Snapshot().Any(receipt => receipt.Installed))
             .IsEqualTo(secretState == "present" && !occupied);
+        await Assert.That(sink.Values.Count > 0).IsTrue();
+        foreach (string exported in sink.Values)
+        {
+            await Assert.That(exported).DoesNotContain(canary);
+            if (!string.IsNullOrWhiteSpace(secret))
+                await Assert.That(exported).DoesNotContain(secret);
+        }
+    }
+
+    private sealed class ConfigurationSink : ILogEventSink
+    {
+        public List<string> Values { get; } = [];
+        public void Emit(LogEvent entry) => Values.Add(entry.RenderMessage() + entry.Exception?.ToString()
+            + string.Join(' ', entry.Properties.Select(property => property.Key + property.Value)));
     }
 
     [Test]
@@ -452,7 +475,7 @@ public sealed class BffAuthEndpointValidationTests
         public void ClearCircuitTokenState(
             HttpContext context,
             ClaimsPrincipal? principal,
-            ILogger logger,
+            Microsoft.Extensions.Logging.ILogger logger,
             string reason)
         {
         }

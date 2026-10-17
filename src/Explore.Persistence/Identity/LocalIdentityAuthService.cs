@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain.Constants;
+using Explore.Persistence.Security;
 using Microsoft.AspNetCore.Identity;
 
 namespace Explore.Persistence.Identity;
@@ -15,6 +16,7 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
     private readonly ILocalJwtTokenGenerator _tokenGenerator;
     private readonly ISystemSettingRepository _systemSettings;
     private readonly LocalIdentityCredentialStateStore _credentialStates;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
     private readonly LocalIdentityUser _dummyUser;
     private readonly string _dummyPasswordHash;
 
@@ -22,12 +24,14 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
         UserManager<LocalIdentityUser> userManager,
         ILocalJwtTokenGenerator tokenGenerator,
         ISystemSettingRepository systemSettings,
-        LocalIdentityCredentialStateStore credentialStates)
+        LocalIdentityCredentialStateStore credentialStates,
+        PostgresNativeQueueEnrollment? nativeEnrollment = null)
     {
         _userManager = userManager;
         _tokenGenerator = tokenGenerator;
         _systemSettings = systemSettings;
         _credentialStates = credentialStates;
+        _nativeEnrollment = nativeEnrollment;
         _dummyUser = new LocalIdentityUser();
         _dummyPasswordHash = userManager.PasswordHasher.HashPassword(
             _dummyUser,
@@ -51,25 +55,38 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
                 _dummyUser,
                 _dummyPasswordHash,
                 request.Password);
+            cancellationToken.ThrowIfCancellationRequested();
             return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
         }
 
-        if (await _userManager.IsLockedOutAsync(user).ConfigureAwait(false))
+        bool locked = await _userManager.IsLockedOutAsync(user).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (locked)
         {
+            _ = _userManager.PasswordHasher.VerifyHashedPassword(
+                _dummyUser,
+                _dummyPasswordHash,
+                request.Password);
+            cancellationToken.ThrowIfCancellationRequested();
             return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AccountLocked);
         }
 
-        if (!await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false))
+        bool passwordValid = await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!passwordValid)
         {
             IdentityResult accessFailure = await _userManager
                 .AccessFailedAsync(user)
                 .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             if (!accessFailure.Succeeded)
             {
                 return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
             }
 
-            return await _userManager.IsLockedOutAsync(user).ConfigureAwait(false)
+            bool lockedAfterFailure = await _userManager.IsLockedOutAsync(user).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return lockedAfterFailure
                 ? LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AccountLocked)
                 : LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
         }
@@ -140,6 +157,22 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
     {
         ArgumentNullException.ThrowIfNull(authority);
         cancellationToken.ThrowIfCancellationRequested();
+        if (_credentialStates.UsesNativeSessionValidation)
+        {
+            try
+            {
+                bool ready = await _credentialStates.ValidateReadySessionAsync(authority,
+                    _nativeEnrollment ?? throw new InvalidOperationException("local_session_native_enrollment_required"),
+                    cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                return ready ? LocalSessionValidationOutcome.Valid : LocalSessionValidationOutcome.Invalid;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return LocalSessionValidationOutcome.Unavailable;
+            }
+        }
         var (_, failure) = await ReadValidatedSessionAsync(
             authority: authority, cancellationToken: cancellationToken).ConfigureAwait(false);
         return failure switch

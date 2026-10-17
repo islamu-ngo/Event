@@ -1,5 +1,6 @@
-using Explore.Application.Contracts.Infrastructure;
+using Cerbos.Sdk;
 using Event.Api.IntegrationTests.Authentication;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
@@ -18,6 +19,7 @@ public sealed class NativeEventSeriesFactory : AuthenticatedWebApplicationFactor
 {
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"native-series-{Guid.CreateVersion7():N}.db");
     public IInterceptor? DatabaseInterceptor { get; init; }
+    public ICerbosClient? InstanceCerbosClient { get; init; }
     public TimeProvider Clock { get; init; } = TimeProvider.System;
     internal LocalizationNativeJwtAuthority? JwtAuthority { get; init; }
 
@@ -40,6 +42,11 @@ public sealed class NativeEventSeriesFactory : AuthenticatedWebApplicationFactor
         builder.ConfigureTestServices(services =>
         {
             JwtAuthority?.ConfigureServices(services);
+            if (InstanceCerbosClient is not null)
+            {
+                services.RemoveAll<ICerbosClient>();
+                services.AddSingleton(InstanceCerbosClient);
+            }
             services.RemoveExploreDbContextRegistrations();
             var options = new DbContextOptionsBuilder<ExploreDbContext>();
             ConfigureDatabase(options);
@@ -65,6 +72,21 @@ public sealed class NativeEventSeriesFactory : AuthenticatedWebApplicationFactor
                     Provider = PrimaryDatabaseProvider.Sqlite,
                     Database = _databasePath
                 }));
+            var runtime = new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _databasePath
+            };
+            services.RemoveAll<InstanceApiKeyDbContextFactories>();
+            services.AddSingleton(new InstanceApiKeyDbContextFactories(
+                runtime, runtime with { Role = PrimaryDatabaseRole.Global },
+                [
+                    runtime with { Role = PrimaryDatabaseRole.InstanceKeyRead },
+                    runtime with { Role = PrimaryDatabaseRole.InstanceKeyWrite },
+                    runtime with { Role = PrimaryDatabaseRole.InstanceKeyIssuance },
+                    runtime with { Role = PrimaryDatabaseRole.PlatformKeyReport }
+                ]));
             services.AddScoped(provider =>
             {
                 if (provider.GetRequiredService<ExploreDbContextExecutionLease>().Context is { } selected)

@@ -47,7 +47,6 @@ public class UnsubscribeFromActorCommandHandler : ICommandHandler<UnsubscribeFro
             _tenantContext.TenantId,
             tenantUser.Id,
             request.Subscription.TargetActorId,
-            trackChanges: true,
             cancellationToken);
 
         if (subscription is null)
@@ -56,6 +55,9 @@ public class UnsubscribeFromActorCommandHandler : ICommandHandler<UnsubscribeFro
                 Guid.Empty,
                 "Actor subscription is already unsubscribed.");
         }
+
+        if (subscription.StatusId == (int)ActorSubscriptionStatusEnum.Blocked)
+            return Failure("Actor unsubscribe failed.", ["Subscription is administratively blocked."]);
 
         if (subscription.ConcurrencyStamp != request.Subscription.ExpectedConcurrencyStamp)
         {

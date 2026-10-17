@@ -353,7 +353,7 @@ public sealed class OrganizationMappingHandlerTests
     {
         public List<OrganizationMember> Items { get; } = items;
         public override Task<OrganizationMember> Create(OrganizationMember entity) { Items.Add(entity); return Task.FromResult(entity); }
-        public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
+        public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
         public Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId) => Task.FromResult(Items.Where(item => item.OrganizationTenant.OrganizationId == organizationId).ToList());
         public Task<List<OrganizationMember>> GetMembershipsByUser(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(Items.Where(item => item.UserId == userId).ToList());
         public Task<List<OrganizationMember>> GetInvitesByEmail(string email) => Task.FromResult(Items.Where(item => item.User?.Pii?.Email == email).ToList());
@@ -431,6 +431,7 @@ public sealed class OrganizationMappingHandlerTests
     internal sealed class ActorStore : Store<Actor, Guid>, IActorRepository
     {
         public List<Actor> Items { get; } = [];
+        public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public override Task<Actor> Create(Actor entity) { Items.Add(entity); return Task.FromResult(entity); }
         public Task<Actor?> GetActorWithDetails(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Actor?> GetPublicActorProfileAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();

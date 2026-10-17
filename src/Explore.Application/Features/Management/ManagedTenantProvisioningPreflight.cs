@@ -20,7 +20,7 @@ public sealed class ManagedTenantProvisioningPreflight(
     ITenantRepository tenantRepository,
     ITenantPlanRepository tenantPlanRepository,
     IModuleDefinitionRepository moduleDefinitionRepository,
-    ITenantSettingRepository tenantSettingRepository,
+    IManagedTenantDomainRepository tenantDomains,
     ISystemSettingRepository systemSettingRepository,
     ITenantBrandingSettingsDocumentLockService brandingLockService,
     TenantPlanStorageQuotaCeilingPolicy storageQuotaCeilingPolicy,
@@ -171,7 +171,7 @@ public sealed class ManagedTenantProvisioningPreflight(
 
         foreach (string host in new[] { subdomain, customDomain }.OfType<string>())
         {
-            TenantSetting? collision = await tenantSettingRepository.GetByDomainHostAsync(
+            TenantSetting? collision = await tenantDomains.GetByDomainHostAsync(
                 host,
                 cancellationToken);
             if (collision is not null)

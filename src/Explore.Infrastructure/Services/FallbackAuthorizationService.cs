@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Infrastructure.Services;
@@ -25,6 +26,7 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<FallbackAuthorizationService> _logger;
+    private readonly IHumanCerbosPrincipalReader? _originalHumanSources;
 
     /// <summary>
     /// When true, only instance admin emergency access is allowed — all other requests are denied.
@@ -63,7 +65,8 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
         IGroupMemberRepository groupMemberRepository,
         IHierarchicalSettingsResolver resolver,
         ITenantContext tenantContext,
-        ILogger<FallbackAuthorizationService> logger)
+        ILogger<FallbackAuthorizationService> logger,
+        IHumanCerbosPrincipalReader? originalHumanSources = null)
     {
         _adminContext = adminContext;
         _machinePrincipalAccessor = machinePrincipalAccessor;
@@ -73,6 +76,7 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
         _resolver = resolver;
         _tenantContext = tenantContext;
         _logger = logger;
+        _originalHumanSources = originalHumanSources;
     }
 
     public async Task<AuthorizationDecision> AuthorizeAsync(
@@ -102,6 +106,19 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
 
         var resourceAttributes = TrustedAttributes(request);
         resourceAttributes = await AddTenantSettingLockAttributeAsync(request, resourceAttributes, cancellationToken);
+
+        if (_originalHumanSources is not null && !_machinePrincipalAccessor.IsMachineCaller
+            && request.ResourceKind == ResourceKinds.Event && request.Facts is EventAuthorizationFacts
+            && request.Action is AuthorizationActions.Events.ViewManagement
+                or AuthorizationActions.Update or AuthorizationActions.Events.ManageRegistrations)
+        {
+            var profile = await ResolveAuthorityProfileAsync(cancellationToken);
+            var authority = await ResolveBatchEventAuthorityAsync(profile, [request], cancellationToken);
+            return EvaluateWithProfile(profile, authority, request.ResourceKind, request.ResourceId,
+                request.Action, resourceAttributes, request.Facts)
+                ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)
+                : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local);
+        }
 
         var allowed = await IsAllowedCoreAsync(
             request.ResourceKind,
@@ -345,7 +362,10 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
     /// <summary>
     /// Resolves the tenant ID from resource attributes, falling back to the current tenant context.
     /// </summary>
-    private Guid ResolveTenantId(IDictionary<string, object>? resourceAttributes)
+    private Guid ResolveTenantId(IDictionary<string, object>? resourceAttributes) =>
+        ResolveTenantId(resourceAttributes, _tenantContext.TenantId);
+
+    private static Guid ResolveTenantId(IDictionary<string, object>? resourceAttributes, Guid ambientTenantId)
     {
         if (resourceAttributes?.TryGetValue("tenantId", out var tenantIdObj) == true)
         {
@@ -353,7 +373,120 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
             if (tenantIdObj is string s && Guid.TryParse(s, out var parsed)) return parsed;
         }
 
-        return _tenantContext.TenantId;
+        return ambientTenantId;
+    }
+
+    internal static bool EvaluatePreparedTenant(HumanPrincipalSourceFacts sources,
+        AuthorizationRequest request, Guid ambientTenantId, bool safeMode)
+    {
+        if (request.ResourceKind != ResourceKinds.Tenant || string.IsNullOrWhiteSpace(request.ResourceId))
+            return false;
+        var inputs = PreparedTenantInputs(sources, request, ambientTenantId);
+        if (inputs.InstanceAdmin && IsInstanceAdminFallbackAllowed(ResourceKinds.Tenant, request.Action))
+            return true;
+        if (safeMode && !inputs.InstanceAdmin
+            || request.Action is not (AuthorizationActions.View or AuthorizationActions.Update))
+            return false;
+        return inputs.ResourceTenant == ambientTenantId && inputs.TenantAdmin;
+    }
+
+    internal static bool EvaluatePreparedAdministrativeResource(HumanPrincipalSourceFacts sources,
+        AuthorizationRequest request, Guid ambientTenantId)
+    {
+        if (request.ResourceKind == ResourceKinds.Tenant)
+            return EvaluatePreparedTenant(sources, request, ambientTenantId, false);
+        if (request.ResourceKind is not (ResourceKinds.CustomPropertyProjection or ResourceKinds.LocationRoom)
+            || string.IsNullOrWhiteSpace(request.ResourceId) || request.Action != AuthorizationActions.Update)
+            return false;
+        var inputs = PreparedTenantInputs(sources, request, ambientTenantId);
+        if (inputs.InstanceAdmin && IsInstanceAdminFallbackAllowed(request.ResourceKind, request.Action))
+            return true;
+        if (inputs.InstanceAdmin && IsInstanceAdminFallbackDenied(request.ResourceKind, request.Action))
+            return false;
+        // Projection administration requires explicit, persisted owning-tenant facts.
+        // Room administration retains its existing ambient-tenant fallback.
+        if (request.ResourceKind == ResourceKinds.CustomPropertyProjection
+            && request.Facts is not CustomPropertyProjectionAuthorizationFacts)
+            return false;
+        return inputs.ResourceTenant == ambientTenantId && inputs.TenantAdmin;
+    }
+
+    internal static bool EvaluatePreparedAiModerationProposal(HumanPrincipalSourceFacts sources,
+        AuthorizationRequest request, Guid ambientTenantId) =>
+        request.ResourceKind == ResourceKinds.Event
+        && request.Action == AuthorizationActions.Events.ModerateHeavy
+        && request.Facts is EventScopedAuthorizationFacts facts
+        && Guid.TryParse(request.ResourceId, out var eventId) && eventId == facts.EventId
+        && PreparedTenantInputs(sources, request, ambientTenantId).InstanceAdmin
+        && IsInstanceAdminFallbackAllowed(request.ResourceKind, request.Action);
+
+    /// <summary>
+    /// Ordinary proposal questions use only PreCreate, EventScoped or TenantScoped facts.
+    /// Reproduces their existing Local branches without repository reads or a synthetic
+    /// authority snapshot. In particular EventScoped facts carry no creating-user ownership.
+    /// </summary>
+    internal static bool EvaluatePreparedAiToolProposal(HumanPrincipalSourceFacts sources,
+        HumanEventAssignmentSourceFacts? assignments, AuthorizationRequest request, Guid ambientTenantId,
+        DateTime evaluationUtc)
+    {
+        if (sources.PrincipalId == Guid.Empty || sources.SelectedTenantId != ambientTenantId
+            || string.IsNullOrWhiteSpace(request.ResourceId)
+            || request.Facts is not (PreCreateAuthorizationFacts or EventScopedAuthorizationFacts or TenantScopedAuthorizationFacts))
+            return false;
+        var inputs = PreparedTenantInputs(sources, request, ambientTenantId);
+        if (inputs.ResourceTenant != ambientTenantId || !IsSupportedEventResourceAction(request.ResourceKind, request.Action))
+            return false;
+        if (request.ResourceKind == ResourceKinds.Tenant)
+            return EvaluatePreparedTenant(sources, request, ambientTenantId, false);
+        if (inputs.InstanceAdmin && IsInstanceAdminFallbackAllowed(request.ResourceKind, request.Action))
+            return true;
+        if (inputs.InstanceAdmin && IsInstanceAdminFallbackDenied(request.ResourceKind, request.Action))
+            return false;
+        // AdminContext.IsTenantAdminAsync does not erase a separately held tenant grant
+        // merely because the same human also has an instance role.
+        bool tenantAdmin = sources.TenantGrants.Any(grant => grant.TenantId == ambientTenantId
+            && grant.RoleId == (int)RoleEnum.TenantAdmin && grant.RevokedAt is null
+            && sources.TenantMemberships.Any(member => member.Id == grant.TenantUserId
+                && member.StatusId == (int)TenantUserStatusEnum.Active && !member.IsDeleted));
+        if (request.ResourceKind == ResourceKinds.Event && request.Action == AuthorizationActions.Create)
+            return request.Facts is PreCreateAuthorizationFacts;
+        if (request.ResourceKind == ResourceKinds.CustomPropertyTemplate)
+            return tenantAdmin;
+        if (request.ResourceKind is not (ResourceKinds.Event or ResourceKinds.EventSession
+            or ResourceKinds.EventSessionGroup or ResourceKinds.EventDay or ResourceKinds.EventAgendaItem)
+            || request.Facts is not EventScopedAuthorizationFacts target
+            || assignments is null || assignments.TenantId != ambientTenantId
+            || assignments.PrincipalId != sources.PrincipalId)
+            return false;
+        if (tenantAdmin && (request.ResourceKind != ResourceKinds.Event || IsTenantAdminEventAction(request.Action)))
+            return true;
+        if (request.ResourceKind == ResourceKinds.Event && IsEventModerationAction(request.Action))
+            return false;
+        // ResolveOrganizationId in the ordinary evaluator falls back to ResourceId.
+        // Neither payload organization/group identifiers nor assignment actor facts are resource facts.
+        Guid? organization = ResolveOrganizationId(TrustedAttributes(request), request.ResourceId);
+        var member = organization is { } organizationId
+            ? sources.Organizations.FirstOrDefault(row => row.TenantId == ambientTenantId && row.OwnerId == organizationId
+                && !row.IsDeleted && !row.PlacementIsDeleted && !row.OwnerIsDeleted)
+            : null;
+        return member?.RoleId == (int)RoleEnum.OrgAdmin
+            || HumanEventAssignmentProjection.Authority(assignments, evaluationUtc).Events
+                .TryGetValue(target.EventId, out var authority)
+                && authority.PermissionCodes.Contains(PermissionCodeFor(request.ResourceKind, request.Action));
+    }
+
+    internal static (bool InstanceAdmin, bool TenantAdmin, Guid ResourceTenant) PreparedTenantInputs(
+        HumanPrincipalSourceFacts sources, AuthorizationRequest request, Guid ambientTenantId)
+    {
+        bool instanceAdmin = sources.PlatformGrants.Any(grant => sources.Roles.Any(role =>
+            role.Id == grant.RoleId && role.RoleScopeId == (int)RoleScopeEnum.Platform
+                && role.MatchesPlatformAdministratorCode));
+        Guid tenant = ResolveTenantId(TrustedAttributes(request), ambientTenantId);
+        bool tenantAdmin = !instanceAdmin && sources.TenantGrants.Any(grant =>
+            grant.TenantId == tenant && grant.RoleId == (int)RoleEnum.TenantAdmin && grant.RevokedAt is null
+            && sources.TenantMemberships.Any(member => member.Id == grant.TenantUserId
+                && member.StatusId == (int)TenantUserStatusEnum.Active && !member.IsDeleted));
+        return (instanceAdmin, tenantAdmin, tenant);
     }
 
     /// <summary>

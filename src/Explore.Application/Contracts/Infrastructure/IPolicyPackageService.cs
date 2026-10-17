@@ -1,4 +1,7 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Services;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Features.Settings;
 
 namespace Explore.Application.Contracts.Infrastructure;
 
@@ -7,6 +10,11 @@ namespace Explore.Application.Contracts.Infrastructure;
 /// </summary>
 public interface IPolicyPackageService
 {
+    Task<IEventResourceProviderPublicationSelection> SelectOriginalPublicationAsync(
+        SyncAuthorizationPolicyPackageCommand command, EventResourceProviderPublicationInput input,
+        CancellationToken cancellationToken);
+    Task RequireOriginalSelectionAsync(SyncAuthorizationPolicyPackageCommand command,
+        IEventResourceProviderPublicationSelection selection, CancellationToken cancellationToken);
     /// <summary>
     /// Builds a provider-neutral manifest for the current authorization policy package without publishing it.
     /// </summary>
@@ -16,20 +24,18 @@ public interface IPolicyPackageService
     /// Publishes the current authorization policy package to the configured provider.
     /// </summary>
     Task<PolicyPackagePublishResult> PublishAsync(
-        CancellationToken cancellationToken = default,
-        PolicyPackageAdminCredentials? oneTimeCredentials = null);
-
-    /// <summary>
-    /// Publishes the current authorization policy package to the instance-managed provider target.
-    /// </summary>
-    Task<PolicyPackagePublishResult> PublishInstanceAsync(
-        CancellationToken cancellationToken = default,
-        PolicyPackageAdminCredentials? oneTimeCredentials = null);
+        SyncAuthorizationPolicyPackageCommand command, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets an operator-safe status summary for the current authorization policy package target.
     /// </summary>
-    Task<PolicyPackageStatusResult> GetStatusAsync(CancellationToken cancellationToken = default);
+    Task<PolicyPackageStatusResult> GetStatusAsync(
+        CancellationToken cancellationToken = default,
+        PolicyPackageAdminCredentials? oneTimeCredentials = null,
+        bool instanceTargetOnly = false);
+
+    /// <summary>Checks the authenticated historical declaration, never live-store equality.</summary>
+    Task<bool> IsPublicationReadyAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Exports the current authorization policy package as a downloadable archive for manual installation.

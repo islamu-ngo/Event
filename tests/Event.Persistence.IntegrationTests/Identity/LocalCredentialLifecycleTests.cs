@@ -360,7 +360,7 @@ public sealed class LocalCredentialLifecycleTests
             {
                 await Identity.Database.EnsureCreatedAsync(CancellationToken);
             }
-            var settings = new SystemSettingRepository(dbContext: application,
+            var settings = SystemSettingRepository.CreateReadOnly(context: application,
                 mutationLock: new RelationalSettingMutationLock(dbContext: application,
                     unitOfWork: new EfCoreUnitOfWork(application)));
             await EmailDispatchSqliteFixture.SetEmailSettingAsync(application,

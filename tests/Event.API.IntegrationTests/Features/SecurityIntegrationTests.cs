@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Domain.Constants;
 using Explore.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -19,7 +21,7 @@ namespace Event.Api.IntegrationTests.Features;
 /// 1. The OIDC metadata discovery works against a real IdP.
 /// 2. Token signature validation works with real RSA keys.
 /// 3. Audience and issuer validation match the Keycloak configuration.
-/// 4. Malformed / missing / expired tokens are correctly rejected.
+/// 4. Malformed / missing / tampered tokens are correctly rejected.
 /// </summary>
 [Category(TestCategories.Security)]
 [ClassDataSource<SecurityInfrastructureFixture>(Shared = SharedType.PerAssembly)]
@@ -181,92 +183,86 @@ public class SecurityIntegrationTests : IAsyncDisposable
 
     #endregion
 
-    #region Negative — Wrong Audience
+    #region Negative — Signature Tampering
 
     [Test]
     public async Task PostProtectedEndpoint_WithTamperedToken_ShouldReturnUnauthorized()
     {
-        // Arrange — get a valid token, then tamper with the payload
+        // Arrange — mutate a decoded signature byte, not base64 padding bits.
         var validToken = await _infra.TokenClient.GetUserTokenAsync();
         var parts = validToken.Split('.');
 
-        if (parts.Length == 3)
-        {
-            // Flip a character in the signature to invalidate it
-            var tamperedSignature = parts[2][..^1] + (parts[2][^1] == 'A' ? 'B' : 'A');
-            var tamperedToken = $"{parts[0]}.{parts[1]}.{tamperedSignature}";
-
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/organization")
-            {
-                Content = JsonContent.Create(new
-                {
-                    FullName = "Tampered Org",
-                    Email = "tampered@test.islamu.org",
-                    Country = "Belgium",
-                    City = "Brussels",
-                    Address = "Test Street 1",
-                    Postcode = 1000
-                })
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tamperedToken);
-
-            // Act
-            var response = await _client.SendAsync(request);
-
-            // Assert
-            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("a JWT with a tampered signature must be rejected by RSA key validation");
-        }
-    }
-
-    #endregion
-
-    #region Negative — Expired Token (Constructed)
-
-    [Test]
-    public async Task PostProtectedEndpoint_WithExpiredJwt_ShouldReturnUnauthorized()
-    {
-        var token = await _infra.TokenClient.GetUserTokenAsync();
-        var parts = token.Split('.');
-
-        await Assert.That(parts.Length).IsEqualTo(3).Because("JWT must have 3 parts");
-
-        var payloadBytes = Convert.FromBase64String(PadBase64(parts[1]));
-        var payloadJson = System.Text.Encoding.UTF8.GetString(payloadBytes);
-
-        var modifiedJson = payloadJson
-            .Replace($"\"exp\":{ExtractClaim(payloadJson, "exp")}", "\"exp\":1");
-
-        var modifiedPayload = Convert.ToBase64String(
-            System.Text.Encoding.UTF8.GetBytes(modifiedJson))
-            .TrimEnd('=');
-
-        var expiredToken = $"{parts[0]}.{modifiedPayload}.{parts[2]}";
+        await Assert.That(parts.Length).IsEqualTo(3);
+        byte[] signature = Base64UrlEncoder.DecodeBytes(parts[2]);
+        await Assert.That(signature.Length > 0).IsTrue();
+        signature[0] ^= 1;
+        var tamperedSignature = Base64UrlEncoder.Encode(signature);
+        var tamperedToken = $"{parts[0]}.{parts[1]}.{tamperedSignature}";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/organization")
         {
             Content = JsonContent.Create(new
             {
-                FullName = "Expired Org",
-                Email = "expired@test.islamu.org",
+                FullName = "Tampered Org",
+                Email = "tampered@test.islamu.org",
                 Country = "Belgium",
                 City = "Brussels",
                 Address = "Test Street 1",
                 Postcode = 1000
             })
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", expiredToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tamperedToken);
 
+        // Act
         var response = await _client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("an expired JWT must be rejected even if the signature is valid");
+        // Assert
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("a JWT with a tampered signature must be rejected by RSA key validation");
     }
 
     #endregion
 
-    #region Negative — Wrong Audience
+    #region Negative — Payload Tampering
 
     [Test]
-    public async Task PostProtectedEndpoint_WithTokenMissingApiAudience_ShouldBeHandled()
+    public async Task PostProtectedEndpoint_WithAlteredExpiryAndOriginalSignature_ShouldReturnUnauthorized()
+    {
+        var token = await _infra.TokenClient.GetUserTokenAsync();
+        var parts = token.Split('.');
+
+        await Assert.That(parts.Length).IsEqualTo(3).Because("JWT must have 3 parts");
+
+        var payload = JsonNode.Parse(Base64UrlEncoder.DecodeBytes(parts[1]))!.AsObject();
+        await Assert.That(payload["exp"]!.GetValue<long>() > 1).IsTrue();
+        payload["exp"] = 1;
+        var modifiedPayload = Base64UrlEncoder.Encode(System.Text.Encoding.UTF8.GetBytes(payload.ToJsonString()));
+        var tamperedToken = $"{parts[0]}.{modifiedPayload}.{parts[2]}";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/organization")
+        {
+            Content = JsonContent.Create(new
+            {
+                FullName = "Payload Tampering Org",
+                Email = "payload-tampering@test.islamu.org",
+                Country = "Belgium",
+                City = "Brussels",
+                Address = "Test Street 1",
+                Postcode = 1000
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tamperedToken);
+
+        var response = await _client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("changing a signed payload without resigning invalidates authenticity, not an isolated lifetime proof");
+    }
+
+    #endregion
+
+    #region Positive — Realm Mapped Audience
+
+    [Test]
+    public async Task PostProtectedEndpoint_WithRealmMappedApiAudience_ShouldPassAuthentication()
     {
         var token = await _infra.TokenClient.GetUserTokenAsync();
 
@@ -274,8 +270,8 @@ public class SecurityIntegrationTests : IAsyncDisposable
         {
             Content = JsonContent.Create(new
             {
-                FullName = "Wrong Audience Org",
-                Email = "wrongaud@test.islamu.org",
+                FullName = "Mapped Audience Org",
+                Email = "mapped-audience@test.islamu.org",
                 Country = "Belgium",
                 City = "Brussels",
                 Address = "Test Street 1",
@@ -324,24 +320,4 @@ public class SecurityIntegrationTests : IAsyncDisposable
 
     #endregion
 
-    #region Helpers
-
-    private static string PadBase64(string base64)
-    {
-        var padding = base64.Length % 4;
-        return padding == 0 ? base64 : base64 + new string('=', 4 - padding);
-    }
-
-    private static string ExtractClaim(string json, string claimName)
-    {
-        var pattern = $"\"{claimName}\":";
-        var idx = json.IndexOf(pattern, StringComparison.Ordinal);
-        if (idx < 0) return "0";
-        var start = idx + pattern.Length;
-        var end = json.IndexOf(',', start);
-        if (end < 0) end = json.IndexOf('}', start);
-        return json[start..end].Trim();
-    }
-
-    #endregion
 }

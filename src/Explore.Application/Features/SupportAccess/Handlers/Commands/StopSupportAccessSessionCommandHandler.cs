@@ -16,7 +16,8 @@ public sealed class StopSupportAccessSessionCommandHandler(
     IAdminContext adminContext,
     ISupportAccessSessionRepository sessionRepository,
     ISupportAccessAuditEventRepository auditEventRepository,
-    IUnitOfWork unitOfWork,
+    IHumanSupportAdministrationPreparation preparation,
+    ISerializableAttemptOwner owner,
     BusinessMetrics metrics,
     ILogger<StopSupportAccessSessionCommandHandler> logger)
     : ICommandHandler<StopSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto>
@@ -37,7 +38,30 @@ public sealed class StopSupportAccessSessionCommandHandler(
                 validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var actorUserId = await adminContext.ResolveUserIdAsync(cancellationToken);
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        var result = await owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            return await ExecuteBodyAsync(request, prepared, token);
+        }, cancellationToken);
+        if (result.IsSuccess && result.Session is { } stopped)
+        {
+            var lifecycleEvent = stopped.StatusId == (int)SupportAccessSessionStatusEnum.Expired
+                ? "expired" : "stopped";
+            metrics.RecordSupportAccessLifecycleEvent(lifecycleEvent,
+                ((SupportAccessModeEnum)stopped.ModeId).ToString(), "succeeded");
+            logger.LogInformation("Support-access session {LifecycleEvent} status={Status}",
+                lifecycleEvent, (SupportAccessSessionStatusEnum)stopped.StatusId);
+        }
+        return result;
+    }
+
+    private async Task<SupportAccessSessionCommandResponseDto> ExecuteBodyAsync(
+        StopSupportAccessSessionCommand request, IPreparedHumanSupportAdministration prepared,
+        CancellationToken cancellationToken)
+    {
+        var actorUserId = prepared.NativeData is not null
+            ? prepared.PrincipalId : await adminContext.ResolveUserIdAsync(cancellationToken);
         if (!actorUserId.HasValue)
         {
             return Failure(
@@ -48,7 +72,11 @@ public sealed class StopSupportAccessSessionCommandHandler(
                 ["Session expired. Please sign in again."]);
         }
 
-        var session = await sessionRepository.GetOwnedSessionAsync(
+        if (actorUserId != prepared.PrincipalId)
+            throw new UnauthorizedAccessException("Support stop actor differs from the original human.");
+
+        var session = prepared.NativeData is { } targetData
+            ? await targetData.ReadSessionAsync(cancellationToken) : await sessionRepository.GetOwnedSessionAsync(
             request.SessionId,
             actorUserId.Value,
             cancellationToken);
@@ -62,65 +90,25 @@ public sealed class StopSupportAccessSessionCommandHandler(
                 ["Support-access session was not found."]);
         }
 
-        var stopped = await StopSessionAsync(session, request.EndReasonText, cancellationToken);
-        var lifecycleEvent = stopped.StatusId == (int)SupportAccessSessionStatusEnum.Expired
-            ? "expired"
-            : "stopped";
-        metrics.RecordSupportAccessLifecycleEvent(
-            lifecycleEvent,
-            ((SupportAccessModeEnum)stopped.ModeId).ToString(),
-            "succeeded");
-        logger.LogInformation(
-            "Support-access session {LifecycleEvent} sessionId={SupportAccessSessionId} actorUserId={ActorUserId} targetTenantId={TargetTenantId} status={Status} endedAtUtc={EndedAtUtc}",
-            lifecycleEvent,
-            stopped.Id,
-            stopped.ActorUserId,
-            stopped.TargetTenantId,
-            (SupportAccessSessionStatusEnum)stopped.StatusId,
-            stopped.EndedAtUtc);
+        if (prepared.EndSession(session))
+        {
+            if (prepared.NativeData is null)
+                await sessionRepository.UpdateAsync(session, cancellationToken);
+            bool expired = session.StatusId == (int)SupportAccessSessionStatusEnum.Expired;
+            var auditEvent = SupportAccessAuditEvent.CreateLifecycleEvent(session,
+                expired ? SupportAccessAuditEventTypeEnum.Expired : SupportAccessAuditEventTypeEnum.Stopped,
+                expired ? "expired" : "stopped", prepared.TransitionAt);
+            if (prepared.NativeData is { } data)
+                await data.SaveOwnStoppedAsync(session, auditEvent, prepared.TransitionAt, cancellationToken);
+            else
+                await auditEventRepository.CreateAsync(auditEvent, cancellationToken);
+            prepared.Complete(session, auditEvent);
+        }
 
         return SupportAccessSessionCommandResponseDto.Success(
-            stopped.Id,
+            session.Id,
             "Support-access session stopped.",
-            SupportAccessMapper.ToDto(stopped, DateTimeOffset.UtcNow));
-    }
-
-    private async Task<SupportAccessSession> StopSessionAsync(
-        SupportAccessSession session,
-        string? endReasonText,
-        CancellationToken cancellationToken)
-    {
-        return await unitOfWork.ExecuteInTransactionAsync(async ct =>
-        {
-            var stoppedAtUtc = DateTimeOffset.UtcNow;
-            if (!session.IsActiveAt(stoppedAtUtc))
-            {
-                if (session.StatusId == (int)SupportAccessSessionStatusEnum.Active)
-                {
-                    session.Expire(stoppedAtUtc, "Expired before stop request.");
-                    await sessionRepository.UpdateAsync(session, ct);
-                    var expiredAuditEvent = SupportAccessAuditEvent.CreateLifecycleEvent(
-                        session,
-                        SupportAccessAuditEventTypeEnum.Expired,
-                        "expired",
-                        stoppedAtUtc);
-                    await auditEventRepository.CreateAsync(expiredAuditEvent, ct);
-                }
-
-                return session;
-            }
-
-            session.Stop(stoppedAtUtc, endReasonText);
-            await sessionRepository.UpdateAsync(session, ct);
-            var auditEvent = SupportAccessAuditEvent.CreateLifecycleEvent(
-                session,
-                SupportAccessAuditEventTypeEnum.Stopped,
-                "stopped",
-                stoppedAtUtc);
-            await auditEventRepository.CreateAsync(auditEvent, ct);
-
-            return session;
-        }, cancellationToken);
+            SupportAccessMapper.ToDto(session, prepared.TransitionAt));
     }
 
     private SupportAccessSessionCommandResponseDto Failure(
@@ -132,10 +120,8 @@ public sealed class StopSupportAccessSessionCommandHandler(
     {
         metrics.RecordSupportAccessLifecycleEvent("stopped", null, "failed", failureCode);
         logger.LogWarning(
-            "Support-access stop denied failureCode={FailureCode} sessionId={SupportAccessSessionId} actorUserId={ActorUserId}",
-            failureCode,
-            sessionId,
-            actorUserId);
+            "Support-access stop denied failureCode={FailureCode}",
+            failureCode);
 
         return SupportAccessSessionCommandResponseDto.Failure(
             BaseCommandResponse.Failure<Guid>(failureCode, message, errors));

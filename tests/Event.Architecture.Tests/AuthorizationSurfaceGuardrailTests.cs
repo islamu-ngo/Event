@@ -21,6 +21,94 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedOperationExceptions =
     [
         new(
+            "Explore.Application.Features.Tenants.Requests.Commands.DeleteTenantCommand",
+            "original-human-tenant-deletion-owner",
+            "DeleteTenantCommandHandler delegates deletion to IHumanTenantMutationPreparation.ExecuteDeletionAsync, which retains the original request and selected human tenant owner before persistence."),
+        new(
+            "Explore.Application.Features.Webhooks.Requests.Commands.AbandonWebhookProviderPublicationCommand",
+            "original-human-webhook-publication-owner",
+            "IHumanWebhookMutationPreparation.ExecuteAsync checks the original typed webhook operation, account and scope, then retains current route, support and physical source custody before publication effects."),
+        new(
+            "Explore.Application.Features.Webhooks.Requests.Commands.ArchiveWebhookEndpointCommand",
+            "original-human-webhook-endpoint-owner",
+            "IHumanWebhookMutationPreparation.ExecuteAsync checks the original typed webhook operation, account and scope, then retains current route, support and physical source custody before endpoint effects."),
+        new(
+            "Explore.Application.Features.Webhooks.Requests.Commands.PauseWebhookEndpointCommand",
+            "original-human-webhook-endpoint-owner",
+            "IHumanWebhookMutationPreparation.ExecuteAsync checks the original typed webhook operation, account and scope, then retains current route, support and physical source custody before endpoint effects."),
+        new(
+            "Explore.Application.Features.Webhooks.Requests.Commands.ReconcileWebhookProviderPublicationCommand",
+            "original-human-webhook-publication-owner",
+            "IHumanWebhookMutationPreparation.ExecuteAsync checks the original typed webhook operation, account and scope, then retains current route, support and physical source custody before publication effects."),
+        new(
+            "Explore.Application.Features.Webhooks.Requests.Commands.ResumeWebhookEndpointCommand",
+            "original-human-webhook-endpoint-owner",
+            "IHumanWebhookMutationPreparation.ExecuteAsync checks the original typed webhook operation, account and scope, then retains current route, support and physical source custody before endpoint effects."),
+        new(
+            "Explore.Application.Features.InstanceOnboarding.Requests.Commands.RecalculateInstanceStorageUsageDuringSetupCommand",
+            "original-accepted-setup-accounting-owner",
+            "StorageAccountingOriginalAuthority accepts only the original accounting setup action, retains the actual setup request and pending source, and acquires the selected physical single-attempt owner before accounting writes. Source and lifetime validation remain inside that owner; StorageAccountingOriginalOwnerTests covers the real accepted setup boundary."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.PollRegistrationProviderReconciliationCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.QueueManualRegistrationProviderImportCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.RetryRegistrationProviderParkedItemCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.ResolveRegistrationProviderQueueItemCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.CreateRegistrationProviderBindingCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.UpdateRegistrationProviderBindingCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.DeleteRegistrationProviderBindingCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.PublishEventRegistrationProviderBindingCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.ReplaceEventDraftRegistrationProviderMappingsCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.ImportExternalRegistrationProviderFormVersionCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.UpsertRegistrationChannelCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.DeleteRegistrationChannelCommand",
+            "original-human-event-provider-owner",
+            "The exact command is a closed HumanEventProviderMutationPreparation target. Original authenticated subject, credential lifetime, tenant, persisted Event assignments, selected route, support and business sources are captured before the Serializable owner, acquired before the callback and retained through terminal admission. Failed business responses roll back the original attempt; caller-provided rollback receipts cannot authorize replay."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.UpsertRegistrationProviderConnectionCommand",
+            "original-human-tenant-provider-owner",
+            "The handler enters IHumanTenantMutationPreparation for RegistrationProviderConnections and calls RequireOwnedAsync for the exact tenant and operation before reading or writing connections, approved origins or bindings. Persisted target lookup remains tenant-bound and current human authority belongs to the original selected owner rather than an outer request-cache decision."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.ReplaceRegistrationProviderApprovedOriginsCommand",
+            "original-human-tenant-provider-owner",
+            "The handler enters IHumanTenantMutationPreparation for RegistrationProviderConnections and calls RequireOwnedAsync for the exact tenant and operation before reading or writing connections, approved origins or bindings. Persisted target lookup remains tenant-bound and current human authority belongs to the original selected owner rather than an outer request-cache decision."),
+        new(
+            "Explore.Application.Features.RegistrationProviders.Commands.DeleteRegistrationProviderConnectionCommand",
+            "original-human-tenant-provider-owner",
+            "The handler enters IHumanTenantMutationPreparation for RegistrationProviderConnections and calls RequireOwnedAsync for the exact tenant and operation before reading or writing connections, approved origins or bindings. Persisted target lookup remains tenant-bound and current human authority belongs to the original selected owner rather than an outer request-cache decision."),
+        new(
             "Explore.Application.Features.Events.Discovery.Commands.ReviewEventDiscoveryAliasCommand",
             "handler-commit-bound-discovery-reviewer",
             "The handler requires an authenticated active tenant user, fences persisted user/membership and event authority, then reevaluates tenant-bound grants, conflicts of interest and the selected review/reversal action after lock waits for every affected event. Graph mutation, audit, outbox and expected identity revision commit atomically. EventDiscoveryIdentityAuthorityTests covers revocation, spoofed scope, conflicts and stale revisions; native identity and writer cohorts verify persisted transaction ordering."),
@@ -323,9 +411,6 @@ public sealed class AuthorizationSurfaceGuardrailTests
         "Explore.Application.Features.RegistrationOrders.Requests.Commands.SubmitGuestNativeRegistrationAttemptCommand",
         "Explore.Application.Features.RegistrationOrders.Requests.Commands.SubmitRegistrationOrderCommand",
         "Explore.Application.Features.RegistrationOrders.Requests.Commands.UpdateRegistrationParticipantCommand",
-        "Explore.Application.Features.RegistrationProviders.Commands.ImportRegistrationProviderSchemaRevisionCommand",
-        "Explore.Application.Features.RegistrationProviders.Commands.PublishRegistrationProviderBindingCommand",
-        "Explore.Application.Features.RegistrationProviders.Commands.ReplaceDraftRegistrationProviderMappingsCommand",
         "Explore.Application.Features.RegistrationSubmissions.Commands.DrainRegistrationFinalizationEffectsCommand",
         "Explore.Application.Features.RegistrationSubmissions.Commands.GetNativeRegistrationRequirementProgressQuery",
         "Explore.Application.Features.RegistrationSubmissions.Commands.LaunchNativeRegistrationAttemptCommand",

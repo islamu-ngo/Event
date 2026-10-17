@@ -60,11 +60,9 @@ public sealed class EventLocationManagementAuthorizationService(
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogWarning(
-                "EventLocation management authorization target loading failed closed. FailureType={FailureType}",
-                ex.GetType().Name);
+            logger.LogWarning("EventLocation management authorization target loading failed closed.");
             targets = [];
         }
 
@@ -91,11 +89,9 @@ public sealed class EventLocationManagementAuthorizationService(
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogWarning(
-                "EventLocation management authorization provider failed closed. FailureType={FailureType}",
-                ex.GetType().Name);
+            logger.LogWarning("EventLocation management authorization provider failed closed.");
         }
 
         var decisionByEventId = new Dictionary<Guid, bool>(validTargets.Length);

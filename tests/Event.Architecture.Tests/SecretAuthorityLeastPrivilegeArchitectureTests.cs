@@ -6,14 +6,20 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
 {
     private static readonly string[] AllowedBlazorInfisicalPaths =
     [
-        "/keycloak",
-        "/blazor",
-        "/atproto"
+        "/runtime/bff/oidc/keycloak",
+        "/runtime/bff/oidc/google",
+        "/runtime/bff/atproto/oauth"
     ];
 
     private static readonly string[] ForbiddenBlazorInfisicalPaths =
     [
         "/api",
+        "/keycloak",
+        "/blazor",
+        "/atproto",
+        "/runtime/api/authentication/keycloak",
+        "/runtime/api/keycloak/lifecycle",
+        "/runtime/api/authorization/cerbos",
         "/database",
         "/database/erasure",
         "/database/identity",
@@ -33,7 +39,10 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
 
     private static readonly string[] ForbiddenApiInfisicalPaths =
     [
-        "/blazor"
+        "/blazor",
+        "/runtime/bff/oidc/keycloak",
+        "/runtime/bff/oidc/google",
+        "/runtime/bff/atproto/oauth"
     ];
 
     private static readonly string[] AllowedMigrationServiceInfisicalPaths =
@@ -53,6 +62,13 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
         "LUCKYPENNY_LICENSE_KEY",
         "DATABASE_RUNTIME_PASSWORD",
         "DATABASE_MIGRATOR_PASSWORD",
+        "DATABASE_GLOBAL_PASSWORD",
+        "DATABASE_INSTANCE_KEY_READ_PASSWORD",
+        "DATABASE_INSTANCE_KEY_WRITE_PASSWORD",
+        "DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD",
+        "DATABASE_PLATFORM_KEY_REPORT_PASSWORD",
+        "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD",
+        "DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD",
         "ERASURE_DATABASE_RUNTIME_PASSWORD",
         "IDENTITY_DATABASE_RUNTIME_PASSWORD",
         "STRIPE_PLATFORM_SECRET_KEY",
@@ -245,8 +261,8 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
 
         var match = Regex.Match(
             content,
-            @"islamu-event-ui:.*?(?<env>environment:\s*<<:\s*\[[^\]]+\])",
-            RegexOptions.Singleline | RegexOptions.CultureInvariant);
+            @"^  islamu-event-ui:.*?^    environment:\r?\n(?<env>(?:^ {6}[^\r\n]*\r?\n)*)",
+            RegexOptions.Singleline | RegexOptions.Multiline | RegexOptions.CultureInvariant);
 
         await Assert.That(match.Success)
             .IsTrue()
@@ -265,6 +281,9 @@ public sealed class SecretAuthorityLeastPrivilegeArchitectureTests
         await Assert.That(envBlock)
             .DoesNotContain("*database-migrator-env")
             .Because("islamu-event-ui (BFF) must not be injected with *database-migrator-env.");
+        await Assert.That(envBlock).DoesNotContain("Database__");
+        await Assert.That(BackendOnlySecretKeys.Where(key => envBlock.Contains(key, StringComparison.Ordinal)))
+            .IsEmpty();
     }
 
     [Test]

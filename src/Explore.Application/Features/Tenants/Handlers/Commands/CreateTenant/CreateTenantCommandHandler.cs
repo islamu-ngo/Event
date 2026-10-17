@@ -184,8 +184,7 @@ public class CreateTenantCommandHandler : ICommandHandler<CreateTenantCommand, B
         if (tenantAdminRole == null)
         {
             _logger.LogWarning(
-                "tenant.admin role not found; skipping automatic admin assignment for UserId={UserId} on TenantId={TenantId}.",
-                userId, tenantId);
+                "tenant.admin role not found; skipping automatic admin assignment");
             return;
         }
 

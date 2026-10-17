@@ -1,10 +1,7 @@
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
-using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -20,7 +17,6 @@ public sealed class CerbosConfigResolverTests : IDisposable
     private readonly MemoryCache _cache;
     private readonly CerbosConfigCacheRegistry _cacheRegistry;
     private readonly ICerbosClientFactory _clientFactory;
-    private readonly ISecretResolver _secretResolver;
     private readonly ILogger<CerbosConfigResolver> _logger;
 
     private static readonly Guid TenantId = Guid.NewGuid();
@@ -32,7 +28,6 @@ public sealed class CerbosConfigResolverTests : IDisposable
         _cache = new MemoryCache(new MemoryCacheOptions());
         _cacheRegistry = new CerbosConfigCacheRegistry();
         _clientFactory = Substitute.For<ICerbosClientFactory>();
-        _secretResolver = Substitute.For<ISecretResolver>();
         _logger = Substitute.For<ILogger<CerbosConfigResolver>>();
 
         _tenantContext.TenantId.Returns(TenantId);
@@ -51,8 +46,6 @@ public sealed class CerbosConfigResolverTests : IDisposable
                 Arg.Any<SettingContext>(),
                 Arg.Any<CancellationToken>())
             .Returns(string.Empty);
-        _secretResolver.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Unconfigured);
     }
 
     public void Dispose()
@@ -140,8 +133,6 @@ public sealed class CerbosConfigResolverTests : IDisposable
     [Test]
     public async Task ResolveAsync_WithCustomModeAndBlankEndpoint_PreservesByoFailureModeInsteadOfInstanceFallback()
     {
-        string username = $"user-{Guid.NewGuid():N}";
-        string password = Guid.NewGuid().ToString("N");
         _settingsResolver.ResolveAsync<string>(
                 GovernanceSettingKeys.Cerbos.CustomEndpoint,
                 Arg.Any<SettingContext>(),
@@ -152,16 +143,6 @@ public sealed class CerbosConfigResolverTests : IDisposable
                 Arg.Any<SettingContext>(),
                 Arg.Any<CancellationToken>())
             .Returns("https://tenant-admin.example.com:8443");
-        _secretResolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername,
-                TenantId,
-                Arg.Any<CancellationToken>())
-            .Returns(Resolved(SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername, username));
-        _secretResolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword,
-                TenantId,
-                Arg.Any<CancellationToken>())
-            .Returns(Resolved(SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword, password));
         var resolver = CreateResolver();
 
         var result = await resolver.ResolveAsync();
@@ -170,8 +151,6 @@ public sealed class CerbosConfigResolverTests : IDisposable
         await Assert.That(result?.Mode).IsEqualTo(CerbosMode.CustomEndpoint);
         await Assert.That(result?.Endpoint).IsEqualTo(string.Empty);
         await Assert.That(result?.AdminEndpoint).IsEqualTo("https://tenant-admin.example.com:8443");
-        await Assert.That(result?.AdminUsername).IsEqualTo(username);
-        await Assert.That(result?.AdminPassword).IsEqualTo(password);
         await Assert.That(result?.IsInstanceDefault).IsFalse();
     }
 
@@ -228,16 +207,7 @@ public sealed class CerbosConfigResolverTests : IDisposable
             _cacheRegistry,
             _clientFactory,
             Options.Create(new CerbosSettings { GrpcEndpoint = instanceGrpcEndpoint ?? "http://localhost:3593" }),
-            _secretResolver,
             _logger);
     }
 
-    private static SecretResolutionResult Resolved(string key, string value) =>
-        SecretResolutionResult.Resolved(new ResolvedSecret(
-            key,
-            value,
-            SecretSourceType.EnvironmentVariable,
-            SecretScope.Tenant,
-            TenantId,
-            DateTimeOffset.UtcNow));
 }

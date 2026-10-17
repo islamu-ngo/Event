@@ -16,13 +16,13 @@ public sealed class AuthorizationPolicyPackageSyncRequestDtoValidator : Abstract
 
         RuleFor(request => request)
             .Must(HasCompleteCredentialPair)
-            .WithMessage("Provide both Cerbos Admin API username and password, or leave both empty to use deployment credentials.");
+            .WithMessage("Provide a fresh Cerbos Admin API username and password for this operation.");
     }
 
     private static bool HasCompleteCredentialPair(AuthorizationPolicyPackageSyncRequestDto request)
     {
         var hasUsername = !string.IsNullOrWhiteSpace(request.AdminUsername);
         var hasPassword = !string.IsNullOrWhiteSpace(request.AdminPassword);
-        return hasUsername == hasPassword;
+        return hasUsername && hasPassword;
     }
 }

@@ -8,7 +8,6 @@ using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.DTOs.ManagedProviderProvisioning.Validators;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Exceptions;
-using Explore.Application.Features.Authentication.Local;
 using Explore.Application.DTOs.Management.Validators;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
 using Explore.Application.Features.Management;
@@ -51,28 +50,28 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
     ITenantSettingsDocumentRepository tenantSettingsDocumentRepository,
     ITenantCreationService tenantCreationService,
     ILocalCredentialAdministration credentials,
-    IAdminContext adminContext,
-    IPlatformUserRoleRepository platformUserRoles,
     IManagedControlPlaneRegistrationRepository registrationRepository,
     IDeploymentModeProvider deploymentModeProvider,
     IAuditLogRepository auditLogRepository,
     ITenantBrandingSettingsDocumentProvisioningService brandingProvisioningService,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
-    IHierarchicalSettingsResolver settingsResolver,
+    IHierarchicalSettingsReader settingsResolver,
     ManagedTenantProvisioningPreflight managedTenantProvisioningPreflight,
     TenantActivationCapacityPolicy tenantActivationCapacityPolicy,
     IOptions<ManagedControlPlaneOptions> managedControlPlaneOptions,
     ISettingMutationLock mutationLock,
-    IUnitOfWork unitOfWork,
     ILogger<EnsureManagedProviderClientProvisionedCommandHandler> logger,
-    Explore.Application.Services.PrivacyIdentityFenceOperation identityFence)
+    Explore.Application.Services.PrivacyIdentityFenceOperation identityFence,
+    HumanManagedProviderProvisioningCoordinator? humanProvisioning = null)
     : ICommandHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>,
         IManagedProviderClientProvisioner
 {
     public async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> ExecuteAsync(
         EnsureManagedProviderClientProvisionedCommand command,
         CancellationToken cancellationToken) =>
-        await EnsureAsync(
+        command.ManagementRequest is null
+            ? await RequireHumanProvisioning().ExecuteAsync(command, cancellationToken)
+            : await EnsureAsync(
             command.ProvisioningDto,
             command.ManagementRequest,
             command.OperationId,
@@ -82,6 +81,29 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
     public async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> EnsureAsync(
         ManagedProviderClientProvisioningDto provisioningDto,
         ManagementTenantProvisioningRequestDto? managementRequest,
+        Guid? operationId,
+        Guid? expectedOutboxMessageId,
+        CancellationToken cancellationToken)
+    {
+        if (managementRequest is null)
+            return await RequireHumanProvisioning().ExecuteAsync(new EnsureManagedProviderClientProvisionedCommand
+            {
+                ProvisioningDto = provisioningDto,
+                OperationId = operationId,
+                ExpectedOutboxMessageId = expectedOutboxMessageId
+            }, cancellationToken);
+
+        return await EnsureWorkerAsync(provisioningDto, managementRequest, operationId,
+            expectedOutboxMessageId, cancellationToken);
+    }
+
+    private HumanManagedProviderProvisioningCoordinator RequireHumanProvisioning() =>
+        humanProvisioning ?? throw new InvalidOperationException(
+            "Human provisioning requires its original authenticated coordinator; a worker cannot lend its authority.");
+
+    private async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> EnsureWorkerAsync(
+        ManagedProviderClientProvisioningDto provisioningDto,
+        ManagementTenantProvisioningRequestDto managementRequest,
         Guid? operationId,
         Guid? expectedOutboxMessageId,
         CancellationToken cancellationToken)
@@ -117,49 +139,45 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             : CreateManagedProviderAccountKey(normalizedIdentityProvider, identityAuthority!, normalizedSubject);
         return await identityFence.ExecuteEnrollmentAsync(accountKey, async cancellationToken =>
         {
-            ManagedTenantProvisioningOperation? managedOperation = null;
-            if (managementRequest is not null)
+            if (operationId is null
+                || operationId == Guid.Empty
+                || expectedOutboxMessageId is null
+                || expectedOutboxMessageId == Guid.Empty)
             {
-                if (operationId is null
-                    || operationId == Guid.Empty
-                    || expectedOutboxMessageId is null
-                    || expectedOutboxMessageId == Guid.Empty)
-                {
-                    return Failure(
-                        "Managed tenant provisioning operation identity is missing.",
-                        "Durable operation and outbox-generation identifiers are required.",
-                        "tenant_provisioning_operation_missing");
-                }
+                return Failure(
+                    "Managed tenant provisioning operation identity is missing.",
+                    "Durable operation and outbox-generation identifiers are required.",
+                    "tenant_provisioning_operation_missing");
+            }
 
-                var managementValidation = await new ManagementTenantProvisioningRequestValidator()
-                    .ValidateAsync(managementRequest, cancellationToken);
-                if (!managementValidation.IsValid)
-                    return BaseCommandResponse.Validation<ManagedProviderClientProvisioningResultDto>(
-                        managementValidation.Errors.Select(error => error.ErrorMessage));
-                managementRequest = ManagedTenantProvisioningRequestCodec.Normalize(managementRequest);
-                if (dto != ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(managementRequest))
-                    return Failure("Managed tenant provisioning input differs from its snapshot.",
-                        "Only the durable request may select the administrator and tenant bootstrap inputs.",
-                        "tenant_provisioning_operation_conflict");
-                managedOperation = await managedTenantProvisioningOperationRepository.GetByIdAsNoTrackingAsync(
-                    operationId.Value,
-                    cancellationToken);
-                string expectedHash = ManagedTenantProvisioningRequestCodec.ComputeHash(managementRequest);
-                if (managedOperation is null
-                    || !string.Equals(managedOperation.RequestHash, expectedHash, StringComparison.Ordinal)
-                    || !string.Equals(
-                        managedOperation.ExternalCustomerReference,
-                        managementRequest.ExternalCustomerReference,
-                        StringComparison.Ordinal)
-                    || !string.Equals(managedOperation.TenantSlug, managementRequest.TenantSlug, StringComparison.Ordinal)
-                    || managedOperation.CurrentOutboxMessageId != expectedOutboxMessageId
-                    || managedOperation.Status != ManagedTenantProvisioningStatus.Processing)
-                {
-                    return Failure(
-                        "Managed tenant provisioning operation does not match its request snapshot.",
-                        "The durable operation identity, customer reference, tenant slug, and request hash must match.",
-                        "tenant_provisioning_operation_conflict");
-                }
+            var managementValidation = await new ManagementTenantProvisioningRequestValidator()
+                .ValidateAsync(managementRequest, cancellationToken);
+            if (!managementValidation.IsValid)
+                return BaseCommandResponse.Validation<ManagedProviderClientProvisioningResultDto>(
+                    managementValidation.Errors.Select(error => error.ErrorMessage));
+            managementRequest = ManagedTenantProvisioningRequestCodec.Normalize(managementRequest);
+            if (dto != ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(managementRequest))
+                return Failure("Managed tenant provisioning input differs from its snapshot.",
+                    "Only the durable request may select the administrator and tenant bootstrap inputs.",
+                    "tenant_provisioning_operation_conflict");
+            ManagedTenantProvisioningOperation? managedOperation =
+                await managedTenantProvisioningOperationRepository.GetByIdAsNoTrackingAsync(
+                    operationId.Value, cancellationToken);
+            string expectedHash = ManagedTenantProvisioningRequestCodec.ComputeHash(managementRequest);
+            if (managedOperation is null
+                || !string.Equals(managedOperation.RequestHash, expectedHash, StringComparison.Ordinal)
+                || !string.Equals(
+                    managedOperation.ExternalCustomerReference,
+                    managementRequest.ExternalCustomerReference,
+                    StringComparison.Ordinal)
+                || !string.Equals(managedOperation.TenantSlug, managementRequest.TenantSlug, StringComparison.Ordinal)
+                || managedOperation.CurrentOutboxMessageId != expectedOutboxMessageId
+                || managedOperation.Status != ManagedTenantProvisioningStatus.Processing)
+            {
+                return Failure(
+                    "Managed tenant provisioning operation does not match its request snapshot.",
+                    "The durable operation identity, customer reference, tenant slug, and request hash must match.",
+                    "tenant_provisioning_operation_conflict");
             }
 
             ManagementTenantProvisioningBlockerDto? authorityBlocker = await EvaluateAuthorityAsync(managedOperation, cancellationToken);
@@ -192,24 +210,19 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     cancellationToken);
             }
 
-            ManagedTenantProvisioningResolvedBootstrap? resolvedBootstrap = null;
-            if (managementRequest is not null)
+            ManagedTenantProvisioningPreflightResult preflight =
+                await managedTenantProvisioningPreflight.EvaluateAsync(
+                    managementRequest,
+                    requireProvisionablePlan: true,
+                    cancellationToken);
+            if (!preflight.Success)
             {
-                ManagedTenantProvisioningPreflightResult preflight =
-                    await managedTenantProvisioningPreflight.EvaluateAsync(
-                        managementRequest,
-                        requireProvisionablePlan: true,
-                        cancellationToken);
-                if (!preflight.Success)
-                {
-                    return Failure(
-                        "Managed tenant provisioning policy validation failed.",
-                        preflight.Error!,
-                        preflight.FailureCode);
-                }
-
-                resolvedBootstrap = preflight.Resolved!;
+                return Failure(
+                    "Managed tenant provisioning policy validation failed.",
+                    preflight.Error!,
+                    preflight.FailureCode);
             }
+            ManagedTenantProvisioningResolvedBootstrap resolvedBootstrap = preflight.Resolved!;
 
             var existingTenant = await tenantRepository.GetTenantBySlug(normalizedTenantSlug);
             if (existingTenant != null)
@@ -442,7 +455,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                 }
 
                 Guid? tenantPlanAssignmentId = null;
-                if (managementRequest is not null && resolvedBootstrap is not null)
+                if (resolvedBootstrap is not null)
                 {
                     tenantPlanAssignmentId = await ApplyManagedBootstrapAsync(
                         managementRequest,
@@ -495,47 +508,9 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             ManagedProviderClientProvisioningResultDto? result;
             try
             {
-                if (managementRequest is null)
-                {
-                    if (dto.ActivateTenant && tenantActivationCapacityPolicy.IsEnforced)
-                    {
-                        (ManagedProviderClientProvisioningResultDto? Result,
-                            BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) ordinaryOutcome =
-                            await mutationLock.ExecuteAsync<(
-                                ManagedProviderClientProvisioningResultDto? Result,
-                                BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
-                                GovernanceSettingKeys.Deployment.Mode,
-                                async ct =>
-                                {
-                                    TenantActivationCapacityAssessment capacity =
-                                        await tenantActivationCapacityPolicy.EvaluateAsync(
-                                            requireMultiTenant: false,
-                                            cancellationToken: ct);
-                                    return capacity.Allowed
-                                        ? (await ProvisionAsync(ct), null)
-                                        : (null, Failure(
-                                            "Tenant activation capacity validation failed.",
-                                            capacity.Error!,
-                                            capacity.FailureCode));
-                                },
-                                cancellationToken);
-                        if (ordinaryOutcome.Failure is not null)
-                        {
-                            return ordinaryOutcome.Failure;
-                        }
-
-                        result = ordinaryOutcome.Result;
-                    }
-                    else
-                    {
-                        result = await unitOfWork.ExecuteInTransactionAsync(ProvisionAsync, cancellationToken);
-                    }
-                }
-                else
-                {
-                    (ManagedProviderClientProvisioningResultDto? Result,
-                        BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) outcome =
-                        await mutationLock.ExecuteOrderedGroupsAsync(
+                (ManagedProviderClientProvisioningResultDto? Result,
+                    BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) outcome =
+                    await mutationLock.ExecuteOrderedGroupsAsync(
                         [EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp)],
                         policyToken => mutationLock.ExecuteManyAsync<(
                             ManagedProviderClientProvisioningResultDto? Result,
@@ -589,13 +564,12 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                         },
                         policyToken), cancellationToken);
 
-                    if (outcome.Failure is not null)
-                    {
-                        return outcome.Failure;
-                    }
-
-                    result = outcome.Result;
+                if (outcome.Failure is not null)
+                {
+                    return outcome.Failure;
                 }
+
+                result = outcome.Result;
             }
             catch (AdministratorLinkageException exception)
             {
@@ -617,17 +591,14 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     "tenant_provisioning_requires_multi_tenant");
             }
 
-            if (managementRequest is not null)
+            await identityFence.AfterEnrollmentCommitAsync(() =>
             {
-                await identityFence.AfterEnrollmentCommitAsync(() =>
-                {
-                    settingsResolver.InvalidateCache(SettingScope.Tenant, result.TenantId);
-                    typedSettingsDocumentResolver.InvalidateTenantDocumentCache(
-                        result.TenantId,
-                        SettingsDocumentKeys.Tenant.Branding);
-                    return Task.CompletedTask;
-                });
-            }
+                settingsResolver.InvalidateCache(SettingScope.Tenant, result.TenantId);
+                typedSettingsDocumentResolver.InvalidateTenantDocumentCache(
+                    result.TenantId,
+                    SettingsDocumentKeys.Tenant.Branding);
+                return Task.CompletedTask;
+            });
 
             return BaseCommandResponse.Success(
                 result,
@@ -639,8 +610,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         ManagedTenantProvisioningOperation? operation, CancellationToken cancellationToken)
     {
         if (operation is null)
-            return await LocalCredentialAdministrator.ResolveAsync(adminContext, platformUserRoles, cancellationToken) is not null
-                ? null : new("authorization_denied", "Current instance administrator authority is required.");
+            return new("tenant_provisioning_operation_missing", "Managed tenant provisioning operation identity is missing.");
         if (!managedControlPlaneOptions.Value.Enabled)
             return new("managed_mode_disabled", "Managed mode is disabled.");
         DeploymentMode mode = await deploymentModeProvider.GetCurrentModeAsync(cancellationToken);

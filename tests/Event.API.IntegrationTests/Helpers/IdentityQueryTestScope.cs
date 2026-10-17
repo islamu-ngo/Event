@@ -5,8 +5,10 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Users.Handlers.Queries;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,9 +24,10 @@ internal sealed class IdentityQueryTestScope : IDisposable
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<ExploreDbContext>(options =>
-            options.UseInMemoryDatabase(nameof(IdentityQueryTestScope), new InMemoryDatabaseRoot()));
-        services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
+        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+            .UseInMemoryDatabase(nameof(IdentityQueryTestScope), new InMemoryDatabaseRoot()).Options;
+        services.AddSingleton<IGlobalExploreDbContextFactory>(new IdentityQueryInMemoryContextFactory(options));
+        services.AddScoped<IExternalLoginAuthenticationRepository, ExternalLoginAuthenticationRepository>();
         services.AddSingleton<IAuthorizationProvider, UnexpectedPolicy>();
         services.AddScoped<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>, ResolveCurrentUserIdByIdentityRequestHandler>();
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
@@ -47,4 +50,10 @@ internal sealed class IdentityQueryTestScope : IDisposable
         public Task<IReadOnlyList<AuthorizationDecision>> AuthorizeBatchAsync(IReadOnlyList<AuthorizationRequest> requests, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Identity resolution does not own a PDP capability.");
     }
+}
+
+/// <summary>Owns real independent EF contexts for controller-only tests; PostgreSQL authority tests use the production factory.</summary>
+internal sealed class IdentityQueryInMemoryContextFactory(DbContextOptions<ExploreDbContext> options)
+    : PooledDbContextFactory<ExploreDbContext>(options, poolSize: 1), IGlobalExploreDbContextFactory
+{
 }

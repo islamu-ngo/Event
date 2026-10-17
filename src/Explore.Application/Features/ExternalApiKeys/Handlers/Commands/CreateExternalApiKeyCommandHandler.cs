@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
@@ -25,7 +26,6 @@ namespace Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
 /// <summary>Commits one credential and a secret-free receipt under current identity and owner authority.</summary>
 public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternalApiKeyCommand, CreateExternalApiKeyCommandResponse>
 {
-    private readonly IExternalApiKeyRepository _externalApiKeyRepository;
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IGroupMemberRepository _groupMemberRepository;
@@ -39,10 +39,11 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
     private readonly IExternalApiKeyIssuanceAuthority _issuanceAuthority;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPrivacyIdentityFenceAuthority _privacyAuthority;
+    private readonly IInstanceApiKeyExecutionScopeFactory _instanceScopes;
+    private readonly IAuthorizationProvider _authorization;
 
     /// <summary>Receives native persistence and identity boundaries; validators remain manually constructed.</summary>
     public CreateExternalApiKeyCommandHandler(
-        IExternalApiKeyRepository externalApiKeyRepository,
         IOrganizationRepository organizationRepository,
         IOrganizationMemberRepository organizationMemberRepository,
         IGroupMemberRepository groupMemberRepository,
@@ -55,9 +56,10 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
         IExternalApiKeyIssuanceReceiptRepository receipts,
         IExternalApiKeyIssuanceAuthority issuanceAuthority,
         IUnitOfWork unitOfWork,
-        IPrivacyIdentityFenceAuthority privacyAuthority)
+        IPrivacyIdentityFenceAuthority privacyAuthority,
+        IInstanceApiKeyExecutionScopeFactory instanceScopes,
+        IAuthorizationProvider authorization)
     {
-        _externalApiKeyRepository = externalApiKeyRepository;
         _organizationRepository = organizationRepository;
         _organizationMemberRepository = organizationMemberRepository;
         _groupMemberRepository = groupMemberRepository;
@@ -71,6 +73,8 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
         _issuanceAuthority = issuanceAuthority;
         _unitOfWork = unitOfWork;
         _privacyAuthority = privacyAuthority;
+        _instanceScopes = instanceScopes;
+        _authorization = authorization;
     }
 
     /// <summary>
@@ -103,13 +107,14 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
                 BaseCommandResponse.Validation<Guid>(["A resolved tenant is required for tenant-owned API-key issuance."]));
 
         var validator = new CreateExternalApiKeyDtoValidator(
-            _externalApiKeyRepository,
+            _receipts.ExistsByOwnerAndNameAsync,
             _organizationRepository,
             _groupRepository,
             currentUserId,
             tenantId);
 
-        _receipts.RequireCleanWriteScope(tenantId);
+        if (tenantId is not null)
+            _receipts.RequireCleanWriteScope(tenantId);
         if (HasIncompleteOwner(dto, ownerType))
         {
             var validationResult = await validator.ValidateAsync(dto, cancellationToken);
@@ -150,13 +155,16 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
 
         try
         {
-            var response = await ExecuteAtCommitAsync(currentUserId, tenantId, ownerType, authorityResult.OwnerId, async ct =>
+            var response = await ExecuteAtCommitAsync(currentUserId, tenantId, ownerType, authorityResult.OwnerId,
+                request.OperationKey, async (receipts, ct) =>
             {
-                var existing = await _receipts.FindAsync(operationFingerprint, tenantId, ct);
+                var existing = await receipts.FindAsync(operationFingerprint, tenantId, ct);
                 if (existing is not null)
-                    return await RecoverAsync(existing, inputDigest, tenantId, ownerType, authorityResult.OwnerId, ct);
+                    return await RecoverAsync(receipts, existing, inputDigest, tenantId, ownerType, authorityResult.OwnerId, ct);
 
-                var validationResult = await validator.ValidateAsync(dto, ct);
+                var nativeValidator = new CreateExternalApiKeyDtoValidator(
+                    receipts.ExistsByOwnerAndNameAsync, _organizationRepository, _groupRepository, currentUserId, tenantId);
+                var validationResult = await nativeValidator.ValidateAsync(dto, ct);
                 if (!validationResult.IsValid || dto.Name is not string name)
                     return CreateExternalApiKeyCommandResponse.Failure(
                         BaseCommandResponse.Validation<Guid>(validationResult.Errors.Select(error => error.ErrorMessage),
@@ -188,7 +196,7 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
                 };
                 var receipt = ExternalApiKeyIssuanceReceipt.Create(
                     receiptId, operationFingerprint, inputDigest, tenantId, aggregateId, createdAt);
-                await _receipts.CreateAsync(receipt, key, ct);
+                await receipts.CreateAsync(receipt, key, ct);
                 return CreateExternalApiKeyCommandResponse.Issued(
                     aggregateId, "Save the secret now because it will not be shown again.", rawApiKey, keyId);
             }, cancellationToken);
@@ -204,7 +212,7 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
             // A commit exception does not prove rollback. Re-enter both authority boundaries.
             var recovered = await RecoverCommittedAsync(
                 currentUserId, tenantId, ownerType, authorityResult.OwnerId,
-                operationFingerprint, inputDigest, cancellationToken);
+                request.OperationKey, operationFingerprint, inputDigest, cancellationToken);
             if (recovered is not null)
                 return recovered;
             throw;
@@ -222,20 +230,41 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
     /// <summary>Resolves ambiguous commit evidence only inside freshly reacquired privacy and owner authority.</summary>
     private Task<CreateExternalApiKeyCommandResponse?> RecoverCommittedAsync(
         Guid currentUserId, Guid? tenantId, ExternalApiKeyOwnerType ownerType, Guid ownerId,
-        string operationFingerprint, string inputDigest, CancellationToken cancellationToken) =>
+        string operationKey, string operationFingerprint, string inputDigest, CancellationToken cancellationToken) =>
         ExecuteAtCommitAsync<CreateExternalApiKeyCommandResponse?>(
-            currentUserId, tenantId, ownerType, ownerId, async ct =>
+            currentUserId, tenantId, ownerType, ownerId, operationKey, async (receipts, ct) =>
             {
-                var receipt = await _receipts.FindAsync(operationFingerprint, tenantId, ct);
+                var receipt = await receipts.FindAsync(operationFingerprint, tenantId, ct);
                 return receipt is null ? null : await RecoverAsync(
-                    receipt, inputDigest, tenantId, ownerType, ownerId, ct);
+                    receipts, receipt, inputDigest, tenantId, ownerType, ownerId, ct);
             }, cancellationToken);
 
     /// <summary>Fences privacy before acquiring the retryable issuance transaction and fresh owner rows.</summary>
-    private Task<T> ExecuteAtCommitAsync<T>(
+    private async Task<T> ExecuteAtCommitAsync<T>(
         Guid currentUserId, Guid? tenantId, ExternalApiKeyOwnerType ownerType, Guid ownerId,
-        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken) =>
-            _privacyAuthority.ExecuteSerializedAsync(async ct =>
+        string operationKey, Func<IExternalApiKeyIssuanceReceiptRepository, CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        if (tenantId is null)
+        {
+            if (ownerType != ExternalApiKeyOwnerType.InstanceAdmin || ownerId != currentUserId)
+                throw new AuthorizationException("Self-owned instance-key issuance is required.");
+            await using var scope = await _instanceScopes.CreateIssuanceAsync(currentUserId, operationKey, cancellationToken);
+            return await scope.PrivacyAuthority.ExecuteSerializedAsync(async ct =>
+            {
+                if (await scope.PrivacyAuthority.IsSubjectFencedAsync(currentUserId, ct))
+                    throw new AuthorizationException("The application account is unavailable.");
+                return await scope.UnitOfWork.ExecuteSerializableAsync(async token =>
+                {
+                    await InstanceApiKeyOperations.AuthorizeAsync(
+                        _authorization, "instance.api-keys.issue", AuthorizationActions.Update, token);
+                    if (!await scope.IsAuthorizedForCommitAsync(token))
+                        throw new AuthorizationException("Current instance administration is required.");
+                    return await operation(scope.Receipts, token);
+                }, ct);
+            }, cancellationToken);
+        }
+        return await _privacyAuthority.ExecuteSerializedAsync(async ct =>
             {
                 if (await _privacyAuthority.IsSubjectFencedAsync(currentUserId, ct))
                     throw new AuthorizationException("The application account is unavailable.");
@@ -244,19 +273,20 @@ public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternal
                     if (!await _issuanceAuthority.IsAuthorizedForCommitAsync(
                             currentUserId, tenantId, ownerType, ownerId, transactionToken))
                         throw new AuthorizationException("Current owner authority is required.");
-                    return await operation(transactionToken);
+                    return await operation(_receipts, transactionToken);
                 }, ct);
             }, cancellationToken);
+    }
 
     /// <summary>Rejects policy changes and reads exact scoped metadata without retrieving credential material.</summary>
-    private async Task<CreateExternalApiKeyCommandResponse> RecoverAsync(
-        ExternalApiKeyIssuanceReceipt receipt, string inputDigest, Guid? tenantId,
+    private static async Task<CreateExternalApiKeyCommandResponse> RecoverAsync(
+        IExternalApiKeyIssuanceReceiptRepository receipts, ExternalApiKeyIssuanceReceipt receipt, string inputDigest, Guid? tenantId,
         ExternalApiKeyOwnerType ownerType, Guid ownerId, CancellationToken ct)
     {
         if (receipt.InputDigest != inputDigest)
             return CreateExternalApiKeyCommandResponse.Failure(
                 BaseCommandResponse.Conflict<Guid>(receipt.ExternalApiKeyId));
-        var key = await _receipts.GetIssuedKeyAsync(
+        var key = await receipts.GetIssuedKeyAsync(
             receipt.ExternalApiKeyId, tenantId, ownerType, ownerId, ct);
         return key is null
             ? CreateExternalApiKeyCommandResponse.Failure(

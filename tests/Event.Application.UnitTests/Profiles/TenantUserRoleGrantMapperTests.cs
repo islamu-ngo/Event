@@ -1,9 +1,6 @@
 using System.Text.Json;
-using Explore.Application.Contracts.Persistence;
-using Explore.Application.Features.TenantUserRoleGrants.Handlers.Queries;
 using Explore.Application.Mappings;
 using Explore.Domain;
-using NSubstitute;
 
 namespace Event.Application.UnitTests.Profiles;
 
@@ -71,25 +68,19 @@ public sealed class TenantUserRoleGrantMapperTests
     }
 
     [Test]
-    public async Task QueryResultsRemainDetachedAndMissingDetailStaysNull()
+    public async Task MappedResultsRemainDetachedFromTheirSourceEntities()
     {
         var grant = Grant();
         var rows = new List<TenantUserRoleGrant> { grant };
-        var repository = Substitute.For<ITenantUserRoleGrantRepository>();
-        repository.GetGrantWithDetails(grant.Id).Returns(grant);
-        repository.GetGrantsWithDetails().Returns(rows);
-        var detailHandler = new GetTenantUserRoleGrantDetailsRequestHandler(repository);
-        var listHandler = new GetTenantUserRoleGrantListRequestHandler(repository);
-
-        var detail = await detailHandler.QueryAsync(new() { Id = grant.Id, TenantId = grant.TenantId }, default);
-        var missing = await detailHandler.QueryAsync(new() { Id = Guid.Empty, TenantId = grant.TenantId }, default);
-        var list = await listHandler.QueryAsync(new(), default);
+        // The actual query owner's missing-result and disclosure controls now use
+        // genuine account custody in HumanAccountMembershipCustodyTests.
+        var detail = TenantUserRoleGrantMapper.ToDetail(grant);
+        var list = rows.Select(TenantUserRoleGrantMapper.ToListItem).ToList();
         grant.Role.FullName = "Changed role";
         grant.Tenant.FullName = "Changed tenant";
         grant.TenantUser.User.FirstName = "Changed user";
         rows.Clear();
 
-        await Assert.That(missing).IsNull();
         await Assert.That(detail!.UserFullName).IsEqualTo("Member Name");
         await Assert.That(detail.RoleName).IsEqualTo("Member");
         await Assert.That(detail.TenantFullName).IsEqualTo("Tenant");

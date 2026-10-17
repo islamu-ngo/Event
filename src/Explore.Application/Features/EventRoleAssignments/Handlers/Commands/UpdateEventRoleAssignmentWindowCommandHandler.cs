@@ -57,13 +57,7 @@ public sealed class UpdateEventRoleAssignmentWindowCommandHandler
         {
             _metrics.RecordEventRoleAssignmentChanged("update-window", "denied", RoleCodeFor(assignment.RoleId));
             _logger.LogWarning(
-                "Event role assignment window update denied TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                assignment.Id,
-                assignment.UserId,
-                assignment.RoleId,
-                request.ActorUserId,
+                "Event role assignment window update denied: {DenyReason}",
                 authority.FailureCode ?? EventRoleAuthorityFailureCodes.AuthorityMissing);
             await WriteAuditAsync(
                 _auditLogRepository,
@@ -98,18 +92,7 @@ public sealed class UpdateEventRoleAssignmentWindowCommandHandler
         assignment.UpdateValidityWindow(request.StartsAtUtc, request.ExpiresAtUtc, DateTime.UtcNow);
         await _assignmentRepository.Update(assignment);
         _metrics.RecordEventRoleAssignmentChanged("update-window", "allowed", RoleCodeFor(assignment.RoleId));
-        _logger.LogInformation(
-            "Event role assignment window updated TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} PreviousStartsAtUtc={PreviousStartsAtUtc} NewStartsAtUtc={NewStartsAtUtc} PreviousExpiresAtUtc={PreviousExpiresAtUtc} NewExpiresAtUtc={NewExpiresAtUtc}",
-            assignment.TenantId,
-            assignment.EventId,
-            assignment.Id,
-            assignment.UserId,
-            assignment.RoleId,
-            request.ActorUserId,
-            previousStartsAtUtc,
-            assignment.StartsAtUtc,
-            previousExpiresAtUtc,
-            assignment.ExpiresAtUtc);
+        _logger.LogInformation("Event role assignment window updated.");
         await WriteAuditAsync(
             _auditLogRepository,
             assignment.TenantId,

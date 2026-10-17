@@ -7,20 +7,20 @@ namespace Explore.Application.Features.Tenants.Handlers.Commands;
 
 public sealed class DeleteTenantCommandHandler(
     ITenantRepository tenantRepository,
-    ITenantSlugCache tenantSlugCache)
+    ITenantSlugCache tenantSlugCache,
+    IHumanTenantMutationPreparation preparation)
     : ICommandHandler<DeleteTenantCommand, bool>
 {
     public async Task<bool> ExecuteAsync(
         DeleteTenantCommand request,
         CancellationToken cancellationToken = default)
     {
-        var tenant = await tenantRepository.GetById(request.Id);
-        if (tenant is null)
+        bool deleted = await preparation.ExecuteDeletionAsync(request, tenantRepository, cancellationToken);
+        if (!deleted)
         {
             return false;
         }
 
-        await tenantRepository.Delete(tenant);
         await tenantSlugCache.RefreshAsync(cancellationToken);
         return true;
     }

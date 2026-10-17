@@ -28,4 +28,15 @@ public sealed class CerbosPolicyPackageOptions
     /// </summary>
     public int MaxPoliciesPerRequest { get; set; } = 100;
 
+    public CerbosPublicationOptions Publication { get; set; } = new();
+}
+
+/// <summary>Deployment-owned public verification material. Never contains the operator signing key.</summary>
+public sealed class CerbosPublicationOptions
+{
+    public string ReceiptBase64 { get; set; } = string.Empty;
+    public string SignatureBase64 { get; set; } = string.Empty;
+    public string PublicKeyPem { get; set; } = string.Empty;
+    public string Revision { get; set; } = string.Empty;
+    public string Environment { get; set; } = string.Empty;
 }

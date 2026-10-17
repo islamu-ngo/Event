@@ -86,6 +86,10 @@ public partial class FallbackAuthorizationService
 
     private async Task<AuthorityProfile> ResolveAuthorityProfileAsync(CancellationToken cancellationToken)
     {
+        if (_originalHumanSources is not null && !_machinePrincipalAccessor.IsMachineCaller
+            && (_adminContext.UserId ?? await _adminContext.ResolveUserIdAsync(cancellationToken)) is { } originalUser)
+            return ProfileFromOriginalSources(await _originalHumanSources.ReadAsync(originalUser, cancellationToken));
+
         var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(cancellationToken);
         var tenantId = _tenantContext.TenantId;
         var isTenantAdmin = !isInstanceAdmin && await _adminContext.IsTenantAdminAsync(tenantId, cancellationToken);

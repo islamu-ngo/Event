@@ -4,18 +4,20 @@ using System.Data.Common;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text.Json;
-using Explore.Application.Configuration;
+using Explore.Domain.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Identity;
 
-internal sealed class LocalIdentityCredentialStateStore(
+internal sealed partial class LocalIdentityCredentialStateStore(
     DbContext identityDbContext,
     ExploreDbContext applicationDbContext,
     UserManager<LocalIdentityUser> userManager,
@@ -187,14 +189,16 @@ internal sealed class LocalIdentityCredentialStateStore(
 
     private async Task<LocalCredentialResetResult> ResetAttemptAsync(
         LocalCredentialResetRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HumanAdministrationAttempt? human = null)
     {
         LocalIdentityCredentialOperation? ownedOperation = null;
         DbUpdateException? uniqueFailure = null;
         try
         {
-            await using var transaction = await identityDbContext.Database
-                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+            await using var ownedTransaction = human is null ? await identityDbContext.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false) : null;
+            var transaction = ownedTransaction ?? human!.Transaction;
             try
             {
                 LocalCredentialResetResult? replay = await ResolveResetReplayAsync(request, cancellationToken)
@@ -268,6 +272,9 @@ internal sealed class LocalIdentityCredentialStateStore(
                 string resetState = JsonSerializer.Serialize(new LocalCredentialStateMetadata(
                     version: LocalCredentialStateMetadata.CurrentVersion, state: LocalCredentialState.ChangeRequired,
                     operationId: request.OperationId, applicationUserId: request.LocalSubjectId));
+                if (human is not null && request.LocalSubjectId == human.Invocation.PrincipalId)
+                    CaptureSelfReset(human, user, previous, token!, ownedOperation, receipt,
+                        passwordHash, userStamp, securityStamp, supersededStamp, resetState, createdAt);
                 int operationRows = await identityDbContext.Set<LocalIdentityCredentialOperation>()
                     .Where(candidate => candidate.Id == previous.Id && candidate.Kind == previous.Kind
                         && candidate.Stage == previous.Stage && candidate.ConcurrencyStamp == previous.ConcurrencyStamp)
@@ -291,19 +298,23 @@ internal sealed class LocalIdentityCredentialStateStore(
                         .SetProperty(candidate => candidate.UpdatedAt, createdAt), cancellationToken).ConfigureAwait(false);
                 if (operationRows != 1 || tokenRows != 1 || userRows != 1)
                 {
-                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    if (ownedTransaction is not null)
+                        await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
                     return LocalCredentialResetResult.Rejected(LocalCredentialResetOutcome.Conflict);
                 }
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                if (ownedTransaction is not null)
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                 return LocalCredentialResetResult.Reset(receipt: receipt, temporaryPassword: temporaryPassword);
             }
             catch
             {
-                await RollbackBestEffortAsync(transaction).ConfigureAwait(false);
+                if (ownedTransaction is not null)
+                    await RollbackBestEffortAsync(transaction).ConfigureAwait(false);
                 throw;
             }
         }
-        catch (DbUpdateException exception) when (RegistrationUniqueConflictClassifier.IsProviderUniqueConflict(exception))
+        catch (DbUpdateException exception) when (human is null
+            && RegistrationUniqueConflictClassifier.IsProviderUniqueConflict(exception))
         {
             uniqueFailure = exception;
         }
@@ -447,8 +458,7 @@ internal sealed class LocalIdentityCredentialStateStore(
             {
                 return LocalCredentialReplacementOutcome.InvalidChallenge;
             }
-            if (request.NewPassword.Length is < LocalIdentityOptions.MinimumPasswordLength
-                or > LocalIdentityOptions.MaximumPasswordLength)
+            if (!LocalPasswordPolicy.TryNormalizeNewCredential(request.NewPassword, out _))
             {
                 return LocalCredentialReplacementOutcome.InvalidPassword;
             }
@@ -546,7 +556,12 @@ internal sealed class LocalIdentityCredentialStateStore(
             throw new ArgumentException("An operation identifier is required.", nameof(operationId));
         cancellationToken.ThrowIfCancellationRequested();
         EnsureReconciliationContextsIdle();
+        return await ReadProvisioningCoreAsync(operationId, cancellationToken).ConfigureAwait(false);
+    }
 
+    private async Task<LocalCredentialProvisioningSnapshot?> ReadProvisioningCoreAsync(
+        Guid operationId, CancellationToken cancellationToken)
+    {
         LocalIdentityCredentialOperation? operation = await identityDbContext
             .Set<LocalIdentityCredentialOperation>().AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.Id == operationId, cancellationToken)
@@ -594,10 +609,12 @@ internal sealed class LocalIdentityCredentialStateStore(
 
     private async Task<LocalCredentialActivationOutcome> ActivateAttemptAsync(
         LocalCredentialActivationRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HumanAdministrationAttempt? human = null)
     {
-        await using var transaction = await identityDbContext.Database
-            .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+        await using var ownedTransaction = human is null ? await identityDbContext.Database
+            .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false) : null;
+        var transaction = ownedTransaction ?? human!.Transaction;
         try
         {
             LocalIdentityCredentialOperation? operation = await identityDbContext
@@ -681,16 +698,19 @@ internal sealed class LocalIdentityCredentialStateStore(
                 .ConfigureAwait(false);
             if (operationRows != 1 || tokenRows != 1 || userRows != 1)
             {
-                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                if (ownedTransaction is not null)
+                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
                 return LocalCredentialActivationOutcome.Conflict;
             }
 
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            if (ownedTransaction is not null)
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return LocalCredentialActivationOutcome.Activated;
         }
         catch
         {
-            await RollbackBestEffortAsync(transaction).ConfigureAwait(false);
+            if (ownedTransaction is not null)
+                await RollbackBestEffortAsync(transaction).ConfigureAwait(false);
             throw;
         }
     }
@@ -730,8 +750,7 @@ internal sealed class LocalIdentityCredentialStateStore(
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
         EnsureReconciliationContextsIdle();
-        if (string.IsNullOrWhiteSpace(password)
-            || password.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+        if (!LocalPasswordPolicy.TryNormalizeNewCredential(password, out _))
             return false;
         LocalCredentialCreateResult? existing = await ResolveExistingAsync(request, null, cancellationToken).ConfigureAwait(false);
         if (existing is not null)
@@ -766,8 +785,7 @@ internal sealed class LocalIdentityCredentialStateStore(
         LocalCredentialCreateRequest request, Guid? localSubjectId, string password, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(password)
-            || password.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+        if (!LocalPasswordPolicy.TryNormalizeNewCredential(password, out _))
             return Task.FromResult(LocalCredentialCreateResult.Rejected(LocalCredentialCreateOutcome.Invalid));
         if (localSubjectId is { } subject && (subject == Guid.Empty || subject.Version != 7 || subject.Variant is < 8 or > 11))
             throw new ArgumentException("A UUIDv7 Local subject is required.", nameof(localSubjectId));
@@ -797,14 +815,15 @@ internal sealed class LocalIdentityCredentialStateStore(
 
     private async Task<LocalCredentialCreateResult> CreateAttemptAsync(
         LocalCredentialCreateRequest request, Guid? localSubjectId, string? password,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, HumanAdministrationAttempt? human = null)
     {
         List<object> ownedEntities = [];
         DbUpdateException? uniqueFailure = null;
         try
         {
-            await using var transaction = await identityDbContext.Database
-                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+            await using var ownedTransaction = human is null ? await identityDbContext.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false) : null;
+            var transaction = ownedTransaction ?? human!.Transaction;
             try
             {
                 LocalCredentialCreateResult? existing = await ResolveExistingAsync(request, localSubjectId, cancellationToken)
@@ -830,7 +849,8 @@ internal sealed class LocalIdentityCredentialStateStore(
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!creation.Succeeded)
                 {
-                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    if (ownedTransaction is not null)
+                        await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -861,17 +881,20 @@ internal sealed class LocalIdentityCredentialStateStore(
                     ownedEntities.Add(state);
                     identityDbContext.AddRange(operation, state);
                     await identityDbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                    if (ownedTransaction is not null)
+                        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                     return LocalCredentialCreateResult.Created(receipt: receipt, temporaryPassword: temporaryPassword);
                 }
             }
             catch
             {
-                await RollbackBestEffortAsync(transaction).ConfigureAwait(false);
+                if (ownedTransaction is not null)
+                    await RollbackBestEffortAsync(transaction).ConfigureAwait(false);
                 throw;
             }
         }
-        catch (DbUpdateException exception) when (RegistrationUniqueConflictClassifier.IsProviderUniqueConflict(exception))
+        catch (DbUpdateException exception) when (human is null
+            && RegistrationUniqueConflictClassifier.IsProviderUniqueConflict(exception))
         {
             uniqueFailure = exception;
         }
@@ -951,6 +974,59 @@ internal sealed class LocalIdentityCredentialStateStore(
         {
             // Preserve the original failure if the provider cannot acknowledge rollback.
         }
+    }
+
+    internal bool UsesNativeSessionValidation => ReferenceEquals(identityDbContext, applicationDbContext)
+        && applicationDbContext.Database.IsNpgsql();
+
+    /// <summary>
+    /// Runtime session validation consumes only current revocation facts, including the
+    /// instance email requirement. Login and password lifecycle work retain the complete
+    /// entity read below; a fact projection must never masquerade as an Identity user.
+    /// </summary>
+    internal async Task<bool> ValidateReadySessionAsync(
+        LocalSessionAuthority authority, PostgresNativeQueueEnrollment enrollment, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(authority);
+        if (!UsesNativeSessionValidation)
+            throw new InvalidOperationException("local_session_native_colocated_owner_required");
+        JsonElement image = await PostgresHumanPrincipalSourceContract.ReadSessionAsync(
+            applicationDbContext, enrollment, authority, cancellationToken).ConfigureAwait(false);
+        T[] Rows<T>(string name) => image.GetProperty(name).Deserialize<T[]>(SerializerOptions)
+            ?? throw new InvalidOperationException("local_session_native_facts_missing");
+        HumanPrincipalLocalAccountFact? account = Rows<HumanPrincipalLocalAccountFact>("l0").SingleOrDefault();
+        if (account is null || account.Id != authority.LocalSubjectId || !account.HasPassword
+            || !account.StampMatches || account.EmailConfirmed != authority.EmailVerified)
+            return false;
+        string? metadata = image.GetProperty("l1").EnumerateArray().SingleOrDefault() is { ValueKind: JsonValueKind.Object } stateRow
+            ? stateRow.GetProperty("Value").GetString() : null;
+        LocalCredentialStateMetadata? state = DeserializeMetadata(metadata);
+        if (state?.State != LocalCredentialState.Ready || state.ApplicationUserId != authority.LocalSubjectId)
+            return false;
+        HumanPrincipalLocalOperationFact? operation = Rows<HumanPrincipalLocalOperationFact>("l2")
+            .SingleOrDefault(row => row.Id == state.OperationId);
+        if (operation is null || operation.LocalSubjectId != authority.LocalSubjectId
+            || (operation.Kind != (int)LocalCredentialOperationKind.Create && operation.Kind != (int)LocalCredentialOperationKind.Reset)
+            || operation.Stage != (int)LocalCredentialOperationStage.Replaced
+            || !Rows<HumanPrincipalAccountFact>("q0").Any(row => row.Id == state.ApplicationUserId && !row.IsDeleted)
+            || !Rows<HumanPrincipalBindingFact>("q1").Any(row => row.Id == operation.ExternalLoginId
+                && row.UserId == state.ApplicationUserId
+                && row.AuthenticationProviderId == (int)AuthenticationProviderKind.Local
+                && string.Equals(row.ProviderKey, authority.LocalSubjectId.ToString("D"), StringComparison.Ordinal)))
+            return false;
+        if (!Rows<HumanPrincipalPersonalActorFact>("l3").Any(row => row.Id == operation.PersonalActorId
+                && row.UserId == state.ApplicationUserId && row.ActorTypeId == (int)ActorTypeEnum.User
+                && !row.IsDeleted && !row.IsSuspended))
+            return false;
+        if (!account.EmailConfirmed)
+        {
+            JsonElement intent = image.GetProperty("l4").EnumerateArray().SingleOrDefault();
+            if (intent.ValueKind == JsonValueKind.Object
+                && JsonSerializer.Deserialize<bool>(intent.GetProperty("Value").GetString()!))
+                return false;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return true;
     }
 
     public async Task<LocalIdentityUser?> ReadReadySessionAsync(

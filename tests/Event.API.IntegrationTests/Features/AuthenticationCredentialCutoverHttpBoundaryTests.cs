@@ -162,9 +162,12 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
             var member = foreign.RequiredReplacements[0];
             input = input with
             {
-                OperationId = foreign.Id, DeploymentRevision = foreign.DeploymentRevision,
-                ReplicaId = member.ReplicaId, ProcessBootId = member.ProcessBootId,
-                Consumer = member.Consumer, Generation = member.Generation,
+                OperationId = foreign.Id,
+                DeploymentRevision = foreign.DeploymentRevision,
+                ReplicaId = member.ReplicaId,
+                ProcessBootId = member.ProcessBootId,
+                Consumer = member.Consumer,
+                Generation = member.Generation,
                 ExpectedOperationStamp = foreign.ConcurrencyStamp
             };
         }
@@ -352,7 +355,8 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
         }
         var input = new
         {
-            receipt.Data.OperationId, receipt.Data.DeploymentRevision,
+            receipt.Data.OperationId,
+            receipt.Data.DeploymentRevision,
             expectedHeadStamp = receipt.Data.CurrentHeadStamp,
             expectedOperationStamp = receipt.Data.ConcurrencyStamp,
             approvedSettingIds = new[] { legacyId },
@@ -424,10 +428,12 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
         using (var request = fixture.Request(HttpMethod.Post, $"{BaseUrl}/cleanup",
                    new AuthenticationCredentialCleanupInputDto
                    {
-                       OperationId = receipt.Data.OperationId, DeploymentRevision = receipt.Data.DeploymentRevision,
+                       OperationId = receipt.Data.OperationId,
+                       DeploymentRevision = receipt.Data.DeploymentRevision,
                        ExpectedHeadStamp = receipt.Data.CurrentHeadStamp!.Value,
                        ExpectedOperationStamp = receipt.Data.ConcurrencyStamp,
-                       ApprovedSettingIds = [], ApprovedBindingIds = []
+                       ApprovedSettingIds = [],
+                       ApprovedBindingIds = []
                    }, authenticated: revoked))
         using (var response = await fixture.Client.SendAsync(request))
             await Assert.That(response.StatusCode).IsEqualTo(
@@ -447,35 +453,35 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
         receipt = await fixture.ActivateAsync(receipt.Data, 1);
         receipt = await fixture.FenceAsync(receipt.Data);
         foreach (string field in new[] { "approvedSettingIds", "approvedBindingIds" })
-        foreach (string mutation in new[] { "omitted", "null", "empty-id", "duplicate", "three", "foreign" })
-        {
-            var body = new Dictionary<string, object?>
+            foreach (string mutation in new[] { "omitted", "null", "empty-id", "duplicate", "three", "foreign" })
             {
-                ["operationId"] = receipt.Data.OperationId,
-                ["deploymentRevision"] = receipt.Data.DeploymentRevision,
-                ["expectedHeadStamp"] = receipt.Data.CurrentHeadStamp,
-                ["expectedOperationStamp"] = receipt.Data.ConcurrencyStamp,
-                ["approvedSettingIds"] = Array.Empty<Guid>(),
-                ["approvedBindingIds"] = Array.Empty<Guid>()
-            };
-            Guid id = Guid.CreateVersion7();
-            switch (mutation)
-            {
-                case "omitted": body.Remove(field); break;
-                case "null": body[field] = null; break;
-                case "empty-id": body[field] = new[] { Guid.Empty }; break;
-                case "duplicate": body[field] = new[] { id, id }; break;
-                case "three": body[field] = new[] { id, Guid.CreateVersion7(), Guid.CreateVersion7() }; break;
-                case "foreign": body[field] = new[] { id }; break;
-                default: throw new ArgumentOutOfRangeException(nameof(mutation));
+                var body = new Dictionary<string, object?>
+                {
+                    ["operationId"] = receipt.Data.OperationId,
+                    ["deploymentRevision"] = receipt.Data.DeploymentRevision,
+                    ["expectedHeadStamp"] = receipt.Data.CurrentHeadStamp,
+                    ["expectedOperationStamp"] = receipt.Data.ConcurrencyStamp,
+                    ["approvedSettingIds"] = Array.Empty<Guid>(),
+                    ["approvedBindingIds"] = Array.Empty<Guid>()
+                };
+                Guid id = Guid.CreateVersion7();
+                switch (mutation)
+                {
+                    case "omitted": body.Remove(field); break;
+                    case "null": body[field] = null; break;
+                    case "empty-id": body[field] = new[] { Guid.Empty }; break;
+                    case "duplicate": body[field] = new[] { id, id }; break;
+                    case "three": body[field] = new[] { id, Guid.CreateVersion7(), Guid.CreateVersion7() }; break;
+                    case "foreign": body[field] = new[] { id }; break;
+                    default: throw new ArgumentOutOfRangeException(nameof(mutation));
+                }
+                using var request = fixture.Request(HttpMethod.Post, $"{BaseUrl}/cleanup", body);
+                using var response = await fixture.Client.SendAsync(request);
+                await Assert.That(response.StatusCode).IsEqualTo(
+                    mutation == "foreign" ? HttpStatusCode.Conflict : HttpStatusCode.BadRequest);
+                await AssertPrivateAsync(response);
+                await AssertSameReceiptAsync(receipt.Data, (await fixture.CurrentAsync()).Data);
             }
-            using var request = fixture.Request(HttpMethod.Post, $"{BaseUrl}/cleanup", body);
-            using var response = await fixture.Client.SendAsync(request);
-            await Assert.That(response.StatusCode).IsEqualTo(
-                mutation == "foreign" ? HttpStatusCode.Conflict : HttpStatusCode.BadRequest);
-            await AssertPrivateAsync(response);
-            await AssertSameReceiptAsync(receipt.Data, (await fixture.CurrentAsync()).Data);
-        }
         await fixture.AssertNoGenericReplayAsync();
     }
 
@@ -489,10 +495,12 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
         receipt = await fixture.FenceAsync(receipt.Data);
         var input = new AuthenticationCredentialCleanupInputDto
         {
-            OperationId = receipt.Data.OperationId, DeploymentRevision = receipt.Data.DeploymentRevision,
+            OperationId = receipt.Data.OperationId,
+            DeploymentRevision = receipt.Data.DeploymentRevision,
             ExpectedHeadStamp = receipt.Data.CurrentHeadStamp!.Value,
             ExpectedOperationStamp = receipt.Data.ConcurrencyStamp,
-            ApprovedSettingIds = [], ApprovedBindingIds = []
+            ApprovedSettingIds = [],
+            ApprovedBindingIds = []
         };
         using (var request = fixture.Request(HttpMethod.Post, $"{BaseUrl}/cleanup", input))
         using (var response = await fixture.Client.SendAsync(request))
@@ -591,21 +599,29 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.Users.Add(new User
             {
-                Id = fixture.UserId, CreatedAt = Now.UtcDateTime, CreatedBy = fixture.UserId,
+                Id = fixture.UserId,
+                CreatedAt = Now.UtcDateTime,
+                CreatedBy = fixture.UserId,
                 Pii = new UserPii
                 {
-                    UserId = fixture.UserId, Email = $"{fixture.UserId:N}@integration.test",
-                    FirstName = "Cutover", LastName = "Administrator"
+                    UserId = fixture.UserId,
+                    Email = $"{fixture.UserId:N}@integration.test",
+                    FirstName = "Cutover",
+                    LastName = "Administrator"
                 }
             });
             db.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = fixture.UserId, User = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = fixture.UserId,
+                User = null!,
                 AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
                 AuthenticationProvider = null!,
                 ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
                     OnboardingWebApplicationFactory.Issuer, fixture.UserId.ToString()).Value,
-                ProviderDisplayName = "keycloak", CreatedAt = Now.UtcDateTime, CreatedBy = fixture.UserId
+                ProviderDisplayName = "keycloak",
+                CreatedAt = Now.UtcDateTime,
+                CreatedBy = fixture.UserId
             });
             var bootstrap = InstanceBootstrapState.CreateInteractivePending(
                 Guid.CreateVersion7(), DeploymentMode.SingleTenant, Now.UtcDateTime);
@@ -723,8 +739,13 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
             await Assert.That(role.RoleScopeId).IsEqualTo((int)RoleScopeEnum.Platform);
             db.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = UserId, User = null!, RoleId = role.Id, Role = role,
-                GrantedBy = UserId, GrantedAt = Now.UtcDateTime
+                Id = Guid.CreateVersion7(),
+                UserId = UserId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role,
+                GrantedBy = UserId,
+                GrantedAt = Now.UtcDateTime
             });
             await db.SaveChangesAsync();
         }

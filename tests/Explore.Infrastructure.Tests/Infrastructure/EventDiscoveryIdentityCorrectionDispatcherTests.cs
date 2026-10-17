@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Domain;
 using Explore.Infrastructure.Messaging;
@@ -10,43 +11,47 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 public sealed class EventDiscoveryIdentityCorrectionDispatcherTests
 {
     [Test]
-    public async Task DispatchBindsPayloadTenantAndRestoresThePreviousScope()
+    public async Task AdmittedCorrectionPreservesReceiptIdentityForDelivery()
     {
-        Guid previousTenantId = Guid.CreateVersion7();
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         var service = Substitute.For<IEventDiscoveryIdentityCorrectionNotificationService>();
-        var tenant = new RecordingTenantContextAccessor(previousTenantId);
-        var dispatcher = new EventDiscoveryIdentityCorrectionDispatcher(service, tenant);
+        Guid deliveredId = Guid.Empty;
+        EventDiscoveryIdentityCorrectionRequested? delivered = null;
+        service.DeliverAsync(Arg.Any<Guid>(), Arg.Any<EventDiscoveryIdentityCorrectionRequested>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                deliveredId = call.Arg<Guid>();
+                delivered = call.Arg<EventDiscoveryIdentityCorrectionRequested>();
+                return Task.CompletedTask;
+            });
+        var dispatcher = new EventDiscoveryIdentityCorrectionDispatcher(
+            service, Substitute.For<INotificationOutboxExecutionAuthority>());
         OutboxMessage message = CreateMessage(tenantId, eventId);
 
         await dispatcher.DispatchAsync(message);
 
-        await service.Received(1).DeliverAsync(
-            message.Id,
-            Arg.Is<EventDiscoveryIdentityCorrectionRequested>(request =>
-                request != null
-                && request.TenantId == tenantId
-                && request.EventId == eventId),
-            Arg.Any<CancellationToken>());
-        await Assert.That(tenant.ObservedTenants).IsEquivalentTo([tenantId, previousTenantId]);
-        await Assert.That(tenant.TenantId).IsEqualTo(previousTenantId);
+        await Assert.That(deliveredId).IsEqualTo(message.Id);
+        var receipt = delivered ?? throw new InvalidOperationException("No correction was delivered.");
+        await Assert.That(receipt.TenantId).IsEqualTo(tenantId);
+        await Assert.That(receipt.EventId).IsEqualTo(eventId);
     }
 
     [Test]
     public async Task UnknownPayloadFieldsFailBeforeDelivery()
     {
         var service = Substitute.For<IEventDiscoveryIdentityCorrectionNotificationService>();
+        bool delivered = false;
+        service.DeliverAsync(Arg.Any<Guid>(), Arg.Any<EventDiscoveryIdentityCorrectionRequested>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { delivered = true; return Task.CompletedTask; });
         var dispatcher = new EventDiscoveryIdentityCorrectionDispatcher(
-            service,
-            new RecordingTenantContextAccessor(null));
+            service, Substitute.For<INotificationOutboxExecutionAuthority>());
         OutboxMessage message = CreateMessage(Guid.CreateVersion7(), Guid.CreateVersion7());
         message.Payload = message.Payload![..^1] + ",\"PrivateCounterpartHint\":\"must-not-pass\"}";
 
         await Assert.That(() => dispatcher.DispatchAsync(message))
             .Throws<JsonException>();
-        await service.DidNotReceiveWithAnyArgs()
-            .DeliverAsync(default, default!, default);
+        await Assert.That(delivered).IsFalse();
     }
 
     private static OutboxMessage CreateMessage(Guid tenantId, Guid eventId)
@@ -71,33 +76,4 @@ public sealed class EventDiscoveryIdentityCorrectionDispatcherTests
         };
     }
 
-    private sealed class RecordingTenantContextAccessor(Guid? tenantId) : ITenantContextAccessor
-    {
-        private bool _executionBound;
-        public List<Guid> ObservedTenants { get; } = [];
-        public Guid? TenantId { get; private set; } = tenantId;
-        public bool IsResolved => TenantId.HasValue;
-
-        public void BindExecutionTenant(Guid value)
-        {
-            ArgumentOutOfRangeException.ThrowIfEqual(value, Guid.Empty);
-            SetTenant(value);
-            _executionBound = true;
-        }
-
-        public void SetTenant(Guid value)
-        {
-            if (_executionBound)
-                throw new InvalidOperationException("Execution tenant facts cannot be changed.");
-            TenantId = value;
-            ObservedTenants.Add(value);
-        }
-
-        public void Clear()
-        {
-            if (_executionBound)
-                throw new InvalidOperationException("Execution tenant facts cannot be cleared.");
-            TenantId = null;
-        }
-    }
 }

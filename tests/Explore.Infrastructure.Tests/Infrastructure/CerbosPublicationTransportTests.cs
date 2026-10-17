@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
 using Explore.Infrastructure.Http;
 using Explore.Infrastructure.Services;
@@ -49,15 +48,14 @@ public sealed class CerbosPublicationTransportTests
                 Mode = CerbosMode.CustomEndpoint,
                 IsInstanceDefault = false
             });
-            var publisher = new CerbosPolicyPackageService(
+            var publisher = new AuthenticatedPolicyPackageTestService(
                 Options.Create(new CerbosPolicyPackageOptions { PoliciesPath = path }),
                 provider.GetRequiredService<IOptions<CerbosAdminApiSettings>>(),
-                resolver, Substitute.For<ISecretResolver>(), provider.GetRequiredService<CerbosAdminEndpointValidator>(),
+                resolver, provider.GetRequiredService<CerbosAdminEndpointValidator>(),
                 provider.GetRequiredService<IHttpClientFactory>(),
                 NullLogger<CerbosPolicyPackageService>.Instance,
-                Substitute.For<IEventResourcePolicyPublicationFence>(),
                 Options.Create(new CerbosSettings { GrpcEndpoint = "https://instance.example:3593" }));
-            // Bound native DNS rejection; this test never contacts a provider or vault.
+            // This deadline includes real Local authentication and native custody setup.
             using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
             var result = await publisher.PublishAsync(deadline.Token,
                 new PolicyPackageAdminCredentials(Guid.NewGuid().ToString("N"),

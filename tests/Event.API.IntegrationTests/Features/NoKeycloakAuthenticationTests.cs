@@ -118,13 +118,17 @@ public class NoKeycloakAuthenticationTests : IAsyncDisposable
     }
 
     [Test]
-    public async Task NoAuthority_HealthEndpoint_StillAccessible()
+    public async Task NoAuthority_HealthEndpointRequiresPrivateListener()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/health");
 
         var response = await _client.SendAsync(request);
 
-        await Assert.That([HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable]).Contains(response.StatusCode).Because("health endpoints must be accessible for infrastructure monitoring");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var operational = Event.Testing.Hosting.OperationalEndpointTestTransport.CreateClient(_factory.Server);
+        using var health = await operational.GetAsync("/health");
+        await Assert.That([HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable]).Contains(health.StatusCode)
+            .Because("readiness remains available to the private infrastructure listener without OIDC");
     }
 
     [Test]

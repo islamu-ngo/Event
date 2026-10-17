@@ -19,6 +19,26 @@ public sealed class TenantCreationService(
         TenantCreationRequest request,
         CancellationToken cancellationToken)
     {
+        TenantCreationOutcome prepared = Prepare(request);
+        Tenant created = await tenantRepository.Create(prepared.Tenant);
+        if (created.Id != request.TenantId)
+        {
+            throw new InvalidOperationException("Tenant persistence changed the planned aggregate identity.");
+        }
+
+        TenantSettingsDocument createdBranding =
+            await tenantSettingsDocumentRepository.Create(prepared.BrandingDocument);
+        TenantSettingsDocument createdIdentity =
+            await tenantSettingsDocumentRepository.Create(prepared.DirectoryOperatorIdentityDocument);
+        return new TenantCreationOutcome(created, createdBranding, createdIdentity);
+    }
+
+    /// <summary>
+    /// Builds the validated tenant and mandatory documents without selecting an owner
+    /// or performing persistence. Native provisioning uses the same seed semantics.
+    /// </summary>
+    public static TenantCreationOutcome Prepare(TenantCreationRequest request)
+    {
         ArgumentNullException.ThrowIfNull(request);
         Validate(request);
         TenantSettingsDocument branding = CreateBranding(request);
@@ -34,17 +54,7 @@ public sealed class TenantCreationService(
             CreatedAt = request.OccurredAt,
             CreatedBy = request.ActorUserId
         };
-        Tenant created = await tenantRepository.Create(tenant);
-        if (created.Id != request.TenantId)
-        {
-            throw new InvalidOperationException("Tenant persistence changed the planned aggregate identity.");
-        }
-
-        TenantSettingsDocument createdBranding =
-            await tenantSettingsDocumentRepository.Create(branding);
-        TenantSettingsDocument createdIdentity =
-            await tenantSettingsDocumentRepository.Create(identity);
-        return new TenantCreationOutcome(created, createdBranding, createdIdentity);
+        return new TenantCreationOutcome(tenant, branding, identity);
     }
 
     private static void Validate(TenantCreationRequest request)

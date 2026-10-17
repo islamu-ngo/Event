@@ -9,7 +9,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Explore.Persistence.Repositories;
 
 public sealed class UserTenantMembershipRepository(
-    IGlobalExploreDbContextFactory globalFactory) : IUserTenantMembershipRepository
+    IGlobalExploreDbContextFactory globalFactory,
+    ITenantExploreDbContextFactory tenantFactory) : IUserTenantMembershipRepository
 {
     public async Task<List<TenantUser>> GetActiveTenantsForUserAsync(
         Guid userId, CancellationToken cancellationToken = default)
@@ -77,4 +78,18 @@ public sealed class UserTenantMembershipRepository(
             }
         }).ToList();
     }
+
+    public async Task<bool> IsActiveTenantUserAsync(
+        Guid tenantId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (tenantId == Guid.Empty || userId == Guid.Empty)
+            return false;
+
+        await using var context = await tenantFactory.CreateDbContextAsync(tenantId, cancellationToken);
+        return await context.TenantUsers.AsNoTracking().AnyAsync(membership =>
+            membership.TenantId == tenantId && membership.UserId == userId
+            && membership.StatusId == (int)TenantUserStatusEnum.Active && !membership.IsDeleted,
+            cancellationToken);
+    }
+
 }

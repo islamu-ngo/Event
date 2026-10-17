@@ -55,7 +55,7 @@ public sealed class LocalCredentialCreationTests
             .IsTrue();
         await Assert.That(string.Equals(current.PasswordHash, result.TemporaryPassword, StringComparison.Ordinal)).IsFalse();
         var application = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var settings = new SystemSettingRepository(dbContext: application,
+        var settings = SystemSettingRepository.CreateReadOnly(context: application,
             mutationLock: new RelationalSettingMutationLock(dbContext: application,
                 unitOfWork: new EfCoreUnitOfWork(application)));
         var secrets = Substitute.For<ISecretResolver>();

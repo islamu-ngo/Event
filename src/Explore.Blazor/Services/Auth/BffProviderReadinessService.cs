@@ -125,9 +125,9 @@ public sealed class BffProviderReadinessService(
         {
             options = optionsMonitor.Get(scheme);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogDebug(ex, "Could not load OIDC options for scheme {Scheme}", scheme);
+            logger.LogDebug("Could not load OIDC options. FailureCategory={FailureCategory}", "oidc_options_unavailable");
             return new(false, "options_unavailable");
         }
 
@@ -270,17 +270,16 @@ public sealed class BffProviderReadinessService(
             httpClient.Timeout = TimeSpan.FromSeconds(10);
 
             logger.LogInformation(
-                "[AuthEndpoints] Checking OIDC discovery for {Provider} at {MetadataAddress}",
-                provider, metadataAddress);
+                "[AuthEndpoints] Checking OIDC discovery for {Provider}",
+                provider);
 
             using var response = await httpClient.GetAsync(metadataAddress, timeoutCts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning(
-                    "[AuthEndpoints] {Provider} discovery endpoint returned status {StatusCode} at {MetadataAddress}",
+                    "[AuthEndpoints] {Provider} discovery endpoint returned status {StatusCode}",
                     provider,
-                    (int)response.StatusCode,
-                    metadataAddress);
+                    (int)response.StatusCode);
                 return false;
             }
 
@@ -293,8 +292,8 @@ public sealed class BffProviderReadinessService(
                 || !TryGetNonEmptyString(root, "token_endpoint", out _))
             {
                 logger.LogWarning(
-                    "[AuthEndpoints] {Provider} discovery document at {MetadataAddress} is missing required fields (issuer/authorization_endpoint/token_endpoint)",
-                    provider, metadataAddress);
+                    "[AuthEndpoints] {Provider} discovery document is missing required fields",
+                    provider);
                 return false;
             }
 
@@ -306,23 +305,22 @@ public sealed class BffProviderReadinessService(
             }
 
             logger.LogInformation(
-                "[AuthEndpoints] {Provider} discovery check passed (issuer: {Issuer})",
-                provider, issuer);
+                "[AuthEndpoints] {Provider} discovery check passed",
+                provider);
             return true;
         }
         catch (OperationCanceledException)
         {
             logger.LogWarning(
-                "[AuthEndpoints] {Provider} discovery request TIMED OUT for {MetadataAddress}",
-                provider, metadataAddress);
+                "[AuthEndpoints] {Provider} discovery request timed out",
+                provider);
             return false;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             logger.LogWarning(
-                ex,
-                "[AuthEndpoints] {Provider} discovery check FAILED at {MetadataAddress}: {Error}",
-                provider, metadataAddress, ex.Message);
+                "[AuthEndpoints] {Provider} discovery check failed. FailureCategory={FailureCategory}",
+                provider, "oidc_discovery_failed");
             return false;
         }
     }

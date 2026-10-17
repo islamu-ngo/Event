@@ -75,6 +75,52 @@ public sealed class LocalIdentityAuthServiceTests
     }
 
     [Test]
+    public async Task MissingWrongAndLockedAttemptsEachPerformNativePasswordWorkWithoutIssuingAuthority()
+    {
+        await using TestFixture fixture = await CreateFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: true);
+        var hasher = new ObservedPasswordHasher(fixture.UserManager.PasswordHasher);
+        fixture.UserManager.PasswordHasher = hasher;
+        var missing = login with { Identifier = $"missing-{Guid.CreateVersion7():N}@example.test" };
+        var wrong = login with { Password = CreateValidPassword() };
+        foreach (LocalAuthRequestDto attempt in new[] { missing, wrong, missing, wrong, login })
+        {
+            hasher.Verifications.Clear();
+            LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(attempt, fixture.CancellationToken);
+            await Assert.That(result.Success).IsFalse();
+            await Assert.That(result.Token).IsNull();
+            await Assert.That(result.ReplacementChallenge).IsNull();
+            await Assert.That(hasher.Verifications.Count).IsEqualTo(1);
+            // A locked correct password takes dummy work, never validates the account's password.
+            if (ReferenceEquals(attempt, login))
+            {
+                await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.AccountLocked);
+                await Assert.That(hasher.Verifications.Single()).IsNotEqualTo(
+                    (await fixture.UserManager.FindByEmailAsync(login.Identifier))!.Id);
+            }
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CancellationDuringDummyWorkPropagatesForMissingAndLockedAccounts(bool locked)
+    {
+        await using TestFixture fixture = await CreateFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: true);
+        if (locked)
+        {
+            LocalIdentityUser user = (await fixture.UserManager.FindByEmailAsync(login.Identifier))!;
+            await Assert.That((await fixture.UserManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddMinutes(15))).Succeeded).IsTrue();
+        }
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(fixture.CancellationToken);
+        fixture.UserManager.PasswordHasher = new ObservedPasswordHasher(fixture.UserManager.PasswordHasher, cancellation.Cancel);
+        LocalAuthRequestDto attempt = locked ? login : login with { Identifier = $"missing-{Guid.CreateVersion7():N}@example.test" };
+        await Assert.That(async () => await fixture.Service.AuthenticateAsync(attempt, cancellation.Token))
+            .Throws<OperationCanceledException>();
+    }
+
+    [Test]
     public async Task LoginIssuesASecretBackedSignedToken()
     {
         byte[] key = RandomNumberGenerator.GetBytes(64);
@@ -284,6 +330,20 @@ public sealed class LocalIdentityAuthServiceTests
         public override DateTimeOffset GetUtcNow() => now;
     }
 
+    private sealed class ObservedPasswordHasher(IPasswordHasher<LocalIdentityUser> native, Action? onVerify = null)
+        : IPasswordHasher<LocalIdentityUser>
+    {
+        internal List<Guid> Verifications { get; } = [];
+        public string HashPassword(LocalIdentityUser user, string password) => native.HashPassword(user, password);
+        public PasswordVerificationResult VerifyHashedPassword(LocalIdentityUser user, string hashedPassword, string providedPassword)
+        {
+            Verifications.Add(user.Id);
+            PasswordVerificationResult result = native.VerifyHashedPassword(user, hashedPassword, providedPassword);
+            onVerify?.Invoke();
+            return result;
+        }
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection _connection =
@@ -332,7 +392,7 @@ public sealed class LocalIdentityAuthServiceTests
                 await context.Database.EnsureCreatedAsync(fixture.CancellationToken);
                 fixture.Context = context;
                 await LookupTableSeeder.SeedAsync(context, fixture.CancellationToken);
-                fixture._systemSettings = new SystemSettingRepository(context,
+                fixture._systemSettings = SystemSettingRepository.CreateReadOnly(context,
                     new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
                 fixture.UserManager = scopedServices
                     .GetRequiredService<UserManager<LocalIdentityUser>>();

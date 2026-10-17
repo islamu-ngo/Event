@@ -41,7 +41,7 @@ public sealed class AuthenticationCredentialCustodyPolicyTests
             case "tenant": binding.Scope = SecretScope.Tenant; binding.ScopeId = Guid.CreateVersion7(); break;
             case "scope-id": binding.ScopeId = Guid.CreateVersion7(); break;
             case "qualified": binding.Qualifier = "other-purpose"; break;
-            case "foreign-key": binding.SettingKey = SecretDefinitionRegistry.Keys.Keycloak.DbPassword; break;
+            case "foreign-key": binding.SettingKey = "keycloak.db_password"; break;
             case "key-case": binding.SettingKey = key.ToUpperInvariant(); break;
             case "variable": binding.EnvironmentVariableName = "OTHER_CLIENT_SECRET_REFERENCE"; break;
             case "source": binding.SecretSourceTypeId = int.MaxValue; break;

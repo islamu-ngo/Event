@@ -1,4 +1,3 @@
-using System.Net;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Microsoft.Extensions.Logging;
@@ -59,19 +58,19 @@ public sealed class WebPushNotificationSender(
         {
             throw;
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
-            logger.LogWarning(ex, "Web Push send timed out for correlation {CorrelationId}", envelope.CorrelationId);
+            logger.LogWarning("Web Push send timed out.");
             return WebPushSendResult.Retryable(null, "Web Push send timed out.");
         }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning(ex, "Web Push transport failed for correlation {CorrelationId}", envelope.CorrelationId);
+            logger.LogWarning("Web Push transport failed with status {StatusCode}", (int?)ex.StatusCode);
             return WebPushSendResult.Retryable((int?)ex.StatusCode, "Web Push transport failed.");
         }
-        catch (ArgumentException ex)
+        catch (ArgumentException)
         {
-            logger.LogWarning(ex, "Web Push request/configuration is malformed for correlation {CorrelationId}", envelope.CorrelationId);
+            logger.LogWarning("Web Push request/configuration is malformed.");
             return WebPushSendResult.PermanentNonRetryable(null, "Web Push request or VAPID configuration is malformed.");
         }
     }

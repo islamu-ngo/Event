@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -10,11 +11,13 @@ public sealed class WebPushSubscriptionRepository
     : GenericRepository<WebPushSubscription, Guid>, IWebPushSubscriptionRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
 
-    public WebPushSubscriptionRepository(ExploreDbContext dbContext)
+    public WebPushSubscriptionRepository(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null)
         : base(dbContext)
     {
         _dbContext = dbContext;
+        _nativeEnrollment = nativeEnrollment;
     }
 
     public async Task<WebPushSubscription> UpsertAsync(
@@ -197,6 +200,10 @@ public sealed class WebPushSubscriptionRepository
         Guid userId,
         CancellationToken cancellationToken = default)
     {
+        if (PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+            return await PostgresPublicationFanoutExecutionContract.ListAsync<WebPushSubscription>(
+                _dbContext, _nativeEnrollment, "push_subscriptions",
+                new { TenantId = tenantId, UserId = userId }, cancellationToken);
         return await _dbContext.WebPushSubscriptions
             .AsNoTracking()
             .Where(subscription => subscription.TenantId == tenantId

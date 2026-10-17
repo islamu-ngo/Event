@@ -5,6 +5,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -17,10 +18,12 @@ public class NotificationFanoutRunRepository : GenericRepository<NotificationFan
     private const int MaximumClaimRoundSize = 1000;
     private const string ProcessorCode = "fanout";
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
 
-    public NotificationFanoutRunRepository(ExploreDbContext dbContext) : base(dbContext)
+    public NotificationFanoutRunRepository(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _nativeEnrollment = nativeEnrollment;
     }
 
     public async Task<NotificationFanoutRun?> GetBySourceAsync(
@@ -32,6 +35,12 @@ public class NotificationFanoutRunRepository : GenericRepository<NotificationFan
         bool trackChanges = false,
         CancellationToken cancellationToken = default)
     {
+        if (PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+            return await PostgresPublicationFanoutExecutionContract.ReadAsync<NotificationFanoutRun>(
+                _dbContext, _nativeEnrollment, "read_run",
+                new { TenantId = tenantId, FanoutKind = fanoutKind, NotificationEntityTypeId = notificationEntityTypeId,
+                    EntityId = entityId, SourceActorId = sourceActorId }, cancellationToken);
+
         var query = _dbContext.NotificationFanoutRuns
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .Include(run => run.NotificationEntityType)
@@ -50,6 +59,39 @@ public class NotificationFanoutRunRepository : GenericRepository<NotificationFan
 
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
+
+    public override async Task<NotificationFanoutRun> Create(NotificationFanoutRun entity)
+    {
+        if (!PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+            return await base.Create(entity);
+        return await PostgresPublicationFanoutExecutionContract.ReadAsync<NotificationFanoutRun>(
+            _dbContext, _nativeEnrollment, "create_run", PublicationRun(entity), CancellationToken.None)
+            ?? throw new InvalidOperationException("publication_fanout_run_unavailable");
+    }
+
+    public override async Task Update(NotificationFanoutRun entity)
+    {
+        if (!PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+        {
+            await base.Update(entity);
+            return;
+        }
+        var saved = await PostgresPublicationFanoutExecutionContract.ReadAsync<NotificationFanoutRun>(
+            _dbContext, _nativeEnrollment, "update_run", PublicationRun(entity), CancellationToken.None)
+            ?? throw new InvalidOperationException("publication_fanout_run_unavailable");
+        entity.ConcurrencyStamp = saved.ConcurrencyStamp;
+        entity.StartedAt = saved.StartedAt;
+        entity.CompletedAt = saved.CompletedAt;
+        entity.FailedAt = saved.FailedAt;
+        entity.LastError = saved.LastError;
+    }
+
+    private static object PublicationRun(NotificationFanoutRun entity) => new
+    {
+        entity.Id, entity.TenantId, entity.FanoutKind, entity.NotificationEntityTypeId,
+        entity.EntityId, entity.SourceActorId, entity.Status, entity.ConcurrencyStamp,
+        entity.CursorSubscriberTenantUserId, entity.ProcessedCount, entity.CreatedNotificationCount
+    };
 
     public async Task<List<NotificationFanoutRun>> GetPendingBatchAsync(
         int pageSize,

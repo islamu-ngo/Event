@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models.InternalEvents;
 using Explore.Application.Notifications;
@@ -21,7 +22,9 @@ public sealed class EventModerationNotificationFanoutService(
     IUnitOfWork unitOfWork,
     BusinessMetrics metrics,
     ILogger<EventModerationNotificationFanoutService> logger,
-    ISettingMutationLock mutationLock) : IEventModerationNotificationFanoutService
+    ISettingMutationLock mutationLock,
+    IEventRepository eventRepository,
+    ITenantContext tenantContext) : IEventModerationNotificationFanoutService
 {
     public const string LightFanoutKind = "event-moderated-light";
     public const string HeavyFanoutKind = "event-moderated-heavy";
@@ -42,14 +45,12 @@ public sealed class EventModerationNotificationFanoutService(
         EventLightModeratedNotificationFanoutRequested request,
         CancellationToken cancellationToken = default)
     {
+        request = await RequireLightSourceAsync(request, cancellationToken);
         var run = await GetOrCreateRunAsync(request, cancellationToken);
         if (string.Equals(run.Status, StatusCompleted, StringComparison.Ordinal))
         {
             metrics.RecordNotificationFanoutRun(LightFanoutKind, OutcomeSkippedCompleted);
-            logger.LogInformation(
-                "Skipping completed light moderation notification fanout run {RunId} for moderation record {ModerationRecordId}",
-                run.Id,
-                request.ModerationRecordId);
+            logger.LogInformation("Skipping completed light moderation notification fanout run.");
             return;
         }
 
@@ -95,6 +96,7 @@ public sealed class EventModerationNotificationFanoutService(
                             return;
                         }
 
+                        request = await RequireLightSourceAsync(request, token);
                         var processed = 0;
                         var created = 0;
                         var duplicateSkipped = 0;
@@ -183,26 +185,23 @@ public sealed class EventModerationNotificationFanoutService(
         {
             run.Status = StatusFailed;
             run.FailedAt = DateTime.UtcNow;
-            run.LastError = ex.Message;
+            run.LastError = "light_moderation_fanout_failed";
             await fanoutRunRepository.Update(run);
             metrics.RecordNotificationFanoutRun(LightFanoutKind, OutcomeFailed);
             metrics.RecordNotificationFanoutSubscribers(processedThisAttempt, LightFanoutKind, OutcomeProcessed);
             metrics.RecordNotificationFanoutSubscribers(createdThisAttempt, LightFanoutKind, OutcomeNotificationCreated);
             metrics.RecordNotificationFanoutSubscribers(duplicateSkippedThisAttempt, LightFanoutKind, OutcomeDuplicateSkipped);
-            logger.LogError(
-                ex,
-                "Failed light moderation notification fanout run {RunId} for moderation record {ModerationRecordId}",
-                run.Id,
-                request.ModerationRecordId);
+            logger.LogError("Failed light moderation notification fanout run.");
             throw;
         }
     }
 
     public async Task FanoutHeavyRedactionAsync(
         EventHeavyRedactedNotificationFanoutRequested request,
+        Guid expectedEventId,
         CancellationToken cancellationToken = default)
     {
-        if (request.TenantId == Guid.Empty
+        if (expectedEventId == Guid.Empty || request.TenantId == Guid.Empty
             || request.ModerationRecordId == Guid.Empty
             || request.Version != EventHeavyRedactedNotificationFanoutRequested.CurrentVersion)
         {
@@ -222,6 +221,7 @@ public sealed class EventModerationNotificationFanoutService(
                     token)
                     ?? throw new InvalidOperationException("The retained heavy moderation authority is unavailable.");
                 if (moderationRecord.TenantId != request.TenantId
+                    || moderationRecord.EventId != expectedEventId
                     || moderationRecord.ActionKind != EventModerationActionKind.HeavyRedacted
                     || !moderationRecord.IsIrreversible)
                 {
@@ -267,10 +267,24 @@ public sealed class EventModerationNotificationFanoutService(
                 ? OutcomeCompleted
                 : OutcomeSkippedCompleted);
         logger.LogInformation(
-            "Retained heavy moderation pointer converged on occurrence {OccurrenceId} in tenant {TenantId} with outcome {Outcome}.",
-            result.ActiveOccurrenceId,
-            request.TenantId,
+            "Retained heavy moderation pointer converged with outcome {Outcome}.",
             result.Outcome);
+    }
+
+    private async Task<EventLightModeratedNotificationFanoutRequested> RequireLightSourceAsync(
+        EventLightModeratedNotificationFanoutRequested request, CancellationToken cancellationToken)
+    {
+        if (request.TenantId == Guid.Empty || request.TenantId != tenantContext.TenantId)
+            throw new InvalidOperationException("The light moderation fanout tenant is not selected.");
+        var record = await moderationRecordRepository.GetByIdAsync(
+            request.TenantId, request.ModerationRecordId, cancellationToken);
+        if (record is null || record.EventId != request.EventId
+            || record.ActionKind != EventModerationActionKind.LightModerated || record.IsIrreversible)
+            throw new InvalidOperationException("The light moderation fanout record is unavailable.");
+        var source = await eventRepository.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        if (source is null || source.TenantId != request.TenantId || source.ActorId != request.SourceActorId)
+            throw new InvalidOperationException("The light moderation fanout Event source is unavailable.");
+        return request with { EventTitle = source.Title, ModeratedAt = record.CreatedAt };
     }
 
     private async Task<NotificationFanoutRun> GetOrCreateRunAsync(

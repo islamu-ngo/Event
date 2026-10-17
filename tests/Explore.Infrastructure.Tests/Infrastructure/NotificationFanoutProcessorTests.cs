@@ -1,11 +1,13 @@
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Notifications;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Infrastructure.HealthChecks;
 using Explore.Infrastructure.NotificationFanout;
+using Explore.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -50,25 +52,32 @@ public sealed class NotificationFanoutProcessorTests
     [Test]
     public async Task ProcessRoundAsync_ResolvesEachClaimProcessorFromFreshScope()
     {
+        var admission = Substitute.For<INotificationFanoutAdmission>();
         var runRepository = Substitute.For<INotificationFanoutRunRepository>();
         NotificationFanoutClaim[] claims =
         [
             Claim(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()),
             Claim(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7())
         ];
-        runRepository.ClaimDueRoundAsync(
+        admission.ClaimDueRoundAsync(
                 Arg.Any<NotificationFanoutClaimRoundRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(new NotificationFanoutClaimRoundResult(claims, 2, 0, 0, 0));
-        runRepository.GetProcessorSnapshotAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+        admission.GetProcessorSnapshotAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(new NotificationFanoutProcessorSnapshot(0, 0, 0, 0, 0, 0, 0, null, false));
 
         int scopedProcessorCount = 0;
+        var resolvedTenants = new System.Collections.Concurrent.ConcurrentBag<Guid>();
         var services = new ServiceCollection();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
+        services.AddSingleton(admission);
         services.AddSingleton(runRepository);
-        services.AddScoped(_ =>
+        services.AddScoped(provider =>
         {
             Interlocked.Increment(ref scopedProcessorCount);
+            resolvedTenants.Add(provider.GetRequiredService<ITenantContextAccessor>().TenantId
+                ?? throw new InvalidOperationException("Claim execution resolved an unbound tenant scope."));
             return CreateUnavailablePageProcessor(runRepository);
         });
         await using ServiceProvider provider = services.BuildServiceProvider();
@@ -86,12 +95,15 @@ public sealed class NotificationFanoutProcessorTests
         await Assert.That(result.UnavailableCount).IsEqualTo(2);
         await Assert.That(result.FailedCount).IsEqualTo(0);
         await Assert.That(scopedProcessorCount).IsEqualTo(2);
+        await Assert.That(resolvedTenants).IsEquivalentTo(claims.Select(claim => claim.TenantId));
+        await using var unbound = provider.CreateAsyncScope();
+        await Assert.That(unbound.ServiceProvider.GetRequiredService<ITenantContextAccessor>().TenantId).IsNull();
     }
 
     [Test]
     public async Task HealthCheck_ExpiredClaim_DegradesWithAggregateDataOnly()
     {
-        var repository = Substitute.For<INotificationFanoutRunRepository>();
+        var repository = Substitute.For<INotificationFanoutAdmission>();
         repository.GetProcessorSnapshotAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(new NotificationFanoutProcessorSnapshot(
                 2,

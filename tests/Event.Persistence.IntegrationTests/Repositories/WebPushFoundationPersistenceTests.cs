@@ -243,8 +243,8 @@ public sealed class WebPushFoundationPersistenceTests(PostgreSqlContainerFixture
         var leaseToken = Guid.CreateVersion7();
 
         var pending = await repository.GetPendingBatch(10, now, CancellationToken.None);
-        var claimed = await repository.TryMarkAsProcessing(dispatch.Id, leaseToken, now, CancellationToken.None);
-        var duplicateClaim = await repository.TryMarkAsProcessing(dispatch.Id, Guid.CreateVersion7(), now, CancellationToken.None);
+        var claimed = await repository.TryMarkAsProcessing(tenant.Id, dispatch.Id, leaseToken, now, CancellationToken.None);
+        var duplicateClaim = await repository.TryMarkAsProcessing(tenant.Id, dispatch.Id, Guid.CreateVersion7(), now, CancellationToken.None);
         var activeClaim = await repository.GetActiveClaimAsync(tenant.Id, dispatch.Id, leaseToken, CancellationToken.None);
         var wrongTenantClaim = await repository.GetActiveClaimAsync(Guid.CreateVersion7(), dispatch.Id, leaseToken, CancellationToken.None);
         var staleLeaseClaim = await repository.GetActiveClaimAsync(tenant.Id, dispatch.Id, Guid.CreateVersion7(), CancellationToken.None);
@@ -261,11 +261,11 @@ public sealed class WebPushFoundationPersistenceTests(PostgreSqlContainerFixture
         context.WebPushDispatchOutbox.AddRange(retry, exhausted, stale);
         await context.SaveChangesAsync();
         var retryLeaseToken = Guid.CreateVersion7();
-        await repository.TryMarkAsProcessing(retry.Id, retryLeaseToken, now.AddSeconds(2), CancellationToken.None);
+        await repository.TryMarkAsProcessing(tenant.Id, retry.Id, retryLeaseToken, now.AddSeconds(2), CancellationToken.None);
         var staleRetryFailure = await repository.MarkAsFailed(retry.Id, Guid.CreateVersion7(), "push_service_unavailable", "temporary", true, TimeSpan.FromMinutes(5), 5, now.AddSeconds(3), CancellationToken.None);
         var retryFailure = await repository.MarkAsFailed(retry.Id, retryLeaseToken, "push_service_unavailable", "temporary", true, TimeSpan.FromMinutes(5), 5, now.AddSeconds(3), CancellationToken.None);
         var exhaustedLeaseToken = Guid.CreateVersion7();
-        await repository.TryMarkAsProcessing(exhausted.Id, exhaustedLeaseToken, now.AddSeconds(4), CancellationToken.None);
+        await repository.TryMarkAsProcessing(tenant.Id, exhausted.Id, exhaustedLeaseToken, now.AddSeconds(4), CancellationToken.None);
         var exhaustedFailure = await repository.MarkAsFailed(exhausted.Id, exhaustedLeaseToken, "invalid_payload", "permanent", false, TimeSpan.Zero, 5, now.AddSeconds(5), CancellationToken.None);
         var recovered = await repository.RecoverStaleProcessing(now.AddMinutes(-10), now.AddSeconds(6), "lease_timeout", "Processing lease expired.", 10, CancellationToken.None);
 

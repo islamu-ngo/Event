@@ -23,6 +23,7 @@ public sealed class NotificationFanoutOccurrenceHandoffServiceTests
             .Returns(occurrence);
         var candidateRunIds = new List<Guid>();
         Guid durableRunId = Guid.CreateVersion7();
+        var durableRun = CreateRun(occurrence, durableRunId);
         runRepository.EnsurePendingOccurrenceRunAsync(
                 occurrence.TenantId,
                 occurrence.Id,
@@ -31,7 +32,7 @@ public sealed class NotificationFanoutOccurrenceHandoffServiceTests
             .Returns(call =>
             {
                 candidateRunIds.Add(call.ArgAt<Guid>(2));
-                return CreateRun(occurrence, durableRunId);
+                return durableRun;
             });
         var service = new NotificationFanoutOccurrenceHandoffService(
             occurrenceRepository,
@@ -44,17 +45,11 @@ public sealed class NotificationFanoutOccurrenceHandoffServiceTests
         await Assert.That(candidateRunIds).Count().IsEqualTo(2);
         await Assert.That(candidateRunIds.Distinct()).Count().IsEqualTo(2);
         await Assert.That(candidateRunIds).DoesNotContain(occurrence.Id);
-        await runRepository.DidNotReceiveWithAnyArgs().TryClaimOccurrenceAsync(
-            default,
-            default,
-            default!,
-            default,
-            default,
-            default,
-            default,
-            default,
-            default,
-            default);
+        await Assert.That(durableRun.Status).IsEqualTo("pending");
+        await Assert.That(durableRun.ProcessingLeaseOwner).IsNull();
+        await Assert.That(durableRun.ProcessingLeaseToken).IsNull();
+        await Assert.That(durableRun.ProcessingLeaseExpiresAt).IsNull();
+        await Assert.That(durableRun.ProcessingGeneration).IsEqualTo(0);
     }
 
     [Test]

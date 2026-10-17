@@ -135,10 +135,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         var contentHash = ComputeManifestHash(orderedArtifacts);
 
         _logger.LogInformation(
-            "Built policy package manifest {PackageId} with {ArtifactCount} artifact(s) and contentHash={ContentHash}",
-            _options.PackageId,
-            orderedArtifacts.Length,
-            contentHash);
+            "Built policy package manifest with {ArtifactCount} artifact(s)",
+            orderedArtifacts.Length);
 
         return new PolicyPackageManifest(
             PackageId: _options.PackageId,
@@ -220,11 +218,9 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             }
 
             _logger.LogInformation(
-                "Published policy package {PackageId} with {PolicyCount} polic(ies), {SchemaCount} schema(s), contentHash={ContentHash}",
-                manifest.PackageId,
+                "Published policy package with {PolicyCount} polic(ies), {SchemaCount} schema(s)",
                 policies.Count,
-                schemas.Count,
-                manifest.ContentHash);
+                schemas.Count);
 
             return new PolicyPackagePublishResult(
                 Succeeded: true,
@@ -236,7 +232,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         }
         catch (PolicyPackageUnavailableException ex)
         {
-            _logger.LogWarning(ex, "Policy package publish skipped because the package is unavailable for this API deployment.");
+            _logger.LogWarning("Policy package publish skipped because the package is unavailable for this API deployment.");
 
             return new PolicyPackagePublishResult(
                 Succeeded: false,
@@ -252,9 +248,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         catch (CerbosAdminApiException ex) when (ex.IssueCode == PolicyPackageIssueCode.AdminApiAuthenticationFailed)
         {
             _logger.LogWarning(
-                ex,
-                "Cerbos Admin API authentication failed while publishing policy package {PackageId}",
-                manifest.PackageId);
+                "Cerbos Admin API authentication failed while publishing the policy package.");
 
             return new PolicyPackagePublishResult(
                 Succeeded: false,
@@ -270,9 +264,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         catch (CerbosAdminApiException ex)
         {
             _logger.LogError(
-                ex,
-                "Cerbos Admin API request failed while publishing policy package {PackageId}",
-                manifest.PackageId);
+                "Cerbos Admin API request failed while publishing the policy package.");
 
             return new PolicyPackagePublishResult(
                 Succeeded: false,
@@ -287,7 +279,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Policy package publish failed for {PackageId}", manifest.PackageId);
+            _logger.LogError("Policy package publish failed. FailureType={FailureType}",
+                "unexpected_failure");
 
             return new PolicyPackagePublishResult(
                 Succeeded: false,
@@ -312,7 +305,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         }
         catch (PolicyPackageUnavailableException ex)
         {
-            _logger.LogWarning(ex, "Policy package status is unavailable because the package is unavailable for this API deployment.");
+            _logger.LogWarning("Policy package status is unavailable because the package is unavailable for this API deployment.");
 
             manifest = CreateUnavailableManifest();
             return new PolicyPackageStatusResult(
@@ -374,11 +367,11 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         {
             storePolicyIds = await ListStorePolicyIdsAsync(target, cancellationToken);
         }
-        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(
                 "Could not list Cerbos store policies to verify package freshness. FailureType={FailureType}",
-                ex.GetType().Name);
+                "unavailable");
 
             return new PolicyPackageStatusResult(
                 PackageId: manifest.PackageId,
@@ -455,16 +448,22 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
 
             using var response = await api.GetPoliciesAsync(auth, storePolicyIds, cancellationToken);
             if (!response.IsSuccessStatusCode || response.Content?.Policies is not { } policies)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _logger.LogWarning(
+                    "Could not read Cerbos store policy hashes to compute an observed revision. FailureType={FailureType}",
+                    "unavailable");
                 return null;
+            }
 
             return CerbosStoreRevision.Compute(
                 policies.Select(policy => (policy.Metadata?.StoreIdentifier, policy.Metadata?.Hash)));
         }
-        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(
                 "Could not read Cerbos store policy hashes to compute an observed revision. FailureType={FailureType}",
-                ex.GetType().Name);
+                "unavailable");
             return null;
         }
     }
@@ -896,21 +895,28 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             response = await api.ReloadInstanceAsync(auth, wait: "true", cancellationToken);
             if (response is null)
                 return false;
+            if (response.HasRequestError(out _))
+            {
+                response.Dispose();
+                cancellationToken.ThrowIfCancellationRequested();
+                _logger.LogWarning(
+                    "Cerbos package reload could not reach its configured target. TransportFailure={TransportFailure}",
+                    "unavailable");
+                return false;
+            }
         }
         catch (ApiException ex)
         {
             _logger.LogWarning(
-                "Cerbos package reload failed at {Endpoint}: {StatusCode}",
-                CerbosAdminEndpointValidator.ToSafeEndpoint(endpoint),
+                "Cerbos package reload failed: {StatusCode}",
                 ex.StatusCode);
             return false;
         }
         catch (Exception ex) when (IsAdminApiTransportFailure(ex, cancellationToken))
         {
             _logger.LogWarning(
-                "Cerbos package reload could not reach {Endpoint}. TransportFailure={TransportFailure}",
-                CerbosAdminEndpointValidator.ToSafeEndpoint(endpoint),
-                ex.GetType().Name);
+                "Cerbos package reload could not reach its configured target. TransportFailure={TransportFailure}",
+                "unavailable");
             return false;
         }
 
@@ -920,8 +926,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 return true;
 
             _logger.LogWarning(
-                "Cerbos package reload failed at {Endpoint}: {StatusCode}",
-                CerbosAdminEndpointValidator.ToSafeEndpoint(endpoint),
+                "Cerbos package reload failed: {StatusCode}",
                 response.StatusCode);
             return false;
         }
@@ -942,6 +947,10 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             if (response.HasRequestError(out _))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                _logger.LogError(
+                    "Cerbos Admin API {ArtifactKind} upload could not reach its configured target. TransportFailure={TransportFailure}",
+                    artifactKind,
+                    "unavailable");
                 throw new CerbosAdminApiException(
                     PolicyPackageIssueCode.AdminApiUnavailable,
                     $"Cerbos Admin API {artifactKind} upload failed before a response was received.");
@@ -956,9 +965,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 : PolicyPackageIssueCode.AdminApiUnavailable;
 
             _logger.LogError(
-                "Cerbos Admin API {ArtifactKind} upload failed at {Endpoint}: {StatusCode}",
+                "Cerbos Admin API {ArtifactKind} upload failed: {StatusCode}",
                 artifactKind,
-                CerbosAdminEndpointValidator.ToSafeEndpoint(endpoint),
                 ex.StatusCode);
             throw new CerbosAdminApiException(
                 issueCode,
@@ -967,10 +975,9 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         catch (Exception ex) when (IsAdminApiTransportFailure(ex, cancellationToken))
         {
             _logger.LogError(
-                "Cerbos Admin API {ArtifactKind} upload could not reach {Endpoint}. TransportFailure={TransportFailure}",
+                "Cerbos Admin API {ArtifactKind} upload could not reach its configured target. TransportFailure={TransportFailure}",
                 artifactKind,
-                CerbosAdminEndpointValidator.ToSafeEndpoint(endpoint),
-                ex.GetType().Name);
+                "unavailable");
             throw new CerbosAdminApiException(
                 PolicyPackageIssueCode.AdminApiUnavailable,
                 $"Cerbos Admin API {artifactKind} upload failed before a response was received.");
@@ -991,9 +998,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             : PolicyPackageIssueCode.AdminApiUnavailable;
 
         _logger.LogError(
-            "Cerbos Admin API {ArtifactKind} upload failed at {Endpoint}: {StatusCode}",
+            "Cerbos Admin API {ArtifactKind} upload failed: {StatusCode}",
             artifactKind,
-            CerbosAdminEndpointValidator.ToSafeEndpoint(endpoint),
             response.StatusCode);
 
         throw new CerbosAdminApiException(
@@ -1087,7 +1093,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
 
     private static string ToSafeWarning(Exception exception)
     {
-        return exception is InvalidOperationException ? exception.Message : "Cerbos Admin API publish failed.";
+        return "Cerbos Admin API publish failed. External changes may have completed; inspect before retrying with fresh credentials.";
     }
 
     private static bool IsAdminApiTransportFailure(Exception exception, CancellationToken cancellationToken)

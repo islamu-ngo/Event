@@ -425,7 +425,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageStatusUnknown);
         object? failureType = logger.Entries.SelectMany(entry => entry.State)
             .Single(property => property.Key == "FailureType").Value;
-        await Assert.That(failureType).IsEqualTo("CerbosAdminApiException");
+        await Assert.That(failureType).IsEqualTo("unavailable");
     }
 
     [Test]

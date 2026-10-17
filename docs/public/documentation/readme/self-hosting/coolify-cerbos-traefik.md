@@ -283,6 +283,12 @@ docker run --rm -it \
 
 ## 10. Connecting ISLAMU Event to Cerbos
 
+Event publication and status logs report bounded categories and HTTP status,
+not provider exception types, endpoints, package identifiers, content hashes, or
+raw transport errors. Use the operation's issue code for recovery. If an unexpected
+publication failure occurs, inspect the provider before retrying: a failed local
+operation does not prove that remote changes were rolled back.
+
 When Event compiles a package for publication or export, it limits the combined
 policy/schema set to 256 files, 2 MiB per file, and 16 MiB total. Files must be
 valid UTF-8. Rewrite YAML anchors, aliases, explicit tags, merge keys, duplicate

@@ -477,6 +477,14 @@ User profile updates use the `islamuevent_user` resource with the target domain 
 
 ### 4.1.1 Cerbos Package Upload
 
+Publication and status diagnostics retain artifact counts, typed HTTP status, and
+closed failure categories rather than exception objects/types, package identity,
+content hashes, provider endpoints, or private transport details. Refit failures
+that arrive as failed response objects follow the same diagnostic boundary as
+thrown failures. Business issue codes and unknown status remain authoritative;
+ordinary logs are not a substitute for publication-state evidence. Unexpected
+failure warnings do not imply that external side effects were rolled back.
+
 The Event package compiler admits at most 256 policy/schema artifacts, 2 MiB per
 artifact, and 16 MiB of aggregate artifact bytes before provider handoff. Reads
 reject file growth beyond the observed length. Every artifact is parsed before

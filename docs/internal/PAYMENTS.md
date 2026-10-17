@@ -30,7 +30,136 @@ Refund initiation is not implemented and is not a stop-sale capability.
 
 `OrganizerDirect` describes the technical direct-charge profile. It does not establish who legally controls an account, bears loss, or owes a remedy in a particular deployment. Operators must retain provider, contractual, legal, and operational evidence for those deployment-specific conclusions.
 
+## Durable Refund Operation And Handoff Ownership
+
+`RegistrationRefundService` binds a native operation key and SHA-256 input
+digest to tenant, payment, order, initiating principal, authority, reason and
+the original nullable requested amount. An omitted/full amount differs from
+an explicit amount. Exact authorized recovery precedes capacity checks; an
+omitted amount resolves once under the reservation lock. Changed inputs return
+a conflict without the earlier refund, even when capacity is now exhausted.
+
+`RefundAttempt` keeps separate buyer and application-fee handoff phases,
+dispatch tokens, concurrency stamps and positive no-handoff evidence.
+`RefundAttemptRepository` commits handoff ownership with recovery outbox work,
+then atomically settles the observed outcome with its next native work. A
+pending marker, process death, cancellation or empty provider listing cannot
+reset that ownership or authorize another mutation. Only positively recorded
+pre-handoff evidence permits a new owner.
+
+Stripe recovery reads pinned buyer-refund metadata and fee evidence. Its
+refund-specific 23-hour mutation deadline is captured at the first handoff and
+never renewed, independently of checkout/session expiry. Provider/account/
+payment/key bindings stay immutable. SDK retries remain disabled. Signed
+callbacks use the same atomic settlement owner; stale dispatch results cannot
+overwrite committed callback success, and contention requests webhook retry.
+
+Committed refund obligations survive initiating-actor revocation; command
+authorization still precedes user-facing recovery disclosure. Unresolved
+ambiguity retains capacity and the obligation for provider/manual reconciliation.
+Deadline expiry or an empty listing is not proof of failure. Native regression
+source is authored; generated migrations, actual provider retention contracts,
+concurrency and programme assurance remain queued.
+
+## Reconciliation Acquisition Recovery
+
+`RegistrationPaymentReconciliationService` creates one
+`PaymentReconciliationAcquisition` before database work: a UUIDv7 lease token,
+bounded owner and batch size, UTC claimed time and fixed lease deadline.
+Timestamps are captured at PostgreSQL's microsecond precision. Retries retain
+these values; they refresh only the observation used to check expiry.
+
+Global admission returns ownership identifiers, not payment content.
+`PaymentReconciliationAdmission` and the direct repository first recover
+still-processing rows matching the token, owner, claimed timestamp and exact
+deadline. Recovery preserves the tenant, effect, payment attempt, processing
+fence, attempt count and captured checkout-dispatch identity. It neither
+renews a lease nor fills the batch with newly due rows. A mismatched existing
+token, expired lease or reclaimed owner returns no authority. Payment reads,
+provider retrieval and settlement still require the exact ordinary tenant
+execution scope and its current row fence.
+
+Execution-strategy re-entry is recovery-only. If acknowledgement is lost after
+commit, admission also makes one read-only recovery attempt through a fresh
+context with an independent five-second cancellation budget. A caller's
+cancellation can therefore recover committed ownership without allowing
+provider work: the service checks cancellation before entering each tenant.
+If this independent recovery cannot establish a live acquisition, the original failure
+propagates; a later scheduler pass can reclaim expired work normally.
+There is no owner-name enumeration or payment mutation under Global.
+
+Initial PostgreSQL reconciliation-role provisioning requires a database
+administrator. That session may create the exact role graph for a separately
+enrolled ordinary migrator. Later installation requires the enrolled migrator
+session and the unchanged exact privilege guard. An ordinary `CREATEROLE`
+login cannot perform first provisioning: PostgreSQL automatically gives it
+administrator memberships granted by the bootstrap superuser, which that login
+cannot revoke. The installer rejects this path before creating roles with
+`55000` / `payment_reconciliation_administrator_bootstrap_required`; it does
+not silently accept the extra memberships or repair administrator-owned grants.
+
+Tenant settlement retains only the payment and newly created observation/outbox
+objects from the locked live reconciliation claim. Their foreign-key visibility
+attestation is bound to the original tenant, attempt, order, physical transaction
+and connection. A different tracked object or a later transaction cannot borrow
+that attestation. Normal persisted visibility checks and database foreign-key
+constraints remain active; Runtime receives no private tenant-table read grant.
+
+The PostgreSQL `SECURITY DEFINER` claim function accepts the caller's fixed
+identity instead of generating another token. Its installer replaces the
+obsolete overload and retains non-login, non-bypass owner roles, the restricted
+column grants and Global execute-only admission. The portable compare-and-set
+path and direct PostgreSQL query use the same recovery fences. Provider keys,
+payment-provider contracts and economic settlement are unchanged.
+
+The acknowledgement-loss, cancellation, retry, competing-owner and expiry
+regressions are authored against native databases. This source delivery does
+not certify runtime behavior; provider execution, installer/role assurance and
+the deferred programme checks remain required.
+
 ## Ticket Purchase Authority And Ceilings
+
+### Mutation Transport Retry Ownership
+
+Unknown checkout redrive additionally requires the current provider descriptor's
+`CheckoutMutationIdempotencyRetentionFloor`, with the same provider, profile
+and pinned API revision. Stripe declares a 24-hour checkout key-retention floor.
+The dispatch service measures from original `PaymentAttempt.CreatedAt`, not
+the renewable checkout cutoff, and reserves a one-minute transport margin.
+It checks before preparation and immediately before the provider handoff.
+Absent, expired or changed guarantees return the attempt/effect to durable
+Unknown without a new provider call, key or active-slot release. Proven
+pre-handoff retries remain separate. Retrieval of a known session is read-only
+and remains available outside this mutation replay window.
+
+Five native regression cases cover missing retention, the exact margin boundary,
+renewed cutoff, changed API revision and expiry while preparing the dispatch.
+Provider-contract verification of the declared Stripe floor and runtime native
+execution remain queued for final programme assurance.
+
+Checkout replacement captures attempt and dispatch-effect IDs before native
+transaction replay. It validates current acceptance, composition and provider
+cutoff before releasing a terminal active slot or extending order/hold deadlines.
+Negative admission results therefore commit no preparatory payment writes.
+An existing queued replacement must match current composition and acceptance.
+Persistence catches only metadata-classified payment uniqueness contention
+outside an enclosing transaction; it recovers the exact provider operation,
+composition, money and recipient binding, never an arbitrary active attempt.
+Other database failures propagate to the native transaction owner for rollback.
+
+The checkout, refund and Connect adapters construct Stripe SDK clients with
+`MaxNetworkRetries = 0`. Named HTTP clients retain existing request and
+connection deadlines, without a transport retry layer around mutations.
+One native dispatch makes at most one handoff per mutation. Stable provider
+operation keys remain attached where the port supplies them.
+
+Timeouts, connection loss and retryable provider responses after possible
+handoff do not prove that no mutation occurred. Native payment/refund state
+machines own reconciliation and authorized redrive, including lease, current
+authority and provider idempotency-retention constraints. Connect callers
+must resolve uncertain onboarding mutations rather than rely on SDK replay.
+This setting does not certify business recovery. Refund retrieval can itself
+perform a fee-refund mutation; that handoff also has no transparent SDK retry.
 
 Purchase governance runs before payment-provider I/O. The Application handler derives quantity from the persisted registration-order lines, resolves the current tenant, and asks `TicketPurchaseAuthorityResolver` for a server-proven enforcement dimension. A command cannot supply an account ID, contact hash, enforcement key, or quantity.
 

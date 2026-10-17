@@ -92,7 +92,9 @@ functions and function-only runtime grants before starting the API.
 
 | Asset | Compose Anchor | Why It Matters |
 |---|---|---|
-| Primary application data | Provider database/schema or primary SQLite volume/file | Tenants, events, users, settings, outbox, and Data Protection keys. Record the configured `Database:Schema`; PostgreSQL/SQL Server tables are clean names inside it, while flat providers use `ie_`. |
+| Primary application data | Provider database/schema or primary SQLite volume/file | Tenants, events, users, settings and outbox; historical DP tables may remain but are not runtime key authority. Record the configured `Database:Schema`; PostgreSQL/SQL Server tables are clean names inside it, while flat providers use `ie_`. |
+| External Data Protection | Selected authority's partition ring and separate admission record | Preserve every retained key, exact descriptor and revocation needed by live data and backups; DB/Redis copies cannot substitute. |
+| Data Protection restore floor | Independently protected deployment pin/minimum generation, outside ordinary restore scope | Preserve the newest accepted inventory/revocation state; never restore this expectation alongside an older ring/admission. |
 | Privacy-erasure authority | `EmbeddedSqlite`: dedicated `/app/data/privacy_erasure_authority.db` volume/file; `CoLocated`: primary application database; `ExternalDatabase`: independently operated structured PostgreSQL target | Typed immutable erasure facts and monotonic counter drive replay. Preserve topology-specific backup independence from application restore operations. |
 | Keycloak PostgreSQL data | `keycloak-db` volume `keycloak_data` | Realms, clients, roles, users, and login configuration. |
 | Object storage | API volume `local_storage_data`; optional `minio` volume `minio_data` or external S3 bucket when selected | Uploaded files, images, and storage-backed assets. |
@@ -100,6 +102,31 @@ functions and function-only runtime grants before starting the API.
 | Release manifest | image tags, commit SHA, migration state, docs version | Required for rollback and audit. |
 
 Do not treat Docker image tags alone as a backup. Database schema and secret-provider state must match the application version being restored.
+
+### Data Protection restore admission
+
+Stop all writers/replicas before changing ring or admission. Inventory persistent
+destinations, sensitive registration values, report evidence, protected outbox
+material, and every backup that can restore such values. Their keys have no
+retirement date inferred from framework expiration. Preserve the latest independent
+pin and generation floor when restoring database, bytes or candidate authority.
+An older ring/record pair must fail even when internally consistent.
+
+Use the native operator `status` against pinned history for bounded inspection.
+`renew` or `rotate` can issue a forward-generation candidate from pinned history
+after its serving lease expires; this validates historical custody, not permission
+to serve the expired record. Preserve all keys and revocations. If restored data
+needs a revoked key, reject access and reconcile the affected data; never un-revoke
+the key or lower the floor. If a retained key is missing, recover it from the
+independent authority backup and approve a forward record; the application cannot
+reconstruct it from ciphertext.
+
+Only resume after each restarted replica reports the exact new admission hash and
+generation, active-key proof, and successful decryptions of representative retained
+payloads using their actual purposes. The source tests are not actual deployment
+receipts. Keep old ring state/backups; no cleanup or migration in this phase deletes
+them. See [SECRETS.md](SECRETS.md#external-data-protection-admission) and the
+[operator runbook](../public/documentation/readme/configuration-and-operations/secrets.md#external-data-protection-rings).
 
 ## Backup Procedure
 
@@ -417,3 +444,45 @@ If release notes do not explicitly state that a rollback is image-only safe, ass
 - [CONFIGURATION.md](CONFIGURATION.md) — authoritative configuration sections.
 - [SECRETS.md](SECRETS.md) — secret-provider behavior.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — release documentation contract.
+
+## Ticketing Recovery Fleet Observation Authority
+
+`TicketingRecoveryHealthCheck` obtains fixed aggregates through
+`ITicketingRecoveryHealthObserver`, separately from the tenant recovery operator
+store. `TicketingRecoveryHealthObserver` acquires a fresh unbound
+`IGlobalExploreDbContextFactory` lease. Neither a requestless Runtime context nor
+removing its EF tenant filter establishes fleet visibility.
+
+After the parent composition integrates `AddTicketingRecoveryHealthPersistence`
+and the migration authority installs `PostgresTicketingRecoveryHealthContract`
+after forced RLS, PostgreSQL Global can execute only the recovery snapshot
+capability. Its dedicated nonlogin owner selects checkpoint/reissue status and
+effect status, failure-code predicate, and next-attempt time columns. The returned
+shape is six counts and the oldest Pending/Unknown next-attempt timestamp, with
+no row, tenant, ticket, manifest, operation identity, or failure-code output.
+Global cannot select or mutate the underlying recovery tables through this
+capability.
+
+The installer consumes declared `PostgresNativeQueueEnrollment.GlobalLogin`;
+exact role edges, column privileges, routine ACLs, safe Global identity, and
+forced-RLS observation policies are checked before reinstall grants and function
+work, and at transactional install exit. An extra applicable restrictive policy
+is a readiness failure, not evidence of an empty fleet. Existing drift is not
+normalized. Fresh creator ADMIN authority survives only until declared grants
+are installed; owned temporary shortcuts and schema CREATE are then removed.
+These checks do not establish ordinary grantor provenance or dependency closure.
+
+Portable profiles also use the separate Global pool and only fixed aggregates.
+Existing status predicates remain unchanged, including literal `POISON_` prefix
+matching and oldest Pending/Unknown time without a due-now filter. The health
+consumer still samples its clock after observation, clamps future ages to zero,
+and applies the configured inclusive warning/unhealthy thresholds. Missing
+observer registration, missing capability, or authority drift yields Unhealthy
+without publishing exception details or synthetic zero counts. Disabled controls
+retain their explicit disabled Healthy result.
+
+The source/specification unit is not execution evidence. The existing
+`ck_fair_return_effect_status` and `ck_fair_return_effect_state` constraints exclude
+Unknown status 5; the schema owner must resolve that producer/storage mismatch
+before the authored real Unknown-row readiness cases can pass. Do not drop
+those constraints in health setup or replace Unknown with Pending to claim proof.

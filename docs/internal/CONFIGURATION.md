@@ -8,6 +8,25 @@ The exhaustive environment-variable reference is maintained in
 `.env.example` is intentionally a curated baseline, not a complete catalogue.
 This document owns configuration architecture, source anchors and invariants.
 
+## Consumer authority and public token policy
+
+Startup source composition fixes the secret consumer before acquisition.
+`SecretAcquisitionPolicy` owns exact runtime roots; `RuntimeSecretEnvironment`
+owns the final AppHost child projection. AppHost consumes the Setup Core
+catalogue's public startup metadata to preserve declared runtime controls without
+forwarding arbitrary parent secrets. Compose assigns independent machine
+credentials per service rather than including a common credential pair in an
+environment anchor. See [the custody contract](SECRETS.md#consumer-isolated-acquisition-and-orchestration).
+
+`KEYCLOAK__AUDIENCE` is the scalar API resource audience, default
+`islamu-event-api`. `KEYCLOAK__PERMITTEDCLIENTS__0` and further indices restrict
+the requesting clients independently; they never add audiences. Both are public
+configuration, not credentials. An absent list means no optional client
+restriction; an empty item is invalid. Compose uses an unresolved-value
+passthrough for index zero so omission does not inject an empty list member.
+The API mapping preserves public process configuration even when secrets come
+from Infisical. Retired accepted-audience arrays are not projected by AppHost.
+
 ## Discovery traversal governance
 
 `EventDiscoveryTraversalSettingDefinitions` registers tenant-scoped integer
@@ -192,6 +211,34 @@ type. Legacy operator identity keys under Checkout governance are unsupported.
 
 Cosmetic branding remains independently configurable and is never a legal
 identity fallback.
+
+### Native legal Markdown rendering bounds
+
+`Event.Wire.Contracts/ConfigurationPortability/LegalMarkdownCodec.cs` is a
+restricted text codec shared by API legal-document rendering and offline setup
+previews, not an active template engine. It accepts at most 256 KiB UTF-8 Markdown,
+128 links, 64 placeholder **occurrences** across body and link labels, and
+500 UTF-16 characters per resolved identity value. Repeating the same placeholder
+consumes the occurrence budget; the inspection result still reports distinct
+placeholder names. Inspection now validates inline label syntax and counts its
+placeholders just as rendering does.
+
+Inline recursion is capped at 32 and rendered HTML at 1,048,576 UTF-16 characters.
+Encoded fragments are checked before appending; block/closing markup is checked
+before returning the output. Intermediate encoded fragments remain bounded by
+the input/value limits. Identity substitution is HTML-encoded once and never
+parsed again as Markdown, a placeholder expression or a runtime type. Existing
+raw HTML/fenced-code/resource rejection and HTTPS destination policy remain.
+Neither inspection nor rendering fetches those destinations.
+
+An excessive input/expansion/output fails with the codec's existing
+`ArgumentException` contract and produces no render result. The public native
+legal-document query already maps this to unavailable; the API returns its
+existing 503 ProblemDetails without partial HTML. Repair the governed draft and
+review/publish it through its native lifecycle; do not loosen the limit or
+replace the published snapshot as a recovery shortcut. No migration is involved.
+The extended `LegalMarkdownRenderingInvariantTests` are source-authored and
+unrun until whole-programme source completion.
 
 ### Operator identity manifest portability
 
@@ -541,7 +588,7 @@ The three application composition roots (`Explore.API`, `Explore.Blazor`, and `E
 
 ### Keycloak onboarding metadata
 
-The API compatibility layer maps `KEYCLOAK_CLIENT_ID` and `KEYCLOAK_BLAZOR_CLIENT_ID` to `Keycloak:ClientId`. It maps the server-only `KEYCLOAK_BLAZOR_CLIENT_SECRET` or `Keycloak:BlazorClientSecret` value to `Keycloak:ClientSecret`. Existing authoritative `Keycloak:*` values retain precedence because compatibility aliases only fill missing keys. `Keycloak:Audience` identifies the API audience and is never used as the browser client ID.
+The API maps public `KEYCLOAK_CLIENT_ID` and `KEYCLOAK_BLAZOR_CLIENT_ID` metadata to `Keycloak:ClientId`. It does not map BFF confidential credentials into `Keycloak:ClientSecret`; the BFF owns that acquisition. `Keycloak:Audience` identifies the API resource and is never derived from a browser or permitted-client identifier.
 
 The deployment tuple is the only runtime authority. Endpoint, realm, BFF client
 ID, optional API audience and BFF client secret must resolve together from the
@@ -566,7 +613,7 @@ inspection, then perform a fresh sign-in.
 
 ## Deployment CI/CD Secrets
 
-GitHub Actions deployment secrets are workflow secrets, not runtime app settings and not `SecretProvider` keys. Cerbos policy publishing reads repository secrets through the `${{ secrets.* }}` context while the job remains gated by the `production` GitHub Environment. Coolify deploy credentials are environment-scoped secrets so production deployments can require approval before those secrets are released to deploy jobs.
+GitHub Actions deployment secrets are workflow secrets, not runtime app settings and not `SecretProvider` keys. Cerbos publication is operator-owned; CI verifies a signed statement without acquiring administrator credentials. Coolify deploy credentials remain environment-scoped secrets so production deployments can require approval before those secrets are released to deploy jobs.
 
 | Environment | Secret / variable | Purpose |
 |---|---|---|
@@ -576,10 +623,8 @@ GitHub Actions deployment secrets are workflow secrets, not runtime app settings
 | `production` variable | `PRODUCTION_URL` | Public environment URL shown on the GitHub deployment environment. |
 | `production` variable | `PRODUCTION_API_URL` | Required API base URL for production `/alive` and `/health` smoke checks. |
 | `production` variable | `PRODUCTION_UI_URL` | Required UI base URL for production `/alive` and `/health` smoke checks. |
-| Repository secret | `CERBOS_SERVER` | Production Cerbos Admin API gRPC address used by the main-branch policy publish job. |
-| Repository secret | `CERBOS_USERNAME` | Production Cerbos Admin API username used by `cerbosctl`. |
-| Repository secret | `CERBOS_PASSWORD` | Production Cerbos Admin API password used by `cerbosctl`. |
-| Repository secret | `CERBOS_CA_CERT_PEM` | Optional private CA certificate PEM for production Cerbos Admin API TLS verification. |
+| `production` variable | `CERBOS_PUBLICATION_PUBLIC_KEY_PEM` | Independent operator receipt-verification key; never the private key. |
+| `production` variable | `CERBOS_PUBLICATION_PDP_ENDPOINT` | Exact expected production PDP endpoint bound into signed publication statements. |
 | `staging` secret | `COOLIFY_DEPLOY_API_STAGING_WEBHOOK` | Coolify staging API application deployment webhook. |
 | `staging` secret | `COOLIFY_DEPLOY_UI_STAGING_WEBHOOK` | Coolify staging UI application deployment webhook. |
 | `staging` secret | `COOLIFY_DEPLOY_TOKEN` | Bearer token used when invoking staging Coolify webhooks. |
@@ -1247,7 +1292,7 @@ through the selected Environment, Infisical, or local User Secrets authority. Th
 | `AiProvider:Enabled` | `false` | Enables provider readiness evaluation. Disabled reports healthy-disabled and performs no provider network call. |
 | `AiProvider:Provider` | `none` | Supported values: `none`, `openai`, `openai-compatible`, `anthropic`, `anthropic-compatible`, and `azure-openai`. `fake` is additionally available only in `Development` and `Testing`; production-like environments reject it and do not register its provider or strategy. `openai` uses OpenAI's Responses API; `anthropic` uses Anthropic's Messages API; compatible providers target configured endpoints. |
 | `AiProvider:EndpointUrl` | unset | Admin/deployment-controlled provider base URL. Optional for `openai` (`https://api.openai.com/v1`) and `anthropic` (`https://api.anthropic.com/v1`); required for `openai-compatible`, `anthropic-compatible`, and `azure-openai`. Azure OpenAI must use HTTPS. Must have no embedded credentials, query string, or fragment. Local/private endpoints require explicit opt-in. |
-| `AiProvider:ApiKey` | unset | Sensitive provider credential. Required for `openai` and `anthropic`; optional for local/self-hosted compatible endpoints that do not require authentication. Never expose in browser payloads, health data, logs, metrics, traces, screenshots, or issue templates. |
+| `AiProvider:CredentialScope` | `none` | Reference selection, not a credential. Deployment configuration permits `none` or `instance`. Environment mapping selects `instance` by default for official API-key providers and `none` for compatible/managed-identity modes. |
 | `AiProvider:ModelId` | unset | Default model identifier for the concrete adapter. Required for OpenAI Responses, Anthropic Messages, compatible, and Azure OpenAI providers when enabled. For Azure OpenAI this is the deployment name passed to the Azure SDK. Health/metrics use only boolean presence flags, not the raw model ID. |
 | `AiProvider:AzureCredentialMode` | `api-key` | Azure OpenAI credential mode: `api-key` or `default-azure-credential`. Prefer `default-azure-credential` for Azure-hosted deployments with managed identity. |
 | `AiProvider:AzureTenantId` | unset | Optional tenant ID used to constrain `DefaultAzureCredential` for Azure OpenAI. Leave unset for the SDK default chain. |
@@ -1495,11 +1540,12 @@ Cerbos runtime settings are the first implemented consumer of the shared secrets
 - `Authorization:Provider` is the authoritative deployment selector. `AUTHORIZATION_PROVIDER` maps to it without overriding an existing authoritative value. Accepted values are blank, `local`, and `cerbos`; any other explicit value fails startup validation.
 - Blank/unset provider intent does not infer Cerbos from endpoint or credential presence. The onboarding page selects Local RBAC by default and keeps Cerbos behind the native **Advanced: use Cerbos PDP** disclosure.
 - Explicit `local` is deployment-managed, reports authorization ready, skips the provider-choice page, and performs no Cerbos endpoint or policy call.
-- Explicit `cerbos` is deployment-managed and selected by runtime authorization immediately, so failures deny rather than falling back to Local. The API background worker verifies the instance PDP gRPC health service and then publishes the bundled policy package specifically to the instance Admin API, never an ambient tenant BYO target. It retries transient startup failures within the configured bound. Configured status becomes ready only after both operations succeed; automatic navigation skips the choice page while reconciliation is pending or ready, and a final failure is exposed as locked remediation from the instance setup task.
+- Explicit `cerbos` is deployment-managed and fails closed rather than falling back to Local. The API background worker verifies PDP gRPC health and a signed operator publication statement. It never calls the Admin API. Configured status requires successful readiness plus a currently valid declaration; historical publication is not live-store equality.
 - `Cerbos:GrpcEndpoint` can prefill onboarding/admin forms as deployment bootstrap. Once an operator saves an application-managed endpoint, the saved setting takes precedence unless the key is explicitly deployment-managed.
 - `Cerbos:UsePolicyScope` defaults to `false`. Keep it false for bundled root policies; enable it only when the PDP has tenant-scoped policy files and `engine.lenientScopeSearch=true`.
 - `Cerbos:AdminApi:*` configures explicit policy package sync/status operations only. Runtime authorization uses the gRPC PDP and never waits for the Admin API. Admin requests have a 10-second HTTP timeout.
-- `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` are resolved through `ISecretResolver` using the instance-scoped Cerbos secret bindings. They never enter `CerbosAdminApiSettings` or general `IConfiguration`. When both resolve, onboarding uses them by default and keeps the one-time override form collapsed. When either is missing or unavailable, publishing fails closed and onboarding opens the one-time credential form. A complete UI pair overrides deployment credentials for one request and is never persisted.
+- Cerbos administrator pairs are foreground input only. The runtime catalogue, configuration resolver and publisher have no credential fallback. `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD_HASH` belong to provider infrastructure, not Event's API. The plaintext password is not a persistent deployment input.
+- `Cerbos:PolicyPackage:Publication` holds only public verification material: `ReceiptBase64`, `SignatureBase64`, `PublicKeyPem`, `Revision`, and `Environment`. Compose/Aspire map `CERBOS_PUBLICATION_*`. The authenticated statement must match the deployment's independently configured revision/environment, package hash and exact PDP endpoint. See [publication and recovery](AUTHORIZATION.md#hosted-cicd-publishing).
 - `Secrets:Ownership:DeploymentManagedKeys` can mark `cerbos.grpc_endpoint` or `*` as deployment-managed. Deployment-managed endpoint fields are read-only in UI and ignore application-managed DB values for that field.
 - Setup and post-onboarding administration reuse the existing endpoint verification, package download/sync, and local-fallback capabilities. They do not add a Cerbos resource inventory or an arbitrary policy-decision test API.
 
@@ -1510,10 +1556,10 @@ Background reconciliation binds from `Cerbos:PolicyBootSync`:
 | `InitialDelaySeconds` | `5` | Delay after API startup before deployment-provider reconciliation begins. |
 | `RetryDelaySeconds` | `3` | Delay between failed automatic reconciliation attempts. |
 | `MaxAttempts` | `5` | Maximum automatic attempts per process start. |
-| `TimeoutSeconds` | `60` | Maximum time for each verification-and-publish attempt. |
+| `TimeoutSeconds` | `60` | Maximum time for each read-only health/declaration verification attempt. |
 
 For a Coolify-managed external Cerbos PDP, use [CERBOS_COOLIFY.md](CERBOS_COOLIFY.md) for the Docker Image tag, PostgreSQL schema bootstrap, Admin API password hash, gRPC routing, and `cerbosctl` upload flow. Compose and Aspire local infrastructure use the repository `cerbos/` folder directly.
-- When `Authorization:Provider` is blank, governance settings select the active provider (`AuthorizationProvider`). Explicit deployment intent takes precedence. Governance still owns whether tenant customization is enabled and per-tenant BYO values such as `cerbos.mode`, `cerbos.custom_endpoint`, custom Admin API endpoint, and custom Admin API credentials.
+- When `Authorization:Provider` is blank, governance settings select the active provider (`AuthorizationProvider`). Explicit deployment intent takes precedence. Governance owns tenant customization, `cerbos.mode`, `cerbos.custom_endpoint`, and the custom Admin API endpoint, never administrator credentials.
 
 Endpoint and secret safety rules:
 
@@ -1800,7 +1846,7 @@ After authentication, onboarding is presented as one server-derived task overvie
 
 - `DEPLOYMENT_MODE` (Infisical `/api`) -> `Deployment:Mode` (`single_tenant`/`multi_tenant` normalized to `SingleTenant`/`MultiTenant`)
 - `MCP_ENABLED`, `MCP_ENDPOINT_PATH`, `MCP_STATELESS`, `MCP_ENABLE_LEGACY_SSE` (Infisical `/api` or `/mcp`) -> `Mcp:Enabled`, `Mcp:EndpointPath`, `Mcp:Stateless`, `Mcp:EnableLegacySse`; when absent, defaults are `true`, `/mcp`, `true`, and `true`; bare endpoint paths such as `mcp` normalize to `/mcp`, and `MCP_ENABLE_LEGACY_SSE` is a startup ceiling only
-- `KEYCLOAK_ENDPOINT` + `KEYCLOAK_REALM` (Infisical `/keycloak`) -> `Keycloak:Authority`, `Keycloak:MetadataAddress`
+- `KEYCLOAK_ENDPOINT` + `KEYCLOAK_REALM` (Infisical `/runtime/api/authentication/keycloak`) -> `Keycloak:Authority`, `Keycloak:MetadataAddress`
 - Keycloak mapper defaults -> `Keycloak:Audience=islamu-event-api`, `Keycloak:RequireHttpsMetadata=true`
 - `CONTROL_PLANE_MANAGED_MODE` -> `ManagedControlPlane:Enabled`
 - `CONTROL_PLANE_URL` -> `ManagedControlPlane:ControlPlaneUrl`
@@ -1808,16 +1854,16 @@ After authentication, onboarding is presented as one server-derived task overvie
 - `CONTROL_PLANE_REGISTRATION_TOKEN` -> `ManagedControlPlane:RegistrationToken`
 - `CONTROL_PLANE_MAXIMUM_TENANT_COUNT` -> `ManagedControlPlane:MaximumTenantCount`
 - `CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL` -> `ManagedControlPlane:TenantAdministratorSignInUrl`
-- `AUTHORIZATION_PROVIDER` (Infisical `/api` or `/cerbos`) -> `Authorization:Provider` (blank, `local`, or `cerbos`)
-- `CERBOS_GRPC_ENDPOINT` (Infisical `/cerbos`) -> `Cerbos:GrpcEndpoint`
-- `CERBOS_HTTP_ENDPOINT` (Infisical `/cerbos`) -> `Cerbos:HttpEndpoint` and the instance Admin API endpoint list
-- `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` are authoritative Environment-authority names; they are never remapped into `IConfiguration`
-- `CERBOS_USE_POLICY_SCOPE` (Infisical `/cerbos`) -> `Cerbos:UsePolicyScope` (`true`/`false`, also accepts `1`/`0`, `yes`/`no`, `on`/`off`)
+- `AUTHORIZATION_PROVIDER` (Infisical `/api`) -> `Authorization:Provider` (blank, `local`, or `cerbos`)
+- `CERBOS_GRPC_ENDPOINT` (Infisical `/runtime/api/authorization/cerbos`) -> `Cerbos:GrpcEndpoint`
+- `CERBOS_HTTP_ENDPOINT` (Infisical `/runtime/api/authorization/cerbos`) -> `Cerbos:HttpEndpoint` and the instance Admin API endpoint list
+- Cerbos administrator credentials have no Event runtime environment mapping; foreground operations require fresh input.
+- `CERBOS_USE_POLICY_SCOPE` (Infisical `/runtime/api/authorization/cerbos`) -> `Cerbos:UsePolicyScope` (`true`/`false`, also accepts `1`/`0`, `yes`/`no`, `on`/`off`)
 - S3 credentials use only `STORAGE_S3_ACCESS_KEY_ID` and
   `STORAGE_S3_SECRET_ACCESS_KEY` under Environment authority. Legacy
   `ISLAMU_EVENT_*` and `S3Settings:*` aliases are removed.
 
-Keycloak base URL: `KEYCLOAK_ENDPOINT` (Infisical `/keycloak`). No hardcoded fallback — if not set, Keycloak mapping is skipped.
+Keycloak base URL: `KEYCLOAK_ENDPOINT` (Infisical `/runtime/api/authentication/keycloak`). No hardcoded fallback — if not set, Keycloak mapping is skipped.
 
 Storage naming rules:
 
@@ -1834,7 +1880,7 @@ Storage naming rules:
 
 `Explore.Blazor.Extensions.ConfigurationExtensions` maps Keycloak, Google, and API base URL keys for the BFF host.
 
-API base URL: `API_ENDPOINT` (Infisical `/blazor`) maps into `ExploreApi:BaseUrl`. Runtime YARP resolution checks `ExploreApi:BaseUrl`, then Aspire service discovery keys `services__explore-api__https__0` and `services__explore-api__http__0`, then falls back to `https://localhost:7039/` when no value is configured at all.
+API base URL is public deployment configuration (`API_ENDPOINT`); the BFF does not acquire a broad `/blazor` folder. Aspire service discovery supplies its local API endpoint.
 
 Important behavior:
 
@@ -1842,8 +1888,9 @@ Important behavior:
 - `Keycloak:ClientSecret` is explicitly overridden when `KEYCLOAK_BLAZOR_CLIENT_SECRET` (Infisical) is present.
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` map to `Google:ClientId` and `Google:ClientSecret`.
 
-Compose and local Aspire pass `KEYCLOAK_BLAZOR_CLIENT_SECRET` only to the API
-and BFF runtime. Bundled Keycloak starts without importing or reconciling the
+Compose and local Aspire pass `KEYCLOAK_BLAZOR_CLIENT_SECRET` only to BFF or
+Combined runtime under Environment authority; Infisical consumers acquire it
+directly with their own identities. Bundled Keycloak starts without importing or reconciling the
 repository sample realm. During setup, an operator can explicitly create an
 absent realm and clients; the BFF secret flows directly from the selected
 authority to that reviewed Admin REST create request. The `islamu-event-api`
@@ -1915,11 +1962,11 @@ Platform monetization is application-managed instance data, not an `appsettings`
 | SMTP | `email.*` | `smtp.username`, `smtp.password` |
 | Optional S3-compatible storage | `s3.*` | `storage.s3.access_key_id`, `storage.s3.secret_access_key` |
 | Authentication | `auth.*` | `auth.keycloak_client_secret`, `auth.google_client_secret` |
-| Cerbos admin credentials | `cerbos.*` | Deployment configuration or request-scoped one-time sync input; never persisted by onboarding |
-| AI assistant | `ai_assistant.*` | `ai_assistant.api_key` |
+| Cerbos admin credentials | No retained runtime credential | Fresh request-scoped one-time input; publication is external operator authority |
+| AI assistant | `ai_assistant.*` | No credential value; scope metadata selects a secret reference. |
 | Support access | `support_access.*` | none |
 
-`SecretDefinitionRegistry` recognizes provider folders for `/api`, `/storage`, `/keycloak`, `/cerbos`, `/postgresql`, `/smtp`, `/analytics`, and `/ai`. The `/smtp` folder uses `MAIL_SMTP_HOST`, `MAIL_SMTP_PORT`, `MAIL_SMTP_USERNAME`, `MAIL_SMTP_PASSWORD`, `MAIL_SMTP_FROM_ADDRESS`, and `MAIL_SMTP_FROM_NAME`. Blazor maps Google client values from `/blazor`; do not claim Google is part of the current secret-catalog folder list unless the registry changes.
+`SecretDefinitionRegistry` declares exact runtime coordinates and `SecretAcquisitionPolicy` admits them for each consumer. Keycloak and Cerbos use purpose-specific runtime roots, while existing service roots such as `/storage`, `/postgresql`, `/smtp`, `/analytics` and `/ai` remain. The BFF acquires Google values only from `/runtime/bff/oidc/google`; broad provider folders are not runtime authority.
 
 ### External Link Transport Policy
 
@@ -1961,7 +2008,7 @@ Stable key:
 | `ai_assistant.enabled` | bool | `false` | Master enable switch. Disabled remains the safe default until provider health, egress validation, auth, quotas, and retention gates are implemented. |
 | `ai_assistant.provider` | string | `"none"` | Tenant/runtime provider intent. Static `AiProvider:*` controls concrete Infrastructure wiring and supports `none`, `openai`, `openai-compatible`, `anthropic`, `anthropic-compatible`, and `azure-openai`; `fake` is registered only in `Development` and `Testing`. Production-like hosts reject and cannot resolve `fake`. Real providers require model configuration, while API keys are optional only for compatible endpoints that do not enforce authentication. |
 | `ai_assistant.endpoint_url` | string | `""` | Provider base URL for self-hosted, OpenAI-compatible, Anthropic-compatible, or Azure OpenAI adapters. First-class `openai` and `anthropic` providers use their official API defaults when this is empty. This is deployment/admin-controlled; browser or request payloads must never choose outbound provider hosts. |
-| `ai_assistant.api_key` | string | `""` | Sensitive provider credential. Required for first-class OpenAI Responses API and Anthropic Messages API calls; optional for local/self-hosted compatible endpoints that do not require authentication. Treat as write-only/redacted; never expose to Blazor, API responses, logs, screenshots, traces, or issue templates. |
+| `ai_assistant.credential_scope` | string | `"none"` | Nonsecret reference selection: `none`, `instance` or `tenant`. Official providers require a reference. Only explicit `none` permits unauthenticated compatible calls. Values remain exclusively in the selected secret authority. |
 | `ai_assistant.model_id` | string | `""` | Default model ID. Real providers are not considered configured unless a model ID is present; compatible endpoints may leave API key empty when the provider accepts unauthenticated requests. |
 | `ai_assistant.allowed_model_ids` | JSON array | `[]` | Optional model picker allow-list. The default model is always included in the effective allow-list; duplicate and blank entries are ignored by availability resolution. |
 | `ai_assistant.max_input_tokens` | int | `8000` | Prompt/context budget used before provider calls. Handlers must still enforce bounded context and prompt length. |
@@ -1979,7 +2026,11 @@ Stable key:
 
 Important notes:
 
-- `AiAssistantSettingGroup.IsConfigured` treats `fake` as configured for deterministic tests, but Infrastructure registers and validates that provider only in `Development` and `Testing`. `openai-compatible` requires `ai_assistant.endpoint_url` and `ai_assistant.model_id`; `ai_assistant.api_key` is optional and sent only when configured.
+- `AiAssistantSettingGroup.IsConfigured` describes structural provider metadata, not credential readiness. `fake` retains its existing environment/admission restrictions. Bootstrap, shell/public availability and native admission consume value-free capability status; Infrastructure repeats reference resolution at dispatch, outside retrying graph transactions.
+- Tenant-selected credentials resolve at the exact tenant scope, without instance inheritance. A tenant-owned provider or endpoint cannot use an instance credential; model-only overrides do not change transport ownership. Category and individual locks govern reference selection.
+- Compatible providers use distinct `ai.openai_compatible.api_key` or `ai.anthropic_compatible.api_key` references, never an official credential. Their unqualified instance bindings use the existing admitted Setup Live writer. Missing, unavailable, unauthorized or invalid selected references stop handoff without another authority, an options credential or an unauthenticated fallback.
+- Instance Azure API-key mode uses its distinct `ai.azure.api_key` reference. Existing managed identity mode retains the vetted identity transport and explicit `none` selection. No tenant Azure provider is added.
+- `AI_API_KEY` and `ai_assistant.api_key` are retired. Source fences reject ordinary and tracked-original-key writes; old values are not copied into a new authority. Coordinated live-row cleanup requires retiring old writers first. Historical notifications, audits and backups need separate retention review; source retirement does not prove physical removal.
 - Provider output is untrusted data. It may produce structured action candidates, but those candidates must be persisted as proposals and require explicit confirmation before any write command runs.
 - Do not log raw prompts, model responses, selected reference content, provider request IDs tied to content, endpoint credentials, or provider exception bodies.
 - Provider endpoint URLs are deployment/admin-controlled. Browser payloads and per-request DTOs must never choose outbound provider hosts.

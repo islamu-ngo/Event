@@ -1,0 +1,29 @@
+Change-Id: CHG-01M55HQT23TR0WKB118XFTRY71
+Title: "Document native authority and operator deployment contracts"
+Type: docs
+Scope: self-hosting
+Summary: "Record the paired operator and technical guidance and durable programme findings for original-authority execution, configuration and recovery."
+Group: staged-programme-documentation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Record the paired operator and technical guidance and durable programme findings for original-authority execution, configuration and recovery.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

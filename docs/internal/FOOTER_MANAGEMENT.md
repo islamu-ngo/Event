@@ -115,6 +115,17 @@ Instance admins can lock footer aspects to prevent tenant overrides:
 
 Governance is managed via `InstanceFooterGovernanceSection.razor` with toggle controls. In single-tenant mode, an info alert explains that governance has no effect.
 
+Human Footer administration now selects its original ordinary Global or exact
+RuntimeTenant owner before handler construction. Annotated Tenant/update policy
+is prepared outside BEGIN; the real owner acquires S/P/route/H before business
+data and revalidates source-set custody, policy inputs, credential lifetime and
+the original support horizon before commit. Lower link/group and scalar writers
+require the private active Footer producer, not an actor ID or bare transaction.
+The existing setup-authorized governance GET reauthenticates the actual setup
+secret before result release and never grants setup writes. Public rendering and
+HAL affordance gating retain their existing roles. These source changes and
+regression controls are not final executable/provider acceptance.
+
 The scalar PATCH resolves current lock state on every request. Requested `template`, `description`, `socialLinks`, or `copyright` leaves that are locked by instance governance are preserved rather than overwritten; unlocked requested leaves can still be written in the same patch. The `general` leaves aren't covered by those scalar locks. HAL remains the UI authority, but direct API calls do not bypass server lock handling.
 
 Link management has a separate boundary. The tenant settings resource includes `manage-link-groups` only when effective link-group governance is unlocked and the caller has tenant update authority. Every create, update, delete, and reorder command also calls `FooterLinkMutationGuard`, so constructing a link mutation URL directly cannot bypass the effective lock. That guard returns an authorization failure in multi-tenant mode and bypasses the instance lock in single-tenant mode, matching the platform governance rule.

@@ -31,6 +31,138 @@ through `TenantStoredFiles` and `TenantStorageSettingsAdminService`, not the ima
 display helper. Collection and detail HAL independently gate the action. A 202
 response means cleanup is pending; stale 409 responses refresh current links.
 
+## Configuration mutation custody
+
+`UpdateInstanceStorageSettingsCommand` and `PatchTenantStorageSettingsCommand`
+reach their services as the original immutable commands, not detached read DTOs.
+`StorageSettingsMutation` is a privately issued first configuration observation,
+not a read/dashboard DTO or a transferable administrator grant. Before merged
+handler validation, the service selects ordinary Global or the exact Runtime
+tenant and captures all 13 setting rows/absences, complete metadata and relevant
+binding sources. Handler validation uses that retained projection; direct
+mutation repeats complete validation against the same issued handle.
+Instance complete groups and tenant sparse leaves keep their distinct semantics.
+Fixed effects, identities, audit attribution and representable data timestamps
+are compiled before writing. The existing human Settings issuer acquires
+current principal, policy-source and support fences on one Serializable attempt.
+These commands have no annotated PDP action; no substitute Settings route is
+invented. Instance configuration requires instance administration; the tenant
+action retains its tenant-or-instance-administrator predicate.
+
+The dedicated `StorageConfigurationWriter` requires private completion on the
+original context, unit and connection. Skipped or equal-value generic writes
+cannot substitute for it. Connection close/reopen permanently invalidates
+custody, even when pooling returns the same backend.
+The instance child proof includes its existing paired lock-clearing effects;
+tenant leaves preserve existing locks. Durable delegation and upload ceilings
+are reread in the acquired tenant owner and at settlement. The capsule's
+effect/policy finalizer joins the original source checks before final credential
+and support-deadline sampling. Rejection rolls back the group; activation calls
+remain after settlement, and provider preflight stays outside held source leases.
+
+SQLite and PostgreSQL source paths are authored. The dedicated PostgreSQL
+contract has fixed configuration functions, four nonlogin roles, independent
+catalog/role/body attestation and a preserved `storage_configuration_source`
+singleton. Source exclusion covers settings/binding relations and coexists
+with probe triggers. Native enrollment supplies data capability, not human
+authority. PostgreSQL data time is represented before compilation; original
+credential and support deadlines retain full precision. SQL Server/MySQL and
+other unsupported provider paths fail closed.
+
+The original 23 controls and 85 new controls (40 signed, 45 native) remain
+unrun. Root/fixture integration is not SQL installation or provider acceptance.
+It grants no setup, provider-probe,
+accounting-repair or physical-byte authority. Accounting and external probe
+actions retain distinct original-source protocols. S3 cache activation now uses
+the process-local generation registry described below; this is not a
+cross-process broadcast or native probe authority.
+
+## Accounting recalculation custody
+
+The actual usage-recalculation POST now preserves its original command through
+controller, handler, service and `InstanceStorageAdministration`. The human
+command requires the resolved original administrator actor. Its separate setup
+command preserves the existing branch: an ordinary authenticated ticket plus
+the accepted setup secret, not the dedicated setup-secret scheme. Setup retains
+a real nonempty actor but gets no administrator grant, and remains restricted to
+the accounting POST and unchanged pending bootstrap state.
+
+`StorageAccountingOriginalAuthority` prepares source custody before BEGIN.
+`StorageAccountingOriginalOwner` binds the idle ordinary Global context lease,
+connection and exact physical Serializable attempt. Current principal/policy/
+support sources and the human administrator grant are fenced through settlement;
+setup additionally fences its original ticket, secret and pending snapshot.
+Fresh no-tracking state reads prevent the setup lock loader's tracked row from
+hiding raw/native changes. Existing physical commit callbacks complete source
+awaits before checking credential/support/secret deadlines.
+
+The fixed repair still updates the union of existing counter, object and upload
+scopes atomically, preserving physical-storage charging and tombstone rules.
+PostgreSQL retains its narrow accounting function and grants. Rejected source
+custody rolls back earlier scopes and newly inserted counters; totals escape
+only after settlement. The actual roots register both accounting source ports.
+There are 34 authored, unrun source controls; provider/native enrollment and
+rollback execution remain unverified under the programme freeze. Provider probes
+and process-local cache activation remain separate from accounting custody.
+
+## Provider probe custody and limits
+
+The original instance administrator, accepted authenticated-plus-secret setup
+branch and tenant-or-instance-administrator probe retain their closed query/
+command through `StorageProbeOriginalAction`. The actual roots register its
+source action and `StorageProbeSourceOwner`. Fresh principal/policy/support,
+administrator, setup-state, provider-binding and credential checks settle on
+the original selected SQLite or PostgreSQL owner before each remote handoff and result.
+Database transactions and source leases are released before remote calls.
+Observation/configuration preflight no longer performs write probes.
+
+The dedicated probe client disables retry and redirects. S3 writes use
+conditional creation; cleanup names only the acknowledged version ID. Collisions,
+ambiguous creation or a missing version do not confer deletion ownership. Source
+revocation before cleanup prevents deletion and fails the result. Provider
+acceptance and revocation during an already in-flight remote request are not
+atomic with the database; no such guarantee is claimed.
+
+`PostgresStorageProbeSourceContract` supplies a separate native source fence
+through the existing enrolled Global/Runtime identities. Its private
+`storage_probe_source` generation and ALWAYS BEFORE STATEMENT triggers cover
+SystemSetting, TenantSetting, SecretBinding and InstanceBootstrapState.
+Initially absent winners, metadata, replacement and pending/absent bootstrap
+states participate. Acquisition retains the original generation and updates
+the physical singleton tuple in one non-replaying Serializable source attempt.
+Source changes invalidate it; source locks last only until that attempt settles.
+Connection release/reopen permanently invalidates the selected probe owner.
+
+Exclusion deliberately covers all four relations: unrelated and zero-row
+committed statements can invalidate a probe too. This trades contention for
+complete source coverage; no throughput guarantee is claimed. Independent
+body/catalog/role/trigger admission rejects drift without repair. The installer
+uses the original Migrator, and shared fixture reset preserves its singleton.
+Portable ASCII fingerprint columns are attested with their actual `C` collation,
+not a default-collation assumption.
+
+SQLite and PostgreSQL source paths are authored. SQL Server/MySQL source custody,
+local write probes and unversioned S3 write probes still fail closed.
+The original 45 controls and 59 native/signed controls (including a parent
+collation-drift regression) remain unrun. Source integration does not certify
+SQL installation, remote/native execution, concurrency or unsupported providers.
+
+## S3 cache activation
+
+`S3ConfigCacheRegistry` is a singleton shared by the ordinary root and selected
+service scopes. It tracks published S3 cache keys and serializes lookup,
+publication and invalidation. Instance invalidation removes every published
+scope in that process; tenant invalidation removes only that tenant's entry.
+Both advance the generation so a resolution started before invalidation cannot
+later republish stale configuration. Network/secret/settings resolution occurs
+outside the registry lock. An already-started read can complete its original
+result, but cannot poison a subsequent cache lookup.
+
+The resolver consumes the existing read-only settings port; it gets no scalar
+mutation permission. Four deterministic authored, unrun controls cover all-scope
+refresh, tenant isolation and both in-flight publication races. This fixes the
+previous logging-only branch for this process; it adds no cross-node broadcast.
+
 ## Origin provenance and derived delivery
 
 `StorageObject.SourceUri` is nullable foreign-origin provenance, not byte identity,
@@ -451,6 +583,62 @@ immutable target recovery are specified in
 [Event Resources](EVENT_RESOURCES.md#retirement-and-producer-settlement).
 
 The local provider intentionally skips temporary files and existing quarantine files during inventory. Metrics, logs, and health data expose only bounded categories/counts; they do not include object keys, filenames, filesystem paths, tenant IDs, user IDs, endpoints, bucket names, access keys, or secrets.
+
+### Reconciliation Custody Cutover
+
+The security programme is implementing a purpose-bound database owner for these
+two reconciliation branches. Its provider migrations and runtime assurance
+remain queued until whole-programme implementation is complete. Source changes
+alone are not deployment admission.
+
+Missing-byte observations must capture the persisted tenant, original concurrency
+stamp, exact binding/key/version and eligibility snapshot. Provider existence
+checks occur outside retrying database delegates. The subsequent Serializable
+operation must compare that same observation with current custody before
+quarantining metadata, using the tenant disclosure parent and shared storage
+source fence. A changed target is skipped; provider failure is not absence.
+
+Local orphan admission must inspect physical identity across all retained local
+bindings, including overlapping roots. The custody union includes soft-deleted
+metadata, every upload-session state, settled and unsettled producers,
+tombstones and existing quarantine work. An apparent tenant segment in a path
+is not tenant authority. The current native producers reserve fresh keys before
+provider I/O and retain custody through atomic transfers; this protocol does
+not invent a producer-key-reuse race.
+
+The selected physical-identity contract is host-derived, not inferred from the
+database server OS. Linux uses ordinal path identity. Windows/macOS use
+conservative ASCII case folding: this can block separate files on a
+case-sensitive volume, but cannot turn a known alias into an orphan. Non-ASCII
+case authority on those hosts remains uncertain and must refuse admission or
+block existing work. Drive/UNC and separator handling must agree between native
+and PostgreSQL predicates. Installed function bodies/readiness must reject a
+different host identity mode. This does not establish Unicode alias authority;
+the final native provider/platform packets remain unrun.
+
+The physical effect accepts an admitted UUID and the captured size and UTC
+last-write time. Its private destination is
+`.quarantine/reconciliation/{quarantineId:N}`. An unchanged source moves without
+overwrite; a missing source with matching destination acknowledges the previous
+move; both absent reports absence. A changed source, mismatched destination or
+both-present conflict moves nothing. These file attributes detect ordinary
+replacement, not hostile inode substitution with identical attributes.
+
+Durable claim and settlement must retain the same target and destination after
+lease expiry or lost acknowledgement. Stale workers cannot settle a newer claim.
+The six observation/lifecycle instants persist as bigint UTC ticks, so a
+100-nanosecond file-mtime observation survives PostgreSQL's ordinary timestamp
+precision unchanged. `SettledAtUtc` records both Completed and Blocked terminal
+outcomes; Pending and Processing retain no terminal time.
+Blocked work retains custody for investigation, rather than releasing a possibly
+moved target. Provider I/O is never enclosed in the database transaction.
+
+PostgreSQL acquisition compares exact function bodies and execution ACLs,
+owner/migrator membership options, narrow column grants, native policy
+fingerprints and forbidden inherited authority. The installer rejects an
+unsafe existing role instead of silently normalizing it. Native authority
+drift and competing-lease source cases are authored; none has executed under
+the whole-programme verification override.
 
 ## Heavy Moderation Image Deletion
 

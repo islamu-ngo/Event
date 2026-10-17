@@ -8,6 +8,29 @@ Each reader, scalar and nonquery command validates that identity before executio
 replacing the tenant context or mutating its tenant ID fails closed. Disposal
 clears the sealed identity and request state before context-pool reuse.
 
+## Global reference catalogue and visitor metadata reads
+
+`LookupDataCache` reads its 17 declared reference entity types through
+`PostgresGlobalLookupCatalogueContract` on PostgreSQL. The caller remains the
+original tenantless Runtime connection in a Serializable transaction. A dedicated
+NOLOGIN function owner has only the declared source-column privileges; Runtime
+receives execution, not source-table access or owner-role promotion. Installation
+and admission attest the function body, role edges, source shape and RLS policies.
+`EventType` is the one tenant-capable reference: only its global (`TenantId IS
+NULL`) rows enter this catalogue. Unknown selectors and tenant-selected sessions
+cannot use it. EF still materializes the mapped entities; cache refresh and load
+failure semantics are unchanged.
+
+Visitor HAL metadata uses `IInstanceTenantSettingsReader` on the selected original
+context instead of raw system/tenant repository queries. One complete
+`AuthoritySettingKeys` snapshot supplies both mode and provider projection;
+`IVisitorAccessProviderReader` projects the instance entities without another
+database read. The capability resolver
+retains lifecycle gating, instance locks, tenant overrides and its existing mode
+evaluation. Provider metadata reads only the instance portion of the fixed
+authority-key snapshot, so tenant settings cannot replace instance authentication
+provider configuration. Neither path grants private event management authority.
+
 ## Tenant Directory-Operator Identity
 
  Every tenant has an authoritative typed directory-operator identity document,
@@ -129,7 +152,291 @@ helpers instead of raw `AddDbContext(...UseInMemoryDatabase...)`; otherwise the
 fail-closed tenant filters correctly hide tenant rows and make fixtures drift
 from runtime behavior.
 
-PostgreSQL RLS is not enabled on production tenant tables yet. A bounded prototype now exists in persistence: `PostgresTenantSessionInterceptor` can bind `app.current_tenant_id` on EF Core connection open when `Persistence:EnableRlsTenantSession=true`, and integration tests prove forced RLS behavior through a non-superuser role. Keep EF named filters and tenant-safe foreign keys as the current enforcement model until a dedicated RLS rollout adds app/migration role separation, table policies, and admin/system-path tests.
+PostgreSQL runtime composition requires tenant-session binding and read-only
+policy admission; it is not an optional `Persistence:EnableRlsTenantSession`
+prototype. Migration authority installs model-derived policies with
+`ENABLE ROW LEVEL SECURITY` and `FORCE ROW LEVEL SECURITY`. Runtime admission
+rejects privileged or elevatable logins, table ownership, missing or divergent
+policies, and extra applicable permissive policies before application SQL.
+EF named filters and tenant-qualified foreign keys remain separate enforcement
+layers; authorization still belongs to the owning handler.
+
+Tracked state is not tenant authority. `GenericRepository.GetById` performs a
+no-tracking filtered key query rather than `FindAsync`, so a previously attached
+foreign or deleted object cannot satisfy the read. Key values are captured as
+query parameters; mapped metadata supplies property identifiers. Generic reads
+also constrain mapped direct tenant columns even when a legacy model owner
+lacks a named tenant filter. Generic tenant mutations require an exact nonempty
+tenant lease, not an absent context or bypass reason.
+
+For a tenant-bound context, `ExploreDbContext.TrackedAuthority.cs` checks pending
+writes inside the existing native save transaction, before disclosure capture.
+It evaluates mapped tenant filters for existing keys and changed parent
+references, including parent-derived ownership, and compares direct tenant
+values with persisted values rather than trusting attachment-supplied originals.
+Owned policy/value slots are checked through their mapped root ownership keys,
+not queried as independent entity sets.
+A context-wide bypass reason cannot authorize a tenant-bound tracked write.
+Failure poisons the existing transaction so a caller cannot catch the rejection
+and commit earlier work through the unit of work. The check does not acquire
+Global credentials, authorize an action, or replace purpose-specific authority
+for unbound maintenance contexts.
+
+`ExploreDbContext` freezes the tenant identity for a lease. Replacing the
+context or mutating its tenant identity after binding is rejected before SQL,
+and pool return clears request identity and bypass state.
+`ITenantExploreDbContextFactory` acquires a separate ordinary Runtime lease for
+an exact persisted tenant. `IGlobalExploreDbContextFactory` owns an independent
+pool using explicitly selected Global credentials and normally binds an absent
+tenant. Neither factory promotes an already-acquired request connection.
+An EF tenant-filter bypass alone cannot bypass PostgreSQL RLS.
+
+Cross-tenant work uses purpose-specific authority: authentication and
+administrative discovery call exact-key or exact-user functions; queue
+discovery returns bounded owner IDs before ordinary tenant work; disclosure
+fanout preserves its source transaction through restricted functions; PDS
+settlement binds the persisted claim tenant before acquisition; ATProto
+materialization uses its fenced private-graph capability. Function execution
+does not grant arbitrary private-table access. Disclosure's execution group
+is named `event_discovery_disclosure_runtime`, but selected Global materialization
+and settlement groups inherit its fixed functions; the name does not authorize
+ordinary tenant Runtime callers. The installer rejects unsafe attributes on its
+three managed non-login roles, unexpected membership edges, and ownership other
+than its exact function catalogue in the selected database/namespace. It never
+silently downgrades an unsafe existing role. The owner is reachable only through
+the dedicated migrator group and selected migration login, using SET rather than
+inherited table authority. Shared writes and bounded disclosure epochs retain
+one transaction, including rollback on fanout above 1,024 tenants. See
+[the security model](SECURITY-MODEL.md#row-level-security-rls--tenant-leases)
+and [database authority provisioning](SECRETS.md) for role and grant ownership.
+The public tenant-directory and email-admission installers likewise reject
+unsafe existing role attributes, unexpected parent/migrator membership, and
+ownership outside their exact function signatures. Their Global execution
+groups must have no effective table, column or sequence privileges in any
+non-system schema, including unrelated tables. Installation fails with `42501`
+rather than silently repairing contaminated authority. Migration membership
+uses explicit `INHERIT FALSE, SET TRUE`; normal callers receive only function
+execution through the selected capability.
+
+Managed-provider provisioning also attests both Ordinary Settings writers on
+`Tenant`: the row-level INSERT/UPDATE/DELETE writer and the statement-level
+TRUNCATE writer (PostgreSQL trigger flags 29 and 32). Their owning partial supplies
+the original bodies, role stamp and privilege contract to
+`ProvisioningSharedWriterAssertions`; the provisioning catalogue admits those
+exact identities rather than a trigger-name exception. Complete migration-only
+absence remains distinct from a partially installed or counterfeit protocol.
+
+Typed native Settings images materialize every `SystemSetting` scalar explicitly.
+`AllowedValues` is a CLR JSON-text property: PostgreSQL supplies a JSON array in
+the native image, while SQLite supplies stored JSON text. The shared materializer
+retains that constraint as JSON text without dropping metadata or changing the
+original image used for admission, comparison and compilation.
+
+Mixed email effects remain on the original Global connection and Serializable
+transaction. Their native writer installs a private row witness only after the
+producer's value, lock, target, metadata and audit checks. The email capture trigger
+consumes that witness against PostgreSQL's complete physical OLD/NEW images;
+Global has no execution grant on the consumer. Only the email owner can call it.
+The mixed attempt retains its own receipts, rather than forging a dedicated email
+purpose receipt. Dedicated email mutation logins and their checks remain separate.
+Composed admission validates the union of both complete role graphs, routine
+execution grants and relation privileges. Installers still create only their own
+roles and grants. The closed-role privilege validator has no peer-role exemption.
+
+Native compilation reserves the email claim lock, snapshots projection baselines
+and membership, and returns one database timestamp to the original writer.
+Projection admission binds the actor, target, original revision and suppression
+history, rejects operator-state changes and repeated projections, and requires a
+consumed setting change. Completion clears witness state in the original attempt
+tombstone; deferred settlement rejects an unfinished attempt. Rollback removes
+settings, projections and witnesses together.
+An instance setting write cannot substitute a tenant override relation. A consumed
+email setting change also requires its primary SMTP processor or selected tenant
+control projection before group completion; completing the key alone is not enough.
+Mixed acquisition and every shared-source change acquire the claim lock before
+the source revision row. Dispatch already takes the claim lock before processor
+updates; a consistent order avoids an inverse wait between dispatch and settings.
+
+Ordinary public discovery has two distinct execution-only capabilities.
+`PostgresDiscoveryTraversalContract` provides exact-tenant revision,
+reservation, snapshot and identity operations through
+`event_discovery_traversal_runtime`. `PostgresPublicEventDiscoveryContract`
+provides fixed local/remote seek, member reprojection and visible-record reads
+through `event_public_discovery_runtime`. The selected Runtime login inherits
+execution, not owner roles or private-source table privileges. Both installers
+run through the existing migration composition after disclosure installation.
+
+The ordinary page-number public search uses that same contract's `page_local`
+operation. It compiles the prepared specification through the canonical typed
+criteria and selects the same earliest matching occurrence, source eligibility
+and stable ordering as seek discovery. The native result includes the current
+total and ordered page together, retaining the total even for an empty later
+page. The repository retains or opens Serializable on its selected connection;
+REST and anonymous MCP do not issue raw Event or EventSession queries. The MCP
+adapter's existing maximum page size remains 25.
+
+`PostgresPublicEventDetailContract` also materializes the public program graph:
+published, scheduled sessions with both endpoints and a published live day when
+assigned; published live groups and their same-event assignments; and live
+agenda items on published days. This is intentionally not discovery's explicit
+open-ended occurrence eligibility. Parent publication, visibility, tenant and
+source-custody predicates still govern the entire result, including sessionless
+detail. Program summary reads this public parent and its groups/agenda rather
+than the managed parent or raw child repositories. Sessions-by-event uses the
+same native detail binding. Physical locations and rooms are not hydrated:
+their placement identifiers still go through `IEventLocationDisclosureService`
+in the handlers, with no local disclosure substitute. The existing migration
+installer derives the required source columns and policies from this projection;
+Runtime receives execution only. Managed program queries retain their original
+repository branches.
+
+The public candidate reader evaluates protected source eligibility internally
+and returns only bounded public entity projections. Its typed conjunction
+preserves the prepared specification, persisted keysets and exact event/session
+pairs. Explicit nonmapped presentation state carries public outcomes without
+transporting storage keys, registration artifacts or unrelated private graphs.
+Snapshot storage remains reference-only; current reprojection and the terminal
+disclosure fence still run in the caller's original Serializable transaction.
+`PublicEventDiscoveryReadBindingFactory` captures the production-selected
+context, connection and tenant lazily. Anonymous requests need no invented human
+mutation lease; an existing explicit lease must retain the same ordinary owner.
+Native entry guards independently validate actual enrollment and posture.
+`PostgresPublicEventResponseClockContract` separately enrolls ordinary Runtime
+for timestamp-only response freshness components. The repository uses the same
+selected public-read binding and retains an existing Serializable transaction,
+or opens one on that original connection when none exists. Its model-derived
+source predicates preserve published sessions and days, eligible local sources,
+governed remote projections including owned local echoes, and eligible location
+reveal components. Federation remains tenant-governed; privacy governance is
+resolved only when eligible locations exist and unresolved governance fails closed.
+Creation-plus-offset arithmetic remains in .NET to preserve 100ns offsets;
+creation and explicit reveal times remain independent conservative boundaries.
+The clock owner receives only required source columns (only the location key
+from `LocationPii`), while Runtime receives execution only. Admission and
+reinstallation attest the exact body, role graph, source schema and RLS policies;
+neither repairs drift or grants Runtime raw source access.
+
+Private event management uses `HumanPrivateEventManagementReader` to hold the
+original authenticated human, selected tenant, credential lifetime, authorization
+route, assignments and support sources through the Serializable read finalizer.
+The repository verifies the exact active closed read request before and after
+execution; another prepared operation cannot borrow it. Native enrollment grants
+`event_private_management_runtime` execution only. My-events retains the union of
+personal, organization-membership and group-membership actors, including private
+and draft Events; application handlers retain DTO mapping and normal HAL policy
+evaluation.
+
+`EventDetailsProjectionService` and `GetEventPublishReadinessRequestHandler`
+require this private reader; neither has a raw-repository fallback. Their queries
+delegate authorization to that original-human read owner rather than acquiring
+a second generic authorization source set before it. The native Details operation
+requires ViewManagement; Readiness independently requires Update. HTTP endpoints
+still require authentication, the native owner evaluates Local/Cerbos policy
+and finalizes source custody, and HAL actions still receive their own policy
+decisions.
+
+The request annotations remain intact for declared action/resource contracts
+and outer machine-caller evaluation. `RequestAuthorization` explicitly delegates
+these original-human reads to their mandatory native owners, following the
+same closed-owner pattern as other source-fenced operations.
+
+`GetManagedEventProgramRequest` maps sessions, groups, days and agenda from one
+native Program graph, rather than acquiring the same complete source set four
+times in an MCP request. It retains ViewManagement authorization, existing
+ordering and managed location fields. MCP still checks the Edit HAL affordance
+and applies its location disclosure ceiling after mapping. No admission is cached.
+`GetManagedEventCustomPropertiesRequest` likewise maps the definition page and
+ordered values from one CustomProperties graph. Definition paging, total count,
+value ordering and MCP truncation/redaction retain their existing semantics.
+`GetEventRegistrationOrdersQueryHandler` also requires the native reader and
+delegates its annotated ManageRegistrations action to that original-human owner;
+neither an Edit HAL link nor generic event facts replace that independent action.
+Machine callers retain outer annotation evaluation and cannot borrow a human read.
+Team-list reads use the separate closed Team entrypoint, under the existing
+`HumanEventTeamActionPreparation` ManageTeam decision and original Serializable
+source owner. The native graph carries complete EventRoleAssignment, User/Pii
+and Role entities; application handlers retain DTO mapping. The exact original
+team request must remain acquired through repository access and final disclosure.
+Generic private reads cannot select Team, and Runtime gains no direct team or
+user-table access. Assignable presets retain their own prepared team authority.
+The combined `GetManagedEventTeamRequest` maps members, current-user authority
+and assignable presets from this same acquired team read. Both authority views
+derive from its held assignment/definition sources before finalization, not a
+second permission query or reusable admission cache. MCP retains its Team HAL
+gate and bounded, redacted descriptors.
+Team preparation constructs the source-set fence before the Serializable attempt;
+acquisition and final validation still execute inside that original transaction.
+Session template sync context uses the closed `SessionSyncContext` graph to
+verify the live session belongs to the selected event and read its history in
+one acquisition. The native graph returns no session/history for a mismatched
+parent, while the existing standalone history operation retains its fail-closed
+selector error. The CQS handler maps the existing history DTOs and pagination;
+MCP retains its Edit HAL gate and diff behavior.
+Protected guest-allocation replay uses a separate closed `GuestRecovery` read:
+the repository supplies the already authenticated challenge's canonical digest,
+exact order/event/tenant and original Serializable owner to the execute-only
+registration capability. It may recover an expired order without refreshing any
+deadline; the handler still checks the challenge's recovery window before and
+after reading. Generic account/plaintext-bearer reads cannot select this kind.
+The operation returns entities and rechecks its physical owner before releasing the result.
+
+Checkout settlement retains the exact new `PaymentReconciliationEffect` only after
+the original active claim's compare-and-set succeeds under its row lock. This
+proves that object's Tenant foreign key inside the same physical transaction.
+It also binds the exact mutated `PaymentAttempt` and its closed domain status;
+preflight accepts only that retained status key, while the database foreign key
+still requires the lookup row to exist. Other parent and tenant checks still run.
+PostgreSQL lease comparisons reject
+sub-microsecond deadline changes before parameter truncation could hide them.
+The precision rule lives in the provider primitive, not the repository.
+
+Tracked foreign-key preflight retains the existing storage-reference conflict
+contract for an invisible storage parent. Missing, retired and foreign storage
+references still fail before persistence and poison the transaction; they surface
+as the same concurrency conflict rather than bypassing the storage protocol with
+a generic tenant-authority exception.
+Lifecycle approval policy resolves only `events.require_approval` through the
+authoritative tenant-only settings hierarchy; instance locks still govern tenant
+overrides. It no longer loads the full administrative policy DTO through raw
+SystemSetting, TenantSetting and Tenant repositories.
+
+Registration order add-ons, fair-return waitlist, participant readiness, purchase
+access and ticket-transfer reads use `IRegistrationPrivateReader`. Account access
+requires the original authenticated human and held principal, route, assignment
+and support sources through final admission. Anonymous access instead binds the
+canonical SHA-256 bearer digest, exact tenant and resource tuple to the original
+Serializable Runtime owner. `registration_private_read` selects ownership or
+capability authority before projecting the closed entity graph; handlers retain
+DTO mapping. Caller/transaction custody and applicable bearer deadlines are
+checked again before disclosure. Existing add-on/waitlist expiry semantics remain
+distinct from purchase/readiness/transfer deadlines.
+
+The migration-owned installer gives the dedicated NOLOGIN owner only declared
+source-column rights; Runtime receives routine execution, not table grants or
+role elevation. Live schema, role, policy and exact body attestation fail closed.
+Waitlist reads supply admitted tenant/event sale-control entities to the same
+paid-checkout evaluator used by other callers, preserving identity/operator
+readiness and stopped-sale rules without reopening raw control-table reads.
+
+Creation publisher options use `HumanEventCreationPublisherReader` and
+`event_creation_publisher_runtime` separately. They retain all own live
+memberships, including unavailable options without eligible actors, and calculate
+publish capability from persisted active permission mappings. Neither read turns
+the caller into an administrator or grants Runtime membership-table access.
+Matching migration enrollment and successful genuine Runtime HTTP/MCP probes
+are both required; a successful build or installer alone is not acceptance.
+The read-only hierarchy resolver uses `IInstanceTenantSettingsReader` for
+detached current system and selected-tenant settings. PostgreSQL uses the
+existing `ordinary_settings_read` function and its enrolled service identity,
+on the original context and transaction, without a human mutation lease or
+raw source-table grants. Native readiness validates exact routines and
+privileges before materialization. Discovery traversal, local-source
+configuration and federation governance request the read-only interface explicitly, not the mutable
+resolver's inherited read method. The mutable resolver retains its original
+admitted repository source; organization, group and user resolution remains
+with their existing repositories.
+Other relational providers retain EF isolation and their native constraints;
+these PostgreSQL RLS claims do not apply to them.
 
 Notable cases:
 

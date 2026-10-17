@@ -36,6 +36,38 @@ erasure receipts and admission-scanner capabilities keep their separate schemes.
 An advertised credential does not bypass tenant, scope, or resource permission
 checks.
 
+## Keycloak API audience and client admission
+
+Give API callers **access tokens**, not ID tokens. Configure one API resource
+audience with `Keycloak:Audience` (default `islamu-event-api`). The BFF login
+client `islamu-event-blazor` is not automatically an API audience, and its
+authorized-party claim (`azp`) cannot replace a missing `aud`.
+The former `Keycloak:ValidAudiences` and `Authentication:ValidAudiences`
+settings are retired; replace them with the intended resource audience.
+
+Configure an access-token audience mapper in Keycloak to include that resource.
+The supported native contract is Keycloak 26.1.2: access tokens use signed
+payload `typ=Bearer`; ID tokens use `typ=ID`. Both may have the same generic
+JOSE `typ=JWT` header, which does not make an ID token an API credential.
+Keep the API resource audience mapper access-only, not an ID-token mapper.
+Changing provider-purpose claims or removing the mapper prevents API admission.
+
+Optionally restrict callers with the deployment-owned
+`Keycloak:PermittedClients` list. When enabled, explicitly include the BFF
+and each intended service client. An accepted signature or API audience
+does not add a service client to that list. Without a list, no client
+restriction is applied and absent `azp` is allowed; a present `azp` must
+still be one nonblank string. Duplicates and malformed claim types are rejected.
+The list grants no tenant membership, roles or administration permission.
+
+Supply these settings to the API or Standalone process and restart it;
+changing a BFF login client or refreshing issuer metadata does not change
+resource/client admission. See the exact
+[environment keys](../configuration-and-operations/environment-variables.md#keycloak-resource-and-client-context).
+Normal Keycloak access tokens retain a five-minute clock-skew tolerance.
+Purpose-specific Local replacement and AT Protocol credentials retain
+their independent audience and lifetime rules.
+
 ## Account Matching and Recovery
 
 Accepting a sign-in provider does not automatically trust it to attach a new
@@ -100,13 +132,21 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 * The API validates Local and Keycloak tokens with isolated bearer schemes. A token signed or issued for one authority cannot authenticate through the other.
 * Direct Google sign-in and Google sign-in brokered by Keycloak use separate provider account namespaces. A brokered login remains bound to the Keycloak issuer and subject; a provider hint does not turn it into a direct Google account. Keep the configured issuer stable when diagnosing account-linking failures.
 
-During configured-administrator setup, the default tenant remains unpublished
+During single-tenant configured-administrator setup, the default tenant remains unpublished
 until activation. Only the authenticated account matching the configured
 provider identity can synchronize at `POST /api/user/sync` while the tenant is
-Provisioning. In multi-tenant deployments, that request needs the default
-tenant's exact slug in `X-Tenant-Slug`; other slugs and unrelated accounts
-remain denied. The administrator can read their private session and authority
+Provisioning. Multi-tenant setup creates instance administrator authority without
+creating a default tenant. Later tenant-bound requests require the selected
+tenant's exact slug in `X-Tenant-Slug`; unrelated accounts remain denied.
+The administrator can read their private session and authority
 after claiming, but this does not make public tenant pages available.
+
+Single-tenant setup completes the administrator's default-tenant membership and
+tenant administrator grant in the same transaction as the setup settings and
+bootstrap receipt. Existing default-tenant documents and unrelated role grants
+are retained. A rejected or interrupted setup cannot commit a partial membership
+or publish the default tenant. Multi-tenant setup does not create this default
+tenant or membership.
 
 After authentication or signout, the application returns only to a local path
 beginning with `/`. Invalid return destinations fall back to the home page;
@@ -122,10 +162,24 @@ rather than complete authentication links or query strings.
 
 Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.
 
+New credentials require 15–128 NFC-normalized Unicode scalars and a complete-value
+operator blocklist check. Login shape remains separate from creation minimum.
+Supply the required snapshot and calibrate the native hash cost as described in
+[Local password policy](../configuration-and-operations/local-password-policy.md)
+before selecting Local; unusable required snapshots fail readiness.
+
 Direct login requests use `identifier` and `password`; the former `email`
 request member is not an alias. A username does not contain `@`; an email-shaped
 identifier uses the account's actual stored address. Accounts without email
 keep it absent rather than receiving an invented address.
+
+Missing accounts, wrong passwords and locked accounts all return HTTP 401 with
+the same `invalid_credentials` ProblemDetails code and generic detail. The
+response does not tell you whether the identifier exists or an account is locked.
+Failed attempts still count toward the account's lockout, and a correct password
+does not bypass an active lockout. Use the offered recovery channel or your
+authorized administrator for account-specific help, rather than inferring account
+state from repeated login attempts.
 
 Login failures use bounded machine-readable error codes. Do not include login
 request bodies or successful token responses in support logs. Their ordinary
@@ -154,6 +208,18 @@ that operation without extending its deadline or invalidating a link in transit.
 Request responses are deliberately generic: acknowledgement does not confirm that
 an account exists or that a message was sent. Rate and operation limits may prevent
 additional mail.
+
+The same empty HTTP 202 acknowledgement also covers classified target-specific
+store failures before recovery intake can commit. It is not a receipt proving
+that a recovery operation exists, and work that never committed has no durable
+retry. Operators should repair the selected Identity store and instance delivery
+capability; a later request can establish a new operation if still eligible.
+If intake did commit before its response was lost, another request reuses the
+live operation and its original deadline, and the existing worker owns delivery.
+Do not reset database rows, select a different login provider or bypass Local
+verification because email configuration or delivery failed. Account-specific
+guidance belongs in the verified recovery channel or the authorized administrator
+process, not in public login or recovery responses.
 
 Open the private link and explicitly submit the requested action. Verification,
 email change and password recovery cannot be exchanged for one another. The
@@ -198,8 +264,9 @@ then marks them as requiring a private password change; neither state permits
 ordinary sign-in. Retrying an interrupted linking operation preserves its account
 identifiers and never returns another temporary password. A valid temporary
 password can now produce a restricted, at-most-five-minute replacement challenge,
-not an ordinary signed-in session. Native replacement preserves the 12–128-character
-login limits, rejects reuse of the temporary password, and requires a fresh login
+not an ordinary signed-in session. Native replacement enforces the shared 15–128
+NFC-normalized scalar creation policy and whole-password blocklist, rejects reuse
+of the temporary password, and requires a fresh login
 after the change. Creation returns a generated temporary password only once;
 neither status reads nor retried operations return it again. Record the operation
 ID, hand over the password privately, and do not persist credential-bearing

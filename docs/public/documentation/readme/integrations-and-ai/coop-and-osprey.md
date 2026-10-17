@@ -13,8 +13,6 @@ ISLAMU Event integrates with **Coop** (distributed review queue) and **Osprey** 
 * **Architecture**: When an attendee reports an event or user profile, the platform generates a metadata-first moderation ticket. If the `moderation` profile is enabled (see [Docker Compose Profiles](../self-hosting/docker-compose.md#optional-service-profiles)), the ticket is mirrored to Coop via authenticated HMAC envelopes (see [Webhooks](webhooks.md)).
 * **Local Decision Finality**: Moderators can review tickets in Coop, but the ultimate execution of decisions (suspending an event, issuing warnings, or banning users) commits exclusively within ISLAMU Event via signed callback verification.
 
----
-
 ### Coop response limits
 
 Configure the facade to return uncompressed JSON. The mirror accepts at most
@@ -42,16 +40,6 @@ Osprey acts strictly as an **advisory, signal-only evaluation coordinator**:
 * Model outputs are never presented as religious rulings, ethical certifications, or automated bans.
 
 ---
-
-### Operational diagnostics
-
-Coop and Osprey failures retain their stable retry categories, and gRPC failures
-retain their typed status. Logs and failure results do not reproduce private
-transport exceptions, provider-supplied exception detail or report/case payloads.
-If intake settings cannot be resolved, intake stays disabled without exposing
-the tenant identifier in diagnostics. Use the fixed category and provider
-health when investigating; provider secrets and payloads are not diagnostic
-attachments.
 
 ## 3. Configuration & Startup Flags
 

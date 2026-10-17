@@ -25,6 +25,15 @@ This runbook guides operators through deploying and operating an external **Cerb
 
 ## 1. Architecture Overview
 
+Keep Cerbos server verifier/database values in the Cerbos resources, not the
+Event API/BFF environment or their Infisical read roots. The API reads only
+decision metadata from `/runtime/api/authorization/cerbos`. Publish through
+operator-owned authority and supply the independently signed deployment receipt;
+Event has no startup/role-change publisher or standing Cerbos administrator.
+Use separate runtime machine identities and complete the
+[consumer isolation cutover](../configuration-and-operations/infisical.md#consumer-isolation-cutover)
+before revoking old grants.
+
 ```
                           Internet / Clients
                                  │

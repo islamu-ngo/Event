@@ -5,8 +5,6 @@
 
 This document details the architectural integration, routing flows, security mechanics, and escalation paths for the **Coop** human review queue integration within the multi-tenant ISLAMU Event platform.
 
----
-
 ## Outbound response admission
 
 `CoopReviewQueueProvider` uses headers-first completion and the shared
@@ -35,21 +33,6 @@ tracking. Tenant target selection and local decision ownership remain with
 the existing resolver and case workflow.
 
 ---
-
-## Diagnostic confidentiality
-
-Coop and Osprey transport failures emit fixed event categories without the
-exception object, remote exception prose, request envelope or report/case
-identifiers. Osprey gRPC diagnostics retain only the typed status and mapped
-failure category. The runtime provider resolver preserves its selected
-retryable failure result without exporting exception types or messages.
-
-`EventReportingIntakeGuard` likewise keeps intake disabled after a settings
-resolution failure without logging the tenant identifier or underlying
-exception. Cancellation behavior and provider retry classifications are not
-changed by this diagnostic boundary. Canary tests inspect the final formatted
-message, structured state, exception field and returned result, including a
-real HTTP/2 gRPC failure path.
 
 ## 1. Overview
 

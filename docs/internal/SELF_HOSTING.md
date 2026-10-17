@@ -26,9 +26,61 @@
 
 ## 1. Headless Instance Onboarding Invariant
 
+Consumer isolation is a deployment prerequisite, not a topology optimization.
+Split uses separate API, BFF and migrator machine identities; Standalone uses an
+explicit Combined runtime identity and a separate migration identity when hosted
+by Aspire. Runtime identities cannot read provisioning or provider-infrastructure
+roots. AppHost performs no shared vault acquisition and never switches the
+selected secret provider for a local profile. Provider containers use
+resource-specific operator injection. The [secret authority contract](SECRETS.md#consumer-isolated-acquisition-and-orchestration)
+defines the trusted-orchestrator limitation and local database prerequisites.
+External provider setup and signed Cerbos publication precede runtime readiness;
+no retired bootstrap script or runtime publisher is restored by this topology.
+
+PostgreSQL startup uses separately selected Runtime, Migrator and Global
+database authorities. Migration authority installs policies, provider
+adjustments and purpose capabilities before runtime admission; request
+contexts cannot repair policies or inherit the migration login. Global
+credentials own an independent pool and receive only the execution groups
+required by enabled consumers. Missing credentials, privileges or matching
+policy stamps reject admission without credential fallback. SQLite and other
+providers retain their own isolation mechanisms, not PostgreSQL RLS claims.
+See [the public environment guide](../public/documentation/readme/configuration-and-operations/environment-variables.md)
+for operator inputs and [SECRETS.md](SECRETS.md) for composition/provisioning
+details. This source contract is not evidence that a deployed login has the
+required grants; deployment admission must verify the actual selected roles.
+
+Compose no longer synthesizes the historical `explore` runtime/migrator password
+or login. Omitted and empty role credentials render empty; server database
+binding rejects them. `PrimaryDatabaseConfiguration` additionally rejects the
+retired password and username-as-password. Runtime and Migrator bind only their
+own structured credential or role-specific environment alias; generic/root
+credentials cannot fill a missing role, and an explicit empty structured value
+cannot fall back to an alias. Password bytes are preserved rather than trimmed.
+`DotenvReadiness` requires protected
+value provenance, rejects whitespace/default passwords, and rejects identical
+Runtime/Global/Migrator usernames or password values when those roles are
+relevant. Server credential catalogue entries do not activate for SQLite.
+Readiness never prints values, and it does not prove database grants or resolve
+an opaque generated reference into a credential.
+
+Actual rendered configuration tests feed `docker compose config --format json`
+output into the native database binder and verify runtime/migration projection
+separation. The test subprocess clears ambient deployment values and bypasses
+`.env`; only generated test credentials enter its environment, and neither
+rendered output nor provider stderr is put in assertion diagnostics. These tests,
+like the remaining programme checks, are authored but not executed.
+
+Effective-host approval and operational listeners are separate from database
+readiness. See [the hosting contract](HOSTING_ARCHITECTURE.md#effective-transport-domain-authority-and-operational-listeners)
+for operator-attested custom domains, fresh reservation checks, canonical links,
+and private socket-only diagnostic access. A private network/firewall and an
+independently bound scraper listener remain deployment prerequisites.
+
 Interactive setup establishes the effective BFF request address internally during
 authorized save/completion, without a URL field or confirmation. `PUBLIC_BASE_URL`
-overrides automatic resolution for deployment-specific needs. An explicit base
+is the explicit canonical host authority for external exposure and sensitive
+onboarding links; incoming request hosts cannot replace it. An explicit base
 domain is required when enabling subdomain routing, not for path-based tenancy.
 Listening addresses are not public origins. See [the configuration boundary](CONFIGURATION.md#guided-setup-configuration-boundary).
 
@@ -263,18 +315,25 @@ provider or runtime migration. Earlier relative-root uploads must be copied and
 reconciled with writes stopped before replacing their container; follow
 [Storage relocation](STORAGE.md#relocating-earlier-standalone-uploads).
 
-`AddApiHostServices` persists Data Protection keys through
-`DataProtectionKeyContext` in the selected primary database. Combined Standalone
-reuses that registration when no Redis cache connection is supplied; it does
-not create `/app/data/dataprotection-keys/`. Its default SQLite database therefore
-contains application state, colocated Local Identity and Data Protection keys.
+`AddApiHostServices`, `AddBffDataProtection` and `AddCombinedApiDataProtection`
+select external `api`, `bff` and `combined` Data Protection partitions. Neither
+SQLite nor Redis nor a local directory can supply runtime ring authority.
+Provision the partition's `EVENT_DP_*_RING` and `EVENT_DP_*_ADMISSION` in the
+selected authority before startup. Separately inject `EVENT_DP_*_ADMISSION_SHA256`
+and `EVENT_DP_*_MINIMUM_GENERATION` from a protected forward-only operator record.
+Environment mode does not contact Infisical; Infisical never uses lower environment
+ring values. User Secrets are local Development/Testing only; pins still require
+independent process environment injection.
 
-`AddBffDataProtection` preserves an existing registration when Redis is absent;
-with `ConnectionStrings:cache`, it selects Redis key
-`islamu-event:data-protection-keys` and application name `islamu-event`. Shipped
-Split Compose supplies Redis to the separate UI host, backed by `redis_data`;
-the API key store remains the primary database. A separate BFF without Redis
-does not inherit the API database registration automatically.
+The full procedure is [external Data Protection admission](SECRETS.md#external-data-protection-admission).
+The native operator tool emits bounded candidates, not provider writes or rollout
+receipts. Renew its 12-hour admission leases before expiry, prepare future overlap,
+then stop/drain and restart every replica against the advanced pin/floor. Runtime
+health verifies only the replica being probed. Missing history or capacity overflow
+blocks readiness; key expiration never triggers deletion. Preserve old database,
+Redis and backup key state during the controlled cutover, even though runtime no
+longer reads it. API and Combined preserve the durable-data discriminator;
+Split BFF's new discriminator intentionally invalidates former BFF sessions.
 
 Preserve the actual primary database, any external Identity database, uploaded
 media, selected secret/key authority and applicable Redis state as coordinated

@@ -3,16 +3,6 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
-## External-Login Authentication Read Enrollment
-
-PostgresExternalLoginAuthenticationContract binds exact provider-account discovery
-to the configured Global session and explicit deployment enrollment.
-Native entry and reinstall attest exact role flags, grant options and dedicated
-read privileges before selecting bindings. Runtime cannot borrow executor
-authority directly or through the Global login. Existing drift is rejected before
-installer changes; the exact provider/account predicate, complete binding shape,
-and absence of user PII joins remain unchanged.
-
 ## Membership Discovery Read Enrollment
 
 PostgresUserTenantMembershipContract requires explicit deployment enrollment and
@@ -79,37 +69,6 @@ Runtime receives no direct user-table privilege. A separate canonical image
 function and contract attestation run before final source/lifetime checks.
 Missing membership causes whole-attempt rollback and false; cache invalidation
 occurs only after successful settlement. Discovery reads confer no write grant.
-
-## Preliminary Tenant Routing Leases
-
-IUserTenantMembershipRepository provides a read-only, exact-user membership
-capability on an independent Global lease. PostgreSQL materializes active,
-nondeleted memberships with active tenant/status navigation in one statement;
-the repository returns detached domain entities, not database projection DTOs.
-Native entry and installer guards reject undeclared routine executors.
-This capability supplies no preference-write or resource-management authority.
-
-Scanner authentication uses IAdmissionScannerAuthenticationRepository on an
-independent Global lease. PostgreSQL matches each key version with its paired
-digest, not the cross product of the candidate lists. The native function returns
-at most two matches so an ambiguous credential fails rather than choosing one
-tenant. Runtime receives no scanner-table or authentication-function grant.
-Routine entry and installation reject undeclared executors.
-
-ApiKeyAuthenticationHandler acquires persisted credentials through
-IExternalApiKeyAuthenticationRepository, which owns an independent Global
-context for each exact-key lookup or usage update. PostgreSQL exposes only
-execute-only functions: the usage function can change LastUsedAt and LastUsedIp,
-subject to the original throttle threshold. Runtime receives neither direct
-credential-table access nor execution authority for these functions. Native
-entry and installer checks reject undeclared routine executors.
-
-ApiTenantResolutionMiddleware resolves slug, host configuration and bootstrap
-directory dependencies in an independent asynchronous service scope. That scope
-is disposed before binding the request tenant or invoking authentication.
-Already-resolved and exempt requests do not instantiate those routing services.
-This prevents preliminary reads from freezing the ordinary request database
-lease before its tenant is selected; it does not confer resource authorization.
 
 ## Human Commit Identity and Source Contracts
 
@@ -714,6 +673,24 @@ Storage readiness reports `provider_unavailable` or `policy_unavailable`
 instead of exception subtype names. Sink tests exercise scheduler and startup
 worker outcomes with private canaries and colliding inherited field names.
 
+## Tenant Routing and Database Authority
+
+`ApiTenantResolutionMiddleware` completes preliminary resolver, slug-cache and
+bootstrap-directory reads in an independent service scope, disposes that scope,
+then binds the request tenant. Exempt or already-resolved requests do not
+instantiate those preliminary repositories. Authentication lookup and claims
+enrichment use purpose-specific independent readers, so neither preliminary
+routing nor authentication freezes the request's database lease with a missing
+or different tenant.
+
+The request's PostgreSQL context freezes EF and session tenant identity
+together. A later identity change rejects SQL rather than retargeting a pooled
+connection. Exact-user administrative discovery does not confer arbitrary
+private-row access; handlers still authorize their concrete tenant/resource.
+See [MULTI_TENANCY.md](MULTI_TENANCY.md) for lease/factory ownership and
+[SECURITY-MODEL.md](SECURITY-MODEL.md#row-level-security-rls--tenant-leases)
+for ordinary-role admission and purpose-bound Global capabilities.
+
 ## AI Credential Reference Policy
 
 `AiCredentialReference.TryCreate` produces a provider-specific secret key,
@@ -1019,11 +996,11 @@ The optional MCP adapter is not an OpenAPI controller group. It is mapped at the
 
 The middleware pipeline in `Program.cs` is ordered precisely. Changing order will break behavior:
 
-1. **API Exception Handling** — `UseApiExceptionHandling()`. ProblemDetails-based chained `IExceptionHandler` (Validation → Global).
-2. **Forwarded Headers** — `UseForwardedHeaders()`. Applies trusted `X-Forwarded-*` values before host-derived tenant resolution.
-3. **Security Headers** — `UseSecurityHeaders()`. Adds defensive headers to every response.
-4. **Correlation ID** — `UseCorrelationId()`. Reads `X-Correlation-ID` or `X-Request-ID`, uses `HttpContext.TraceIdentifier` when absent, pushes to Serilog `LogContext`.
-5. **Request Logging** — `UseRequestLogging()`. Structured Serilog logging: method, path, status, duration, userId, tenantId, correlationId.
+1. **Forwarded Headers** — the effective-host ingress boundary applies trusted `X-Forwarded-*` values before host-derived tenant resolution.
+2. **Correlation ID** — `UseCorrelationId()`. Creates a server-owned UUIDv7 identifier, pushes it to Serilog `LogContext`, and returns `X-Correlation-ID`; caller correlation/request headers are not echoed.
+3. **Request Logging** — `UseRequestLogging()`. Records bounded method, native route identity, final status, duration, presence flags and server correlation.
+4. **API Exception Handling** — `UseApiExceptionHandling()`. ProblemDetails-based chained `IExceptionHandler` (Validation → Configuration Import → Global), inside the diagnostic scope so caught failures retain correlation and the request event records their final status.
+5. **Security Headers** — `UseSecurityHeaders()`. Adds defensive headers to every response.
 6. **Response Compression** — `UseResponseCompression()`. Brotli + Gzip at `CompressionLevel.Fastest`. Enabled for HTTPS. Additional MIME types: `application/json`, `application/hal+json`.
 7. **HTTPS Redirection** — `UseHttpsRedirection()`.
 8. **HATEOAS Prefer Header** — `UseHateoas()`. RFC 7240 `Prefer` header processing (`return=minimal` strips `_links`).
@@ -1035,12 +1012,129 @@ The middleware pipeline in `Program.cs` is ordered precisely. Changing order wil
 14. **Tenant Resolution (post-auth)** — `UseMiddleware<ApiTenantPostAuthenticationMiddleware>()`. Finalizes API-key tenant binding, mismatch handling, and fail-closed auth behavior.
 15. **MCP Runtime Gate** — `UseMiddleware<McpRuntimeGateMiddleware>()`. Applies only to the configured MCP path after tenant/auth context exists. Returns `404` when startup mapping is enabled but runtime `mcp.enabled` resolves false.
 16. **Request Localization** — `UseRequestLocalization()`.
-17. **Idempotency** — `UseMiddleware<IdempotencyMiddleware>()`. Implements `Idempotency-Key` header for write operations (POST/PUT/PATCH/DELETE). Caches responses by (Key, TenantId) and replays on duplicate requests within 24-hour window.
-18. **Rate Limiter** — `UseRateLimiter()`. Eight tiered policies (see below).
-19. **Authorization** — `UseAuthorization()`.
-20. **Support Access Audit** — `SupportAccessAuditMiddleware`. For active BFF/server-forwarded support-access sessions, records bounded request evidence after authorization without changing the response if audit persistence fails.
-21. **Output Cache** — `UseOutputCache()`. Eight cache policies (see below).
-22. **ETag** — `UseETag()`. SHA256-based weak ETags, 304 Not Modified support.
+17. **Rate Limiter** — `UseRateLimiter()`. Eight tiered policies (see below).
+18. **Authorization** — `UseAuthorization()`.
+19. **Tenant Lifecycle** — `TenantLifecycleAccessMiddleware`. Ordinary routes must pass current lifecycle admission before replay; private administrator-session reads have their earlier dedicated lifecycle boundary.
+20. **Idempotency** — `UseMiddleware<IdempotencyMiddleware>()`. Claims write identities by (Key, TenantId), binds method/target/body/principal, and replays only eligible unexpired receipts after current authorization and lifecycle admission.
+21. **Support Access Audit** — `SupportAccessAuditMiddleware`. For active BFF/server-forwarded support-access sessions, records bounded request evidence after authorization without changing the response if audit persistence fails.
+22. **Output Cache** — `UseOutputCache()`. Eight cache policies (see below).
+23. **ETag** — `UseETag()`. SHA256-based weak ETags, 304 Not Modified support.
+
+### Confidential API diagnostic sinks
+
+`GlobalExceptionHandler` and `ValidationExceptionHandler` emit stable `code`,
+status, bounded method, native route, server trace ID and server correlation,
+not exception objects, messages, inner exceptions or request paths. This applies
+in Development and Testing as well as production. ProblemDetails retains its
+status/type/title/detail/instance and extension JSON shapes; `instance` is a
+native endpoint identity/template or `route-unresolved`. Validation exception
+errors retain the dictionary-of-arrays shape but use one generic `validation`
+entry: arbitrary field names and validator messages are not a safe content
+contract. Nonexception typed controller validation contracts are separate.
+Concurrency responses retain known conflict codes and omit optional entity
+identity strings; quota exceptions retain numeric limit/actual/attempted fields
+with bounded `quota`/`request` key/scope categories. Retry-After and existing
+no-store/no-referrer policy are unchanged.
+
+API-local `ApiDiagnosticLogEnricher` retains `SourceContext` and properties bound
+by the event's message template, discarding inherited request/caller scopes from
+every event. Producers must still omit private explicit arguments; this is not
+automatic redaction of message-template values. API-key
+authentication retains its existing bounded outcome/reason/source fields;
+post-auth tenancy and throttling use fixed codes and native route metadata,
+never key IDs, tenant IDs or raw paths. Both the Serilog pipeline and forwarded
+logging providers exclude framework ASP.NET Core/IdentityModel, native HTTP
+client, gRPC client, EF Core and host lifecycle/error categories, which have no
+confidentiality contract for URLs, SQL, startup or authentication exceptions.
+OpenTelemetry logging disables scope export. Native API failure and HTTP events
+replace those messages; this does not disable metrics.
+
+Native configuration, role, moderation, fanout, admission/idempotency and HAL
+producers emit bounded status/decision/counts without private identity, validity
+windows, paths, provider messages or exception objects. Authorized results and
+persisted audit/operation records retain their business data. JWT warmup keeps
+key counts/source and retry timing, not issuer/authority URLs. Link-generation
+failures omit route values. Scheduler default diagnostics keep action, target
+category and refusal code; the `ISchedulerAdminAuditSink` record retains operator
+and job references for a separately registered access-controlled audit destination.
+The default logger is not evidence of durable actor-attributed scheduler auditing.
+
+`ApiDiagnosticTraceProcessor` is registered before ServiceDefaults' exporters.
+It keeps native HTTP status, bounded method and server route template (or the
+`http-dependency` category for native HTTP client spans), dropping URL query/full
+URL, unrelated tags and free-form HTTP status descriptions.
+For every exported activity source, the processor clears baggage and trace-state
+on the activity and its live ancestors: clearing only a child cannot remove
+inherited context from exporter enumeration. Native AI/authorization/MCP fields
+and trace/span IDs remain. This also stops subsequent spans inheriting the
+removed diagnostic context; baggage is never business authority.
+HTTP instrumentation exception recording is explicitly disabled and
+`UseExceptionHandler` suppresses raw framework exception diagnostics. IdentityModel
+PII and complete security-artifact export are disabled in every environment.
+Span trace/span IDs still link diagnostics; outside HTTP it does not sanitize
+producer tags/events. Their closed vocabulary remains a producer obligation.
+
+### Bounded response capture and ambiguous operation outcomes
+
+`BoundedResponseCaptureStream` checks eligibility and remaining space before allocating
+or copying response bytes. Its lazy buffer has a fixed capacity: 256 KiB for ETag,
+1 MiB for generic idempotency receipts. Declared streaming/non-JSON responses bypass
+ETag, and declared ineligible receipt output keeps the original response stream.
+Unknown-length output crossing either cap drains the retained prefix exactly once,
+disposes it, and forwards subsequent writes directly. Explicit flush/start also ends
+capture, preserving partial-response delivery. An uncaptured response receives no
+middleware ETag. HEAD and 204/304 suppress body delivery; compression remains outside
+capture in the host pipeline, so validators describe the uncompressed representation.
+
+Generic HTTP handling cannot prove business rollback. Oversize or otherwise
+ineligible responses, downstream exceptions, serialization failures, cancellation,
+connection abort and HTTP error status therefore never release the acquired claim.
+An owner may complete status `0` (in progress) into a normal receipt or status `-1`
+(`ResponseUnavailableStatusCode`, a persistence sentinel, never an HTTP status).
+Status `-1` stores no body or content type. A matching retry receives 409 with
+`idempotency_response_unavailable`, `private, no-store`, and a reconciliation
+instruction; a different identity receives `idempotency_key_reuse`. There is no
+generic reexecution path for unavailable outcomes. If the bounded five-second
+failure-state update itself fails, the original status-zero fence still blocks
+reexecution. A completed usable receipt may safely survive a later client disconnect.
+
+Receipt expiry removes disclosure authority, not execution history.
+`IdempotencyRepository.TryClaimAsync` scrubs an expired receipt in place rather than
+creating another owner. The cleanup contract `ScrubExpiredAsync` removes
+payloads and converts expired active/completed receipts to unavailable fences;
+its count is receipts scrubbed, not physical rows deleted. Existing schema columns
+and the unique tenant/key index carry the fence, with no migration. These minimal
+identities remain retained while an old request can be submitted. Their eventual
+retirement requires native proof that replay cannot execute; the 24-hour receipt
+TTL alone is not that proof. ID-only `ReleaseAsync` has been removed. A durable
+HTTP claim cannot be released by rollback of a later, unrelated business
+transaction. Transaction-owned AI claims, message/run writes and receipt
+completion share one original transaction; acknowledged rollback removes them
+together without a separate delete/release capability.
+
+`IdempotencyRequestDescriptor` binds every lookup to the exact request identity.
+Mismatches return no prior record or payload. Completion requires the opaque
+original `IIdempotencyClaimOwner`, not a copied receipt or GUID. The managed
+handle retains its issuer, context rental, tenant/schema, original connection
+and transaction; closing/reopening the connection invalidates it. PostgreSQL
+independently checks private nonce-hash/backend/transaction evidence created
+only by the inserting invocation. The native receipt functions expose bounded
+operations, never table grants to Runtime/Global. ATProto bootstrap consumption
+uses a dedicated Boolean one-time operation rather than generic response replay.
+
+Feature-owned anonymous-order recovery may read the exact committed order without
+acquiring/releasing its historical claim. Existing feature-owned revalidation of
+usable receipts remains intact. One-time/API-key issuance still suppresses generic
+storage entirely. Protected receipts keep private no-store, bind Data Protection
+purpose to the exact durable record ID, and reject tampered/cross-record ciphertext.
+Replay expiry is checked again before disclosure; anonymous-order disclosure also
+checks its original recovery deadline before forwarding buffered or streaming bytes.
+
+The source regression owners are `ResponseCaptureBoundaryTests`,
+`IdempotencyRepositorySqliteTests`, `IdempotencyRepositoryTests`, and the existing
+anonymous registration deadline tests. They cover native TestServer responses,
+real durable commits, subscribed response/commit gates, and positive native
+transaction rollback.
 
 ---
 
@@ -1783,7 +1877,7 @@ Non-GET responses additionally receive:
   string. Configured client entries must be nonempty and distinct.
 - Clock skew tolerance: 5 minutes.
 - Dev mode: accepts self-signed certificates.
-- Minimal JWT event logging: `OnAuthenticationFailed` (Warning), `OnChallenge` (Debug). PII-leaking handlers removed.
+- JWT event logging uses fixed `authentication_failed` (Warning) and `authentication_challenge` (Debug) categories with native route/trace/correlation. `IncludeErrorDetails=false`; challenge error descriptions/URIs are cleared and the only failure error is `invalid_token`, without provider exception content.
 
 ### Endpoint Auth Pattern
 - `GET`: usually `[AllowAnonymous]`

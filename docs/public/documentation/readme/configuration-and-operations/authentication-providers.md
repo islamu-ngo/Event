@@ -40,6 +40,24 @@ You can start with Local Identity and deliberately switch later after linking
 the administrator to the target provider. The server prevents a switch that
 would remove every usable administrator sign-in path.
 
+## Configuration authority
+
+Authentication and authorization configuration keep setup and administrator
+authority separate. During setup, the server requires the accepted setup-secret
+session and the same pending setup state throughout the operation. An
+administrator cannot use the setup path as a substitute for sign-in.
+
+After setup, the server checks the original administrator's current credentials,
+grants and any forwarded support-session deadline through database settlement.
+A revoked grant, expired credential or changed setup state rejects the whole
+configuration group, including its locks. Notifications and configuration cache
+activation follow successful settlement; endpoint connectivity checks run before
+the database operation. Reload current state and sign in again when authority
+has changed rather than retrying with another configuration route.
+
+These source controls have authored regression coverage; executable programme
+and database-provider assurance remains pending.
+
 ## Supported Provider States
 
 | Primary provider | AT Protocol login | Result |
@@ -143,6 +161,53 @@ apply confirmation. Re-enter them and confirm the operation again after returnin
 Freshly entered Keycloak administrator usernames and passwords are passed to
 Keycloak exactly as entered, including significant leading or trailing spaces.
 Empty or whitespace-only credentials are rejected rather than normalized.
+
+### Lifecycle Email Uses A Separate Service Client
+
+Verification, password reset and email-update action emails need a dedicated
+confidential service-account client in the user's Keycloak realm. Do not supply
+a human administrator password or reuse the browser/BFF client. The supported
+grant profile is pinned to Keycloak 26.1.2, matching the repository image.
+
+Disable browser, implicit and password flows. Assign only
+`realm-management/manage-users`, remove default realm-role and other client
+assignments, and validate the realm export before enabling the sender:
+
+```bash
+dotnet run eng/tools/keycloak-lifecycle-grants.cs -- 26.1.2 ISLAMU event-lifecycle realm-export.json
+```
+
+The command returns a value-free validity result and fails for unsupported
+versions, extra roles or incompatible client settings. Keep the export private;
+it can contain unrelated provider credentials. `manage-users` is the minimum
+available role for this provider version but grants broader user administration
+than action emails. Isolate and rotate this service credential accordingly.
+
+Configure `KEYCLOAKLIFECYCLEEMAIL__ENABLED`,
+`KEYCLOAKLIFECYCLEEMAIL__BASEURL`, `KEYCLOAKLIFECYCLEEMAIL__REALM`,
+`KEYCLOAKLIFECYCLEEMAIL__CLIENTID`, `KEYCLOAKLIFECYCLEEMAIL__DEFAULTCLIENTID`
+(the application/BFF client, distinct from the sender), and
+`KEYCLOAKLIFECYCLEEMAIL__PROVIDERVERSION`. Supply the secret through the selected
+authority as `KEYCLOAK_LIFECYCLE_CLIENT_SECRET`, or the API-owned Infisical leaf
+`/runtime/api/keycloak/lifecycle`. Event does not fall back to another identity
+or source. Keep HTTPS; the local-URL option is an explicit exception for controlled
+local deployments. Missing configuration or a foreign/excess grant fails closed.
+
+### Interactive Administrator Operations
+
+Enter a fresh administrator username/password pair for each administrative
+inspection, reviewed plan, apply or reconciliation. Event does not retain that
+pair for a later operation. Both fields clear after success, rejection, timeout,
+navigation or leaving the component; re-enter both when another action is needed.
+Credentials are used exactly as entered, including significant whitespace.
+
+The administrator connection uses the server-selected Keycloak binding, not
+a browser-supplied destination. It supports operator-owned internal Keycloak
+addresses while blocking metadata services, credential-bearing redirects and
+system proxies. If an Apply response is lost or an external change is only
+partially confirmed, refresh the existing receipt or reconcile with fresh
+credentials. Do not assume the provider change rolled back or apply it again
+without reviewing the receipt.
 
 A correctly configured deployment connects with its existing runtime BFF
 credential. The application resolves the Keycloak endpoint, realm, client ID and

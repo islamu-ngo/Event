@@ -36,14 +36,6 @@ Sector capabilities are governed by tenant feature flags (e.g. `Mod_Islamic` or 
 * Use a **[Governed Custom Property](custom-properties.md)** for organizer-specific, one-off questions (e.g. "T-shirt size", "Dietary allergies", "Emergency contact").
 * Neither mechanism may ever be used to bypass [Authorization](../security-and-identity/authorization.md), [Payment Truth](paid-events-and-payouts.md), or [Admission Issuance](ticketing-and-check-in.md).
 
-## Lifecycle Diagnostic Privacy
-
-Aspect lifecycle logs report that processing occurred without copying the event
-identifier, religious details, workshop metadata or repository URL into
-diagnostics. Aspect values and event links still follow the normal event access
-and module rules. Use the event interface for those details rather than treating
-support logs as an alternate copy of event data.
-
 ## Visitor Access And Account-Required Participation
 
 Tenant public-experience settings distinguish visitor access from the directory's

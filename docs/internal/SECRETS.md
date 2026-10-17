@@ -3,10 +3,206 @@ ABOUTME: Covers bootstrap selection, safe diagnostics, health monitoring, and ro
 
 # Secrets Management
 
+## Consumer-isolated acquisition and orchestration
+
+`SecretAcquisitionPolicy` admits the compiled consumer's exact roots before
+authentication. API composition selects `Api`; Standalone explicitly selects
+`Combined`; the migration service selects `Migration`. Combined admits the API
+and BFF union, not provider administration. The separate BFF loader retains its
+three exact frontend roots. Runtime source options preserve the consumer selected
+by composition rather than a consumer supplied by vault content.
+
+The cached Infisical provider independently repeats exact-root admission before
+universal authentication, as well as before secret listing. Path failure
+diagnostics retain only the finite admitted root and HTTP status; project,
+environment, credentials, access token and provider body remain absent.
+The native loopback transport cases are authored; executable assurance is
+deferred with the programme, not implied by source inspection.
+
+Shared startup, cached-provider and binding reads disable recursion, imports and
+reference expansion. Every returned `secretPath` must equal the requested path;
+missing provenance, duplicate mapped keys and reference expressions fail closed.
+Binding resolution checks registry-owned paths and selected environment before
+cache lookup and before client authentication. Retained references undergo the
+same admission. Changing a registry default does not authorize an old persisted
+coordinate. `keycloak.db_password` is no longer a runtime secret definition.
+Canonical BFF authentication writes remain the separate bounded write-only
+capability; API read permission does not expand to BFF roots.
+
+API Keycloak metadata lives at `/runtime/api/authentication/keycloak`, lifecycle
+authority at `/runtime/api/keycloak/lifecycle`, and Cerbos decision metadata at
+`/runtime/api/authorization/cerbos`. Database and other declared runtime roots
+remain explicit in `SecretAcquisitionPolicy`. Data Protection ring and admission
+folders are deliberately absent from bulk configuration: the separate Phase 9
+loader and process-only pin/floor controls remain authoritative.
+
+AppHost does not call the vault or combine runtime, provisioning and infrastructure
+folder results. Operators provision infrastructure separately and inject only
+resource-owned inputs into its container declarations. Its final project
+environment projection suppresses ambient parent secrets, provider admin/database
+fields and sibling machine identities. API, BFF, Combined and migration projects
+receive independent `INFISICAL_<CONSUMER>_CLIENT_ID/CLIENT_SECRET` pairs. Shared
+universal-auth credentials are not a projection fallback. All Aspire modes,
+including `local-full`, preserve the selected provider.
+
+The orchestrator is still a trusted process: it observes injected launch inputs
+and manages its children. This is not isolation from a compromised AppHost, OS
+account, debugger or shared Development User Secrets file. Operators must enforce
+independent provider ACLs, prevent identity reuse across consumers, and deny
+runtime identities `/provisioning/*`, `/infrastructure/*`, `/keycloak` and
+`/cerbos`. Event does not create or prove these external ACLs. Provider containers
+receive their own verifier/database/bootstrap values; foreground administration
+and external operator-signed Cerbos publication remain separate operations.
+
+For Infisical-backed local data resources, inject their bootstrap database roles
+and stable ports separately and provision matching runtime/migrator coordinates
+in the vault. AppHost no longer reads runtime database credentials to construct
+child environments. An unavailable vault, missing identity or mismatched database
+coordinate is a startup failure, not permission to use local generated values.
+See the [public cutover procedure](../public/documentation/readme/configuration-and-operations/infisical.md#consumer-isolation-cutover).
+
 `Explore.Secrets` resolves values from exactly one deployment-selected authority.
 `Environment` and `Infisical` are supported for deployments. `UserSecrets` is a
 local Development/Testing authority. A missing, unsupported, disallowed, or failed
 authority stops required startup work and never falls back to another source.
+
+## External Data Protection Admission
+
+`Explore.ServiceDefaults/DataProtection` owns the shared framework adapter because
+Split BFF must not reference backend Domain/Application/Secrets assemblies.
+`ExternalDataProtectionSource` bypasses general configuration aggregation and
+reads only the selected authority. `Environment` uses process variables directly;
+`UserSecrets` reads `event-shared-secrets` only in Development/Testing; Infisical
+uses Universal Auth and exact, nonrecursive, reference-unexpanded folder reads.
+Missing or failed authority never falls back to appsettings, DB, Redis or files.
+The API, BFF and Combined composition roots explicitly select `api`, `bff` and
+`combined`. API and Combined retain discriminator `islamu-event` because they own
+the same durable ciphertext contracts; Split BFF uses `islamu-event:bff:v1`.
+Rings are separately provisioned. Sharing backend material across API/Combined
+is an explicit stopped-host topology move, not automatic sharing with the BFF.
+
+For partition `api`, `bff` or `combined`, the exact selected-authority roots are:
+
+| Authority location | One allowed value |
+| --- | --- |
+| `/runtime/<partition>/data-protection` | `EVENT_DP_<PARTITION>_RING` |
+| `/admission/<partition>/data-protection` | `EVENT_DP_<PARTITION>_ADMISSION` |
+
+Uppercase the partition in variable names. Each Infisical folder contains exactly
+that one value; the runtime identity has read-only access to its two roots, never
+write/delete or access to another partition. The reader checks returned folder
+and key provenance, refuses redirects/references/compressed responses, and bounds
+the response before JSON materialization. HTTPS is required outside loopback
+Development/Testing. Existing Infisical bootstrap names apply, including
+`INFISICAL_ENV` / `SecretProvider__Infisical__Environment`.
+
+### Independent inventory and restore floor
+
+The ring is JSON `Version=1`, `Partition`, positive `Generation`, `Documents`.
+Each document is an unwrapped framework AES-256-CBC/HMACSHA256 key or explicit
+per-key revocation XML. Custom descriptor/decryptor types, recursive DP wrapping,
+duplicate IDs/properties, unknown JSON members and malformed dates are rejected.
+The entire UTF-8 ring is at most 32 KiB and contains at most 16 documents,
+**including revocations**. Admission JSON has its own 32 KiB bound and at most
+16 inventory entries. Exceeding either bound halts; it never evicts old keys.
+
+The separate admission record has `Version`, `Partition`, `Generation`,
+`RingSha256`, `ActiveKeyId`, `NotBeforeUtc`, `NotAfterUtc`, and `Keys`.
+Each key entry has `Id`, the SHA-256 of the exact canonical XML
+(`XElement.ToString(SaveOptions.DisableFormatting)`), and `Revoked`.
+The record lists **all historical keys**, including expired and revoked keys.
+The runtime requires equality between this inventory and candidate key IDs,
+material fingerprints and revocation records. It verifies every nonrevoked
+descriptor by actual authenticated encryption/decryption and proves that the
+framework's active round-trip used exactly `ActiveKeyId`.
+
+The record is trusted only when its exact UTF-8 SHA-256 equals
+`EVENT_DP_<PARTITION>_ADMISSION_SHA256`, and its generation meets
+`EVENT_DP_<PARTITION>_MINIMUM_GENERATION`. These two expectations are read
+**only from process environment**, even with Infisical/User Secrets selected.
+Operators must inject them from a separately access-controlled, forward-only
+deployment record that is NOT restored with ring/admission/application backups.
+The floor must never decrease; retain the latest approved pin through recovery.
+Putting these variables beside the candidate in the same rollbackable `.env`
+does not satisfy this prerequisite. No application can detect an administrator
+restoring both its input and its supposed independent expectation.
+
+Initial completeness is an operator custody obligation: inventory every prior
+writer, ring, replica, protected-data owner and retained backup before approving
+the initial pin. A fresh deployment may explicitly declare that it has no prior
+protected state. The candidate ring, an active-key round-trip and the tool's
+generated inventory cannot independently prove that declaration. After initial
+admission, the operator tool preserves every entry and all revocations; there is
+no delete or un-revoke command. A missing historical inventory blocks adoption,
+not a reason to manufacture a passing receipt.
+
+### Serving, renewal and cache fencing
+
+`ExternalDataProtectionProvider` owns an isolated framework service provider with
+a read-only `IXmlRepository`, no logging sinks, no automatic generation and no
+key encryptor. The application exposes its guarded `IDataProtectionProvider`;
+outer-host DB/Redis/file persistence options cannot alter the isolated provider.
+`StoreElement` rejects, including attempts to generate or revoke at runtime.
+The startup hosted service admits before serving. Cached protectors check the
+admission lease and active-key expiry on every operation. New protection also
+checks the framework payload key ID; a default-key switch fences the process.
+Expired retained keys still decrypt under a current admitted ring. Revoked or
+missing keys fail; time-limited capability expiry is separately enforced.
+
+Admission leases are at most 24 hours. The operator tool issues 12-hour leases,
+shortened by active expiry or the next prepared activation. `external-data-protection`
+readiness rereads authority and independent expectations, compares them to the
+loaded snapshot and tests the active key. Any change/failure irreversibly fences
+that process until restart, including already-created protectors. Warnings start
+seven days before active expiry or two hours before lease expiry. Health output
+contains only partition, generation, admission hash, counts and deadlines, never
+XML, provider exceptions or protected values.
+
+There is no cross-process invalidation claim: checking one replica does not
+refresh another. Before changing a pin, active key or revocation, stop/drain every
+old replica; route traffic only after every replacement reports the exact expected
+generation/hash. Health checks must actually be scheduled by deployment readiness.
+A process not probed can retain its snapshot until lease expiry, so emergency
+revocation requires an explicit full drain, not merely publishing new material.
+
+### Protected purpose and lifetime inventory
+
+The conservative inventory below is about retained ciphertext, not key expiry.
+No expiration date authorizes deleting a key. Existing data, outbox items and
+restorable backups must all be included in any later separately approved retirement.
+
+| Owner / purpose | Protection lifetime and retention consequence |
+| --- | --- |
+| `EventResourceDestinationProtector`: `EventResource / ExternalDestination / v1 / tenant / resource` | No cryptographic expiry; retain indefinitely while any destination or backup needs it. |
+| `RegistrationSensitiveValueProtector`: `Explore.RegistrationSensitiveAnswerValue / v1` | No cryptographic expiry; sensitive answer rows and backups remain dependent. |
+| `EventReportEvidenceProtector`: `ISLAMU.EventReporting.Evidence.v1` | No cryptographic expiry; retained reports/evidence and backups remain dependent. |
+| `RegistrationProviderCallbackReceiptProtector`: `Explore.RegistrationProviderCallbackReceipt / v1` | No DP expiry; receipt/application validation is separate. Conservatively retain. |
+| `AdmissionDeliveryEnvelopeProtector`, `AdmissionRecoveryDeliveryEnvelopeProtector`, `AdmissionRecoveryRequestEnvelopeProtector` | Versioned credential/contact/recovery purposes; delivery disclosure/deadline checks and durable request/outbox retention are application-owned, not DP expiry. |
+| `ConfigurationImportArtifactStore`, `ConfigurationDirectTransferChunkRepository` | `ISLAMU.Event.ConfigurationImportArtifact.v1` / `ISLAMU.Event.ConfigurationDirectTransferChunk.v1`; stored expiry and cleanup are application-owned; backup copies remain relevant. |
+| `EventDiscoveryCursorProtector`: `Explore.EventDiscoveryContinuation / v1` | Cursor envelope expiry/current-policy validation is outside raw DP; replicas must share the backend partition. |
+| `EventResourceCursorProtector`: `EventResource.AudienceCursor.v1` | Application-enforced 15-minute envelope lifetime. |
+| `IdempotencyMiddleware`: `Explore.API.IdempotencyReplay` | Stored response receipt expires normally after 24 hours (shorter recovery bounds where supplied); DP is not the receipt/reopen authority. |
+| `AnonymousRegistrationChallengeService`: `Explore.AnonymousRegistrationChallenge.v1` | 120-second challenge with a separate 24-hour recovery allowance; not a key-retirement clock. |
+| `DataProtectionAddressSelectionProtector`: `ISLAMU.Geocoding.AddressSelection / v1 / purpose / tenant / configuration fingerprint` | Application expiry from `SelectionLifetimeSeconds`. |
+| `EmailUnsubscribeTokenService`: `ISLAMU.Email.Unsubscribe.v1` | Time-limited DP, 180-day default with caller-selected lifetime. |
+| `EmailDeliveryDisableTokenService`: `ISLAMU.Email.DeliveryDisable.v1` | Time-limited DP, five minutes, bound to the actor and impact snapshot. |
+| `PrivacyErasureProviderLocatorProtector`: `ISLAMU.PrivacyErasure.ProviderLocator.v1` | Caller-selected time-limited DP lifetime, not a universal upper retention bound. |
+| BFF authentication cookies, OIDC state, antiforgery, Blazor circuit state | Framework scheme/purpose isolation; cookie default is 12 hours with sliding renewal; protocol settings own other lifetimes. Not all framework state has a fixed cryptographic expiry. |
+| `LocalIdentityLifecycleTokenProviders` in API/Combined | Distinct Identity verification/recovery providers validate token lifespans of 30/15 minutes; default Identity providers are also registered. |
+| `BffSelfCallTokenService`, `SetupSecretCookieProtector`, `LocalCredentialChallengeCookie` | Distinct versioned BFF purposes; time-limited DP: 2 minutes, 30 minutes and at most 5 minutes respectively. |
+| `RegistrationPaymentCheckoutTicketStore` | `registration-payment-checkout-cookie-v2`; application expiry is 5 minutes. |
+| `ApiBackedOAuthStateStore`, `AtprotoBrowserProof`, `AtprotoTenantSessionHandoffStore` | `oauth-state-v2`, origin-bound proof `v1`, `tenant-handoff-v2`; browser proof 15 minutes with 2-minute handoff budget, state/handoff expiry also checked against API-owned records. |
+
+Combined contains both backend and BFF purposes within one process trust boundary.
+Split BFF cannot decrypt API data even if a key is accidentally copied because its
+discriminator differs. API/Combined changes require operator-provisioned matching
+material, not application fallback to each other's roots.
+
+The native tool is `eng/security/Event.DataProtection.Operator`. Operational
+provisioning, overlap, restore and independently protected floor procedures are
+in [the public secrets runbook](../public/documentation/readme/configuration-and-operations/secrets.md#external-data-protection-rings).
+No live authority, replica or complete historical inventory was provisioned by
+authoring these source changes.
 
 ## Keycloak Runtime Credential Ownership
 
@@ -24,6 +220,61 @@ endpoints are outside application authority. Rotation is coordinated externally:
 update Keycloak and the selected environment/Infisical authority, restart all
 affected replicas, run read-only inspection, then verify a fresh user sign-in.
 Event provides this guidance but performs no live rotation or fallback copy.
+
+## Request-Scoped Keycloak Administration
+
+Current operator routes use native inspection/plan/apply/reconcile operations,
+not the retired bootstrap/doctor/rotation DTOs. Server-derived operator
+authority and the resolved deployment binding select the target. Administrative
+plan/apply/reconcile require a fresh complete username/password pair; no pair
+is loaded from settings, receipts or background work. Public-only inspection
+without a pair cannot perform administrator reads or writes. Partial pairs
+are rejected by manually constructed validators.
+
+Apply contexts preserve the supplied credential strings exactly instead of
+trimming a provider password or username. Bearer authentication belongs to
+each request message, never shared default headers. The typed administrator
+client uses connection-time DNS vetting with original TLS hostname validation;
+it permits operator-owned private Keycloak targets selected by the server,
+but rejects metadata targets and disables proxies, redirects and cookies.
+
+`KeycloakOperatorPanel` clears both fields and Apply confirmation after every
+terminal action, navigation and disposal. It retains credential-free receipts
+for ambiguous external completion: refresh or reconcile with a new pair rather
+than retrying an unconfirmed provider mutation or claiming remote rollback.
+Runtime BFF secret rotation remains deployment-owned as described above.
+
+## Dedicated Keycloak Lifecycle Sender
+
+`KeycloakAccountAuthorityLifecycleEmailService` uses same-realm
+`client_credentials`, never administrator password grant, `admin-cli`, the BFF
+client secret or credentials retained from an operator request. Its fixed
+instance-only registry key is `keycloak.lifecycle_client_secret`, environment
+alias `KEYCLOAK_LIFECYCLE_CLIENT_SECRET`, with Infisical authority rooted at
+`/runtime/api/keycloak/lifecycle`. Resolution has no source or tenant fallback.
+
+`KeycloakLifecycleGrantProfile` pins the deployment policy to Keycloak 26.1.2.
+The dedicated confidential client must disable browser, implicit and password
+flows and have only the non-composite `realm-management/manage-users` mapping,
+with no realm roles or other client grants. The offline realm-export validator
+in `eng/tools/keycloak-lifecycle-grants.cs` rejects extra or incompatible
+authority without printing exported credentials. This is the minimum available
+role for that provider version; it is broader than email actions, so isolation
+of the dedicated service credential remains consequential.
+
+Fresh token-response admission checks exact issuer/client/service-account
+identity, expiry and the complete effective role set before fixed lifecycle
+handoff. It is a permission check on the transport-authenticated OAuth response,
+not a JWT authentication API for caller-supplied tokens. Token responses are
+bounded to 64 KiB and values never enter audit receipts or logs. The sender's
+typed transport preserves TLS identity and blocks metadata/proxies/redirects.
+HTTP requires the explicit local-URL option; production should retain HTTPS.
+
+Native authority regression uses the pinned real provider: the minimal grant
+reaches lifecycle endpoint validation without sending mail, while removal
+returns `403`. Source fixtures separately cover positive audit/delegation and
+rejected foreign/missing/excess grants. Execution remains part of the final
+programme gate; these are authored tests, not passing receipts.
 
 ## Authentication Configuration Is Not Credential Custody
 
@@ -138,7 +389,7 @@ phase; never reuse the Photon configuration surface.
       "ClientId": "",
       "ClientSecret": "",
       "Environment": "dev",
-      "Paths": ["/"]
+      "Paths": ["/smtp"]
     }
   }
 }
@@ -184,7 +435,7 @@ or direct host. The five-minute resolver cache bound does not reload the backing
 User Secrets file.
 
 > [!IMPORTANT]
-> The contributor default Aspire profile is `local-full`. It starts local infrastructure and uses Environment unless `UserSecrets` is explicitly selected, so contributors should not need Infisical credentials.
+> The contributor default Aspire profile is `local-full`. It starts local infrastructure but never changes the explicitly selected secret provider.
 > Maintainer profiles intentionally differ:
 > - `local-core` starts local PostgreSQL/Redis and uses the authority selected in `.env` for external platform values.
 > - `local-lite` starts the migration worker, API, and Blazor and uses the same selected authority.
@@ -214,9 +465,11 @@ dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj --launch-profile
 docker run --env-file .env islamu-event-standalone
 ```
 
-For an Infisical-backed Aspire profile, select `Infisical` in `.env` and provide
-the documented `INFISICAL_URL`, `INFISICAL_PROJECT_ID`, `INFISICAL_CLIENT_ID`,
-`INFISICAL_CLIENT_SECRET`, and `INFISICAL_ENV` inputs before starting the AppHost.
+For an Infisical-backed Aspire profile, select `Infisical` in `.env`, provide
+`INFISICAL_URL`, `INFISICAL_PROJECT_ID` and `INFISICAL_ENV`, and independently
+provide the API/BFF or Combined pair plus the migration pair documented in
+`.env.example`. Direct-process `INFISICAL_CLIENT_ID/CLIENT_SECRET` are not
+AppHost projection inputs.
 For Environment mode, leave every `INFISICAL_*` value blank and provide each
 required consumer variable directly.
 
@@ -228,9 +481,9 @@ an explicit deployment cutover and requires a full restart of the affected repli
 
 | Secret authority | Direct Standalone | Aspire Standalone | Aspire Split | Single-replica Compose | Multi-replica Split |
 |---|---|---|---|---|---|
-| `Environment` | Supported with explicit process injection | Supported in `local-core`/`local-lite`; `local-full` defaults to local Environment mode | Supported in `local-core`/`local-lite`; `local-full` defaults to local Environment mode | Supported through the explicit Compose allow-list | Supported only when the deployment injects one consistent value set and one explicit shared setup secret into every replica |
+| `Environment` | Supported with explicit process injection | Explicit selection in every local profile | Explicit selection in every local profile | Supported through the explicit Compose allow-list | Supported only when the deployment injects one consistent value set and one explicit shared setup secret into every replica |
 | `UserSecrets` | Development/Testing only | Supported for local Development profiles | Supported for local Development profiles | Rejected | Rejected |
-| `Infisical` | Supported with all five `INFISICAL_*` bootstrap inputs | Supported in `local-core`/`local-lite` | Supported in `local-core`/`local-lite` | Supported with the same explicit bootstrap inputs | Supported when every replica uses the same project/environment authority and deployment-owned setup secret |
+| `Infisical` | Inject the Combined identity into direct-process bootstrap fields | Separate Combined and migration identities; local resources need operator injection | Separate API, BFF and migration identities; local resources need operator injection | Separate API, BFF and migration identities | Replicas share their consumer's authority, never another consumer's permissions |
 | Vault / Azure Key Vault / AWS Secrets Manager | Fail closed | Fail closed | Fail closed | Fail closed | Fail closed |
 
 `SECRET_PROVIDER` has no deployment default. Compose and direct hosts reject a
@@ -307,14 +560,595 @@ configurable prefix secret.
 | Compose key | Direct .NET key | Consumer |
 |---|---|---|
 | `DATABASE_RUNTIME_USERNAME`, `DATABASE_RUNTIME_PASSWORD` | `Database:Runtime:Username`, `Database:Runtime:Password` | API/runtime processes only |
+| `DATABASE_GLOBAL_USERNAME`, `DATABASE_GLOBAL_PASSWORD` | `Database:Global:Username`, `Database:Global:Password` | API-owned bounded cross-tenant capabilities only |
+| `DATABASE_INSTANCE_KEY_READ_USERNAME/PASSWORD` | `Database:InstanceKeyRead:Username/Password` | API instance-key metadata read pool |
+| `DATABASE_INSTANCE_KEY_WRITE_USERNAME/PASSWORD` | `Database:InstanceKeyWrite:Username/Password` | API fixed instance-key policy/revocation pool |
+| `DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME/PASSWORD` | `Database:InstanceKeyIssuance:Username/Password` | API self-owned issuance/metadata-recovery pool |
+| `DATABASE_PLATFORM_KEY_REPORT_USERNAME/PASSWORD` | `Database:PlatformKeyReport:Username/Password` | API historical aggregate report pool |
 | `DATABASE_MIGRATOR_USERNAME`, `DATABASE_MIGRATOR_PASSWORD` | `Database:Migrator:Username`, `Database:Migrator:Password` | `Event.MigrationService` only |
+
+Global credentials are explicit startup-owned inputs, available from the selected
+authority as flat keys or structured `Database:Global:*` keys. Infisical stores
+them under `/database`; the username is public configuration and the password
+is secret. `BindGlobal` requires its own username/password for server databases:
+it never substitutes Runtime, Migrator, or root `Database:Username/Password`.
+Shared endpoint/schema metadata does not imply shared credentials.
+
+The four instance-key authorities are separate from Global and from each other.
+Their structured values and explicit environment aliases bind without another
+role's credential fallback; explicit empty values remain unavailable. Backend
+projection masks unselected aliases, and Compose forwards these pairs only to
+the API database environment anchor. Infisical uses the exact `/database` root;
+BFF consumers receive none of these credentials.
+
+`InstanceApiKeyDbContextFactories` checks the common database/namespace/TLS
+target and distinct server logins/passwords before creating four independent
+pools. Startup admission opens every purpose and verifies ordinary-role RLS
+readiness, execute-only access, expected function owner/body/search path, no
+PUBLIC execution and no direct private-table/column access. Missing capabilities
+fail the advertised profile; no request repairs or installs them.
+
+Migration-owned installers create `event_instance_key_read_executor`,
+`event_instance_key_write_executor`, `event_instance_key_issuance_executor` and
+`event_platform_key_report_executor`. Provision each configured login with only
+its corresponding executor membership (inheritance enabled, role switching
+disabled); never grant owner/migrator membership or combine these executor
+memberships. Read metadata is hash/IP-redacted. Management admits only fixed
+policy/revocation columns, issuance inserts a self-owned key and digest-only
+receipt, and reporting returns aggregates including inactive historical tenants
+and null-tenant keys. Authentication/scanner/Global rights remain unchanged.
+The source and bindings are authored; native provider tests, provisioning
+execution and generated catalogue refresh remain deferred to final assurance.
+
+Persisted machine footer link/group PATCH uses the existing Runtime login and
+connection, not a fifth API-key management pool. The migration-owned
+`PostgresMachineMutationAuthorityContract` installs
+`event_machine_footer_owner`, `event_machine_footer_migrator` and
+`event_machine_footer_runtime`. Provision only the last role to the ordinary
+Runtime login, with inheritance enabled and role switching disabled. Never
+grant its owner/migrator roles to a consumer or its executor to Global,
+authentication, scanner, or any of the four key-management/report logins.
+No new secret or environment key is required.
+
+That executor exposes only the fixed
+`machine_footer_patch_authority` function for an exact tenant, group and
+optional link in the caller's Serializable transaction. Its non-login owner
+has minimal key identity/status/expiry/scope and owner/target-fence columns;
+no secret/hash, usage, generic setting or enumeration capability is granted.
+Admission rejects extra frozen-purpose role membership/function access,
+altered function identity/body/search path/owner, PUBLIC execution and direct
+executor key-table access. Missing execution or failed readiness denies the
+mutation; the API never installs or repairs privileges. Apply through the
+migration service and provision the Runtime membership before enabling these
+machine operations. Tests and provisioning execution are still unrun.
+
+Room updates have a separate same-Runtime purpose:
+`event_machine_room_owner`, `event_machine_room_migrator` and
+`event_machine_room_runtime`, installed by
+`PostgresMachineRoomMutationAuthorityContract`. Provision only
+`event_machine_room_runtime` to the ordinary Runtime login with inheritance
+enabled and role switching disabled. Its fixed
+`machine_room_update_authority` function accepts an exact room and optional
+destination, derives the stored source, and validates current persisted-key
+and owner authority after room/location contention. Its minimal columns do
+not include credentials or usage. Do not grant its executor to a frozen
+Global/authentication/scanner/key-management/report profile, grant it table
+rights, or make it inherit footer execution. A Runtime login may receive both
+distinct executor memberships when both operations are enabled; neither
+executor role may borrow the other's function. No environment key or pool
+is added. Provisioning and native execution remain unrun.
+
+Global uses an independent login and connection pool for bounded capabilities
+such as public tenant discovery. It is not a universal `BYPASSRLS` authority:
+PostgreSQL Global must remain `NOSUPERUSER NOBYPASSRLS` with only the specific
+capability grants needed. DDL and capability installation remain migration-only.
+Rotate credentials through the selected authority and restart the consuming
+API processes so their pools are rebuilt; never promote Runtime to Global or
+inject Migrator credentials into API processes.
+
+PostgreSQL request and Global pools inspect effective role privileges and
+model-derived policy coverage before binding a connection. The migrator stamps
+each tenant policy with a v2 source-condition fingerprint and digests of the stored
+USING/CHECK expression trees. Deparsed SQL is not used because PostgreSQL renders
+relation names differently under different connection search paths. Runtime
+compares those catalog values without issuing DDL;
+missing, altered, or extra applicable permissive policies reject acquisition.
+Apply the migration-owned policy installer to replace older stamps before restarting consumers. A failed
+admission cannot be caught and followed by EF commands on that same connection.
+
+Initial tenant resolution performs preliminary configuration, slug/domain and
+configured-bootstrap directory reads in an independently disposed service scope.
+Those readers retain their selected Runtime authority and existing bounded
+public lookup capability; the scope closes before the request tenant is bound
+or authentication is forwarded. Resolved, exempt and single-tenant paths do not
+instantiate those preliminary repositories. This prevents a routing dependency
+from freezing the ordinary request lease at a null tenant.
+
+Aspire local PostgreSQL resources supply their parent login only to migration
+work. API and Standalone receive separately selected Runtime and Global
+credentials through secret parameters; Global projection does not overwrite
+Runtime database metadata. Provision those logins and their bounded capability
+grants under migration authority before consumers start.
+
+PDS settlement uses `IPdsSettlementDbContextFactory` to capture the persisted
+claim tenant before exposing a Global lease. Its private claim, ownership,
+presentation and Event writes remain constrained by the ordinary tenant policy;
+shared record and disclosure epochs commit in the same Serializable transaction.
+The migration-owned `event_pds_settlement_global` group enumerates its required
+column/table grants and inherits only the bounded disclosure executor. Grant
+that group to the selected Global login, never the default Runtime login.
+Lookup acquisition through `IGlobalExploreDbContextFactory` remains sealed-null.
+
+Moderation compensation additionally requires `event_atproto_moderation_global`
+on the selected Global login. Grant only this execute group, not
+`event_atproto_moderation_owner`, `event_atproto_moderation_migrator`, private
+table access or role-switch authority. Its fixed reads/writes join the handler's
+Serializable transaction. Installation rejects unexpected owner members,
+execute-group parent memberships and ownership of protected relations by either
+the owner or execute group.
+
+The operations join the same
+Serializable transaction, bind the suspended subject and exact publication
+lineage, and expose policy/session metadata without credential envelopes.
+Ordinary planning and delivery gates use `IAtprotoSessionBindingReader` on the
+already sealed exact Runtime lease. Only the transport reads/decrypts credentials.
+
+PDS queue admission separately acquires a sealed-null Global lease through
+`IPdsSyncQueueAdmissionDbContextFactory`. Grant `event_pds_admission_global`
+to that selected Global login, with inheritance enabled and role switching
+disabled. Its fixed function atomically admits at most 100 due or expired
+claims in creation-time/ID order, checks record dependencies and returns only
+outbox, tenant, user, lease-token and fence identifiers. The non-login owner has
+only eligibility-column reads and fixed lease/status writes; neither payload
+nor session material is read. Global never receives generic queue-table access
+or owner/migrator membership. The drain binds each claim's exact scope-local
+tenant before resolving its ordinary Runtime delivery graph; settlement retains
+its separate purpose acquisition and transaction.
+
+IntegrationSync enumeration also uses that sealed-null Global pool, through
+`IIntegrationSyncQueueDiscovery`. The migration-owned
+`event_integration_sync_discovery_runtime` group can execute a bounded function
+returning tenant and outbox IDs only; it has no queue-table read or claim-write
+grant. Grant it to the selected Global login, with inheritance enabled and role
+switching disabled, never to Runtime or to either owner/migrator group. The drain
+binds each discovered tenant before resolving the Runtime repository for due-row
+reload, claim, recovery or execution. Subscriber payloads and durable handoff
+tokens remain confined to those exact tenant leases.
+
+Email admission uses `IEmailDispatchAdmissionDbContextFactory` for a sealed-null
+Global lease and the migration-owned `event_email_admission_global` executor.
+Grant only that executor to the selected Global login, with inheritance enabled
+and role switching disabled. Fixed functions serialize admission and stale
+recovery under the existing claim gate; they preserve global/per-tenant limits,
+priority rounds and reminder backlog hysteresis without returning message
+content. `EmailDispatchAdmission` closes Global before hydrating ownership IDs
+through exact Runtime leases, rechecking status, token and admission time.
+Cancellation after admission leaves a durable recoverable claim. Recovery keeps
+SMTP in-doubt work Unknown across outbox, attempt, receipt and delivery ledgers.
+
+ATProto audience and recovery-policy resolution use
+`IAtprotoGovernanceSettingRepository` on a separate sealed-null Global lease.
+Grant `event_atproto_governance_runtime` to Global with inheritance enabled and
+role switching disabled. Its fixed-search-path function returns tenant overrides
+only for event enablement, backfill enablement and backfill mode. Neither Global
+nor Runtime receives the owner/migrator roles or private setting-table reads.
+The complete override audience is returned; instance locks, deployment mode and
+backfill precedence remain Application decisions. Generic setting reads used
+inside other mutation transactions do not route through this capability.
+
+Pre-tenant authentication readers also acquire independent sealed-null Global
+leases. Grant the selected Global login `event_api_key_authentication_global`,
+`event_scanner_authentication_global`, `event_user_membership_global` and
+`event_external_login_authentication_global`, with inheritance enabled and role
+switching disabled. Their owner/migrator groups and direct private-table grants
+remain unavailable to Runtime and Global.
+Exact key lookup preserves inactive/expired rows for the authentication handler's
+persisted-credential precedence; its usage function changes only last-use time
+and IP. Scanner lookup pairs each digest with its version and returns up to two
+matches so ambiguity is rejected. Membership discovery returns the complete
+active membership/Tenant/TenantStatus graph for one server-resolved user; checking
+a chosen target tenant uses an independent exact Runtime lease instead.
+Standalone external-login lookup uses the exact provider/account pair, while
+transactional identity synchronization keeps its existing same-context reader.
+Claims enrichment resolves authority directly through
+`IAdministrativeAuthorityRepository`, without constructing the ordinary
+`IAdminContext` before post-authentication tenant binding.
+
+Grant `event_admin_authority_global` to Global with inheritance enabled and role
+switching disabled. Its four fixed-search-path functions return only an exact
+user's platform-administrator Boolean and tenant/organization/group scope IDs.
+They retain revoked, inactive and soft-delete eligibility checks without adding
+tenant lifecycle or participation-approval restrictions. Optional tenant
+selection is explicit, not taken from the request lease. Global cannot read the
+underlying private grant/membership tables or inherit the owner/migrator groups.
+`AdminContext` uses this reader for complete enumeration, while scoped checks,
+transactional external-login binding and platform-assignment convergence retain
+their existing owning repositories.
+
+Verified ATProto actor consolidation retains the onboarding transaction and
+its already-bound request lease. Grant `event_actor_consolidation_runtime`
+only to the selected backend login that performs that operation, with
+inheritance enabled and role switching disabled. Unlike independently acquired
+discovery readers, this exact actor-pair function must execute on the owning
+transaction: acquiring another pool would split reference moves from source
+retirement and disclosure epochs. The function moves only identity/event/
+series/speaker/subscription actor references, checks cross-tenant collisions,
+and grants no direct cross-tenant table DML. The caller still verifies DID
+evidence and current target management authority. Do not grant the owner or
+migrator groups to Runtime.
 
 SQLite has no database credentials. Its `DATABASE_NAME` value is a
 persisted local file path and is deployment configuration, not a secret. Do not
-give runtime services the migrator role, and never expose either role to the
+give runtime services the migrator role, and never expose any database role to the
 Blazor client.
 
+Managed tenant domain collision checks use `IManagedTenantDomainRepository`
+on an independent Global lease. Grant `event_managed_domain_global` to Global
+with inheritance enabled and role switching disabled. The function returns at
+most one exact-host match from the two domain-setting keys, preserving JSON
+string encoding, case and trailing-dot matching; it never exposes arbitrary
+tenant settings. Domain mutation/namespace locking stays with its existing
+owner.
+
+Notification fanout admission and health require `event_fanout_admission_global`
+on Global, not Runtime, with inheritance enabled and role switching disabled.
+Admission preserves global/per-tenant capacity, priority/fairness, reminder
+hysteresis and the existing global/tenant/event/occurrence advisory lock keys.
+Global results contain fenced ledger identities, not recipient cursors or
+occurrence snapshots. `NotificationFanoutAdmission` hydrates those identities
+through separate exact Runtime leases, then the processor binds each new page
+scope to its persisted claim tenant before resolving repositories. Cancellation
+after admission leaves expiring recoverable claims without starting recipient
+materialization. Health exposes fixed aggregate counts only. Never grant
+either capability's owner/migrator groups to an application login.
+
+Web Push dispatch discovery, claim/recovery and four scalar health counts
+require `event_webpush_admission_global` on Global with inheritance enabled
+and role switching disabled. Discovery returns only tenant/dispatch IDs;
+discovery and recovery batches are bounded to 1000. The definer reads ledger
+predicate columns, not payloads, subscription secrets, recipients or
+preferences. The drain acquires fresh exact Runtime leases for active-claim
+hydration, erasure/preferences/subscription checks and settlement, preserving
+claim-token fences, attempt accounting and existing recovery semantics.
+Endpoint uniqueness/upsert has a separate authority contract.
+
+Queue-drain readiness requires `event_queue_drain_health_global` on Global
+with the same execution-only membership shape. Its fixed function returns
+13 integer counts for IntegrationSync, incoming messages, replay operations,
+provider publication and PDS queues. Predicate-column grants exclude payloads,
+recipient IDs and arbitrary row projection. The integration stale cutoff stays
+independent of webhook/PDS expiry observations; status, null-time, soft-delete,
+ambiguity and supersession predicates remain unchanged.
+
+Incoming webhook message/effect discovery and renewal require
+`event_incoming_webhook_global` on Global with inheritance enabled and role
+switching disabled. The four fixed functions return claim identities, not
+payload, receipt or effect-envelope content. Message claims/recovery append
+attempt evidence atomically; renewal checks exact tenant/ID/token/fence/
+generation/state and strict lease expiry. Existing
+`IncomingWebhookTenantExecutor` retains fresh exact Runtime execution and
+settlement. Never grant the capability's owner/migrator groups or private-table
+access to the application login.
+
+Instance operations report synchronization counts use
+`IEventReportOperationsRepository` on independent Global leases. Grant
+`event_report_operations_global` to Global with inheritance enabled and role
+switching disabled. Its scalar function reads only link state/creation and
+parent ID/tenant/soft-delete columns, preserves the parent-report soft-delete
+filter and strict `CreatedAt < cutoff`, and never projects report/case/content
+or provider URLs. Tenant-specific report operations stay on their original
+repository and owning transactions.
+
+Email operational health reuses `event_email_dispatch_admission_global` through
+the existing admission definer. The `_health` function returns six counts,
+oldest-due time, a 1–100 tenant backlog sample and three processor flags.
+Soft-deleted/redacted/tenant-paused rows are excluded; global pause remains a
+reported flag. Rate override is exposed only as a boolean. Instance operations
+and email health consume this independent snapshot rather than generic
+cross-tenant repository queries; claim/recovery algorithms are unchanged.
+
+Resource-audit retention requires `event_resource_audit_retention_runtime`
+membership on Global only, despite the execution group's historical suffix.
+It exposes bounded owner discovery through the existing directory join; the
+definer reads audit tenant keys, not attribution. Each deletion batch acquires
+a fresh exact Runtime context and rereads governance in the same Serializable
+transaction. The sweep captures time once, pages 100 owners, deletes at most
+1000 rows per batch, retains the inclusive cutoff and zero-retention purge,
+and propagates failure without silently deleting held evidence.
+
+Local webhook delivery requires `event_local_webhook_admission_global` on
+Global for bounded discovery/governance/fair claims/recovery. Governance exposes
+exactly seven delivery keys, preserving instance locks, tenant overrides and
+startup ceilings. Fresh exact Runtime scopes hydrate payload/credentials,
+settle and manually retry; token/fence/expiry/active-endpoint checks remain.
+Recovery records failed-attempt evidence atomically. Grant execution membership
+with inheritance enabled and role switching disabled, not private-table
+privileges or owner/migrator membership. HTTP transport remains a separate
+workstream boundary.
+
+Registration finalization requires `event_registration_finalization_global`
+on Global with inheritance enabled and role switching disabled. Its claim
+function exposes only effect/order/tenant/token/fence identities and owns only
+queue columns, not payment or fulfillment graphs. Claims/recovery retain
+committed effect identity and advance attempt/fence under row locks atomically.
+The drain binds each fresh ordinary scope to the persisted claim tenant before
+resolving lifecycle/settlement/admission services, then clears/disposes it.
+Financial transitions stay in their original owning transactions; settlement
+retains exact identity/token/fence/state and strict expiry checks. Runtime
+must receive neither the Global capability nor owner/migrator membership.
+
+Payment reconciliation requires `event_payment_reconciliation_global` on
+Global for bounded claims and aggregate health. Fresh exact Runtime scopes
+hydrate and settle payment attempts. Settlement locks the reconciliation row
+and checks payment-attempt ID, token/fence/attempt/expiry plus every captured
+dispatch identity field before economic writes. Unknown-dispatch recovery and
+settlement share one transaction, retaining provider idempotency identity.
+Grant inheritance-enabled, role-switch-disabled execution membership only;
+do not grant owner/migrator membership or private-table access. Provider outcome
+mapping remains with the existing reconciliation service.
+
+Instance visitor-policy validation requires `event_visitor_policy_global` on
+the selected Global login. Its parameterless functions read only the compiled
+visitor-authority setting keys and live account-required participation. They
+execute on the writer's owning serializable connection, so an uncommitted
+instance lock cannot be missed by a separate reader pool. Runtime receives no
+execution membership; Global receives no private-table or owner/migrator
+membership. Instance mutation composition must acquire Global before resolving
+the writer, unit of work and ordered mutation locks.
+
+SMTP policy reconciliation uses `event_email_policy_runtime` on Runtime and
+`event_email_policy_global` on Global. Each is an execute-only membership for
+the parameterless fixed `EmailDeliverySettingKeys.All` override reader. This
+purpose-bound cross-tenant read must use the mutation's current transaction:
+an independent pool would miss uncommitted instance locks and compromise the
+delivery-policy revision calculation. Neither group grants table access,
+owner/migrator membership or a change to the immutable tenant lease. Provision
+memberships with inheritance enabled and role switching disabled.
+
+Paid-policy instance ceiling validation requires execute-only
+`event_paid_policy_ceiling_runtime` membership on the policy-mutation Runtime
+login, with inheritance enabled and role switching disabled. The bounded
+active-policy reader runs on the owning connection and transaction, including
+manifest writes. Its fixed aggregates retain persisted identity, all four
+ordered collections and exact `long` minor-unit amounts. Model-owned tenant
+policy and owner read-policy fingerprints are checked before projection;
+missing or changed authority fails closed. The group grants no policy-table
+DML, owner/migrator membership or tenant lease changes.
+
+Instance accounting uses `event_instance_storage_admin_global` on Global only.
+The parameterless repair primitive discovers scopes, fences counters,
+recalculates custody-derived totals and reads the final report in one transaction.
+Owner DML is limited to counter accounting/fences; objects, sessions and
+tombstones remain read-only. No tenant lease retargeting or per-tenant commits
+are permitted. Other providers use the same single transaction with parameterized
+counter statements and the existing custody totals builder.
+
+The storage reconciliation custody cutover adds separate Global-only execution
+groups: `event_storage_reconciliation_global` for bounded metadata observations
+and exact-snapshot quarantine, and `event_local_storage_quarantine_global` for
+physical orphan inspection, durable admission, claims and fenced settlement.
+Neither is the accounting capability. Their NOLOGIN owners have only the
+specific custody reads and fixed metadata/work transitions; Global receives
+function execution, not ordinary storage-table CRUD. Runtime receives no new
+membership or storage bypass. Keep execution inheritance enabled, role
+switching disabled, and owner/migrator membership absent. Readiness must reject
+missing or altered capability ownership, signatures, search path, grants and
+policies rather than falling back to ordinary repositories. Generated provider
+migrations and native final assurance for this cutover are still queued.
+
+The email-policy execution groups also expose a bounded tenant-control snapshot
+and fixed revision transition, not arbitrary control DML. Each chunk contains
+at most 500 tenants; expected revision fences and transaction baselines prevent
+double increments. Only revision, suppression and audit fields change;
+pause state and token buckets remain intact, including during rollback.
+
+### Policy mutation acquisition
+
+Bootstrap effect replay uses `event_manifest_replay_runtime` on Runtime and
+`event_manifest_replay_global` on Global. These grant only the fixed
+`configuration_manifest_replay_results(uuid)` reader, qualified by an applied
+bootstrap operation and bounded to 256 safe tenant-result records. Its owner
+reads only result metadata and operation ID/status/mode. Do not grant table
+access or owner/migrator membership to either execution group.
+
+Instance import snapshots use `event_configuration_import_snapshot_global`
+on Global only. The three fixed functions read exact-tenant manifest-catalog
+overrides, stored branding documents, and the exact active instance/tenant
+paid-policy aggregate. The nonlogin owner has only the required SELECT columns
+and fixed owner-only RLS predicates; the execution group has no table access.
+Installation and execution reject unsafe memberships, table ownership,
+privileges, or changed policy fingerprints.
+
+`ConfigurationInstanceImportExecutor` acquires the sealed-null Global owner
+before constructing repositories, resolvers, locks, and the unit of work.
+Snapshot calls reuse that connection and any current transaction, so apply's
+post-write fidelity read sees its uncommitted state. The snapshot role does
+not authorize import writes or replace the existing session/target/digest
+checks and single serializable apply transaction.
+
+Instance import session and protected-artifact operations use
+`event_configuration_import_state_global`. Its fixed session reader locks the
+exact instance row; updates retain immutable token/artifact/target fields and
+compare the original revision. Artifact reads require an instance session or
+applied/rollback receipt link, while new rollback artifacts can be stored before
+their receipt is inserted. Payloads remain Data Protection ciphertext. Native
+operations enlist in the existing owner transaction; they do not open another
+connection or commit individual steps. Fresh instance sessions use a fixed native create operation:
+Uploaded state, revision 1, instance target, no preview/cancellation/consumption
+metadata, and a lifetime of at most one hour. The protected artifact's metadata
+must match and its PostgreSQL `xmin` must belong to this staging transaction;
+an already-linked artifact cannot be attached to another session. Only the
+non-login function owner receives the exact session INSERT columns. Global
+keeps execution permission without direct session INSERT access.
+The state owner also receives SELECT on the artifact's `xmin` system column
+for the transaction check, not a table-wide SELECT grant. Its privilege audit
+includes system columns and rejects any other undeclared column permission.
+Cancellation and expiry persist the terminal session transition before deleting
+its ciphertext in the same transaction. The fixed native delete requires a
+Cancelled/Expired instance-session link whose `xmin` is this transaction,
+rejects any active/foreign session or retained receipt snapshot link, and cannot
+delete an arbitrary artifact. Its non-login owner alone receives DELETE on the
+artifact table; Global receives only function execution. A delete failure rolls
+back the terminal session transition too.
+
+Coordinated publication-policy import uses
+`event_configuration_import_publication_global` for the five fixed policy
+settings. Its snapshot includes existing tenant overrides across the instance,
+including retired or unmapped tenants, so policy compilation retains its full
+ceiling checks. Reads and writes take the same transaction-owned setting locks;
+the Global group receives function execution only. Tenant overrides retain
+forced RLS; installation does not enable tenant-style RLS on instance settings.
+
+Ordinary scalar instance imports use `event_configuration_import_scalar_global`
+for catalog-admitted non-specialized Boolean/String settings. Fixed operations
+retain creation identity and audit, derive registry metadata, and return the
+old value for deferred effects. Specialized policy/resource/privacy/operator
+keys remain outside this group; it has no direct table grants.
+
+Instance import receipts and their fresh bound effects require
+`event_configuration_import_receipt_global`. Successful writes require the
+existing serializable owner transaction, with PostgreSQL `xmin` provenance
+binding session consumption, rollback snapshot, receipt and exact Pending effect.
+The group cannot rewrite receipts or process arbitrary outbox messages. Failed
+evidence can open a new transaction on the same selected connection only after
+the selected changes have rolled back; artifact metadata is read without
+granting access to its protected payload.
+
+Paid-policy imports use `event_configuration_import_paid_policy_global` for
+fixed active-aggregate reads, bounded pages of all active tenant policies, and
+revision persistence. Validation includes unmapped tenants before narrowing the
+instance ceiling. Native writes compare the original identity/version, retire
+only that active row, preserve its history and creation audit, and insert the
+Domain-created revision with normalized children. These operations reuse the
+sealed owner connection and existing serializable transaction; policy aggregates
+remain detached from EF tracking. The Global group receives function execution
+only, not table access or membership in the Runtime ceiling capability.
+
+Tenant name/audit imports require `event_configuration_import_tenant_identity_global`.
+The purpose repository operation changes only `FullName`, `UpdatedAt` and
+`UpdatedBy`; it does not give imported entities generic mutation authority.
+Native parent fences and terminal discovery revision finalization share the
+same serializable owner transaction. Sorted parent/epoch locking and expected
+identity revisions retain disclosure invalidation without Runtime enrollment.
+The tenant-owned revision relation retains forced RLS and owner-only boundaries;
+the Global group has function execution only.
+
+Tenant branding imports require `event_configuration_import_branding_global`.
+`ApplyBrandingImportAsync` admits only the manifest branding key and its fixed
+catalog schema/defaults. Native create/update uses the sealed owner's existing
+serializable transaction; updates compare persisted identity/stamp and preserve
+creation audit, while both paths generate a fresh concurrency stamp. Snapshot
+rereads see the uncommitted persisted result without publishing it to shared
+cache. Column-limited nonlogin ownership and forced owner-boundary RLS keep
+the Global execution group outside direct document-table access.
+
+Portable resource-setting imports require `event_configuration_import_resource_global`.
+The resource writer uses fixed-key system snapshots and exact selected-tenant
+snapshot reads; an instance-only import issues no tenant query. Its shared
+Domain validation retains system locks and raw-value non-widening checks.
+Native SetValue writes compare original persisted state, retain metadata/audit/
+locks, and defer notifications to the import's bound effect. SQL and C# both
+require the existing serializable owner transaction. Forced RLS remains on
+tenant overrides; instance-setting RLS is not changed.
+
+Ordinary manifest tenant scalars require `event_configuration_import_tenant_setting_global`.
+This native batch excludes coordinated publication, resource, email, privacy,
+operator and visitor-policy keys. It routes before the unrelated email-policy
+wrapper, acquires the existing ordered setting locks, honors system/tenant
+locks, and compares every original row field before upsert. Updates retain
+identity/creation audit; creates use UUIDv7. Disclosure enrollment stays on the
+existing serializable owner transaction. Forced tenant RLS and column-limited
+ownership grant Global only the fixed upsert function, not table access.
+
+Instance upload, cancellation, receipt, history and forward-rollback handlers enter
+`IConfigurationInstanceImportExecutor`, not the Runtime-scoped apply service.
+Direct-transfer promotion uses the same executor for instance staging; tenant
+promotion retains its tenant-scoped session service. The executor obtains a
+fresh selected Global owner before resolving repositories, while the session
+manager owns atomic artifact/session creation and cancellation. Runtime needs
+no instance staging-table write grant for these handlers.
+Rollback session creation reads the immutable retained receipt/artifact and
+creates fresh staging state on the same selected Global owner. The session
+manager owns that staging transaction; the executor does not nest another
+transaction around it. Apply separately owns its serializable mutation.
+Preview and cancellation share normalization of the UUIDv7 operation prefix
+on rollback tokens before authorizing their underlying secret. Cancellation
+retains token verification, including idempotent replay, and removes only the
+fresh session's ciphertext, not its source receipt's retained snapshot.
+Apply still requires that exact prefix
+to match its explicit source operation before the initial artifact read and
+again inside the mutation transaction. A mismatched source leaves the session
+PreviewReady without a receipt or setting mutation. Runtime tenant authority remains
+unchanged throughout these operations.
+
+Current editable legal source uses `event_configuration_import_legal_source_global`.
+Imported draft/revision persistence additionally requires
+`event_configuration_import_legal_mutation_global`. Its fixed operations read
+the complete exact-target aggregate, then append validated Domain source with
+original-stamp/version/lifecycle comparisons on the same transaction. The group
+has no direct private-table privileges and cannot publish or rewrite history.
+It reads the current version and bounded localizations, including unpublished
+drafts, without review identities, publication history, or acceptance records.
+Documents and their versions/localizations/publications have model-owned tenant
+filters and RLS. Parent-derived policies follow the declared navigation path
+through explicit FK joins to the terminal tenant predicate, so a permissive
+parent policy cannot authorize foreign children.
+
+Location privacy review health uses `event_location_review_global` on Global
+only. `EventLocationPrivacyReviewReader` acquires an independent Global lease
+and calls the parameterless `location_privacy_review_depth` function. Its owner
+has SELECT on only `NeedsPrivacyReview` and `IsDeleted`; execution returns one
+count and never locations, tenant identities or address data. Runtime remains
+tenant-bound. Portable providers count the same active review predicate through
+the independently acquired Global context. This capability does not authorize
+governance mutation or grant access to location tables.
+
+Governance uses `event_location_governance_runtime` and
+`event_location_governance_global` for the fixed override/projection readers and
+correction writer. Runtime is restricted to a non-null target matching the
+canonical leased tenant session; instance or foreign-target execution requires
+inherited Global authority. All calls enlist in the existing setting transaction.
+The owner reads only policy facts and location kind, updates only review/version/
+actor/time/stamp fields, and inserts the matching fixed audit/outbox pair.
+The existing C# policy determines which projections need correction.
+
+`LocationPrivacyGovernanceStore` batches at most 500 corrections per call without
+independent commits and rolls back the owning transaction on invalid/stale targets.
+Raw corrections explicitly enlist disclosure revisions; tracked instance-setting
+saves retain the existing all-tenant enrollment and parent fences. Native clock
+parameters and serialized audit clocks pass through the same PostgreSQL timestamp
+conversion. Contract installation owns its separate migration transaction.
+Neither execution group receives private-table access or owner/migrator membership.
+
+Policy mutation composition acquires its lease before constructing the selected
+native handler graph. Instance setting commands use the independent Global
+pool; explicit target-tenant administration uses an exact Runtime lease.
+Global therefore needs the instance-setting object privileges for the admitted
+core as well as its specific function memberships. Authorization is still the
+outer native decorator, and the scope choice never grants user permission.
+The scope-local context is single-assignment and DI owns its disposal; no
+existing request lease is changed. Authentication configuration acquires the
+same boundary before resolving its writer, unit of work and ordered locks.
+Manifest roots retain their existing exclusions and transaction ownership.
+
+Child execution uses `ITenantContextAccessor.BindExecutionTenant`, not
+`SetTenant`: the latter is the request-resolution API and writes shared
+`HttpContext.Items`. Execution facts are single-assignment, take precedence
+inside that child scope, and reject replacement or clearing. They never change
+the caller's HTTP tenant facts. Overlapping execution scopes therefore retain
+their distinct targets without borrowing or retargeting an existing lease.
+
 ### Privacy-erasure authority credentials
+
+Subject disposal requires `event_subject_erasure_global` on the selected Global
+login only, with inheritance enabled and role switching disabled. The trusted
+adapter independently rereads the committed retained fact, then the native
+functions check the application saga tuple. Necessary provider locators feed
+the existing application protector; they are not public output or telemetry.
+Protected work, fixed disposal, custody/accounting, mirrors and outbox remain
+in one serializable application transaction. Retained authority stays committed
+if local settlement rolls back. Grant neither private tables nor owner/migrator
+membership to Global, and do not grant this capability to Runtime.
 
 | Compose / Infisical key | Direct .NET key | Consumer |
 |---|---|---|
@@ -620,6 +1454,8 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/database/DATABASE_SERVER_VERSION` | Optional override for MariaDB/MySQL (defaults: MariaDB `11.4`, MySQL `8.4`; e.g. `10.11`, `8.0`) |
 | `/database/DATABASE_RUNTIME_USERNAME` | Runtime database username |
 | `/database/DATABASE_RUNTIME_PASSWORD` | Runtime database password |
+| `/database/DATABASE_GLOBAL_USERNAME` | Independent bounded-capability database username |
+| `/database/DATABASE_GLOBAL_PASSWORD` | Startup-owned Global database password |
 | `/database/DATABASE_MIGRATOR_USERNAME` | Migrator database username |
 | `/database/DATABASE_MIGRATOR_PASSWORD` | Migrator database password |
 | `/database/ERASURE_DATABASE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase` |

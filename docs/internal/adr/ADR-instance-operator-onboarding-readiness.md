@@ -71,6 +71,16 @@ their own capabilities.
 
 `SetupSecretProvider` checks durable bootstrap completion state (`InstanceBootstrapState.Status == Completed`) independently of operator identity presence.
 
+Startup, live setup checks and deployment-mode resolution use
+`IInstanceBootstrapStateReader`, separate from the repository that owns onboarding
+mutations. Deployment-mode resolution runs before tenant selection, so it cannot
+read bootstrap tables through a request's Runtime context. PostgreSQL reads use the independent
+ordinary Global pool and the fully attested provider-configuration source image;
+Runtime receives no raw bootstrap-table privilege. The reader materializes detached
+entities, preserving explicit absence and descending generation, creation time and
+ID ordering. Mutation repositories retain their original transaction and fences.
+Failed native source admission stops startup rather than reopening setup.
+
 Even if an already-completed instance suffers corrupted or missing operator identity in `SystemSetting`, setup mode **never** re-enables and the setup secret remains permanently locked (returning HTTP 410 Gone). Only authenticated platform administrators (`platform.admin`) can repair identity via `/settings/instance?section=operator-identity`.
 
 ### 6. Optional Headless Bootstrap Input

@@ -95,6 +95,21 @@ echo it.
 
 ## Aspire Split Or Standalone Topology
 
+Authority errors are not repaired by changing the selected source implicitly:
+
+| Bounded failure | Repair |
+| --- | --- |
+| `secret_consumer_scope_invalid` | Remove broad, sibling, provisioning or infrastructure paths; use the compiled exact consumer roots. |
+| `secret_consumer_identity_missing` | Inject the enabled consumer's `INFISICAL_<CONSUMER>_CLIENT_ID/CLIENT_SECRET`, not a shared pair. |
+| `secret_consumer_identity_reused` | Provision independent machine identities and independently restricted ACLs. |
+| `secret_authority_invalid` | Check exact returned provenance, duplicate configuration keys and reference expressions without logging values. |
+| `secret_local_database_port_required` | Set the local database's stable operator-injected port and match it in the selected vault. |
+
+AppHost preserves Infisical in `local-full`. Supply provider-resource inputs
+separately; repairing a provider does not authorize the runtime to read that
+provider's admin or database credentials. A blank permitted-client item is
+invalid: omit it completely when no optional restriction is intended.
+
 Symptoms:
 
 - Aspire starts the unexpected API/BFF pair or omits the combined host.
@@ -862,7 +877,9 @@ enable bootstrap on API replicas.
 
 The diagnostic intentionally reports a digest prefix and stable code rather
 than the full path or values. Use `docker compose config` to confirm that only
-`event-migrationservice` has the manifest environment and read-only mount.
+`islamu-event-api` has the manifest environment and read-only mount in split
+deployment, and that it waits for successful `event-migrationservice`
+completion. The migration service has no manifest or Global credential.
 After correcting a pre-commit failure, run `ValidateOnly`, then rerun the same
 topology owner. Existing tenants remain wholesale skips. A same-section rerun
 uses fresh Day 2 instance authority and never replays historical instance

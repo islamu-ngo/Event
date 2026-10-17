@@ -99,6 +99,61 @@ This presentation correction does not change option identities, stored ranks, th
 
 ---
 
+## Pattern Validation and Intentional Field Clearing
+
+Shared Organization/Group, event and session definitions now use one bounded
+pattern contract. `RegexPattern` accepts at most 2,048 characters and only syntax
+supported by .NET's non-backtracking engine. Backreferences and lookarounds are
+not supported; malformed or excessive patterns are rejected when creating or
+editing a definition. Matching has a 100 ms timeout and checks the property's
+configured input-length bounds first. Null or empty patterns mean no pattern
+constraint; whitespace remains a literal pattern.
+
+Text defaults must satisfy the configured length and pattern; number and date
+defaults must satisfy their bounds. Length bounds cannot be negative, and an
+upper bound cannot precede its lower bound. Editing a definition validates the
+whole saved candidate, so changing only one bound cannot bypass the other bound
+or an existing default.
+
+On create, omitted `options` means an empty collection. An empty array is legal
+for a non-option property; an option property needs at least one valid option.
+Explicit `options: null` or an array containing null items is rejected.
+On PATCH, omit the `options` group to preserve the saved choices. If the group
+is supplied, `items` must be a non-null array without null entries; an empty
+array still has to satisfy the resulting property type.
+
+Nullable PATCH fields use a presence envelope. Omission, bare JSON null, and
+`hasValue: false` preserve the saved value. To clear Description, send:
+
+```json
+{
+  "metadata": {
+    "description": { "hasValue": true, "value": null }
+  }
+}
+```
+
+Use the same envelope with `value: ""` to save an empty description, or with
+a string to replace it. The nullable validation fields, including `regexPattern`
+and the bounds, use the same envelope in the `validation` group. Send PATCH to
+the definition's existing route with `If-Match: "<current concurrency stamp>"`
+from its latest detail response. A stale stamp still requires a reload before
+retrying.
+
+Invalid candidates return HTTP 400 with `validation_failed`; the response does
+not echo the submitted pattern or collected answer. Rejection leaves the stored
+definition and answers unchanged. Historical unsupported patterns also reject
+new event/session single or multi-value writes safely. Re-author such a pattern
+using supported syntax, or intentionally clear it with
+`{"hasValue":true,"value":null}` in `validation.regexPattern`, before retrying.
+Correct any conflicting default or bounds in that same patch. No database
+migration or automatic rewriting of stored patterns is part of this change.
+
+This is an intentional pre-release syntax restriction. Deploy the matching API
+and regenerated clients together; an older instance retains the unsafe pattern
+behavior and is not a security rollback. If a save response is lost, reload the
+definition and its concurrency stamp before retrying.
+
 ## Related Guides & Next Steps
 
 * **[Modular Event Aspects](modular-event-aspects.md)** — When to use typed relational aspects vs. custom properties.

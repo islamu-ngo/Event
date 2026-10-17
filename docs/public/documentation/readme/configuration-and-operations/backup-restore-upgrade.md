@@ -33,21 +33,26 @@ cleanup complete. See [storage target recovery](../integrations-and-ai/storage.m
 
 | Asset | Storage Location | Why It Matters |
 |---|---|---|
-| Primary database | Split `postgres_data`; Standalone `/app/data/islamu_event.db` | Application state, persisted email settings, outbox, colocated Local Identity and API/Standalone Data Protection keys; include migration histories and operational schemas |
+| Primary database | Split `postgres_data`; Standalone `/app/data/islamu_event.db` | Application state, persisted email settings, outbox and colocated Local Identity; include migration histories and operational schemas. Historical DP tables are not runtime key authority. |
 | External Local Identity, if selected | Configured independent Identity database | Credentials and credential-operation state, coordinated with application identity mappings |
 | Privacy-erasure authority | Default `/app/data/privacy_erasure_authority.db`; Split volume `privacy_erasure_authority_data` | Retained erasure facts and replay bounds, preserved independently of primary rollback |
 | Keycloak, when used | `keycloak-db`, volume `keycloak_data` | Accounts, realms, clients and credentials; use the configured database name, not an assumed one |
-| Split UI Data Protection keys | Redis key `islamu-event:data-protection-keys`, persisted in `redis_data` | The separate UI's protected-cookie key store; it is not the API's database key store |
+| External Data Protection ring and admission | Selected authority's exact partition folders/variables | Every retained key and revocation required by protected values and restorable backups |
+| Independent DP admission pin/floor | Separately protected operator deployment control | Preserve the latest hash/generation independently of application and candidate-authority rollback |
 | Media | Split `local_storage_data`; Standalone configured path, `/app/data/storage` in the Standalone runbook; or selected S3 bucket | Uploads and attachments consistent with database metadata |
 | Secret/configuration authority | Private `.env` or selected Infisical authority, configuration manifests and bindings | Local signing keys, external credentials, deployment configuration and key versions required by protected data |
 | Release inventory | Source revision, image digests, migration state and enabled profiles | Identifies the software and schema compatible with the recovery point |
 
-There is no `data_protection_keys` filesystem volume in shipped Compose and no
-Standalone `/app/data/dataprotection-keys/` directory. Default Standalone keys are
-in its primary database. Split uses database keys for the API and Redis keys for
-the separate UI. Preserve the selected secret authority too; Data Protection
-keys do not replace Local JWT signing keys. Key preservation alone does not
-guarantee that every session remains valid after recovery.
+No database, Redis snapshot or filesystem key directory supplies runtime Data
+Protection authority. Provision the selected external ring and separate complete
+admission record. Keep the current independently protected admission hash and
+minimum generation when restoring older data; restoring them with the candidate
+would defeat rollback rejection. Expired retained keys still decrypt, revoked
+keys stay revoked, and missing keys cannot be reconstructed. Durable destinations,
+registration answers and report evidence can require keys indefinitely.
+Preserve old database/Redis ring state and backups offline; cutover never deletes
+them. Data Protection does not replace Local JWT signing keys. See the
+[external ring runbook](secrets.md#external-data-protection-rings).
 
 If setup is incomplete, protect its generated secret in Split `setup_data` or
 Standalone `/app/data/setup-secret` as confidential bootstrap state. Optional
@@ -173,11 +178,13 @@ a main file with unrelated WAL/SHM files from another recovery point.
 
 ### Step 3: Restore Keys, Media And Secret Authority
 
-Database restoration includes API/Standalone Data Protection keys. For shipped
-Split, restore the complete captured Redis persistence unit into clean
-`redis_data` while Redis and the UI are stopped. Restore local media or S3 state
-consistent with the application snapshot. Use your volume/storage restore tool,
-not an invented filesystem keyring path. Preserve the deployment's non-root
+Database and Redis restoration do not provision current Data Protection authority.
+Restore the external partition's retained material and admission record without
+lowering the independently protected current hash/generation floor. Recover forward
+if a candidate is older; keep newer revocations. Restore any needed Redis persistence
+into clean `redis_data` with Redis/UI stopped, and media or S3 state consistent with
+the application snapshot. Use your volume/storage restore tool, not an invented
+filesystem keyring path. Preserve the deployment's non-root
 ownership and access permissions, including authority directories `0700` and
 files `0600`.
 
@@ -241,8 +248,10 @@ checkpoints or deleting facts. Keep traffic closed if these checks fail.
 
 Then start the UI, verify selected-provider sign-in, tenant routing, public event
 reads and media access, and review ambiguous outbox/provider outcomes before any
-replay. Inspect `data-protection-keys` on the UI: Redis reachability alone does not
-prove that its former keyring was restored. Check email intent separately:
+replay. Inspect `external-data-protection` on every API/BFF/Combined replica:
+require the intended generation and admission hash, then test real retained
+payloads. One healthy replica does not prove inventory completeness or cluster
+convergence. Check email intent separately:
 persisted disabled email is intentional, while SMTP-only degradation can return
 HTTP 200 with otherwise healthy core checks. Neither restoring configuration nor
 starting Mailpit should silently enable delivery. Required authority, database
@@ -339,3 +348,45 @@ Rollback needs matching binaries and a matching backup, not only a code revert.
 * **[Docker Compose Runbook](../self-hosting/docker-compose.md)** — Production deployment and container lifecycle commands.
 * **[Docker Standalone Runbook](../self-hosting/docker-standalone.md)** — Single-container storage and stopped-writer SQLite capture.
 * **[Troubleshooting & Operational Health](troubleshooting-and-health.md)** — Diagnose migration lock timeouts and database connection errors.
+
+## Public Event Response Freshness After Restore
+
+Run the matching release's migration authority before enabling PostgreSQL public
+event traffic. Public detail reads also need the timestamp-only response clock
+installed by that migration. It keeps responses bounded by upcoming session
+changes, enabled federation sources and location disclosure transitions, including
+sources omitted from a filtered result.
+
+The ordinary Runtime login receives execution permission, not raw event, session,
+federation or private-address table access. A missing or altered clock contract
+fails closed; do not grant source-table access, elevate Runtime, or disable
+freshness checks to restore service. Reinstallation rejects altered routine bodies,
+permissions and row-security policies rather than silently repairing them. Use the
+reviewed deployment recovery procedure with matching binaries and database authority.
+
+## Ticketing Recovery Readiness After Restore
+
+For releases integrating the recovery fleet observer, enabled `ticketing-recovery`
+readiness must observe recovery state across every tenant through the separately
+configured Global database authority. A successful ordinary Runtime database
+connection is not sufficient evidence: its tenant restrictions can hide unresolved
+recovery work.
+
+Run the matching release's migration authority before enabling traffic. On
+PostgreSQL, it enrolls Global for an aggregate-only observation capability;
+Global receives no direct recovery-table read or mutation permission. Do not
+grant broad table access or elevated database roles to make readiness pass.
+Repair missing or drifted authority through the reviewed deployment procedure.
+Portable deployments also require the separately configured Global scope.
+
+Missing observation authority reports Unhealthy rather than an empty healthy
+fleet. A Failed recovery checkpoint or sufficiently old due work is Unhealthy;
+unresolved recovery, ambiguous, poison, dead-letter, or threshold backlog work
+can be Degraded. Only fixed counts and an age are published, never ticket,
+tenant, operation, manifest, or private failure details. Disabled controls report
+an explicit disabled Healthy result and do not certify restore readiness.
+
+Release assurance must demonstrate foreign-tenant Failed checkpoints and Unknown
+effects through the registered health check. A schema that cannot persist Unknown
+effects has an unresolved recovery compatibility problem; do not weaken its
+constraints or treat a substitute status as a successful restore proof.

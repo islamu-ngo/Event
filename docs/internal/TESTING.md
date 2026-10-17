@@ -302,6 +302,65 @@ dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTest
 
 Support-access UI tests must assert affordances from HAL `_links`, not local role or claim checks. The tenant evidence view is intentionally read-only; tests should prove it does not render start or force-stop controls and only renders audit drill-in when the session resource contains an `audit-events` link.
 
+### Authentic Keycloak Token Context Evidence
+
+`KeycloakTokenContextHttpTests` uses `KeycloakTokenContextFixture`: each
+condition gets a runtime-generated RSA authority, independent wrong-key
+authority and issuer, controlled public metadata, and a TestServer host
+registered through production `AddApiAuthentication`. No TestAuth handler,
+signature/lifetime validator override or provider container is used.
+The protected endpoint changes an in-memory revision only after ordinary
+authentication and authorization succeed. Each negative asserts `401`,
+unchanged revision and a valid control request on the same host. Both current
+`JsonWebToken` and legacy `JwtSecurityToken` representations are exercised.
+This fixture proves the authentication boundary, not persistence, tenant
+membership, Local current-session authority or provider MFA.
+
+Cases are independently signed, including genuinely expired tokens beyond
+the normal five-minute skew, future not-before, wrong signing key, issuer,
+API/BFF/resource audience, client restrictions, JOSE header and signed
+access-purpose claims. Missing, duplicated/conflicting properties and wrong
+JSON types cannot pass through claim coercion. A separate near-expiry case
+retains normal provider skew. No sleep or wall-clock wait is used.
+
+`KeycloakNativeTokenContextHttpTests` is a separate Runtime lane, using
+`KeycloakContainerFixture` pinned to Keycloak 26.1.2 and the actual imported
+test realm. It asserts fetched issuer/token-endpoint/JWKS metadata and
+actual access/ID token shape; independent RSA verification checks both native
+signatures before purpose rejection. It verifies access-only API audience
+mapper effects, rejects an unmapped client, rejects native ID substitution
+even when the handler's resource audience matches that ID token, and admits
+a mapped service token only under the explicit client allowlist. Every
+HTTP assertion still uses production JwtBearer. Fixture passwords and
+confidential client credentials are generated per disposable container,
+never stored in the realm file or logged. These tests are not proof of
+an operator's live realm or MFA configuration.
+
+`SecurityIntegrationTests` retains separate decoded signature-byte and
+unsigned payload-tampering checks. Changing `exp` with the old signature is
+tampering evidence, not authentic expiry evidence. Unexpected compact-token
+shape fails instead of skipping an assertion. The former mislabeled
+missing-audience success test now describes its actual mapped-audience
+positive condition.
+
+For the source-only security programme these checks are authored, **unrun**.
+After the full implementation is complete, queue the Release API integration
+project build and the two owning classes separately:
+
+```bash
+dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/KeycloakTokenContextHttpTests/*" --minimum-expected-tests 1 --no-progress
+dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/KeycloakNativeTokenContextHttpTests/*" --minimum-expected-tests 1 --no-progress
+```
+
+Retain the repaired `SecurityIntegrationTests` and existing Local/ATProto
+purpose/current-authority suites in final programme assurance. No API DTO,
+OpenAPI, client or migration generation is required by this unit. The
+release-engine change fragment allocation/validation is a separate final
+queue item, not generated during source-only execution. Framework token
+representation APIs, pinned provider claims/mappers and metadata acquisition
+remain physically unverified until these queued checks run.
+
 ### Test Taxonomy And CI Lanes
 
 Use TUnit metadata to route tests into the smallest lane that proves the behavior. TUnit uses `--treenode-filter` for metadata filtering; do not use VSTest-style `--filter` examples for TUnit projects.

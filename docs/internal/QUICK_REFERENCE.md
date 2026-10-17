@@ -81,6 +81,12 @@ Database defense-in-depth (PostgreSQL):
 - `PostgresTenantSessionInterceptor` sets the connection session variable `app.current_tenant_id` on every connection open.
 - Model-derived policies fail closed (`0` rows visible, cross-tenant inserts rejected with 42501) when `app.current_tenant_id` is missing or empty, protecting against raw SQL queries or inadvertent `IgnoreQueryFilters()` calls.
 - Runtime database roles must have `NOBYPASSRLS` and must not have `SUPERUSER`.
+- PostgreSQL runtime registration always binds an immutable tenant lease and
+  performs read-only role/policy admission before application SQL. Migration
+  authority installs policies; Runtime never repairs them.
+- Explicit Global credentials own a separate pool. EF tenant-filter bypass is
+  not database authority: use the owning purpose-specific function or an exact
+  ordinary tenant lease, never session switching or Runtime role promotion.
 
 ## Auditing And Soft Delete
 1. Auditable entities use `CreatedAt/By` and `UpdatedAt/By`.

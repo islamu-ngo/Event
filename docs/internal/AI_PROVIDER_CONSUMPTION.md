@@ -1,6 +1,6 @@
 # AI provider response consumption
 
-> **Status:** Isolated Release build and 123 targeted tests passed; final programme assurance remains open.
+> **Status:** Source implemented; execution evidence deferred until programme assurance.
 > **Scope:** Infrastructure AI completion and model discovery, not credential acquisition.
 > **Source anchors:** `AiResponseReader`, `AiResponseLimits`, `AiResponseBudgetHandler`, `InfrastructureServicesRegistration`.
 
@@ -79,13 +79,8 @@ and `HttpClientPipelineTransport` SDK parsing happen only after it returns.
 It consumes and validates the original stream, then substitutes a bounded
 `ByteArrayContent` whose length is derived from accepted bytes.
 
-The production SDK factory uses this named transport with
-`ClientRetryPolicy(0)`. One application dispatch makes one HTTP attempt, including
-HTTP 408, 429 and 5xx failures. Their transient classifications are preserved so
-the native operation owner, rather than the SDK transport, decides whether a
-new dispatch is authorized. The stream-observable regression uses the real SDK
-pipeline and verifies one attempt plus disposal without reading the error body.
-This is an Azure-specific construction
+The instance SDK factory and tenant SDK constructor both use this named
+transport with SDK retries disabled. This is an Azure-specific construction
 contract, not a claim that an arbitrary `IChatClient` has a safe transport.
 Other provider IDs are rejected by the SDK adapter with
 `provider_transport_unsupported`; the factory also refuses non-Azure profiles.
@@ -99,30 +94,6 @@ responses are rejected; no compressed/decoded dual-budget implementation is
 claimed. The Azure catalogue is a configured deployment descriptor, not a
 successful remote-discovery result. Azure credential acquisition remains in the
 separately owned credential-custody workstream.
-
-## Endpoint and cloud identity authority
-
-`AiProviderSettingsValidator` applies the same outbound URL policy as the
-connection-time `VettedAddressConnector`; it does not treat configuration
-validation as authorization to connect to a later DNS answer. Each connection
-validates the resolved address set and opens the socket to an admitted address,
-while TLS authenticates the original hostname.
-
-`AiProviderConfigurationResolver` compares the requested and freshly selected
-origins as parsed scheme, normalized hostname and port. Equivalent spellings
-retain instance transport ownership; tenant-owned endpoint or provider metadata
-cannot borrow that ownership merely by repeating an instance value. Public and
-instance clients remain separate, and instance dispatch cannot escape its
-configured origin. Local instance opt-in never admits metadata destinations.
-Adapters and discovery map outbound denial to fixed categories without provider
-addresses or exception prose.
-
-The Azure `DefaultAzureCredential` chain excludes managed identity. Its token
-HTTP transport uses a shared process-lifetime client with the public-only
-connection policy, independent of instance local-endpoint opt-in. Reusing that
-client gives its handler durable ownership rather than allocating an unowned
-client for every credential chain. Tenant metadata cannot replace instance
-Azure identity fields.
 
 ## Safe failures
 
@@ -145,7 +116,7 @@ the status and response headers remain intact. HTTP 408, 429 and 5xx remain
 transient. Caller cancellation propagates; the adapter-owned deadline remains a
 distinct transient `provider_timeout`.
 
-## Verification
+## Deferred evidence
 
 `AiBoundedConsumptionTests` contains stream-observable direct-adapter and real
 Azure SDK pipeline cases for byte ceilings, disposal, caller cancellation,
@@ -157,19 +128,9 @@ of the final gate. The touched OpenAI timeout test now fires an injected timer
 after observing request entry; it no longer waits 1100 ms and hopes a deadline
 has elapsed.
 
-The isolated Infrastructure test project passed its Release build and 123 tests
-without skips: `AiBoundedConsumptionTests` (51), `AiCredentialHandoffTests` (29),
-`OpenAiResponsesChatProviderTests` (8), `OpenAiCompatibleChatProviderTests` (17),
-`AnthropicChatProviderTests` (1), `AnthropicCompatibleChatProviderTests` (5), and
-`MicrosoftExtensionsAiChatProviderTests` (12). Build and class receipts are
-recorded in the programme execution ledger.
-
-```bash
-dotnet build tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet
-dotnet run --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/*<TestClass>/*"
-```
-
-Source-only language-server diagnostics are not substitutes. At the
+No tests, builds, generators or validators have been executed for this source
+slice. Native Azure SDK transport behavior and final compilation remain pending
+proof; source-only language-server diagnostics are not substitutes. At the
 whole-programme gate, run the Infrastructure Release build and the combined
 Infrastructure tests once, including the parent-owned
 `BoundedResponseReaderTests` and all affected provider tests.

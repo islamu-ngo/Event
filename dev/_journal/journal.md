@@ -2853,3 +2853,138 @@ Do not infer wire presence from DTO nullability or an isolated serializer test.
 - [x] Stays in journal only; production HTTP field-presence assertions are the regression.
 
 ---
+
+[2026-10-08 Europe/Brussels] - Policy integrity hashes must not depend on search path
+
+**Context**: PostgreSQL ordinary-role admission was being verified during the tenant-lease security remediation.
+
+**Symptom / Observation**: All five catalog-admission checks and their combined Boolean passed on a raw connection, but the same role and database failed factory admission with `postgres_tenant_runtime_authority_not_ready`. The native search-path regression reproduced false readiness after changing only the connection search path.
+
+**Root Cause**: The installer and readiness check hashed `pg_get_expr` output for USING/CHECK policy expressions. PostgreSQL deparsing can qualify parent-table names differently depending on which schema is visible. The bare API fixture provisioned policies under a different search path from the configured Runtime pool, so unchanged parent-derived policies produced different digests.
+
+**Resolution**: The v2 stamp hashes the stored `polqual::text` and `polwithcheck::text` expression trees together with the source-condition fingerprint. The migrator provisions stamps; Runtime only verifies them. The native regression passed one case, exit0, in1m45s741ms with `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter '/*/*/*PostgresTenantApplicationTableIsolationTests/RuntimeAdmissionPolicyIntegrityDoesNotDependOnConnectionSearchPath' --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1`. Separate fail-closed and API checks remain pending at this checkpoint.
+
+**Why This Matters for Future Work**: Rendered SQL is presentation, not a connection-independent identity for stored database expressions. Integrity checks must detect policy changes without rejecting legitimate connection configuration differences. Reprovision v2 stamps under migration authority before starting consumers; do not relax Runtime authority or accept old stamps as a fallback.
+
+**References**:
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRowLevelSecurityModel.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRuntimeReadiness.cs`
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresTenantApplicationTableIsolationTests.cs`
+- `docs/internal/SECRETS.md`
+- `docs/public/documentation/readme/configuration-and-operations/environment-variables.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; provisioning and admission guidance already describes the mechanism.
+
+---
+
+[2026-10-08 Europe/Brussels] - Fenced EF reloads must refresh original values
+
+**Context**: Native PostgreSQL materialization was tested with an execute-only federation role, including staged image promotion, replacement, retained physical owners and terminal rollback.
+
+**Symptom / Observation**: Graph-only import passed, but four thumbnail scenarios exhausted retries with `40001: storage_producer_conflict`. Initially, a duplicate tracked `AtprotoRecord` during projection attachment masked that conflict on retry.
+
+**Root Cause**: The native fence updated producer concurrency stamps and returned the refreshed graph. The adapter assigned only current property values before setting the entry to Unchanged, leaving its original comparison values stale. Private deletion compared those originals against the newly fenced database row. Separately, EF relationship fixup had connected a caller-owned projection to the previous attempt's record; clearing tracking did not clear that object reference.
+
+**Resolution**: Reload both current and original mapped values from the authoritative fenced graph. Bind a supplied projection to the current attempt's tracked record before either attachment path. Native `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter '/*/*/*PostgresAtprotoMaterializationAuthorityTests/*' --minimum-expected-tests 5 --no-progress --maximum-parallel-tests 1` passed all five scenarios, exit0, in1m49s472ms. Concurrency predicates, private-table denials, custody checks and rollback assertions remain intact.
+
+**Why This Matters for Future Work**: A server-side fence changes the expected original concurrency value, not just the displayed current value. EF tracking state alone is not a reload contract. Retryable operations must also rebind navigation references on reused input entities to the current attempt's identity map.
+
+**References**:
+- `src/Explore.Persistence/Database/ProviderPrimitives/AtprotoMaterializationProviderOperations.cs`
+- `src/Explore.Persistence/Repositories/AtprotoJetstreamRepository.cs`
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresAtprotoMaterializationAuthorityTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the native regression owns this materialization boundary.
+
+---
+
+[2026-10-16 Europe/Brussels] - Shape routine lookup sets without caching live admission
+
+**Context**: Final security programme assurance exposed slow authenticated reads while principal, support and assignment source contracts repeatedly attested PostgreSQL catalog authority.
+
+**Symptom / Observation**: The measured second-pass statement totals were 227.358 ms, 85.022 ms and 152.940 ms respectively. Rewriting only the declared routine-ID lookup set reduced those totals to 150.788 ms, 45.720 ms and 109.092 ms. The targeted authority blocks fell from 82.896/57.116/57.252 ms to 16.184/18.185/18.299 ms.
+
+**Root Cause**: Catalog exclusion predicates embedded repeated scalar `to_regprocedure(signature)` expressions. Representing those same source-declared signatures as an uncorrelated `VALUES` relation changed the query shape without changing the expected routine set or the catalog predicates.
+
+**Resolution**: The three installers now use `SELECT pg_catalog.to_regprocedure(expected.signature) FROM (VALUES ...) expected(signature)` in both existing `NOT IN` predicates. Live role, ACL, ownership, body, schema and source validation remains enabled on every assertion; missing-routine NULL semantics are unchanged. The retained profiler receipt passed 1/1 before its temporary test was removed. Unexpected routine grant/ownership controls passed 2/2, and the disabled-writer control passed 1/1. The unchanged drift controls also passed in the later full support-source cohort. For a focused rerun, use `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter "/*/*/HumanSupportAccessNativeSourceFenceTests/UnexpectedRoutineGrantOrOwnershipFailsLiveAdmission" --minimum-expected-tests 2 --no-progress`; the analogous disabled-writer filter has minimum 1.
+
+**Why This Matters for Future Work**: Optimize a measured catalog query before weakening admission or changing server JIT settings. Faster attestation alone does not prove an end-to-end request meets its budget: subsequent MCP verification still exposed raw settings access and repeated complete graph acquisitions, which required separate fixes.
+
+**References**:
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresHumanPrincipalSourceContract.Installer.cs:100`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresHumanSupportAccessSourceContract.Installer.cs:53`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresHumanEventAssignmentSourceContract.Installer.cs:53`
+- `tests/Event.Persistence.IntegrationTests/HumanSupportAccessNativeSourceFenceTests.cs`
+- `dev/active/event-api-security-remediation/final-programme-assurance-evidence.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; measurements are specific to the retained provider run.
+
+---
+
+[2026-10-16 Europe/Brussels] - Direct SQLite fixtures need transaction lifecycle hooks
+
+**Context**: Final security programme assurance exercised resource-management revocation and authority snapshots over independent SQLite connections.
+
+**Symptom / Observation**: The management class stalled at `RevocationAfterAcceptedReadCannotReuseFinalMutationAuthority`. The independent membership-revocation case failed with `The operation was canceled.` Its stack reached `SemaphoreSlim` acquisition in `RelationalNamedLock.AcquireSqliteProcessLockAsync` during disclosure-epoch finalization. Simple creation and the real 500-resource capacity boundary passed independently, so neither fixture startup nor bulk arrangement explained the stall.
+
+**Root Cause**: The shared test database constructed options with raw `UseSqlite`, omitting the transaction lifecycle interceptors installed by production provider composition. The context constructor installed disclosure interception only. SQLite named locks are process semaphores retained until transaction completion; without the named-lock interceptor, fallback cleanup only scavenged completed transactions on the same physical connection. A different writer connection therefore waited on a semaphore whose database transaction had already completed.
+
+**Resolution**: The existing in-memory fixture now installs `SqliteNamedLockTransactionInterceptor.Instance` and `SqliteProjectionLockTransactionInterceptor.Instance`, matching production lifecycle wiring without inventing a persisted database configuration. The unchanged management class passed 32/32 and authority-snapshot class passed 15/15; the complete nine-class resource cohort passed 145/145 with no failures, skips, aborts or timeouts. Temporary diagnostic source was removed before these receipts. The coherent Release build passed with 600 warnings and zero errors; those warnings remain unclassified.
+
+Exact focused commands, executed under the existing serialized verification locks with a 900-second process bound:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/EventResourceManagementPersistenceTests/*" --minimum-expected-tests 32 --detailed-stacktrace --report-trx --report-trx-filename Final725-EventResourceManagementPersistenceTests.trx
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/EventResourceAuthoritySnapshotPersistenceTests/*" --minimum-expected-tests 15 --detailed-stacktrace --report-trx --report-trx-filename Final725-EventResourceAuthoritySnapshotPersistenceTests.trx
+```
+
+**Why This Matters for Future Work**: A committed database transaction does not by itself release an emulated process lock. Direct-construction fixtures must retain provider lifecycle hooks, especially when testing genuine independent connections. Increasing cancellation budgets or removing the competing writer would hide the missing wiring rather than test revocation.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/EventResourcePersistenceTests.cs`
+- `tests/Event.Persistence.IntegrationTests/EventResourceManagementPersistenceTests.Boundaries.cs`
+- `tests/Event.Persistence.IntegrationTests/EventResourceAuthoritySnapshotPersistenceTests.cs`
+- `src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs:38`
+- `src/Explore.Persistence/Database/ProviderPrimitives/RelationalNamedLock.cs:43`
+- `src/Explore.Persistence/Database/ProviderPrimitives/SqliteNamedLockTransactionInterceptor.cs`
+- `dev/active/event-api-security-remediation/final-programme-assurance-evidence.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; direct fixture composition must follow the existing provider contract.
+
+---
+
+[2026-10-16 Europe/Brussels] - Attest legitimate sibling writers through their owning contracts
+
+**Context**: Managed-provider provisioning attests every non-internal writer on its source relations before native creation or replay.
+
+**Symptom / Observation**: A fully installed database failed the provisioning source catalogue check because the Ordinary Settings Tenant membership row and TRUNCATE writers were absent from the shared inventory. The exact-intersection test also reported these unexpected legitimate writers.
+
+**Root Cause**: Adding a sibling protocol's relation triggers changes the provisioning writer intersection even when provisioning does not own that protocol. Both the production inventory and its independent test inventory omitted the two writers.
+
+**Resolution**: The Ordinary Settings owning partial now supplies both original bodies, role stamp and privilege contract to the existing shared-writer bridge. Provisioning checks their exact function identities, bodies, ACLs and trigger shapes (row flags 29; statement TRUNCATE flags 32), rather than allowing names by prefix or removing the writers. Migration-only whole absence remains distinct from partial installation or a named counterfeit. The fixture retains activation with a valid operator identity and includes both writers in disabled/body-restamped controls.
+
+Fresh native provisioning passed 23/23. Expanded composition passed 48/49, then the remaining original migration-absence/counterfeit case passed 1/1 after correcting explicit-transaction fixture composition and its missing namespace import: 49 distinct cases accepted, not a fresh combined 49-case receipt. The frozen non-incremental build passed with 1,353 unclassified warnings and zero errors.
+
+Exact native commands for the fresh provisioning and final composition case:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/HumanManagedProviderProvisioningNativeTests/*" --minimum-expected-tests 23 --detailed-stacktrace --report-trx --report-trx-filename Final731-HumanManagedProviderProvisioningNativeTests.trx
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/HumanProvisioningSharedWriterCompositionTests/LaterWriterAbsenceIsMigrationOnlyAndCannotHideANamedCounterfeit" --minimum-expected-tests 1 --detailed-stacktrace --report-trx --report-trx-filename Final740-LaterWriterAbsenceIsMigrationOnlyAndCannotHideANamedCounterfeit.trx
+```
+
+**Why This Matters for Future Work**: A closed catalogue must track legitimate cross-protocol composition without learning authority from live metadata. Reusing each owner's original body and privilege declaration preserves strict rejection of drift without duplicating SQL or broadening Runtime authority. Freeze target source during compilation; an incremental success alone did not establish that the changed fixture compiled in this investigation.
+
+**References**:
+- `src/Explore.Persistence/Security/ProviderPrimitives/ProvisioningSharedWriterAssertions.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Disclosure.cs`
+- `tests/Event.Persistence.IntegrationTests/HumanProvisioningSharedWriterCompositionTests.cs`
+- `dev/active/event-api-security-remediation/final-programme-assurance-evidence.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the existing shared-writer regression owns this composition boundary.
+
+---

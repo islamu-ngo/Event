@@ -129,19 +129,26 @@ remain separately operator-pulled, not bundled into it.
 
 ### Persistent Key Ownership
 
-API composition registers Data Protection with application name `islamu-event`
-and `PersistKeysToDbContext<DataProtectionKeyContext>()` in the primary database.
-Combined Standalone keeps that store when Redis is absent. If cache is configured,
-the later BFF registration selects Redis for the combined process. Shipped Split
-uses the database for API keys and Redis
-`islamu-event:data-protection-keys` for its separate UI, backed by `redis_data`.
-The API's database registration does not propagate across processes.
+API, BFF and Combined use explicit `api`, `bff` and `combined` external ring
+partitions. The layer-neutral `Explore.ServiceDefaults.DataProtection` adapter
+serves a bounded read-only framework XML repository from the selected authority;
+no runtime DB, Redis or filesystem persistence/generation remains in these hosts.
+API/Combined retain `islamu-event` for their durable data contracts, while Split
+BFF uses `islamu-event:bff:v1`. Combined intentionally owns both API and BFF
+purposes; it does not implicitly borrow either Split ring.
 
-Neither topology creates the previously described filesystem keyring volume.
-Coordinate backups of actual database/Redis keys, Identity, media and selected
-secret authority, while preserving newer erasure facts independently of primary
-rollback. Persistence registration is not evidence of crash safety, successful
-restore or preservation of every session. See
+An independent complete key/revocation inventory must match the ring. Separately
+protected deployment hash and minimum generation prevent admission of a restored
+older record; they cannot be rolled back alongside it. Startup proves active
+protection and every required retained descriptor. Leases and readiness changes
+fence cached protectors until restart. See [SECRETS.md](SECRETS.md#external-data-protection-admission)
+for the exact trust assumptions, bounded schema and purpose/lifetime inventory.
+
+Old database/Redis rings and backups are preserved, not read as compatibility
+authority or automatically deleted. Coordinate external key custody with Identity,
+media and application backup; independently preserve erasure facts and the DP
+admission floor. A successful active round-trip does not prove historical inventory
+completeness, replica convergence or restore correctness. See
 [SELF_HOSTING.md](SELF_HOSTING.md#persistent-keys-and-backup-boundaries) and
 [OPERATIONS.md](OPERATIONS.md#health-and-metrics-endpoints) for precise storage and
 readiness limitations.
@@ -341,7 +348,9 @@ Native timing intentionally excludes authorization. Invocation-local timestamps 
 
 The API and standalone shared host composition validate final descriptors after all modules and test substitutions, rejecting missing, duplicate, open-generic or late raw native entries. Microsoft DI scope/build validation covers inspectable registrations; it does not prove open-generic or opaque factory graphs. A scoped native construction guard detects reentry through aliases and clears its state in `finally`, with bounded type-only errors. It does not analyze cycles wholly inside unrelated opaque factories.
 
-Normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph before shared API setup, workers or traffic. Standalone-owned migrations and administrator bootstrap precede this shared runtime preflight; final descriptor validation still runs during Build, before standalone bootstrap. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent. CI calls `ValidateNativeOperationsDeepAsync` against the actual final provider in a disposable scope, resolving every closed native handler without calling business operations. Constructors must remain free of network and business side effects.
+Normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph before shared API setup, workers or traffic. Standalone-owned migrations and administrator bootstrap precede this shared runtime preflight; final descriptor validation still runs during Build, before standalone bootstrap. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent.
+
+CI proves public pipeline construction on the dormant actual host separately from protected implementation construction. The API integration proof authenticates genuine Local requests, selects each operation's production owner and purpose, and resolves every concrete entry in the actual native catalog without invoking its business operation. The activated contract set must equal the discovered set. An anonymous universal Instance scope cannot satisfy these protected constructors, and `ValidateNativeOperationsDeepAsync` is not that exhaustive authenticated proof. Select the policy purpose before human preparation binds the physical owner; a prepared Standard owner cannot be changed into a MixedSettings owner. Constructors must remain free of network and business side effects.
 
 ## Settings Capability Dispatch
 

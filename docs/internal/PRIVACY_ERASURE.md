@@ -49,6 +49,20 @@ erasure request -> append authority fact (committed first)
 
 ### Serialized Enrollment And Erased-Subject Fencing
 
+Local disposal also retains HTTP/AI idempotency key rejection fences. Both
+`UserLocationPrivacyErasureRepository` and the PostgreSQL subject-disposal policy
+match canonical dashed and compact User UUID strings, set the receipt to
+response-unavailable, and clear its User linkage, request metadata, fingerprints
+and response payload. Only the tenant/key identity, receipt identifier and
+lifetime metadata remain. Deleting the row would let another principal acquire
+an already-used key after a potentially committed business effect.
+
+The scrub executes inside the original erasure transaction. A failed settlement
+rolls it back with the other local effects; replay applies the same scrub again.
+Later request lookup cannot recover the erased payload or manufacture ownership:
+the retained key produces a mismatch against the erased descriptor. This is
+separate from the short-lived `ErasureReceipt` capability used for status polling.
+
 `PrivacyIdentityFenceOperation` serializes external enrollment through
 `IPrivacyIdentityFenceAuthority` before binding resolution and holds the
 authority gate through the application commit. This gate is keyless. Ordinary

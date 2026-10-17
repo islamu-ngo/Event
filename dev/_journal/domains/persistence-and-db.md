@@ -77,3 +77,26 @@
 **Promotion Consideration**:
 
 - [x] Stays in the persistence journal as demonstrated provider behavior.
+
+---
+
+[2026-10-15 Europe/Brussels] - Same-name index replacement must retain foreign-key support
+
+**Context**: Final security programme assurance exercised the complete application migration history on actual SQL Server, MariaDB and MySQL engines, including rollback to an empty database and reapplication.
+
+**Observation**: MySQL rejected dropping `ix_ai_tool_executions_proposed_action_id` because InnoDB still needed that leading-column index for the proposed-action foreign key. The generated migration recreated the index later under the same name, so moving its creation before its drop would instead collide on the index name.
+
+**Resolution**: `ConfigurableMySqlMigrationsSqlGenerator` creates a temporary nonunique index on `proposed_action_id` before dropping the original, generates the intended replacement with its actual uniqueness, then removes the temporary index. This applies in both directions. Foreign-key enforcement stays enabled, and no generated migration or snapshot is hand-edited.
+
+**Evidence**: `Repair-MySql-ForeignKeyIndexCoverage.trx` passed both generated-SQL ordering cases. `Repair-ServerProvider-MigrationLifecycle.trx` passed all three actual server-provider round-trips with zero skips. The latter used:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+  --configuration Release --no-build --verbosity quiet -- \
+  --maximum-parallel-tests 1 \
+  --treenode-filter "/*/*/SqlServerApplicationInitialLifecycleTests/GeneratedInitial_AppliesRollsBackAndReapplies" \
+  --minimum-expected-tests 3 --detailed-stacktrace --report-trx \
+  --report-trx-filename Repair-ServerProvider-MigrationLifecycle.trx
+```
+
+**Reuse**: Distinguish different-name index replacement, which can create the successor first, from same-name replacement, which needs temporary FK coverage. Verify both Up and Down on the real engine; a model-valid final schema does not prove each intermediate DDL operation is legal.

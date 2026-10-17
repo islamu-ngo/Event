@@ -62,8 +62,52 @@ Manifests deliberately exclude:
 
 Manifest file ingestion represents an administrative trust boundary:
 1. Restrict file access, ownership, and write permissions to the application service user.
-2. Validate schema version, authority signatures, and every included section before committing.
+2. Validate schema version and every included section before committing.
 3. Apply outcomes are strictly atomic: if a single section fails validation, the entire manifest is rejected rather than leaving the system in a partially trusted state.
+
+For unattended bootstrap, the trust origin is the owning post-migration host's
+deployment-selected `Bootstrap` mode, local regular file, and selected
+database/namespace. Review and protect that deployment configuration and mount
+the manifest read-only. A supplied parsed manifest, database credential, or
+checksum alone does not authorize bootstrap.
+
+The reader computes a SHA-256 checksum to identify the exact file; it does not
+verify a digital signature or authenticate a signer. Do not treat a checksum
+as proof of who supplied the manifest. Authenticated Day 2 import uses its own
+administrator admission, not this request-free startup origin.
+
+In split deployments, the API owns this startup step after MigrationService
+finishes successfully. Docker Compose mounts the reviewed source read-only
+into `islamu-event-api`; Aspire passes mode/path to `Explore.API`, which waits
+for migration completion. MigrationService receives neither the manifest nor
+Global credentials. Standalone keeps its own migrate-then-manifest sequence
+and does not repeat it in shared API startup.
+
+Start or recreate the API with `CONFIGURATION_MANIFEST_MODE=ValidateOnly`,
+check its startup outcome, then repeat with `Bootstrap`. Return to `Off` after
+successful application. Validation starts the ordinary API host; it is no
+longer a one-shot MigrationService command. If you deploy the API directly,
+complete migrations first. Native authority that is absent or incompatible
+rejects bootstrap rather than falling back to migration credentials.
+
+The new bootstrap file-custody implementation currently supports Linux only;
+other operating systems reject Bootstrap rather than using weaker file checks.
+PostgreSQL installation enrolls only the selected Global login in the dedicated
+`event_manifest_bootstrap_global` execution group. Runtime receives no bootstrap
+grant. These registration and installation hooks are authored; the bootstrap
+source review, native installation and runtime acceptance remain pending.
+
+ValidateOnly reads a consistent snapshot without taking the bootstrap manifest
+mutex or retaining source row locks. It rolls back its read transaction and
+does not grant permission to apply that preview later; Bootstrap must originate
+its own deployment-file attempt.
+
+During PostgreSQL Bootstrap, source relation locks also protect missing rows
+until commit or rollback, so another writer cannot insert a captured missing
+setting mid-attempt. Concurrent writes can wait or fail as conflicts; an
+attempt is not replayed automatically. The dedicated no-login owner receives
+the read privilege needed for these locks; the application Global login does
+not receive that owner role or new direct table write access.
 
 ---
 
@@ -86,6 +130,81 @@ authorized tenant. Keep its generated authority and sovereign-field omission
 metadata intact: the importer validates those declarations. The omission list
 describes excluded fields; it contains no credentials and grants no additional
 authority.
+
+Committed imports and forward rollbacks can finish cache refresh and
+notifications asynchronously. Keep the committed receipt if delivery needs
+recovery; retry its existing effect rather than importing the configuration
+again. Delivery accepts only the effect message bound to that successful
+receipt. Failed imports and mismatched messages cannot publish those effects.
+
+Human imports retain the original publication-policy rows and missing keys
+before validating the fresh preview. Applying a selected publication change
+must consume that same observation and verify its exact persisted result.
+Changed row identities, metadata or other policy inputs reject the whole
+attempt; they are not silently adopted as a new baseline. Tenant imports
+continue to reject overrides of locked instance publication settings.
+
+Deploy the updated native import contract through the owning migration process
+before enabling its consumers. The selected Global import capability uses the
+retained-original writer; direct execution of the older raw publication writer
+is revoked. The security programme's runtime assurance for this change remains
+pending, rather than being established by documentation or source diagnostics.
+
+Instance exports read each selected active tenant through its own isolated
+read scope, so the administrator's current tenant does not change the exported
+values. Tenant-package exports read only their authorized target. This does not
+change the import's atomic commit: fidelity checks remain on the transaction
+that owns its configuration changes.
+
+Import snapshots also retain the latest successful bootstrap identity and
+metadata through a bounded native read on that same owner. Deploy its updated
+snapshot function through the migration process; do not repair missing
+capability installation by granting the application direct access to bootstrap
+history. Runtime assurance for this repair remains pending.
+Tenant lock targets are also selected through a bounded native read. A matching
+inactive tenant remains visible to the import's eligibility checks; this does
+not authorize applying changes to an inactive tenant. The application does not
+need direct tenant-table access for this selection.
+Resource-change notification timestamps use the same registered clock as the
+import receipt. Provenance validation still rejects notifications outside that
+receipt's interval; it does not widen the interval to accept inconsistent clocks.
+
+Legal source snapshots include the current editable version, including an
+unpublished draft: audience, localized title/summary/Markdown, template
+provenance and the fresh-acceptance requirement. Kind names use the manifest
+format, such as `TermsOfService`, rather than public route names such as
+`terms-of-service`. The imported intent is `ReviewRequired`; review identities,
+publication status and acceptance history are not transferred.
+
+Imported legal source is persisted inside the import transaction before fidelity
+is checked, but remains invisible to other requests until commit. A failed import
+rolls back that source with the other selected changes. Existing unpublished
+drafts are not overwritten; a revision starts only from published or retired
+state and must pass the target's legal review before publication.
+
+Legal Markdown is restricted text, not an executable template. Keep each locale
+within 256 KiB of UTF-8 input, 128 links and 64 total identity-placeholder
+occurrences, including placeholders in link labels. Repetition of the same name
+counts each time. Identity substitutions are at most 500 UTF-16 characters and
+are HTML-encoded once; text inside them is never interpreted as another
+placeholder or as markup. Inline nesting is limited to 32 and rendered HTML to
+1,048,576 UTF-16 characters. HTML escaping can expand text, so input within its
+byte budget can still exceed the output budget.
+
+Over-budget content produces no partial public HTML. If a published document
+cannot render within these bounds, its public route reports unavailable.
+Shorten the governed source, review it and publish a new version through the
+existing legal lifecycle. Remote links are checked as destinations, never fetched
+by the renderer. Do not add active template expressions to work around a limit.
+
+Selected changes, consumed session, rollback snapshot, terminal receipt and
+deferred-effect marker commit together. Failed apply rolls back the selected
+changes; its sanitized failure evidence can be recorded afterward without
+committing any of those changes.
+
+Fidelity reads bypass shared settings and branding caches. They can inspect
+the import transaction's own changes before commit without exposing those
+changes through cache refresh or another reader.
 
 ---
 

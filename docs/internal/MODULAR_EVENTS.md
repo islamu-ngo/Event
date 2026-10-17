@@ -43,15 +43,6 @@ Session Islamic aspect includes prayer-relative scheduling fields and ritual fla
 - `RequiresWudu`
 - `RitualRequirementsJson`
 
-## Lifecycle diagnostic privacy
-
-`IslamicEventStrategy` and `TechEventStrategy` record fixed lifecycle events,
-not event identity or aspect field values. Religious details, workshop metadata
-and repository URLs belong to the event data contract, not a second diagnostic
-copy. Their lifecycle hooks retain informational diagnostics with no dynamic
-arguments; aspect values and generated links remain available through the
-existing event contract and its normal access boundaries.
-
 ## API Surface
 
 Aspect-specific endpoints live under `EventAspectController` (route `api/event`):

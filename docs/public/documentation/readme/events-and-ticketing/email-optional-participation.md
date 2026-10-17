@@ -115,17 +115,18 @@ uncertain deliveries retain their existing reconciliation process.
 
 ### Operating The Deletion Sweep
 
-The registration deletion sweep discovers only active tenant identities, then
-runs each tenant's cleanup through separately selected database authority.
-PostgreSQL requires the current native discovery capability installed before
-enabling the worker. Other relational providers retain bounded tenant discovery;
-model-only providers are rejected. Monitor failed scheduled jobs rather than
-treating missing deletions as success.
+The registration deletion sweep uses separate discovery and tenant-scoped
+execution authorities. Discovery returns only tenant identities; each tenant's
+cleanup runs with its own database authority. On PostgreSQL, install the current
+native database capability before enabling the worker. Other relational providers
+retain bounded tenant discovery; model-only providers are rejected. Monitor
+failed scheduled jobs rather than treating missing deletions as success.
 
-Suspended tenants remain outside the seeded eligibility policy. This does not
-extend a stored privacy deadline: read-time expiry still denies expired data
-when physical deletion is delayed. Restoring cleanup must not broaden database
-privileges, override legal holds, or change provider-delivery reconciliation.
+The sweep retains its existing active-tenant eligibility rule. Suspended tenants
+are not included by the seeded policy. This does not extend a stored privacy
+deadline: read-time expiry still denies expired data even when physical deletion
+is delayed. Restoring cleanup must not broaden database privileges, override
+legal holds, or change existing provider-delivery reconciliation.
 
 ## Public Calendar Export
 

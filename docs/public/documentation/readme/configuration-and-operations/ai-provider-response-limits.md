@@ -52,19 +52,6 @@ Automatic response decompression is disabled. Providers and intermediate
 proxies must return identity-encoded responses; compressed replies are rejected
 because this release does not separately bound compressed and decoded streams.
 
-## Endpoint and cloud identity boundaries
-
-Tenant AI traffic uses public-network transport. An instance may opt in to a
-local provider, but that exception is limited to its selected origin and never
-admits cloud metadata endpoints. Reusing the same endpoint text in tenant
-settings does not grant the instance exception. DNS changes are checked at the
-actual connection, and TLS still validates the provider hostname.
-
-Azure default credentials are instance-owned. Their token traffic always uses
-public-only transport, and managed identity is excluded; enabling local
-instance endpoints does not enable metadata-based token acquisition. Configure
-an admitted credential mechanism rather than relying on a metadata route.
-
 ## Rejection and recovery
 
 A size, nesting, collection, identifier, scalar, argument or encoding rejection
@@ -80,15 +67,12 @@ limit can be raised back to the documented ceiling, but there is no unlimited
 setting. Do not collect raw provider replies in support reports.
 
 Ordinary HTTP 408, 429 and server failures remain retryable according to the
-existing provider policy. Azure SDK dispatch makes only one HTTP attempt;
-transient status does not authorize an automatic SDK resend. Recovery belongs
-to the operation owner, not an invisible transport retry. User cancellation
-remains cancellation, while the configured request deadline reports a timeout.
+existing provider policy. User cancellation remains cancellation, while the
+configured request deadline reports a timeout.
 
 ## Assurance status
 
-The isolated Release build and 123 targeted regression tests passed without
-skips. The security programme's final build and test gate remains open; these
-in-memory transport checks are not live-provider certification. Changes
+This implementation is awaiting the security programme's final build and test
+gate. Source completion is not a claim of live-provider certification. Changes
 to an SDK or HTTP pipeline require new bounded-consumption evidence before
 admitting that profile.

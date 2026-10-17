@@ -47,6 +47,49 @@ both catalogs as well.
 
 ## Consequences
 
+### Resolver editor original-source custody
+
+`PATCH /api/instance/settings/resolver-config` is an authenticated human
+instance-administrator action. `UpdateResolverConfigurationCommandHandler`
+retains that predicate; the command has no policy-route annotation to invent.
+`ResolverConfigService` carries the original closed command into ordinary
+Global owner selection, then captures the genuine subject, credential lifetime,
+request and support forwarding sources through
+`ResolverConfigurationMutationAuthority`. Setup-secret tickets and configured
+startup routing readers do not grant resolver editing authority.
+
+`ResolverConfigurationMutation` compiles supplied leaves from the complete
+seven-row source, not a cached DTO. Its dedicated settings writer uses one
+non-replaying Serializable attempt on the original connection/context/unit.
+Human preparation installs compulsory fixed-writer completion admission before
+exposing execution: an exact-value generic scalar write is insufficient.
+Terminal admission compares all seven rows, including unpatched validation
+inputs, IDs, locks, metadata and canonical creation/update attribution. Awaited
+source checks finish before original credential/support deadline sampling.
+Failure rolls back the complete patch; cache invalidation follows acknowledged
+physical settlement only. The action has no resolver network preflight.
+
+The integrated source implementations cover SQLite and a dedicated PostgreSQL
+contract. `PostgresResolverConfigurationContract` uses the existing enrolled
+Global/Migrator identities with fixed read/write functions, independent body
+hashes and catalog/privilege attestation. A private
+`resolver_configuration_source` singleton and ALWAYS row/TRUNCATE triggers
+exclude changes across all seven keys, including absent-row insertion,
+metadata changes, deletion and key renaming. The native writer updates and
+holds that singleton through physical settlement; a competing committed change
+since its Serializable snapshot causes serialization failure. The shared test
+reset preserves the singleton rather than recreating a missing authority.
+
+The selected writer represents PostgreSQL data time at microsecond precision
+before compilation. Original credential/support deadlines keep full precision.
+Original connection-state custody rejects close/reopen, even when pooling
+returns the same backend. This is a resolver-specific data capability; the
+operator-identity editor supplies no resolver grant. SQL Server, MySQL/MariaDB
+and other unsupported providers reject with
+`resolver_configuration_native_custody_not_supported`. The 40 original source
+and 84 native/signed cases remain unrun under the whole-programme verification
+freeze; installation hooks and authored SQL are not runtime certification.
+
 - A default self-hosted multi-tenant deployment can use one hostname and ordinary
   TLS certificate; wildcard DNS and TLS are not prerequisites.
 - Custom domains and tenant subdomains remain optional host-based strategies. A

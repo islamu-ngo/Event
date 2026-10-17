@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -30,12 +31,8 @@ public class SupportAccessAuditEventRepository : ISupportAccessAuditEventReposit
     {
         int boundedLimit = Math.Clamp(limit, 1, MaxListLimit);
 
-        return await _dbContext.SupportAccessAuditEvents
-            .AsNoTracking()
-            .Where(auditEvent => auditEvent.SupportAccessSessionId == sessionId)
-            .OrderByDescending(auditEvent => auditEvent.OccurredAtUtc)
-            .Take(boundedLimit)
-            .ToListAsync(cancellationToken);
+        return await SupportAccessTemporalQueries.ListAuditForSessionAsync(
+            _dbContext, sessionId, boundedLimit, cancellationToken);
     }
 
     public async Task<IReadOnlyList<SupportAccessAuditEvent>> ListForTargetTenantAsync(
@@ -45,11 +42,7 @@ public class SupportAccessAuditEventRepository : ISupportAccessAuditEventReposit
     {
         int boundedLimit = Math.Clamp(limit, 1, MaxListLimit);
 
-        return await _dbContext.SupportAccessAuditEvents
-            .AsNoTracking()
-            .Where(auditEvent => auditEvent.TargetTenantId == targetTenantId)
-            .OrderByDescending(auditEvent => auditEvent.OccurredAtUtc)
-            .Take(boundedLimit)
-            .ToListAsync(cancellationToken);
+        return await SupportAccessTemporalQueries.ListAuditForTargetTenantAsync(
+            _dbContext, targetTenantId, boundedLimit, cancellationToken);
     }
 }

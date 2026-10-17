@@ -1,9 +1,11 @@
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
@@ -11,10 +13,12 @@ namespace Explore.Persistence.Services;
 public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly Func<IPrivateEventManagementReader>? _privateManagement;
 
-    public EventAuthoritySnapshotService(ExploreDbContext dbContext)
+    public EventAuthoritySnapshotService(ExploreDbContext dbContext, Func<IPrivateEventManagementReader>? privateManagement = null)
     {
         _dbContext = dbContext;
+        _privateManagement = privateManagement;
     }
 
     public async Task<EventAuthoritySnapshot> GetCommitBoundForUserAndEventsAsync(
@@ -81,6 +85,11 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
         }
 
         var distinctEventIds = eventIds.Distinct().ToArray();
+
+        if (_privateManagement is not null && _dbContext.Database.CurrentTransaction is null
+            && PostgresPrivateEventManagementContract.For(_dbContext) is { } native)
+            return await native.ReadAuthorityAsync(
+                _privateManagement, tenantId, userId, distinctEventIds, cancellationToken);
 
         var assignments = await _dbContext.EventRoleAssignments
             .AsNoTracking()

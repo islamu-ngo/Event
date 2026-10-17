@@ -175,7 +175,8 @@ public sealed class HumanSupportAccessSourceFenceTests
             fixture.Services.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>(), default)
             ?? throw new InvalidOperationException("The persisted original human is required.");
         var service = new SupportAccessSessionService(http, fixture.Services.GetRequiredService<IAdminContext>(), tenant,
-            fixture.Services.GetRequiredService<IHierarchicalSettingsResolver>(), new SupportAccessSessionRepository(fixture.Context));
+            fixture.Services.GetRequiredService<IHierarchicalSettingsResolver>(), new SupportAccessSessionRepository(fixture.Context),
+            TimeProvider.System);
         return (subject, await HumanSupportForwardingObservation.CaptureAsync(subject, service, tenant), service);
     }
 }

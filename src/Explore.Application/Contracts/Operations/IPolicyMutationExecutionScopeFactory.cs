@@ -1,5 +1,11 @@
 namespace Explore.Application.Contracts.Operations;
 
+/// <summary>Closed access to an already acquired mixed owner; never constructs or reselects a scope.</summary>
+public interface IMixedSettingsExecutionScopeAccess
+{
+    IServiceProvider BorrowMixedSettings(Explore.Application.Features.Settings.MixedSettingsBatchMutation mutation);
+}
+
 /// <summary>
 /// Acquires an immutable instance or target-tenant lease before constructing a mutation graph.
 /// Existing handlers retain ownership of transactions, ordered locks and commit effects.

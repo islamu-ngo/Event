@@ -37,7 +37,10 @@ public sealed partial class HumanSettingsMutationPreparation(
     IHttpContextAccessor httpContext,
     IHumanAuthenticationLifetimeObserver lifetimeObserver,
     ITenantContext tenantContext,
-    TimeProvider clock) : IHumanSettingsMutationPreparation
+    TimeProvider clock,
+    CerbosAuthorizationService cerbos,
+    IOptions<AuthorizationProviderDeploymentOptions> authorizationOptions,
+    IOptions<CerbosSettings> cerbosOptions) : IHumanSettingsMutationPreparation
 {
     private readonly AsyncLocal<Prepared?> _currentOwner = new();
 
@@ -48,6 +51,100 @@ public sealed partial class HumanSettingsMutationPreparation(
 
     public IOrdinarySettingsSource? CurrentOrdinarySource =>
         _currentOwner.Value is { Active: true } current ? current.OrdinarySource : null;
+
+    public async Task<T> ExecuteMixedJoinedAsync<T>(MixedSettingsBatchMutation mutation,
+        Func<IPreparedHumanSettingsMutation, CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        mutation.RequireActive();
+        services.GetRequiredService<Explore.Application.Features.EmailDispatch.IHumanEmailMutationPreparation>()
+            .RequireMixedSource(mutation.Source);
+        if (_currentOwner.Value is not null || mutation.Actor != humanScope.Subject?.PrincipalId
+            || mutation.TenantId.HasValue && mutation.TenantId != tenantContext.TenantId
+            || !ReferenceEquals(mutation.Owner, services.GetRequiredService<ISerializableAttemptOwner>()))
+            throw new UnauthorizedAccessException("A mixed Settings slice must borrow its original physical owner.");
+        var effects = mutation.SettingsEffects();
+        var issued = new Prepared(this, mutation.Original, effects,
+            CoordinatedKeys(effects.Select(effect => effect.Key)), mutation.Owner,
+            _ => throw new UnauthorizedAccessException("A mixed Settings slice cannot acquire another owner."))
+        {
+            Consumed = 1,
+            Active = true,
+            ValidateOwner = token =>
+            {
+                mutation.RequireActive();
+                return mutation.Source.RequireSourcesAsync(token);
+            }
+        };
+        _currentOwner.Value = issued;
+        try { return await InvokeAsync(issued, operation, cancellationToken); }
+        finally { _currentOwner.Value = null; issued.Active = false; issued.ValidateOwner = null; }
+    }
+
+    public async Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateResolverConfigurationCommand command,
+        ResolverConfigurationMutation mutation, CancellationToken cancellationToken = default)
+    {
+        services.GetRequiredService<IResolverConfigurationMutationAuthority>().RequireIssued(mutation.Source);
+        mutation.RequireActive();
+        if (!ReferenceEquals(command, mutation.OriginalCommand) || command.UserId == Guid.Empty
+            || command.UserId != mutation.Actor)
+            throw new UnauthorizedAccessException("Resolver effects require their actual original human command.");
+        // The real resolver PATCH has an instance-admin predicate, not a PDP annotation.
+        // Its fixed metadata/lock effects belong to its dedicated writer, not generic scalar access.
+        var issued = (Prepared)await PrepareCoreAsync(mutation, SettingScope.Instance, null, Authority.Instance, command.UserId,
+            (_, _) => mutation.Effects.Select(effect => new HumanSettingsMutation(
+                HumanSettingsOperation.InstanceSettings, SettingScope.Instance, null, null,
+                effect.Key, HumanSettingsMutationKind.SetValue, effect.Value)).ToImmutableArray(),
+            [], cancellationToken);
+        var writer = services.GetRequiredService<IResolverConfigurationSettingsWriter>();
+        var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
+        // Only this wrapper escapes preparation. It retains the same physical owner and
+        // original acquisition, and installs completion admission before exposing any callback.
+        // An exact-value scalar write cannot bypass the capsule's metadata/projection checks.
+        return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async token =>
+        {
+            var validate = await issued.Acquire(token);
+            finalizer.Register(finalToken => writer.RequireAppliedAsync(mutation, finalToken), _ =>
+            {
+                mutation.RequireActive();
+                mutation.Source.RequireTime();
+            });
+            return validate;
+        });
+    }
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(SaveInstanceOperatorIdentityCommand command,
+        OperatorIdentityMutation mutation, CancellationToken cancellationToken = default) =>
+        PrepareOperatorIdentityAsync(command, mutation, null, cancellationToken);
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(ImportInstanceOperatorIdentityCommand command,
+        OperatorIdentityMutation mutation, CancellationToken cancellationToken = default)
+    {
+        ISecureRequest original = command;
+        return PrepareOperatorIdentityAsync(command, mutation,
+            new AuthorizationRequest(ResourceKinds.InstanceSetting, original.ResourceId!,
+                AuthorizationActions.InstanceSettings.Update, Facts: original.AuthorizationFacts),
+            cancellationToken);
+    }
+
+    private Task<IPreparedHumanSettingsMutation> PrepareOperatorIdentityAsync(object command,
+        OperatorIdentityMutation mutation, AuthorizationRequest? check, CancellationToken token)
+    {
+        services.GetRequiredService<IOperatorIdentityMutationAuthority>().RequireIssued(mutation.Source);
+        if (!ReferenceEquals(command, mutation.OriginalCommand) || !mutation.Source.IsHuman
+            || mutation.Actor is not { } actor || actor == Guid.Empty
+            || check is not null && mutation.Source.IsSetup)
+            throw new UnauthorizedAccessException("Operator identity must retain its actual human command and source.");
+        // Save has no PDP annotation. Import retains its real InstanceSetting/update annotation.
+        // A human using the accepted setup-secret branch keeps Subject/P/H, not a fabricated
+        // administrator grant. The dedicated writer also fences that exact pending generation.
+        return PrepareCoreAsync(mutation, SettingScope.Instance, null,
+            mutation.Source.IsSetup ? Authority.Subject : Authority.Instance, actor,
+            (_, _) => [new(HumanSettingsOperation.InstanceSettings, SettingScope.Instance, null, null,
+                InstanceOperatorIdentitySettingKeys.OperatorIdentity, HumanSettingsMutationKind.SetValue,
+                mutation.After.Value)], [], token, check);
+    }
 
     public Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateInstanceStorageSettingsCommand command,
         StorageSettingsMutation mutation, CancellationToken cancellationToken = default)
@@ -178,6 +275,149 @@ public sealed partial class HumanSettingsMutationPreparation(
         return await ExecuteDerivedAsync(parent, effects.ToImmutable(), mutation, cancellationToken);
     }
 
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateSettingCommand command, string storedValue,
+        CancellationToken cancellationToken = default) =>
+        PrepareScalarAsync(command, command.Scope, command.Key, HumanSettingsMutationKind.SetValue,
+            storedValue, null, cancellationToken);
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(ResetSettingCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        if (command.Scope == SettingScope.Instance)
+            throw new UnauthorizedAccessException("Instance settings cannot be reset through ordinary reset.");
+        return PrepareScalarAsync(command, command.Scope, command.Key, HumanSettingsMutationKind.Remove,
+            null, null, cancellationToken);
+    }
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(LockSettingCommand command,
+        CancellationToken cancellationToken = default) =>
+        PrepareLockAsync(command, command.Scope, command.Key, true, cancellationToken);
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(UnlockSettingCommand command,
+        CancellationToken cancellationToken = default) =>
+        PrepareLockAsync(command, command.Scope, command.Key, false, cancellationToken);
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateSettingBatchCommand command,
+        ImmutableDictionary<string, string> storedValues, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(storedValues);
+        if (command.Values is null || storedValues.Keys.Any(key => !command.Values.ContainsKey(key)))
+            throw new UnauthorizedAccessException("Prepared batch effects must belong to the original request.");
+        // BestEffort may exclude invalid keys. The immutable original command retains category,
+        // input values and batch mode; only validated stored effects can receive mutation proof.
+        return PrepareCoreAsync(command, command.Scope, null, null, null,
+            (tenant, actor) => storedValues.Select(pair => new HumanSettingsMutation(OperationFor(command.Scope), command.Scope,
+                command.Scope == SettingScope.Instance ? null : tenant,
+                command.Scope == SettingScope.User ? actor : null, pair.Key,
+                HumanSettingsMutationKind.SetValue, pair.Value)).ToImmutableArray(),
+            CoordinatedKeys(storedValues.Keys), cancellationToken);
+    }
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(SetInstanceTenantSettingCommand command,
+        string storedValue, CancellationToken cancellationToken = default) =>
+        PrepareInstanceTenantAsync(command, command.TenantId, command.Key,
+            HumanSettingsMutationKind.SetValue, storedValue, null, cancellationToken);
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(LockInstanceTenantSettingCommand command,
+        CancellationToken cancellationToken = default) =>
+        PrepareInstanceTenantAsync(command, command.TenantId, command.Key,
+            HumanSettingsMutationKind.SetLock, null, true, cancellationToken);
+
+    public Task<IPreparedHumanSettingsMutation> PrepareAsync(UnlockInstanceTenantSettingCommand command,
+        CancellationToken cancellationToken = default) =>
+        PrepareInstanceTenantAsync(command, command.TenantId, command.Key,
+            HumanSettingsMutationKind.SetLock, null, false, cancellationToken);
+
+    public Task<IPreparedHumanSettingsMutation> PrepareResourceAsync(
+        ImmutableArray<EventResourceSettingMutation> mutations, SettingsMutationOperation operation,
+        Guid? actorUserId, CancellationToken cancellationToken = default)
+    {
+        if (mutations.IsDefault || mutations.Any(mutation => mutation is null
+                || !Enum.IsDefined(mutation.Kind) || !EventResourceSettingMutationGuard.Handles(mutation.Key)))
+            throw new ArgumentException("Exact resource setting mutations are required.", nameof(mutations));
+        return PrepareWriterAsync(mutations, operation, actorUserId,
+            mutations.Select(mutation => new HumanSettingsMutation(OperationFor(operation),
+                mutation.TenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance,
+                mutation.TenantId, null, mutation.Key, mutation.Kind switch
+                {
+                    EventResourceSettingMutationKind.SetValue => HumanSettingsMutationKind.SetValue,
+                    EventResourceSettingMutationKind.SetLock => HumanSettingsMutationKind.SetLock,
+                    EventResourceSettingMutationKind.Remove => HumanSettingsMutationKind.Remove,
+                    _ => throw new ArgumentOutOfRangeException(nameof(mutations))
+                }, mutation.Value, mutation.IsLocked)).ToImmutableArray(),
+            EventResourceSettingMutationGuard.Keys, cancellationToken);
+    }
+
+    public Task<IPreparedHumanSettingsMutation> PrepareVisitorAsync(
+        ImmutableArray<VisitorAccessSettingMutation> mutations, SettingsMutationOperation operation,
+        Guid? actorUserId, CancellationToken cancellationToken = default)
+    {
+        if (mutations.IsDefault || mutations.Any(mutation => mutation is null
+                || !Enum.IsDefined(mutation.Kind) || !VisitorAccessSettingMutationGuard.Handles(mutation.Key)))
+            throw new ArgumentException("Exact visitor setting mutations are required.", nameof(mutations));
+        return PrepareWriterAsync(mutations, operation, actorUserId,
+            mutations.Select(mutation => new HumanSettingsMutation(OperationFor(operation),
+                mutation.TenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance,
+                mutation.TenantId, null, mutation.Key, mutation.Kind switch
+                {
+                    VisitorAccessSettingMutationKind.SetValue => HumanSettingsMutationKind.SetValue,
+                    VisitorAccessSettingMutationKind.SetLock => HumanSettingsMutationKind.SetLock,
+                    VisitorAccessSettingMutationKind.Remove => HumanSettingsMutationKind.Remove,
+                    _ => throw new ArgumentOutOfRangeException(nameof(mutations))
+                }, mutation.Value, mutation.IsLocked)).ToImmutableArray(),
+            Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys.ToImmutableArray(),
+            cancellationToken);
+    }
+
+    private Task<IPreparedHumanSettingsMutation> PrepareWriterAsync(object original,
+        SettingsMutationOperation operation, Guid? actor, ImmutableArray<HumanSettingsMutation> effects,
+        ImmutableArray<string> coordinatedReadKeys, CancellationToken token)
+    {
+        // These are three closed existing administrator actions. Import is deliberately not a
+        // fourth boolean mode: its producer must prove its original acquired policy decision.
+        var scope = operation switch
+        {
+            SettingsMutationOperation.InstanceSettings => SettingScope.Instance,
+            SettingsMutationOperation.TenantSettings or SettingsMutationOperation.InstanceTenantSettings => SettingScope.Tenant,
+            _ => throw new UnauthorizedAccessException("Import settings require the original producer's acquired effect proof.")
+        };
+        Guid? target = scope == SettingScope.Instance ? null : tenantContext.TenantId;
+        if (effects.Any(effect => effect.TenantId != target))
+            throw new UnauthorizedAccessException("Settings effects must retain their original selected tenant.");
+        return PrepareCoreAsync(original, scope, target,
+            operation == SettingsMutationOperation.InstanceTenantSettings ? Authority.Instance : null,
+            actor, (_, _) => effects, coordinatedReadKeys, token);
+    }
+
+    private Task<IPreparedHumanSettingsMutation> PrepareLockAsync(object command, SettingScope scope,
+        string key, bool locked, CancellationToken token)
+    {
+        if (scope is not (SettingScope.Instance or SettingScope.Tenant))
+            throw new UnauthorizedAccessException("Only the existing administrator setting scopes can lock settings.");
+        return PrepareScalarAsync(command, scope, key, HumanSettingsMutationKind.SetLock, null, locked, token);
+    }
+
+    private Task<IPreparedHumanSettingsMutation> PrepareScalarAsync(object command, SettingScope scope,
+        string key, HumanSettingsMutationKind kind, string? value, bool? locked, CancellationToken token) =>
+        PrepareCoreAsync(command, scope, null, null, null,
+            (tenant, actor) => [new(OperationFor(scope), scope, scope == SettingScope.Instance ? null : tenant,
+                scope == SettingScope.User ? actor : null, key, kind, value, locked)], CoordinatedKeys([key]), token);
+
+    private Task<IPreparedHumanSettingsMutation> PrepareInstanceTenantAsync(ISecureRequest command, Guid tenant,
+        string key, HumanSettingsMutationKind kind, string? value, bool? locked, CancellationToken token)
+    {
+        if (tenant == Guid.Empty)
+            throw new ArgumentException("An exact instance-managed tenant is required.", nameof(tenant));
+        // Only the three typed public overloads reach this seam. Their actual annotation is
+        // InstanceSetting/update, even for lock/unlock, and their resource ID is not the data key.
+        var check = new AuthorizationRequest(ResourceKinds.InstanceSetting, command.ResourceId!,
+            AuthorizationActions.InstanceSettings.Update, Facts: command.AuthorizationFacts);
+        return PrepareCoreAsync(command, SettingScope.Tenant, tenant, Authority.Instance, null,
+            (_, _) => [new(HumanSettingsOperation.InstanceTenantSettings, SettingScope.Tenant, tenant, null, key, kind, value, locked)],
+            CoordinatedKeys([key]), token, check);
+    }
+
     private static ImmutableArray<string> CoordinatedKeys(IEnumerable<string> keys)
     {
         var captured = keys.ToHashSet(StringComparer.Ordinal);
@@ -192,33 +432,11 @@ public sealed partial class HumanSettingsMutationPreparation(
         return reads.ToImmutableArray();
     }
 
-    private async Task<T> ExecuteDerivedAsync<T>(Prepared parent, ImmutableArray<HumanSettingsMutation> slice,
-        Func<IPreparedHumanSettingsMutation, CancellationToken, Task<T>> mutation, CancellationToken cancellationToken)
-    {
-        await ValidateActiveAsync(parent, cancellationToken);
-        var child = new Prepared(this, parent.Original, slice, CoordinatedKeys(slice.Select(effect => effect.Key)), parent.Owner,
-            _ => throw new UnauthorizedAccessException("A joined Settings proof cannot acquire a new owner."))
-        {
-            Consumed = 1,
-            Active = true,
-            OrdinarySource = parent.OrdinarySource,
-            OrdinaryStore = parent.OrdinaryStore,
-            ValidateOwner = async token =>
-            {
-                RequireActive(parent);
-                await ValidateActiveAsync(parent, token);
-            }
-        };
-        var previous = _currentOwner.Value;
-        _currentOwner.Value = child;
-        try { return await InvokeAsync(child, mutation, cancellationToken); }
-        finally { _currentOwner.Value = previous; child.Active = false; child.ValidateOwner = null; }
-    }
-
     private async Task<IPreparedHumanSettingsMutation> PrepareCoreAsync(object original, SettingScope scope,
         Guid? explicitTenant, Authority? explicitAuthority, Guid? auditActor,
         Func<Guid?, Guid, ImmutableArray<HumanSettingsMutation>> capture,
-        ImmutableArray<string> coordinatedReadKeys, CancellationToken token)
+        ImmutableArray<string> coordinatedReadKeys, CancellationToken token, AuthorizationRequest? selectedCheck = null,
+        bool observeRouteOnly = false)
     {
         ArgumentNullException.ThrowIfNull(original);
         var authority = explicitAuthority ?? scope switch
@@ -254,6 +472,8 @@ public sealed partial class HumanSettingsMutationPreparation(
         // any one of them inside the Serializable callback would violate that binding contract.
         var sourceSet = services.GetRequiredService<IPolicySourceSetFence>();
         var principalSource = services.GetRequiredService<IHumanPrincipalSourceFence>();
+        var routeSource = selectedCheck is null && !observeRouteOnly ? null
+            : services.GetRequiredService<IHumanAuthorizationRouteSource>();
         var supportSource = await services.GetRequiredService<IHumanSupportAccessSourceFactory>().CreateAsync(token);
         var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
         var owner = services.GetRequiredService<ISerializableAttemptOwner>();
@@ -263,6 +483,7 @@ public sealed partial class HumanSettingsMutationPreparation(
         var instanceAuthority = authority is Authority.Instance or Authority.TenantOrInstance
             ? services.GetRequiredService<IInstanceAdministratorCommitAuthority>() : null;
         var principalFacts = await principalSource.ObserveAsync(token);
+        var routeFacts = routeSource is null ? null : await routeSource.ObserveAsync(token);
         var originalSupport = await supportSource.ObserveAsync(token);
         // Source-owned selection, not the ambient single-tenant fallback, determines whether
         // this is Runtime or ordinary Global. The ambient value is retained separately because
@@ -315,6 +536,8 @@ public sealed partial class HumanSettingsMutationPreparation(
                 : scope == SettingScope.User ? ResourceKinds.User : ResourceKinds.TenantSetting,
                 AuthorizationActions.Update, authority != Authority.Instance && selectedTenant.HasValue
                     ? new TenantScopedAuthorizationFacts(selectedTenant.Value) : InstanceScopedAuthorizationFacts.Instance)];
+        if (selectedCheck is not null)
+            supportChecks = [new(selectedCheck.ResourceKind, selectedCheck.Action, selectedCheck.Facts)];
 
         void RequireTimeAndSupport(HumanSupportAccessSourceFacts current, DateTimeOffset now)
         {
@@ -330,7 +553,60 @@ public sealed partial class HumanSettingsMutationPreparation(
         }
         RequireTimeAndSupport(originalSupport, clock.GetUtcNow());
 
-        void Compare(HumanPrincipalSourceFacts facts) => RequirePrincipal(facts);
+        HumanAuthorizationRouteDeployment? deployment = null;
+        HumanAuthorizationRoute? route = null;
+        Cerbos.Api.V1.Engine.Principal? serialized = null;
+        AuthorizationDecision? acceptedDecision = null;
+        bool localInput = false;
+        if (observeRouteOnly)
+        {
+            if (routeFacts!.SelectedTenantId != selectedTenant || routeFacts.PrincipalId != subject.PrincipalId)
+                throw new UnauthorizedAccessException("The original administrative route selection changed.");
+            deployment = HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value);
+            route = HumanAuthorizationRouteProjector.Project(routeFacts, deployment, settingsGovernance: true,
+                localDecisionSourcesCoLocated: lifetime.LocalSession is null || principalFacts.LocalSession is not null);
+        }
+        if (selectedCheck is not null)
+        {
+            if (routeFacts!.SelectedTenantId != selectedTenant || routeFacts.PrincipalId != subject.PrincipalId)
+                throw new UnauthorizedAccessException("The original Settings route belongs to another actor or tenant.");
+            deployment = HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value);
+            route = HumanAuthorizationRouteProjector.Project(routeFacts, deployment, settingsGovernance: true,
+                localDecisionSourcesCoLocated: lifetime.LocalSession is null || principalFacts.LocalSession is not null);
+            var projection = CerbosPrincipalBuilder.BuildPrincipalFromSources(principalFacts);
+            serialized = CerbosPrincipalBuilder.CapturePrincipal(projection);
+            localInput = InstancePolicyInput(principalFacts);
+            if (route.Provider == HumanAuthorizationRouteProvider.Local)
+                acceptedDecision = localInput ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)
+                    : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local);
+            else if (route.Provider == HumanAuthorizationRouteProvider.CerbosInstance)
+                acceptedDecision = await cerbos.AuthorizePreparedHumanAsync(projection, selectedCheck,
+                    ambientTenant, deployment.UsePolicyScope, route.Endpoint!, token);
+            if (acceptedDecision?.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
+                throw new AuthorizationProviderUnavailableException(selectedCheck.ResourceKind, selectedCheck.Action);
+            if (acceptedDecision?.IsAllowed != true)
+                throw new AuthorizationException(selectedCheck.ResourceKind, selectedCheck.Action);
+        }
+        RequireTimeAndSupport(originalSupport, clock.GetUtcNow());
+
+        void Compare(HumanPrincipalSourceFacts facts, HumanAuthorizationRouteFacts? currentRoute)
+        {
+            RequirePrincipal(facts);
+            if (observeRouteOnly && deployment != HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value))
+                throw new UnauthorizedAccessException("The original administrative route declaration changed.");
+            if (routeSource is null) return;
+            if (selectedCheck is not null && acceptedDecision?.IsAllowed != true || currentRoute is null
+                || currentRoute.SelectedTenantId != selectedTenant || currentRoute.PrincipalId != subject.PrincipalId)
+                throw new UnauthorizedAccessException("The original selected Settings decision is required.");
+            var projected = HumanAuthorizationRouteProjector.Project(currentRoute, deployment!, settingsGovernance: true,
+                localDecisionSourcesCoLocated: lifetime.LocalSession is null || facts.LocalSession is not null);
+            bool matches = selectedCheck is null || (route!.Provider == HumanAuthorizationRouteProvider.Local
+                ? localInput == InstancePolicyInput(facts)
+                : serialized!.Equals(CerbosPrincipalBuilder.CapturePrincipal(
+                    CerbosPrincipalBuilder.BuildPrincipalFromSources(facts))));
+            if (!route!.IsSemanticallyEquivalentTo(projected) || !matches)
+                throw new UnauthorizedAccessException("The original selected Settings policy inputs have changed.");
+        }
 
         async Task RequireAuthorityAsync(CancellationToken cancellationToken)
         {
@@ -355,8 +631,9 @@ public sealed partial class HumanSettingsMutationPreparation(
             if (ordinarySource is not null)
                 await ordinaryStore!.AcquireAsync(ordinarySource, cancellationToken);
             var principal = await principalSource.AcquireAsync(exclusion, cancellationToken);
+            var currentRoute = routeSource is null ? null : await routeSource.AcquireAsync(exclusion, cancellationToken);
             var support = await supportSource.AcquireAsync(exclusion, principal, cancellationToken: cancellationToken);
-            Compare(principal.Facts);
+            Compare(principal.Facts, currentRoute?.Facts);
             await RequireAuthorityAsync(cancellationToken);
             RequireTimeAndSupport(support.Facts, clock.GetUtcNow());
             HumanSupportAccessSourceFacts? finalSupport = null;
@@ -377,8 +654,9 @@ public sealed partial class HumanSettingsMutationPreparation(
                 // reentry enforces the original context/pool/connection/transaction identity.
                 await exclusion.ValidateAsync(finalToken);
                 var currentPrincipal = await principal.ValidateAsync(finalToken);
+                var finalRoute = currentRoute is null ? null : await currentRoute.ValidateAsync(finalToken);
                 finalSupport = await support.ValidateAsync(finalToken);
-                Compare(currentPrincipal);
+                Compare(currentPrincipal, finalRoute);
                 await RequireAuthorityAsync(finalToken);
             }
             finalizer.Register(token => ReadSourcesAsync(token, terminal: true), now => RequireTimeAndSupport(finalSupport
@@ -421,7 +699,142 @@ public sealed partial class HumanSettingsMutationPreparation(
             issued.ValidateOwner = null;
             if (issued.OrdinarySource is not null)
                 issued.OrdinaryStore!.Expire(issued.OrdinarySource);
+            if (issued.TypedOriginal is not null)
+                issued.TypedStore!.Close(issued.TypedOriginal);
+            if (issued.ResourceProviderOriginal is not null)
+                issued.ResourceProviderStore!.Close(issued.ResourceProviderOriginal);
         }
+    }
+
+    public Task<T> ExecuteCurrentJoinedAsync<T>(ImmutableArray<HumanSettingsMutation> slice,
+        Func<IPreparedHumanSettingsMutation, CancellationToken, Task<T>> mutation,
+        CancellationToken cancellationToken = default) =>
+        ExecuteJoinedAsync(_currentOwner.Value
+            ?? throw new UnauthorizedAccessException("An actual original Settings producer is required."),
+            slice, mutation, cancellationToken);
+
+    public async Task<T> ExecuteJoinedAsync<T>(IPreparedHumanSettingsMutation owner,
+        ImmutableArray<HumanSettingsMutation> slice,
+        Func<IPreparedHumanSettingsMutation, CancellationToken, Task<T>> mutation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var parent = RequireActive(owner);
+        if (slice.IsDefault || slice.Any(effect => !parent.Effects.Contains(effect))
+            || slice.Distinct().Count() != slice.Length)
+            throw new UnauthorizedAccessException("A joined Settings effect must be captured by its original owner.");
+        return await ExecuteDerivedAsync(parent, slice, mutation, cancellationToken);
+    }
+
+    private async Task<T> ExecuteDerivedAsync<T>(Prepared parent, ImmutableArray<HumanSettingsMutation> slice,
+        Func<IPreparedHumanSettingsMutation, CancellationToken, Task<T>> mutation, CancellationToken cancellationToken)
+    {
+        await ValidateActiveAsync(parent, cancellationToken);
+        var child = new Prepared(this, parent.Original, slice, CoordinatedKeys(slice.Select(effect => effect.Key)), parent.Owner,
+            _ => throw new UnauthorizedAccessException("A joined Settings proof cannot acquire a new owner."))
+        {
+            Consumed = 1,
+            Active = true,
+            OrdinarySource = parent.OrdinarySource,
+            OrdinaryStore = parent.OrdinaryStore,
+            ValidateOwner = async token =>
+            {
+                RequireActive(parent);
+                await ValidateActiveAsync(parent, token);
+            }
+        };
+        var previous = _currentOwner.Value;
+        _currentOwner.Value = child;
+        try { return await InvokeAsync(child, mutation, cancellationToken); }
+        finally { _currentOwner.Value = previous; child.Active = false; child.ValidateOwner = null; }
+    }
+
+    public async Task<HumanSettingsMutation> RequirePublicationReadAsync(Guid? tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var parent = RequireActive(_currentOwner.Value
+            ?? throw new UnauthorizedAccessException("Publication reads require the original Settings owner."));
+        var anchor = parent.Effects.FirstOrDefault(effect => effect.TenantId == tenantId
+            && effect.Scope == (tenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance)
+            && PublicationPolicySettingKeys.All.Contains(effect.Key, StringComparer.Ordinal))
+            ?? throw new UnauthorizedAccessException("This owner has no publication-policy read closure.");
+        await ValidateActiveAsync(parent, cancellationToken);
+        return anchor;
+    }
+
+    public async Task<T> ExecutePublicationJoinedAsync<T>(ImmutableArray<string> keys, Guid? tenantId,
+        Guid actorUserId, PublicationPolicyLockedSystemBehavior lockedSystemBehavior,
+        Func<ImmutableArray<PublicationPolicySettingMutation>, CancellationToken, Task<T>> mutation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var parent = RequireActive(_currentOwner.Value
+            ?? throw new UnauthorizedAccessException("Publication requires its original Settings producer."));
+        if (humanScope.Subject?.PrincipalId != actorUserId || keys.IsDefaultOrEmpty
+            || keys.Distinct(StringComparer.Ordinal).Count() != keys.Length
+            || !Enum.IsDefined(lockedSystemBehavior)
+            || !tenantId.HasValue && lockedSystemBehavior != PublicationPolicyLockedSystemBehavior.Reject)
+            throw new UnauthorizedAccessException("Publication requires its original actor and exact keys.");
+        await RequirePublicationReadAsync(tenantId, cancellationToken);
+        var originals = keys.Select(key => parent.Effects.SingleOrDefault(effect => effect.Key == key
+            && effect.TenantId == tenantId && PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
+            ?? throw new UnauthorizedAccessException("Publication effects must belong to the original command.")).ToImmutableArray();
+        var settings = services.GetRequiredService<ISystemSettingRepository>();
+        var derived = ImmutableArray.CreateBuilder<HumanSettingsMutation>();
+        var mutations = ImmutableArray.CreateBuilder<PublicationPolicySettingMutation>();
+        foreach (var original in originals)
+        {
+            var row = await settings.GetByKey(original.Key, cancellationToken);
+            if (original.Kind == HumanSettingsMutationKind.Remove
+                || tenantId.HasValue && original.Kind == HumanSettingsMutationKind.SetValue
+                    && row?.IsLocked == true
+                    && lockedSystemBehavior == PublicationPolicyLockedSystemBehavior.RemoveOverride)
+            {
+                derived.Add(original with { Kind = HumanSettingsMutationKind.Remove, Value = null, IsLocked = null });
+                mutations.Add(new(original.Key, PublicationPolicyMutationKind.Remove, null, tenantId, null));
+                continue;
+            }
+            if (tenantId.HasValue && original.Kind == HumanSettingsMutationKind.SetLock)
+                throw new UnauthorizedAccessException("Publication policy cannot be locked at tenant scope.");
+            if (original.Kind == HumanSettingsMutationKind.SetLock && row is null)
+                throw new UnauthorizedAccessException("Publication locking requires the original system setting row.");
+            string value = original.Kind == HumanSettingsMutationKind.SetValue ? original.Value!
+                : row?.Value ?? SettingRegistry.Get(original.Key)!.DefaultValue;
+            bool? locked = tenantId.HasValue ? null
+                : original.Kind == HumanSettingsMutationKind.SetLock ? original.IsLocked : row?.IsLocked ?? false;
+            derived.Add(original with { Kind = HumanSettingsMutationKind.SetValue, Value = value, IsLocked = null });
+            if (locked.HasValue)
+                derived.Add(original with { Kind = HumanSettingsMutationKind.SetLock, Value = null, IsLocked = locked });
+            mutations.Add(new(original.Key, PublicationPolicyMutationKind.Set, value, tenantId, locked));
+        }
+        return await ExecuteDerivedAsync(parent, derived.ToImmutable(),
+            (_, token) => mutation(mutations.ToImmutable(), token), cancellationToken);
+    }
+
+    public async Task<T> ExecuteLocationJoinedAsync<T>(string key, SettingScope scope, Guid? tenantId,
+        Guid actorUserId,
+        Func<IPreparedHumanSettingsMutation, HumanSettingsMutation, string, CancellationToken, Task<T>> mutation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var parent = RequireActive(_currentOwner.Value
+            ?? throw new UnauthorizedAccessException("Location governance requires the original Settings producer."));
+        if (humanScope.Subject?.PrincipalId != actorUserId
+            || !LocationPrivacySettingDefinitions.All.Any(item => item.Key == key)
+            || scope is not (SettingScope.Instance or SettingScope.Tenant))
+            throw new UnauthorizedAccessException("Location governance requires its original actor, scope and key.");
+        var effect = parent.Effects.SingleOrDefault(item => item.Key == key && item.Scope == scope
+            && item.TenantId == tenantId)
+            ?? throw new UnauthorizedAccessException("Location governance must belong to the original command.");
+        if (effect.Kind is not (HumanSettingsMutationKind.SetValue or HumanSettingsMutationKind.Remove))
+            throw new UnauthorizedAccessException("Location projection governance requires a value or reset action.");
+        await ValidateActiveAsync(parent, cancellationToken);
+        string effectiveValue = effect.Kind == HumanSettingsMutationKind.SetValue ? effect.Value!
+            : scope == SettingScope.Instance ? SettingRegistry.Get(key)!.DefaultValue
+            : (await services.GetRequiredService<ISystemSettingRepository>().GetByKey(key, cancellationToken))?.Value
+                ?? SettingRegistry.Get(key)!.DefaultValue;
+        return await ExecuteDerivedAsync(parent, [effect],
+            (proof, token) => mutation(proof, effect, effectiveValue, token), cancellationToken);
     }
 
     public Task RequireCurrentOwnedAsync(SettingScope scope, Guid? tenantId, Guid? userId, string key,
@@ -523,16 +936,30 @@ public sealed partial class HumanSettingsMutationPreparation(
         _ => throw new UnauthorizedAccessException("This setting scope has no ordinary mutation authority.")
     };
 
+    private static HumanSettingsOperation OperationFor(SettingsMutationOperation operation) => operation switch
+    {
+        SettingsMutationOperation.InstanceSettings => HumanSettingsOperation.InstanceSettings,
+        SettingsMutationOperation.TenantSettings => HumanSettingsOperation.TenantSettings,
+        SettingsMutationOperation.InstanceTenantSettings => HumanSettingsOperation.InstanceTenantSettings,
+        _ => throw new UnauthorizedAccessException("Import requires its producer's original acquired effect proof.")
+    };
     private sealed record SupportCheck(string Kind, string Action, IAuthorizationFacts? Facts);
 
     private sealed class Prepared(HumanSettingsMutationPreparation issuer, object original,
         ImmutableArray<HumanSettingsMutation> effects, ImmutableArray<string> coordinatedReadKeys,
         ISerializableAttemptOwner owner, Func<CancellationToken, Task<Func<CancellationToken, Task>>> acquire)
-        : IPreparedHumanSettingsMutation
+        : IPreparedHumanTenantPlanAssignment
     {
+        public TenantPlanAssignmentSelection PlanSelection => TypedOriginal?.PlanAssignment is not null
+            ? ((ITypedTenantPlanOriginalStore)TypedStore!).SelectPlan(TypedOriginal)
+            : throw new UnauthorizedAccessException("The original plan selection is required.");
         internal HumanSettingsMutationPreparation Issuer => issuer;
         internal object Original => original;
-        internal ImmutableArray<HumanSettingsMutation> Effects => effects;
+        internal ImmutableArray<HumanSettingsMutation> Effects { get; set; } = effects;
+        internal TypedSettingsOriginal? TypedOriginal { get; init; }
+        internal ITypedSettingsOriginalStore? TypedStore { get; init; }
+        internal EventResourceProviderOriginal? ResourceProviderOriginal { get; init; }
+        internal IEventResourceProviderOriginalStore? ResourceProviderStore { get; init; }
         internal ImmutableArray<string> CoordinatedReadKeys => coordinatedReadKeys;
         internal ISerializableAttemptOwner Owner => owner;
         internal Func<CancellationToken, Task<Func<CancellationToken, Task>>> Acquire => acquire;

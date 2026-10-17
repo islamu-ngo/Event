@@ -57,7 +57,7 @@ public static class HumanSupportAccessSourceRegistration
             var purpose = context.IsConfigurationInstanceImportOwner ? PolicySourceSetPurpose.ConfigurationImport
                 : lease.SelectedTenantId.HasValue ? PolicySourceSetPurpose.RuntimeTenant : PolicySourceSetPurpose.Global;
             return new HumanSupportAccessSourceFence(context, subject, forwarding, purpose,
-                context.Database.IsNpgsql() ? provider.GetRequiredService<PostgresNativeQueueEnrollment>() : null,
+                HumanSourceProviderOperations.BindEnrollment(context, () => provider.GetRequiredService<IConfiguration>()),
                 lifetime.LocalSession is null ? null : context);
         }
     }

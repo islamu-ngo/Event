@@ -57,6 +57,7 @@ internal sealed class CurrentHumanPrincipalFixture : IAsyncDisposable
     internal IServiceProvider Services => _scope.ServiceProvider;
     internal IAdminContext Admin => Services.GetRequiredService<IAdminContext>();
     internal MachinePrincipalAccessor Machine => Services.GetRequiredService<MachinePrincipalAccessor>();
+    internal IHumanCerbosPrincipalReader Reader => Services.GetRequiredService<IHumanCerbosPrincipalReader>();
     internal int DatabaseCommands => _databaseObservation.Commands;
 
     internal CurrentHumanPrincipalFixture(Guid userId, Guid tenantId, string? databasePath = null)
@@ -92,9 +93,17 @@ internal sealed class CurrentHumanPrincipalFixture : IAsyncDisposable
         services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
         services.AddScoped<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>,
             ResolveCurrentUserIdByIdentityRequestHandler>();
+        services.AddScoped<IHumanCommitScopePreparation>(provider =>
+            (IHumanCommitScopePreparation)provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>());
         services.AddScoped<IAdminContext, AdminContext>();
         services.AddScoped<MachinePrincipalAccessor>();
         services.AddScoped<IMachinePrincipalAccessor>(provider => provider.GetRequiredService<MachinePrincipalAccessor>());
+        services.AddScoped<IHumanCerbosPrincipalReader>(provider => new HumanCerbosPrincipalReader(
+            provider.GetRequiredService<IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<IHttpContextAccessor>(),
+            provider.GetRequiredService<IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<IMachinePrincipalAccessor>(), Tenant, TimeProvider.System,
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>()));
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         _scope = _provider.CreateAsyncScope();
         _contexts = Services.GetRequiredService<IHttpContextAccessor>();

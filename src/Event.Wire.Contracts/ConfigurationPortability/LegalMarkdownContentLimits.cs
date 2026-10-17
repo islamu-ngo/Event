@@ -12,4 +12,6 @@ public static class LegalMarkdownContentLimits
     public const int MaximumLanguageTagLength = 35;
     public const int MaximumLinkLength = 2048;
     public const int MaximumIdentityValueLength = 500;
+    public const int MaximumRenderedHtmlCharacters = 1_048_576;
+    public const int MaximumInlineDepth = 32;
 }

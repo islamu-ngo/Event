@@ -190,7 +190,7 @@ public static class LegalMarkdownCodec
         string[] lines = markdown.Split('\n');
         var html = new StringBuilder();
         var links = ImmutableArray.CreateBuilder<string>();
-        var placeholders = new HashSet<string>(StringComparer.Ordinal);
+        var placeholders = new List<string>();
         var diagnostics = ImmutableArray.CreateBuilder<LegalMarkdownDiagnostic>();
         int previousHeadingLevel = 0;
         int index = 0;
@@ -339,10 +339,11 @@ public static class LegalMarkdownCodec
             throw new ArgumentOutOfRangeException(nameof(markdown));
         }
 
+        EnsureOutputBound(html);
         return new ParseResult(
             html.ToString(),
             links.ToImmutable(),
-            placeholders.Order(StringComparer.Ordinal).ToImmutableArray(),
+            placeholders.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToImmutableArray(),
             diagnostics.ToImmutable());
     }
 
@@ -351,10 +352,13 @@ public static class LegalMarkdownCodec
         IReadOnlyDictionary<string, string>? identityValues,
         StringBuilder html,
         ImmutableArray<string>.Builder links,
-        HashSet<string> placeholders,
+        List<string> placeholders,
         ImmutableArray<LegalMarkdownDiagnostic>.Builder diagnostics,
-        bool render)
+        bool render,
+        int depth = 1)
     {
+        if (depth > LegalMarkdownContentLimits.MaximumInlineDepth)
+            throw new ArgumentOutOfRangeException(nameof(value));
         int cursor = 0;
         while (cursor < value.Length)
         {
@@ -371,13 +375,15 @@ public static class LegalMarkdownCodec
                 string placeholder = value[(cursor + 2)..end];
                 ValidatePlaceholder(placeholder, nameof(value));
                 placeholders.Add(placeholder);
+                if (placeholders.Count > LegalMarkdownContentLimits.MaximumPlaceholdersPerLocale)
+                    throw new ArgumentOutOfRangeException(nameof(value));
                 if (render)
                 {
                     if (identityValues is not null
                         && identityValues.TryGetValue(placeholder, out string? resolved)
                         && !string.IsNullOrWhiteSpace(resolved))
                     {
-                        html.Append(HtmlEncoder.Default.Encode(resolved));
+                        AppendEncoded(html, resolved);
                     }
                     else
                     {
@@ -421,6 +427,8 @@ public static class LegalMarkdownCodec
 
                 ValidateLink(target);
                 links.Add(target);
+                if (links.Count > LegalMarkdownContentLimits.MaximumLinksPerLocale)
+                    throw new ArgumentOutOfRangeException(nameof(value));
                 if (IsWeakLinkLabel(label))
                 {
                     diagnostics.Add(new LegalMarkdownDiagnostic(
@@ -430,20 +438,22 @@ public static class LegalMarkdownCodec
 
                 if (render)
                 {
-                    html.Append("<a href=\"")
-                        .Append(HtmlEncoder.Default.Encode(target))
-                        .Append("\" rel=\"noopener noreferrer\">");
-                    AppendInline(
-                        label,
-                        identityValues,
-                        html,
-                        links: ImmutableArray.CreateBuilder<string>(),
-                        placeholders,
-                        diagnostics,
-                        render);
-                    html.Append("</a>");
+                    html.Append("<a href=\"");
+                    AppendEncoded(html, target);
+                    html.Append("\" rel=\"noopener noreferrer\">");
                 }
 
+                AppendInline(
+                    label,
+                    identityValues,
+                    html,
+                    links: ImmutableArray.CreateBuilder<string>(),
+                    placeholders,
+                    diagnostics,
+                    render,
+                    depth + 1);
+                if (render)
+                    html.Append("</a>");
                 cursor = urlEnd + 1;
                 continue;
             }
@@ -469,7 +479,8 @@ public static class LegalMarkdownCodec
                     links,
                     placeholders,
                     diagnostics,
-                    render);
+                    render,
+                    depth + 1);
                 if (render)
                     html.Append("</strong>");
                 cursor = end + 2;
@@ -490,7 +501,8 @@ public static class LegalMarkdownCodec
                     links,
                     placeholders,
                     diagnostics,
-                    render);
+                    render,
+                    depth + 1);
                 if (render)
                     html.Append("</em>");
                 cursor = end + 1;
@@ -504,9 +516,9 @@ public static class LegalMarkdownCodec
                     throw new LegalMarkdownContractException("Inline code is incomplete.", nameof(value));
                 if (render)
                 {
-                    html.Append("<code>")
-                        .Append(HtmlEncoder.Default.Encode(value[(cursor + 1)..end]))
-                        .Append("</code>");
+                    html.Append("<code>");
+                    AppendEncoded(html, value[(cursor + 1)..end]);
+                    html.Append("</code>");
                 }
 
                 cursor = end + 1;
@@ -518,7 +530,7 @@ public static class LegalMarkdownCodec
                 if (cursor + 1 >= value.Length)
                     throw new LegalMarkdownContractException("Markdown escape is incomplete.", nameof(value));
                 if (render)
-                    html.Append(HtmlEncoder.Default.Encode(value[cursor + 1].ToString()));
+                    AppendEncoded(html, value[cursor + 1].ToString());
                 cursor += 2;
                 continue;
             }
@@ -532,9 +544,24 @@ public static class LegalMarkdownCodec
             }
 
             if (render)
-                html.Append(HtmlEncoder.Default.Encode(value[cursor..textEnd]));
+                AppendEncoded(html, value[cursor..textEnd]);
             cursor = textEnd;
         }
+        EnsureOutputBound(html);
+    }
+
+    private static void AppendEncoded(StringBuilder html, string text)
+    {
+        string encoded = HtmlEncoder.Default.Encode(text);
+        if (encoded.Length > LegalMarkdownContentLimits.MaximumRenderedHtmlCharacters - html.Length)
+            throw new ArgumentOutOfRangeException(nameof(text));
+        html.Append(encoded);
+    }
+
+    private static void EnsureOutputBound(StringBuilder html)
+    {
+        if (html.Length > LegalMarkdownContentLimits.MaximumRenderedHtmlCharacters)
+            throw new ArgumentOutOfRangeException(nameof(html));
     }
 
     private static bool TryReadHeading(

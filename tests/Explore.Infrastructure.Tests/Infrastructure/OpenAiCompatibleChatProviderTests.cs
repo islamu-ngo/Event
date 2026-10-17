@@ -31,17 +31,14 @@ public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
     }
 
     [Test]
-    public async Task ListAvailableModels_WhenModelsEndpointFails_ReturnsConfiguredModel()
+    public async Task ListAvailableModels_WhenModelsEndpointFails_DoesNotClaimModelAvailability()
     {
         var handler = new RecordingMessageHandler(_ => JsonResponse("{}", statusCode: HttpStatusCode.NotFound));
         var provider = CreateProvider(handler, CreateSettings());
 
         var models = await provider.ListAvailableModelsAsync();
 
-        await Assert.That(models.Count).IsEqualTo(1);
-        await Assert.That(models[0].Id).IsEqualTo("gpt-test");
-        await Assert.That(models[0].SupportsToolProposals).IsTrue();
-        await Assert.That(models[0].SupportsStreaming).IsFalse();
+        await Assert.That(models.Count).IsEqualTo(0);
     }
 
     [Test]
@@ -466,17 +463,16 @@ public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
     [Test]
     public async Task SendAsync_WhenRuntimeProviderConfigurationIsUsed_UsesRequestTimeoutInsteadOfStaticDefault()
     {
-        var handler = new DelayedSuccessMessageHandler(TimeSpan.FromMilliseconds(1100));
+        var handler = new CancellationMessageHandler();
+        var clock = new DeadlineTimeProvider();
         var settings = CreateSettings();
         settings.TimeoutSeconds = 1;
-        var provider = CreateProvider(handler, settings);
-        await Fixture.SelectTenantAsync(
-            AiProviderSettings.ProviderOpenAiCompatible,
-            "https://tenant-ai.example.test/v1",
-            AiCredentialScope.None,
-            "tenant-model");
+        settings.CredentialScope = AiCredentialScope.None;
+        await Fixture.SelectTenantAsync(AiProviderSettings.ProviderOpenAiCompatible,
+            "https://tenant-ai.example.test/v1", AiCredentialScope.None, "tenant-model");
+        var provider = CreateProvider(handler, settings, clock);
 
-        var result = await provider.SendAsync(CreateRequest(
+        var pending = provider.SendAsync(CreateRequest(
             "Hello",
             timeoutSeconds: 2,
             providerConfiguration: new AiChatProviderConfiguration(
@@ -485,13 +481,20 @@ public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
                 AiCredentialScope.None,
                 "tenant-model")));
 
-        await Assert.That(result.Succeeded).IsTrue();
+        await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(clock.DueTime).IsEqualTo(TimeSpan.FromSeconds(2));
+        clock.Fire();
+        var result = await pending.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(result.Error!.Code).IsEqualTo("provider_timeout");
+        await Assert.That(result.Error.IsTransient).IsTrue();
+        await Assert.That(handler.CancellationObserved).IsTrue();
         await Assert.That(handler.Calls).IsEqualTo(1);
     }
 
     private OpenAiCompatibleChatProvider CreateProvider(
         HttpMessageHandler handler,
-        AiProviderSettings settings)
+        AiProviderSettings settings,
+        TimeProvider? timeProvider = null)
     {
         var client = Fixture.CreateClient(handler);
         var factory = new StaticHttpClientFactory(client);
@@ -500,7 +503,8 @@ public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
             factory,
             Fixture.Configuration(settings),
             Fixture.Validator,
-            Fixture.Metrics);
+            Fixture.Metrics,
+            timeProvider: timeProvider);
     }
 
     private static AiProviderSettings CreateSettings() => new()
@@ -590,26 +594,46 @@ public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
         }
     }
 
-    private sealed class DelayedSuccessMessageHandler(TimeSpan delay) : HttpMessageHandler
+    private sealed class CancellationMessageHandler : HttpMessageHandler
     {
         public int Calls { get; private set; }
+        public bool CancellationObserved { get; private set; }
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             Calls++;
-            await Task.Delay(delay, cancellationToken);
-            return JsonResponse("""
-                {
-                  "choices": [
-                    {
-                      "message": { "content": "Delayed assistant response" },
-                      "finish_reason": "stop"
-                    }
-                  ]
-                }
-                """);
+            var cancelled = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var registration = cancellationToken.Register(() =>
+            {
+                CancellationObserved = true;
+                cancelled.TrySetCanceled(cancellationToken);
+            });
+            Entered.TrySetResult();
+            return await cancelled.Task;
+        }
+    }
+
+    private sealed class DeadlineTimeProvider : TimeProvider
+    {
+        private TimerCallback? _callback;
+        private object? _state;
+        public TimeSpan DueTime { get; private set; }
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            _callback = callback;
+            _state = state;
+            DueTime = dueTime;
+            return new DeadlineTimer();
+        }
+        public void Fire() => _callback!(_state);
+        private sealed class DeadlineTimer : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => throw new NotSupportedException();
+            public void Dispose() { }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
     }
 }

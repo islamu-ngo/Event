@@ -21,6 +21,7 @@
     * [Backup, Restore & Upgrade](readme/configuration-and-operations/backup-restore-upgrade.md)
     * [Releases & Changelog](readme/configuration-and-operations/releases-and-changelog.md)
     * [Troubleshooting & Health](readme/configuration-and-operations/troubleshooting-and-health.md)
+    * [AI Provider Response Limits](readme/configuration-and-operations/ai-provider-response-limits.md)
   * [Security & Identity](readme/security-and-identity/README.md)
     * [Authentication](readme/security-and-identity/authentication.md)
     * [Authorization](readme/security-and-identity/authorization.md)

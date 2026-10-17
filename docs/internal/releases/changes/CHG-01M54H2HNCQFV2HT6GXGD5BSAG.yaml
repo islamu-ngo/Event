@@ -1,0 +1,31 @@
+Change-Id: CHG-01M54H2HNCQFV2HT6GXGD5BSAG
+Title: "Bound AI provider responses before materialization"
+Type: fix
+Scope: access
+Summary: "Reject excessive AI discovery and completion bodies before provider DTO or SDK parsing."
+Group: ai-bounded-provider-consumption
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/ai-provider-response-limits.md
+    Disposition: documented
+    Detail: Excessive or encoded responses are rejected and rejected catalogues no longer fall back to configured-model success.
+  Security:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Bound wire acquisition and JSON shape before direct-adapter or SDK materialization.
+  Migration:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: documented
+    Detail: AiResponseLimits exposes positive operator-owned ceilings that tenants cannot raise.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/ai-provider-response-limits.md
+    Disposition: documented
+    Detail: Providers must return bounded identity-encoded JSON; inspect fixed rejection categories and correct the provider contract.

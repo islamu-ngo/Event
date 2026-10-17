@@ -683,6 +683,10 @@ public static class InfrastructureServicesRegistration
         // AI provider foundation. Strategy pattern dispatches to concrete adapters without if/else bloat.
         services.AddOptions<AiProviderSettings>()
             .Bind(configuration.GetSection(AiProviderSettings.SectionName));
+        services.AddOptions<AiResponseLimits>()
+            .Bind(configuration.GetSection(AiResponseLimits.SectionName))
+            .Validate(limits => limits.IsValid, "AI response limits must be positive and within the supported ceilings.")
+            .ValidateOnStart();
         var aiProviderSettingsValidator = new AiProviderSettingsValidator(environment);
         services.AddSingleton(aiProviderSettingsValidator);
         services.AddSingleton<IValidateOptions<AiProviderSettings>>(aiProviderSettingsValidator);
@@ -913,13 +917,23 @@ public static class InfrastructureServicesRegistration
     private static void RegisterAiHttpClients(IServiceCollection services, string name)
     {
         services.AddHttpClient(name, client => client.Timeout = Timeout.InfiniteTimeSpan)
-            .ConfigurePrimaryHttpMessageHandler(_ =>
-                AiTransportAuthority.CreateHandler(new AiProviderSettings(), instanceScope: false));
+            .ConfigurePrimaryHttpMessageHandler(sp =>
+            {
+                var transport = AiTransportAuthority.CreateHandler(new AiProviderSettings(), instanceScope: false);
+                return name == MicrosoftExtensionsAiChatProvider.HttpClientName
+                    ? new AiResponseBudgetHandler(sp.GetRequiredService<IOptions<AiResponseLimits>>().Value) { InnerHandler = transport }
+                    : transport;
+            });
         services.AddHttpClient(name + AiTransportAuthority.InstanceClientSuffix,
                 client => client.Timeout = Timeout.InfiniteTimeSpan)
             .ConfigurePrimaryHttpMessageHandler(sp =>
-                AiTransportAuthority.CreateHandler(
-                    sp.GetRequiredService<IOptions<AiProviderSettings>>().Value, instanceScope: true));
+            {
+                var transport = AiTransportAuthority.CreateHandler(
+                    sp.GetRequiredService<IOptions<AiProviderSettings>>().Value, instanceScope: true);
+                return name == MicrosoftExtensionsAiChatProvider.HttpClientName
+                    ? new AiResponseBudgetHandler(sp.GetRequiredService<IOptions<AiResponseLimits>>().Value) { InnerHandler = transport }
+                    : transport;
+            });
     }
 
     internal static IChatClient CreateSdkBackedChatClient(AiProviderSettings settings, string apiKey, HttpClient httpClient)

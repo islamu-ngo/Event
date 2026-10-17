@@ -119,12 +119,13 @@ internal sealed class AiProviderTestFixture : IAsyncDisposable
         return client;
     }
 
-    public IAiChatProvider Provider(int provider, AiProviderConfigurationResolver configuration, IHttpClientFactory factory) => provider switch
+    public IAiChatProvider Provider(int provider, AiProviderConfigurationResolver configuration, IHttpClientFactory factory,
+        AiResponseLimits? limits = null) => provider switch
         {
-            AiProviderSettings.ProviderOpenAi => new OpenAiResponsesChatProvider(factory, configuration, Validator, Metrics),
-            AiProviderSettings.ProviderOpenAiCompatible => new OpenAiCompatibleChatProvider(factory, configuration, Validator, Metrics),
-            AiProviderSettings.ProviderAnthropic => new AnthropicChatProvider(factory, configuration, Validator, Metrics),
-            AiProviderSettings.ProviderAnthropicCompatible => new AnthropicCompatibleChatProvider(factory, configuration, Validator, Metrics),
+            AiProviderSettings.ProviderOpenAi => new OpenAiResponsesChatProvider(factory, configuration, Validator, Metrics, Options.Create(limits ?? new())),
+            AiProviderSettings.ProviderOpenAiCompatible => new OpenAiCompatibleChatProvider(factory, configuration, Validator, Metrics, Options.Create(limits ?? new())),
+            AiProviderSettings.ProviderAnthropic => new AnthropicChatProvider(factory, configuration, Validator, Metrics, Options.Create(limits ?? new())),
+            AiProviderSettings.ProviderAnthropicCompatible => new AnthropicCompatibleChatProvider(factory, configuration, Validator, Metrics, Options.Create(limits ?? new())),
             AiProviderSettings.ProviderAzureOpenAi => new MicrosoftExtensionsAiChatProvider(configuration, Metrics, factory),
             _ => throw new ArgumentOutOfRangeException(nameof(provider))
         };

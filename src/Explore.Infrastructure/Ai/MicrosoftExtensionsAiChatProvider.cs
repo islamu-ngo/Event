@@ -1,9 +1,10 @@
 using System.Diagnostics;
-using System.Net.Http;
 using System.Text.Json;
+using System.ClientModel;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
+using Explore.Infrastructure.Http;
 using Microsoft.Extensions.AI;
 
 namespace Explore.Infrastructure.Ai;
@@ -86,13 +87,22 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 providerName, startedAt, telemetryActivity);
         var settings = configuration.Settings;
 
-        if (!settings.Enabled || settings.Provider != AiProviderSettings.ProviderAzureOpenAi)
+        if (!settings.Enabled)
         {
             return CompleteFailure(
                 RecordFailure(providerName, "provider_disabled", "AI provider integration is disabled."),
                 providerName,
                 startedAt,
                 telemetryActivity);
+        }
+
+        // Only the Azure factory has an owned HTTP pipeline with a pre-SDK response budget.
+        // A newly installed IChatClient/provider must not silently inherit admission.
+        if (settings.Provider != AiProviderSettings.ProviderAzureOpenAi)
+        {
+            return CompleteFailure(
+                RecordFailure(providerName, "provider_transport_unsupported", "The AI provider transport has no bounded response contract."),
+                providerName, startedAt, telemetryActivity);
         }
 
         if (request.Options.StreamingEnabled)
@@ -138,8 +148,8 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
 
         try
         {
-            using var chatClient = _createClient(configuration);
-            var response = await chatClient.GetResponseAsync(
+            using var sdkClient = _createClient(configuration);
+            var response = await sdkClient.GetResponseAsync(
                 messages!,
                 chatOptions,
                 timeoutCts.Token);
@@ -169,6 +179,12 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 startedAt,
                 telemetryActivity);
         }
+        catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { })
+        {
+            return CompleteFailure(
+                RecordFailure(providerName, AiResponseReader.FindRejection(exception)!.Category, "AI provider response was rejected."),
+                providerName, startedAt, telemetryActivity);
+        }
         catch (HttpRequestException)
         {
             return CompleteFailure(
@@ -185,6 +201,15 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 startedAt,
                 telemetryActivity);
         }
+        catch (ClientResultException exception)
+        {
+            bool hasStatus = exception.Status is >= 100 and <= 599;
+            bool transient = exception.Status is 408 or 429 or >= 500;
+            return CompleteFailure(
+                RecordFailure(providerName, hasStatus ? $"http_{exception.Status}" : "provider_failure",
+                    "AI provider request failed.", transient),
+                providerName, startedAt, telemetryActivity);
+        }
         catch (InvalidOperationException)
         {
             return CompleteFailure(
@@ -194,6 +219,11 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 telemetryActivity);
         }
     }
+
+    private static string ResolveTelemetryProvider(AiProviderSettings settings) =>
+        settings.Provider == AiProviderSettings.ProviderAzureOpenAi
+            ? "azure-openai"
+            : ProviderName;
 
     private static TimeSpan GetTimeout(AiProviderSettings settings, AiChatOptions options)
     {

@@ -7,6 +7,8 @@ using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
+using Explore.Infrastructure.Http;
+using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Ai;
 
@@ -22,17 +24,20 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
     private readonly AiProviderConfigurationResolver _configuration;
     private readonly AiProviderSettingsValidator _validator;
     private readonly BusinessMetrics _metrics;
+    private readonly AiResponseLimits _responseLimits;
 
     public OpenAiResponsesChatProvider(
         IHttpClientFactory httpClientFactory,
         AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
-        BusinessMetrics metrics)
+        BusinessMetrics metrics,
+        IOptions<AiResponseLimits>? responseLimits = null)
     {
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _validator = validator;
         _metrics = metrics;
+        _responseLimits = responseLimits?.Value ?? new AiResponseLimits();
     }
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListAvailableModelsAsync(CancellationToken cancellationToken = default)
@@ -48,15 +53,20 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
             return [];
         }
 
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(settings.TimeoutSeconds, 1, AiProviderDefaults.MaxTimeoutSeconds)));
         try
         {
-            var httpClient = _httpClientFactory.CreateClient(
-                HttpClientName + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty));
-            var models = await DiscoverModelsAsync(httpClient, settings.EndpointUrl, configuration.ApiKey, cancellationToken);
+            var httpClient = _httpClientFactory.CreateClient(HttpClientName + AiTransportAuthority.InstanceClientSuffix);
+            var models = await DiscoverModelsAsync(httpClient, settings.EndpointUrl, configuration.ApiKey, timeout.Token, _responseLimits);
             if (models.Count > 0)
             {
                 return models;
             }
+        }
+        catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { } rejection)
+        {
+            throw new ProviderResponseRejectedException(rejection.Category);
         }
         catch (HttpRequestException)
         {
@@ -64,21 +74,22 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
         catch (JsonException)
         {
         }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
         }
         catch (UriFormatException)
         {
         }
 
-        return [CreateConfiguredModelDescriptor(settings)];
+        return [];
     }
 
     public static async Task<IReadOnlyList<AiModelDescriptor>> DiscoverModelsAsync(
         HttpClient httpClient,
         string? endpointUrl,
         string apiKey,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        AiResponseLimits? responseLimits = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -94,7 +105,8 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var json = await AiResponseReader.ReadAsync(response.Content, responseLimits ?? new AiResponseLimits(),
+            discovery: true, cancellationToken);
         var modelsResponse = JsonSerializer.Deserialize<OpenAiModelsListResponse>(json, JsonOptions);
 
         if (modelsResponse?.Data is null || modelsResponse.Data.Count == 0)
@@ -182,9 +194,9 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
 
         try
         {
-            using var httpRequest = CreateHttpRequest(settings, configuration.ApiKey, payload!);
-            var client = _httpClientFactory.CreateClient(
-                HttpClientName + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty));
+            using var httpRequest = CreateHttpRequest(settings, payload!, configuration.ApiKey);
+            var client = _httpClientFactory.CreateClient(HttpClientName
+                + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty));
             using var response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
 
             if (!response.IsSuccessStatusCode)
@@ -192,8 +204,8 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
                 return CompleteFailure(RecordHttpFailure(response.StatusCode), startedAt, telemetryActivity);
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
-            var providerResponse = await JsonSerializer.DeserializeAsync<OpenAiResponsesResponse>(stream, JsonOptions, timeoutCts.Token);
+            var bytes = await AiResponseReader.ReadAsync(response.Content, _responseLimits, discovery: false, timeoutCts.Token);
+            var providerResponse = JsonSerializer.Deserialize<OpenAiResponsesResponse>(bytes, JsonOptions);
 
             if (providerResponse is null)
             {
@@ -227,6 +239,12 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
                 startedAt,
                 telemetryActivity);
         }
+        catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { })
+        {
+            return CompleteFailure(
+                RecordFailure(AiResponseReader.FindRejection(exception)!.Category, "AI provider response was rejected."),
+                startedAt, telemetryActivity);
+        }
         catch (HttpRequestException)
         {
             return CompleteFailure(
@@ -257,10 +275,10 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
         return TimeSpan.FromSeconds(Math.Min(boundedSettingsTimeout, boundedRequestTimeout));
     }
 
-    private static HttpRequestMessage CreateHttpRequest(AiProviderSettings settings, string apiKey, OpenAiResponsesRequest payload)
+    private static HttpRequestMessage CreateHttpRequest(AiProviderSettings settings, OpenAiResponsesRequest payload, string apiKey)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, BuildResponsesUri(settings.EndpointUrl));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
         var json = JsonSerializer.Serialize(payload, JsonOptions);
@@ -317,15 +335,6 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
 
     private static Uri CreateEndpointUri(string? endpointUrl) =>
         new(string.IsNullOrWhiteSpace(endpointUrl) ? DefaultEndpointUrl : endpointUrl.Trim(), UriKind.Absolute);
-
-    private static AiModelDescriptor CreateConfiguredModelDescriptor(AiProviderSettings settings) =>
-        new(
-            settings.ModelId.Trim(),
-            settings.ModelId.Trim(),
-            settings.MaxInputTokens,
-            settings.MaxOutputTokens,
-            SupportsToolProposals: true,
-            SupportsStreaming: false);
 
     private bool TryCreatePayload(
         AiProviderSettings settings,

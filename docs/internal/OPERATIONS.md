@@ -423,6 +423,21 @@ or personal data. Internal admission facts retain the minimum actor or scanner i
 for authoritative lineage and compensation, under restricted access and retention controls; those
 identifiers are never emitted by the export-safe projection.
 
+## Settings Audit Diagnostic Boundary
+
+`SettingAuditLogHandler` emits only the closed setting scope, including
+`unknown` for an unrecognized scope. Registration or sensitivity metadata is
+not permission to copy a setting key, old/new value, actor or tenant into the
+technical logger. `ConfigurationChangeLogService` still writes its governed
+business audit record, while its diagnostic event retains only the typed scope.
+
+S3 configuration diagnostics identify the unavailable configuration component
+without tenant identity or credential values. Listmonk connection diagnostics
+retain typed HTTP status or fixed transport/timeout/configuration categories,
+not provider bodies, raw exceptions, credentials or tenant identity. Native
+settings resolution, durable audit data and existing fallback decisions remain
+separate from these minimized diagnostic exports.
+
 ## Localization Static Bundle Operations
 
 No-TMS and provider-fallback localization bundles are stored under the API

@@ -85,7 +85,7 @@ public class S3ConfigResolver : IS3ConfigResolver
             cancellationToken);
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            _logger.LogDebug("S3 not configured for tenant {TenantId}: endpoint is empty", tenantId);
+            _logger.LogDebug("S3 not configured because the endpoint is empty");
             return null;
         }
 
@@ -95,7 +95,7 @@ public class S3ConfigResolver : IS3ConfigResolver
             cancellationToken);
         if (string.IsNullOrWhiteSpace(bucketName))
         {
-            _logger.LogDebug("S3 not configured for tenant {TenantId}: bucket_name is empty", tenantId);
+            _logger.LogDebug("S3 not configured because the bucket is empty");
             return null;
         }
 
@@ -105,7 +105,7 @@ public class S3ConfigResolver : IS3ConfigResolver
             cancellationToken);
         if (string.IsNullOrWhiteSpace(accessKeyId))
         {
-            _logger.LogDebug("S3 not configured for tenant {TenantId}: access_key_id is empty", tenantId);
+            _logger.LogDebug("S3 not configured because the access key is unavailable");
             return null;
         }
 
@@ -115,7 +115,7 @@ public class S3ConfigResolver : IS3ConfigResolver
             cancellationToken);
         if (string.IsNullOrWhiteSpace(secretAccessKey))
         {
-            _logger.LogDebug("S3 not configured for tenant {TenantId}: secret_access_key is empty", tenantId);
+            _logger.LogDebug("S3 not configured because the secret key is unavailable");
             return null;
         }
 

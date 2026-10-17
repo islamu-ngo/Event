@@ -267,6 +267,18 @@ Navigate to `/settings/instance` $\to$ **Monetization** (see [Paid Events & Payo
 
 ---
 
+## Settings Audit And Diagnostic Privacy
+
+Use the governed audit trail through authorized administration for business
+change details. Ordinary settings diagnostics retain scope, not setting names,
+old/new values, actor identity or tenant identity; this remains true even for an
+unregistered setting key. The durable audit record is not deleted or replaced
+by that minimized log.
+
+Storage and Listmonk configuration failures report safe categories or typed
+HTTP status without copying credentials, provider response bodies or raw
+exceptions into shared support diagnostics.
+
 ## 3. Tenant Administration & White-Labeling
 
 Tenant administrators manage their community experience via `/settings/admin`:

@@ -57,25 +57,23 @@ public sealed class ListmonkConnectionTester(
         catch (ApiException ex)
         {
             logger.LogWarning(
-                ex,
-                "Listmonk connection test failed for tenant {TenantId} with status {StatusCode}.",
-                tenantContext.TenantId,
+                "Listmonk connection test failed with status {StatusCode}.",
                 ex.StatusCode);
             return false;
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            logger.LogWarning(ex, "Listmonk connection test failed for tenant {TenantId}.", tenantContext.TenantId);
+            logger.LogWarning("Listmonk connection test transport failed.");
             return false;
         }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Listmonk connection test timed out for tenant {TenantId}.", tenantContext.TenantId);
+            logger.LogWarning("Listmonk connection test timed out.");
             return false;
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            logger.LogWarning(ex, "Listmonk connection test has invalid configuration for tenant {TenantId}.", tenantContext.TenantId);
+            logger.LogWarning("Listmonk connection test has invalid configuration.");
             return false;
         }
     }

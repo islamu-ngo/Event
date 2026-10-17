@@ -1,0 +1,28 @@
+Change-Id: CHG-01M55HCXMM7V8N1JEFTEGFKVP3
+Title: "Omit JWT discovery authority from diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Retain signing key counts availability and retry timing without exporting authority URLs or provider exceptions."
+Group: jwt-discovery-diagnostic-minimization
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Retain useful metadata availability, signing-key counts and retry timing without exporting authority URLs or provider exceptions from JWT discovery reload and warmup.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

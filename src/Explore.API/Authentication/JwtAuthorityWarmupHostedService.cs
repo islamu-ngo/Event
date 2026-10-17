@@ -83,9 +83,7 @@ internal sealed class JwtAuthorityWarmupHostedService : IHostedService, IDisposa
             var oidcConfig = await manager.GetConfigurationAsync(cts.Token).ConfigureAwait(false);
             var keyCount = oidcConfig?.SigningKeys?.Count ?? 0;
             _logger.LogInformation(
-                "[JWT-Warmup] OIDC metadata + JWKS prefetched. Authority={Authority}, Issuer={Issuer}, SigningKeys={KeyCount}",
-                _dynamicConfig.Authority ?? "<none>",
-                oidcConfig?.Issuer ?? "<none>",
+                "[JWT-Warmup] OIDC metadata + JWKS prefetched. SigningKeys={KeyCount}",
                 keyCount);
             return true;
         }
@@ -100,10 +98,9 @@ internal sealed class JwtAuthorityWarmupHostedService : IHostedService, IDisposa
                 WarmupTimeout.TotalSeconds);
             return false;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _logger.LogWarning(
-                ex,
                 "[JWT-Warmup] Failed to prefetch OIDC/JWKS metadata within {Timeout}s. " +
                 "Background retry will continue.",
                 WarmupTimeout.TotalSeconds);
@@ -136,8 +133,7 @@ internal sealed class JwtAuthorityWarmupHostedService : IHostedService, IDisposa
                 var oidcConfig = await manager.GetConfigurationAsync(cts.Token).ConfigureAwait(false);
                 var keyCount = oidcConfig?.SigningKeys?.Count ?? 0;
                 _logger.LogInformation(
-                    "[JWT-Warmup] Background retry succeeded. Authority={Authority}, SigningKeys={KeyCount}",
-                    _dynamicConfig.Authority ?? "<none>",
+                    "[JWT-Warmup] Background retry succeeded. SigningKeys={KeyCount}",
                     keyCount);
                 return;
             }
@@ -150,9 +146,9 @@ internal sealed class JwtAuthorityWarmupHostedService : IHostedService, IDisposa
                 _logger.LogError("[JWT-Warmup] All {Count} background retries exhausted. JWT auth will lazy-load on first request.", RetryDelays.Length);
                 return;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogDebug(ex, "[JWT-Warmup] Background retry attempt failed (next in {Delay}s).", delay.TotalSeconds);
+                _logger.LogDebug("[JWT-Warmup] Background retry attempt failed (next in {Delay}s).", delay.TotalSeconds);
             }
         }
     }

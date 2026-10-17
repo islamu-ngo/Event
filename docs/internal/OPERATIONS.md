@@ -3,6 +3,15 @@
 
 # Operations
 
+## AppHost MessagePack Security Floor
+
+The central MessagePack pin is 3.1.9 for
+[GHSA-qhrr-8q5h-9q3h](https://github.com/advisories/GHSA-qhrr-8q5h-9q3h).
+The affected dependency graph belongs to AppHost tooling. Regenerate its NuGet
+lockfile with the native restore command, then build AppHost and audit transitive
+packages. Keep NuGet vulnerability auditing and warning enforcement enabled.
+This dependency repair does not require database migrations.
+
 ## Guided Administration Verification
 
 After private setup, inspect the disclosure, paid-event and recommended groups at

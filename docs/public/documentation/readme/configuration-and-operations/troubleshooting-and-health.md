@@ -68,6 +68,13 @@ scope before selecting the request tenant. A `tenant_lease_identity_changed`
 failure indicates an attempt to retarget an already-bound database lease;
 do not bypass that guard or expand table privileges to repair routing.
 
+## AppHost Package Audit Failures
+
+If building or launching Aspire fails with `NU1902` for MessagePack 3.1.8, use
+the centrally patched 3.1.9 dependency and its regenerated AppHost lockfile.
+This addresses an upstream deserialization denial-of-service advisory and
+restores the package-audit gate. No database migration is required.
+
 ## Human mutation admission contracts
 
 Localization governance updates require a currently valid authenticated session

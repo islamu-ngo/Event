@@ -15,6 +15,39 @@ namespace Explore.Infrastructure.Tests.Infrastructure.Webhooks;
 public sealed class SvixWebhookProviderHealthCheckTests
 {
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task HealthDataContainsNoUnregisteredConfigurationText(bool selected)
+    {
+        string canary = Guid.CreateVersion7().ToString("N");
+        var options = new WebhookOptions
+        {
+            Enabled = true,
+            Provider = selected ? WebhookOptions.ProviderSvix : canary,
+            Svix = new WebhookSvixOptions
+            {
+                Environment = canary,
+                ProviderVersion = canary,
+                CapabilityPolicyVersion = canary,
+                BaseUrl = canary,
+                AuthTokenSecretRef = canary,
+                OperationalWebhookSecretRef = canary
+            }
+        };
+        var result = await CreateHealthCheck(Substitute.For<ISecretResolver>(), options)
+            .CheckHealthAsync(new HealthCheckContext());
+        await Assert.That(result.Status).IsEqualTo(selected ? HealthStatus.Unhealthy : HealthStatus.Healthy);
+        await Assert.That(result.Data["svixProviderSelected"]).IsEqualTo(selected);
+        await Assert.That(result.Data["provider"]).IsEqualTo(selected ? WebhookOptions.ProviderSvix : "unknown");
+        await Assert.That(result.Data["providerVersionConfigured"]).IsEqualTo(true);
+        await Assert.That(result.Data["capabilityPolicyVersionConfigured"]).IsEqualTo(true);
+        await Assert.That(result.Data["environmentConfigured"]).IsEqualTo(true);
+        await Assert.That(string.Join(' ', result.Data.Select(field => field.Key + "=" + field.Value)))
+            .DoesNotContain(canary);
+        await Assert.That(result.Exception).IsNull();
+    }
+
+    [Test]
     public async Task CheckHealthAsync_WhenSvixProviderNotSelected_ReturnsHealthyWithoutResolvingSecrets()
     {
         var secretResolver = Substitute.For<ISecretResolver>();

@@ -23,6 +23,89 @@ public class CerbosPolicyPackageServiceTests : IDisposable
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"cerbos-package-{Guid.NewGuid():N}");
 
     [Test]
+    [Arguments("resourcePolicy: &policy\n  resource: islamuevent_event\ncopy: *policy\n")]
+    [Arguments("resourcePolicy: !!map\n  resource: islamuevent_event\n")]
+    [Arguments("resourcePolicy:\n  resource: islamuevent_event\n  resource: replaced\n")]
+    [Arguments("resourcePolicy:\n  <<: {resource: islamuevent_event}\n")]
+    [Arguments("resourcePolicy:\n  resource: islamuevent_event\n---\nresourcePolicy:\n  resource: replaced\n")]
+    public async Task BuildManifestRejectsYamlExpansionAndAmbiguousAuthority(string yaml)
+    {
+        var root = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(root, "islamuevent_event.yaml"), yaml);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        var service = CreateService(root);
+
+        await Assert.That(async () => await service.BuildManifestAsync()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments(".json")]
+    [Arguments(".yaml")]
+    public async Task BuildManifestRejectsInvalidUtf8InsteadOfReplacingAuthorityText(string extension)
+    {
+        var root = CreatePackageRoot();
+        await File.WriteAllBytesAsync(Path.Combine(root, "islamuevent_event" + extension), [0xC3, 0x28]);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+
+        await Assert.That(async () => await CreateService(root).BuildManifestAsync())
+            .Throws<DecoderFallbackException>();
+    }
+
+    [Test]
+    public async Task BuildManifestRejectsExcessiveArtifactBeforeHashingOrPublication()
+    {
+        var root = CreatePackageRoot();
+        var path = Path.Combine(root, "islamuevent_event.yaml");
+        await using (var file = File.Create(path))
+            file.SetLength(2 * 1024 * 1024 + 1);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        using var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var service = CreateService(root, handler: handler);
+
+        var result = await service.PublishAsync();
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PublishRejectsPackageCountOrAggregateBudgetBeforeSending(bool excessiveAggregateBytes)
+    {
+        var root = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(root, "islamuevent_event.yaml"),
+            CreatePolicyYaml("islamuevent_event"));
+        int count = excessiveAggregateBytes ? 9 : 256;
+        string schema = excessiveAggregateBytes
+            ? "{\"description\":\"" + new string('a', 1_900_000) + "\"}"
+            : "{\"type\":\"object\"}";
+        for (int index = 0; index < count; index++)
+            await File.WriteAllTextAsync(Path.Combine(root, "_schemas", $"islamuevent_{index}.json"), schema);
+        using var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+
+        var result = await CreateService(root, handler: handler)
+            .PublishAsync();
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageUnavailable);
+        await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    public async Task BuildManifestRejectsDeepJsonAndDuplicateMembers()
+    {
+        var root = CreatePackageRoot();
+        var path = Path.Combine(root, "islamuevent_event.json");
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        var service = CreateService(root);
+        await File.WriteAllTextAsync(path, "{\"resourcePolicy\":{},\"resourcePolicy\":{}}");
+        await Assert.That(async () => await service.BuildManifestAsync()).Throws<InvalidOperationException>();
+        await File.WriteAllTextAsync(path, new string('[', 33) + "0" + new string(']', 33));
+        await Assert.That(async () => await service.BuildManifestAsync()).Throws<JsonException>();
+    }
+
+    [Test]
     public async Task BuildManifestAsync_WithNamespacedArtifacts_ReturnsStableManifest()
     {
         var policiesRoot = CreatePackageRoot();

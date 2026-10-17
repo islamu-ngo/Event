@@ -477,6 +477,17 @@ User profile updates use the `islamuevent_user` resource with the target domain 
 
 ### 4.1.1 Cerbos Package Upload
 
+The Event package compiler admits at most 256 policy/schema artifacts, 2 MiB per
+artifact, and 16 MiB of aggregate artifact bytes before provider handoff. Reads
+reject file growth beyond the observed length. Every artifact is parsed before
+manifest hashing using strict UTF-8 and JSON depth 32. Duplicate JSON members,
+`$type`, and merge keys are rejected. YAML is preflighted before deserialization:
+one document, depth 32, at most 65,536 parser events, scalar length at most 65,536
+characters, and aggregate scalar text at most 2 MiB. Anchors, aliases, explicit
+tags, duplicate mapping keys, and merge keys are not admitted. Converted JSON
+must also fit the per-artifact byte budget. Existing packages using these YAML
+features must be rewritten as explicit bounded mappings before Event publication.
+
 #### In-App Onboarding & Admin Sync (`POST /api/instance/settings/authz-provider/sync`)
 
 Operators can synchronize the bundled policy package directly through the instance administration UI or API:

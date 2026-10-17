@@ -13,6 +13,8 @@ using Explore.Domain.Secrets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Refit;
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
 
 namespace Explore.Infrastructure.Services;
@@ -27,12 +29,16 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
     private const string ArchiveContentType = "application/zip";
     private const string ArchiveInstructionsFileName = "INSTRUCTIONS.md";
     private const string ArchiveManifestFileName = "manifest.json";
+    private const int MaximumArtifactBytes = 2 * 1024 * 1024;
+    private const int MaximumPackageBytes = 16 * 1024 * 1024;
+    private const int MaximumArtifactCount = 256;
     private static readonly string[] PolicyFilePatterns = ["*.yaml", "*.yml", "*.json"];
+    private static readonly UTF8Encoding ArtifactEncoding = new(false, true);
     private static readonly JsonSerializerOptions AdminApiJsonOptions = new()
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
-    private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder().Build();
+    private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder().WithDuplicateKeyChecking().Build();
     private static readonly ISerializer JsonCompatibleYamlSerializer = new SerializerBuilder()
         .JsonCompatible()
         .Build();
@@ -87,7 +93,11 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                     $"Policy artifact '{fileName}' must use the '{_options.ProductNamespacePrefix}' namespace prefix.");
             }
 
+            if (artifacts.Count >= MaximumArtifactCount)
+                throw CreatePackageUnavailableException();
             artifacts.Add(await BuildArtifactAsync(packageRoot, policyFile, PolicyArtifactKind.Policy, cancellationToken));
+            if (artifacts.Sum(artifact => artifact.SizeInBytes) > MaximumPackageBytes)
+                throw CreatePackageUnavailableException();
         }
 
         var schemaRoot = Path.Combine(packageRoot, SchemaDirectoryName);
@@ -108,7 +118,11 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                     $"Schema artifact '{fileName}' must use the '{_options.ProductNamespacePrefix}' namespace prefix.");
             }
 
+            if (artifacts.Count >= MaximumArtifactCount)
+                throw CreatePackageUnavailableException();
             artifacts.Add(await BuildArtifactAsync(packageRoot, schemaFile, PolicyArtifactKind.Schema, cancellationToken));
+            if (artifacts.Sum(artifact => artifact.SizeInBytes) > MaximumPackageBytes)
+                throw CreatePackageUnavailableException();
         }
 
         var orderedArtifacts = artifacts.OrderBy(a => a.LogicalId, StringComparer.Ordinal).ToArray();
@@ -676,7 +690,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         PolicyArtifactKind kind,
         CancellationToken cancellationToken)
     {
-        var bytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
+        var bytes = await ReadArtifactBytesAsync(filePath, cancellationToken);
+        _ = ParseArtifactDocument(bytes, Path.GetExtension(filePath));
         var logicalId = Path.GetRelativePath(packageRoot, filePath).Replace(Path.DirectorySeparatorChar, '/');
         var sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
@@ -700,7 +715,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         foreach (var artifact in manifest.Artifacts.Where(a => a.Kind == PolicyArtifactKind.Schema))
         {
             var path = ResolveArtifactPath(packageRoot, artifact.LogicalId);
-            var schemaBytes = await File.ReadAllBytesAsync(path, cancellationToken);
+            var schemaBytes = await ReadArtifactBytesAsync(path, cancellationToken);
             schemas.Add(new CerbosSchemaDefinition
             {
                 Id = artifact.LogicalId.StartsWith($"{SchemaDirectoryName}/", StringComparison.Ordinal)
@@ -730,20 +745,88 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
 
     private static async Task<object> ReadPolicyDocumentAsync(string path, CancellationToken cancellationToken)
     {
-        var content = await File.ReadAllTextAsync(path, cancellationToken);
-        var extension = Path.GetExtension(path);
-        var json = extension.Equals(".json", StringComparison.OrdinalIgnoreCase)
-            ? content
-            : ConvertYamlToJson(content);
+        var bytes = await ReadArtifactBytesAsync(path, cancellationToken);
+        return ParseArtifactDocument(bytes, Path.GetExtension(path));
+    }
 
-        using var document = JsonDocument.Parse(json);
+    private static async Task<byte[]> ReadArtifactBytesAsync(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(path);
+        long length = stream.Length;
+        if (length > MaximumArtifactBytes)
+            throw CreatePackageUnavailableException();
+        byte[] bytes = new byte[(int)length];
+        await stream.ReadExactlyAsync(bytes, cancellationToken);
+        if (stream.ReadByte() != -1)
+            throw CreatePackageUnavailableException();
+        return bytes;
+    }
+
+    private static JsonElement ParseArtifactDocument(byte[] bytes, string extension)
+    {
+        string json = extension.Equals(".json", StringComparison.OrdinalIgnoreCase)
+            ? ArtifactEncoding.GetString(bytes)
+            : ConvertYamlToJson(ArtifactEncoding.GetString(bytes));
+        if (Encoding.UTF8.GetByteCount(json) > MaximumArtifactBytes)
+            throw CreatePackageUnavailableException();
+        using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 32 });
+        ValidateJsonMembers(document.RootElement);
         return document.RootElement.Clone();
+    }
+
+    private static void ValidateJsonMembers(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+            {
+                if (!names.Add(property.Name) || property.Name is "$type" or "<<")
+                    throw CreatePackageUnavailableException();
+                ValidateJsonMembers(property.Value);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+                ValidateJsonMembers(child);
+        }
     }
 
     private static string ConvertYamlToJson(string yaml)
     {
-        var yamlObject = YamlDeserializer.Deserialize(new StringReader(yaml));
-        return JsonCompatibleYamlSerializer.Serialize(yamlObject);
+        try
+        {
+            var parser = new Parser(new StringReader(yaml));
+            int events = 0;
+            int depth = 0;
+            int characters = 0;
+            int documents = 0;
+            while (parser.MoveNext())
+            {
+                if (++events > 65_536 || parser.Current is AnchorAlias
+                    || parser.Current is NodeEvent node && (!node.Anchor.IsEmpty || !node.Tag.IsEmpty))
+                    throw CreatePackageUnavailableException();
+                if (parser.Current is DocumentStart && ++documents > 1)
+                    throw CreatePackageUnavailableException();
+                if (parser.Current is MappingStart or SequenceStart && ++depth > 32)
+                    throw CreatePackageUnavailableException();
+                if (parser.Current is MappingEnd or SequenceEnd)
+                    depth--;
+                if (parser.Current is Scalar scalar)
+                {
+                    characters += scalar.Value.Length;
+                    if (scalar.Value.Length > 65_536 || characters > MaximumArtifactBytes || scalar.Value == "<<")
+                        throw CreatePackageUnavailableException();
+                }
+            }
+            var yamlObject = YamlDeserializer.Deserialize(new StringReader(yaml));
+            return JsonCompatibleYamlSerializer.Serialize(yamlObject);
+        }
+        catch (YamlException)
+        {
+            throw CreatePackageUnavailableException();
+        }
     }
 
     private ICerbosAdminApi CreateAdminApi(Uri endpoint)

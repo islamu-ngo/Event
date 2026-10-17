@@ -283,6 +283,15 @@ docker run --rm -it \
 
 ## 10. Connecting ISLAMU Event to Cerbos
 
+When Event compiles a package for publication or export, it limits the combined
+policy/schema set to 256 files, 2 MiB per file, and 16 MiB total. Files must be
+valid UTF-8. Rewrite YAML anchors, aliases, explicit tags, merge keys, duplicate
+keys, and multiple documents as explicit mappings. JSON duplicate members and
+`$type` metadata are rejected. Nesting is limited to 32; YAML also limits parser
+events to 65,536 and individual scalar text to 65,536 characters. Rejection occurs
+before provider handoff. These are Event compiler limits, not claims about direct
+`cerbosctl` upload behavior.
+
 In your ISLAMU Event `.env` configuration file (see [Environment Variables Reference](../configuration-and-operations/environment-variables.md#10-advanced-authorization-cerbos-pdp)), configure the Cerbos PDP connection:
 
 ```env

@@ -1,9 +1,7 @@
-using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Explore.Secrets.Database;
-using Explore.Infrastructure.ConfigurationManifest;
 
 namespace Event.MigrationService;
 
@@ -32,18 +30,12 @@ public sealed class Worker(IServiceProvider serviceProvider, IHostApplicationLif
             await externalIdentity.Database.MigrateAsync(stoppingToken);
         }
 
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var startupSequence = scope.ServiceProvider
-            .GetRequiredService<IConfigurationManifestPostMigrationSequence>();
-        await startupSequence.RunAsync(
-            cancellationToken => ExploreDatabaseMigrator.MigrateAndSeedAsync(
-                db,
+        await ExploreDatabaseMigrator.MigrateAndSeedAsync(
                 environment,
                 configuration,
                 migrationDatabaseOptions,
                 logger,
-                cancellationToken),
-            stoppingToken);
+                cancellationToken: stoppingToken);
 
         lifetime.StopApplication();
     }

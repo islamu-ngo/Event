@@ -111,6 +111,45 @@ public sealed class OutboxRepositoryClaimTests(PostgreSqlContainerFixture fixtur
         await Assert.That(row.NextRetryAt).IsNull();
     }
 
+    [Test]
+    public async Task ReplacementClaimFencesHistoricalPayloadRewriteAndPreservesCurrentOwner()
+    {
+        await fixture.ResetAsync();
+        var message = CreateMessage(maxRetries: 3);
+        message.Payload = "retained-private-payload";
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.OutboxMessages.Add(message);
+            await seed.SaveChangesAsync();
+        }
+        await using var contextA = fixture.CreateDbContext();
+        await using var contextB = fixture.CreateDbContext();
+        var repositoryA = new OutboxRepository(contextA);
+        var repositoryB = new OutboxRepository(contextB);
+        DateTime claimedAt = new(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        DateTime leaseA = (await repositoryA.TryClaimForProcessing(message.Id, claimedAt))!.Value;
+        DateTime leaseB = (await repositoryB.TryClaimForProcessing(message.Id, leaseA))!.Value;
+        await Assert.That(await repositoryA.TryReplaceProcessingPayloadAsync(
+            message.Id, leaseA, message.Payload, "stale-rewrite")).IsFalse();
+        await using (var verify = fixture.CreateDbContext())
+        {
+            var retained = await verify.OutboxMessages.AsNoTracking().SingleAsync(row => row.Id == message.Id);
+            await Assert.That(retained.Payload).IsEqualTo(message.Payload);
+            await Assert.That(retained.NextRetryAt).IsEqualTo(leaseB);
+        }
+        await Assert.That(await repositoryB.TryReplaceProcessingPayloadAsync(
+            message.Id, leaseB, message.Payload, "safe-pointer")).IsTrue();
+        await Assert.That(await repositoryB.TryReplaceProcessingPayloadAsync(
+            message.Id, leaseB, message.Payload, "wrong-original-payload")).IsFalse();
+        await Assert.That(await repositoryB.MarkAsCompleted(message.Id, leaseB)).IsTrue();
+        await Assert.That(await repositoryB.TryReplaceProcessingPayloadAsync(
+            message.Id, leaseB, "safe-pointer", "terminal-rewrite")).IsFalse();
+        await using var final = fixture.CreateDbContext();
+        var row = await final.OutboxMessages.AsNoTracking().SingleAsync(value => value.Id == message.Id);
+        await Assert.That(row.Payload).IsEqualTo("safe-pointer");
+        await Assert.That(row.Status).IsEqualTo(OutboxMessageStatus.Completed);
+    }
+
     private static OutboxMessage CreateMessage(int maxRetries) => new()
     {
         Id = Guid.CreateVersion7(),

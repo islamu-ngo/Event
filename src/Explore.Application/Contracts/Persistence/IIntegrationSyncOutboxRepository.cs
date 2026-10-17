@@ -12,6 +12,12 @@ public interface IIntegrationSyncOutboxRepository
         DateTime staleProcessingStartedBefore,
         CancellationToken cancellationToken);
 
+    Task<IntegrationSyncOutbox?> GetPendingAsync(
+        Guid outboxId,
+        DateTime now,
+        DateTime staleProcessingStartedBefore,
+        CancellationToken cancellationToken);
+
     Task<bool> TryClaimAsync(
         IntegrationSyncClaimRequest request,
         CancellationToken cancellationToken);

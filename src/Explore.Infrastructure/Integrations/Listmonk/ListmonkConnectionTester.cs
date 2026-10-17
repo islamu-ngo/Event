@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 namespace Explore.Infrastructure.Integrations.Listmonk;
 
 public sealed class ListmonkConnectionTester(
-    IHierarchicalSettingsResolver settingsResolver,
+    IHierarchicalSettingsReader settingsResolver,
     ISecretResolver secretResolver,
     ITenantContext tenantContext,
     IHttpClientFactory httpClientFactory,

@@ -20,9 +20,9 @@ public sealed class IntegrationSyncDrainService(
     public async Task<IntegrationSyncDrainResult> ProcessBatchAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IIntegrationSyncOutboxRepository>();
+        var discovery = scope.ServiceProvider.GetRequiredService<IIntegrationSyncQueueDiscovery>();
         DateTime now = DateTime.UtcNow;
-        var pending = await repository.GetPendingBatch(
+        var pending = await discovery.GetPendingAsync(
             _settings.BatchSize,
             now,
             now.AddSeconds(-_settings.ProcessingLeaseTimeoutSeconds),
@@ -34,9 +34,19 @@ public sealed class IntegrationSyncDrainService(
         var ambiguous = 0;
         var alreadyClaimed = 0;
 
-        foreach (var outbox in pending)
+        foreach (var candidate in pending)
         {
-            var result = await ProcessOutboxAsync(outbox, cancellationToken);
+            IntegrationSyncOutbox? outbox;
+            await using (var candidateScope = scopeFactory.CreateAsyncScope())
+            {
+                candidateScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(candidate.TenantId);
+                var candidateRepository = candidateScope.ServiceProvider.GetRequiredService<IIntegrationSyncOutboxRepository>();
+                outbox = await candidateRepository.GetPendingAsync(
+                    candidate.OutboxId, now, now.AddSeconds(-_settings.ProcessingLeaseTimeoutSeconds), cancellationToken);
+            }
+            var result = outbox is null
+                ? new IntegrationSyncSingleDrainResult(IntegrationSyncDrainOutcome.AlreadyClaimed, candidate.OutboxId)
+                : await ProcessOutboxAsync(outbox, cancellationToken);
             switch (result.Outcome)
             {
                 case IntegrationSyncDrainOutcome.Completed:
@@ -88,6 +98,7 @@ public sealed class IntegrationSyncDrainService(
             (outbox.ProcessingLeaseToken is null || outbox.ProcessingStartedAt is null))
         {
             await using var malformedScope = scopeFactory.CreateAsyncScope();
+            malformedScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(outbox.TenantId);
             var malformedRepository = malformedScope.ServiceProvider.GetRequiredService<IIntegrationSyncOutboxRepository>();
             bool parked = await malformedRepository.ParkMalformedProcessingAsync(
                 outbox.TenantId,
@@ -105,6 +116,7 @@ public sealed class IntegrationSyncDrainService(
             outbox.ProcessingStartedAt is DateTime inDoubtStartedAt)
         {
             await using var recoveryScope = scopeFactory.CreateAsyncScope();
+            recoveryScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(outbox.TenantId);
             var recoveryRepository = recoveryScope.ServiceProvider.GetRequiredService<IIntegrationSyncOutboxRepository>();
             bool parked = await recoveryRepository.ParkAmbiguousAsync(
                 new IntegrationSyncClaimIdentity(outbox.TenantId, outbox.Id, inDoubtToken, inDoubtStartedAt),
@@ -121,6 +133,7 @@ public sealed class IntegrationSyncDrainService(
 
         {
             await using var claimScope = scopeFactory.CreateAsyncScope();
+            claimScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(outbox.TenantId);
             var claimRepository = claimScope.ServiceProvider.GetRequiredService<IIntegrationSyncOutboxRepository>();
             var claimed = await claimRepository.TryClaimAsync(
                 new IntegrationSyncClaimRequest(
@@ -137,6 +150,7 @@ public sealed class IntegrationSyncDrainService(
         }
 
         await using var executionScope = scopeFactory.CreateAsyncScope();
+        executionScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(outbox.TenantId);
         var repository = executionScope.ServiceProvider.GetRequiredService<IIntegrationSyncOutboxRepository>();
         var activeClaim = await repository.GetActiveClaimAsync(claim, cancellationToken);
         if (activeClaim is null)
@@ -144,98 +158,81 @@ public sealed class IntegrationSyncDrainService(
             return new IntegrationSyncSingleDrainResult(IntegrationSyncDrainOutcome.AlreadyClaimed, outbox.Id);
         }
 
-        var tenantAccessor = executionScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
-        Guid? previousTenantId = tenantAccessor.TenantId;
-        tenantAccessor.SetTenant(activeClaim.TenantId);
-        try
+        if (activeClaim.UserId is not Guid userId)
         {
-            if (activeClaim.UserId is not Guid userId)
-            {
-                bool failed = await repository.FailAsync(
-                    claim,
-                    "Integration sync has no durable user identity.",
-                    false,
-                    TimeSpan.Zero,
-                    _settings.MaxAttemptCount,
-                    DateTime.UtcNow,
-                    cancellationToken);
-                return new IntegrationSyncSingleDrainResult(
-                    failed ? IntegrationSyncDrainOutcome.DeadLettered : IntegrationSyncDrainOutcome.AlreadyClaimed,
-                    activeClaim.Id);
-            }
-
-            var privacyErasureStateRepository = executionScope.ServiceProvider.GetRequiredService<IPrivacyErasureStateRepository>();
-            if (await privacyErasureStateRepository.GetBySubjectAsync(userId, cancellationToken) is not null)
-            {
-                bool failed = await repository.FailAsync(
-                    claim,
-                    PrivacyErasureFencedMessage,
-                    false,
-                    TimeSpan.Zero,
-                    _settings.MaxAttemptCount,
-                    DateTime.UtcNow,
-                    cancellationToken);
-                return new IntegrationSyncSingleDrainResult(
-                    failed ? IntegrationSyncDrainOutcome.DeadLettered : IntegrationSyncDrainOutcome.AlreadyClaimed,
-                    activeClaim.Id);
-            }
-
-            var listmonkSyncService = executionScope.ServiceProvider.GetRequiredService<ListmonkSyncService>();
-            var syncResult = await listmonkSyncService.SyncSubscriberAsync(
-                activeClaim,
-                ct => repository.MarkProviderHandoffStartedAsync(claim, DateTime.UtcNow, ct),
-                cancellationToken);
-            if (syncResult.Outcome == ListmonkSyncOutcome.LostClaim)
-            {
-                return new IntegrationSyncSingleDrainResult(IntegrationSyncDrainOutcome.AlreadyClaimed, activeClaim.Id);
-            }
-
-            if (syncResult.Succeeded)
-            {
-                bool completed = await repository.CompleteAsync(claim, DateTime.UtcNow, cancellationToken);
-                return new IntegrationSyncSingleDrainResult(
-                    completed ? IntegrationSyncDrainOutcome.Completed : IntegrationSyncDrainOutcome.AlreadyClaimed,
-                    activeClaim.Id);
-            }
-
-            if (syncResult.Outcome == ListmonkSyncOutcome.Ambiguous)
-            {
-                bool parked = await repository.ParkAmbiguousAsync(claim, DateTime.UtcNow, cancellationToken);
-                return new IntegrationSyncSingleDrainResult(
-                    parked ? IntegrationSyncDrainOutcome.Ambiguous : IntegrationSyncDrainOutcome.AlreadyClaimed,
-                    activeClaim.Id);
-            }
-
-            var failedAttemptCount = activeClaim.AttemptCount;
-            var maxAttempts = Math.Min(activeClaim.MaxAttempts, _settings.MaxAttemptCount);
-            var willDeadLetter = !syncResult.IsRetryable || failedAttemptCount >= maxAttempts;
-            var retryDelay = TimeSpan.FromSeconds(_settings.CalculateRetryDelay(failedAttemptCount));
-
-            bool settled = await repository.FailAsync(
+            bool failed = await repository.FailAsync(
                 claim,
-                syncResult.ErrorMessage ?? "Listmonk sync failed.",
-                syncResult.IsRetryable,
-                retryDelay,
+                "Integration sync has no durable user identity.",
+                false,
+                TimeSpan.Zero,
                 _settings.MaxAttemptCount,
                 DateTime.UtcNow,
                 cancellationToken);
-
             return new IntegrationSyncSingleDrainResult(
-                !settled
-                    ? IntegrationSyncDrainOutcome.AlreadyClaimed
-                    : willDeadLetter ? IntegrationSyncDrainOutcome.DeadLettered : IntegrationSyncDrainOutcome.RetryScheduled,
+                failed ? IntegrationSyncDrainOutcome.DeadLettered : IntegrationSyncDrainOutcome.AlreadyClaimed,
                 activeClaim.Id);
         }
-        finally
+
+        var privacyErasureStateRepository = executionScope.ServiceProvider.GetRequiredService<IPrivacyErasureStateRepository>();
+        if (await privacyErasureStateRepository.GetBySubjectAsync(userId, cancellationToken) is not null)
         {
-            if (previousTenantId is { } previous)
-            {
-                tenantAccessor.SetTenant(previous);
-            }
-            else
-            {
-                tenantAccessor.Clear();
-            }
+            bool failed = await repository.FailAsync(
+                claim,
+                PrivacyErasureFencedMessage,
+                false,
+                TimeSpan.Zero,
+                _settings.MaxAttemptCount,
+                DateTime.UtcNow,
+                cancellationToken);
+            return new IntegrationSyncSingleDrainResult(
+                failed ? IntegrationSyncDrainOutcome.DeadLettered : IntegrationSyncDrainOutcome.AlreadyClaimed,
+                activeClaim.Id);
         }
+
+        var listmonkSyncService = executionScope.ServiceProvider.GetRequiredService<ListmonkSyncService>();
+        var syncResult = await listmonkSyncService.SyncSubscriberAsync(
+            activeClaim,
+            ct => repository.MarkProviderHandoffStartedAsync(claim, DateTime.UtcNow, ct),
+            cancellationToken);
+        if (syncResult.Outcome == ListmonkSyncOutcome.LostClaim)
+        {
+            return new IntegrationSyncSingleDrainResult(IntegrationSyncDrainOutcome.AlreadyClaimed, activeClaim.Id);
+        }
+
+        if (syncResult.Succeeded)
+        {
+            bool completed = await repository.CompleteAsync(claim, DateTime.UtcNow, cancellationToken);
+            return new IntegrationSyncSingleDrainResult(
+                completed ? IntegrationSyncDrainOutcome.Completed : IntegrationSyncDrainOutcome.AlreadyClaimed,
+                activeClaim.Id);
+        }
+
+        if (syncResult.Outcome == ListmonkSyncOutcome.Ambiguous)
+        {
+            bool parked = await repository.ParkAmbiguousAsync(claim, DateTime.UtcNow, cancellationToken);
+            return new IntegrationSyncSingleDrainResult(
+                parked ? IntegrationSyncDrainOutcome.Ambiguous : IntegrationSyncDrainOutcome.AlreadyClaimed,
+                activeClaim.Id);
+        }
+
+        var failedAttemptCount = activeClaim.AttemptCount;
+        var maxAttempts = Math.Min(activeClaim.MaxAttempts, _settings.MaxAttemptCount);
+        var willDeadLetter = !syncResult.IsRetryable || failedAttemptCount >= maxAttempts;
+        var retryDelay = TimeSpan.FromSeconds(_settings.CalculateRetryDelay(failedAttemptCount));
+
+        bool settled = await repository.FailAsync(
+            claim,
+            syncResult.ErrorMessage ?? "Listmonk sync failed.",
+            syncResult.IsRetryable,
+            retryDelay,
+            _settings.MaxAttemptCount,
+            DateTime.UtcNow,
+            cancellationToken);
+
+        return new IntegrationSyncSingleDrainResult(
+            !settled
+                ? IntegrationSyncDrainOutcome.AlreadyClaimed
+                : willDeadLetter ? IntegrationSyncDrainOutcome.DeadLettered : IntegrationSyncDrainOutcome.RetryScheduled,
+            activeClaim.Id);
     }
 }

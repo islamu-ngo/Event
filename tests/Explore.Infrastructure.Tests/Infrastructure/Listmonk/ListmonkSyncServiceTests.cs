@@ -11,12 +11,49 @@ using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Integrations.Listmonk;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure.Listmonk;
 
 public sealed class ListmonkSyncServiceTests
 {
+    [Test]
+    [Arguments("transport")]
+    [Arguments("timeout")]
+    [Arguments("payload")]
+    [Arguments("status")]
+    public async Task NativeSubscriberFailuresKeepOutcomesWithoutPrivateDiagnosticCopies(string failure)
+    {
+        string canary = Guid.NewGuid().ToString("N");
+        var logs = new TestListLogger<ListmonkSyncService>();
+        var handler = new RecordingMessageHandler(_ => failure switch
+        {
+            "transport" => throw new PrivateSubscriberTransportFailure(canary),
+            "timeout" => throw new TaskCanceledException(canary),
+            "payload" => throw new InvalidOperationException("Malformed payload must not reach HTTP."),
+            _ => JsonResponse(HttpStatusCode.ServiceUnavailable, $"{{\"private\":\"{canary}\"}}")
+        });
+        var fixture = new Fixture(handler, logger: logs);
+        var outbox = CreateOutbox(failure == "payload" ? "{\"private\":\"" + canary : null);
+
+        var result = await fixture.Service.SyncSubscriberAsync(outbox, BeginHandoff, CancellationToken.None);
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.Outcome).IsEqualTo(failure == "payload"
+            ? ListmonkSyncOutcome.DefiniteFailure : ListmonkSyncOutcome.Ambiguous);
+        await Assert.That(handler.CallCount).IsEqualTo(failure == "payload" ? 0 : 1);
+        await Assert.That(logs.Entries.All(entry => entry.Exception is null)).IsTrue();
+        string exported = result.ErrorMessage + string.Join(' ', logs.Entries.Select(entry => entry.Message +
+            string.Join(' ', entry.State.Select(property => property.Key + property.Value))));
+        await Assert.That(exported).DoesNotContain(canary);
+        await Assert.That(exported).DoesNotContain(fixture.Username);
+        await Assert.That(exported).DoesNotContain(fixture.ApiKey);
+        await Assert.That(exported).DoesNotContain(nameof(PrivateSubscriberTransportFailure));
+    }
+
+    private sealed class PrivateSubscriberTransportFailure(string canary) : HttpRequestException(canary);
+
     [Test]
     public async Task SyncSubscriberAsync_WhenListmonkAcceptsSubscriber_PostsGeneratedPayloadWithBasicAuth()
     {
@@ -129,7 +166,7 @@ public sealed class ListmonkSyncServiceTests
         public string Username { get; } = $"user-{Guid.NewGuid():N}";
         public string ApiKey { get; } = Guid.NewGuid().ToString("N");
 
-        public Fixture(RecordingMessageHandler handler, bool configureSecrets = true)
+        public Fixture(RecordingMessageHandler handler, bool configureSecrets = true, ILogger<ListmonkSyncService>? logger = null)
         {
             SettingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
             SecretResolver = Substitute.For<ISecretResolver>();
@@ -178,7 +215,7 @@ public sealed class ListmonkSyncServiceTests
                 HttpClientFactory,
                 SettingsResolver,
                 SecretResolver,
-                NullLogger<ListmonkSyncService>.Instance);
+                logger ?? NullLogger<ListmonkSyncService>.Instance);
         }
 
         private IHierarchicalSettingsResolver SettingsResolver { get; }

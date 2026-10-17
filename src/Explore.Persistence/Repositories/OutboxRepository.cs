@@ -1,7 +1,11 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Application.Services;
+using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Domain;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -13,14 +17,25 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
 {
     private static readonly TimeSpan ProcessingLease = TimeSpan.FromMinutes(5);
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
 
-    public OutboxRepository(ExploreDbContext dbContext) : base(dbContext)
+    public OutboxRepository(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _nativeEnrollment = nativeEnrollment;
     }
+
+    private PostgresNativeQueueEnrollment NativeEnrollment => _nativeEnrollment
+        ?? throw new UnauthorizedAccessException("outbox_execution_enrollment_required");
 
     public new async Task<OutboxMessage> Create(OutboxMessage message)
     {
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+        {
+            await native.StoreEffectAsync(message, CancellationToken.None);
+            return message;
+        }
         await _dbContext.OutboxMessages.AddAsync(message);
         await _dbContext.SaveChangesAsync();
         return message;
@@ -42,6 +57,11 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
 
         return await _dbContext.OutboxMessages
             .AsNoTracking()
+            .Where(m => m.EventType != EventPublishedOutboxMessageFactory.EventPublishedNotificationFanoutRequestedEventType
+                    && m.EventType != EventModerationOutboxMessageFactory.EventLightModeratedNotificationFanoutRequestedEventType
+                    && m.EventType != EventModerationOutboxMessageFactory.EventHeavyRedactedNotificationFanoutRequestedEventType
+                    && m.EventType != NotificationFanoutOccurrenceOutboxMessageFactory.EventType
+                    && m.EventType != EventDiscoveryIdentityCorrectionRequested.EventType)
             .Where(m => (m.Status == OutboxMessageStatus.Pending
                          && (m.NextRetryAt == null || m.NextRetryAt <= now))
                         || (m.Status == OutboxMessageStatus.Processing
@@ -49,18 +69,62 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
                             && m.NextRetryAt <= now)
                         || (m.Status == OutboxMessageStatus.DeadLettered
                             && m.NextRetryAt != null
-                            && m.NextRetryAt <= now))
+                            && m.NextRetryAt <= now
+                            && m.EventType != "EventReportProviderSyncRequested"
+                            && m.EventType != "RegistrationOrderRejected"
+                            && m.EventType != "RegistrationOrderConfirmed"))
             .OrderBy(m => m.CreatedAt)
+            .ThenBy(m => m.Id)
             .Take(batchSize)
             .ToListAsync(ct);
     }
 
-    public Task<OutboxMessage?> GetByIdAsync(
+    public Task<OutboxMessage?> GetClaimedNotificationAsync(
+        Guid id, DateTime processingLeaseExpiresAt, CancellationToken ct = default)
+    {
+        if (PostgresOutboxExecutionContract.For(_dbContext) is { } native)
+            return native.ReadAsync(NativeEnrollment,
+                id, processingLeaseExpiresAt, OutboxMessageStatus.Processing, true, ct);
+        return _dbContext.OutboxMessages.AsNoTracking()
+            .Where(message => message.Id == id && message.Status == OutboxMessageStatus.Processing
+                && message.NextRetryAt == processingLeaseExpiresAt
+                && (message.EventType == EventPublishedOutboxMessageFactory.EventPublishedNotificationFanoutRequestedEventType
+                    || message.EventType == EventModerationOutboxMessageFactory.EventLightModeratedNotificationFanoutRequestedEventType
+                    || message.EventType == EventModerationOutboxMessageFactory.EventHeavyRedactedNotificationFanoutRequestedEventType
+                    || message.EventType == NotificationFanoutOccurrenceOutboxMessageFactory.EventType
+                    || message.EventType == EventDiscoveryIdentityCorrectionRequested.EventType))
+            .SingleOrDefaultAsync(ct);
+    }
+
+    public Task<OutboxMessage?> GetClaimedGenericAsync(
+        Guid id, DateTime leaseExpiresAt, OutboxMessageStatus status, DateTime observedAtUtc, CancellationToken ct = default)
+    {
+        if (status is not (OutboxMessageStatus.Processing or OutboxMessageStatus.DeadLettered))
+            return Task.FromResult<OutboxMessage?>(null);
+        if (PostgresOutboxExecutionContract.For(_dbContext) is { } native)
+            return leaseExpiresAt <= observedAtUtc ? Task.FromResult<OutboxMessage?>(null)
+                : native.ReadAsync(NativeEnrollment,
+                    id, leaseExpiresAt, status, false, ct);
+        return _dbContext.OutboxMessages.AsNoTracking()
+            .Where(message => message.Id == id && message.Status == status
+                && message.NextRetryAt == leaseExpiresAt && message.NextRetryAt > observedAtUtc
+                && message.EventType != EventPublishedOutboxMessageFactory.EventPublishedNotificationFanoutRequestedEventType
+                && message.EventType != EventModerationOutboxMessageFactory.EventLightModeratedNotificationFanoutRequestedEventType
+                && message.EventType != EventModerationOutboxMessageFactory.EventHeavyRedactedNotificationFanoutRequestedEventType
+                && message.EventType != NotificationFanoutOccurrenceOutboxMessageFactory.EventType
+                && message.EventType != EventDiscoveryIdentityCorrectionRequested.EventType)
+            .SingleOrDefaultAsync(ct);
+    }
+
+    public async Task<OutboxMessage?> GetByIdAsync(
         Guid messageId,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(messageId, Guid.Empty);
-        return _dbContext.OutboxMessages
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.ReadEffectAsync(messageId, cancellationToken);
+        return await _dbContext.OutboxMessages
             .AsNoTracking()
             .SingleOrDefaultAsync(message => message.Id == messageId, cancellationToken);
     }
@@ -132,15 +196,21 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
 
     public async Task<bool> TryReplaceProcessingPayloadAsync(
         Guid id,
+        DateTime processingLeaseExpiresAt,
         string expectedPayload,
         string replacementPayload,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedPayload);
         ArgumentException.ThrowIfNullOrWhiteSpace(replacementPayload);
+        if (PostgresOutboxExecutionContract.For(_dbContext) is { } native)
+            return await native.SettleAsync(NativeEnrollment,
+                id, processingLeaseExpiresAt, OutboxMessageStatus.Processing, 4,
+                null, false, 0, null, expectedPayload, replacementPayload, ct) == 1;
         int rowsAffected = await _dbContext.OutboxMessages
             .Where(message => message.Id == id
                 && message.Status == OutboxMessageStatus.Processing
+                && message.NextRetryAt == processingLeaseExpiresAt
                 && message.Payload == expectedPayload)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(message => message.Payload, replacementPayload), ct);
@@ -152,6 +222,10 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
         DateTime processingLeaseExpiresAt,
         CancellationToken ct = default)
     {
+        if (PostgresOutboxExecutionContract.For(_dbContext) is { } native)
+            return await native.SettleAsync(NativeEnrollment,
+                id, processingLeaseExpiresAt, OutboxMessageStatus.Processing, 1,
+                null, false, 0, null, null, null, ct) == 1;
         var rowsAffected = await _dbContext.OutboxMessages
             .Where(m => m.Id == id
                 && m.Status == OutboxMessageStatus.Processing
@@ -174,6 +248,10 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
         DateTime failedAt,
         CancellationToken ct = default)
     {
+        if (PostgresOutboxExecutionContract.For(_dbContext) is { } native)
+            return (OutboxFailureTransition)await native.SettleAsync(NativeEnrollment,
+                id, processingLeaseExpiresAt, OutboxMessageStatus.Processing, 2,
+                error, isRetryable, retryDelaySeconds, AtPostgresPrecision(failedAt), null, null, ct);
         var now = AtPostgresPrecision(failedAt);
         var boundedError = error.Length > 2000 ? error[..2000] : error;
         var ownedClaim = _dbContext.OutboxMessages.Where(m =>
@@ -245,6 +323,10 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
         DateTime processingLeaseExpiresAt,
         CancellationToken ct = default)
     {
+        if (PostgresOutboxExecutionContract.For(_dbContext) is { } native)
+            return await native.SettleAsync(NativeEnrollment,
+                id, processingLeaseExpiresAt, OutboxMessageStatus.DeadLettered, 3,
+                null, false, 0, null, null, null, ct) == 1;
         var rowsAffected = await _dbContext.OutboxMessages
             .Where(m => m.Id == id
                 && m.Status == OutboxMessageStatus.DeadLettered

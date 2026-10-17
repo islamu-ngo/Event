@@ -14,9 +14,12 @@ namespace Explore.Persistence.Database;
 internal sealed class PolicyMutationExecutionScopeFactory(
     IServiceProvider provider, IServiceScopeFactory scopes,
     IGlobalExploreDbContextFactory globalFactory, ITenantExploreDbContextFactory tenantFactory,
-    ExploreDbContextExecutionLease currentLease) : IPolicyMutationExecutionScopeFactory, IHumanCommitScopePreparation
+    ExploreDbContextExecutionLease currentLease) : IPolicyMutationExecutionScopeFactory, IHumanCommitScopePreparation,
+    IHumanOriginalCredentialCustody
 {
     public HumanCommitSubject? Subject => currentLease.HumanScope?.Subject;
+    public void RequireOriginalCredential(HumanAuthenticationLifetime lifetime) =>
+        currentLease.RequireOriginalCredential(provider.GetService<IHttpContextAccessor>()?.HttpContext, lifetime);
 
     public async ValueTask PrepareAsync(CancellationToken cancellationToken)
     {
@@ -49,6 +52,9 @@ internal sealed class PolicyMutationExecutionScopeFactory(
         currentLease.BindHuman(subject, purpose, context.Database.IsNpgsql()
             ? provider.GetRequiredService<PostgresNativeQueueEnrollment>() : null,
             await ResolveLifetimeAsync(provider, cancellationToken));
+        if (currentLease.HumanLifetime is not null)
+            currentLease.BindOriginalCredential(provider.GetRequiredService<IHttpContextAccessor>().HttpContext
+                ?? throw new UnauthorizedAccessException("The original authenticated request is missing."));
     }
 
     public async ValueTask<IPolicyMutationExecutionScope> CreateAsync(
@@ -116,6 +122,9 @@ internal sealed class PolicyMutationExecutionScopeFactory(
                 };
                 lease.BindHuman(subject, purpose, context.Database.IsNpgsql()
                     ? provider.GetRequiredService<PostgresNativeQueueEnrollment>() : null, lifetime);
+                if (lifetime is not null)
+                    lease.BindOriginalCredential(provider.GetRequiredService<IHttpContextAccessor>().HttpContext
+                        ?? throw new UnauthorizedAccessException("The original authenticated request is missing."));
             }
             _ = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             captured = true;
@@ -149,7 +158,11 @@ internal sealed class PolicyMutationExecutionScopeFactory(
         IServiceProvider services, CancellationToken cancellationToken)
     {
         if (services.GetRequiredService<ExploreDbContextExecutionLease>().HumanLifetime is { } retained)
+        {
+            services.GetRequiredService<ExploreDbContextExecutionLease>().RequireOriginalCredential(
+                services.GetService<IHttpContextAccessor>()?.HttpContext, retained);
             return retained;
+        }
         var observer = services.GetService<IHumanAuthenticationLifetimeObserver>();
         var principal = services.GetService<IHttpContextAccessor>()?.HttpContext?.User;
         return observer is not null && principal is not null

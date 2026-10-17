@@ -3,6 +3,24 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Original Human Tenant Preference Mutation
+
+UpdateUserLastActiveTenantCommand selects an original Global owner before handler
+construction. HumanTenantPreferencePreparation retains the resolved self, actual
+request/principal references, validated credential lifetime, and immutable target.
+It acquires source-set, principal and support exclusions in one nonreplaying
+Serializable attempt. Native subject authority and the active target membership
+remain current through settlement; support forwarding does not replace self.
+Selecting a tenant imposes no tenant-status condition and grants no resource access.
+
+HumanTenantPreferenceStore accepts only the registered preparation's current
+mutation. Its native function can update only the exact user's
+last_active_tenant_id, updated_at and updated_by. Global has execute-only access;
+Runtime receives no direct user-table privilege. A separate canonical image
+function and contract attestation run before final source/lifetime checks.
+Missing membership causes whole-attempt rollback and false; cache invalidation
+occurs only after successful settlement. Discovery reads confer no write grant.
+
 ## Preliminary Tenant Routing Leases
 
 IUserTenantMembershipRepository provides a read-only, exact-user membership

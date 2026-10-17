@@ -277,6 +277,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IAdministrativeAuthorityRepository, AdministrativeAuthorityRepository>();
         services.AddScoped<IExternalApiKeyAuthenticationRepository, ExternalApiKeyAuthenticationRepository>();
         services.AddScoped<IUserTenantMembershipRepository, UserTenantMembershipRepository>();
+        services.AddScoped<IHumanTenantPreferenceStore, HumanTenantPreferenceStore>();
         services.AddScoped<IAdmissionScannerAuthenticationRepository, AdmissionScannerAuthenticationRepository>();
         services.AddScoped<IInstanceTenantSettingsReader, InstanceTenantSettingsReader>();
         services.AddScoped<ILocalizationSecretStatusReader, LocalizationSecretStatusReader>();

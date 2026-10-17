@@ -6,6 +6,16 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Changing the current user's active tenant requires the original authenticated
+session and a current active membership in the selected target tenant through
+transaction settlement. Revoked or foreign memberships do not change the saved
+preference. Support forwarding cannot substitute another user's self authority.
+An inactive tenant can remain a preference; lifecycle guards still control access.
+If native preference admission fails, inspect credential validity, membership
+state and the installed Global execution contract; do not grant Runtime direct
+user-table access. Restore the approved native contract before retrying a
+reported contract-image or execution-grant mismatch.
+
 The native membership discovery capability requires its Global execution group.
 It returns active memberships for one user and excludes inactive tenants.
 If its native guard rejects an undeclared function executor, remove that

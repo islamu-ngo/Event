@@ -2,6 +2,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Users.Requests.Commands;
 using Microsoft.Extensions.Caching.Hybrid;
 
@@ -9,46 +10,30 @@ namespace Explore.Application.Features.Users.Handlers.Commands;
 
 public class UpdateUserLastActiveTenantCommandHandler : ICommandHandler<UpdateUserLastActiveTenantCommand, bool>
 {
-    private readonly IUserRepository _userRepository;
-    private readonly ITenantUserRepository _tenantUserRepository;
+    private readonly IHumanTenantPreferencePreparation _preparation;
     private readonly HybridCache _cache;
+    private readonly IUserContext _userContext;
+    private readonly IAdminContext _adminContext;
 
     public UpdateUserLastActiveTenantCommandHandler(
-        IUserRepository userRepository,
-        ITenantUserRepository tenantUserRepository,
-        HybridCache cache)
+        IHumanTenantPreferencePreparation preparation,
+        HybridCache cache,
+        IUserContext userContext,
+        IAdminContext adminContext)
     {
-        _userRepository = userRepository;
-        _tenantUserRepository = tenantUserRepository;
+        _preparation = preparation;
         _cache = cache;
+        _userContext = userContext;
+        _adminContext = adminContext;
     }
 
     public async Task<bool> ExecuteAsync(UpdateUserLastActiveTenantCommand request, CancellationToken cancellationToken = default)
     {
-        // 1. Verify user is actually a member of the target tenant
-        var isActive = await _tenantUserRepository.IsActiveTenantUserAsync(request.TenantId, request.UserId, cancellationToken);
-        if (!isActive)
-        {
+        if (!_userContext.IsAuthenticated || request.UserId == Guid.Empty || request.TenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) != request.UserId)
             return false;
-        }
-
-        // 2. Load user
-        var user = await _userRepository.GetById(request.UserId);
-        if (user == null)
-        {
+        if (!await _preparation.ExecuteAsync(request, cancellationToken))
             return false;
-        }
-
-        // 3. Update LastActiveTenantId
-        if (user.LastActiveTenantId == request.TenantId)
-        {
-            return true; // Already up to date
-        }
-
-        user.LastActiveTenantId = request.TenantId;
-        await _userRepository.Update(user);
-
-        // 4. Invalidate user cache
         await _cache.RemoveAsync($"user:detail:{request.UserId}", cancellationToken);
 
         return true;

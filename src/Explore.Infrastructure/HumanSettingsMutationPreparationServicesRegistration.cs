@@ -14,6 +14,7 @@ public static class HumanSettingsMutationPreparationServicesRegistration
     public static IServiceCollection AddHumanSettingsMutationPreparation(this IServiceCollection services)
     {
         services.TryAddScoped<IHumanSettingsMutationPreparation, HumanSettingsMutationPreparation>();
+        services.TryAddScoped<IHumanTenantPreferencePreparation, HumanTenantPreferencePreparation>();
         return services;
     }
 }

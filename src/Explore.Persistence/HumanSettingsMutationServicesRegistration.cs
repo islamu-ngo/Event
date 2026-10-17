@@ -19,6 +19,7 @@ internal static class HumanSettingsMutationServicesRegistration
         services.AddScoped<PolicyMutationExecutionScopeFactory>();
         services.AddScoped<IPolicyMutationExecutionScopeFactory>(provider => provider.GetRequiredService<PolicyMutationExecutionScopeFactory>());
         services.AddScoped<IHumanCommitScopePreparation>(provider => provider.GetRequiredService<PolicyMutationExecutionScopeFactory>());
+        services.AddScoped<IHumanOriginalCredentialCustody>(provider => provider.GetRequiredService<PolicyMutationExecutionScopeFactory>());
         services.AddScoped<ISerializableAttemptOwner>(provider => (EfCoreUnitOfWork)provider.GetRequiredService<IUnitOfWork>());
         services.AddScoped<HumanSettingsDataBoundary>();
         services.AddScoped<IOrdinarySettingsMutationStore, OrdinarySettingsMutationStore>();

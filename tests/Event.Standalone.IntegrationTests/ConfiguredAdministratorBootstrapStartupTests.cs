@@ -5,8 +5,8 @@ using Explore.API.Scheduling;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Domain;
-using Explore.Infrastructure.ConfigurationManifest;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Event.Standalone.Hosting;
@@ -29,11 +29,12 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     private static readonly TimeSpan SignalTimeout = TimeSpan.FromSeconds(10);
 
     [Test]
-    public async Task SplitWaitsForMigrationAndManifestThenPreparesExactlyOnceBeforeHttp()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task SplitWaitsForMigrationThenRunsManifestAndPreparationExactlyOnceBeforeHttp(bool manifestFails)
     {
         var timeline = new StartupTimeline();
         timeline.Record("migration-dependency");
-        timeline.Record("manifest-dependency");
 
         using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
         {
@@ -54,8 +55,22 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             IsOpenApiGeneration: false,
             UseQuartzScheduler: false,
             HttpsRedirectionEnabled: false,
-            OwnsDevelopmentMigrations: true);
+            OwnsDevelopmentMigrations: false,
+            OwnsConfigurationManifestStartup: true);
 
+        var manifest = app.Services.GetRequiredService<ManifestProbe>();
+        if (manifestFails)
+        {
+            var failure = new InvalidOperationException("Injected manifest startup failure.");
+            manifest.Failure = failure;
+            var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                app.RunApiHostStartupAsync(state, shutdown, () => { }));
+            await Assert.That(thrown).IsSameReferenceAs(failure);
+            await Assert.That(timeline.Events).IsEquivalentTo(
+                ["migration-dependency", "manifest"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+            await Assert.That(manifest.RunCount).IsEqualTo(1);
+            return;
+        }
         await app.RunApiHostStartupAsync(state, shutdown, () => { });
         app.MapGet("/ready", () =>
         {
@@ -73,10 +88,10 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(timeline.Events).IsEquivalentTo(
-            ["migration-dependency", "manifest-dependency", "preparation", "bootstrap-created", "setup-authority", "http-ready", "http"],
+            ["migration-dependency", "manifest", "preparation", "bootstrap-created", "setup-authority", "http-ready", "http"],
             TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(timeline.Count("preparation")).IsEqualTo(1);
-        await Assert.That(app.Services.GetRequiredService<ManifestProbe>().RunCount).IsEqualTo(0);
+        await Assert.That(app.Services.GetRequiredService<ManifestProbe>().RunCount).IsEqualTo(1);
 
         await app.StopAsync(startupTimeout.Token);
     }
@@ -287,7 +302,8 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             ["Database__Runtime__Database"] = "event_test",
             ["Database__Migrator__Database"] = "event_test",
             ["Database__Runtime__Username"] = "event_test",
-            ["Database__Runtime__Password"] = "runtime-password"
+            ["Database__Runtime__Password"] =
+                Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
         });
 
         public StartupFactory(
@@ -311,7 +327,8 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             builder.UseSetting("Database:Runtime:Database", "event_test");
             builder.UseSetting("Database:Migrator:Database", "event_test");
             builder.UseSetting("Database:Runtime:Username", "event_test");
-            builder.UseSetting("Database:Runtime:Password", "runtime-password");
+            builder.UseSetting("Database:Runtime:Password",
+                Environment.GetEnvironmentVariable("Database__Runtime__Password")!);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(BaseValues(_bootstrapValues, _includeOperatorIdentity)));
             builder.ConfigureServices(services =>
@@ -386,15 +403,19 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         }
     }
 
-    private sealed class ManifestProbe : IConfigurationManifestStartupRunner
+    private sealed class ManifestProbe(StartupTimeline timeline) : IConfigurationManifestStartupRunner
     {
         private int _runCount;
         public int RunCount => Volatile.Read(ref _runCount);
+        internal Exception? Failure { get; set; }
 
         public Task RunAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _runCount);
+            timeline.Record("manifest");
+            if (Failure is { } failure)
+                throw failure;
             return Task.CompletedTask;
         }
     }

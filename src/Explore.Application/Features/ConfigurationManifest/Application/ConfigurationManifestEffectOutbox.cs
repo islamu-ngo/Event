@@ -47,24 +47,43 @@ public static class ConfigurationManifestEffectOutbox
 
 public interface IConfigurationManifestEffectDispatcher
 {
-    Task DispatchAsync(Guid operationId, CancellationToken cancellationToken);
+    Task DispatchAsync(OutboxMessage message, CancellationToken cancellationToken);
 }
 
 public sealed class ConfigurationManifestEffectDispatcher(
     IConfigurationManifestOperationRepository operationRepository,
-    IHierarchicalSettingsResolver settingsResolver,
+    IConfigurationManifestEffectOutboxRepository outboxRepository,
+    IHierarchicalSettingsReader settingsResolver,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
     IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
     : IConfigurationManifestEffectDispatcher
 {
     public async Task DispatchAsync(
-        Guid operationId,
+        OutboxMessage message,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(message);
+        if (message.Id == Guid.Empty || message.AggregateId == Guid.Empty
+            || message.AggregateType != ConfigurationManifestEffectOutbox.AggregateType
+            || message.EventType != ConfigurationManifestEffectOutbox.EventType
+            || message.Payload is not null
+            || message.Status is not OutboxMessageStatus.Processing and not OutboxMessageStatus.DeadLettered
+            || message.NextRetryAt is null)
+            throw new InvalidOperationException("Manifest effect envelope is invalid.");
+        OutboxMessage persisted = await outboxRepository.GetByIdAsync(message.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Manifest effect message was not found.");
+        if (persisted.AggregateId != message.AggregateId
+            || persisted.AggregateType != message.AggregateType
+            || persisted.EventType != message.EventType || persisted.Payload is not null
+            || persisted.Status != message.Status || persisted.NextRetryAt != message.NextRetryAt
+            || persisted.CreatedAt != message.CreatedAt)
+            throw new InvalidOperationException("Manifest effect custody was lost.");
+        Guid operationId = persisted.AggregateId;
         ConfigurationManifestOperation operation =
             await operationRepository.GetByIdAsync(operationId, cancellationToken)
             ?? throw new InvalidOperationException("Manifest effect operation was not found.");
-        if (operation.Status != ConfigurationManifestOperationStatus.Applied)
+        if (operation.Status != ConfigurationManifestOperationStatus.Applied
+            || operation.EffectOutboxId != persisted.Id || operation.CompletedAt != persisted.CreatedAt)
         {
             throw new InvalidOperationException("Manifest effects require an applied operation.");
         }

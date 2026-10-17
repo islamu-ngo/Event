@@ -23,8 +23,8 @@ public sealed class ExportTenantConfigurationPackageQueryHandler(
                 cancellationToken)
             ?? throw new ConfigurationImportSessionException(
                 ConfigurationImportFailureCodes.ArtifactMissing);
-        ConfigurationManifestExportResult manifest = await currentState.ReadAsync(
-            request.View,
+        ConfigurationManifestExportResult manifest = await currentState.ReadTenantAsync(
+            request.TenantId, request.View,
             cancellationToken);
         ConfigurationImportParsedArtifact parsed = parser.Parse(manifest.Utf8Json);
         var selected = parsed.Manifest.Spec.Tenants

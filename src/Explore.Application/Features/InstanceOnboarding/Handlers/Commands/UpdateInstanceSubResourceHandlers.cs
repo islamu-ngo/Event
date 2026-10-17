@@ -1,75 +1,48 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Instance.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Features.Settings;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
-using Explore.Domain.Constants;
-using Explore.Domain.Enums;
-using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
-public class UpdateModuleSettingsCommandHandler : ICommandHandler<UpdateModuleSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateModuleSettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateModuleSettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IDeploymentModeProvider _deploymentModeProvider;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public UpdateModuleSettingsCommandHandler(
-        IAdminContext adminContext,
-        IInstanceGovernanceSettingService service,
-        IDeploymentModeProvider deploymentModeProvider,
-        IUnitOfWork unitOfWork)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _deploymentModeProvider = deploymentModeProvider;
-        _unitOfWork = unitOfWork;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateModuleSettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one module setting must be provided.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.EnableIslamicModule.HasValue)
-            settings.Modules.EnableIslamicModule = request.Patch.EnableIslamicModule.Value;
-        if (request.Patch.EnableTechModule.HasValue)
-            settings.Modules.EnableTechModule = request.Patch.EnableTechModule.Value;
-
-        Guid? defaultTenantId = await _deploymentModeProvider.IsSingleTenantAsync(cancellationToken)
-            ? PlatformDefaults.DefaultTenantId
-            : null;
-        await _unitOfWork.ExecuteInTransactionAsync(ct =>
-            _service.ApplyModuleSettingsPatchAsync(defaultTenantId, request.Patch, settings.Modules, request.UserId, ct), cancellationToken);
+            return GovernancePatchExecution.Invalid("At least one module setting must be provided.");
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, cancellationToken);
         return BaseCommandResponse.Success(Guid.Empty, "Module settings updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
 public class UpdateEventPolicyCommandHandler : ICommandHandler<UpdateEventPolicyCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
+    private readonly IHumanSettingsMutationPreparation _preparation;
+    private readonly ITypedSettingsOriginalStore _originalStore;
+    private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
-    public UpdateEventPolicyCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork,
-        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    public UpdateEventPolicyCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service,
+        IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore originalStore,
+        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
     {
         _adminContext = adminContext;
         _service = service;
-        _unitOfWork = unitOfWork;
+        _preparation = preparation;
+        _originalStore = originalStore;
         _notificationHandlers = notificationHandlers;
     }
 
@@ -81,21 +54,12 @@ public class UpdateEventPolicyCommandHandler : ICommandHandler<UpdateEventPolicy
         if (!request.Patch.HasChanges())
             return Invalid("At least one event policy setting must be provided.");
 
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.AllowUserSubmittedEvents.HasValue)
-            settings.EventPolicy.AllowUserSubmittedEvents = request.Patch.AllowUserSubmittedEvents.Value;
-        if (request.Patch.AllowOrganizationSubmittedEvents.HasValue)
-            settings.EventPolicy.AllowOrganizationSubmittedEvents = request.Patch.AllowOrganizationSubmittedEvents.Value;
-        if (request.Patch.AllowGroupSubmittedEvents.HasValue)
-            settings.EventPolicy.AllowGroupSubmittedEvents = request.Patch.AllowGroupSubmittedEvents.Value;
-        if (request.Patch.EventCardClickOpensDetailPage.HasValue)
-            settings.EventPolicy.EventCardClickOpensDetailPage = request.Patch.EventCardClickOpensDetailPage.Value;
-        if (request.Patch.LockTenantEventCardClickBehavior.HasValue)
-            settings.EventPolicy.LockTenantEventCardClickBehavior = request.Patch.LockTenantEventCardClickBehavior.Value;
-
-        PublicationPolicyMutationResult result = await _unitOfWork.ExecuteInTransactionAsync(
-            ct => _service.ApplyEventPolicyPatchAsync(request.Patch, settings.EventPolicy, request.UserId, ct),
-            cancellationToken);
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        PublicationPolicyMutationResult result = await _preparation.ExecutePreparedAsync(prepared,
+            (_, ct) => _service.ApplyEventPolicyPatchAsync(
+                _preparation.CurrentTypedOriginal
+                    ?? throw new UnauthorizedAccessException("The original event-policy owner is required."),
+                _originalStore, ct), cancellationToken);
         if (!result.Success)
         {
             string failureCode = string.IsNullOrWhiteSpace(result.FailureCode)
@@ -104,10 +68,7 @@ public class UpdateEventPolicyCommandHandler : ICommandHandler<UpdateEventPolicy
             string failureMessage = string.IsNullOrWhiteSpace(result.Message)
                 ? PublicationPolicyMutationMessages.InvalidPolicy
                 : result.Message;
-            return BaseCommandResponse.Failure<Guid>(
-                failureCode,
-                failureMessage,
-                [failureCode]);
+            return BaseCommandResponse.Failure<Guid>(failureCode, failureMessage, [failureCode]);
         }
 
         foreach (SettingChangedNotification notification in result.DeferredNotifications)
@@ -119,467 +80,190 @@ public class UpdateEventPolicyCommandHandler : ICommandHandler<UpdateEventPolicy
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateOrganizationPolicyCommandHandler : ICommandHandler<UpdateOrganizationPolicyCommand, BaseCommandResponse<Guid>>
+public class UpdateOrganizationPolicyCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateOrganizationPolicyCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public UpdateOrganizationPolicyCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _unitOfWork = unitOfWork;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateOrganizationPolicyCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one organization policy setting must be provided.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.RequireOrganizationVerification.HasValue)
-            settings.OrganizationPolicy.RequireOrganizationVerification = request.Patch.RequireOrganizationVerification.Value;
-        if (request.Patch.AllowTenantToOmitVerification.HasValue)
-            settings.OrganizationPolicy.AllowTenantToOmitVerification = request.Patch.AllowTenantToOmitVerification.Value;
-        if (request.Patch.AllowOrganizationSelfRegistration.HasValue)
-            settings.OrganizationPolicy.AllowOrganizationSelfRegistration = request.Patch.AllowOrganizationSelfRegistration.Value;
-        if (request.Patch.AllowGroupSelfRegistration.HasValue)
-            settings.OrganizationPolicy.AllowGroupSelfRegistration = request.Patch.AllowGroupSelfRegistration.Value;
-
-        await _unitOfWork.ExecuteInTransactionAsync(ct =>
-            _service.ApplyOrganizationPolicyPatchAsync(request.Patch, settings.OrganizationPolicy, request.UserId), cancellationToken);
+            return GovernancePatchExecution.Invalid("At least one organization policy setting must be provided.");
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, cancellationToken);
         return BaseCommandResponse.Success(Guid.Empty, "Organization policy updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateBrandingSettingsCommandHandler : ICommandHandler<UpdateBrandingSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateBrandingSettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    ISettingMutationLock mutationLock, IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateBrandingSettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IDeploymentModeProvider _deploymentModeProvider;
-    private readonly ITenantBrandingSettingsDocumentProvisioningService _tenantBrandingProvisioningService;
-    private readonly ISettingMutationLock _mutationLock;
-    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
-
-    public UpdateBrandingSettingsCommandHandler(
-        IAdminContext adminContext,
-        IInstanceGovernanceSettingService service,
-        IDeploymentModeProvider deploymentModeProvider,
-        ITenantBrandingSettingsDocumentProvisioningService tenantBrandingProvisioningService,
-        ISettingMutationLock mutationLock,
-        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _deploymentModeProvider = deploymentModeProvider;
-        _tenantBrandingProvisioningService = tenantBrandingProvisioningService;
-        _mutationLock = mutationLock;
-        _notificationHandlers = notificationHandlers;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateBrandingSettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one branding setting must be provided.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.DefaultBrandDisplayName.HasValue)
-            settings.Branding.DefaultBrandDisplayName = request.Patch.DefaultBrandDisplayName.Value ?? string.Empty;
-        if (request.Patch.DefaultBrandLogoUrl.HasValue)
-            settings.Branding.DefaultBrandLogoUrl = request.Patch.DefaultBrandLogoUrl.Value ?? string.Empty;
-        if (request.Patch.DefaultBrandFaviconUrl.HasValue)
-            settings.Branding.DefaultBrandFaviconUrl = request.Patch.DefaultBrandFaviconUrl.Value ?? string.Empty;
-        if (request.Patch.DefaultBrandCustomCssUrl.HasValue)
-            settings.Branding.DefaultBrandCustomCssUrl = request.Patch.DefaultBrandCustomCssUrl.Value ?? string.Empty;
-        if (request.Patch.LockTenantBrandDisplayName.HasValue)
-            settings.Branding.LockTenantBrandDisplayName = request.Patch.LockTenantBrandDisplayName.Value;
-        if (request.Patch.LockTenantBrandLogoUrl.HasValue)
-            settings.Branding.LockTenantBrandLogoUrl = request.Patch.LockTenantBrandLogoUrl.Value;
-        if (request.Patch.LockTenantBrandFaviconUrl.HasValue)
-            settings.Branding.LockTenantBrandFaviconUrl = request.Patch.LockTenantBrandFaviconUrl.Value;
-        if (request.Patch.LockTenantBrandCustomCssUrl.HasValue)
-            settings.Branding.LockTenantBrandCustomCssUrl = request.Patch.LockTenantBrandCustomCssUrl.Value;
-
-        IReadOnlyList<SettingChangedNotification> notifications = [];
-        await _mutationLock.ExecuteManyAsync(
-            TenantBrandingGovernanceMutationLockKeys.All,
-            async ct =>
-            {
-                notifications = await _service.ApplyBrandingSettingsPatchAsync(
-                    request.Patch,
-                    settings.Branding,
-                    request.UserId,
-                    ct);
-
-                if (request.Patch.DefaultBrandDisplayName.HasValue
-                    && await _deploymentModeProvider.IsSingleTenantAsync(ct))
-                {
-                    await _tenantBrandingProvisioningService
-                        .EnsureTenantBrandingDocumentAsync(
-                            PlatformDefaults.DefaultTenantId,
-                            settings.Branding.DefaultBrandDisplayName,
-                            ct);
-                }
-
-                return true;
-            },
-            cancellationToken);
-        foreach (SettingChangedNotification notification in notifications)
-            await _notificationHandlers.HandleAsync(notification, cancellationToken);
+            return GovernancePatchExecution.Invalid("At least one branding setting must be provided.");
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        await mutationLock.ExecuteOrderedGroupsAsync([TenantBrandingGovernanceMutationLockKeys.All], async ct =>
+        {
+            await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, ct);
+            return true;
+        }, cancellationToken);
         return BaseCommandResponse.Success(Guid.Empty, "Branding settings updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateDomainSettingsCommandHandler : ICommandHandler<UpdateDomainSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateDomainSettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateDomainSettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
-
-    public UpdateDomainSettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork,
-        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _unitOfWork = unitOfWork;
-        _notificationHandlers = notificationHandlers;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateDomainSettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one domain setting must be provided.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.InstanceBaseDomain.HasValue)
-            settings.Domains.InstanceBaseDomain = request.Patch.InstanceBaseDomain.Value ?? string.Empty;
-        if (request.Patch.AdminHost.HasValue)
-            settings.Domains.AdminHost = request.Patch.AdminHost.Value ?? string.Empty;
-        if (request.Patch.AllowTenantCustomDomains.HasValue)
-            settings.Domains.AllowTenantCustomDomains = request.Patch.AllowTenantCustomDomains.Value;
-        if (request.Patch.LockTenantSubdomain.HasValue)
-            settings.Domains.LockTenantSubdomain = request.Patch.LockTenantSubdomain.Value;
-        if (request.Patch.LockTenantCustomDomain.HasValue)
-            settings.Domains.LockTenantCustomDomain = request.Patch.LockTenantCustomDomain.Value;
-
-        IReadOnlyList<SettingChangedNotification> notifications = [];
-        await _unitOfWork.ExecuteInTransactionAsync(async ct =>
-        {
-            notifications = await _service.ApplyDomainSettingsPatchAsync(request.Patch, settings.Domains, request.UserId, ct);
-        }, cancellationToken);
-        foreach (SettingChangedNotification notification in notifications)
-            await _notificationHandlers.HandleAsync(notification, cancellationToken);
+            return GovernancePatchExecution.Invalid("At least one domain setting must be provided.");
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, cancellationToken);
         return BaseCommandResponse.Success(Guid.Empty, "Domain settings updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateTenantDelegationSettingsCommandHandler : ICommandHandler<UpdateTenantDelegationSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateTenantDelegationSettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    ISettingMutationLock mutationLock, IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateTenantDelegationSettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
-    private readonly ISettingMutationLock _mutationLock;
-
-    public UpdateTenantDelegationSettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service,
-        IUnitOfWork unitOfWork, IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
-        ISettingMutationLock mutationLock)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _unitOfWork = unitOfWork;
-        _notificationHandlers = notificationHandlers;
-        _mutationLock = mutationLock;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateTenantDelegationSettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one tenant delegation setting must be provided.");
-
-        Task<IReadOnlyList<SettingChangedNotification>> ApplyPatchAsync(CancellationToken token) =>
-            request.Patch.LockTenantSmtp.HasValue
-                ? _unitOfWork.ExecuteSerializableAsync(ApplyPatchCoreAsync, token)
-                : _unitOfWork.ExecuteInTransactionAsync(ApplyPatchCoreAsync, token);
-
-        async Task<IReadOnlyList<SettingChangedNotification>> ApplyPatchCoreAsync(CancellationToken ct)
+            return GovernancePatchExecution.Invalid("At least one tenant delegation setting must be provided.");
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        async Task<bool> ApplyAsync(CancellationToken token)
         {
-            var settings = await _service.ReadSettingsAsync();
-            if (request.Patch.AllowTenantSelfServiceRegistration.HasValue)
-                settings.TenantDelegation.AllowTenantSelfServiceRegistration = request.Patch.AllowTenantSelfServiceRegistration.Value;
-            if (request.Patch.AllowTenantWhiteLabeling.HasValue)
-                settings.TenantDelegation.AllowTenantWhiteLabeling = request.Patch.AllowTenantWhiteLabeling.Value;
-            if (request.Patch.DefaultPublicHomePage.HasValue)
-                settings.TenantDelegation.DefaultPublicHomePage = request.Patch.DefaultPublicHomePage.Value ?? string.Empty;
-            if (request.Patch.LockTenantHomePagePreference.HasValue)
-                settings.TenantDelegation.LockTenantHomePagePreference = request.Patch.LockTenantHomePagePreference.Value;
-            if (request.Patch.LockTenantSmtp.HasValue)
-                settings.TenantDelegation.LockTenantSmtp = request.Patch.LockTenantSmtp.Value;
-            if (request.Patch.LockTenantStorage.HasValue)
-                settings.TenantDelegation.LockTenantStorage = request.Patch.LockTenantStorage.Value;
-            if (request.Patch.LockTenantAnalytics.HasValue)
-                settings.TenantDelegation.LockTenantAnalytics = request.Patch.LockTenantAnalytics.Value;
-            if (request.Patch.LockTenantAiAssistant.HasValue)
-                settings.TenantDelegation.LockTenantAiAssistant = request.Patch.LockTenantAiAssistant.Value;
-
-            return await _service.ApplyTenantDelegationSettingsPatchAsync(
-                settings.DeploymentMode.Mode == DeploymentMode.MultiTenant,
-                request.Patch,
-                settings.TenantDelegation,
-                request.UserId,
-                ct);
+            await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, token);
+            return true;
         }
-
-        IReadOnlyList<SettingChangedNotification> notifications = request.Patch.LockTenantSmtp.HasValue
-            ? await _mutationLock.ExecuteOrderedGroupsAsync(
-                [EmailDeliverySettingKeys.All], ApplyPatchAsync, cancellationToken)
-            : await ApplyPatchAsync(cancellationToken);
-        foreach (SettingChangedNotification notification in notifications)
-            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+        if (request.Patch.LockTenantSmtp.HasValue)
+            await mutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All], ApplyAsync, cancellationToken);
+        else
+            await ApplyAsync(cancellationToken);
         return BaseCommandResponse.Success(Guid.Empty, "Tenant delegation settings updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateAdminPortalSettingsCommandHandler : ICommandHandler<UpdateAdminPortalSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateAdminPortalSettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateAdminPortalSettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public UpdateAdminPortalSettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _unitOfWork = unitOfWork;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateAdminPortalSettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one admin portal setting must be provided.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.Enabled.HasValue)
-            settings.AdminPortal.Enabled = request.Patch.Enabled.Value;
-        if (request.Patch.PublicUrl.HasValue)
-            settings.AdminPortal.PublicUrl = request.Patch.PublicUrl.Value ?? string.Empty;
-        if (request.Patch.AllowTenantAdminAccess.HasValue)
-            settings.AdminPortal.AllowTenantAdminAccess = request.Patch.AllowTenantAdminAccess.Value;
-
-        await _unitOfWork.ExecuteInTransactionAsync(ct =>
-            _service.ApplyAdminPortalSettingsPatchAsync(request.Patch, settings.AdminPortal, request.UserId), cancellationToken);
+            return GovernancePatchExecution.Invalid("At least one admin portal setting must be provided.");
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, cancellationToken);
         return BaseCommandResponse.Success(Guid.Empty, "Admin portal settings updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateMcpGovernanceSettingsCommandHandler : ICommandHandler<UpdateMcpGovernanceSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateMcpGovernanceSettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateMcpGovernanceSettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
-
-    public UpdateMcpGovernanceSettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork,
-        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _unitOfWork = unitOfWork;
-        _notificationHandlers = notificationHandlers;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateMcpGovernanceSettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one MCP governance setting must be provided.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.Enabled.HasValue)
-            settings.Mcp.Enabled = request.Patch.Enabled.Value;
-        if (request.Patch.EnableLegacySse.HasValue)
-            settings.Mcp.EnableLegacySse = request.Patch.EnableLegacySse.Value;
-        if (request.Patch.LockTenantMcp.HasValue)
-            settings.Mcp.LockTenantMcp = request.Patch.LockTenantMcp.Value;
-        if (request.Patch.LockTenantMcpLegacySse.HasValue)
-            settings.Mcp.LockTenantMcpLegacySse = request.Patch.LockTenantMcpLegacySse.Value;
-
-        IReadOnlyList<SettingChangedNotification> notifications = [];
-        await _unitOfWork.ExecuteInTransactionAsync(async ct =>
-        {
-            notifications = await _service.ApplyMcpGovernanceSettingsPatchAsync(request.Patch, settings.Mcp, request.UserId, ct);
-        }, cancellationToken);
-        foreach (SettingChangedNotification notification in notifications)
-            await _notificationHandlers.HandleAsync(notification, cancellationToken);
+            return GovernancePatchExecution.Invalid("At least one MCP governance setting must be provided.");
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, cancellationToken);
         return BaseCommandResponse.Success(Guid.Empty, "MCP governance settings updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateAiAssistantGovernanceSettingsCommandHandler : ICommandHandler<UpdateAiAssistantGovernanceSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateAiAssistantGovernanceSettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateAiAssistantGovernanceSettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
-
-    public UpdateAiAssistantGovernanceSettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork,
-        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _unitOfWork = unitOfWork;
-        _notificationHandlers = notificationHandlers;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateAiAssistantGovernanceSettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one AI Assistant governance setting must be provided.");
+            return GovernancePatchExecution.Invalid("At least one AI Assistant governance setting must be provided.");
         if (request.Patch.ProviderConfiguration is { HasValue: true, Value: null })
-            return Invalid("AI provider configuration must be complete.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.Enabled.HasValue)
-            settings.AiAssistant.Enabled = request.Patch.Enabled.Value;
-        if (request.Patch.ProviderConfiguration.HasValue)
+            return GovernancePatchExecution.Invalid("AI provider configuration must be complete.");
+        try
         {
-            var provider = request.Patch.ProviderConfiguration.Value!;
-            settings.AiAssistant.Provider = provider.Provider;
-            settings.AiAssistant.EndpointUrl = provider.EndpointUrl;
-            settings.AiAssistant.CredentialScope = provider.CredentialScope;
-            settings.AiAssistant.ModelId = provider.ModelId;
-            settings.AiAssistant.AllowedModelIds = provider.AllowedModelIds;
+            var prepared = await preparation.PrepareAsync(request, cancellationToken);
+            await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, cancellationToken);
         }
-        if (request.Patch.AllowAnonymousAccess.HasValue)
-            settings.AiAssistant.AllowAnonymousAccess = request.Patch.AllowAnonymousAccess.Value;
-        if (request.Patch.ToolProposalsEnabled.HasValue)
-            settings.AiAssistant.ToolProposalsEnabled = request.Patch.ToolProposalsEnabled.Value;
-        if (request.Patch.LockTenantAiAssistant.HasValue)
-            settings.AiAssistant.LockTenantAiAssistant = request.Patch.LockTenantAiAssistant.Value;
-
-        IReadOnlyList<SettingChangedNotification> notifications = [];
-        await _unitOfWork.ExecuteInTransactionAsync(async ct =>
+        catch (Explore.Application.Exceptions.ValidationException exception)
         {
-            notifications = await _service.ApplyAiAssistantGovernanceSettingsPatchAsync(request.Patch, settings.AiAssistant, request.UserId, ct);
-        }, cancellationToken);
-        foreach (SettingChangedNotification notification in notifications)
-            await _notificationHandlers.HandleAsync(notification, cancellationToken);
+            return BaseCommandResponse.Validation<Guid>(exception.Errors, "AI provider configuration is invalid.");
+        }
         return BaseCommandResponse.Success(Guid.Empty, "AI Assistant governance settings updated successfully.");
     }
-
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
-        BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateRenderPolicySettingsCommandHandler : ICommandHandler<UpdateRenderPolicySettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateRenderPolicySettingsCommandHandler(
+    IAdminContext adminContext, IHumanSettingsMutationPreparation preparation, ITypedSettingsOriginalStore store,
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateRenderPolicySettingsCommand, BaseCommandResponse<Guid>>
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IInstanceGovernanceSettingService _service;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public UpdateRenderPolicySettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork)
-    {
-        _adminContext = adminContext;
-        _service = service;
-        _unitOfWork = unitOfWork;
-    }
-
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRenderPolicySettingsCommand request, CancellationToken cancellationToken)
     {
-        if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
-            return BaseCommandResponse.Authorization<Guid>(
-                "Only instance administrators can update instance governance settings.");
+        if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
+            return GovernancePatchExecution.Denied();
         if (!request.Patch.HasChanges())
-            return Invalid("At least one render policy setting must be provided.");
-
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.RenderPolicyPreset.HasValue)
-            settings.RenderPolicy.RenderPolicyPreset = request.Patch.RenderPolicyPreset.Value ?? string.Empty;
-        if (request.Patch.EnableAdvancedRenderPolicyOverrides.HasValue)
-            settings.RenderPolicy.EnableAdvancedRenderPolicyOverrides = request.Patch.EnableAdvancedRenderPolicyOverrides.Value;
-        if (request.Patch.GlobalRenderMode.HasValue)
-            settings.RenderPolicy.GlobalRenderMode = request.Patch.GlobalRenderMode.Value ?? string.Empty;
-        if (request.Patch.GlobalPrerenderEnabled.HasValue)
-            settings.RenderPolicy.GlobalPrerenderEnabled = request.Patch.GlobalPrerenderEnabled.Value;
-        if (request.Patch.PublicSeoRenderMode.HasValue)
-            settings.RenderPolicy.PublicSeoRenderMode = request.Patch.PublicSeoRenderMode.Value ?? string.Empty;
-        if (request.Patch.PublicSeoPrerenderEnabled.HasValue)
-            settings.RenderPolicy.PublicSeoPrerenderEnabled = request.Patch.PublicSeoPrerenderEnabled.Value;
-        if (request.Patch.OperationalRenderMode.HasValue)
-            settings.RenderPolicy.OperationalRenderMode = request.Patch.OperationalRenderMode.Value ?? string.Empty;
-        if (request.Patch.OperationalPrerenderEnabled.HasValue)
-            settings.RenderPolicy.OperationalPrerenderEnabled = request.Patch.OperationalPrerenderEnabled.Value;
-        if (request.Patch.AdminRenderMode.HasValue)
-            settings.RenderPolicy.AdminRenderMode = request.Patch.AdminRenderMode.Value ?? string.Empty;
-        if (request.Patch.AdminPrerenderEnabled.HasValue)
-            settings.RenderPolicy.AdminPrerenderEnabled = request.Patch.AdminPrerenderEnabled.Value;
-        if (request.Patch.OnboardingRenderMode.HasValue)
-            settings.RenderPolicy.OnboardingRenderMode = request.Patch.OnboardingRenderMode.Value ?? string.Empty;
-        if (request.Patch.OnboardingPrerenderEnabled.HasValue)
-            settings.RenderPolicy.OnboardingPrerenderEnabled = request.Patch.OnboardingPrerenderEnabled.Value;
-        if (request.Patch.AllowTenantRenderPolicyOverride.HasValue)
-            settings.RenderPolicy.AllowTenantRenderPolicyOverride = request.Patch.AllowTenantRenderPolicyOverride.Value;
-        if (request.Patch.LockTenantPublicSeoRenderPolicy.HasValue)
-            settings.RenderPolicy.LockTenantPublicSeoRenderPolicy = request.Patch.LockTenantPublicSeoRenderPolicy.Value;
-        if (request.Patch.LockTenantOperationalRenderPolicy.HasValue)
-            settings.RenderPolicy.LockTenantOperationalRenderPolicy = request.Patch.LockTenantOperationalRenderPolicy.Value;
-        if (request.Patch.LockTenantAdminRenderPolicy.HasValue)
-            settings.RenderPolicy.LockTenantAdminRenderPolicy = request.Patch.LockTenantAdminRenderPolicy.Value;
-
-        var validator = new RenderPolicySettingsDtoValidator();
-        var validation = await validator.ValidateAsync(settings.RenderPolicy, cancellationToken);
-        if (!validation.IsValid)
+            return GovernancePatchExecution.Invalid("At least one render policy setting must be provided.");
+        try
         {
-            return BaseCommandResponse.Validation<Guid>(
-                validation.Errors.Select(e => e.ErrorMessage),
-                "Invalid render policy settings.");
+            var prepared = await preparation.PrepareAsync(request, cancellationToken);
+            await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, cancellationToken);
         }
-
-        await _unitOfWork.ExecuteInTransactionAsync(ct =>
-            _service.ApplyRenderPolicySettingsPatchAsync(request.Patch, settings.RenderPolicy, request.UserId), cancellationToken);
+        catch (Explore.Application.Exceptions.ValidationException exception)
+        {
+            return BaseCommandResponse.Validation<Guid>(exception.Errors, "Invalid render policy settings.");
+        }
         return BaseCommandResponse.Success(Guid.Empty, "Render policy settings updated successfully.");
     }
+}
 
-    private static BaseCommandResponse<Guid> Invalid(string message) =>
+internal static class GovernancePatchExecution
+{
+    internal static BaseCommandResponse<Guid> Denied() => BaseCommandResponse.Authorization<Guid>(
+        "Only instance administrators can update instance governance settings.");
+    internal static BaseCommandResponse<Guid> Invalid(string message) =>
         BaseCommandResponse.Validation<Guid>([message], message);
+
+    internal static async Task ApplyAsync(IHumanSettingsMutationPreparation preparation,
+        ITypedSettingsOriginalStore store, IPreparedHumanSettingsMutation prepared,
+        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers, CancellationToken token)
+    {
+        TypedSettingsOriginal? original = null;
+        var notifications = await preparation.ExecutePreparedAsync(prepared, (_, ct) =>
+        {
+            original = preparation.CurrentTypedOriginal
+                ?? throw new UnauthorizedAccessException("The acquired original governance owner is required.");
+            return store.ApplyGovernanceAsync(original, ct);
+        }, token);
+        store.InvalidateGovernanceAfterCommit(original!);
+        foreach (var notification in notifications)
+            await notificationHandlers.HandleAsync(notification, CancellationToken.None);
+    }
 }

@@ -68,7 +68,7 @@ public sealed class SetupSecretDurableRevocationTests
         using var response = await client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Gone);
-        await configurationService.DidNotReceiveWithAnyArgs().ApplyConfigurationAsync(default!);
+        await configurationService.DidNotReceiveWithAnyArgs().ApplySetupConfigurationAsync(default!);
     }
 
     private static PatchAuthProviderConfigurationDto CreateValidPatch() => new()
@@ -107,7 +107,7 @@ public sealed class SetupSecretDurableRevocationTests
                 Guid.Parse("01991e80-8c00-7000-8000-000000000001"),
                 DeploymentMode.SingleTenant,
                 PendingAt);
-            var repository = Substitute.For<IInstanceBootstrapStateRepository>();
+            var repository = Substitute.For<IInstanceBootstrapStateReader>();
             repository.GetCurrent(Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult<InstanceBootstrapState?>(sharedState));
             IServiceScopeFactory scopeFactory = CreateScopeFactory(repository);
@@ -142,10 +142,10 @@ public sealed class SetupSecretDurableRevocationTests
 
         public void Dispose() => _completingReplica.Dispose();
 
-        private static IServiceScopeFactory CreateScopeFactory(IInstanceBootstrapStateRepository repository)
+        private static IServiceScopeFactory CreateScopeFactory(IInstanceBootstrapStateReader repository)
         {
             var scope = Substitute.For<IServiceScope>();
-            scope.ServiceProvider.GetService(typeof(IInstanceBootstrapStateRepository)).Returns(repository);
+            scope.ServiceProvider.GetService(typeof(IInstanceBootstrapStateReader)).Returns(repository);
             var scopeFactory = Substitute.For<IServiceScopeFactory>();
             scopeFactory.CreateScope().Returns(scope);
             return scopeFactory;

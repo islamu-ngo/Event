@@ -5,4 +5,5 @@ namespace Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 
 public sealed record TestInstanceStorageProviderQuery : IQuery<InstanceStorageProviderStatusDto>
 {
+    public required Guid UserId { get; init; }
 }

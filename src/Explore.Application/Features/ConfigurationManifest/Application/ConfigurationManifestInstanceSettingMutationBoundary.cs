@@ -1,10 +1,15 @@
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Collections.Immutable;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
+using Explore.Domain;
+using Explore.Domain.Settings;
 
 public sealed record ConfigurationManifestInstanceSettingMutation(
     string Key,
@@ -30,7 +35,7 @@ public interface IConfigurationManifestInstanceSettingMutationBoundary
 }
 
 public sealed class ConfigurationManifestInstanceSettingMutationBoundary(
-    SettingUpsertService scalarSettings,
+    ISystemSettingRepository scalarSettings,
     IPublicationPolicyMutationBoundary publicationPolicy)
     : IConfigurationManifestInstanceSettingMutationBoundary
 {
@@ -118,21 +123,37 @@ public sealed class ConfigurationManifestInstanceSettingMutationBoundary(
         foreach (ConfigurationManifestInstanceSettingMutation mutation
                  in ordinary.OrderBy(item => item.Key, StringComparer.Ordinal))
         {
-            InstanceSettingMutationResult result =
-                await scalarSettings.UpsertInstanceValueInCurrentTransactionAsync(
-                    new InstanceSettingMutationInput(
-                        mutation.Key,
-                        mutation.SerializedValue,
-                        input.ActorUserId,
-                        input.OccurredAtUtc),
-                    cancellationToken);
-            notifications.Add(result.Notification);
+            SettingDefinition definition = SettingRegistry.Get(mutation.Key)
+                ?? throw new InvalidOperationException("The manifest setting has no registered definition.");
+            if (definition.IsSensitive || definition.MinScope > SettingScope.Instance
+                || definition.MaxScope < SettingScope.Instance)
+                throw new InvalidOperationException("The setting is not eligible for instance mutation.");
+            EventResourceSettingMutationGuard.RejectGenericMutation(mutation.Key);
+            EventResourceProviderBindingDocument.RejectGenericMutation(mutation.Key);
+            Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(mutation.Key);
+            if (InstanceOperatorIdentitySettingKeys.Contains(mutation.Key))
+                throw new InvalidOperationException("Operator identity requires its dedicated mutation boundary.");
+            string? previous = await scalarSettings.UpsertInCurrentTransactionAsync(new SystemSetting
+            {
+                SettingKey = mutation.Key,
+                Value = mutation.SerializedValue,
+                ValueType = definition.ValueType,
+                IsLocked = false,
+                Description = definition.Description,
+                Category = definition.Category,
+                CreatedAt = input.OccurredAtUtc,
+                CreatedBy = input.ActorUserId,
+                UpdatedAt = input.OccurredAtUtc,
+                UpdatedBy = input.ActorUserId
+            }, cancellationToken);
+            notifications.Add(new SettingChangedNotification(mutation.Key, previous, mutation.SerializedValue,
+                SettingSource.SystemDefault, null, input.ActorUserId, input.OccurredAtUtc));
         }
 
         return new ConfigurationManifestInstanceSettingMutationResult(
             Success: true,
             FailureCode: null,
             SuccessMessage,
-            notifications.MoveToImmutable());
+            notifications.ToImmutable());
     }
 }

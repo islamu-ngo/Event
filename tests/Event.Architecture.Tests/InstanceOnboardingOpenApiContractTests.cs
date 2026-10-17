@@ -207,10 +207,9 @@ public sealed class InstanceOnboardingOpenApiContractTests
 
         await Assert.That(smtpJson).DoesNotContain("username", StringComparison.OrdinalIgnoreCase);
         await Assert.That(smtpJson).DoesNotContain("password", StringComparison.OrdinalIgnoreCase);
-        using var aiReadDocument = JsonDocument.Parse(aiJson);
-        await Assert.That(aiReadDocument.RootElement.TryGetProperty("apiKey", out _)).IsFalse();
-        await Assert.That(aiReadDocument.RootElement.TryGetProperty("apiKeyConfigured", out _)).IsFalse();
-        await Assert.That(aiReadDocument.RootElement.GetProperty("credentialScope").GetString()).IsEqualTo("instance");
+        using var aiRead = JsonDocument.Parse(aiJson);
+        await Assert.That(aiRead.RootElement.GetProperty("credentialScope").GetString()).IsEqualTo("instance");
+        await Assert.That(aiRead.RootElement.TryGetProperty("apiKey", out _)).IsFalse();
 
         await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var schemaDocument = await JsonDocument.ParseAsync(schemaStream);

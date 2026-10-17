@@ -1,7 +1,10 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
+using Explore.Persistence.Database.ProviderPrimitives;
 
 namespace Explore.Persistence.Repositories;
 
@@ -57,7 +60,9 @@ public sealed class ConfigurationManifestOperationRepository(ExploreDbContext db
     public Task<ConfigurationManifestOperation?>
         GetLatestAppliedBootstrapAsync(
             CancellationToken cancellationToken) =>
-        dbContext.ConfigurationManifestOperations
+        ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native
+            ? native.ReadLatestAppliedBootstrapAsync(cancellationToken)
+            : dbContext.ConfigurationManifestOperations
             .AsNoTracking()
             .Where(operation =>
                 operation.Status
@@ -75,12 +80,23 @@ public sealed class ConfigurationManifestOperationRepository(ExploreDbContext db
             CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(operationId, Guid.Empty);
-        return await dbContext.ConfigurationManifestTenantResults
+        if (ConfigurationRepositoryNativeOperations.ForManifestReplay(dbContext) is { } native)
+            return await native.ReadManifestResultsAsync(operationId, cancellationToken);
+        if (!await dbContext.ConfigurationManifestOperations.AsNoTracking().AnyAsync(
+                operation => operation.Id == operationId
+                    && operation.Status == ConfigurationManifestOperationStatus.Applied
+                    && operation.Mode == ConfigurationManifestAuditMode.Bootstrap, cancellationToken))
+            return [];
+        List<ConfigurationManifestTenantResult> results = await dbContext.ConfigurationManifestTenantResults
             .IgnoreTenantFilter(TenantFilterBypassReasons.ConfigurationManifestOperationReplay)
             .AsNoTracking()
             .Where(result => result.OperationId == operationId)
             .OrderBy(result => result.TenantId)
+            .Take(ConfigurationManifestValidator.MaximumTenantCount + 1)
             .ToListAsync(cancellationToken);
+        if (results.Count > ConfigurationManifestValidator.MaximumTenantCount)
+            throw new InvalidOperationException("Manifest replay result bound was exceeded.");
+        return results;
     }
 
     public Task<ConfigurationManifestTenantResult?> GetCurrentTenantResultAsync(

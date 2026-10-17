@@ -1,15 +1,12 @@
-using System.Collections.Immutable;
+using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.Management;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
-using Explore.Application.Features.ConfigurationManifest.Compilation;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Explore.Application.Features.Tenants;
 using Explore.Application.Features.Tenants.Handlers.Commands.CreateTenant;
@@ -24,10 +21,15 @@ using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
@@ -43,22 +45,10 @@ public sealed class ConfigurationManifestConcurrencyTests(
         await using ExploreDbContext firstContext = fixture.CreateDbContext();
         await using ExploreDbContext secondContext = fixture.CreateDbContext();
         var initialGate = new InitialPreflightGate(participantCount: 2);
-        var failureRecorder =
-            Substitute.For<IConfigurationManifestFailureRecorder>();
-        var firstHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-            firstContext,
-            new GatedExistencePreflight(
-                new TenantRepository(firstContext),
-                initialGate),
-            new ConfigurationManifestOperationRepository(firstContext),
-            failureRecorder);
-        var secondHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-            secondContext,
-            new GatedExistencePreflight(
-                new TenantRepository(secondContext),
-                initialGate),
-            new ConfigurationManifestOperationRepository(secondContext),
-            failureRecorder);
+        await using var firstHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        await using var secondHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        firstHandler.BeforeLock = secondHandler.BeforeLock = (key, _, token) =>
+            key == ConfigurationManifestLockKeys.InstanceManifest ? initialGate.SignalAndWaitAsync(token) : Task.CompletedTask;
         var source = ConfigurationManifestApplicationTestSupport.Source("collision");
 
         var results = await Task.WhenAll(
@@ -70,8 +60,6 @@ public sealed class ConfigurationManifestConcurrencyTests(
                 CancellationToken.None));
 
         await Assert.That(results.All(result => result.IsSuccess)).IsTrue();
-        await failureRecorder.DidNotReceiveWithAnyArgs()
-            .RecordAsync(default!, default);
         await using ExploreDbContext verification = fixture.CreateDbContext();
         ConfigurationManifestOperation[] operations =
             await verification.ConfigurationManifestOperations
@@ -86,6 +74,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
         await Assert.That(await verification.Tenants.CountAsync(tenant =>
             tenant.Slug == "collision")).IsEqualTo(1);
         await Assert.That(operations.Length).IsEqualTo(2);
+        await Assert.That(operations.All(operation => operation.Status == ConfigurationManifestOperationStatus.Applied)).IsTrue();
         await Assert.That(operations.Count(operation =>
             operation.CreatedTenantCount == 1)).IsEqualTo(1);
         await Assert.That(operations.Count(operation =>
@@ -109,25 +98,6 @@ public sealed class ConfigurationManifestConcurrencyTests(
             TaskCreationOptions.RunContinuationsAsynchronously);
         await using ExploreDbContext manifestContext = fixture.CreateDbContext();
         bool transactionWasActiveAtLaterAttempt = true;
-        var manifestUnitOfWork = new EfCoreUnitOfWork(manifestContext);
-        var manifestMutationLock = new RelationalSettingMutationLock(
-            manifestContext,
-            manifestUnitOfWork,
-            async (normalizedKey, cancellationToken) =>
-            {
-                if (!string.Equals(
-                        normalizedKey,
-                        slugLockKey,
-                        StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                transactionWasActiveAtLaterAttempt =
-                    manifestContext.Database.CurrentTransaction is not null;
-                laterLockAttempted.TrySetResult();
-                await releaseLaterLockAttempt.Task.WaitAsync(cancellationToken);
-            });
         await using ExploreDbContext writerContext = fixture.CreateDbContext();
         var writerLockAcquired = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -145,7 +115,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
                         $"explore:setting-mutation:{slugLockKey}",
                         CancellationToken.None);
                 writerLockAcquired.TrySetResult();
-                await laterLockAttempted.Task;
+                await laterLockAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30));
                 writerContext.Tenants.Add(new Tenant
                 {
                     Id = committedTenantId,
@@ -159,17 +129,23 @@ public sealed class ConfigurationManifestConcurrencyTests(
                 await writerTransaction.CommitAsync();
             });
         await writerLockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        var preflight = new CapturingFreshPreflight(
-            new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                new TenantRepository(manifestContext)));
-        var failureRecorder =
-            Substitute.For<IConfigurationManifestFailureRecorder>();
-        var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-            manifestContext,
-            preflight,
-            new ConfigurationManifestOperationRepository(manifestContext),
-            failureRecorder,
-            mutationLock: manifestMutationLock);
+        var observed = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        handler.BeforeLock = async (key, actualOwner, cancellationToken) =>
+        {
+            if (key != slugLockKey) return;
+            transactionWasActiveAtLaterAttempt = actualOwner.Database.CurrentTransaction is not null;
+            laterLockAttempted.TrySetResult();
+            await releaseLaterLockAttempt.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        };
+        handler.AfterObservation = async (actualOwner, _, token) =>
+        {
+            await Assert.That(actualOwner.Database.CurrentTransaction!.GetDbTransaction().IsolationLevel)
+                .IsEqualTo(System.Data.IsolationLevel.Serializable);
+            await using var independent = fixture.CreateDbContext();
+            observed.TrySetResult(await independent.Tenants.Where(tenant => tenant.Slug == slug)
+                .Select(tenant => tenant.Id).SingleAsync(token));
+        };
 
         Task<Explore.Application.Responses.BaseCommandResponse<Guid>> manifestTask =
             handler.ExecuteAsync(
@@ -187,20 +163,13 @@ public sealed class ConfigurationManifestConcurrencyTests(
             releaseLaterLockAttempt.TrySetResult();
         }
 
-        ConfigurationManifestPreflightResult fresh =
-            await preflight.FreshEvaluation.Task.WaitAsync(
-                TimeSpan.FromSeconds(30));
+        Guid observedTenant = await observed.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Explore.Application.Responses.BaseCommandResponse<Guid> result =
             await manifestTask.WaitAsync(TimeSpan.FromSeconds(30));
 
-        ConfigurationManifestPreflightTenant tenant = fresh.Tenants.Single();
         await Assert.That(transactionWasActiveAtLaterAttempt).IsFalse();
-        await Assert.That(tenant.Disposition)
-            .IsEqualTo(ConfigurationManifestTenantDisposition.SkippedExisting);
-        await Assert.That(tenant.TenantId).IsEqualTo(committedTenantId);
+        await Assert.That(observedTenant).IsEqualTo(committedTenantId);
         await Assert.That(result.IsSuccess).IsTrue();
-        await failureRecorder.DidNotReceiveWithAnyArgs()
-            .RecordAsync(default!, default);
         await using ExploreDbContext verification = fixture.CreateDbContext();
         ConfigurationManifestOperation operation = await verification
             .ConfigurationManifestOperations
@@ -208,6 +177,8 @@ public sealed class ConfigurationManifestConcurrencyTests(
             .SingleAsync();
         await Assert.That(operation.CreatedTenantCount).IsEqualTo(0);
         await Assert.That(operation.SkippedExistingTenantCount).IsEqualTo(1);
+        await Assert.That((await verification.ConfigurationManifestTenantResults.IgnoreQueryFilters().SingleAsync()).Status)
+            .IsEqualTo(ConfigurationManifestTenantResultStatus.SkippedExisting);
     }
 
     [Test]
@@ -223,32 +194,54 @@ public sealed class ConfigurationManifestConcurrencyTests(
         }
 
         await using ExploreDbContext apply = fixture.CreateDbContext();
-        var failureRecorder =
-            Substitute.For<IConfigurationManifestFailureRecorder>();
-        var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-            apply,
-            new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                new TenantRepository(apply),
-                new PaidEventPolicyRepository(apply),
-                forcedExpectedPaidPolicyVersion: 2),
-            new ConfigurationManifestOperationRepository(apply),
-            failureRecorder);
-
-        var result = await handler.ExecuteAsync(
-            new ApplyConfigurationManifestCommand(
-                ConfigurationManifestApplicationTestSupport.PaidPolicySource(
-                    new string('d', ConfigurationManifestOperation.DigestLength),
-                    "paid-drift")),
-            CancellationToken.None);
+        var sql = apply.GetService<ISqlGenerationHelper>();
+        var tenantType = apply.Model.FindEntityType(typeof(Tenant))!;
+        var policyType = apply.Model.FindEntityType(typeof(PaidEventPolicyVersion))!;
+        var tenantStore = StoreObjectIdentifier.Table(tenantType.GetTableName()!, tenantType.GetSchema());
+        var policyStore = StoreObjectIdentifier.Table(policyType.GetTableName()!, policyType.GetSchema());
+        string tenants = sql.DelimitIdentifier(tenantStore.Name, tenantStore.Schema ?? "public");
+        string policies = sql.DelimitIdentifier(policyStore.Name, policyStore.Schema ?? "public");
+        string slugColumn = sql.DelimitIdentifier(tenantType.FindProperty(nameof(Tenant.Slug))!.GetColumnName(tenantStore)!);
+        string versionColumn = sql.DelimitIdentifier(policyType.FindProperty(nameof(PaidEventPolicyVersion.VersionNumber))!.GetColumnName(policyStore)!);
+        string activeColumn = sql.DelimitIdentifier(policyType.FindProperty(nameof(PaidEventPolicyVersion.IsActive))!.GetColumnName(policyStore)!);
+        string tenantColumn = sql.DelimitIdentifier(policyType.FindProperty(nameof(PaidEventPolicyVersion.TenantId))!.GetColumnName(policyStore)!);
+        string function = sql.DelimitIdentifier("test_manifest_policy_drift", tenantStore.Schema ?? "public");
+        await apply.Database.ExecuteSqlRawAsync($"""
+            CREATE FUNCTION {function}() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $body$
+            BEGIN
+                IF NEW.{slugColumn} = 'paid-drift' THEN
+                    UPDATE {policies} SET {versionColumn} = {versionColumn} + 1
+                    WHERE {tenantColumn} IS NULL AND {activeColumn};
+                END IF;
+                RETURN NEW;
+            END;
+            $body$;
+            CREATE TRIGGER test_manifest_policy_drift AFTER INSERT ON {tenants}
+            FOR EACH ROW EXECUTE FUNCTION {function}();
+            """);
+        await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        Explore.Application.Responses.BaseCommandResponse<Guid> result;
+        try
+        {
+            result = await handler.ExecuteAsync(
+                new ApplyConfigurationManifestCommand(
+                    ConfigurationManifestApplicationTestSupport.PaidPolicySource(
+                        new string('d', ConfigurationManifestOperation.DigestLength),
+                        "paid-drift")),
+                CancellationToken.None);
+        }
+        finally
+        {
+            await apply.Database.ExecuteSqlRawAsync(
+                $"DROP TRIGGER test_manifest_policy_drift ON {tenants}; DROP FUNCTION {function}();");
+        }
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.FailureCode)
             .IsEqualTo(ConfigurationManifestApplicationFailureCodes.WriteConflict);
-        await failureRecorder.Received(1).RecordAsync(
-            Arg.Is<ConfigurationManifestOperation>(operation =>
-                operation.Status == ConfigurationManifestOperationStatus.Failed),
-            Arg.Any<CancellationToken>());
         await using ExploreDbContext verification = fixture.CreateDbContext();
+        await Assert.That((await verification.ConfigurationManifestOperations.SingleAsync()).Status)
+            .IsEqualTo(ConfigurationManifestOperationStatus.Failed);
         await Assert.That(await verification.Tenants
             .IgnoreQueryFilters()
             .CountAsync(tenant => tenant.Slug == "paid-drift")).IsEqualTo(0);
@@ -284,17 +277,9 @@ public sealed class ConfigurationManifestConcurrencyTests(
         await using ExploreDbContext manifestContext = fixture.CreateDbContext();
         await using ExploreDbContext policyContext = fixture.CreateDbContext();
         var initialGate = new InitialPreflightGate(participantCount: 2);
-        var failureRecorder =
-            Substitute.For<IConfigurationManifestFailureRecorder>();
-        var manifestHandler =
-            ConfigurationManifestApplicationTestSupport.CreateHandler(
-                manifestContext,
-                new GatedExistencePreflight(
-                    new TenantRepository(manifestContext),
-                    initialGate,
-                    new PaidEventPolicyRepository(manifestContext)),
-                new ConfigurationManifestOperationRepository(manifestContext),
-                failureRecorder);
+        await using var manifestHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        manifestHandler.BeforeLock = (key, _, token) =>
+            key == ConfigurationManifestLockKeys.InstanceManifest ? initialGate.SignalAndWaitAsync(token) : Task.CompletedTask;
         var policyUnitOfWork = new EfCoreUnitOfWork(policyContext);
         var policyBoundary = new PaidEventPolicyMutationBoundary(
             new PaidEventPolicyRepository(policyContext),
@@ -370,21 +355,12 @@ public sealed class ConfigurationManifestConcurrencyTests(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseTenantCreation = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var pausingTenantCreation = new PausingTenantCreationService(
-            new TenantCreationService(
-                new TenantRepository(manifestContext),
-                new TenantSettingsDocumentRepository(manifestContext)),
-            tenantCreationEntered,
-            releaseTenantCreation);
-        var failureRecorder =
-            Substitute.For<IConfigurationManifestFailureRecorder>();
-        var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-            manifestContext,
-            new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                new TenantRepository(manifestContext)),
-            new ConfigurationManifestOperationRepository(manifestContext),
-            failureRecorder,
-            tenantCreationService: pausingTenantCreation);
+        await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        handler.AfterObservation = async (_, _, token) =>
+        {
+            tenantCreationEntered.TrySetResult();
+            await releaseTenantCreation.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+        };
 
         Task<Explore.Application.Responses.BaseCommandResponse<Guid>> manifestTask =
             handler.ExecuteAsync(
@@ -394,6 +370,13 @@ public sealed class ConfigurationManifestConcurrencyTests(
                 CancellationToken.None);
         await tenantCreationEntered.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
+        await using (ExploreDbContext competitor = fixture.CreateDbContext())
+        {
+            await Assert.That(await ConfigurationManifestCompetingWriterRedTests.TryAcquireCompetingLockAsync(
+                competitor, PublicExperienceSettingDefinitions.EventCatalogLabel.Key)).IsFalse();
+            foreach (string key in TenantBrandingGovernanceMutationLockKeys.All)
+                await Assert.That(await ConfigurationManifestCompetingWriterRedTests.TryAcquireCompetingLockAsync(competitor, key)).IsFalse();
+        }
         var settingAttempted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var settingEntered = new TaskCompletionSource(
@@ -435,8 +418,9 @@ public sealed class ConfigurationManifestConcurrencyTests(
         await Assert.That((await manifestTask).IsSuccess).IsTrue();
         await Assert.That(await settingTask).IsTrue();
         await Assert.That(await brandingTask).IsTrue();
-        await failureRecorder.DidNotReceiveWithAnyArgs()
-            .RecordAsync(default!, default);
+        await using var receipt = fixture.CreateDbContext();
+        await Assert.That((await receipt.ConfigurationManifestOperations.SingleAsync()).Status)
+            .IsEqualTo(ConfigurationManifestOperationStatus.Applied);
     }
 
     [Test]
@@ -444,48 +428,30 @@ public sealed class ConfigurationManifestConcurrencyTests(
     {
         await fixture.ResetAsync();
         await using ExploreDbContext manifestContext = fixture.CreateDbContext();
-        await using ExploreDbContext ordinaryContext = fixture.CreateDbContext();
         var initialGate = new InitialPreflightGate(participantCount: 2);
-        var manifestHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-            manifestContext,
-            new GatedExistencePreflight(
-                new TenantRepository(manifestContext),
-                initialGate),
-            new ConfigurationManifestOperationRepository(manifestContext),
-            Substitute.For<IConfigurationManifestFailureRecorder>());
-        var realOrdinaryRepository = new TenantRepository(ordinaryContext);
-        var ordinaryRepository = Substitute.For<ITenantRepository>();
-        int slugLookupCount = 0;
-        ordinaryRepository.GetTenantBySlug(Arg.Any<string>())
-            .Returns(async call =>
-            {
-                Tenant? tenant = await realOrdinaryRepository.GetTenantBySlug(call.Arg<string>());
-                if (Interlocked.Increment(ref slugLookupCount) == 1)
-                {
-                    await initialGate.SignalAndWaitAsync(CancellationToken.None);
-                }
-
-                return tenant;
-            });
-        ordinaryRepository.Create(Arg.Any<Tenant>())
-            .Returns(call => realOrdinaryRepository.Create(call.Arg<Tenant>()));
+        await using ExploreDbContext ordinaryContext = fixture.CreateDbContext(new OrdinarySlugObservation(initialGate));
+        await using var manifestHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        manifestHandler.BeforeLock = (key, _, token) =>
+            key == ConfigurationManifestLockKeys.InstanceManifest ? initialGate.SignalAndWaitAsync(token) : Task.CompletedTask;
+        var ordinaryRepository = new TenantRepository(ordinaryContext);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
         var ordinaryHandler = new CreateTenantCommandHandler(
             ordinaryRepository,
-            Substitute.For<ITenantUserRoleGrantRepository>(),
-            Substitute.For<ITenantUserRepository>(),
-            Substitute.For<IRoleRepository>(),
+            new TenantUserRoleGrantRepository(ordinaryContext),
+            new TenantUserRepository(ordinaryContext),
+            new RoleRepository(ordinaryContext),
             new TenantCreationService(
                 ordinaryRepository,
                 new TenantSettingsDocumentRepository(ordinaryContext)),
-            Substitute.For<ITypedSettingsDocumentResolver>(),
+            new TypedSettingsDocumentResolver(new TenantSettingsDocumentRepository(ordinaryContext), cache),
             NullLogger<CreateTenantCommandHandler>.Instance,
             new RelationalSettingMutationLock(
                 ordinaryContext,
                 new EfCoreUnitOfWork(ordinaryContext)),
             new TenantActivationCapacityPolicy(
-                Substitute.For<IInstanceBootstrapStateRepository>(),
+                new InstanceBootstrapStateRepository(ordinaryContext),
                 ordinaryRepository,
-                Substitute.For<IManagedTenantProvisioningOperationRepository>(),
+                new ManagedTenantProvisioningOperationRepository(ordinaryContext),
                 Options.Create(new ManagedControlPlaneOptions())));
         var ordinaryCommand = new CreateTenantCommand
         {
@@ -517,51 +483,17 @@ public sealed class ConfigurationManifestConcurrencyTests(
             .IsEqualTo(1);
     }
 
-    private sealed class CapturingFreshPreflight(
-        IConfigurationManifestPreflight inner) : IConfigurationManifestPreflight
+    private sealed class OrdinarySlugObservation(InitialPreflightGate gate) : DbCommandInterceptor
     {
-        private int _evaluationCount;
-
-        public TaskCompletionSource<ConfigurationManifestPreflightResult>
-            FreshEvaluation
-        { get; } = new(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public async Task<ConfigurationManifestPreflightResult> EvaluateAsync(
-            ConfigurationManifestApplyPlan plan,
-            CancellationToken cancellationToken)
+        private int observed;
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
+            CancellationToken cancellationToken = default)
         {
-            ConfigurationManifestPreflightResult result =
-                await inner.EvaluateAsync(plan, cancellationToken);
-            if (Interlocked.Increment(ref _evaluationCount) == 2)
-            {
-                FreshEvaluation.TrySetResult(result);
-            }
-
+            if (command.Parameters.Cast<DbParameter>().Any(parameter => parameter.Value is "shared")
+                && Interlocked.Exchange(ref observed, 1) == 0)
+                await gate.SignalAndWaitAsync(cancellationToken);
             return result;
-        }
-    }
-
-    private sealed class GatedExistencePreflight(
-        ITenantRepository tenantRepository,
-        InitialPreflightGate initialGate,
-        IPaidEventPolicyRepository? paidEventPolicies = null)
-        : IConfigurationManifestPreflight
-    {
-        private int _evaluationCount;
-
-        public async Task<ConfigurationManifestPreflightResult> EvaluateAsync(
-            ConfigurationManifestApplyPlan plan,
-            CancellationToken cancellationToken)
-        {
-            if (Interlocked.Increment(ref _evaluationCount) == 1)
-            {
-                await initialGate.SignalAndWaitAsync(cancellationToken);
-            }
-
-            return await new ConfigurationManifestApplicationTestSupport
-                .ExistencePreflight(tenantRepository, paidEventPolicies)
-                .EvaluateAsync(plan, cancellationToken);
         }
     }
 
@@ -603,23 +535,6 @@ public sealed class ConfigurationManifestConcurrencyTests(
             CancellationToken.None);
     }
 
-    private sealed class PausingTenantCreationService(
-        ITenantCreationService inner,
-        TaskCompletionSource entered,
-        TaskCompletionSource release) : ITenantCreationService
-    {
-        public async Task<TenantCreationOutcome> CreateInCurrentTransactionAsync(
-            TenantCreationRequest request,
-            CancellationToken cancellationToken)
-        {
-            entered.TrySetResult();
-            await release.Task.WaitAsync(cancellationToken);
-            return await inner.CreateInCurrentTransactionAsync(
-                request,
-                cancellationToken);
-        }
-    }
-
     private sealed class InitialPreflightGate(int participantCount)
     {
         private readonly TaskCompletionSource _allArrived =
@@ -633,7 +548,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
                 _allArrived.TrySetResult();
             }
 
-            await _allArrived.Task.WaitAsync(cancellationToken);
+            await _allArrived.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         }
     }
 }

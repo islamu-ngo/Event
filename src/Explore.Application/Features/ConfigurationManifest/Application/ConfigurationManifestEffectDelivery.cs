@@ -84,7 +84,11 @@ public sealed class ConfigurationManifestEffectDelivery(
 
         try
         {
-            await dispatcher.DispatchAsync(message.AggregateId, cancellationToken);
+            OutboxMessage claimed = await outboxRepository.GetByIdAsync(message.Id, cancellationToken)
+                ?? throw new InvalidOperationException("Manifest effect claim was not found.");
+            if (claimed.Status != OutboxMessageStatus.Processing || claimed.NextRetryAt != leaseExpiresAt.Value)
+                throw new InvalidOperationException("Manifest effect claim was replaced.");
+            await dispatcher.DispatchAsync(claimed, cancellationToken);
             bool completed = await outboxRepository.MarkAsCompleted(
                 message.Id,
                 leaseExpiresAt.Value,

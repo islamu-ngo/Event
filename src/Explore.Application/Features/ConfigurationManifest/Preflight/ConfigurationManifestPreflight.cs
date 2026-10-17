@@ -12,7 +12,7 @@ using Explore.Domain.Services.Registration;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 
-public sealed class ConfigurationManifestPreflight(
+public sealed partial class ConfigurationManifestPreflight(
     ITenantRepository tenantRepository,
     ISystemSettingRepository systemSettingRepository,
     ITenantBrandingSettingsDocumentLockService brandingLockService,

@@ -31,8 +31,10 @@ public sealed class InspectAuthenticationCredentialCleanupQueryHandler(
                 instanceId, request.OperationId, timeProvider.GetUtcNow(), cancellationToken);
             return new()
             {
-                OperationId = inventory.OperationId, DeploymentRevision = inventory.DeploymentRevision,
-                HeadStamp = inventory.HeadStamp, OperationStamp = inventory.OperationStamp,
+                OperationId = inventory.OperationId,
+                DeploymentRevision = inventory.DeploymentRevision,
+                HeadStamp = inventory.HeadStamp,
+                OperationStamp = inventory.OperationStamp,
                 Settings = inventory.Settings.Select(row =>
                     new AuthenticationCredentialCleanupTargetDto(row.Id, row.SettingKey)).ToArray(),
                 Bindings = inventory.Bindings.Select(row =>

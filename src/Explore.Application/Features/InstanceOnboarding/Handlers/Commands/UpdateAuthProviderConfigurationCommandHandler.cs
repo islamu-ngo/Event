@@ -1,15 +1,11 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
-using Explore.Application.DTOs.Onboarding;
-using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Responses;
-using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
@@ -18,8 +14,6 @@ public class UpdateAuthProviderConfigurationCommandHandler :
     ICommandHandler<UpdateAuthProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
-    private readonly IUserRepository _userRepository;
-    private readonly IUserExternalLoginRepository _userExternalLoginRepository;
     private readonly IAuthProviderConfigurationService _configurationService;
     private readonly IAuthenticationProviderModeCacheInvalidator
         _authenticationProviderModeCacheInvalidator;
@@ -28,8 +22,6 @@ public class UpdateAuthProviderConfigurationCommandHandler :
 
     public UpdateAuthProviderConfigurationCommandHandler(
         IAdminContext adminContext,
-        IUserRepository userRepository,
-        IUserExternalLoginRepository userExternalLoginRepository,
         IAuthProviderConfigurationService configurationService,
         IAuthenticationProviderModeCacheInvalidator
             authenticationProviderModeCacheInvalidator,
@@ -37,8 +29,6 @@ public class UpdateAuthProviderConfigurationCommandHandler :
         ISetupSecretProvider setupSecretProvider)
     {
         _adminContext = adminContext;
-        _userRepository = userRepository;
-        _userExternalLoginRepository = userExternalLoginRepository;
         _configurationService = configurationService;
         _authenticationProviderModeCacheInvalidator =
             authenticationProviderModeCacheInvalidator;
@@ -55,7 +45,8 @@ public class UpdateAuthProviderConfigurationCommandHandler :
                 "Only instance administrators can update auth provider configuration.");
         }
 
-        return await ApplyConfigurationAsync(request.Patch, request.UserId, cancellationToken);
+        return await ApplyConfigurationAsync(request.Patch,
+            token => _configurationService.ObserveConfigurationAsync(request, token), cancellationToken);
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -68,74 +59,33 @@ public class UpdateAuthProviderConfigurationCommandHandler :
             return BaseCommandResponse.Validation<Guid>([message], message);
         }
 
-        return await ApplyConfigurationAsync(request.Patch, currentAdminUserId: null, cancellationToken);
+        return await ApplyConfigurationAsync(request.Patch,
+            token => _configurationService.ObserveConfigurationAsync(request, token), cancellationToken);
     }
 
     private async Task<BaseCommandResponse<Guid>> ApplyConfigurationAsync(
         PatchAuthProviderConfigurationDto configurationPatch,
-        Guid? currentAdminUserId,
+        Func<CancellationToken, Task<ProviderConfigurationMutation>> observeOriginal,
         CancellationToken cancellationToken)
     {
-        var currentConfiguration = await _configurationService.ReadConfigurationAsync();
         if (!configurationPatch.HasChanges() || configurationPatch.Configuration.Value is null)
         {
             const string message = "Authentication provider patch must include a complete configuration group.";
             return BaseCommandResponse.Validation<Guid>([message], message);
         }
 
-        var patch = configurationPatch.Configuration.Value;
-        var configuration = new AuthProviderConfigurationDto
-        {
-            PrimaryProviderId = patch.PrimaryProviderId,
-            PrimaryProviderCode = string.Empty,
-            PrimaryProviderName = string.Empty,
-            LockPrimaryProvider = patch.LockPrimaryProvider,
-            KeycloakAuthority = patch.KeycloakAuthority,
-            KeycloakClientId = patch.KeycloakClientId,
-            KeycloakDetectedFromEnvironment = currentConfiguration.KeycloakDetectedFromEnvironment,
-            KeycloakClientSecretOwnership = currentConfiguration.KeycloakClientSecretOwnership,
-            AtprotoLoginEnabled = patch.AtprotoLoginEnabled,
-            AtprotoPublicUrl = patch.AtprotoPublicUrl,
-            GoogleSsoEnabled = patch.GoogleSsoEnabled,
-            GoogleClientId = patch.GoogleClientId,
-            GoogleClientSecretOwnership = currentConfiguration.GoogleClientSecretOwnership,
-            LockAtprotoLoginEnabled = patch.LockAtprotoLoginEnabled,
-            LockGoogleSsoEnabled = patch.LockGoogleSsoEnabled,
-            KeycloakPublicOnboardingPolicy = patch.KeycloakPublicOnboardingPolicy,
-            KeycloakPublicSignupUrl = patch.KeycloakPublicSignupUrl,
-            GooglePublicOnboardingPolicy = patch.GooglePublicOnboardingPolicy,
-            GooglePublicSignupUrl = patch.GooglePublicSignupUrl
-        };
-        var validator = new AuthProviderConfigurationDtoValidator(currentConfiguration);
-        var validationResult = await validator.ValidateAsync(configuration, cancellationToken);
+        await using var observation = await observeOriginal(cancellationToken);
+        var validationResult = await observation.ValidateAsync(cancellationToken);
         if (!validationResult.IsValid)
         {
+            if (validationResult.Errors is [{ PropertyName: "User" or "Provider" } failure])
+                return BaseCommandResponse.Validation<Guid>([failure.ErrorMessage], failure.ErrorMessage);
             return BaseCommandResponse.Validation<Guid>(
                 validationResult.Errors.Select(x => x.ErrorMessage),
                 "Invalid auth provider configuration.");
         }
 
-        if (currentAdminUserId.HasValue)
-        {
-            var currentUser = await _userRepository.GetById(currentAdminUserId.Value);
-            if (currentUser == null)
-            {
-                const string message = "Current user could not be resolved.";
-                return BaseCommandResponse.Validation<Guid>([message], message);
-            }
-
-            var currentUserLogins = await _userExternalLoginRepository.GetByUser(currentAdminUserId.Value);
-            if (!AuthenticationProviderLockoutPolicy
-                    .PreservesCurrentAdministratorAccess(
-                        currentUserLogins,
-                        configuration))
-            {
-                const string message = "Cannot disable all authentication providers linked to your current admin account.";
-                return BaseCommandResponse.Validation<Guid>([message], message);
-            }
-        }
-
-        await _configurationService.ApplyConfigurationAsync(configuration, cancellationToken: cancellationToken);
+        await _configurationService.ApplyConfigurationAsync(observation, cancellationToken);
         _authenticationProviderModeCacheInvalidator.InvalidateInstanceMode();
         await _jwtAuthorityRefreshNotifier.ReloadAsync(cancellationToken);
 

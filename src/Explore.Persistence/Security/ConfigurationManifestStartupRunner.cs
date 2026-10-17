@@ -1,33 +1,48 @@
-namespace Explore.Infrastructure.ConfigurationManifest;
+namespace Explore.Persistence.Security;
 
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Ingestion;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
-public interface IConfigurationManifestStartupRunner
-{
-    Task RunAsync(CancellationToken cancellationToken);
-}
-
-public sealed class ConfigurationManifestStartupRunner(
-    IOptions<ConfigurationManifestOptions> options,
+internal sealed class ConfigurationManifestStartupRunner(
+    IConfiguration configuration,
     IConfigurationManifestReader reader,
     IConfigurationManifestApplier applier,
     ILogger<ConfigurationManifestStartupRunner> logger)
     : IConfigurationManifestStartupRunner
 {
-    public async Task RunAsync(CancellationToken cancellationToken)
+    internal IConfiguration Configuration => configuration;
+    public Task RunAsync(CancellationToken cancellationToken) =>
+        ConfigurationManifestStartupInvocation.RunAsync(this, RunCoreAsync, cancellationToken);
+
+    private async Task RunCoreAsync(CancellationToken cancellationToken)
     {
-        ConfigurationManifestOptions startup = options.Value;
+        var startup = new ConfigurationManifestReadOptions(
+            ConfigurationManifestBootstrapDeployment.ParseMode(configuration[ConfigurationManifestBootstrapDeployment.ModeVariable]),
+            configuration[ConfigurationManifestBootstrapDeployment.PathVariable]);
+        if (startup.Mode == ConfigurationManifestMode.Bootstrap)
+        {
+            var original = await applier.ApplyOriginalStartupAsync(cancellationToken);
+            if (original is null)
+            {
+                logger.LogInformation("No convention bootstrap manifest was discovered.");
+                return;
+            }
+            if (!original.IsSuccess)
+                throw new ConfigurationManifestStartupException(original.Id,
+                    original.FailureCode ?? ConfigurationManifestApplicationFailureCodes.ApplyFailed);
+            logger.LogInformation("Original configuration bootstrap operation {OperationId} completed.", original.Id);
+            return;
+        }
         ConfigurationManifestReadResult? source;
         try
         {
             source = await reader.ReadAsync(
                 new ConfigurationManifestReadOptions(
                     startup.Mode,
-                    startup.Path),
+                    startup.ConfiguredPath),
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -83,25 +98,7 @@ public sealed class ConfigurationManifestStartupRunner(
     }
 }
 
-public sealed class ConfigurationManifestStartupException(
-    Guid? operationId,
-    string failureCode)
-    : Exception(
-        "Configuration manifest startup failed. Inspect the operation id and stable failure code.")
-{
-    public Guid? OperationId { get; } = operationId;
-
-    public string FailureCode { get; } = failureCode;
-}
-
-public interface IConfigurationManifestPostMigrationSequence
-{
-    Task RunAsync(
-        Func<CancellationToken, Task> migrateAndSeed,
-        CancellationToken cancellationToken);
-}
-
-public sealed class ConfigurationManifestPostMigrationSequence(
+internal sealed class ConfigurationManifestPostMigrationSequence(
     IConfigurationManifestStartupRunner startupRunner)
     : IConfigurationManifestPostMigrationSequence
 {

@@ -1049,8 +1049,25 @@ public class InstanceOnboardingControllerTests
 
         using (var scope = factory.Services.CreateScope())
         {
-            var configuration = scope.ServiceProvider.GetRequiredService<IAuthProviderConfigurationService>();
-            await configuration.ApplyConfigurationAsync(CreateGoogleOnlyAuthProviderConfiguration());
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            context.SystemSettings.AddRange(
+                new SystemSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = GovernanceSettingKeys.Authentication.GoogleSsoEnabled,
+                    Value = "true",
+                    ValueType = SettingValueType.Boolean,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new SystemSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = GovernanceSettingKeys.Authentication.GoogleClientId,
+                    Value = JsonSerializer.Serialize("google-client-id"),
+                    ValueType = SettingValueType.String,
+                    CreatedAt = DateTime.UtcNow
+                });
+            await context.SaveChangesAsync();
         }
 
         using var internalWithoutSecretRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
@@ -1194,8 +1211,17 @@ public class InstanceOnboardingControllerTests
 
         using (var scope = factory.Services.CreateScope())
         {
-            var configuration = scope.ServiceProvider.GetRequiredService<IAuthorizationProviderConfigurationService>();
-            await configuration.ApplyConfigurationAsync(CreateLocalAuthorizationProviderConfiguration());
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            context.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
+                Value = JsonSerializer.Serialize("local"),
+                ValueType = SettingValueType.String,
+                IsLocked = true,
+                CreatedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
         }
 
         using var internalWithoutSecretRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/authz-provider-configuration/internal");

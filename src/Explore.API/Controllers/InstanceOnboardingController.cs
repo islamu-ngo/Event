@@ -444,9 +444,9 @@ public class InstanceOnboardingController : EventControllerBase
             var archive = await _downloadPolicyPackageQuery.QueryAsync(new DownloadAuthorizationPolicyPackageQuery(), cancellationToken);
             return File(archive.Content.ToArray(), archive.ContentType, archive.FileName);
         }
-        catch (PolicyPackageUnavailableException ex)
+        catch (PolicyPackageUnavailableException)
         {
-            _logger.LogWarning(ex, "Authorization policy package download is unavailable for this API deployment.");
+            _logger.LogWarning("Authorization policy package download is unavailable for this API deployment.");
             return AuthorizationPolicyPackageUnavailableProblem();
         }
     }

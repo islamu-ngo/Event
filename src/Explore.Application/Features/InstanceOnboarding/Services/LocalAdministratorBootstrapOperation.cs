@@ -13,6 +13,7 @@ using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Models;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Domain.Authentication;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 
@@ -44,8 +45,7 @@ public sealed class LocalAdministratorBootstrapOperation(
             return Failure("local_bootstrap_provider_inactive");
         if (operationId.Version != 7 || operationId.Variant is < 8 or > 11)
             return Failure("local_bootstrap_operation_invalid");
-        if (string.IsNullOrWhiteSpace(temporaryPassword)
-            || temporaryPassword.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+        if (!LocalPasswordPolicy.TryNormalizeNewCredential(temporaryPassword, out _))
             return Failure("local_bootstrap_credential_invalid");
 
         settings.DeploymentMode = await deploymentModeProvider.GetConfiguredOnboardingModeAsync(cancellationToken);

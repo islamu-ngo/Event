@@ -61,7 +61,8 @@ public sealed class SetupAssistantArchitectureTests
             ["Event.SetupAssistant.Cli"] = ["Event.Setup.Core", "Event.Setup.Artifacts"],
             ["SetupCliCommandSchemaGenerator"] = ["Event.SetupAssistant.Cli"],
             ["Event.Setup.Core.Tests"] = ["Event.Setup.Core"],
-            ["Event.Setup.Artifacts.Tests"] = ["Event.Setup.Artifacts"],
+            // Compose credential integration uses the real host binder; the shipped artifact library stays offline.
+            ["Event.Setup.Artifacts.Tests"] = ["Event.Setup.Artifacts", "Explore.Secrets"],
             ["Event.SetupAssistant.Tests"] = ["Event.SetupAssistant", "Event.SetupAssistant.SetupLive"],
             ["Event.SetupAssistant.Browser.Tests"] = ["Event.SetupAssistant.Browser"],
             ["Event.SetupAssistant.Desktop.Tests"] = ["Event.SetupAssistant.Desktop"],

@@ -3,9 +3,10 @@ namespace Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Contracts.Operations;
+using Microsoft.Extensions.DependencyInjection;
 
 public sealed class CreateInstanceConfigurationImportSessionCommandHandler(
-    ConfigurationImportSessionApplicationService service)
+    IConfigurationInstanceImportExecutor service)
     : ICommandHandler<
         CreateInstanceConfigurationImportSessionCommand,
         ConfigurationImportSessionCreatedResult>
@@ -13,26 +14,30 @@ public sealed class CreateInstanceConfigurationImportSessionCommandHandler(
     public Task<ConfigurationImportSessionCreatedResult> ExecuteAsync(
         CreateInstanceConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
-        service.CreateInstanceAsync(request.Artifact, cancellationToken);
+        service.CreateAsync(request.Artifact, cancellationToken);
 }
 
 public sealed class CreateTenantConfigurationImportSessionCommandHandler(
-    ConfigurationImportSessionApplicationService service)
+    IPolicyMutationExecutionScopeFactory scopes)
     : ICommandHandler<
         CreateTenantConfigurationImportSessionCommand,
         ConfigurationImportSessionCreatedResult>
 {
-    public Task<ConfigurationImportSessionCreatedResult> ExecuteAsync(
+    public async Task<ConfigurationImportSessionCreatedResult> ExecuteAsync(
         CreateTenantConfigurationImportSessionCommand request,
-        CancellationToken cancellationToken) =>
-        service.CreateTenantAsync(
+        CancellationToken cancellationToken)
+    {
+        ReadOnlyMemory<byte> artifact = request.Artifact.ToArray();
+        await using var selected = await scopes.CreateAsync(new PolicyMutationScope(request.TenantId), cancellationToken);
+        return await selected.Services.GetRequiredService<ConfigurationImportSessionApplicationService>().CreateTenantAsync(
             request.TenantId,
-            request.Artifact,
+            artifact,
             cancellationToken);
+    }
 }
 
 public sealed class PreviewInstanceConfigurationImportSessionCommandHandler(
-    ConfigurationImportSessionApplicationService service)
+    IConfigurationInstanceImportExecutor service)
     : ICommandHandler<
         PreviewInstanceConfigurationImportSessionCommand,
         ConfigurationImportPreviewResult>
@@ -40,7 +45,7 @@ public sealed class PreviewInstanceConfigurationImportSessionCommandHandler(
     public Task<ConfigurationImportPreviewResult> ExecuteAsync(
         PreviewInstanceConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
-        service.PreviewInstanceAsync(
+        service.PreviewAsync(
             request.SessionId,
             request.AccessToken,
             request.Preview,
@@ -48,45 +53,53 @@ public sealed class PreviewInstanceConfigurationImportSessionCommandHandler(
 }
 
 public sealed class PreviewTenantConfigurationImportSessionCommandHandler(
-    ConfigurationImportSessionApplicationService service)
+    IPolicyMutationExecutionScopeFactory scopes)
     : ICommandHandler<
         PreviewTenantConfigurationImportSessionCommand,
         ConfigurationImportPreviewResult>
 {
-    public Task<ConfigurationImportPreviewResult> ExecuteAsync(
+    public async Task<ConfigurationImportPreviewResult> ExecuteAsync(
         PreviewTenantConfigurationImportSessionCommand request,
-        CancellationToken cancellationToken) =>
-        service.PreviewTenantAsync(
+        CancellationToken cancellationToken)
+    {
+        var preview = request.Preview?.Capture()
+            ?? throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.ContractInvalid);
+        await using var selected = await scopes.CreateAsync(new PolicyMutationScope(request.TenantId), cancellationToken);
+        return await selected.Services.GetRequiredService<ConfigurationImportSessionApplicationService>().PreviewTenantAsync(
             request.TenantId,
             request.SessionId,
             request.AccessToken,
-            request.Preview,
+            preview,
             cancellationToken);
+    }
 }
 
 public sealed class CancelInstanceConfigurationImportSessionCommandHandler(
-    ConfigurationImportSessionApplicationService service)
+    IConfigurationInstanceImportExecutor service)
     : ICommandHandler<CancelInstanceConfigurationImportSessionCommand>
 {
     public async Task ExecuteAsync(
         CancelInstanceConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
-        await service.CancelInstanceAsync(
+        await service.CancelAsync(
             request.SessionId,
             request.AccessToken,
             cancellationToken);
 }
 
 public sealed class CancelTenantConfigurationImportSessionCommandHandler(
-    ConfigurationImportSessionApplicationService service)
+    IPolicyMutationExecutionScopeFactory scopes)
     : ICommandHandler<CancelTenantConfigurationImportSessionCommand>
 {
     public async Task ExecuteAsync(
         CancelTenantConfigurationImportSessionCommand request,
-        CancellationToken cancellationToken) =>
-        await service.CancelTenantAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var selected = await scopes.CreateAsync(new PolicyMutationScope(request.TenantId), cancellationToken);
+        await selected.Services.GetRequiredService<ConfigurationImportSessionApplicationService>().CancelTenantAsync(
             request.TenantId,
             request.SessionId,
             request.AccessToken,
             cancellationToken);
+    }
 }

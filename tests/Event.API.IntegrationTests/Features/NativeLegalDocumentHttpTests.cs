@@ -4,15 +4,15 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Builders;
-using Event.Api.IntegrationTests.Fixtures;
+using Event.Api.IntegrationTests.Authentication;
 using Explore.API.Attributes;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.LegalDocuments;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.LegalDocuments.Requests.Queries;
 using Explore.Application.Operations.Decorators;
 using Explore.Application.Services;
@@ -21,16 +21,11 @@ using Explore.Domain.Constants;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Persistence;
-using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -64,7 +59,7 @@ public sealed class NativeLegalDocumentHttpTests
     [Test]
     public async Task AnonymousHttp_ReturnsLastPublishedVersionAndLocaleWithoutDraftOrReviewDisclosure()
     {
-        await using var factory = new LegalDocumentFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync();
         using var client = factory.CreateClient();
         var document = Draft(LegalDocumentKind.TermsOfService);
         Publish(document, OccurredAt);
@@ -109,7 +104,7 @@ public sealed class NativeLegalDocumentHttpTests
     [Arguments("terms-of-service", "private")]
     public async Task AnonymousHttp_AbsentAndNonPublicDocumentsReturnNonCacheable404(string kind, string state)
     {
-        await using var factory = new LegalDocumentFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync();
         using var client = factory.CreateClient();
         if (state != "absent")
         {
@@ -130,7 +125,7 @@ public sealed class NativeLegalDocumentHttpTests
     [Arguments("unresolved-token")]
     public async Task AnonymousHttp_UnavailableTenantIdentityOrRenderingReturnsValueSafe503(string failure)
     {
-        await using var factory = new LegalDocumentFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync();
         using var client = factory.CreateClient();
         var document = Draft(LegalDocumentKind.TenantTerms, PlatformDefaults.DefaultTenantId,
             markdown: failure == "unresolved-token" ? "# Terms\n\n{{operator.website_url}}" : PublicMarkdown);
@@ -153,7 +148,7 @@ public sealed class NativeLegalDocumentHttpTests
     [Test]
     public async Task AnonymousHttp_UsesTrustedTenantIdentityAndPublicDisclosureRatherThanPaidCommerceReadiness()
     {
-        await using var factory = new LegalDocumentFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync();
         using var client = factory.CreateClient();
         var document = Draft(LegalDocumentKind.TenantTerms, PlatformDefaults.DefaultTenantId);
         Publish(document, OccurredAt);
@@ -175,7 +170,7 @@ public sealed class NativeLegalDocumentHttpTests
     [Test]
     public async Task NativeScopes_UseRealDependenciesAndTenantAuthorityWithoutMutationAndPropagateCancellation()
     {
-        await using var factory = new LegalDocumentFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync();
         using var client = factory.CreateClient();
         var firstDocument = Draft(LegalDocumentKind.TenantTerms, PlatformDefaults.DefaultTenantId);
         var secondDocument = Draft(LegalDocumentKind.TenantTerms, Guid.CreateVersion7());
@@ -255,8 +250,10 @@ public sealed class NativeLegalDocumentHttpTests
             // TermsUrl is deliberately absent: public disclosure must not require paid-commerce readiness.
         }, JsonSerializerOptions.Web);
 
-    private static async Task SeedAsync(LegalDocumentFactory factory, LegalDocument document, string? identityJson = null)
+    private static async Task SeedAsync(OperatorIdentityHttpMigrationFixture factory, LegalDocument document, string? identityJson = null)
     {
+        // Strong document/tenant seeds exercise publication and public projection,
+        // not legal-editor acceptance. Instance identity uses the authenticated PUT.
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         if (document.TenantId is { } tenantId)
@@ -280,21 +277,20 @@ public sealed class NativeLegalDocumentHttpTests
         await db.SaveChangesAsync();
         if (document.TenantId is null)
         {
-            var saved = await scope.ServiceProvider.GetRequiredService<InstanceOperatorIdentityService>()
-                .SaveAsync(new InstanceOperatorIdentitySettings
-                {
-                    PublicName = "Test Instance Operator",
-                    LegalName = "Test Instance Operator ASBL",
-                    OperatorKindCode = "registered_organization",
-                    JurisdictionCountryCode = "BE",
-                    RegistrationIdentifier = "BE 0123.456.789",
-                    PublicContactEmail = "contact@instance.example.test",
-                    WebsiteUrl = "https://instance.example.test",
-                    LegalNoticeUrl = "https://instance.example.test/legal",
-                    TermsUrl = "https://instance.example.test/terms",
-                    PrivacyUrl = "https://instance.example.test/privacy",
-                    OfficialOrigin = "https://instance.example.test"
-                }, null);
+            var saved = await factory.SaveAsync(new SaveInstanceOperatorIdentityRequestDto
+            {
+                PublicName = "Test Instance Operator",
+                LegalName = "Test Instance Operator ASBL",
+                OperatorKindCode = "registered_organization",
+                JurisdictionCountryCode = "BE",
+                RegistrationIdentifier = "BE 0123.456.789",
+                PublicContactEmail = "contact@instance.example.test",
+                WebsiteUrl = "https://instance.example.test",
+                LegalNoticeUrl = "https://instance.example.test/legal",
+                TermsUrl = "https://instance.example.test/terms",
+                PrivacyUrl = "https://instance.example.test/privacy",
+                OfficialOrigin = "https://instance.example.test"
+            });
             await Assert.That(saved.IsSuccess).IsTrue();
         }
     }
@@ -313,59 +309,5 @@ public sealed class NativeLegalDocumentHttpTests
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         await Assert.That(json.RootElement.GetProperty("status").GetInt32()).IsEqualTo((int)status);
         await Assert.That(json.RootElement.GetProperty("code").GetString()).IsEqualTo(code);
-    }
-
-    private sealed class LegalDocumentFactory : AuthenticatedWebApplicationFactory
-    {
-        private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"native-legal-{Guid.CreateVersion7():N}.db");
-
-        public LegalDocumentFactory()
-        {
-            SeedActiveDefaultTenant = true;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            base.ConfigureWebHost(builder);
-            builder.ConfigureTestServices(services =>
-            {
-                services.RemoveExploreDbContextRegistrations();
-                var options = new DbContextOptionsBuilder<ExploreDbContext>();
-                ConfigureDatabase(options);
-                using (var db = new ExploreDbContext(options.Options))
-                    db.Database.EnsureCreated();
-                services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
-                services.AddScoped(provider =>
-                {
-                    var db = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
-                    db.TenantContext = provider.GetRequiredService<ITenantContext>();
-                    db.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
-                    return db;
-                });
-            });
-        }
-
-        private void ConfigureDatabase(DbContextOptionsBuilder options)
-        {
-            PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
-            {
-                Role = PrimaryDatabaseRole.Runtime,
-                Provider = PrimaryDatabaseProvider.Sqlite,
-                Database = _databasePath
-            });
-            options.UseSnakeCaseNamingConvention();
-        }
-
-        public override async ValueTask DisposeAsync()
-        {
-            await base.DisposeAsync();
-            var options = new DbContextOptionsBuilder<ExploreDbContext>();
-            ConfigureDatabase(options);
-            await using var db = new ExploreDbContext(options.Options);
-            SqliteConnection.ClearPool((SqliteConnection)db.Database.GetDbConnection());
-            File.Delete(_databasePath);
-            File.Delete(_databasePath + "-wal");
-            File.Delete(_databasePath + "-shm");
-        }
     }
 }

@@ -1,10 +1,9 @@
-namespace Explore.Infrastructure.ConfigurationManifest;
+namespace Explore.Application.Features.ConfigurationManifest.Ingestion;
 
 using System.Text;
 using System.Text.Json;
-using Explore.Application.Features.ConfigurationManifest.Ingestion;
 
-internal static class ConfigurationManifestJsonScanner
+public static class ConfigurationManifestJsonScanner
 {
     private const int MaximumDepth = 16;
     private const int MaximumTokens = 262_144;

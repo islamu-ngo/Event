@@ -36,6 +36,8 @@ public sealed class SetupSecretAuthenticationHandler(
                && string.Equals(request.Path.Value, "/api/instanceonboarding/complete-local", StringComparison.OrdinalIgnoreCase)
            || HttpMethods.IsGet(request.Method)
                && string.Equals(request.Path.Value, "/api/instance/settings/branding", StringComparison.OrdinalIgnoreCase)
+           || HttpMethods.IsGet(request.Method)
+               && string.Equals(request.Path.Value, "/api/instance/settings/footer-governance", StringComparison.OrdinalIgnoreCase)
            || HttpMethods.IsPatch(request.Method)
                && string.Equals(request.Path.Value, "/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase)
            || IsKeycloakOperatorRequest(request);

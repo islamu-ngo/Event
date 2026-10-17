@@ -1091,16 +1091,16 @@ public sealed class SetupLiveApplicationContractTests
         CustomAttributeData[] assemblyAttributes =
             ApplicationAssembly.CustomAttributes.ToArray();
         RequireContract(
-            assemblyAttributes.Length == 17,
-            $"invalid-setup-live-application-assembly-attribute-count:expected=17;actual={assemblyAttributes.Length}");
+            assemblyAttributes.Length == 18,
+            $"invalid-setup-live-application-assembly-attribute-count:expected=18;actual={assemblyAttributes.Length}");
         CustomAttributeData[] friends = assemblyAttributes
             .Where(attribute => attribute.AttributeType == typeof(InternalsVisibleToAttribute))
             .ToArray();
-        RequireContract(friends.Length == 4, "invalid-setup-live-application-friend-count");
+        RequireContract(friends.Length == 5, "invalid-setup-live-application-friend-count");
         foreach (string friend in new[]
         {
             "Explore.Infrastructure", "Event.Application.UnitTests",
-            "Event.Architecture.Tests", "Event.API.IntegrationTests"
+            "Event.Architecture.Tests", "Event.API.IntegrationTests", "Explore.API"
         })
         {
             AssertExactManifestAttribute(

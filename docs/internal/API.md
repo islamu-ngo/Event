@@ -3,6 +3,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Membership Discovery Read Enrollment
+
+PostgresUserTenantMembershipContract requires explicit deployment enrollment and
+the configured Global session for cross-tenant membership discovery.
+Native entry and reinstall attest exact dedicated role flags, memberships and
+data grants; Runtime cannot inherit discovery authority through executor or login
+roles. Installers reject existing drift before changing authority. Active-user
+membership and tenant visibility predicates remain unchanged, and ordinary
+tenant-filtered Runtime membership access remains separate and intact.
+
 ## Scanner Authentication Read Enrollment
 
 PostgresAdmissionScannerAuthenticationContract requires explicit deployment

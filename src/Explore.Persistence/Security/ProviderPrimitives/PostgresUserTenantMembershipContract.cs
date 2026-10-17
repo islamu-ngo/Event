@@ -22,17 +22,24 @@ public static class PostgresUserTenantMembershipContract
             entity.GetTableName()! + "_active_for_user", Schema(context, entity));
     }
 
-    public static async Task ApplyAsync(ExploreDbContext context, CancellationToken cancellationToken = default)
+    public static async Task ApplyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        CancellationToken cancellationToken = default)
     {
         if (!context.Database.IsNpgsql())
             return;
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(BuildSql(context), cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        await using var transaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(cancellationToken) : null;
+        await context.Database.ExecuteSqlRawAsync(BuildSql(context, enrollment), cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
     }
 
-    public static string BuildSql(ExploreDbContext context)
+    public static string BuildSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
+        enrollment.Validate();
+        string[] roles = [OwnerRole, MigratorRole, GlobalRole];
+        if (new[] { enrollment.MigratorLogin, enrollment.GlobalLogin, enrollment.RuntimeLogin,
+                enrollment.EmailInstanceMutationLogin, enrollment.EmailTenantMutationLogin }.Any(roles.Contains))
+            throw new InvalidOperationException("user_membership_enrollment_collision");
         var membership = context.Model.FindEntityType(typeof(TenantUser))!;
         var tenant = context.Model.FindEntityType(typeof(Tenant))!;
         var status = context.Model.FindEntityType(typeof(TenantStatus))!;
@@ -81,8 +88,49 @@ public static class PostgresUserTenantMembershipContract
             [$"{function}(uuid)"], OwnerRole, GlobalRole, requireComplete: false);
         string currentAcl = PostgresPrivilegeGuard.BuildRoutineAclAssertSql(
             [$"{function}(uuid)"], OwnerRole, GlobalRole, requireComplete: true);
+        var contract = new PostgresPrivilegeGuard.Contract(Schema(context, membership), roles,
+            [new(membership.GetTableName()! + "_active_for_user", "uuid", OwnerRole, [GlobalRole])],
+            new[] { membership, tenant, status }.Select(entity => new PostgresPrivilegeGuard.Relation(
+                entity.GetTableName()!, OwnerRole, [], entity.GetProperties().Select(property =>
+                    new PostgresPrivilegeGuard.Column(property.GetColumnName(
+                        StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!, ["SELECT"])).ToArray())).ToArray(),
+            [new(OwnerRole, MigratorRole, false, true, false),
+                new(MigratorRole, enrollment.MigratorLogin, false, true, false),
+                new(GlobalRole, enrollment.GlobalLogin, true, false, false)]);
+        string guard = PostgresPrivilegeGuard.BuildAssertSql(contract) + currentAcl + $"""
+            IF pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}', '{OwnerRole}', 'MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}', '{MigratorRole}', 'MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}', '{GlobalRole}', 'MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}', '{OwnerRole}', 'MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}', '{MigratorRole}', 'MEMBER')
+                OR EXISTS (
+                    WITH RECURSIVE inherited_roles(roleid) AS (
+                        SELECT edge.roleid FROM pg_catalog.pg_auth_members edge
+                        WHERE edge.member = (SELECT oid FROM pg_catalog.pg_roles
+                            WHERE rolname = '{Literal(enrollment.MigratorLogin)}')
+                        UNION
+                        SELECT edge.roleid FROM pg_catalog.pg_auth_members edge
+                        JOIN inherited_roles inherited ON edge.member = inherited.roleid)
+                    SELECT 1 FROM inherited_roles
+                    WHERE roleid = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{GlobalRole}'))
+                OR pg_catalog.has_schema_privilege('{Literal(enrollment.RuntimeLogin)}', '{Literal(Schema(context, membership))}', 'CREATE')
+                OR pg_catalog.has_schema_privilege('{Literal(enrollment.GlobalLogin)}', '{Literal(Schema(context, membership))}', 'CREATE')
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+                    WHERE rolname IN ('{Literal(enrollment.RuntimeLogin)}', '{Literal(enrollment.GlobalLogin)}')
+                        AND (NOT rolcanlogin OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication))
+                OR pg_catalog.has_function_privilege('{Literal(enrollment.RuntimeLogin)}', '{Literal(function)}(uuid)', 'EXECUTE') THEN
+                RAISE EXCEPTION 'native_user_membership_effective_privilege_drift' USING ERRCODE = '55000';
+            END IF;
+            """;
         return $"""
             DO $prior_acl$ BEGIN {priorAcl} END; $prior_acl$;
+            DO $prior_privileges$ BEGIN
+                IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+                    WHERE rolname IN ('{OwnerRole}', '{MigratorRole}', '{GlobalRole}'))
+                    OR pg_catalog.to_regprocedure('{Literal(function)}(uuid)') IS NOT NULL THEN
+                    {guard}
+                END IF;
+            END $prior_privileges$;
             DO $contract$
             DECLARE v_role text;
             BEGIN
@@ -111,8 +159,9 @@ public static class PostgresUserTenantMembershipContract
                     RAISE EXCEPTION 'user membership execution and migration logins must remain separate';
                 END IF;
             END $contract$;
-            GRANT {OwnerRole} TO {MigratorRole};
-            GRANT {MigratorRole} TO CURRENT_USER;
+            GRANT {OwnerRole} TO {MigratorRole} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+            GRANT {MigratorRole} TO {sql.DelimitIdentifier(enrollment.MigratorLogin)} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+            GRANT {GlobalRole} TO {sql.DelimitIdentifier(enrollment.GlobalLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE;
             GRANT USAGE, CREATE ON SCHEMA {schema} TO {OwnerRole};
             GRANT USAGE ON SCHEMA {schema} TO {GlobalRole};
             REVOKE ALL ON TABLE {members}, {tenants}, {statuses} FROM {OwnerRole}, {GlobalRole};
@@ -131,7 +180,11 @@ public static class PostgresUserTenantMembershipContract
                 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog
                 AS $function$
                 BEGIN
-                    {currentAcl}
+                    {guard}
+                    {PostgresPrivilegeGuard.RestrictedCallerSql}
+                    IF session_user <> '{Literal(enrollment.GlobalLogin)}' OR current_user <> '{OwnerRole}' THEN
+                        RAISE EXCEPTION 'native_user_membership_wrong_executor' USING ERRCODE = '42501';
+                    END IF;
                     RETURN QUERY SELECT {projection}
                     FROM {members} AS m
                     INNER JOIN {tenants} AS t ON t.{tenantKey} = m.{tenantId}
@@ -149,11 +202,13 @@ public static class PostgresUserTenantMembershipContract
                 PERFORM set_config('role', v_previous_role, true);
             END $bootstrap$;
             REVOKE CREATE ON SCHEMA {schema} FROM {OwnerRole};
-            DO $current_acl$ BEGIN {currentAcl} END; $current_acl$;
+            DO $current_acl$ BEGIN {guard} END; $current_acl$;
             """;
     }
 
     private static string Schema(ExploreDbContext context, IEntityType entity) =>
         context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema
         ?? entity.GetSchema() ?? "public";
+
+    private static string Literal(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 }

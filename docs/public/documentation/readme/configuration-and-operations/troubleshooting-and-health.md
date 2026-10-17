@@ -6,6 +6,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Cross-tenant membership discovery requires the enrolled Global database login,
+not Runtime inheritance of a discovery executor. Reconcile unexpected role grants
+through the approved database process before reinstalling. This does not change
+ordinary tenant-filtered membership access or grant additional tenant authority.
+
 Native scanner credential discovery requires the enrolled Global database login.
 Runtime must not inherit its executor role or the Global login. If readiness
 rejects enrollment or role drift, reconcile unauthorized grants through the

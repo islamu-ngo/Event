@@ -3,8 +3,13 @@
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,
        so Local and Cerbos can never drift onto different scenario sets. -->
   <ItemGroup>
+    <Compile Include="..\Shared\OperationalEndpointTestTransport.cs" Link="Fixtures\OperationalEndpointTestTransport.cs" />
+    <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
     <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.cs" Link="Fixtures\AuthenticatedSettingsFixture.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.Postgres.cs" Link="Fixtures\AuthenticatedSettingsFixture.Postgres.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\TestDbContextOptions.cs" Link="Fixtures\NativeTestDbContextOptions.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\PostgreSqlContainerFixture.cs" Link="Fixtures\NativePostgreSqlContainerFixture.cs" />
   </ItemGroup>

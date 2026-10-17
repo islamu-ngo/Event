@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Event.Setup.Artifacts\Event.Setup.Artifacts.csproj" />
+    <ProjectReference Include="..\..\src\Explore.Secrets\Explore.Secrets.csproj" />
     <PackageReference Include="TUnit" />
   </ItemGroup>
 </Project>

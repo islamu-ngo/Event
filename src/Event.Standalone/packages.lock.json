@@ -709,7 +709,7 @@
           "Explore.ServiceDefaults": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[10.0.10, )",
           "Microsoft.AspNetCore.Components.WebAssembly.Server": "[10.0.13, )",
-          "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": "[10.0.10, )",
+          "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": "[10.0.13, )",
           "Microsoft.Extensions.Caching.StackExchangeRedis": "[10.0.10, )",
           "Microsoft.Extensions.Http.Resilience": "[10.8.0, )",
           "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
@@ -1171,9 +1171,9 @@
       },
       "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": {
         "type": "CentralTransitive",
-        "requested": "[10.0.10, )",
-        "resolved": "10.0.10",
-        "contentHash": "cbAS0fCaHRF201gdtopfEwxW3CbWRX5/ScaAixbG0h33fQIoHUFMktCSVvpnfCvgUs6l9fmn/ZU2FeJGZ2/rGg==",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "/1GfT2ctt6tU98RSx52WTWgun7GNBBHsXyzK9QrNOyK+KwSfUNfraut3N5cOshOeMoUahRKPnPWvf8dekQpS8g==",
         "dependencies": {
           "StackExchange.Redis": "2.7.27"
         }

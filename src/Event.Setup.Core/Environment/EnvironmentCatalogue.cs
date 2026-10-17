@@ -69,8 +69,11 @@ public sealed class EnvironmentCatalogue
         ArgumentNullException.ThrowIfNull(key);
         if (_byKey.TryGetValue(key, out EnvironmentVariableDefinition? definition))
             return definition;
-        if (!IdentityCorrelationEnvironment.IsIssuerKey(key)
-            || !_byKey.TryGetValue(IdentityCorrelationEnvironment.FirstKey, out EnvironmentVariableDefinition? template))
+        string? templateKey = IdentityCorrelationEnvironment.IsIssuerKey(key)
+            ? IdentityCorrelationEnvironment.FirstKey
+            : KeycloakTokenEnvironment.IsClientKey(key) ? KeycloakTokenEnvironment.FirstClient : null;
+        if (templateKey is null
+            || !_byKey.TryGetValue(templateKey, out EnvironmentVariableDefinition? template))
             return null;
         return new EnvironmentVariableDefinition(key, template.Category, template.Sensitivity,
             template.Requirement, template.SafeDefault, template.Order, template.Activation,

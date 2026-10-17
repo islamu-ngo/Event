@@ -36,13 +36,17 @@ public sealed class SecretRuntimeRedactionTests
         var factory = Substitute.For<IInfisicalClientFactory>();
         factory.GetClientAsync(Arg.Any<CancellationToken>()).Returns(client);
         var logger = new CollectingLogger<InfisicalSecretSource>();
-        var source = new InfisicalSecretSource(factory, logger);
+        var source = new InfisicalSecretSource(factory, logger, Options.Create(new SecretProviderOptions
+        {
+            Provider = SecretProviderType.Infisical,
+            Infisical = new() { Environment = EnvironmentCanary }
+        }));
         SecretBinding binding = SecretBinding.CreateInfisical(
             SecretDefinitionRegistry.Keys.Smtp.Password,
             SecretScope.Instance,
             scopeId: null,
             EnvironmentCanary,
-            PathCanary,
+            "/smtp",
             "key-coordinate-canary");
 
         SecretResolutionResult result = await source.GetSecretAsync(binding, CancellationToken.None);
@@ -76,13 +80,19 @@ public sealed class SecretRuntimeRedactionTests
             .Returns(client);
         var source = new InfisicalSecretSource(
             factory,
-            new CollectingLogger<InfisicalSecretSource>());
+            new CollectingLogger<InfisicalSecretSource>(),
+            Options.Create(new SecretProviderOptions
+            {
+                Provider = SecretProviderType.Infisical,
+                Consumer = SecretConsumer.Bff,
+                Infisical = new() { Environment = EnvironmentCanary }
+            }));
         SecretBinding binding = SecretBinding.CreateInfisical(
             SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret,
             SecretScope.Instance,
             scopeId: null,
             EnvironmentCanary,
-            PathCanary,
+            "/runtime/bff/oidc/keycloak",
             "KEYCLOAK_BLAZOR_CLIENT_SECRET");
 
         SecretResolutionResult first =

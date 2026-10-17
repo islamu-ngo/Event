@@ -16,6 +16,9 @@ using Microsoft.Extensions.Options;
 
 public sealed class InfisicalSdkFailureBoundaryTests
 {
+    private const string SecretPath = "/smtp";
+    private const string SecretName = "MAIL_SMTP_PASSWORD";
+
     [Test]
     public async Task PinnedSdkUsesLocalReadProtocol()
     {
@@ -27,7 +30,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
         {
             ProjectId = Guid.CreateVersion7().ToString(),
             EnvironmentSlug = "test",
-            SecretPath = "/",
+            SecretPath = SecretPath,
             Recursive = false,
             ExpandSecretReferences = true,
             ViewSecretValue = true
@@ -55,7 +58,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
             try
             {
                 var client = await factory.GetClientAsync();
-                await client!.WriteSecretAsync("test", "/", "CANARY", value);
+                await client!.WriteSecretAsync("test", SecretPath, SecretName, value);
             }
             catch (Exception exception)
             {
@@ -71,7 +74,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
             {
                 var client = await factory.GetClientAsync();
                 failure = null;
-                try { await client!.GetSecretAsync("test", "/", "CANARY"); }
+                try { await client!.GetSecretAsync("test", SecretPath, SecretName); }
                 catch (Exception exception) { failure = exception; }
                 await AssertBoundedFailure(failure, server, expectedKind, definiteRejection);
             }
@@ -81,14 +84,14 @@ public sealed class InfisicalSdkFailureBoundaryTests
     private static async Task AssertBoundedFailure(
         Exception? failure, LocalProvider server, string expectedKind, bool definiteRejection)
     {
-            // Assert only bounded data, so a red run cannot print provider diagnostics.
-            await Assert.That(failure is InfisicalOperationException).IsTrue();
-            var bounded = (InfisicalOperationException)failure!;
-            await Assert.That(bounded.FailureKind.ToString()).IsEqualTo(expectedKind);
-            await Assert.That(bounded.DefiniteRejection).IsEqualTo(definiteRejection);
-            await Assert.That(bounded.InnerException is null).IsTrue();
-            await Assert.That(bounded.ToString().Contains(server.Canary, StringComparison.Ordinal)).IsFalse();
-            await Assert.That(bounded.ToString().Contains(server.ClientSecret, StringComparison.Ordinal)).IsFalse();
+        // Assert only bounded data, so a red run cannot print provider diagnostics.
+        await Assert.That(failure is InfisicalOperationException).IsTrue();
+        var bounded = (InfisicalOperationException)failure!;
+        await Assert.That(bounded.FailureKind.ToString()).IsEqualTo(expectedKind);
+        await Assert.That(bounded.DefiniteRejection).IsEqualTo(definiteRejection);
+        await Assert.That(bounded.InnerException is null).IsTrue();
+        await Assert.That(bounded.ToString().Contains(server.Canary, StringComparison.Ordinal)).IsFalse();
+        await Assert.That(bounded.ToString().Contains(server.ClientSecret, StringComparison.Ordinal)).IsFalse();
     }
 
     [Test]
@@ -105,7 +108,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
             try
             {
                 var client = await factory.GetClientAsync();
-                await client!.WriteSecretAsync("test", "/", "CANARY", value);
+                await client!.WriteSecretAsync("test", SecretPath, SecretName, value);
             }
             catch (Exception exception) { failure = exception; }
             finally { CryptographicOperations.ZeroMemory(value); }
@@ -114,7 +117,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
             {
                 var client = (await factory.GetClientAsync())!;
                 failure = null;
-                try { await client.GetSecretAsync("test", "/", "CANARY"); }
+                try { await client.GetSecretAsync("test", SecretPath, SecretName); }
                 catch (Exception exception) { failure = exception; }
                 await AssertBoundedFailure(failure, server, expectedKind, false);
             }
@@ -136,7 +139,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
         try
         {
             await Assert.That(async () => await client.WriteSecretAsync(
-                "test", "/", "CANARY", value, cancellation.Token)).Throws<OperationCanceledException>();
+                "test", SecretPath, SecretName, value, cancellation.Token)).Throws<OperationCanceledException>();
             await Assert.That(async () => await factory.GetClientAsync(cancellation.Token))
                 .Throws<OperationCanceledException>();
             await Assert.That(server.WriteCount).IsEqualTo(0);
@@ -158,7 +161,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
                 Task operation = loginFailure
                     ? factory.GetClientAsync(cancellation.Token)
                     : (await factory.GetClientAsync())!.WriteSecretAsync(
-                        "test", "/", "CANARY", value, cancellation.Token);
+                        "test", SecretPath, SecretName, value, cancellation.Token);
                 await server.Dispatched.Task.WaitAsync(TimeSpan.FromSeconds(10));
                 cancellation.Cancel();
                 await Assert.That(async () => await operation).Throws<OperationCanceledException>();
@@ -173,21 +176,23 @@ public sealed class InfisicalSdkFailureBoundaryTests
         await using var server = await LocalProvider.StartAsync(200);
         await using var factory = Factory(server);
         var client = (await factory.GetClientAsync())!;
-        var secret = await client.GetSecretAsync("test", "/", "CANARY");
+        var secret = await client.GetSecretAsync("test", SecretPath, SecretName);
         await Assert.That(secret!.Value == server.Canary).IsTrue();
         await Assert.That(secret.Revision == $"{server.SecretId}:1").IsTrue();
-        await Assert.That(await client.GetSecretAsync("test", "/", "ABSENT")).IsNull();
+        await Assert.That(await client.GetSecretAsync("test", SecretPath, "ABSENT")).IsNull();
         byte[] value = Encoding.UTF8.GetBytes(server.Canary);
         try
         {
-            await Assert.That(await client.WriteSecretAsync("test", "/", "CANARY", value)).IsTrue();
+            await Assert.That(await client.WriteSecretAsync("test", SecretPath, SecretName, value)).IsTrue();
             await Assert.That(server.ExactWrite).IsTrue();
             var sdk = new InfisicalClient(new InfisicalSdkSettingsBuilder().WithHostUri(server.Url).Build());
             await sdk.Auth().UniversalAuth().LoginAsync(server.ClientId, server.ClientSecret);
             var written = await sdk.Secrets().UpdateAsync(new UpdateSecretOptions
             {
                 ProjectId = Guid.CreateVersion7().ToString(),
-                EnvironmentSlug = "test", SecretPath = "/", SecretName = "CANARY",
+                EnvironmentSlug = "test",
+                SecretPath = SecretPath,
+                SecretName = SecretName,
                 NewSecretValue = server.Canary
             });
             await Assert.That(written is not null).IsTrue();
@@ -203,7 +208,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
         var client = (await factory.GetClientAsync())!;
         byte[] value = [0xC3, 0x28];
         Exception? failure = null;
-        try { await client.WriteSecretAsync("test", "/", "CANARY", value); }
+        try { await client.WriteSecretAsync("test", SecretPath, SecretName, value); }
         catch (Exception exception) { failure = exception; }
         finally { CryptographicOperations.ZeroMemory(value); }
         await AssertBoundedFailure(failure, server, "Invalid", false);
@@ -276,8 +281,8 @@ public sealed class InfisicalSdkFailureBoundaryTests
             {
                 ProjectId = Guid.CreateVersion7().ToString(),
                 EnvironmentSlug = "test",
-                SecretPath = "/",
-                SecretName = "CANARY",
+                SecretPath = SecretPath,
+                SecretName = SecretName,
                 NewSecretValue = server.Canary
             });
         }
@@ -322,7 +327,7 @@ public sealed class InfisicalSdkFailureBoundaryTests
             {
                 bool login = context.Request.Path.Value!.Contains("universal-auth", StringComparison.Ordinal);
                 Console.WriteLine($"SDK wire method={context.Request.Method}; " +
-                    $"route={context.Request.Path.Value!.Replace("CANARY", "{name}", StringComparison.Ordinal)}");
+                    $"route={context.Request.Path.Value!.Replace(SecretName, "{name}", StringComparison.Ordinal)}");
                 if (HttpMethods.IsGet(context.Request.Method))
                 {
                     Console.WriteLine("SDK wire query fields=" + string.Join(",", context.Request.Query.Keys));
@@ -334,9 +339,9 @@ public sealed class InfisicalSdkFailureBoundaryTests
                         body.RootElement.EnumerateObject().Select(property => property.Name)));
                     if (HttpMethods.IsPatch(context.Request.Method))
                         provider.ExactWrite = body.RootElement.GetProperty("secretValue").GetString() == provider.Canary
-                            && body.RootElement.GetProperty("secretName").GetString() == "CANARY"
+                            && body.RootElement.GetProperty("secretName").GetString() == SecretName
                             && body.RootElement.GetProperty("environment").GetString() == "test"
-                            && body.RootElement.GetProperty("secretPath").GetString() == "/";
+                            && body.RootElement.GetProperty("secretPath").GetString() == SecretPath;
                 }
                 if (login)
                 {
@@ -379,7 +384,11 @@ public sealed class InfisicalSdkFailureBoundaryTests
                 {
                     var secret = new
                     {
-                        id = provider.SecretId, secretKey = "CANARY", secretValue = provider.Canary, version = 1
+                        id = provider.SecretId,
+                        secretKey = SecretName,
+                        secretPath = SecretPath,
+                        secretValue = provider.Canary,
+                        version = 1
                     };
                     if (HttpMethods.IsGet(context.Request.Method))
                         await context.Response.WriteAsJsonAsync(new { secrets = new[] { secret } });

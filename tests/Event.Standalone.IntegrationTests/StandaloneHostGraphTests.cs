@@ -191,6 +191,7 @@ public sealed class StandaloneHostGraphTests
 
         using var uiRequest = new HttpRequestMessage(HttpMethod.Get, "/auth/status");
         uiRequest.Headers.Add("X-Forwarded-Host", bffOptions.AdminHosts.Single());
+        uiRequest.Headers.Add("X-Forwarded-Proto", "https");
         uiRequest.Headers.Add("X-Forwarded-For", "198.51.100.42");
         using var uiResponse = await client.SendAsync(uiRequest);
 

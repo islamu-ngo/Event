@@ -392,6 +392,12 @@ public sealed class CommandResponseResultMapperTests
     [Arguments("run_not_cancellable", 409, ConflictType, "run_not_cancellable", "ai-response-detail")]
     [Arguments("proposed_action_rejected", 409, ConflictType, "proposed_action_rejected", "ai-response-detail")]
     [Arguments("proposed_action_failed", 409, ConflictType, "proposed_action_failed", "ai-response-detail")]
+    [Arguments("proposed_action_expired", 409, ConflictType, "proposed_action_expired", "ai-response-detail")]
+    [Arguments("proposed_action_version_changed", 409, ConflictType, "proposed_action_version_changed", "ai-response-detail")]
+    [Arguments("proposed_action_authority_changed", 409, ConflictType, "proposed_action_authority_changed", "ai-response-detail")]
+    [Arguments("ai_draft_recovery_required", 409, ConflictType, "ai_draft_recovery_required", "ai-response-detail")]
+    [Arguments("ai_primary_recovery_required", 409, ConflictType, "ai_primary_recovery_required", "ai-response-detail")]
+    [Arguments("ai_draft_image_authority_changed", 409, ConflictType, "ai_draft_image_authority_changed", "ai-response-detail")]
     [Arguments("invalid_proposed_action_state", 409, ConflictType, "invalid_proposed_action_state",
         "ai-response-detail")]
     [Arguments("idempotency_key_conflict", 409, ConflictType, "idempotency_key_conflict", "ai-response-detail")]
@@ -419,6 +425,24 @@ public sealed class CommandResponseResultMapperTests
             expectedType,
             expectedCode,
             expectedDetail);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task AiRecoveryProblemDisclosesOriginalDraftOnlyForAuthorizedRecoveryDisposition(bool recovery)
+    {
+        Guid draftId = Guid.CreateVersion7();
+        string code = recovery ? "ai_draft_recovery_required" : "proposed_action_authority_changed";
+        var result = CreateController().ToAiAssistantProblem(
+            BaseCommandResponse.Failure(code, "Recovery is required.", id: draftId));
+        var objectResult = result as ObjectResult;
+        await Assert.That(objectResult!.StatusCode).IsEqualTo(409);
+        var problem = (ProblemDetails)objectResult.Value!;
+        await Assert.That(problem.Extensions["code"]).IsEqualTo(code);
+        await Assert.That(problem.Extensions.ContainsKey("id")).IsEqualTo(recovery);
+        if (recovery)
+            await Assert.That(problem.Extensions["id"]).IsEqualTo(draftId);
     }
 
     [Test]

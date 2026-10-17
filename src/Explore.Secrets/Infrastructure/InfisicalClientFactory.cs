@@ -21,6 +21,7 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
 {
     private readonly ILogger<InfisicalClientFactory> _logger;
     private readonly InfisicalOptions _options;
+    private readonly SecretConsumer _consumer;
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
     private HttpClient? _client;
@@ -38,6 +39,7 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
         ArgumentNullException.ThrowIfNull(options);
         _logger = logger;
         _options = options.Value.Infisical;
+        _consumer = options.Value.Consumer;
     }
 
     /// <inheritdoc />
@@ -103,7 +105,8 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.GetString());
             _authenticatedUntil = DateTimeOffset.UtcNow.AddSeconds(seconds);
             _facade ??= new InfisicalClientFacade(_client, _options.ProjectId!,
-                async token => { _ = await GetClientAsync(token).ConfigureAwait(false); });
+                async token => { _ = await GetClientAsync(token).ConfigureAwait(false); },
+                _consumer, _options.Environment);
             _initialized = true;
 
             _logger.LogInformation("secret_provider_authenticated");
@@ -170,13 +173,13 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
 
     private static InfisicalOperationException FromStatus(
         HttpStatusCode status, bool definiteRejection = true) => status switch
-    {
-        HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
-            new(InfisicalOperationFailureKind.Unauthorized, definiteRejection),
-        HttpStatusCode.NotFound => new(InfisicalOperationFailureKind.Missing, definiteRejection),
-        HttpStatusCode.BadRequest => new(InfisicalOperationFailureKind.Invalid, definiteRejection),
-        _ => new(InfisicalOperationFailureKind.Unavailable)
-    };
+        {
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
+                new(InfisicalOperationFailureKind.Unauthorized, definiteRejection),
+            HttpStatusCode.NotFound => new(InfisicalOperationFailureKind.Missing, definiteRejection),
+            HttpStatusCode.BadRequest => new(InfisicalOperationFailureKind.Invalid, definiteRejection),
+            _ => new(InfisicalOperationFailureKind.Unavailable)
+        };
 
     // The pinned SDK discards HTTP status and has no transport hook. Observe status
     // before reading a response body; never retain provider error payloads.
@@ -215,13 +218,18 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
         private readonly string _projectId;
         private readonly Func<CancellationToken, Task>? _authenticateAsync;
         private readonly Func<UpdateSecretOptions, CancellationToken, Task<bool>> _writeSecretAsync;
+        private readonly SecretConsumer _consumer;
+        private readonly string? _environment;
 
         public InfisicalClientFacade(
-            HttpClient client, string projectId, Func<CancellationToken, Task> authenticateAsync)
+            HttpClient client, string projectId, Func<CancellationToken, Task> authenticateAsync,
+            SecretConsumer consumer = SecretConsumer.Api, string? environment = null)
         {
             _client = client;
             _projectId = projectId;
             _authenticateAsync = authenticateAsync;
+            _consumer = consumer;
+            _environment = environment;
             _writeSecretAsync = async (options, cancellationToken) =>
             {
                 using var request = new HttpRequestMessage(
@@ -263,41 +271,57 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(environment) || string.IsNullOrWhiteSpace(folderPath)
-                || string.IsNullOrWhiteSpace(secretName))
+                || string.IsNullOrWhiteSpace(secretName)
+                || secretName.Contains("${", StringComparison.Ordinal)
+                || secretName.Contains('/')
+                || !SecretAcquisitionPolicy.AllowsPath(_consumer, folderPath)
+                || _environment is not null && !string.Equals(environment, _environment, StringComparison.Ordinal))
                 throw new InfisicalOperationException(InfisicalOperationFailureKind.Invalid);
+            SecretAcquisitionPolicy.AdmitEntry(folderPath, secretName);
             if (_authenticateAsync is not null)
                 await _authenticateAsync(cancellationToken).ConfigureAwait(false);
 
             using var request = new HttpRequestMessage(HttpMethod.Get,
                 $"/api/v3/secrets/raw?workspaceId={Uri.EscapeDataString(_projectId)}" +
                 $"&environment={Uri.EscapeDataString(environment)}&secretPath={Uri.EscapeDataString(folderPath)}" +
-                "&recursive=false&expandSecretReferences=true&viewSecretValue=true&include_imports=false" +
+                "&recursive=false&expandSecretReferences=false&viewSecretValue=true&include_imports=false" +
                 "&SetSecretsAsEnvironmentVariables=false");
             using JsonDocument result = await SendAsync(_client, request, cancellationToken).ConfigureAwait(false);
             if (result.RootElement.ValueKind != JsonValueKind.Object
                 || !result.RootElement.TryGetProperty("secrets", out JsonElement secrets)
                 || secrets.ValueKind != JsonValueKind.Array)
                 throw new InfisicalOperationException(InfisicalOperationFailureKind.Invalid);
+            SecretProviderValue? selected = null;
             foreach (JsonElement secret in secrets.EnumerateArray())
             {
                 if (secret.ValueKind != JsonValueKind.Object
+                    || !secret.TryGetProperty("secretPath", out JsonElement path)
+                    || path.ValueKind != JsonValueKind.String
+                    || !string.Equals(path.GetString(), folderPath, StringComparison.Ordinal)
                     || !secret.TryGetProperty("secretKey", out JsonElement key)
-                    || key.ValueKind != JsonValueKind.String)
+                    || key.ValueKind != JsonValueKind.String
+                    || !secret.TryGetProperty("secretValue", out JsonElement entryValue)
+                    || entryValue.ValueKind != JsonValueKind.String
+                    || entryValue.GetString()!.Contains("${", StringComparison.Ordinal))
                     throw new InfisicalOperationException(InfisicalOperationFailureKind.Invalid);
                 if (string.Equals(key.GetString(), secretName, StringComparison.OrdinalIgnoreCase))
                 {
                     if (!secret.TryGetProperty("secretValue", out JsonElement value)
                         || value.ValueKind != JsonValueKind.String
+                        || value.GetString()!.Contains("${", StringComparison.Ordinal)
                         || !secret.TryGetProperty("id", out JsonElement id)
                         || id.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(id.GetString())
                         || !secret.TryGetProperty("version", out JsonElement version)
-                        || version.ValueKind != JsonValueKind.Number || !version.TryGetInt64(out long number))
+                        || version.ValueKind != JsonValueKind.Number || !version.TryGetInt64(out long number)
+                        || number <= 0)
                         throw new InfisicalOperationException(InfisicalOperationFailureKind.Invalid);
-                    return new SecretProviderValue(value.GetString()!, $"{id.GetString()}:{number}");
+                    if (selected is not null)
+                        throw new InfisicalOperationException(InfisicalOperationFailureKind.Invalid);
+                    selected = new SecretProviderValue(value.GetString()!, $"{id.GetString()}:{number}");
                 }
             }
 
-            return null;
+            return selected;
         }
 
         public async Task<bool> WriteSecretAsync(
@@ -309,7 +333,13 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(environment) || string.IsNullOrWhiteSpace(folderPath)
-                || string.IsNullOrWhiteSpace(secretName))
+                || string.IsNullOrWhiteSpace(secretName)
+                || _environment is not null && !string.Equals(environment, _environment, StringComparison.Ordinal)
+                || !(SecretAcquisitionPolicy.AllowsPath(_consumer, folderPath)
+                    || _consumer is SecretConsumer.Api or SecretConsumer.Combined
+                        && (folderPath, secretName) is
+                            ("/runtime/bff/oidc/keycloak", "KEYCLOAK_BLAZOR_CLIENT_SECRET")
+                            or ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET")))
                 throw new InfisicalOperationException(InfisicalOperationFailureKind.Invalid);
 
             try

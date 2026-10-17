@@ -42,6 +42,7 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
     private readonly SecretResolverMetrics _metrics;
     private readonly ILogger<SecretResolver> _logger;
     private readonly SecretProviderType _provider;
+    private readonly SecretConsumer _consumer;
     private readonly string _infisicalEnvironment;
     private readonly string? _authorityEndpoint;
     private readonly string? _authorityProject;
@@ -67,6 +68,7 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         _metrics = metrics;
         _logger = logger;
         _provider = options.Value.Provider;
+        _consumer = options.Value.Consumer;
         _infisicalEnvironment = options.Value.Infisical.Environment;
         _authorityEndpoint = _provider == SecretProviderType.Infisical ? options.Value.Infisical.Url : null;
         _authorityProject = _provider == SecretProviderType.Infisical ? options.Value.Infisical.ProjectId : null;
@@ -79,7 +81,8 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         string settingKey, Guid tenantId, CancellationToken cancellationToken)
     {
         var binding = await ResolveBindingAsync(settingKey, tenantId, cancellationToken).ConfigureAwait(false);
-        if (binding is null || SelectedSourceType() != binding.SourceType)
+        if (binding is null || SelectedSourceType() != binding.SourceType
+            || !SecretAcquisitionPolicy.AllowsBinding(_consumer, binding, _infisicalEnvironment))
             throw new InvalidOperationException("storage_secret_unavailable");
         return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
     }
@@ -161,7 +164,9 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
-        ArgumentException.ThrowIfNullOrWhiteSpace(qualifier);
+        ArgumentNullException.ThrowIfNull(qualifier);
+        if (qualifier.Length != 0 && string.IsNullOrWhiteSpace(qualifier))
+            throw new ArgumentException("A qualifier must be empty or contain a binding identity.", nameof(qualifier));
 
         var stopwatch = Stopwatch.StartNew();
         var status = SecretResolutionStatus.Unavailable;
@@ -285,8 +290,15 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
             return SecretResolutionResult.Invalid;
         }
 
+        if (!SecretAcquisitionPolicy.AllowsBinding(_consumer, binding, _infisicalEnvironment))
+        {
+            _metrics.RecordError(binding.SourceType, SecretResolutionStatus.Invalid);
+            return SecretResolutionResult.Invalid;
+        }
+
         if (binding.SettingKey is SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret
             or SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret
+            or SecretDefinitionRegistry.Keys.Keycloak.LifecycleClientSecret
             or SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks)
         {
             SecretDefinition definition = SecretDefinitionRegistry.GetRequired(binding.SettingKey);

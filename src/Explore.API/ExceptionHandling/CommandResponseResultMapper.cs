@@ -628,6 +628,8 @@ internal static class CommandResponseResultMapper
             problemDetails.Extensions["quota"] = response.QuotaExceeded;
         }
 
+        if (response.FailureCode == "ai_draft_recovery_required" && response.Id != Guid.Empty)
+            problemDetails.Extensions["id"] = response.Id;
         return ApiProblemFactory.ToProblemResult(problemDetails);
     }
 
@@ -643,6 +645,12 @@ internal static class CommandResponseResultMapper
             "proposed_action_rejected" => StatusCodes.Status409Conflict,
             "proposed_action_failed" => StatusCodes.Status409Conflict,
             "invalid_proposed_action_state" => StatusCodes.Status409Conflict,
+            "proposed_action_expired" => StatusCodes.Status409Conflict,
+            "proposed_action_version_changed" => StatusCodes.Status409Conflict,
+            "proposed_action_authority_changed" => StatusCodes.Status409Conflict,
+            "ai_draft_recovery_required" => StatusCodes.Status409Conflict,
+            "ai_primary_recovery_required" => StatusCodes.Status409Conflict,
+            "ai_draft_image_authority_changed" => StatusCodes.Status409Conflict,
             "idempotency_key_conflict" => StatusCodes.Status409Conflict,
             "idempotency_replay_failed" => StatusCodes.Status409Conflict,
             FailureCodes.QuotaExceeded => StatusCodes.Status422UnprocessableEntity,

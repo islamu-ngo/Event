@@ -50,6 +50,13 @@ public static class SecretAuthorityConfiguration
     public static IConfiguration Build(
         IConfiguration bootstrapConfiguration,
         string environmentName,
+        params string[] infisicalPaths) =>
+        Build(bootstrapConfiguration, environmentName, SecretConsumer.Api, infisicalPaths);
+
+    public static IConfiguration Build(
+        IConfiguration bootstrapConfiguration,
+        string environmentName,
+        SecretConsumer consumer,
         params string[] infisicalPaths)
     {
         SecretProviderType provider = GetRequiredProvider(bootstrapConfiguration, environmentName);
@@ -58,24 +65,26 @@ public static class SecretAuthorityConfiguration
             IConfiguration environment = new ConfigurationBuilder()
                 .AddEnvironmentVariables()
                 .Build();
-            return PreserveProviderSelection(environment, provider);
+            return PreserveProviderSelection(environment, provider, consumer: consumer);
         }
 
         if (provider == SecretProviderType.UserSecrets)
         {
             EnsureUserSecretsEnvironment(environmentName);
-            return PreserveProviderSelection(BuildUserSecrets(), provider);
+            return PreserveProviderSelection(BuildUserSecrets(), provider, consumer: consumer);
         }
 
+        SecretAcquisitionPolicy.AdmitPaths(consumer, infisicalPaths);
         var builder = new ConfigurationBuilder();
         builder.AddInfisical(bootstrapConfiguration, source =>
         {
             source.Paths.Clear();
             source.Paths.AddRange(infisicalPaths);
+            source.Consumer = consumer;
             source.ThrowOnFirstLoadFailure = true;
         }, environmentName);
         var source = (InfisicalConfigurationSource)builder.Sources.Single();
-        return PreserveProviderSelection(builder.Build(), provider, source);
+        return PreserveProviderSelection(builder.Build(), provider, source, consumer);
     }
 
     public static string GetEnvironmentName(IConfiguration configuration) =>
@@ -91,12 +100,14 @@ public static class SecretAuthorityConfiguration
     internal static IConfiguration PreserveProviderSelection(
         IConfiguration authority,
         SecretProviderType provider,
-        InfisicalConfigurationSource? infisicalSource = null)
+        InfisicalConfigurationSource? infisicalSource = null,
+        SecretConsumer consumer = SecretConsumer.Api)
     {
         const string prefix = "SecretProvider:Infisical";
         var runtime = authority.GetSection(prefix).AsEnumerable()
             .ToDictionary(pair => pair.Key, _ => (string?)null, StringComparer.OrdinalIgnoreCase);
         runtime[$"{SecretProviderOptions.SectionName}:Provider"] = provider.ToString();
+        runtime[$"{SecretProviderOptions.SectionName}:Consumer"] = consumer.ToString();
         runtime["SECRET_PROVIDER"] = null;
         if (infisicalSource is not null)
         {

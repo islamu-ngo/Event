@@ -185,24 +185,12 @@ public class SecretBindingTests
 
 
     [Test]
-    public async Task Registry_CerbosAdminCredentials_AreNonBootstrapSecretDefinitions()
+    public async Task Registry_CerbosAdministratorBindingsAreNotRuntimeCapabilities()
     {
-        var username = SecretDefinitionRegistry.GetRequired(SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername);
-        var password = SecretDefinitionRegistry.GetRequired(SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword);
-
-        await Assert.That(username.DefaultInfisicalPath).IsEqualTo("/cerbos");
-        await Assert.That(username.DefaultEnvironmentVariableName).IsEqualTo("CERBOS_ADMIN_USERNAME");
-        await Assert.That(username.IsBootstrapSecret).IsFalse();
-        await Assert.That(username.AllowedSources).IsEquivalentTo([
-            SecretSourceType.Infisical,
-            SecretSourceType.EnvironmentVariable]);
-
-        await Assert.That(password.DefaultInfisicalPath).IsEqualTo("/cerbos");
-        await Assert.That(password.DefaultEnvironmentVariableName).IsEqualTo("CERBOS_ADMIN_PASSWORD");
-        await Assert.That(password.IsBootstrapSecret).IsFalse();
-        await Assert.That(password.AllowedSources).IsEquivalentTo([
-            SecretSourceType.Infisical,
-            SecretSourceType.EnvironmentVariable]);
+        await Assert.That(SecretDefinitionRegistry.TryGet(
+            SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername)).IsNull();
+        await Assert.That(SecretDefinitionRegistry.TryGet(
+            SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword)).IsNull();
     }
 
     [Test]

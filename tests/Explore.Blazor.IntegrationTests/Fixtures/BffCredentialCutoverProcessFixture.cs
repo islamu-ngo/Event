@@ -46,7 +46,10 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
             Results.Json(new { pathEnabled = false, headerEnabled = false }));
         _upstream.MapGet("/api/instanceonboarding/status", () => Results.Json(new
         {
-            isCompleted = true, state = "Completed", mode = "Interactive", generation = 1
+            isCompleted = true,
+            state = "Completed",
+            mode = "Interactive",
+            generation = 1
         }));
         _upstream.MapGet("/api/instanceonboarding/auth-provider-configuration", () => Results.NoContent());
         _upstream.MapGet("/api/cutover-drain", async (HttpContext context) =>
@@ -71,8 +74,10 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
         string project = Path.Combine(repository, "src", "Explore.Blazor");
         var start = new ProcessStartInfo("dotnet")
         {
-            WorkingDirectory = project, RedirectStandardOutput = true,
-            RedirectStandardError = true, UseShellExecute = false
+            WorkingDirectory = project,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
         };
         start.ArgumentList.Add(Path.Combine(project, "bin", "Release", "net10.0", "Explore.Blazor.dll"));
         var hostVariables = new[] { "PATH", "DOTNET_ROOT", "TMPDIR", "LD_LIBRARY_PATH" }
@@ -163,10 +168,12 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
 
         public HttpClient CreateBrowser() => new(new HttpClientHandler
         {
-            AllowAutoRedirect = false, CookieContainer = new CookieContainer(),
+            AllowAutoRedirect = false,
+            CookieContainer = new CookieContainer(),
             ServerCertificateCustomValidationCallback = (_, certificate, _, _) =>
                 certificate?.GetNameInfo(X509NameType.SimpleName, false) == "localhost"
-        }) { BaseAddress = Address };
+        })
+        { BaseAddress = Address };
 
         public async Task SignalStopAsync(CancellationToken cancellationToken)
         {

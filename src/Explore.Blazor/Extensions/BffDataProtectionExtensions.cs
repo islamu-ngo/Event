@@ -1,35 +1,15 @@
-using Microsoft.AspNetCore.DataProtection;
-using StackExchange.Redis;
+using Explore.ServiceDefaults.DataProtection;
 
 namespace Explore.Blazor.Extensions;
 
 public static class BffDataProtectionExtensions
 {
-    public const string ApplicationName = "islamu-event";
-    public const string KeyRingName = "islamu-event:data-protection-keys";
+    public const string ApplicationName = "islamu-event:bff:v1";
 
     public static IServiceCollection AddBffDataProtection(
-        this IServiceCollection services,
-        string? redisConnectionString)
+        this IServiceCollection services)
     {
-        var dataProtection = services
-            .AddDataProtection()
-            .SetApplicationName(ApplicationName);
-
-        if (string.IsNullOrWhiteSpace(redisConnectionString))
-        {
-            return services;
-        }
-
-        var connection = new Lazy<IConnectionMultiplexer>(
-            () => ConnectionMultiplexer.Connect(redisConnectionString));
-        services.AddSingleton(_ => connection.Value);
-
-        dataProtection.PersistKeysToStackExchangeRedis(
-            () => connection.Value.GetDatabase(),
-            KeyRingName);
-
-        return services;
+        return services.AddExternalDataProtection("bff");
     }
 
 }

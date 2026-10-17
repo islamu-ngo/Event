@@ -57,6 +57,14 @@ public static class DotenvComposer
                 .OrderBy(item => item.Key, StringComparer.Ordinal))
                 .DistinctBy(item => item.Key, StringComparer.Ordinal).ToArray();
         }
+        if (relevant.Any(item => item.Key == KeycloakTokenEnvironment.FirstClient))
+        {
+            relevant = relevant.Concat(supplied.Where(entry => entry is not null
+                    && KeycloakTokenEnvironment.IsClientKey(entry.Key))
+                .Select(entry => catalogue.Lookup(entry!.Key)!)
+                .OrderBy(item => item.Key, StringComparer.Ordinal))
+                .DistinctBy(item => item.Key, StringComparer.Ordinal).ToArray();
+        }
         var relevantByKey = relevant.ToDictionary(item => item.Key, StringComparer.Ordinal);
         var diagnostics = new List<EnvironmentDiagnostic>();
         var groups = new Dictionary<string, List<DotenvEntry>>(StringComparer.OrdinalIgnoreCase);
@@ -110,6 +118,7 @@ public static class DotenvComposer
         ValidateConfiguredBootstrapMatrix(relevantByKey, suppliedByKey, diagnostics);
         var output = new List<DotenvEntry>();
         var correlationIssuers = new HashSet<string>(StringComparer.Ordinal);
+        var permittedClients = new HashSet<string>(StringComparer.Ordinal);
         foreach (EnvironmentVariableDefinition definition in relevant)
         {
             bool isProtected = definition.Sensitivity != EnvironmentVariableSensitivity.Public;
@@ -125,6 +134,14 @@ public static class DotenvComposer
 
             if (suppliedEntry is not null)
             {
+                if (definition.Key == KeycloakTokenEnvironment.Audience
+                    && string.IsNullOrWhiteSpace(suppliedEntry.Value)
+                    || KeycloakTokenEnvironment.IsClientKey(definition.Key)
+                    && (string.IsNullOrWhiteSpace(suppliedEntry.Value) || !permittedClients.Add(suppliedEntry.Value)))
+                {
+                    Add(diagnostics, "dotenv-input-value-invalid", definition.Key);
+                    continue;
+                }
                 if (!ValidSuppliedEntry(suppliedEntry, isProtected))
                 {
                     Add(diagnostics, "dotenv-input-provenance-invalid", definition.Key);

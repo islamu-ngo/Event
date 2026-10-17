@@ -1,10 +1,8 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
-using Event.Api.IntegrationTests.Authentication;
 using Event.Api.IntegrationTests.Fixtures;
-using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
@@ -18,8 +16,6 @@ using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Localization;
 using Explore.Persistence;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -42,7 +38,6 @@ public sealed class NativeLocalizationHttpTests
         var directory = Directory.CreateTempSubdirectory("native-localization-");
         try
         {
-            using var jwt = new LocalizationNativeJwtAuthority();
             var liveProviderRequests = 0;
             var environment = Substitute.For<IWebHostEnvironment>();
             environment.ContentRootPath.Returns(directory.FullName);
@@ -51,11 +46,8 @@ public sealed class NativeLocalizationHttpTests
                 AuthorizationProviderOverride = new StubAuthorizationProvider(),
                 SeedActiveDefaultTenant = true
             };
-            baseFactory.AdditionalConfiguration["Keycloak:Authority"] = jwt.Issuer;
-            baseFactory.AdditionalConfiguration["Keycloak:MetadataAddress"] = $"{jwt.Issuer}/.well-known/openid-configuration";
             await using var factory = baseFactory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             {
-                jwt.ConfigureServices(services);
                 services.RemoveAll<OfflineTranslationProvider>();
                 services.AddSingleton(provider => new OfflineTranslationProvider(
                     provider.GetRequiredService<ILogger<OfflineTranslationProvider>>(), environment));
@@ -74,9 +66,7 @@ public sealed class NativeLocalizationHttpTests
             {
                 using var db = baseFactory.CreateMigratorContext();
                 var admin = NewUser(adminId, "localization-admin");
-                var member = NewUser(memberId, "localization-member");
-                db.Users.AddRange(admin, member);
-                db.UserExternalLogins.AddRange(jwt.Binding(admin), jwt.Binding(member));
+                db.Users.AddRange(admin, NewUser(memberId, "localization-member"));
                 var role = await db.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin");
                 db.PlatformUserRoles.Add(new PlatformUserRole
                 {
@@ -91,9 +81,8 @@ public sealed class NativeLocalizationHttpTests
             }
 
             using var anonymous = factory.CreateClient();
-            string adminToken = jwt.Token(adminId);
-            using var adminClient = Client(factory, adminToken);
-            using var forgedAdmin = Client(factory, jwt.Token(memberId, forgedAdmin: true));
+            using var adminClient = Client(factory, TestAuthHandler.CreateAuthHeaderValue(adminId));
+            using var forgedAdmin = Client(factory, TestAuthHandler.CreateInstanceAdminHeaderValue(memberId));
             using (var unauthorized = await anonymous.PostAsync("/api/admin/localization/test-connection", null))
                 await Assert.That(unauthorized.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
             using (var denied = await forgedAdmin.PostAsync("/api/admin/localization/test-connection", null))
@@ -186,18 +175,10 @@ public sealed class NativeLocalizationHttpTests
                 var previous = accessor.HttpContext;
                 accessor.HttpContext = new DefaultHttpContext
                 {
-                    RequestServices = services
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", adminId.ToString())], "Test"))
                 };
-                accessor.HttpContext.Request.Headers.Authorization = $"Bearer {adminToken}";
                 try
                 {
-                    var authentication = await accessor.HttpContext.AuthenticateAsync(JwtBearerDefaults.AuthenticationScheme);
-                    await Assert.That(authentication.Succeeded).IsTrue();
-                    accessor.HttpContext.User = authentication.Principal!;
-                    var lifetime = await services.GetRequiredService<IHumanAuthenticationLifetimeObserver>()
-                        .ObserveAsync(accessor.HttpContext.User, default);
-                    await Assert.That(lifetime).IsNotNull();
-                    await Assert.That(lifetime!.AuthenticationScheme).IsEqualTo(JwtBearerDefaults.AuthenticationScheme);
                     var resolver = services.GetRequiredService<ITranslationResolver>();
                     await Assert.That(await resolver.ResolveAsync("ui.native_cohort.greeting", "fr")).IsEqualTo("Bonjour");
                     var cache = services.GetRequiredService<IMemoryCache>();
@@ -220,16 +201,10 @@ public sealed class NativeLocalizationHttpTests
             {
                 var services = scope.ServiceProvider;
                 var tenant = services.GetRequiredService<ITenantContextAccessor>();
+                var status = services.GetRequiredService<IQueryHandler<GetLocalizationTmsApiKeyConfiguredQuery, bool>>();
                 tenant.SetTenant(foreignTenantId);
-                var status = services.GetRequiredService<IQueryHandler<GetLocalizationTmsApiKeyConfiguredQuery, bool>>();
                 await Assert.That(await status.QueryAsync(new(), default)).IsTrue();
-            }
-            using (var scope = factory.Services.CreateScope())
-            {
-                var services = scope.ServiceProvider;
-                var tenant = services.GetRequiredService<ITenantContextAccessor>();
                 tenant.SetTenant(PlatformDefaults.DefaultTenantId);
-                var status = services.GetRequiredService<IQueryHandler<GetLocalizationTmsApiKeyConfiguredQuery, bool>>();
                 await Assert.That(await status.QueryAsync(new(), default)).IsFalse();
                 using var db = baseFactory.CreateMigratorContext();
                 db.SecretBindings.Add(Binding(SecretScope.Instance, null));
@@ -277,10 +252,10 @@ public sealed class NativeLocalizationHttpTests
         Runtime = new() { ForceOfflineMode = true, ClientPickerEnabled = false }
     };
 
-    private static HttpClient Client(WebApplicationFactory<Program> factory, string token)
+    private static HttpClient Client(WebApplicationFactory<Program> factory, string claims)
     {
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeaderName, claims);
         return client;
     }
 

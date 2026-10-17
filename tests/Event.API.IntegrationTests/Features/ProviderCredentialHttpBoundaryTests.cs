@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
@@ -12,6 +13,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -50,6 +52,40 @@ public sealed class ProviderCredentialHttpBoundaryTests
         from caller in Enum.GetValues<Caller>()
         where caller != Caller.SetupOnly || !IsSetup(route)
         select (route, caller);
+
+    [Test]
+    [MethodDataSource(nameof(Routes))]
+    public async Task SignedWrongPurposeCannotReachCredentialProvider(Route route)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var denied = await fixture.SendAsync(route, accessToken: fixture.WrongPurposeToken());
+        await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        await Assert.That(fixture.Provider.Calls).IsEqualTo(0);
+        await AssertPrivateAsync(denied);
+
+        using var control = await fixture.SendAsync(route);
+        await Assert.That(control.StatusCode).IsEqualTo(ExpectedOutcome(route, Outcome.Success));
+        await Assert.That(fixture.Provider.Calls).IsEqualTo(1);
+    }
+
+    [Test]
+    [MethodDataSource(nameof(Routes))]
+    public async Task ForegroundCredentialStringsReachProviderUnchanged(Route route)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var credentials = new AuthorizationPolicyPackageSyncRequestDto
+        {
+            AdminUsername = $" {Canary()} ",
+            AdminPassword = $" {Canary()} "
+        };
+
+        using var response = await fixture.SendAsync(route, credentials: credentials);
+
+        await Assert.That(response.StatusCode).IsEqualTo(ExpectedOutcome(route, Outcome.Success));
+        await Assert.That(fixture.Provider.LastCredentials?.Username).IsEqualTo(credentials.AdminUsername);
+        await Assert.That(fixture.Provider.LastCredentials?.Password).IsEqualTo(credentials.AdminPassword);
+        await AssertPrivateAsync(response);
+    }
 
     [Test]
     [MethodDataSource(nameof(Outcomes))]
@@ -452,6 +488,8 @@ public sealed class ProviderCredentialHttpBoundaryTests
             return new Fixture(root, host, client, setup, provider, observer, userId);
         }
 
+        public string WrongPurposeToken() => _root.CreateJwt(_userId, [new Claim("typ", "ID")]);
+
         public async Task<HttpResponseMessage> SendAsync(
             Route route,
             string? key = null,
@@ -460,17 +498,21 @@ public sealed class ProviderCredentialHttpBoundaryTests
             string? setup = null,
             bool useDefaultSetup = true,
             bool forgedTenant = false,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            AuthorizationPolicyPackageSyncRequestDto? credentials = null,
+            string? accessToken = null)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, Path(route));
             request.Content = invalidBody
                 ? new StringContent("{", Encoding.UTF8, "application/json")
-                : JsonContent.Create(_bodies[route], _bodies[route].GetType());
+                : credentials is not null
+                    ? JsonContent.Create(credentials)
+                    : JsonContent.Create(_bodies[route], _bodies[route].GetType());
             // An explicit empty Authorization value prevents DefaultRequestHeaders inheritance.
             request.Headers.TryAddWithoutValidation(
                 "Authorization",
                 bearer
-                    ? $"Bearer {_bearer}"
+                    ? $"Bearer {accessToken ?? _bearer}"
                     : string.Empty);
             if (useDefaultSetup && IsSetup(route))
             {
@@ -554,8 +596,7 @@ public sealed class ProviderCredentialHttpBoundaryTests
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.IdempotencyRecords.RemoveRange(db.IdempotencyRecords);
             await db.SaveChangesAsync();
-            var repository = scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>();
-            IdempotencyClaim claim = await repository.TryClaimAsync(new IdempotencyRecord
+            db.IdempotencyRecords.Add(new IdempotencyRecord
             {
                 Id = Guid.CreateVersion7(),
                 Key = key,
@@ -568,19 +609,16 @@ public sealed class ProviderCredentialHttpBoundaryTests
                 RequestBodyHash = identity.BodyHash,
                 PrincipalFingerprint =
                     identity.PrincipalFingerprint,
-                StatusCode = IdempotencyRecord.InProgressStatusCode,
+                StatusCode = StatusCodes.Status200OK,
+                ContentType = "application/json",
+                ResponseBody = JsonSerializer.Serialize(
+                    new { credential = marker }),
                 CreatedAt =
                     DateTime.UtcNow.AddMinutes(-1),
                 ExpiresAt =
                     DateTime.UtcNow.AddHours(1)
             });
-            using IIdempotencyClaimOwner owner = claim.Owner
-                ?? throw new InvalidOperationException("The historical receipt seed did not acquire its original owner.");
-            await Assert.That(await repository.CompleteAsync(
-                owner,
-                StatusCodes.Status200OK,
-                JsonSerializer.Serialize(new { credential = marker }),
-                "application/json")).IsTrue();
+            await db.SaveChangesAsync();
         }
 
         public async ValueTask DisposeAsync()
@@ -633,7 +671,7 @@ public sealed class ProviderCredentialHttpBoundaryTests
 
     private sealed class ConfigurationStore : IAuthProviderConfigurationService
     {
-        private AuthProviderConfigurationDto _configuration = new()
+        private readonly AuthProviderConfigurationDto _configuration = new()
         {
             PrimaryProviderId =
                 (int)AuthenticationProviderKind.Keycloak,
@@ -647,11 +685,22 @@ public sealed class ProviderCredentialHttpBoundaryTests
             ReadConfigurationAsync() =>
             Task.FromResult(_configuration with { });
         public Task<bool> IsConfiguredAsync() => Task.FromResult(true);
-        public Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration, IReadOnlySet<string>? suppliedKeys = null, CancellationToken cancellationToken = default)
-        {
-            _configuration = configuration with { };
-            return Task.CompletedTask;
-        }
+        public Task<Explore.Application.Features.InstanceOnboarding.Services.ProviderConfigurationMutation>
+            ObserveConfigurationAsync(UpdateAuthProviderConfigurationCommand command, CancellationToken cancellationToken) =>
+            throw new UnauthorizedAccessException("The credential boundary fixture is observation-only.");
+        public Task<Explore.Application.Features.InstanceOnboarding.Services.ProviderConfigurationMutation>
+            ObserveConfigurationAsync(UpdateAuthProviderConfigurationDuringSetupCommand command, CancellationToken cancellationToken) =>
+            throw new UnauthorizedAccessException("The credential boundary fixture is observation-only.");
+        public Task ApplyConfigurationAsync(
+            Explore.Application.Features.InstanceOnboarding.Services.ProviderConfigurationMutation observation,
+            CancellationToken cancellationToken) =>
+            throw new UnauthorizedAccessException("The credential boundary fixture cannot complete configuration writes.");
+        public Task ApplySetupConfigurationAsync(UpdateAuthProviderConfigurationDuringSetupCommand command,
+            CancellationToken cancellationToken = default) =>
+            throw new UnauthorizedAccessException("The credential boundary fixture is observation-only.");
+        public Task ApplyConfigurationAsync(UpdateAuthProviderConfigurationCommand command,
+            CancellationToken cancellationToken = default) =>
+            throw new UnauthorizedAccessException("The credential boundary fixture is observation-only.");
     }
 
     private sealed class ProviderBoundary : IPolicyPackageService
@@ -660,6 +709,7 @@ public sealed class ProviderCredentialHttpBoundaryTests
         public int Calls => Volatile.Read(ref _calls);
         public bool Reject { get; set; }
         public bool Block { get; set; }
+        public PolicyPackageAdminCredentials? LastCredentials { get; private set; }
         public TaskCompletionSource FirstEntered { get; } = Signal();
         public TaskCompletionSource SecondEntered { get; } = Signal();
         public TaskCompletionSource Release { get; } = Signal();
@@ -671,15 +721,27 @@ public sealed class ProviderCredentialHttpBoundaryTests
             if (call == 2) SecondEntered.TrySetResult();
             if (Block) await Release.Task.WaitAsync(Deadline, cancellationToken);
         }
-        public async Task<PolicyPackagePublishResult> PublishAsync(CancellationToken cancellationToken = default, PolicyPackageAdminCredentials? oneTimeCredentials = null)
+        public async Task<PolicyPackagePublishResult> PublishAsync(SyncAuthorizationPolicyPackageCommand command,
+            CancellationToken cancellationToken = default)
         {
+            LastCredentials = command.Request.AdminUsername is null ? null
+                : new(command.Request.AdminUsername, command.Request.AdminPassword!);
             await EnterAsync(cancellationToken);
             return new(!Reject, "boundary", "boundary-revision", Message, DateTimeOffset.UtcNow, []);
         }
-        public Task<PolicyPackagePublishResult> PublishInstanceAsync(CancellationToken cancellationToken = default, PolicyPackageAdminCredentials? oneTimeCredentials = null)
-            => PublishAsync(cancellationToken, oneTimeCredentials);
+        public Task<IEventResourceProviderPublicationSelection> SelectOriginalPublicationAsync(
+            SyncAuthorizationPolicyPackageCommand command,
+            Explore.Application.Features.Settings.EventResourceProviderPublicationInput input, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("This HTTP transport boundary does not issue source custody.");
+        public Task RequireOriginalSelectionAsync(SyncAuthorizationPolicyPackageCommand command,
+            IEventResourceProviderPublicationSelection selection, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("This HTTP transport boundary does not issue source custody.");
         public Task<PolicyPackageManifest> BuildManifestAsync(CancellationToken cancellationToken = default) => throw new InvalidOperationException("Unexpected provider manifest operation.");
-        public Task<PolicyPackageStatusResult> GetStatusAsync(CancellationToken cancellationToken = default) => throw new InvalidOperationException("Unexpected provider status operation.");
+        public Task<PolicyPackageStatusResult> GetStatusAsync(CancellationToken cancellationToken = default,
+            PolicyPackageAdminCredentials? oneTimeCredentials = null, bool instanceTargetOnly = false)
+            => throw new InvalidOperationException("Unexpected provider status operation.");
+        public Task<bool> IsPublicationReadyAsync(CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Unexpected publication readiness operation.");
         public Task<PolicyPackageArchive> ExportArchiveAsync(CancellationToken cancellationToken = default) => throw new InvalidOperationException("Unexpected provider export operation.");
     }
 }

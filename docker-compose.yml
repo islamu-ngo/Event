@@ -4,7 +4,6 @@ x-keycloak-env: &keycloak-env
   KEYCLOAK_REALM: ${KEYCLOAK_REALM:-ISLAMU}
   KEYCLOAK_ENDPOINT: ${KEYCLOAK_ENDPOINT:-http://keycloak.localhost:8080}
   KEYCLOAK_BLAZOR_CLIENT_ID: ${KEYCLOAK_BLAZOR_CLIENT_ID:-islamu-event-blazor}
-  KEYCLOAK_BLAZOR_CLIENT_SECRET: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
   KEYCLOAK_INTERNAL_URL: http://keycloak:8080
   Keycloak__RequireHttpsMetadata: ${KEYCLOAK_REQUIRE_HTTPS_METADATA:-false}
 
@@ -50,12 +49,10 @@ x-secrets-env: &secrets-env
   SecretProvider__Provider: ${SECRET_PROVIDER:?Set SECRET_PROVIDER to Environment or Infisical}
   SecretProvider__Infisical__Url: ${INFISICAL_URL:-}
   SecretProvider__Infisical__ProjectId: ${INFISICAL_PROJECT_ID:-}
-  SecretProvider__Infisical__ClientId: ${INFISICAL_CLIENT_ID:-}
-  SecretProvider__Infisical__ClientSecret: ${INFISICAL_CLIENT_SECRET:-}
   SecretProvider__Infisical__Environment: ${INFISICAL_ENV:-}
 
 x-postgres-env: &postgres-env
-  POSTGRES_USER: ${DATABASE_MIGRATOR_USERNAME-explore}
+  POSTGRES_USER: ${DATABASE_MIGRATOR_USERNAME:-}
   POSTGRES_PASSWORD: ${DATABASE_MIGRATOR_PASSWORD:-}
   POSTGRES_DB: ${DATABASE_NAME:-islamu_event_db}
 
@@ -89,14 +86,26 @@ x-database-env: &database-env
   Database__ServerVersion: ${DATABASE_SERVER_VERSION:-}
 
 x-database-runtime-env: &database-runtime-env
-  Database__Runtime__Username: ${DATABASE_RUNTIME_USERNAME-explore}
-  Database__Runtime__Password: ${DATABASE_RUNTIME_PASSWORD-explore}
+  Database__Runtime__Username: ${DATABASE_RUNTIME_USERNAME:-}
+  Database__Runtime__Password: ${DATABASE_RUNTIME_PASSWORD:-}
   Database__Global__Username: ${DATABASE_GLOBAL_USERNAME:-}
   Database__Global__Password: ${DATABASE_GLOBAL_PASSWORD:-}
+  Database__InstanceKeyRead__Username: ${DATABASE_INSTANCE_KEY_READ_USERNAME:-}
+  Database__InstanceKeyRead__Password: ${DATABASE_INSTANCE_KEY_READ_PASSWORD:-}
+  Database__InstanceKeyWrite__Username: ${DATABASE_INSTANCE_KEY_WRITE_USERNAME:-}
+  Database__InstanceKeyWrite__Password: ${DATABASE_INSTANCE_KEY_WRITE_PASSWORD:-}
+  Database__InstanceKeyIssuance__Username: ${DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME:-}
+  Database__InstanceKeyIssuance__Password: ${DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD:-}
+  Database__PlatformKeyReport__Username: ${DATABASE_PLATFORM_KEY_REPORT_USERNAME:-}
+  Database__PlatformKeyReport__Password: ${DATABASE_PLATFORM_KEY_REPORT_PASSWORD:-}
+  Database__EmailPolicyInstanceMutation__Username: ${DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME:-}
+  Database__EmailPolicyInstanceMutation__Password: ${DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD:-}
+  Database__EmailPolicyTenantMutation__Username: ${DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME:-}
+  Database__EmailPolicyTenantMutation__Password: ${DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD:-}
 
 x-database-migrator-env: &database-migrator-env
-  Database__Migrator__Username: ${DATABASE_MIGRATOR_USERNAME-explore}
-  Database__Migrator__Password: ${DATABASE_MIGRATOR_PASSWORD-explore}
+  Database__Migrator__Username: ${DATABASE_MIGRATOR_USERNAME:-}
+  Database__Migrator__Password: ${DATABASE_MIGRATOR_PASSWORD:-}
 
 x-privacy-erasure-authority-env: &privacy-erasure-authority-env
   PrivacyErasure__Authority__Topology: ${ERASURE_DATABASE_TOPOLOGY:-EmbeddedSqlite}
@@ -142,6 +151,22 @@ x-s3-env: &s3-env
   STORAGE_S3_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_ACCESS_KEY:-}
 
 x-api-runtime-env: &api-runtime-env
+  EffectiveHostAuthority__InstanceHosts__0: ${EFFECTIVEHOSTAUTHORITY__INSTANCEHOSTS__0:-islamu-event-api}
+  EffectiveHostAuthority__SubdomainBaseDomains__0: ${EFFECTIVEHOSTAUTHORITY__SUBDOMAINBASEDOMAINS__0:-}
+  ForwardedHeadersTrust__ForwardLimit: ${FORWARDEDHEADERSTRUST__FORWARDLIMIT:-1}
+  ForwardedHeadersTrust__TrustLoopbackProxy: ${FORWARDEDHEADERSTRUST__TRUSTLOOPBACKPROXY:-false}
+  ForwardedHeadersTrust__KnownProxies__0: ${FORWARDEDHEADERSTRUST__KNOWNPROXIES__0:-}
+  ForwardedHeadersTrust__KnownNetworks__0: ${FORWARDEDHEADERSTRUST__KNOWNNETWORKS__0:-}
+  OperationalEndpoints__Address: ${OPERATIONALENDPOINTS__ADDRESS:-}
+  OperationalEndpoints__Port: ${OPERATIONALENDPOINTS__PORT:-0}
+  KEYCLOAK_LIFECYCLE_CLIENT_SECRET: ${KEYCLOAK_LIFECYCLE_CLIENT_SECRET:-}
+  KEYCLOAKLIFECYCLEEMAIL__ENABLED: ${KEYCLOAKLIFECYCLEEMAIL__ENABLED:-false}
+  KEYCLOAKLIFECYCLEEMAIL__BASEURL: ${KEYCLOAKLIFECYCLEEMAIL__BASEURL:-}
+  KEYCLOAKLIFECYCLEEMAIL__REALM: ${KEYCLOAKLIFECYCLEEMAIL__REALM:-ISLAMU}
+  KEYCLOAKLIFECYCLEEMAIL__CLIENTID: ${KEYCLOAKLIFECYCLEEMAIL__CLIENTID:-event-lifecycle}
+  KEYCLOAKLIFECYCLEEMAIL__DEFAULTCLIENTID: ${KEYCLOAKLIFECYCLEEMAIL__DEFAULTCLIENTID:-event-blazor}
+  KEYCLOAKLIFECYCLEEMAIL__PROVIDERVERSION: ${KEYCLOAKLIFECYCLEEMAIL__PROVIDERVERSION:-26.1.2}
+  KEYCLOAKLIFECYCLEEMAIL__ALLOWLOCALURLS: ${KEYCLOAKLIFECYCLEEMAIL__ALLOWLOCALURLS:-false}
   DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-}
   INSTANCE_ADMIN_PUBLIC_ORIGIN: ${INSTANCE_ADMIN_PUBLIC_ORIGIN:-http://admin.localhost:7002}
   SETUP_SECRET: ${SETUP_SECRET:-}
@@ -196,7 +221,12 @@ x-ai-env: &ai-env
   AI_PROVIDER: ${AI_PROVIDER:-none}
   AI_ENDPOINT: ${AI_ENDPOINT:-}
   AI_MODEL_ID: ${AI_MODEL_ID:-}
-  AI_API_KEY: ${AI_API_KEY:-}
+  AI_CREDENTIAL_SCOPE: ${AI_CREDENTIAL_SCOPE:-}
+  AI_OPENAI_API_KEY: ${AI_OPENAI_API_KEY:-}
+  AI_ANTHROPIC_API_KEY: ${AI_ANTHROPIC_API_KEY:-}
+  AI_OPENAI_COMPATIBLE_API_KEY: ${AI_OPENAI_COMPATIBLE_API_KEY:-}
+  AI_ANTHROPIC_COMPATIBLE_API_KEY: ${AI_ANTHROPIC_COMPATIBLE_API_KEY:-}
+  AI_AZURE_API_KEY: ${AI_AZURE_API_KEY:-}
   AI_TOOL_PROPOSALS_ENABLED: ${AI_TOOL_PROPOSALS_ENABLED:-false}
 
 x-geocoding-env: &geocoding-env
@@ -351,16 +381,10 @@ services:
       dockerfile: src/Event.MigrationService/Dockerfile
     environment:
       <<: [*secrets-env, *database-env, *database-migrator-env, *privacy-erasure-migrator-env, *local-identity-migrator-env]
-      CONFIGURATION_MANIFEST_MODE: ${CONFIGURATION_MANIFEST_MODE:-Off}
-      CONFIGURATION_MANIFEST_PATH: ${CONFIGURATION_MANIFEST_PATH:-/etc/islamu-event/bootstrap/configuration-manifest.json}
+      SecretProvider__Infisical__ClientId: ${INFISICAL_MIGRATION_CLIENT_ID:-}
+      SecretProvider__Infisical__ClientSecret: ${INFISICAL_MIGRATION_CLIENT_SECRET:-}
     volumes:
       - privacy_erasure_authority_data:/app/data
-      - type: bind
-        source: ${CONFIGURATION_MANIFEST_HOST_DIRECTORY:-./deploy/bootstrap}
-        target: /etc/islamu-event/bootstrap
-        read_only: true
-        bind:
-          create_host_path: false
     depends_on:
       privacy-erasure-authority-volume-init:
         condition: service_completed_successfully
@@ -447,6 +471,17 @@ services:
       context: .
       dockerfile: src/Explore.API/Dockerfile
     environment:
+      EVENT_DP_API_RING: ${EVENT_DP_API_RING:-}
+      EVENT_DP_API_ADMISSION: ${EVENT_DP_API_ADMISSION:-}
+      EVENT_DP_API_ADMISSION_SHA256: ${EVENT_DP_API_ADMISSION_SHA256:-}
+      EVENT_DP_API_MINIMUM_GENERATION: ${EVENT_DP_API_MINIMUM_GENERATION:-}
+      SecretProvider__Infisical__ClientId: ${INFISICAL_API_CLIENT_ID:-}
+      SecretProvider__Infisical__ClientSecret: ${INFISICAL_API_CLIENT_SECRET:-}
+      CONFIGURATION_MANIFEST_MODE: ${CONFIGURATION_MANIFEST_MODE:-Off}
+      CONFIGURATION_MANIFEST_PATH: ${CONFIGURATION_MANIFEST_PATH:-/etc/islamu-event/bootstrap/configuration-manifest.json}
+      KEYCLOAK__AUDIENCE: ${KEYCLOAK__AUDIENCE:-islamu-event-api}
+      # No default/empty item: Compose omits an unresolved passthrough variable.
+      KEYCLOAK__PERMITTEDCLIENTS__0:
       <<: [*keycloak-env, *authentication-selection-env, *local-identity-runtime-env, *s3-env, *local-storage-env, *secrets-env, *database-env, *database-runtime-env, *privacy-erasure-runtime-env, *api-runtime-env, *instance-operator-identity-env, *payment-operations-env, *payment-api-env, *ai-env, *geocoding-env, *mcp-env, *smtp-env, *email-dispatch-rabbitmq-env, *web-push-env, *reporting-env, *webhooks-env, *listmonk-env]
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: Production
@@ -463,11 +498,13 @@ services:
       Cerbos__PlaintextMode: ${CERBOS_PLAINTEXT_MODE:-true}
       Cerbos__PolicyPackagePath: /app/cerbos/policies
       Cerbos__AdminApi__Endpoints__0: ${CERBOS_HTTP_ENDPOINT:-http://cerbos:3592}
-      Cerbos__AdminPasswordHash: ${CERBOS_ADMIN_PASSWORD_HASH:-}
-      CERBOS_ADMIN_USERNAME: ${CERBOS_ADMIN_USERNAME:-}
-      CERBOS_ADMIN_PASSWORD: ${CERBOS_ADMIN_PASSWORD:-}
+      Cerbos__PolicyPackage__Publication__ReceiptBase64: ${CERBOS_PUBLICATION_RECEIPT_BASE64:-}
+      Cerbos__PolicyPackage__Publication__SignatureBase64: ${CERBOS_PUBLICATION_SIGNATURE_BASE64:-}
+      Cerbos__PolicyPackage__Publication__PublicKeyPem: ${CERBOS_PUBLICATION_PUBLIC_KEY_PEM:-}
+      Cerbos__PolicyPackage__Publication__Revision: ${CERBOS_PUBLICATION_REVISION:-}
+      Cerbos__PolicyPackage__Publication__Environment: ${CERBOS_PUBLICATION_ENVIRONMENT:-}
     ports:
-      - "${API_HTTP_PORT:-7039}:8080"
+      - "127.0.0.1:${API_HTTP_PORT:-7039}:8080"
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080'"]
       interval: 5s
@@ -482,6 +519,12 @@ services:
       - setup_data:/app/bootstrap
       - local_storage_data:/app/storage-data/local
       - privacy_erasure_authority_data:/app/data
+      - type: bind
+        source: ${CONFIGURATION_MANIFEST_HOST_DIRECTORY:-./deploy/bootstrap}
+        target: /etc/islamu-event/bootstrap
+        read_only: true
+        bind:
+          create_host_path: false
     deploy:
       replicas: 1
     depends_on:
@@ -491,7 +534,6 @@ services:
         condition: service_healthy
       event-migrationservice:
         condition: service_completed_successfully
-        required: false
       privacy-erasure-db:
         condition: service_healthy
         required: false
@@ -518,6 +560,16 @@ services:
       context: .
       dockerfile: src/Explore.Blazor/Dockerfile
     environment:
+      EVENT_DP_BFF_RING: ${EVENT_DP_BFF_RING:-}
+      EVENT_DP_BFF_ADMISSION: ${EVENT_DP_BFF_ADMISSION:-}
+      EVENT_DP_BFF_ADMISSION_SHA256: ${EVENT_DP_BFF_ADMISSION_SHA256:-}
+      EVENT_DP_BFF_MINIMUM_GENERATION: ${EVENT_DP_BFF_MINIMUM_GENERATION:-}
+      SecretProvider__Infisical__ClientId: ${INFISICAL_BFF_CLIENT_ID:-}
+      SecretProvider__Infisical__ClientSecret: ${INFISICAL_BFF_CLIENT_SECRET:-}
+      KEYCLOAK_BLAZOR_CLIENT_SECRET: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS: ${ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS:-}
       <<: [*keycloak-env, *authentication-selection-env, *secrets-env]
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: Production
@@ -624,21 +676,22 @@ services:
 
   cerbos-policy-sync:
     image: ghcr.io/cerbos/cerbosctl:0.53.0
-    profiles: ["authz"]
+    profiles: ["cerbos-publication"]
     depends_on:
       cerbos:
         condition: service_healthy
     environment:
-      CERBOS_USERNAME: ${CERBOS_ADMIN_USERNAME:-cerbos}
-      CERBOS_PASSWORD: ${CERBOS_ADMIN_PASSWORD:-}
+      CERBOS_USERNAME:
+      CERBOS_PASSWORD:
     volumes:
       # Sync the same repository policy bundle that local Cerbos reads from disk.
       - ./cerbos/policies:/policies:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        cerbosctl --server=http://cerbos:3592 put policy --recursive /policies &&
+        test -n "$$CERBOS_USERNAME" && test -n "$$CERBOS_PASSWORD" &&
         cerbosctl --server=http://cerbos:3592 put schema --recursive /policies/_schemas &&
+        cerbosctl --server=http://cerbos:3592 put policy --recursive /policies &&
         cerbosctl --server=http://cerbos:3592 store reload --wait
 
   svix-db:

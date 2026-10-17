@@ -25,7 +25,8 @@ public partial class OutboundTransportSecurityTests
     {
         await using var server = new OutboundTlsPeer("outbound.example");
         var services = new ServiceCollection();
-        services.ConfigureInfrastructureServices(new ConfigurationBuilder().Build());
+        services.ConfigureInfrastructureServices(new ConfigurationBuilder().Build(),
+            registerBackgroundWorkers: false);
         using var provider = services.BuildServiceProvider();
         using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(clientName);
         using var content = new OutboundTlsPayload();

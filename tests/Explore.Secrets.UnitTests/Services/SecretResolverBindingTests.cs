@@ -45,7 +45,11 @@ public sealed class SecretResolverBindingTests : IDisposable
         var source = new RecordingSecretSource(SecretSourceType.EnvironmentVariable);
         var resolver = new SecretResolver(new FakeSecretBindingRepository([binding]), [source],
             _cache, _metrics, NullLogger<SecretResolver>.Instance,
-            Options.Create(new SecretProviderOptions { Provider = SecretProviderType.Environment }));
+            Options.Create(new SecretProviderOptions
+            {
+                Provider = SecretProviderType.Environment,
+                Consumer = SecretConsumer.Bff
+            }));
         SecretResolutionResult initial = await resolver.ResolveAsync(settingKey, null);
         await Assert.That(initial.IsResolved).IsTrue();
 
@@ -369,6 +373,55 @@ public sealed class SecretResolverBindingTests : IDisposable
             await Assert.That(results[index].ScopeId).IsEqualTo(expectedTenant);
             await Assert.That(results[index].Value).IsEqualTo(expectedValue);
         }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExactUnqualifiedTenantResolutionCannotInheritInstanceCredential(bool configured)
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        const string key = SecretDefinitionRegistry.Keys.Ai.OpenAiApiKey;
+        var instance = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null, "INSTANCE_AI_KEY");
+        instance.Id = Guid.CreateVersion7();
+        var tenant = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Tenant, tenantId, "TENANT_AI_KEY");
+        tenant.Id = Guid.CreateVersion7();
+        string instanceValue = SecretsTestValues.CreateSecret();
+        string tenantValue = SecretsTestValues.CreateSecret();
+        var resolver = Resolver(configured ? [instance, tenant] : [instance], new Dictionary<Guid, string>
+        {
+            [instance.Id] = instanceValue,
+            [tenant.Id] = tenantValue
+        });
+
+        var result = await resolver.ResolveQualifiedAsync(key, SecretScope.Tenant, tenantId, "");
+
+        await Assert.That(result.Status).IsEqualTo(configured ? SecretResolutionStatus.Resolved : SecretResolutionStatus.Unconfigured);
+        await Assert.That(result.Value).IsEqualTo(configured ? tenantValue : null);
+        if (configured)
+        {
+            await Assert.That(result.Scope).IsEqualTo(SecretScope.Tenant);
+            await Assert.That(result.ScopeId).IsEqualTo(tenantId);
+        }
+    }
+
+    [Test]
+    public async Task CompatibleAiReferenceCannotSelectOfficialCredential()
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        const string key = SecretDefinitionRegistry.Keys.Ai.OpenAiApiKey;
+        var official = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Tenant, tenantId, "OFFICIAL_AI_KEY");
+        official.Id = Guid.CreateVersion7();
+        var resolver = Resolver([official], new Dictionary<Guid, string>
+        {
+            [official.Id] = SecretsTestValues.CreateSecret()
+        });
+
+        var result = await resolver.ResolveQualifiedAsync(SecretDefinitionRegistry.Keys.Ai.OpenAiCompatibleApiKey,
+            SecretScope.Tenant, tenantId, "");
+
+        await Assert.That(result.Status).IsEqualTo(SecretResolutionStatus.Unconfigured);
+        await Assert.That(result.Value).IsNull();
     }
 
     [Test]

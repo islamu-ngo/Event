@@ -34,6 +34,7 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
 
     private static SocketsHttpHandler CreateIpv4Handler() => new()
     {
+        AllowAutoRedirect = false,
         ConnectTimeout = TimeSpan.FromSeconds(5),
         ConnectCallback = static async (context, cancellationToken) =>
         {
@@ -119,7 +120,7 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
                 + $"?workspaceId={Uri.EscapeDataString(source.ProjectId)}"
                 + $"&environment={Uri.EscapeDataString(source.Environment)}"
                 + $"&secretPath={Uri.EscapeDataString(path)}"
-                + "&expandSecretReferences=false&recursive=false";
+                + "&expandSecretReferences=false&recursive=false&include_imports=false";
 
             using var response = http.GetAsync(requestUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)

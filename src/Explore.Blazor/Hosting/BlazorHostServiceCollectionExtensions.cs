@@ -56,7 +56,8 @@ public static class BlazorHostServiceCollectionExtensions
             builder.Host.UseSerilog((context, services, loggerConfiguration) =>
                 loggerConfiguration.ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
-                    .Enrich.FromLogContext(),
+                    .Enrich.FromLogContext()
+                    .WithBffDiagnosticConfidentiality(),
                 writeToProviders: true);
 
             builder.WebHost.ConfigureKestrel(options =>
@@ -72,6 +73,8 @@ public static class BlazorHostServiceCollectionExtensions
             });
 
             builder.AddServiceDefaults();
+            builder.Logging.AddFilter((category, _) => !BffDiagnosticLoggingExtensions.IsFrameworkCategory(category));
+            builder.Logging.AddOpenTelemetry(options => options.IncludeScopes = false);
             builder.AddResilientDistributedCache(connectionName: "cache");
             builder.AddDistributedCacheReadinessCheck();
             builder.AddOidcDiscoveryReadinessCheck();
@@ -187,7 +190,7 @@ public static class BlazorHostServiceCollectionExtensions
         healthChecks.AddCheck<DataProtectionKeyStoreHealthCheck>(
             "data-protection-keys",
             failureStatus: HealthStatus.Unhealthy,
-            tags: ["ready", "data-protection", "redis"]);
+            tags: ["ready", "data-protection", "external-authority"]);
 
         if (profile == BlazorHostProfile.Split)
         {

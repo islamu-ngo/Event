@@ -29,14 +29,17 @@ public sealed class EnvironmentSecretSource(
     {
         ArgumentNullException.ThrowIfNull(binding);
 
-        if (string.IsNullOrWhiteSpace(binding.EnvironmentVariableName))
+        string? variable = binding.EnvironmentVariableName;
+        if (string.IsNullOrWhiteSpace(variable)
+            || !SecretAcquisitionPolicy.AllowsBinding(options.Value.Consumer, binding,
+                options.Value.Infisical.Environment))
         {
             return Task.FromResult(SecretResolutionResult.Invalid);
         }
 
         var value = options.Value.Provider == SecretProviderType.UserSecrets
-            ? userSecretsAuthority.Get(binding.EnvironmentVariableName)
-            : Environment.GetEnvironmentVariable(binding.EnvironmentVariableName);
+            ? userSecretsAuthority.Get(variable)
+            : Environment.GetEnvironmentVariable(variable);
         if (string.IsNullOrEmpty(value))
         {
             return Task.FromResult(SecretResolutionResult.Unconfigured);

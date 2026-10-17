@@ -81,6 +81,43 @@ public static class DotenvReadiness
             if (isProtected) blocked.Add(definition.Key);
             else missing.Add(definition.Key);
         }
+        var relevantKeys = relevant.Select(definition => definition.Key).ToHashSet(StringComparer.Ordinal);
+        string[] roles = ["RUNTIME", "GLOBAL", "MIGRATOR"];
+        for (var index = 0; index < roles.Length; index++)
+        {
+            string usernameKey = $"DATABASE_{roles[index]}_USERNAME";
+            string passwordKey = $"DATABASE_{roles[index]}_PASSWORD";
+            if (!relevantKeys.Contains(passwordKey)) continue;
+            entries.TryGetValue(passwordKey, out var password);
+            entries.TryGetValue(usernameKey, out var username);
+            if (!string.IsNullOrWhiteSpace(password?.Value)
+                && (string.Equals(password.Value.Trim(), "explore", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(password.Value, username?.Value, StringComparison.OrdinalIgnoreCase)))
+            {
+                blocked.Add(passwordKey);
+                diagnostics.Add(new EnvironmentDiagnostic(
+                    "database-default-credential-forbidden", "$.readiness", passwordKey, "dotenv-readiness"));
+            }
+            for (var other = index + 1; other < roles.Length; other++)
+            {
+                foreach (var field in new[] { "USERNAME", "PASSWORD" })
+                {
+                    string firstKey = $"DATABASE_{roles[index]}_{field}";
+                    string secondKey = $"DATABASE_{roles[other]}_{field}";
+                    if (!relevantKeys.Contains(secondKey)
+                        || !entries.TryGetValue(firstKey, out var first)
+                        || !entries.TryGetValue(secondKey, out var second)
+                        || string.IsNullOrWhiteSpace(first?.Value) || string.IsNullOrWhiteSpace(second?.Value))
+                        continue;
+                    var comparison = field == "USERNAME" ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+                    if (!string.Equals(first.Value, second.Value, comparison)) continue;
+                    blocked.Add(firstKey);
+                    blocked.Add(secondKey);
+                    diagnostics.Add(new EnvironmentDiagnostic(
+                        "database-role-credentials-not-distinct", "$.readiness", firstKey, "dotenv-readiness"));
+                }
+            }
+        }
         DotenvReadinessState state = blocked.Count > 0
             ? DotenvReadinessState.Blocked
             : missing.Count > 0 ? DotenvReadinessState.Incomplete : DotenvReadinessState.Ready;
@@ -89,7 +126,7 @@ public static class DotenvReadiness
 
     private static bool ValidRequiredState(DotenvEntry? entry, bool isProtected)
     {
-        if (entry is null || string.IsNullOrEmpty(entry.Value)) return false;
+        if (entry is null || string.IsNullOrWhiteSpace(entry.Value)) return false;
         if (!isProtected)
             return !entry.IsSecret
                 && entry.Kind == DotenvEntryKind.LocalHumanValue

@@ -1,75 +1,45 @@
-using Explore.Blazor.Extensions;
+using System.Security.Cryptography;
+using Event.Testing.DataProtection;
 using Explore.Blazor.HealthChecks;
-using Microsoft.AspNetCore.DataProtection;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
-using StackExchange.Redis;
 
 namespace Explore.Blazor.IntegrationTests.Endpoints;
 
 public sealed class DataProtectionKeyStoreHealthCheckTests
 {
     [Test]
-    public async Task CheckHealthAsync_WhenKeyStoreIsReachable_ReturnsHealthyWithSafeData()
+    public async Task AdmittedAuthorityReportsOnlySafeMetadata()
     {
-        var database = Substitute.For<IDatabase>();
-        database.PingAsync(Arg.Any<CommandFlags>()).Returns(TimeSpan.FromMilliseconds(3));
-        database.KeyExistsAsync(
-                (RedisKey)BffDataProtectionExtensions.KeyRingName,
-                Arg.Any<CommandFlags>())
-            .Returns(true);
-        var connectionMultiplexer = Substitute.For<IConnectionMultiplexer>();
-        connectionMultiplexer.GetDatabase(Arg.Any<int>(), Arg.Any<object?>()).Returns(database);
-
-        var healthCheck = new DataProtectionKeyStoreHealthCheck(
-            [connectionMultiplexer],
-            new EphemeralDataProtectionProvider(),
-            NullLogger<DataProtectionKeyStoreHealthCheck>.Instance);
-
-        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
-
+        var authority = new ExternalDataProtectionTestAuthority("bff");
+        using var provider = ExternalDataProtectionProvider.Create(authority.Input, "bff", TimeProvider.System);
+        var check = new DataProtectionKeyStoreHealthCheck(new(authority, provider, TimeProvider.System));
+        var result = await check.CheckHealthAsync(new HealthCheckContext());
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Healthy);
-        await Assert.That(result.Data["keyRingPresent"]).IsEqualTo(true);
-        await Assert.That(result.Data["store"]).IsEqualTo("redis");
+        await Assert.That(result.Data["generation"]).IsEqualTo(1L);
         await Assert.That(result.Data.Keys).DoesNotContain("xml");
-        await Assert.That(result.Data.Keys).DoesNotContain("connectionString");
+        await Assert.That(result.Exception).IsNull();
     }
 
     [Test]
-    public async Task CheckHealthAsync_WhenKeyStoreIsMissing_ReturnsUnhealthyWithSafeFailureType()
+    public async Task ChangedAuthorityLatchesEveryCachedProtectorClosedUntilRestart()
     {
-        var connectionMultiplexer = Substitute.For<IConnectionMultiplexer>();
-        connectionMultiplexer
-            .GetDatabase(Arg.Any<int>(), Arg.Any<object?>())
-            .Returns(_ => throw new InvalidOperationException("Redis unavailable"));
-        var healthCheck = new DataProtectionKeyStoreHealthCheck(
-            [connectionMultiplexer],
-            new EphemeralDataProtectionProvider(),
-            NullLogger<DataProtectionKeyStoreHealthCheck>.Instance);
-
-        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
-
+        var authority = new ExternalDataProtectionTestAuthority("bff");
+        using var first = ExternalDataProtectionProvider.Create(authority.Input, "bff", TimeProvider.System);
+        using var second = ExternalDataProtectionProvider.Create(authority.Input, "bff", TimeProvider.System);
+        var cached = first.CreateProtector("cookie");
+        byte[] protectedData = cached.Protect([1, 2, 3]);
+        authority.Input = authority.Input with { MinimumGeneration = 2 };
+        var result = await new DataProtectionKeyStoreHealthCheck(new(authority, first, TimeProvider.System))
+            .CheckHealthAsync(new HealthCheckContext());
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Unhealthy);
-        await Assert.That(result.Description).IsEqualTo("Data Protection key store is unreachable.");
-        await Assert.That(result.Data["failureType"]).IsEqualTo(nameof(InvalidOperationException));
-        await Assert.That(result.Data.Keys).DoesNotContain("connectionString");
-    }
-
-    [Test]
-    public async Task CheckHealthAsync_WhenRedisIsNotConfigured_ValidatesLocalDataProtection()
-    {
-        var healthCheck = new DataProtectionKeyStoreHealthCheck(
-            [],
-            new EphemeralDataProtectionProvider(),
-            NullLogger<DataProtectionKeyStoreHealthCheck>.Instance);
-
-        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
-
-        await Assert.That(result.Status).IsEqualTo(HealthStatus.Healthy);
-        await Assert.That(result.Description).IsEqualTo("Local Data Protection key store is usable.");
-        await Assert.That(result.Data["store"]).IsEqualTo("local");
-        await Assert.That(result.Data.Keys).DoesNotContain("xml");
-        await Assert.That(result.Data.Keys).DoesNotContain("connectionString");
+        await Assert.That(() => cached.Unprotect(protectedData)).Throws<CryptographicException>();
+        // A different process is not magically refreshed by checking the first process.
+        await Assert.That(second.CreateProtector("cookie").Unprotect(protectedData).Length).IsEqualTo(3);
+        var secondResult = await new DataProtectionKeyStoreHealthCheck(new(authority, second, TimeProvider.System))
+            .CheckHealthAsync(new HealthCheckContext());
+        await Assert.That(secondResult.Status).IsEqualTo(HealthStatus.Unhealthy);
+        authority.Input = authority.Input with { MinimumGeneration = 1 };
+        await Assert.That(() => cached.Unprotect(protectedData)).Throws<CryptographicException>();
     }
 }

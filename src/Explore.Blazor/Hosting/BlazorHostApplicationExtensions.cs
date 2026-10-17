@@ -6,6 +6,7 @@ using Explore.Blazor.Components;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Services;
+using Explore.ServiceDefaults;
 
 namespace Explore.Blazor.Hosting;
 
@@ -61,6 +62,7 @@ public static class BlazorHostApplicationExtensions
         if (profile == BlazorHostProfile.Split)
         {
             app.UseEventBffForwardedHeaders();
+            app.UseEarlyRequestAdmission();
         }
 
         string? publicPathBase = ResolvePublicPathBase(app.Configuration);

@@ -345,7 +345,7 @@ public static class AgentBrowserPersonaStartup
 
     private static async Task ValidatePasswordAsync(IServiceProvider services, AgentBrowserPersona persona, string password, CancellationToken token)
     {
-        if (password.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+        if (!Explore.Domain.Authentication.LocalPasswordPolicy.TryNormalizeNewCredential(password, out _))
             throw Failure("password_invalid");
         var manager = services.GetRequiredService<UserManager<LocalIdentityUser>>();
         var user = new LocalIdentityUser { Id = persona.SubjectId, UserName = persona.Email, Email = persona.Email };

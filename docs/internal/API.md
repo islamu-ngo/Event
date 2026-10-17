@@ -5,6 +5,13 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Preliminary Tenant Routing Leases
 
+Scanner authentication uses IAdmissionScannerAuthenticationRepository on an
+independent Global lease. PostgreSQL matches each key version with its paired
+digest, not the cross product of the candidate lists. The native function returns
+at most two matches so an ambiguous credential fails rather than choosing one
+tenant. Runtime receives no scanner-table or authentication-function grant.
+Routine entry and installation reject undeclared executors.
+
 ApiKeyAuthenticationHandler acquires persisted credentials through
 IExternalApiKeyAuthenticationRepository, which owns an independent Global
 context for each exact-key lookup or usage update. PostgreSQL exposes only

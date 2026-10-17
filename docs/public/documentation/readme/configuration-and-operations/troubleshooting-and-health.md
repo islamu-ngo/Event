@@ -6,6 +6,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Scanner authentication requires its native Global execution group. Version and
+digest must match as a pair; a credential matching more than one scanner fails
+closed rather than selecting a tenant. Check digest-key rotation configuration
+and native installation without granting Runtime access to scanner records.
+
 Persisted API-key authentication requires the native authentication projection
 on the Global database account. Its usage update is restricted to the exact
 key's last-used time and IP address. Diagnose a failed projection through native

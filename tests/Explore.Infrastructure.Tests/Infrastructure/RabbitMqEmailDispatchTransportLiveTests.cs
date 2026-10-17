@@ -30,7 +30,8 @@ public sealed class RabbitMqEmailDispatchTransportLiveTests(RabbitMqContainerFix
 
         await Assert.That(health.Enabled).IsTrue();
         await Assert.That(health.Healthy).IsTrue();
-        await Assert.That(health.Data["exchange"]).IsEqualTo(settings.ExchangeName);
+        await Assert.That(health.Data.Count).IsEqualTo(1);
+        await Assert.That(health.Data["enabled"]).IsEqualTo(true);
 
         var exchange = await rabbitMq.GetExchangeAsync(settings.ExchangeName);
         var deadLetterExchange = await rabbitMq.GetExchangeAsync(settings.DeadLetterExchangeName);

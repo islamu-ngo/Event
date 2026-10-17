@@ -174,6 +174,8 @@ public sealed class EmailDeliveryInvitationAuthorityTests
             services.AddSingleton<BusinessMetrics>();
             services.AddScoped(_ => CreateContext(databasePath));
             services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+            services.AddScoped<IEmailDispatchAdmission>(provider =>
+                provider.GetRequiredService<IEmailDispatchOutboxRepository>());
             services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
             services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
             services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();

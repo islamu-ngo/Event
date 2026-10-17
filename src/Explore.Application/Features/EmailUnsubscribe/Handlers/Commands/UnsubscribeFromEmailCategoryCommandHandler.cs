@@ -56,9 +56,7 @@ public sealed class UnsubscribeFromEmailCategoryCommandHandler(
         }
 
         logger.LogInformation(
-            "Email category unsubscribed. TenantId={TenantId} UserId={UserId} Category={Category}",
-            request.TenantId,
-            request.UserId,
+            "Email category unsubscribed: {Category}",
             normalizedCategory);
 
         return BaseCommandResponse.Success(request.UserId, "Email notification preference updated.");

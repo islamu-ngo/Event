@@ -1,5 +1,6 @@
 
 using System.Data.Common;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings;
@@ -148,13 +149,11 @@ public sealed class EmailDeliveryFenceTests
         try
         {
             await CreateDatabaseAsync(databasePath);
-            await using ExploreDbContext context = CreateContext(databasePath);
-            var unitOfWork = new EfCoreUnitOfWork(context);
-            var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
-            var repository = new SystemSettingRepository(context, mutationLock);
-
-            await Assert.That(async () => await unitOfWork.ExecuteInTransactionAsync(async token =>
+            await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => CreateContext(databasePath));
+            await authenticated.RunAsync(null, session => session.ValueAsync(
+                settingKey, "smtp.changed.test", "\"smtp.changed.test\"", async token =>
             {
+                var repository = new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary);
                 var setting = new SystemSetting
                 {
                     Id = Guid.CreateVersion7(),
@@ -163,11 +162,13 @@ public sealed class EmailDeliveryFenceTests
                     ValueType = SettingValueType.String,
                     CreatedAt = DateTime.UtcNow
                 };
-                if (useExplicitTransactionWrite)
-                    await repository.UpsertInCurrentTransactionAsync(setting, token);
-                else
-                    await repository.UpsertAsync(setting, token);
-            })).Throws<InvalidOperationException>();
+                var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    useExplicitTransactionWrite
+                        ? repository.UpsertInCurrentTransactionAsync(setting, token)
+                        : repository.UpsertAsync(setting, token));
+                await Assert.That(rejected!.Message).Contains("email");
+                return true;
+            }));
 
             await using ExploreDbContext verification = CreateContext(databasePath);
             string host = await verification.SystemSettings
@@ -240,7 +241,7 @@ public sealed class EmailDeliveryFenceTests
             await Assert.That(transactionStartedBeforeRelease).IsFalse();
             await Assert.That(writerCompletedBeforeRelease).IsFalse();
             await using ExploreDbContext verificationContext = CreateContext(databasePath);
-            var repository = new SystemSettingRepository(verificationContext,
+            var repository = SystemSettingRepository.CreateReadOnly(verificationContext,
                 new RelationalSettingMutationLock(verificationContext, new EfCoreUnitOfWork(verificationContext)));
             var persisted = await repository.GetByKey(settingKey);
             await Assert.That(persisted!.Value).IsEqualTo(value);

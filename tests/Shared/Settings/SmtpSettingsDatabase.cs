@@ -1,9 +1,7 @@
 
-using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
-using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Models;
 using Explore.Application.Services;
 using Explore.Application.Settings;
@@ -18,14 +16,13 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
+using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.AspNetCore.DataProtection;
 using NSubstitute;
 using NSubstitute.Extensions;
 
@@ -40,26 +37,22 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
     private readonly TenantSettingRepository _tenantSettings;
     private readonly SecretBindingRepository _bindings;
     private readonly Dictionary<Guid, string> _bindingKeys = [];
-    private readonly EmailDeliveryDisableTokenService _tokens = new(new EphemeralDataProtectionProvider());
+    private readonly InternalEmailDeliverySettingsWriter _setupWriter;
 
     private SmtpSettingsDatabase(SqliteConnection connection, ExploreDbContext context)
     {
         _connection = connection;
         _context = context;
         MutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
-        _systemSettings = new SystemSettingRepository(context, MutationLock);
-        _tenantSettings = new TenantSettingRepository(context, MutationLock);
+        _systemSettings = SystemSettingRepository.CreateReadOnly(context, MutationLock);
+        _tenantSettings = TenantSettingRepository.CreateReadOnly(context, MutationLock);
         _bindings = new SecretBindingRepository(context);
-        Writer = new EmailDeliverySettingsWriter(context, MutationLock, new EfCoreUnitOfWork(context),
-            new EmailDeliveryDisableImpactReader(context), _tokens);
-        Settings = new HierarchicalSettingsResolver(_systemSettings, _tenantSettings,
+        _setupWriter = new InternalEmailDeliverySettingsWriter(context, MutationLock, new EfCoreUnitOfWork(context));
+        Settings = new HierarchicalSettingsReader(_systemSettings, _tenantSettings,
             new OrganizationSettingRepository(context), new GroupSettingRepository(context),
-            new GroupTenantRepository(context), new UserPreferenceRepository(context), this,
-            MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, Writer,
-            new EventResourceSettingsWriter(context, MutationLock, new EfCoreUnitOfWork(context)));
+            UserPreferenceRepository.CreateReadOnly(context), _cache);
         Capabilities = new EmailDeliveryCapabilityResolver(Settings, Secrets, _bindings);
         Smtp = new SmtpConfigResolver(Capabilities, this, Settings);
-        InstanceSmtp = new InstanceSmtpSettingService(_systemSettings, Writer, []);
         Secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(SecretResolutionResult.Unconfigured);
         Secrets.ResolveTenantBindingAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -71,11 +64,9 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
     public ExploreDbContext Context => _context;
     public ISettingMutationLock MutationLock { get; }
     public ISecretResolver Secrets { get; } = Substitute.For<ISecretResolver>();
-    public IHierarchicalSettingsResolver Settings { get; }
+    public IHierarchicalSettingsReader Settings { get; }
     public EmailDeliveryCapabilityResolver Capabilities { get; }
     public ISmtpConfigResolver Smtp { get; }
-    public InstanceSmtpSettingService InstanceSmtp { get; }
-    public EmailDeliverySettingsWriter Writer { get; }
 
     public static async Task<SmtpSettingsDatabase> CreateAsync()
     {
@@ -95,15 +86,10 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
         });
         var context = new ExploreDbContext(options.UseSqlite(connection).UseSnakeCaseNamingConvention().Options);
         await context.Database.EnsureCreatedAsync();
+        await SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);
+        await LookupTableSeeder.SeedAsync(context, CancellationToken.None);
         var fixture = new SmtpSettingsDatabase(connection, context);
         context.AddRange(
-            new SettingValueTypeLookup { Id = 0, MasterCode = "String", FullName = "String" },
-            new SettingValueTypeLookup { Id = 1, MasterCode = "Integer", FullName = "Integer" },
-            new SettingValueTypeLookup { Id = 2, MasterCode = "Boolean", FullName = "Boolean" },
-            new SettingScopeLookup { Id = 1, MasterCode = "Instance", FullName = "Instance" },
-            new SettingScopeLookup { Id = 2, MasterCode = "Tenant", FullName = "Tenant" },
-            new SecretSourceTypeLookup { Id = (int)SecretSourceType.EnvironmentVariable, MasterCode = "EnvironmentVariable", FullName = "Environment variable" },
-            new SecretValidationStatus { Id = (int)SecretValidationResult.NotValidated, MasterCode = "NotValidated", FullName = "Not validated" },
             new User
             {
                 Id = fixture.ActorId,
@@ -115,13 +101,8 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
                 Id = fixture.TenantId,
                 FullName = "SMTP test tenant",
                 Slug = "smtp-test",
-                TenantStatus = new TenantStatus
-                {
-                    Id = (int)TenantStatusEnum.Active,
-                    MasterCode = "Active",
-                    FullName = "Active",
-                    IsActiveState = true
-                },
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
                 CreatedAt = DateTime.UtcNow
             });
         await context.SaveChangesAsync();
@@ -150,14 +131,7 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
         if (EmailDeliverySettingKeys.Contains(key))
             await SetEmailValueAsync(tenantId: null, key, SettingValueSerializer.Serialize(value));
         else
-            await _systemSettings.UpsertAsync(new SystemSetting
-            {
-                Id = Guid.CreateVersion7(),
-                SettingKey = key,
-                Value = SettingValueSerializer.Serialize(value),
-                ValueType = SettingValueType.String,
-                CreatedAt = DateTime.UtcNow
-            });
+            await SetHumanValueAsync(key, value, tenantId: null);
         Settings.InvalidateCache(SettingScope.Instance);
     }
 
@@ -166,54 +140,73 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
         if (EmailDeliverySettingKeys.Contains(key))
             await SetEmailValueAsync(TenantId, key, SettingValueSerializer.Serialize(value));
         else
-            await _tenantSettings.SetValueAsync(TenantId, key, SettingValueSerializer.Serialize(value));
+            await SetHumanValueAsync(key, value, TenantId);
         Settings.InvalidateCache(SettingScope.Tenant, TenantId);
     }
 
-    // Commits through the policy writer without invalidating this process's settings cache.
+    private async Task SetHumanValueAsync<T>(string key, T value, Guid? tenantId)
+    {
+        string stored = SettingValueSerializer.Serialize(value);
+        string input = value is string text ? text : stored;
+        var options = (DbContextOptions<ExploreDbContext>)_context.GetService<IDbContextOptions>();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+            () => new ExploreDbContext(options));
+        await authenticated.RunAsync(tenantId, session => session.ValueAsync(key, input, stored, async token =>
+        {
+            if (tenantId is { } tenant)
+                await new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .SetValueAsync(tenant, key, stored, token, actorId: session.ActorId);
+            else
+            {
+                var repository = new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary);
+                var setting = await repository.GetByKey(key, token) ?? new SystemSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = key,
+                    Value = stored,
+                    ValueType = SettingValueType.String,
+                    CreatedBy = session.ActorId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                setting.Value = stored;
+                setting.UpdatedBy = session.ActorId;
+                await repository.UpsertAsync(setting, token);
+            }
+            return true;
+        }));
+    }
+
+    /// <summary>Seeds corrupt persisted state for reader fail-closed tests, not a lawful setting mutation.</summary>
+    public async Task SeedCorruptInstanceValueAsync(string key, string storedValue)
+    {
+        var setting = await _context.SystemSettings.SingleAsync(row => row.SettingKey == key);
+        setting.Value = storedValue;
+        await _context.SaveChangesAsync();
+        Settings.InvalidateCache(SettingScope.Instance);
+    }
+
+    // Nonhuman fixture setup deliberately leaves the reader cache intact for freshness tests.
     public async Task SetEmailValueAsync(Guid? tenantId, string key, string value)
     {
-        EmailDeliverySettingsWriteResult result;
-        if (key == GovernanceSettingKeys.Email.DeliveryEnabled && value == "false")
-        {
-            result = await MutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All],
-                token => new EfCoreUnitOfWork(_context).ExecuteSerializableAsync(async transactionToken =>
-                {
-                    var impact = (await new EmailDeliveryDisableImpactReader(_context).ReadAsync(tenantId, transactionToken))!;
-                    Guid actor = ActorId;
-                    return impact.CanDisable
-                        ? await Writer.DisableAsync(new(TenantId: tenantId, ActorUserId: actor,
-                            ExpectedRevision: impact.Revision, ConfirmationToken: _tokens.Issue(actor, impact).Token,
-                            Acknowledgement: EmailDeliveryDisableConfirmation.RequiredAcknowledgement), transactionToken)
-                        : await Writer.ApplyAsync([new(TenantId: tenantId, Key: key,
-                            Kind: EmailDeliverySettingMutationKind.SetValue, Value: value)], actorUserId: null, transactionToken);
-                }, token));
-        }
-        else
-            result = await Writer.ApplyAsync([new(TenantId: tenantId, Key: key,
+        var result = key == GovernanceSettingKeys.Email.DeliveryEnabled && value == "false"
+            ? await _setupWriter.DisableInternalAsync(tenantId, actorUserId: null)
+            : await _setupWriter.ApplyInternalAsync([new(TenantId: tenantId, Key: key,
                 Kind: EmailDeliverySettingMutationKind.SetValue, Value: value)], actorUserId: null);
         if (result.Status is not (EmailDeliverySettingsWriteStatus.Applied or EmailDeliverySettingsWriteStatus.NoChange))
             throw new InvalidOperationException($"SMTP fixture mutation rejected: {result.Status}.");
+    }
+
+    public async Task RemoveEmailValueAsync(Guid? tenantId, string key)
+    {
+        var result = await _setupWriter.ApplyInternalAsync(
+            [new(tenantId, key, EmailDeliverySettingMutationKind.Remove)], actorUserId: null);
+        result.EnsureAccepted();
     }
 
     public async Task AddCredentialsAsync(SecretScope scope)
     {
         await AddBindingAsync(SecretDefinitionRegistry.Keys.Smtp.Username, scope);
         await AddBindingAsync(SecretDefinitionRegistry.Keys.Smtp.Password, scope);
-    }
-
-    public Task RejectPortUpdatesAsync()
-    {
-        var entity = _context.Model.FindEntityType(typeof(SystemSetting))!;
-        var sql = _context.GetService<ISqlGenerationHelper>();
-        var table = sql.DelimitIdentifier(entity.GetTableName()!);
-        var key = sql.DelimitIdentifier(entity.FindProperty(nameof(SystemSetting.SettingKey))!.GetColumnName());
-        var trigger = $"""
-            CREATE TRIGGER reject_smtp_port_update BEFORE UPDATE ON {table}
-            WHEN NEW.{key} = 'email.smtp_port'
-            BEGIN SELECT RAISE(ABORT, 'SMTP port write rejected by test database'); END;
-            """;
-        return _context.Database.ExecuteSqlRawAsync(trigger);
     }
 
     public async Task AddBindingAsync(string key, SecretScope scope)

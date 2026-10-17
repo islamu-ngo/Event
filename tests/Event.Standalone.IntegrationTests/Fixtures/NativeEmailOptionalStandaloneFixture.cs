@@ -3,6 +3,8 @@
 
 using System.Runtime.Loader;
 using System.Security.Cryptography;
+using System.Text.Json;
+using Event.Testing.DataProtection;
 using Event.Standalone.Hosting;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
@@ -42,6 +44,16 @@ internal sealed class NativeEmailOptionalStandaloneFixture : IDisposable
                 SetEnvironment(name, null);
         }
 
+        byte[] blocklist = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            Version = 1,
+            Revision = Guid.CreateVersion7().ToString("N"),
+            Source = "runtime-generated fixture",
+            License = "project-authored synthetic data",
+            Passwords = new[] { NewPassword() }
+        });
+        string blocklistPath = Path.Combine(_directory, "password-policy.json");
+        File.WriteAllBytes(blocklistPath, blocklist);
         var values = new Dictionary<string, string?>
         {
             ["SECRET_PROVIDER"] = "Environment",
@@ -51,6 +63,8 @@ internal sealed class NativeEmailOptionalStandaloneFixture : IDisposable
             ["AUTHENTICATION_PROVIDER"] = "local",
             ["AUTHORIZATION_PROVIDER"] = "local",
             ["AUTHENTICATION_LOCAL_JWT_KEY"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+            ["AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH"] = blocklistPath,
+            ["AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256"] = Convert.ToHexString(SHA256.HashData(blocklist)),
             ["PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID"] = Guid.CreateVersion7().ToString("N"),
             ["PRIVACY_ERASURE_IDENTITY_FENCE_KEY"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             ["INSTANCE_BOOTSTRAP_MODE"] = "ConfiguredAdministrator",
@@ -88,6 +102,12 @@ internal sealed class NativeEmailOptionalStandaloneFixture : IDisposable
         };
         foreach ((string name, string? value) in values)
             SetEnvironment(name, value);
+        var dataProtection = new ExternalDataProtectionTestAuthority("combined").Input;
+        SetEnvironment("EVENT_DP_COMBINED_RING", dataProtection.Ring);
+        SetEnvironment("EVENT_DP_COMBINED_ADMISSION", dataProtection.Admission);
+        SetEnvironment("EVENT_DP_COMBINED_ADMISSION_SHA256", dataProtection.AdmissionSha256);
+        SetEnvironment("EVENT_DP_COMBINED_MINIMUM_GENERATION", dataProtection.MinimumGeneration.ToString(
+            System.Globalization.CultureInfo.InvariantCulture));
 
         // Standalone's native package includes these assemblies. WebApplicationFactory does not
         // transitively copy the host's custom migration output target into the test executable.
@@ -144,12 +164,10 @@ internal sealed class NativeEmailOptionalStandaloneFixture : IDisposable
             });
         }
 
-        public HttpClient OpenClient() => CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false,
-            HandleCookies = false,
-            BaseAddress = new Uri("https://localhost")
-        });
+        // Existing operator-readiness scenarios explicitly use the private TestServer socket.
+        // Public-boundary scenarios use CreateClient instead.
+        public HttpClient OpenClient() =>
+            Event.Testing.Hosting.OperationalEndpointTestTransport.CreateClient(Server);
     }
 
     internal sealed class SmtpDiagnosticTransport : IEmailConnectionTester

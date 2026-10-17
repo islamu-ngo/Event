@@ -1,4 +1,5 @@
 
+using Explore.Persistence.Database.ProviderPrimitives;
 using System.Net;
 using System.Text.Json.Nodes;
 using Explore.API.Configuration;
@@ -14,6 +15,7 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Mail;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Tests.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
@@ -24,6 +26,8 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using OpenTelemetry.Metrics;
 using NSubstitute;
 using NSubstitute.Extensions;
@@ -140,6 +144,24 @@ public sealed class EmailOptionalHealthTests
     }
 
     [Test]
+    public async Task Readiness_EnabledDispatchReadsEmptyOperationalSnapshot()
+    {
+        await using var database = await SmtpSettingsDatabase.CreateAsync();
+        await using var app = await StartAsync(database, new Probe(EmailScenario.Disabled), new EmailDispatchProcessorSettings
+        {
+            Enabled = true,
+            Mode = EmailDispatchProcessorMode.HostedService
+        });
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync("/health");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(CheckStatus(await response.Content.ReadAsStringAsync(), "email-dispatch"))
+            .IsEqualTo(HealthStatus.Healthy);
+    }
+
+    [Test]
     public async Task Readiness_EnabledDispatchCannotHideDatabaseFailure()
     {
         await using var database = await SmtpSettingsDatabase.CreateAsync();
@@ -165,6 +187,8 @@ public sealed class EmailOptionalHealthTests
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.WebHost.UseTestServer();
+        builder.Configuration["OperationalEndpoints:Address"] = "127.0.0.1";
+        builder.Configuration["OperationalEndpoints:Port"] = "9091";
         builder.Logging.ClearProviders();
         builder.Services.AddOpenTelemetry().WithMetrics(metrics => metrics.AddPrometheusExporter());
         builder.Services.AddSingleton<IEmailConnectionTester>(transport);
@@ -186,13 +210,32 @@ public sealed class EmailOptionalHealthTests
             builder.Services.Configure<QuartzSchedulerSettings>(options => options.Enabled = false);
             builder.Services.AddMetrics();
             builder.Services.AddSingleton<BusinessMetrics>();
-            builder.Services.AddSingleton<IEmailDispatchOutboxRepository>(new EmailDispatchOutboxRepository(database.Context));
+            builder.Services.AddSingleton<IEmailDispatchHealthSnapshotReader>(
+                new EmailDispatchHealthSnapshotReader(new HealthDbContextFactory(database)));
             health.AddCheck<EmailDispatchHealthCheck>("email-dispatch", tags: ["ready"]);
         }
         var app = builder.Build();
+        app.Use((context, next) =>
+        {
+            context.Connection.LocalIpAddress = IPAddress.Loopback;
+            context.Connection.LocalPort = 9091;
+            return next(context);
+        });
         app.MapDefaultEndpoints();
         await app.StartAsync();
         return app;
+    }
+
+    private sealed class HealthDbContextFactory(SmtpSettingsDatabase database) : IEmailDispatchAdmissionDbContextFactory
+    {
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // Reuse the actual SQLite database without transferring ownership of the
+            // SMTP fixture context. A disposed authority still fails acquisition.
+            var options = (DbContextOptions<ExploreDbContext>)database.Context.GetService<IDbContextOptions>();
+            return Task.FromResult(new ExploreDbContext(options));
+        }
     }
 
     private sealed class FailingAuthorityProbe(SmtpSettingsDatabase database, AuthorityFailure failure) : IEmailConnectionTester

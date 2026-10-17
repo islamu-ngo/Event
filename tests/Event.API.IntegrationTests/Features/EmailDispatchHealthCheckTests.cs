@@ -102,13 +102,6 @@ public sealed class EmailDispatchHealthCheckTests
         await Assert.That(result.Description).Contains("intentionally disabled");
         await Assert.That(result.Data).ContainsKey("enabled").And.Value.IsEqualTo(false);
         await Assert.That(result.Data).ContainsKey("consumerId").And.Value.IsEqualTo("disabled-consumer");
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountDueDispatchAsync(default, default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountRetryScheduledAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountStaleProcessingAsync(default, default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountDeadLetteredAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountUnknownAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountParkedAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().IsOptionalReminderDeferralActiveAsync(default);
     }
 
     [Test]
@@ -133,13 +126,6 @@ public sealed class EmailDispatchHealthCheckTests
         await Assert.That(result.Description).Contains("Disabled");
         await Assert.That(result.Data).ContainsKey("enabled").And.Value.IsEqualTo(true);
         await Assert.That(result.Data).ContainsKey("mode").And.Value.IsEqualTo(nameof(EmailDispatchProcessorMode.Disabled));
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountDueDispatchAsync(default, default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountRetryScheduledAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountStaleProcessingAsync(default, default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountDeadLetteredAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountUnknownAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountParkedAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().IsOptionalReminderDeferralActiveAsync(default);
     }
 
     [Test]
@@ -164,13 +150,6 @@ public sealed class EmailDispatchHealthCheckTests
         await Assert.That(result.Description).Contains("Quartz");
         await Assert.That(result.Data).ContainsKey("mode").And.Value.IsEqualTo(nameof(EmailDispatchProcessorMode.Quartz));
         await Assert.That(result.Data).ContainsKey("schedulerEnabled").And.Value.IsEqualTo(false);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountDueDispatchAsync(default, default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountRetryScheduledAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountStaleProcessingAsync(default, default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountDeadLetteredAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountUnknownAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().CountParkedAsync(default);
-        await setup.Repository.DidNotReceiveWithAnyArgs().IsOptionalReminderDeferralActiveAsync(default);
     }
 
     [Test]
@@ -379,10 +358,27 @@ public sealed class EmailDispatchHealthCheckTests
         await Assert.That(json).Contains(HealthCheckResponseWriter.RedactedValue);
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GlobalPauseControlsHealthWithoutHidingRateOverride(bool paused)
+    {
+        var setup = CreateHealthCheck(
+            new EmailDispatchProcessorSettings { Enabled = true, Mode = EmailDispatchProcessorMode.HostedService },
+            globalPaused: paused,
+            globalSmtpRateLimitOverrideActive: true);
+        using var services = setup.Services;
+
+        var result = await setup.HealthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        await Assert.That(result.Status).IsEqualTo(paused ? HealthStatus.Degraded : HealthStatus.Healthy);
+        await Assert.That(result.Data).ContainsKey("globalPaused").And.Value.IsEqualTo(paused);
+        await Assert.That(result.Data).ContainsKey("globalSmtpRateLimitOverrideActive").And.Value.IsEqualTo(true);
+    }
+
     private static (
         EmailDispatchHealthCheck HealthCheck,
-        ServiceProvider Services,
-        IEmailDispatchOutboxRepository Repository) CreateHealthCheck(
+        ServiceProvider Services) CreateHealthCheck(
             EmailDispatchProcessorSettings settings,
             QuartzSchedulerSettings? schedulerOptions = null,
             int dueDispatchCount = 0,
@@ -393,46 +389,43 @@ public sealed class EmailDispatchHealthCheckTests
             int parkedCount = 0,
             bool optionalReminderDeferralActive = false,
             DateTime? oldestDueCreatedAt = null,
-            IReadOnlyDictionary<Guid, int>? dueDispatchByTenant = null)
+            IReadOnlyDictionary<Guid, int>? dueDispatchByTenant = null,
+            bool globalPaused = false,
+            bool globalSmtpRateLimitOverrideActive = false)
     {
-        var repository = Substitute.For<IEmailDispatchOutboxRepository>();
-        repository.CountDueDispatchAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(dueDispatchCount));
-        repository.CountRetryScheduledAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(retryScheduledCount));
-        repository.CountStaleProcessingAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(staleProcessingCount));
-        repository.CountDeadLetteredAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(deadLetteredCount));
-        repository.CountUnknownAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(unknownCount));
-        repository.CountParkedAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(parkedCount));
-        repository.IsOptionalReminderDeferralActiveAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(optionalReminderDeferralActive));
-        repository.GetOldestDueCreatedAtAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(oldestDueCreatedAt));
-        repository.CountDueDispatchByTenantAsync(
-                Arg.Any<DateTime>(),
-                Arg.Any<int>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => Task.FromResult<IReadOnlyDictionary<Guid, int>>(
-                (dueDispatchByTenant ?? new Dictionary<Guid, int>())
-                .OrderByDescending(entry => entry.Value)
-                .ThenBy(entry => entry.Key)
-                .Take(call.ArgAt<int>(1))
-                .ToDictionary()));
-
-        var services = new ServiceCollection()
-            .AddSingleton(repository)
-            .BuildServiceProvider();
+        var serviceCollection = new ServiceCollection();
+        // No reader is available in disabled modes: accidentally acquiring aggregate
+        // authority makes the existing healthy/degraded assertions fail.
+        if (settings.Enabled && settings.Mode != EmailDispatchProcessorMode.Disabled
+            && (settings.Mode != EmailDispatchProcessorMode.Quartz || schedulerOptions?.Enabled == true))
+        {
+            serviceCollection.AddSingleton<IEmailDispatchHealthSnapshotReader>(new HealthSnapshotReader(
+                new EmailDispatchHealthSnapshot(
+                    dueDispatchCount, retryScheduledCount, staleProcessingCount,
+                    deadLetteredCount, unknownCount, parkedCount, oldestDueCreatedAt,
+                    optionalReminderDeferralActive, globalPaused, globalSmtpRateLimitOverrideActive,
+                    dueDispatchByTenant ?? new Dictionary<Guid, int>())));
+        }
+        var services = serviceCollection.BuildServiceProvider();
         var healthCheck = new EmailDispatchHealthCheck(
             Options.Create(settings),
             Options.Create(schedulerOptions ?? new QuartzSchedulerSettings()),
             services.GetRequiredService<IServiceScopeFactory>(),
             CreateMetrics());
 
-        return (healthCheck, services, repository);
+        return (healthCheck, services);
+    }
+
+    private sealed class HealthSnapshotReader(EmailDispatchHealthSnapshot snapshot) : IEmailDispatchHealthSnapshotReader
+    {
+        public Task<EmailDispatchHealthSnapshot> ReadAsync(
+            DateTime now, DateTime processingStartedBefore, int tenantSampleLimit, CancellationToken cancellationToken) =>
+            Task.FromResult(new EmailDispatchHealthSnapshot(
+                snapshot.DueDispatchCount, snapshot.RetryScheduledCount, snapshot.StaleProcessingCount,
+                snapshot.DeadLetteredCount, snapshot.UnknownCount, snapshot.ParkedCount, snapshot.OldestDueCreatedAt,
+                snapshot.OptionalReminderDeferralActive, snapshot.GlobalPaused, snapshot.GlobalSmtpRateLimitOverrideActive,
+                snapshot.TenantBacklogSample.OrderByDescending(entry => entry.Value).ThenBy(entry => entry.Key)
+                    .Take(tenantSampleLimit).ToDictionary()));
     }
 
     private static BusinessMetrics CreateMetrics()

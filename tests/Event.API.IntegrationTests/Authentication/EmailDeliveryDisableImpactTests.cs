@@ -1,17 +1,16 @@
 
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.EmailDispatch;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
-using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using static Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace Event.Persistence.IntegrationTests.Repositories;
+namespace Event.Api.IntegrationTests.Authentication;
 
 [NotInParallel("SqliteEmailDispatchEligibility")]
 public sealed class EmailDeliveryDisableImpactTests
@@ -19,12 +18,13 @@ public sealed class EmailDeliveryDisableImpactTests
     [Test]
     public async Task InstanceDisable_IncludesInheritedAndMisconfiguredScopesButPreservesIndependentEnablement()
     {
-        string path = NewDatabasePath();
-        try
+        await using var fixture = await SmtpAuthenticatedFixture.CreateAsync();
         {
-            await CreateDatabaseAsync(path);
-            await using var context = CreateContext(path);
+            await using var context = fixture.CreateIndependentContext();
             await UnlockDelegationAsync(context);
+            await SetEmailSettingAsync(context, GovernanceSettingKeys.Email.SmtpHost, "\"smtp.impact.test\"");
+            await SetTenantSettingsAsync(context, fixture.TenantId,
+                (GovernanceSettingKeys.Email.DeliveryEnabled, "false"));
             Guid inherited = await AddTenantAsync(context);
             Guid sharedExplicit = await AddTenantAsync(context);
             Guid independent = await AddTenantAsync(context);
@@ -54,12 +54,9 @@ public sealed class EmailDeliveryDisableImpactTests
                 .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDeliveryPolicyReconciliation)
                 .AsNoTracking().OrderBy(row => row.Id)
                 .Select(row => new { row.Id, row.Value, row.IsLocked }).ToListAsync();
-            await context.Database.OpenConnectionAsync();
-            await using var transaction = await context.Database.BeginTransactionAsync();
-            await context.Database.ExecuteSqlRawAsync("PRAGMA query_only = ON");
-            try
+            await fixture.ExecuteAsync(tenantOwner: false, async services =>
             {
-                var snapshot = await new EmailDeliveryDisableImpactReader(context).ReadAsync(null);
+                var snapshot = await ReadImpactAsync(services, null);
 
                 await Assert.That(snapshot).IsNotNull();
                 await Assert.That(snapshot!.CanDisable).IsTrue();
@@ -68,15 +65,10 @@ public sealed class EmailDeliveryDisableImpactTests
                     .. new[] { inherited, sharedExplicit, inheritedByo, misconfigured }.Order()
                         .Select(id => new EmailDeliveryAffectedScope(TenantId: id, Revision: controlsBefore.GetValueOrDefault(id)))];
                 await Assert.That(snapshot.AffectedScopes.SequenceEqual(expected)).IsTrue();
-                await Assert.That(context.ChangeTracker.Entries().Any()).IsFalse();
-                await transaction.CommitAsync();
-            }
-            finally
-            {
-                await context.Database.ExecuteSqlRawAsync("PRAGMA query_only = OFF");
-            }
+                await Assert.That(services.GetRequiredService<ExploreDbContext>().ChangeTracker.Entries().Any()).IsFalse();
+            });
 
-            await using var observer = CreateContext(path);
+            await using var observer = fixture.CreateIndependentContext();
             await Assert.That((await observer.SystemSettings.AsNoTracking().SingleAsync(
                 setting => setting.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled)).Value).IsEqualTo("true");
             await Assert.That((await observer.EmailDispatchProcessorStates.AsNoTracking().SingleAsync()).DeliveryPolicyRevision)
@@ -91,7 +83,6 @@ public sealed class EmailDeliveryDisableImpactTests
                 .Select(row => new { row.Id, row.Value, row.IsLocked }).ToListAsync();
             await Assert.That(overridesAfter.SequenceEqual(overridesBefore)).IsTrue();
         }
-        finally { DeleteDatabase(path); }
     }
 
     [Test]
@@ -99,11 +90,9 @@ public sealed class EmailDeliveryDisableImpactTests
     [Arguments(true)]
     public async Task TenantDisable_RespectsInstanceAndDelegationLocks(bool delegationLock)
     {
-        string path = NewDatabasePath();
-        try
+        await using var fixture = await SmtpAuthenticatedFixture.CreateAsync();
         {
-            await CreateDatabaseAsync(path);
-            await using var context = CreateContext(path);
+            await using var context = fixture.CreateIndependentContext();
             await UnlockDelegationAsync(context);
             Guid tenantId = await AddTenantAsync(context);
             await SetTenantSettingsAsync(context, tenantId, (GovernanceSettingKeys.Email.DeliveryEnabled, "true"));
@@ -111,36 +100,38 @@ public sealed class EmailDeliveryDisableImpactTests
                 [new(TenantId: null,
                     Key: delegationLock ? GovernanceSettingKeys.TenantDelegation.LockSmtp : GovernanceSettingKeys.Email.DeliveryEnabled,
                     Kind: EmailDeliverySettingMutationKind.SetValue, Value: "true", IsLocked: !delegationLock)]);
-            await using var transaction = await context.Database.BeginTransactionAsync();
-            var snapshot = await new EmailDeliveryDisableImpactReader(context).ReadAsync(tenantId);
-            await Assert.That(snapshot!.IsLocked).IsTrue();
-            await Assert.That(snapshot.CanDisable).IsFalse();
-            await Assert.That(snapshot.AffectedScopes.IsEmpty).IsTrue();
+            await fixture.ExecuteAsync(tenantOwner: true, async services =>
+            {
+                var snapshot = await ReadImpactAsync(services, tenantId);
+                await Assert.That(snapshot!.IsLocked).IsTrue();
+                await Assert.That(snapshot.CanDisable).IsFalse();
+                await Assert.That(snapshot.AffectedScopes.IsEmpty).IsTrue();
+            }, selectedTenantId: tenantId);
         }
-        finally { DeleteDatabase(path); }
     }
 
     [Test]
     public async Task TenantDisable_OnlyAffectsSelectedTenantAndUsesZeroForAbsentControl()
     {
-        string path = NewDatabasePath();
-        try
+        await using var fixture = await SmtpAuthenticatedFixture.CreateAsync();
         {
-            await CreateDatabaseAsync(path);
-            await using var context = CreateContext(path);
+            await using var context = fixture.CreateIndependentContext();
             await UnlockDelegationAsync(context);
             Guid selected = await AddTenantAsync(context);
             await AddTenantAsync(context);
-            await using var transaction = await context.Database.BeginTransactionAsync();
-            var reader = new EmailDeliveryDisableImpactReader(context);
-            var snapshot = await reader.ReadAsync(selected);
-            await Assert.That(snapshot!.Revision).IsEqualTo(0L);
-            await Assert.That(snapshot.CanDisable).IsTrue();
-            await Assert.That(snapshot.AffectedScopes.SequenceEqual([new EmailDeliveryAffectedScope(TenantId: selected, Revision: 0)])).IsTrue();
-            await Assert.That(await reader.ReadAsync(Guid.CreateVersion7())).IsNull();
-            await Assert.That(async () => await reader.ReadAsync(Guid.Empty)).Throws<ArgumentException>();
+            await fixture.ExecuteAsync(tenantOwner: true, async services =>
+            {
+                var snapshot = await ReadImpactAsync(services, selected);
+                await Assert.That(snapshot!.Revision).IsEqualTo(0L);
+                await Assert.That(snapshot.CanDisable).IsTrue();
+                await Assert.That(snapshot.AffectedScopes.SequenceEqual(
+                    [new EmailDeliveryAffectedScope(TenantId: selected, Revision: 0)])).IsTrue();
+                var reader = services.GetRequiredService<IEmailDeliveryDisableImpactReader>();
+                await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    ExecutePreviewAsync(services, selected, _ => reader.ReadAsync(Guid.CreateVersion7())));
+                await Assert.That(async () => await reader.ReadAsync(Guid.Empty)).Throws<ArgumentException>();
+            }, selectedTenantId: selected);
         }
-        finally { DeleteDatabase(path); }
     }
 
     [Test]
@@ -148,11 +139,9 @@ public sealed class EmailDeliveryDisableImpactTests
     [Arguments(true)]
     public async Task ScopeOwnLock_OnlyLocksDescendantsAndStillAllowsDisable(bool tenantScope)
     {
-        string path = NewDatabasePath();
-        try
+        await using var fixture = await SmtpAuthenticatedFixture.CreateAsync();
         {
-            await CreateDatabaseAsync(path);
-            await using var context = CreateContext(path);
+            await using var context = fixture.CreateIndependentContext();
             await UnlockDelegationAsync(context);
             Guid tenantId = await AddTenantAsync(context);
             if (tenantScope)
@@ -163,65 +152,54 @@ public sealed class EmailDeliveryDisableImpactTests
                 await ApplyEmailSettingsAsync(context,
                     [new(TenantId: null, Key: GovernanceSettingKeys.Email.DeliveryEnabled,
                         Kind: EmailDeliverySettingMutationKind.SetValue, Value: "true", IsLocked: true)]);
-            await using var transaction = await context.Database.BeginTransactionAsync();
-            var snapshot = await new EmailDeliveryDisableImpactReader(context).ReadAsync(tenantScope ? tenantId : null);
-            await Assert.That(snapshot!.IsLocked).IsFalse();
-            await Assert.That(snapshot.CanDisable).IsTrue();
-            await Assert.That(snapshot.AffectedScopes.Any(scope => scope.TenantId == tenantId)).IsTrue();
+            await fixture.ExecuteAsync(tenantOwner: tenantScope, async services =>
+            {
+                var snapshot = await ReadImpactAsync(services, tenantScope ? tenantId : null);
+                await Assert.That(snapshot!.IsLocked).IsFalse();
+                await Assert.That(snapshot.CanDisable).IsTrue();
+                await Assert.That(snapshot.AffectedScopes.Any(scope => scope.TenantId == tenantId)).IsTrue();
+            }, selectedTenantId: tenantScope ? tenantId : null);
         }
-        finally { DeleteDatabase(path); }
     }
 
     [Test]
     public async Task InstancePreview_ReflectsCommittedMembershipChangesWithoutAnInstanceRevisionChange()
     {
-        string path = NewDatabasePath();
-        try
+        await using var fixture = await SmtpAuthenticatedFixture.CreateAsync();
         {
-            await CreateDatabaseAsync(path);
-            await using var observer = CreateContext(path);
             EmailDeliveryDisableImpactSnapshot before;
-            await using (var transaction = await observer.Database.BeginTransactionAsync())
-            {
-                before = (await new EmailDeliveryDisableImpactReader(observer).ReadAsync(null))!;
-                await transaction.CommitAsync();
-            }
-
-            await using var writer = CreateContext(path);
+            before = (await ReadImpactAsync(fixture, null))!;
+            await using var writer = fixture.CreateIndependentContext();
             Guid createdTenant = await AddTenantAsync(writer);
-            await using (var transaction = await observer.Database.BeginTransactionAsync())
             {
-                var afterCreation = (await new EmailDeliveryDisableImpactReader(observer).ReadAsync(null))!;
+                var afterCreation = (await ReadImpactAsync(fixture, null))!;
                 await Assert.That(afterCreation.Revision).IsEqualTo(before.Revision);
                 await Assert.That(afterCreation.AffectedScopes.Length).IsEqualTo(before.AffectedScopes.Length + 1);
                 await Assert.That(afterCreation.AffectedScopes.Contains(
                     new EmailDeliveryAffectedScope(TenantId: createdTenant, Revision: 0))).IsTrue();
-                await transaction.CommitAsync();
             }
 
             await writer.Tenants.Where(tenant => tenant.Id == createdTenant).ExecuteDeleteAsync();
-            await using (var transaction = await observer.Database.BeginTransactionAsync())
             {
-                var afterRemoval = (await new EmailDeliveryDisableImpactReader(observer).ReadAsync(null))!;
+                var afterRemoval = (await ReadImpactAsync(fixture, null))!;
                 await Assert.That(afterRemoval.Revision).IsEqualTo(before.Revision);
                 await Assert.That(afterRemoval.AffectedScopes.SequenceEqual(before.AffectedScopes)).IsTrue();
             }
         }
-        finally { DeleteDatabase(path); }
     }
 
     [Test]
-    public async Task Preview_RequiresCallerTransaction()
+    public async Task Preview_RequiresOriginalAcquiredProofNotOnlyCallerTransaction()
     {
-        string path = NewDatabasePath();
-        try
+        await using var fixture = await SmtpAuthenticatedFixture.CreateAsync();
+        await fixture.ExecuteAsync(tenantOwner: false, async services =>
         {
-            await CreateDatabaseAsync(path);
-            await using var context = CreateContext(path);
-            await Assert.That(async () => await new EmailDeliveryDisableImpactReader(context).ReadAsync(null))
-                .Throws<InvalidOperationException>();
-        }
-        finally { DeleteDatabase(path); }
+            var reader = services.GetRequiredService<IEmailDeliveryDisableImpactReader>();
+            await Assert.That(async () => await reader.ReadAsync(null)).Throws<InvalidOperationException>();
+            await using var transaction = await services.GetRequiredService<ExploreDbContext>()
+                .Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => reader.ReadAsync(null));
+        });
     }
 
     private static async Task<Guid> AddTenantAsync(ExploreDbContext context)
@@ -250,13 +228,52 @@ public sealed class EmailDeliveryDisableImpactTests
     private static Task UnlockDelegationAsync(ExploreDbContext context) =>
         SetEmailSettingAsync(context, GovernanceSettingKeys.TenantDelegation.LockSmtp, "false");
 
-    private static string NewDatabasePath() => Path.Combine(Path.GetTempPath(), $"email-disable-impact-{Guid.CreateVersion7():N}.db");
-
-    private static void DeleteDatabase(string path)
+    private static async Task ApplyEmailSettingsAsync(ExploreDbContext context,
+        System.Collections.Immutable.ImmutableArray<EmailDeliverySettingMutation> effects)
     {
-        SqliteConnection.ClearAllPools();
-        File.Delete(path);
-        File.Delete(path + "-wal");
-        File.Delete(path + "-shm");
+        var unit = new EfCoreUnitOfWork(context);
+        var writer = new InternalEmailDeliverySettingsWriter(context,
+            new RelationalSettingMutationLock(context, unit), unit);
+        var result = await writer.ApplyInternalAsync(effects, null);
+        await Assert.That(result.Status is EmailDeliverySettingsWriteStatus.Applied
+            or EmailDeliverySettingsWriteStatus.NoChange).IsTrue();
+    }
+
+    private static async Task SetEmailSettingAsync(ExploreDbContext context, string key, string value,
+        Guid? tenantId = null)
+    {
+        if (key != GovernanceSettingKeys.Email.DeliveryEnabled || value != "false")
+        {
+            await ApplyEmailSettingsAsync(context, [new(tenantId, key, EmailDeliverySettingMutationKind.SetValue, value)]);
+            return;
+        }
+        var unit = new EfCoreUnitOfWork(context);
+        var writer = new InternalEmailDeliverySettingsWriter(context,
+            new RelationalSettingMutationLock(context, unit), unit);
+        var result = await writer.DisableInternalAsync(tenantId, null);
+        await Assert.That(result.Status is EmailDeliverySettingsWriteStatus.Applied
+            or EmailDeliverySettingsWriteStatus.NoChange).IsTrue();
+    }
+
+    private static async Task<EmailDeliveryDisableImpactSnapshot?> ExecutePreviewAsync(
+        IServiceProvider services, Guid? tenantId,
+        Func<CancellationToken, Task<EmailDeliveryDisableImpactSnapshot?>> observe)
+    {
+        var issuer = services.GetRequiredService<IHumanEmailMutationPreparation>();
+        var proof = await issuer.PreparePreviewAsync(tenantId);
+        return await issuer.ExecutePreparedAsync(proof, observe);
+    }
+
+    private static Task<EmailDeliveryDisableImpactSnapshot?> ReadImpactAsync(IServiceProvider services, Guid? tenantId) =>
+        ExecutePreviewAsync(services, tenantId,
+            token => services.GetRequiredService<IEmailDeliveryDisableImpactReader>().ReadAsync(tenantId, token));
+
+    private static async Task<EmailDeliveryDisableImpactSnapshot?> ReadImpactAsync(
+        SmtpAuthenticatedFixture fixture, Guid? tenantId)
+    {
+        EmailDeliveryDisableImpactSnapshot? result = null;
+        await fixture.ExecuteAsync(tenantOwner: tenantId.HasValue, async services =>
+            result = await ReadImpactAsync(services, tenantId), selectedTenantId: tenantId);
+        return result;
     }
 }

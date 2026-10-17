@@ -19,7 +19,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 [NotInParallel("PersistenceDb")]
-public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlContainerFixture fixture)
+public sealed partial class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
     public async Task EligibilityRefreshesCurrentVerifiedAddressAndCreatesProviderFenceAtomically()

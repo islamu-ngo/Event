@@ -3,17 +3,9 @@ using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;
 
-public interface IEmailDispatchOutboxRepository
+public interface IEmailDispatchOutboxRepository : IEmailDispatchAdmission
 {
     Task<EmailDispatchOutbox> Create(EmailDispatchOutbox entity, CancellationToken cancellationToken);
-
-    Task<IReadOnlyList<EmailDispatchOutbox>> ClaimPendingBatchAsync(
-        EmailDispatchBatchClaimRequest request,
-        CancellationToken cancellationToken);
-
-    Task<EmailDispatchOutbox?> TryClaimSpecificAsync(
-        EmailDispatchSpecificClaimRequest request,
-        CancellationToken cancellationToken);
 
     Task<EventReminderStateChangeResult> SuppressEventRemindersInCurrentTransactionAsync(
         EventReminderSupersessionRequest request,
@@ -148,10 +140,6 @@ public interface IEmailDispatchOutboxRepository
         Guid tenantId,
         Guid? changedBy,
         DateTime redactedAt,
-        CancellationToken cancellationToken);
-
-    Task<EmailDispatchStaleRecoveryResult> RecoverStaleProcessing(
-        EmailDispatchStaleRecoveryRequest request,
         CancellationToken cancellationToken);
 
     Task<EmailDispatchPreHandoffReleaseOutcome> ReleaseClaimBeforeProviderHandoff(

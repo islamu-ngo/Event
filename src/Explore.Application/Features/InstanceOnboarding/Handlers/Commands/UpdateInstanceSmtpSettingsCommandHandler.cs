@@ -26,8 +26,9 @@ public class UpdateInstanceSmtpSettingsCommandHandler : ICommandHandler<UpdateIn
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateInstanceSmtpSettingsCommand request, CancellationToken cancellationToken)
     {
-        var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken);
-        if (!isInstanceAdmin)
+        Guid? actor = await _adminContext.ResolveUserIdAsync(cancellationToken);
+        if (actor is null || actor == Guid.Empty
+            || !await _adminContext.IsInstanceAdminAsync(actor.Value, cancellationToken))
         {
             return BaseCommandResponse.Authorization<Guid>(
                 "Only instance administrators can update SMTP settings.");
@@ -58,8 +59,18 @@ public class UpdateInstanceSmtpSettingsCommandHandler : ICommandHandler<UpdateIn
             }
             : null;
 
-        await _smtpSettingService.ApplySettingsAsync(settings, actorUserId: request.UserId,
-            enableDelivery: request.Patch.DeliveryEnabled.HasValue, cancellationToken: cancellationToken);
+        try
+        {
+            // The selected email writer acquires current instance authority in its original
+            // Serializable owner before settings, revisions, or suppression can change.
+            await _smtpSettingService.ApplySettingsAsync(settings, actorUserId: actor.Value,
+                enableDelivery: request.Patch.DeliveryEnabled.HasValue, cancellationToken: cancellationToken);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return BaseCommandResponse.Authorization<Guid>(
+                "Only instance administrators can update SMTP settings.");
+        }
 
         _smtpConfigResolver.InvalidateCache();
 

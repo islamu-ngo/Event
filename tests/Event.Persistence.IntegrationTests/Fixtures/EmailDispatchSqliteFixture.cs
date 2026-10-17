@@ -1,18 +1,13 @@
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;
-using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Persistence.Repositories;
-using Explore.Persistence.Schema.ProviderPrimitives;
 using Explore.Persistence.Seed;
 using Explore.Persistence.Services;
-using Explore.Infrastructure.Mail;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -36,17 +31,17 @@ internal static class EmailDispatchSqliteFixture
          new(TenantId: null, Key: GovernanceSettingKeys.Email.FromAddress, Kind: EmailDeliverySettingMutationKind.SetValue, Value: "\"events@fixture.test\""),
          new(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpSecurity, Kind: EmailDeliverySettingMutationKind.SetValue, Value: "\"StartTls\"")]);
 
-    internal static EmailDeliverySettingsWriter CreateEmailSettingsWriter(ExploreDbContext context,
-        ISettingMutationLock? mutationLock = null, EmailDeliveryDisableTokenService? tokenService = null) =>
-        new(context: context, mutationLock: mutationLock ?? new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)),
-            unitOfWork: new EfCoreUnitOfWork(context), impactReader: new EmailDeliveryDisableImpactReader(context),
-            tokenService: tokenService ?? new EmailDeliveryDisableTokenService(new EphemeralDataProtectionProvider()));
+    internal static InternalEmailDeliverySettingsWriter CreateInternalEmailSettingsWriter(
+        ExploreDbContext context, ISettingMutationLock? mutationLock = null) =>
+        new(context, mutationLock ?? new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)),
+            new EfCoreUnitOfWork(context));
 
     internal static async Task ApplyEmailSettingsAsync(ExploreDbContext context,
         System.Collections.Immutable.ImmutableArray<EmailDeliverySettingMutation> mutations,
         Guid? actorUserId = null, ISettingMutationLock? mutationLock = null, CancellationToken cancellationToken = default)
     {
-        var outcome = await CreateEmailSettingsWriter(context, mutationLock).ApplyAsync(mutations, actorUserId, cancellationToken);
+        var outcome = await CreateInternalEmailSettingsWriter(context, mutationLock)
+            .ApplyInternalAsync(mutations, actorUserId, cancellationToken);
         if (outcome.Status is not (EmailDeliverySettingsWriteStatus.Applied or EmailDeliverySettingsWriteStatus.NoChange))
             throw new InvalidOperationException($"Email fixture mutation rejected: {outcome.Status}.");
     }
@@ -62,40 +57,10 @@ internal static class EmailDispatchSqliteFixture
     internal static async Task ConfirmEmailDisableAsync(ExploreDbContext context, Guid? tenantId = null,
         Guid? actorUserId = null, ISettingMutationLock? mutationLock = null, CancellationToken cancellationToken = default)
     {
-        var unitOfWork = new EfCoreUnitOfWork(context);
-        mutationLock ??= new RelationalSettingMutationLock(context, unitOfWork);
-        var tokens = new EmailDeliveryDisableTokenService(new EphemeralDataProtectionProvider());
-        var writer = CreateEmailSettingsWriter(context, mutationLock, tokens);
-        async Task<bool> ConfirmAsync(CancellationToken token)
-        {
-            var impact = (await new EmailDeliveryDisableImpactReader(context).ReadAsync(tenantId, token))!;
-            Guid actor = actorUserId ?? await context.Users.AsNoTracking().Select(user => user.Id).FirstOrDefaultAsync(token);
-            if (actor == Guid.Empty)
-            {
-                actor = Guid.CreateVersion7();
-                context.Users.Add(new User
-                {
-                    Id = actor,
-                    CreatedAt = DateTime.UtcNow,
-                    Pii = new UserPii { Email = $"email-fixture-actor-{actor:N}@example.test", FirstName = "Email", LastName = "Operator" }
-                });
-                await context.SaveChangesAsync(token);
-            }
-            var result = impact.CanDisable
-                ? await writer.DisableAsync(new(TenantId: tenantId, ActorUserId: actor, ExpectedRevision: impact.Revision,
-                    ConfirmationToken: tokens.Issue(actor, impact).Token,
-                    Acknowledgement: EmailDeliveryDisableConfirmation.RequiredAcknowledgement), token)
-                : await writer.ApplyAsync([new(TenantId: tenantId, Key: GovernanceSettingKeys.Email.DeliveryEnabled,
-                    Kind: EmailDeliverySettingMutationKind.SetValue, Value: "false")], actorUserId, token);
-            if (result.Status is not (EmailDeliverySettingsWriteStatus.Applied or EmailDeliverySettingsWriteStatus.NoChange))
-                throw new InvalidOperationException($"Email fixture disable rejected: {result.Status}.");
-            return true;
-        }
-        if (context.Database.CurrentTransaction is not null)
-            await ConfirmAsync(cancellationToken);
-        else
-            await mutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All],
-                token => unitOfWork.ExecuteSerializableAsync(ConfirmAsync, token), cancellationToken);
+        var result = await CreateInternalEmailSettingsWriter(context, mutationLock)
+            .DisableInternalAsync(tenantId, actorUserId, cancellationToken);
+        if (result.Status is not (EmailDeliverySettingsWriteStatus.Applied or EmailDeliverySettingsWriteStatus.NoChange))
+            throw new InvalidOperationException($"Email fixture disable rejected: {result.Status}.");
     }
 
     internal static ExploreDbContext CreateContext(string databasePath, params IInterceptor[] interceptors)

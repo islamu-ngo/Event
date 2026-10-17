@@ -7,12 +7,25 @@ namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
 public sealed class AssignEventRoleByEmailCommandHandler(
     IUserRepository userRepository,
-    ICommandHandler<AssignEventRoleCommand, BaseCommandResponse<Guid>> assignRoleHandler)
+    IHumanEventTeamAssignmentOwner assignRoleHandler,
+    IHumanEventTeamActionPreparation preparation,
+    ISerializableAttemptOwner owner)
     : ICommandHandler<AssignEventRoleByEmailCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         AssignEventRoleByEmailCommand command,
         CancellationToken cancellationToken = default)
+    {
+        var prepared = await preparation.PrepareAsync(command, cancellationToken);
+        return await owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(command, token);
+            return await ExecuteBodyAsync(command, prepared, token);
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(
+        AssignEventRoleByEmailCommand command, IPreparedHumanEventTeamAction prepared, CancellationToken cancellationToken)
     {
         var targetUserEmail = command.TargetUserEmail.Trim();
         if (string.IsNullOrWhiteSpace(targetUserEmail))
@@ -22,17 +35,8 @@ public sealed class AssignEventRoleByEmailCommandHandler(
         if (targetUser is null)
             return Failure("Target user not found.", "target_user_not_found");
 
-        return await assignRoleHandler.ExecuteAsync(new AssignEventRoleCommand
-        {
-            TenantId = command.TenantId,
-            EventId = command.EventId,
-            TargetUserId = targetUser.Id,
-            RoleId = command.RoleId,
-            ActorUserId = command.ActorUserId,
-            Status = command.Status,
-            StartsAtUtc = command.StartsAtUtc,
-            ExpiresAtUtc = command.ExpiresAtUtc
-        }, cancellationToken);
+        var inner = prepared.BindResolvedTarget(command, targetUser.Id);
+        return await assignRoleHandler.ExecuteHandoffAsync(inner, prepared, cancellationToken);
     }
 
     private static BaseCommandResponse<Guid> Failure(string message, string failureCode) =>

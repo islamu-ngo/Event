@@ -7,7 +7,7 @@ namespace Explore.Infrastructure.Mail;
 public sealed class SmtpConfigResolver(
     EmailDeliveryCapabilityResolver resolver,
     ITenantContext tenantContext,
-    IHierarchicalSettingsResolver settings) : ISmtpConfigResolver
+    IHierarchicalSettingsReader settings) : ISmtpConfigResolver
 {
     public Task<SmtpConfiguration?> ResolveAsync(CancellationToken cancellationToken = default) =>
         ResolveAsync(tenantContext.TenantId == Guid.Empty ? null : tenantContext.TenantId, cancellationToken);

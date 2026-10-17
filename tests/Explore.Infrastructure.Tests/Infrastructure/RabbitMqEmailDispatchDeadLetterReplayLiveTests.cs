@@ -1,16 +1,26 @@
 using System.Diagnostics.Metrics;
+using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.Tests.Fixtures;
+using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Repositories;
+using Explore.Persistence.Seed;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
@@ -24,147 +34,113 @@ public sealed class RabbitMqEmailDispatchDeadLetterReplayLiveTests(RabbitMqConta
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
     [Timeout(180_000)]
-    public async Task ReplayWorker_WithDeadLetteredOutbox_ResetsDurableRowAndRepublishesPointer()
+    public async Task ReplayWorker_PreservesDurableResetAndMissingOutboxParking(bool exists)
     {
         var settings = CreateSettings(rabbitMq);
-        var dispatch = CreateDispatch(EmailDispatchStatus.DeadLettered);
-        var repository = new InMemoryEmailDispatchOutboxRepository(dispatch);
-        var pointer = EmailDispatchPointer.FromOutbox(dispatch);
-        var settingsMonitor = CreateOptionsMonitor(settings);
-        await using var transport = CreateTransport(settingsMonitor);
-        await transport.DeclareTopologyAsync(CancellationToken.None);
-        await using var serviceProvider = CreateServiceProvider(repository);
-        var replayService = CreateReplayService(settingsMonitor, transport, serviceProvider);
-
-        await replayService.StartAsync(CancellationToken.None);
-        try
+        await using var database = new PersistedEmailDispatchScenario.DispatchDatabase();
+        EmailDispatchPointer pointer;
+        await using (var writer = database.CreateContext())
         {
-            var routed = await rabbitMq.PublishStringAsync(
-                settings.DeadLetterExchangeName,
-                settings.DeadLetterRoutingKey,
-                SerializePointer(pointer));
-            var replayedPayload = await WaitForQueuePayloadAsync(
-                settings.DispatchQueueName,
-                TimeSpan.FromSeconds(20));
-            await WaitForQueueSettledAsync(settings.DeadLetterQueueName, TimeSpan.FromSeconds(10));
-
-            await Assert.That(routed).IsTrue();
-            await Assert.That(replayedPayload).Contains(dispatch.PublishEventId.ToString());
-            await Assert.That(dispatch.Status).IsEqualTo(EmailDispatchStatus.Pending);
-            await Assert.That(dispatch.DeadLetteredAt).IsNull();
-            await Assert.That(repository.ReplayCount).IsEqualTo(1);
-        }
-        finally
-        {
-            await replayService.StopAsync(CancellationToken.None);
-        }
-    }
-
-    [Test]
-    [Timeout(180_000)]
-    public async Task ReplayWorker_WithMissingOutbox_ParksPayloadAndAcksDeadLetter()
-    {
-        var settings = CreateSettings(rabbitMq);
-        var repository = new InMemoryEmailDispatchOutboxRepository(CreateDispatch(EmailDispatchStatus.Pending));
-        var pointer = new EmailDispatchPointer(
-            TenantId: Guid.CreateVersion7(),
-            PublishEventId: Guid.CreateVersion7(),
-            Kind: EmailDispatchKind.RegistrationConfirmation,
-            SourceType: "event-registration",
-            SourceId: Guid.CreateVersion7(),
-            EventId: Guid.CreateVersion7(),
-            RegistrationOrderId: Guid.CreateVersion7());
-        var settingsMonitor = CreateOptionsMonitor(settings);
-        await using var transport = CreateTransport(settingsMonitor);
-        await transport.DeclareTopologyAsync(CancellationToken.None);
-        await using var serviceProvider = CreateServiceProvider(repository);
-        var replayService = CreateReplayService(settingsMonitor, transport, serviceProvider);
-
-        await replayService.StartAsync(CancellationToken.None);
-        try
-        {
-            var routed = await rabbitMq.PublishStringAsync(
-                settings.DeadLetterExchangeName,
-                settings.DeadLetterRoutingKey,
-                SerializePointer(pointer));
-            var parkedPayload = await WaitForQueuePayloadAsync(
-                settings.ParkingQueueName,
-                TimeSpan.FromSeconds(20));
-            await WaitForQueueSettledAsync(settings.DeadLetterQueueName, TimeSpan.FromSeconds(10));
-
-            await Assert.That(routed).IsTrue();
-            await Assert.That(parkedPayload).Contains(pointer.PublishEventId.ToString());
-            await Assert.That(repository.Dispatch.Status).IsEqualTo(EmailDispatchStatus.Pending);
-            await Assert.That(repository.ReplayCount).IsEqualTo(0);
-        }
-        finally
-        {
-            await replayService.StopAsync(CancellationToken.None);
-        }
-    }
-
-    private async Task<string> WaitForQueuePayloadAsync(string queueName, TimeSpan timeout)
-    {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            var messages = await rabbitMq.GetQueueMessagesAsync(queueName, count: 1);
-            if (messages.Count > 0)
+            await writer.Database.EnsureCreatedAsync();
+            await SqliteDatabaseInitializer.InitializeAsync(writer, CancellationToken.None);
+            await LookupTableSeeder.SeedAsync(writer, CancellationToken.None);
+            await database.SeedAsync(writer, "Replay notification", "Replay storage fixture.");
+            var dispatch = await writer.EmailDispatchOutbox.IgnoreQueryFilters().SingleAsync();
+            if (exists)
             {
-                return messages[0].Payload;
+                dispatch.Status = EmailDispatchStatus.DeadLettered;
+                dispatch.DeadLetteredAt = DateTime.UtcNow;
+                dispatch.LastFailureCategory = "broker_rejected";
+                dispatch.LastError = "broker_rejected";
+                var delivery = await writer.NotificationDeliveries.IgnoreQueryFilters().SingleAsync();
+                delivery.StatusId = (int)NotificationDeliveryStatusEnum.DeadLettered;
+                await writer.SaveChangesAsync();
+                pointer = EmailDispatchPointer.FromOutbox(dispatch);
             }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
-        }
-
-        var finalQueue = await rabbitMq.GetQueueAsync(queueName);
-        throw new TimeoutException(
-            $"RabbitMQ queue did not receive a message. Queue={queueName}, Messages={finalQueue.Messages}, Ready={finalQueue.MessagesReady}, Unacknowledged={finalQueue.MessagesUnacknowledged}.");
-    }
-
-    private async Task WaitForQueueSettledAsync(string queueName, TimeSpan timeout)
-    {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            var queue = await rabbitMq.GetQueueAsync(queueName);
-            if (queue.Messages == 0 && queue.MessagesReady == 0 && queue.MessagesUnacknowledged == 0)
+            else
             {
-                return;
+                pointer = new(database.TenantId, Guid.CreateVersion7(),
+                    EmailDispatchKind.RegistrationConfirmation, "notification_intent", Guid.CreateVersion7(), null, null);
             }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
         }
-
-        var finalQueue = await rabbitMq.GetQueueAsync(queueName);
-        throw new TimeoutException(
-            $"RabbitMQ queue did not settle. Queue={queueName}, Messages={finalQueue.Messages}, Ready={finalQueue.MessagesReady}, Unacknowledged={finalQueue.MessagesUnacknowledged}.");
-    }
-
-    private static EmailDispatchRabbitMqDeadLetterReplayService CreateReplayService(
-        IOptionsMonitor<EmailDispatchRabbitMqSettings> settingsMonitor,
-        IEmailDispatchTransport transport,
-        IServiceProvider serviceProvider) =>
-        new(
-            new ConfigurationBuilder().Build(),
-            settingsMonitor,
-            transport,
-            serviceProvider,
-            CreateMetrics(),
-            NullLogger<EmailDispatchRabbitMqDeadLetterReplayService>.Instance);
-
-    private static ServiceProvider CreateServiceProvider(InMemoryEmailDispatchOutboxRepository repository)
-    {
         var services = new ServiceCollection();
-        services.AddSingleton<IEmailDispatchOutboxRepository>(repository);
-        return services.BuildServiceProvider(new ServiceProviderOptions
+        services.AddScoped(_ => database.CreateContext(database.TenantId));
+        services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+        services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
-            ValidateOnBuild = true,
-            ValidateScopes = true
+            ValidateOnBuild = true, ValidateScopes = true
         });
+        var settingsMonitor = CreateOptionsMonitor(settings);
+        await using var transport = CreateTransport(settingsMonitor);
+        await transport.DeclareTopologyAsync(CancellationToken.None);
+        await using var broker = await new ConnectionFactory { Uri = new Uri(rabbitMq.AmqpConnectionString) }
+            .CreateConnectionAsync();
+        await using var channel = await broker.CreateChannelAsync();
+        var delivered = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var observer = new AsyncEventingBasicConsumer(channel);
+        observer.ReceivedAsync += (_, args) =>
+        {
+            delivered.TrySetResult(Encoding.UTF8.GetString(args.Body.Span));
+            return Task.CompletedTask;
+        };
+        await channel.BasicConsumeAsync(exists ? settings.DispatchQueueName : settings.ParkingQueueName,
+            autoAck: true, consumerTag: "replay-result-observer", noLocal: false, exclusive: false,
+            arguments: null, consumer: observer, cancellationToken: CancellationToken.None);
+        using var meter = new Meter("ReplaySettlementTest");
+        var meterFactory = Substitute.For<IMeterFactory>();
+        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(meter);
+        var metrics = new BusinessMetrics(meterFactory);
+        var acknowledged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, owner) =>
+        {
+            if (ReferenceEquals(instrument.Meter, meter)
+                && instrument.Name == "explore.email_dispatch.rabbitmq.consumes")
+                owner.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+        {
+            foreach (var tag in tags)
+                if (tag.Key == "outcome" && tag.Value is string outcome
+                    && outcome == (exists ? "replayed" : "parked"))
+                    acknowledged.TrySetResult();
+        });
+        listener.Start();
+        Task ack = acknowledged.Task.WaitAsync(TimeSpan.FromSeconds(45));
+        Task<string> payload = delivered.Task.WaitAsync(TimeSpan.FromSeconds(45));
+        var replay = new EmailDispatchRabbitMqDeadLetterReplayService(
+            new ConfigurationBuilder().Build(), settingsMonitor, transport, provider, metrics,
+            NullLogger<EmailDispatchRabbitMqDeadLetterReplayService>.Instance);
+        await replay.StartAsync(CancellationToken.None);
+        try
+        {
+            await Assert.That(await rabbitMq.PublishStringAsync(settings.DeadLetterExchangeName,
+                settings.DeadLetterRoutingKey, JsonSerializer.Serialize(pointer, JsonOptions))).IsTrue();
+            await ack;
+            using var document = JsonDocument.Parse(await payload);
+            await Assert.That(document.RootElement.GetProperty("publishEventId").GetGuid()).IsEqualTo(pointer.PublishEventId);
+        }
+        finally
+        {
+            await replay.StopAsync(CancellationToken.None);
+            replay.Dispose();
+        }
+
+        await using var context = database.CreateContext(database.TenantId);
+        var persisted = await context.EmailDispatchOutbox.AsNoTracking().SingleAsync();
+        await Assert.That(persisted.Status).IsEqualTo(EmailDispatchStatus.Pending);
+        await Assert.That(persisted.DeadLetteredAt).IsNull();
+        await Assert.That(persisted.LastError).IsNull();
+        await Assert.That(persisted.LastFailureCategory).IsNull();
+        await Assert.That(persisted.ProcessingLeaseToken).IsNull();
+        await Assert.That(await context.EmailDispatchAttempts.CountAsync()).IsEqualTo(0);
+        var currentDelivery = await context.NotificationDeliveries.AsNoTracking().SingleAsync();
+        await Assert.That(currentDelivery.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Queued);
+        await Assert.That(await channel.BasicGetAsync(settings.DeadLetterQueueName, autoAck: true)).IsNull();
     }
 
     private static RabbitMqEmailDispatchTransport CreateTransport(
@@ -189,31 +165,6 @@ public sealed class RabbitMqEmailDispatchDeadLetterReplayLiveTests(RabbitMqConta
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
         return new BusinessMetrics(meterFactory);
     }
-
-    private static string SerializePointer(EmailDispatchPointer pointer) =>
-        JsonSerializer.Serialize(pointer, JsonOptions);
-
-    private static EmailDispatchOutbox CreateDispatch(EmailDispatchStatus status) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        TenantId = Guid.CreateVersion7(),
-        PublishEventId = Guid.CreateVersion7(),
-        Kind = EmailDispatchKind.RegistrationConfirmation,
-        SourceType = "event-registration",
-        SourceId = Guid.CreateVersion7(),
-        EventId = Guid.CreateVersion7(),
-        RegistrationOrderId = Guid.CreateVersion7(),
-        RecipientUserId = Guid.CreateVersion7(),
-        RecipientEmail = "attendee@example.test",
-        Subject = "Registration confirmation",
-        PlainTextBody = "This row is used only for DLQ replay tests.",
-        HtmlBody = "<p>This row is used only for DLQ replay tests.</p>",
-        Status = status,
-        DeadLetteredAt = status == EmailDispatchStatus.DeadLettered ? DateTime.UtcNow : null,
-        LastFailureCategory = status == EmailDispatchStatus.DeadLettered ? "broker_rejected" : null,
-        LastError = status == EmailDispatchStatus.DeadLettered ? "Message was dead-lettered by broker." : null,
-        CorrelationId = $"corr-{Guid.CreateVersion7():N}"
-    };
 
     private static EmailDispatchRabbitMqSettings CreateSettings(RabbitMqContainerFixture rabbitMq)
     {

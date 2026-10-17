@@ -38,9 +38,11 @@ public sealed class EmailDispatchProcessor(
             {
                 break;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                logger.LogError(ex, "Error in email dispatch processor loop");
+                logger.LogError(
+                    "Error in email dispatch processor loop. FailureCategory={FailureCategory}",
+                    "drain_failed");
             }
 
             try

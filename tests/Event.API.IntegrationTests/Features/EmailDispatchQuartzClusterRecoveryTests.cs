@@ -18,6 +18,7 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -145,7 +146,9 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
 
         await using ExploreDbContext context = CreateDbContext();
         await context.Database.EnsureCreatedAsync();
+        await PostgresDiscoveryDisclosureContract.ApplyAsync(context);
         await LookupTableSeeder.SeedAsync(context);
+        await PostgresEmailDispatchAdmissionContract.ApplyAsync(context);
     }
 
     private async Task<DispatchIdentity> SeedPendingDispatchAsync()

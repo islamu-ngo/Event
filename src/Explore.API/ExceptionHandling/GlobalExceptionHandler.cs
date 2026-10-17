@@ -9,8 +9,7 @@ namespace Explore.API.ExceptionHandling;
 
 internal sealed class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
-    ILogger<GlobalExceptionHandler> logger,
-    IHostEnvironment hostEnvironment) : IExceptionHandler
+    ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     /// <summary>
     /// Maps HTTP status codes to stable IANA RFC 9110 type URIs for ProblemDetails.
@@ -37,15 +36,15 @@ internal sealed class GlobalExceptionHandler(
     {
         var (statusCode, title, detail, code) = exception switch
         {
-            BadRequestException badRequestException => (
+            BadRequestException => (
                 StatusCodes.Status400BadRequest,
                 "Bad request",
-                badRequestException.Message,
+                "The request is invalid.",
                 ApiProblemCodes.ValidationFailed),
-            NotFoundException notFoundException => (
+            NotFoundException => (
                 StatusCodes.Status404NotFound,
                 "Resource not found",
-                notFoundException.Message,
+                "The requested resource was not found.",
                 ApiProblemCodes.ResourceNotFound),
             UnauthorizedAccessException => (
                 StatusCodes.Status401Unauthorized,
@@ -65,22 +64,23 @@ internal sealed class GlobalExceptionHandler(
             ConfigurationManifestExportTooLargeException tooLargeException => (
                 StatusCodes.Status413PayloadTooLarge,
                 "Configuration manifest export too large",
-                tooLargeException.Message,
+                "The configuration manifest export exceeds the maximum supported size.",
                 tooLargeException.FailureCode),
             ConcurrencyConflictException concurrencyConflictException => (
                 StatusCodes.Status409Conflict,
                 "Concurrency conflict",
-                concurrencyConflictException.Message,
-                ApiProblemCodes.ConcurrencyConflict),
-            KeycloakOperationConflictException keycloakConflictException => (
+                "The resource changed. Refresh before retrying.",
+                concurrencyConflictException.Code == ConcurrencyConflictException.StaleSyncBase
+                    ? ConcurrencyConflictException.StaleSyncBase : ConcurrencyConflictException.ConcurrentUpdate),
+            KeycloakOperationConflictException => (
                 StatusCodes.Status409Conflict,
                 "Keycloak operation conflict",
-                keycloakConflictException.Message,
+                "The provider operation conflicts with current state.",
                 ApiProblemCodes.ResourceConflict),
-            QuotaExceededException quotaExceededException => (
+            QuotaExceededException => (
                 QuotaProblemDetailsFactory.StatusCode,
                 QuotaProblemDetailsFactory.Title,
-                quotaExceededException.Message,
+                "The request exceeds the supported quota.",
                 "quota_exceeded"),
             AdmissionRecoveryRateLimitExceededException => (
                 StatusCodes.Status429TooManyRequests,
@@ -120,24 +120,16 @@ internal sealed class GlobalExceptionHandler(
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "Internal server error",
-                hostEnvironment.IsDevelopment() ? exception.Message : "An unexpected error occurred.",
+                "An unexpected error occurred.",
                 ApiProblemCodes.UnexpectedError)
         };
 
-        bool isAdmissionRequest = RequestLoggingMiddleware.TryGetAdmissionRouteIdentity(
-            httpContext,
-            out string admissionRouteIdentity);
-        string requestIdentity = isAdmissionRequest
-            ? admissionRouteIdentity
-            : httpContext.Request.Path;
-        if (statusCode >= StatusCodes.Status500InternalServerError)
-        {
-            logger.LogError(exception, "Unhandled exception for {Method} {Route}", httpContext.Request.Method, requestIdentity);
-        }
-        else
-        {
-            logger.LogWarning(exception, "Handled application exception for {Method} {Route}", httpContext.Request.Method, requestIdentity);
-        }
+        string requestIdentity = SafeRouteMetadata.GetRouteIdentityOrClassification(httpContext);
+        logger.Log(
+            statusCode >= StatusCodes.Status500InternalServerError ? LogLevel.Error : LogLevel.Warning,
+            "API failure {Code} for {Method} {Route} responded {StatusCode} | TraceId={TraceId} CorrelationId={CorrelationId}",
+            code, SafeRouteMetadata.GetMethod(httpContext), requestIdentity, statusCode,
+            httpContext.TraceIdentifier, httpContext.Items["CorrelationId"] as string);
 
         httpContext.Response.StatusCode = statusCode;
         if (exception is AdmissionCheckInUnavailableException or EventDiscoveryUnavailableException
@@ -175,7 +167,7 @@ internal sealed class GlobalExceptionHandler(
             Title = title,
             Detail = detail,
             Type = typeUri,
-            Instance = isAdmissionRequest ? admissionRouteIdentity : httpContext.Request.Path
+            Instance = requestIdentity
         };
 
         if (exception is not ConcurrencyConflictException and not QuotaExceededException)
@@ -183,28 +175,23 @@ internal sealed class GlobalExceptionHandler(
             problemDetails.Extensions["code"] = code;
         }
 
-        if (exception is ConcurrencyConflictException concurrencyConflict)
+        if (exception is ConcurrencyConflictException)
         {
-            problemDetails.Extensions["code"] = concurrencyConflict.Code;
-            if (concurrencyConflict.EntityType is not null)
-            {
-                problemDetails.Extensions["entityType"] = concurrencyConflict.EntityType;
-            }
-            if (concurrencyConflict.EntityId is not null)
-            {
-                problemDetails.Extensions["entityId"] = concurrencyConflict.EntityId;
-            }
+            problemDetails.Extensions["code"] = code;
         }
 
         if (exception is QuotaExceededException quotaExceeded)
         {
-            QuotaProblemDetailsFactory.AddExtensions(problemDetails, quotaExceeded.Details);
+            QuotaProblemDetailsFactory.AddExtensions(problemDetails, quotaExceeded.Details with
+            {
+                QuotaKey = "quota",
+                Scope = "request"
+            });
         }
 
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
-            Exception = exception,
             ProblemDetails = problemDetails
         });
     }

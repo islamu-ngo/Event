@@ -93,8 +93,8 @@ public class AnalyticsConfigResolver : IAnalyticsConfigResolver
 
         var provider = ParseProvider(providerStr);
 
-        _logger.LogDebug("Analytics config resolved for tenant {TenantId}: Provider={Provider}, Enabled={Enabled}",
-            tenantId, provider, enabled);
+        _logger.LogDebug("Analytics config resolved: Provider={Provider}, Enabled={Enabled}",
+            provider, enabled);
 
         return new AnalyticsConfiguration
         {

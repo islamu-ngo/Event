@@ -102,6 +102,7 @@ public class PostHogAnalyticsProvider : IAnalyticsProvider, IAnalyticsFeatureFla
             var response = await api.DecideAsync($"Bearer {config.PersonalApiKey}", request, cancellationToken);
             if (!response.IsSuccessStatusCode || response.Content == null)
             {
+                _logger.LogWarning("posthog_feature_flag_check_failed");
                 return false;
             }
 
@@ -121,9 +122,9 @@ public class PostHogAnalyticsProvider : IAnalyticsProvider, IAnalyticsFeatureFla
 
             return false;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "PostHog feature flag check failed for {FeatureKey}", featureKey);
+            _logger.LogWarning("posthog_feature_flag_check_failed");
             return false;
         }
     }
@@ -149,6 +150,7 @@ public class PostHogAnalyticsProvider : IAnalyticsProvider, IAnalyticsFeatureFla
             var response = await api.DecideAsync($"Bearer {config.PersonalApiKey}", request, cancellationToken);
             if (!response.IsSuccessStatusCode || response.Content == null)
             {
+                _logger.LogWarning("posthog_feature_flag_payload_failed");
                 return null;
             }
 
@@ -164,9 +166,9 @@ public class PostHogAnalyticsProvider : IAnalyticsProvider, IAnalyticsFeatureFla
 
             return JsonSerializer.Serialize(payloadValue);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "PostHog feature flag payload fetch failed for {FeatureKey}", featureKey);
+            _logger.LogWarning("posthog_feature_flag_payload_failed");
             return null;
         }
     }
@@ -194,12 +196,12 @@ public class PostHogAnalyticsProvider : IAnalyticsProvider, IAnalyticsFeatureFla
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("PostHog capture returned status {StatusCode}", response.StatusCode);
+                _logger.LogWarning("posthog_capture_failed");
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "PostHog analytics call failed for event {EventName}", eventName);
+            _logger.LogWarning("posthog_capture_failed");
         }
     }
 

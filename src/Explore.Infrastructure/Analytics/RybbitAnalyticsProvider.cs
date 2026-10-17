@@ -78,12 +78,12 @@ public class RybbitAnalyticsProvider : IAnalyticsProvider
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("Rybbit call returned status {StatusCode}", response.StatusCode);
+                _logger.LogWarning("rybbit_track_failed");
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Rybbit analytics call failed for {Type}:{Name}", type, name);
+            _logger.LogWarning("rybbit_track_failed");
         }
     }
 

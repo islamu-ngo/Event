@@ -2652,6 +2652,13 @@ Current operational expectations:
 - `NullAnalyticsProvider` is the safe baseline for disabled deployments.
 - Runtime provider selection is tenant-aware and settings-driven through `AnalyticsConfigResolver`.
 - Provider/network failures are logged and swallowed so command/query flows continue.
+- Server-side diagnostic events use fixed provider/operation categories, never
+  exception objects, caller identifiers, event names, page paths, group keys,
+  feature keys or provider endpoint/credential values. RudderStack operation
+  labels come from a closed identify/track/page/group mapping.
+- Configuration diagnostics retain the typed provider and enabled state without
+  exporting tenant identity. Resolution failures keep the disabled fallback;
+  feature-flag failures still return false or null rather than blocking callers.
 - Self-hosted operators may need first-party proxying or custom endpoints via `analytics.endpoint_url` to reduce CSP or ad-blocker loss.
 - Browser relay fallback is available at `POST /api/a/t` for operators who cannot or do not want to load vendor analytics scripts in the browser.
 

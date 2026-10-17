@@ -79,12 +79,12 @@ public class PlausibleAnalyticsProvider : IAnalyticsProvider
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("Plausible call returned status {StatusCode}", response.StatusCode);
+                _logger.LogWarning("plausible_event_failed");
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Plausible analytics call failed for event {EventName}", eventName);
+            _logger.LogWarning("plausible_event_failed");
         }
     }
 

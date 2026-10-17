@@ -53,9 +53,9 @@ public sealed class RuntimeAnalyticsProvider : IAnalyticsProvider, IAnalyticsFea
         {
             await provider.IdentifyAsync(distinctId, traits, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Analytics identify failed on provider {ProviderType}; falling back to NullProvider", provider.GetType().Name);
+            _logger.LogWarning("analytics_identify_failed");
         }
     }
 
@@ -67,9 +67,9 @@ public sealed class RuntimeAnalyticsProvider : IAnalyticsProvider, IAnalyticsFea
         {
             await provider.TrackAsync(distinctId, eventName, properties, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Analytics track failed on provider {ProviderType} for {EventName}; falling back to NullProvider", provider.GetType().Name, eventName);
+            _logger.LogWarning("analytics_track_failed");
         }
     }
 
@@ -81,9 +81,9 @@ public sealed class RuntimeAnalyticsProvider : IAnalyticsProvider, IAnalyticsFea
         {
             await provider.PageViewAsync(distinctId, pagePath, properties, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Analytics pageview failed on provider {ProviderType} for {PagePath}; falling back to NullProvider", provider.GetType().Name, pagePath);
+            _logger.LogWarning("analytics_pageview_failed");
         }
     }
 
@@ -95,9 +95,9 @@ public sealed class RuntimeAnalyticsProvider : IAnalyticsProvider, IAnalyticsFea
         {
             await provider.GroupIdentifyAsync(groupType, groupKey, properties, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Analytics group identify failed on provider {ProviderType}; falling back to NullProvider", provider.GetType().Name);
+            _logger.LogWarning("analytics_group_identify_failed");
         }
     }
 
@@ -113,9 +113,9 @@ public sealed class RuntimeAnalyticsProvider : IAnalyticsProvider, IAnalyticsFea
         {
             return await featureFlagProvider.IsFeatureEnabledAsync(featureKey, distinctId, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Analytics feature flag check failed on provider {ProviderType} for {FeatureKey}", provider.GetType().Name, featureKey);
+            _logger.LogWarning("analytics_feature_flag_check_failed");
             return false;
         }
     }
@@ -132,9 +132,9 @@ public sealed class RuntimeAnalyticsProvider : IAnalyticsProvider, IAnalyticsFea
         {
             return await featureFlagProvider.GetFeatureFlagPayloadAsync(featureKey, distinctId, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Analytics feature flag payload failed on provider {ProviderType} for {FeatureKey}", provider.GetType().Name, featureKey);
+            _logger.LogWarning("analytics_feature_flag_payload_failed");
             return null;
         }
     }
@@ -158,9 +158,9 @@ public sealed class RuntimeAnalyticsProvider : IAnalyticsProvider, IAnalyticsFea
                 _ => _nullProvider
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Failed to resolve analytics provider; defaulting to NullProvider");
+            _logger.LogWarning("analytics_provider_resolution_failed fallback=disabled");
             return _nullProvider;
         }
     }

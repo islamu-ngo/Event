@@ -634,6 +634,14 @@ intentionally omit page paths, user identifiers, event payloads and raw browser
 exception text. Use the operation to check analytics configuration and consent;
 do not add sensitive payloads to shared support logs to diagnose a failed call.
 
+Server analytics adapters likewise emit fixed provider/operation failure
+categories rather than exception objects, endpoint credentials, event names,
+feature keys or caller identities. Configuration logs retain only the typed
+provider and enabled state, not the tenant identifier. A failed provider
+resolution falls back to disabled analytics, and feature-flag failures remain
+false or null; analytics diagnostics must not become a second export of the
+event or identity being measured.
+
 ### Recipe 1: Keycloak "Invalid Parameter: redirect_uri" or Infinite Login Loop
 
 #### Why this happens

@@ -545,6 +545,16 @@ tracks saved setup state, not a guarantee of continued external availability.
 Completion checks readiness again before taking the setup write lock; changed
 saved settings still require a refresh.
 
+## AI Credential Scope Definitions
+
+The registry supports `AI_OPENAI_COMPATIBLE_API_KEY` and
+`AI_ANTHROPIC_COMPATIBLE_API_KEY` under `/ai` for instance or tenant bindings.
+`AI_AZURE_API_KEY` is instance-only. Supply values through the selected secret
+authority rather than source configuration. Tenant-owned transports must not
+borrow instance credentials; compatible providers may explicitly select no
+credential when their endpoint permits it. These definitions alone do not enable
+a provider or authorize a transport.
+
 ## Getting-Started And Identity Controls
 
 An unavailable checklist is not a ready result. Use its Refresh status action and

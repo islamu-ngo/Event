@@ -238,6 +238,9 @@ public static class SecretDefinitionRegistry
         {
             public const string OpenAiApiKey = "ai.openai.api_key";
             public const string AnthropicApiKey = "ai.anthropic.api_key";
+            public const string AzureApiKey = "ai.azure.api_key";
+            public const string OpenAiCompatibleApiKey = "ai.openai_compatible.api_key";
+            public const string AnthropicCompatibleApiKey = "ai.anthropic_compatible.api_key";
         }
 
         public static class Integrations
@@ -923,6 +926,39 @@ public static class SecretDefinitionRegistry
             },
 
             // --- ai/AI_* ---
+            new()
+            {
+                Key = Keys.Ai.OpenAiCompatibleApiKey,
+                AllowedScopes = instanceOrTenant,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/ai",
+                DefaultInfisicalKey = "AI_OPENAI_COMPATIBLE_API_KEY",
+                DefaultEnvironmentVariableName = "AI_OPENAI_COMPATIBLE_API_KEY",
+                IsBootstrapSecret = false,
+                Description = "OpenAI-compatible provider API key.",
+            },
+            new()
+            {
+                Key = Keys.Ai.AnthropicCompatibleApiKey,
+                AllowedScopes = instanceOrTenant,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/ai",
+                DefaultInfisicalKey = "AI_ANTHROPIC_COMPATIBLE_API_KEY",
+                DefaultEnvironmentVariableName = "AI_ANTHROPIC_COMPATIBLE_API_KEY",
+                IsBootstrapSecret = false,
+                Description = "Anthropic-compatible provider API key.",
+            },
+            new()
+            {
+                Key = Keys.Ai.AzureApiKey,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/ai",
+                DefaultInfisicalKey = "AI_AZURE_API_KEY",
+                DefaultEnvironmentVariableName = "AI_AZURE_API_KEY",
+                IsBootstrapSecret = false,
+                Description = "Instance Azure OpenAI API key.",
+            },
             new()
             {
                 Key = Keys.Ai.OpenAiApiKey,

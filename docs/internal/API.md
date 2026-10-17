@@ -714,6 +714,22 @@ Storage readiness reports `provider_unavailable` or `policy_unavailable`
 instead of exception subtype names. Sink tests exercise scheduler and startup
 worker outcomes with private canaries and colliding inherited field names.
 
+## AI Credential Reference Policy
+
+`AiCredentialReference.TryCreate` produces a provider-specific secret key,
+scope, optional tenant ID and empty qualifier; it never contains a secret value.
+Tenant-owned transports cannot select instance credentials. Tenant scope requires
+a nonempty admitted tenant ID. Azure OpenAI accepts instance scope only.
+Credential-free selection is explicit and limited to the fake and compatible
+providers; unknown providers and invalid scopes fail without a reference.
+
+The secret registry defines `ai.openai_compatible.api_key` and
+`ai.anthropic_compatible.api_key` for instance or tenant scope, and
+`ai.azure.api_key` for instance scope only. Their default authority names are
+`AI_OPENAI_COMPATIBLE_API_KEY`, `AI_ANTHROPIC_COMPATIBLE_API_KEY` and
+`AI_AZURE_API_KEY` under `/ai`. This value contract does not resolve credentials
+or replace transport admission and secret-consumer authorization.
+
 ## Reserved Tenant Roots
 
 `ReservedTenantSlugs.IsReserved` rejects the operational roots `alive`,

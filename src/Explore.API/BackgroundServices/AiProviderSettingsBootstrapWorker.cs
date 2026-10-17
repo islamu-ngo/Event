@@ -40,7 +40,7 @@ public sealed class AiProviderSettingsBootstrapWorker(
         }
 
         if ((providerId == AiProviderSettings.ProviderOpenAi || providerId == AiProviderSettings.ProviderAnthropic)
-            && (string.IsNullOrWhiteSpace(settings.ApiKey) || string.IsNullOrWhiteSpace(settings.ModelId)))
+            && string.IsNullOrWhiteSpace(settings.ModelId))
         {
             return;
         }
@@ -78,10 +78,8 @@ public sealed class AiProviderSettingsBootstrapWorker(
                     await SeedIfMissingAsync(systemSettings, upsertService, GovernanceSettingKeys.AiAssistant.ModelId, modelId).ConfigureAwait(false);
                     await SeedIfMissingAsync(systemSettings, upsertService, GovernanceSettingKeys.AiAssistant.AllowedModelIds, new[] { modelId }).ConfigureAwait(false);
 
-                    if (!string.IsNullOrWhiteSpace(settings.ApiKey))
-                    {
-                        await SeedIfMissingAsync(systemSettings, upsertService, GovernanceSettingKeys.AiAssistant.ApiKey, settings.ApiKey.Trim()).ConfigureAwait(false);
-                    }
+                    await SeedIfMissingAsync(systemSettings, upsertService, GovernanceSettingKeys.AiAssistant.CredentialScope,
+                        settings.CredentialScope.ToString().ToLowerInvariant()).ConfigureAwait(false);
                 }
 
                 await SeedIfMissingAsync(systemSettings, upsertService, GovernanceSettingKeys.AiAssistant.MaxInputTokens, settings.MaxInputTokens).ConfigureAwait(false);

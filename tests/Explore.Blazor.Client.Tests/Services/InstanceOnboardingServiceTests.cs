@@ -765,7 +765,7 @@ public class InstanceOnboardingServiceTests
     #region UpdateAiAssistantProviderConfigurationAsync
 
     [Test]
-    public async Task UpdateAiAssistantProviderConfigurationAsync_SendsOneCoupledCredentialGroup()
+    public async Task UpdateAiAssistantProviderConfigurationAsync_SendsOneCoupledProviderAndCredentialScope()
     {
         string? requestJson = null;
         SetupBffClient(async request =>
@@ -778,7 +778,7 @@ public class InstanceOnboardingServiceTests
         {
             Provider = "openai-compatible",
             EndpointUrl = "https://ai.example.test/v1",
-            ApiKey = "replacement-key",
+            CredentialScope = "instance",
             ModelId = "model-a",
             AllowedModelIds = ["model-a"]
         });
@@ -787,7 +787,8 @@ public class InstanceOnboardingServiceTests
         JsonElement root = document.RootElement;
         JsonElement update = root.GetProperty("providerConfiguration");
         await Assert.That(update.GetProperty("hasValue").GetBoolean()).IsTrue();
-        await Assert.That(update.GetProperty("value").GetProperty("apiKey").GetString()).IsEqualTo("replacement-key");
+        await Assert.That(update.GetProperty("value").GetProperty("credentialScope").GetString()).IsEqualTo("instance");
+        await Assert.That(update.GetProperty("value").TryGetProperty("apiKey", out _)).IsFalse();
         await Assert.That(root.GetProperty("enabled").ValueKind).IsEqualTo(JsonValueKind.Null);
     }
 

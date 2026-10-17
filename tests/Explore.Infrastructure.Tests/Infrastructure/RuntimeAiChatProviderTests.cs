@@ -1,19 +1,15 @@
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure.Ai;
-using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
-public sealed class RuntimeAiChatProviderTests
+public sealed class RuntimeAiChatProviderTests : AiProviderTestBase
 {
     [Test]
     public async Task SendAsync_WhenDisabled_FailsWithoutCallingHttp()
@@ -165,7 +161,7 @@ public sealed class RuntimeAiChatProviderTests
             Enabled = true,
             Provider = AiProviderSettings.ProviderOpenAiCompatible,
             EndpointUrl = "http://localhost:11434/v1",
-            ApiKey = "test-key",
+            CredentialScope = AiCredentialScope.Instance,
             ModelId = "gpt-test"
         }, handler);
 
@@ -184,21 +180,26 @@ public sealed class RuntimeAiChatProviderTests
             Enabled = true,
             Provider = AiProviderSettings.ProviderAzureOpenAi,
             EndpointUrl = "https://ai.example.openai.azure.com/",
-            ApiKey = "test-key",
+            CredentialScope = AiCredentialScope.Instance,
             ModelId = "gpt-test"
         };
-        var chatClient = new RecordingChatClient(new ChatResponse(new ChatMessage(ChatRole.Assistant, "SDK response"))
-        {
-            FinishReason = ChatFinishReason.Stop
-        });
-        var sdkProvider = CreateMicrosoftExtensionsProvider(settings, chatClient);
+        var handler = new RecordingMessageHandler(_ => JsonResponse("""
+            {
+              "id": "resp_test",
+              "model": "gpt-test",
+              "choices": [
+                { "message": { "role": "assistant", "content": "SDK response" }, "finish_reason": "stop" }
+              ]
+            }
+            """));
+        var sdkProvider = CreateMicrosoftExtensionsProvider(settings, handler);
         var provider = CreateProvider(settings, microsoftExtensionsProvider: sdkProvider);
 
         var result = await provider.SendAsync(CreateRequest("Hello"));
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(result.Response!.AssistantMessage).IsEqualTo("SDK response");
-        await Assert.That(chatClient.Calls).IsEqualTo(1);
+        await Assert.That(handler.Calls).IsEqualTo(1);
     }
 
     [Test]
@@ -209,7 +210,7 @@ public sealed class RuntimeAiChatProviderTests
             Enabled = true,
             Provider = AiProviderSettings.ProviderAzureOpenAi,
             EndpointUrl = "https://ai.example.openai.azure.com/",
-            ApiKey = "test-key",
+            CredentialScope = AiCredentialScope.Instance,
             ModelId = "gpt-test"
         });
 
@@ -219,30 +220,27 @@ public sealed class RuntimeAiChatProviderTests
         await Assert.That(result.Error!.Code).IsEqualTo("provider_not_configured");
     }
 
-    private static RuntimeAiChatProvider CreateProvider(
+    private RuntimeAiChatProvider CreateProvider(
         AiProviderSettings settings,
         RecordingMessageHandler? handler = null,
         MicrosoftExtensionsAiChatProvider? microsoftExtensionsProvider = null)
     {
         handler ??= new RecordingMessageHandler(_ => throw new InvalidOperationException("HTTP should not be called."));
-        var client = new HttpClient(handler);
+        var client = Fixture.CreateClient(handler);
         var factory = new StaticHttpClientFactory(client);
         var options = Options.Create(settings);
-        var environment = Substitute.For<IHostEnvironment>();
-        environment.EnvironmentName.Returns("Testing");
-        var validator = new AiProviderSettingsValidator(environment);
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
+        var validator = Fixture.Validator;
+        var configuration = Fixture.Configuration(settings);
 
         var fakeProvider = new FakeAiChatProvider();
         var openAiResponsesProvider = new OpenAiResponsesChatProvider(
-            factory, options, validator, new BusinessMetrics(meterFactory));
+            factory, configuration, validator, Fixture.Metrics);
         var openAiProvider = new OpenAiCompatibleChatProvider(
-            factory, options, validator, new BusinessMetrics(meterFactory));
+            factory, configuration, validator, Fixture.Metrics);
         var officialAnthropicProvider = new AnthropicChatProvider(
-            factory, options, validator, new BusinessMetrics(meterFactory));
+            factory, configuration, validator, Fixture.Metrics);
         var anthropicProvider = new AnthropicCompatibleChatProvider(
-            factory, options, validator, new BusinessMetrics(meterFactory));
+            factory, configuration, validator, Fixture.Metrics);
 
         var strategies = new List<IAiProviderStrategy>
         {
@@ -262,24 +260,21 @@ public sealed class RuntimeAiChatProviderTests
         return new RuntimeAiChatProvider(options, validator, resolver);
     }
 
-    private static MicrosoftExtensionsAiChatProvider CreateMicrosoftExtensionsProvider(
+    private MicrosoftExtensionsAiChatProvider CreateMicrosoftExtensionsProvider(
         AiProviderSettings settings,
-        RecordingChatClient chatClient)
+        RecordingMessageHandler handler)
     {
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
-
         return new MicrosoftExtensionsAiChatProvider(
-            chatClient,
-            Options.Create(settings),
-            new BusinessMetrics(meterFactory));
+            Fixture.Configuration(settings),
+            Fixture.Metrics,
+            new StaticHttpClientFactory(Fixture.CreateClient(handler)));
     }
 
     private static AiProviderSettings CreateOpenAiResponsesSettings() => new()
     {
         Enabled = true,
         Provider = AiProviderSettings.ProviderOpenAi,
-        ApiKey = "test-key",
+        CredentialScope = AiCredentialScope.Instance,
         ModelId = "gpt-test",
         MaxInputTokens = 8000,
         MaxOutputTokens = 1024,
@@ -291,7 +286,7 @@ public sealed class RuntimeAiChatProviderTests
         Enabled = true,
         Provider = AiProviderSettings.ProviderOpenAiCompatible,
         EndpointUrl = "https://ai.example.test/v1",
-        ApiKey = "test-key",
+        CredentialScope = AiCredentialScope.Instance,
         ModelId = "gpt-test",
         MaxInputTokens = 8000,
         MaxOutputTokens = 1024,
@@ -302,7 +297,7 @@ public sealed class RuntimeAiChatProviderTests
     {
         Enabled = true,
         Provider = AiProviderSettings.ProviderAnthropic,
-        ApiKey = "test-key",
+        CredentialScope = AiCredentialScope.Instance,
         ModelId = "claude-test",
         MaxInputTokens = 8000,
         MaxOutputTokens = 1024,
@@ -352,39 +347,4 @@ public sealed class RuntimeAiChatProviderTests
         }
     }
 
-    private sealed class RecordingChatClient : IChatClient
-    {
-        private readonly ChatResponse _response;
-
-        public RecordingChatClient(ChatResponse response)
-        {
-            _response = response;
-        }
-
-        public int Calls { get; private set; }
-
-        public Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null,
-            CancellationToken cancellationToken = default)
-        {
-            Calls++;
-            return Task.FromResult(_response);
-        }
-
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-            IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            await Task.CompletedTask;
-            yield break;
-        }
-
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-
-        public void Dispose()
-        {
-        }
-    }
 }

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure.Ai;
+using Explore.Domain.Ai;
 
 public sealed class AiProviderSettings
 {
@@ -17,7 +18,7 @@ public sealed class AiProviderSettings
     public bool Enabled { get; set; }
     public int Provider { get; set; } = ProviderNone;
     public string EndpointUrl { get; set; } = string.Empty;
-    public string ApiKey { get; set; } = string.Empty;
+    public AiCredentialScope CredentialScope { get; set; } = AiCredentialScope.None;
     public string ModelId { get; set; } = string.Empty;
     public string AzureCredentialMode { get; set; } = AzureCredentialModeApiKey;
     public string AzureTenantId { get; set; } = string.Empty;

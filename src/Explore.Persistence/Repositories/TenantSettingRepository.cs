@@ -63,6 +63,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         CancellationToken cancellationToken = default,
         Guid? actorId = null)
     {
+        Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(key);
         EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
@@ -176,6 +177,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(key);
         EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
@@ -209,6 +211,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(key);
         EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
@@ -254,6 +257,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         ArgumentNullException.ThrowIfNull(overrides);
         foreach (var setting in overrides)
         {
+            Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(setting.SettingKey);
             EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         }
@@ -332,6 +336,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         }
         foreach (var setting in overrides)
         {
+            Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(setting.SettingKey);
             EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         }

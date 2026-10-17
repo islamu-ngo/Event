@@ -84,11 +84,6 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
 
     private static void ValidateOpenAiSettings(AiProviderSettings options, List<string> failures)
     {
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
-        {
-            failures.Add("AiProvider:ApiKey is required for openai providers.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.ModelId))
         {
             failures.Add("AiProvider:ModelId is required for openai providers.");
@@ -117,11 +112,6 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
             failures.Add("AiProvider:AzureCredentialMode must be api-key or default-azure-credential.");
         }
 
-        if (options.AzureCredentialMode.Equals(AiProviderSettings.AzureCredentialModeApiKey, StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrWhiteSpace(options.ApiKey))
-        {
-            failures.Add("AiProvider:ApiKey is required for azure-openai providers using api-key authentication.");
-        }
     }
 
     private static void ValidateOpenAiCompatibleSettings(AiProviderSettings options, List<string> failures)
@@ -152,11 +142,6 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
 
     private static void ValidateAnthropicSettings(AiProviderSettings options, List<string> failures)
     {
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
-        {
-            failures.Add("AiProvider:ApiKey is required for anthropic providers.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.ModelId))
         {
             failures.Add("AiProvider:ModelId is required for anthropic providers.");

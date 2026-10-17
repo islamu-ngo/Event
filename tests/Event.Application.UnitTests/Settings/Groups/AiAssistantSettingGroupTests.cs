@@ -35,13 +35,13 @@ public class AiAssistantSettingGroupTests
     }
 
     [Test]
-    public async Task Populate_OpenAiRequiresApiKeyAndModelButNotEndpoint()
+    public async Task Populate_OpenAiRequiresReferenceAndModelButNotEndpoint()
     {
         var group = new AiAssistantSettingGroup();
         group.Populate(CreateSettings(
             (GovernanceSettingKeys.AiAssistant.Enabled, "true"),
             (GovernanceSettingKeys.AiAssistant.Provider, "\"openai\""),
-            (GovernanceSettingKeys.AiAssistant.ApiKey, "\"test-key\""),
+            (GovernanceSettingKeys.AiAssistant.CredentialScope, "\"instance\""),
             (GovernanceSettingKeys.AiAssistant.ModelId, "\"gpt-test\"")));
 
         await Assert.That(group.IsOpenAiProvider).IsTrue();
@@ -50,13 +50,13 @@ public class AiAssistantSettingGroupTests
     }
 
     [Test]
-    public async Task Populate_AnthropicRequiresApiKeyAndModelButNotEndpoint()
+    public async Task Populate_AnthropicRequiresReferenceAndModelButNotEndpoint()
     {
         var group = new AiAssistantSettingGroup();
         group.Populate(CreateSettings(
             (GovernanceSettingKeys.AiAssistant.Enabled, "true"),
             (GovernanceSettingKeys.AiAssistant.Provider, "\"anthropic\""),
-            (GovernanceSettingKeys.AiAssistant.ApiKey, "\"test-key\""),
+            (GovernanceSettingKeys.AiAssistant.CredentialScope, "\"instance\""),
             (GovernanceSettingKeys.AiAssistant.ModelId, "\"claude-test\"")));
 
         await Assert.That(group.IsAnthropicProvider).IsTrue();
@@ -85,14 +85,14 @@ public class AiAssistantSettingGroupTests
             (GovernanceSettingKeys.AiAssistant.Enabled, "true"),
             (GovernanceSettingKeys.AiAssistant.Provider, "\"openai-compatible\""),
             (GovernanceSettingKeys.AiAssistant.EndpointUrl, "\"https://ai.example.test\""),
-            (GovernanceSettingKeys.AiAssistant.ApiKey, "\"test-key\"")));
+            (GovernanceSettingKeys.AiAssistant.CredentialScope, "\"instance\"")));
 
         await Assert.That(group.IsConfigured).IsFalse();
         await Assert.That(group.IsAvailable).IsFalse();
     }
 
     [Test]
-    public async Task Populate_OpenAiCompatibleWithoutApiKeyIsAvailable()
+    public async Task Populate_OpenAiCompatibleWithoutCredentialIsStructurallyAvailable()
     {
         var group = new AiAssistantSettingGroup();
         group.Populate(CreateSettings(

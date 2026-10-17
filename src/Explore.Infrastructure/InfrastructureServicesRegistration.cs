@@ -21,6 +21,7 @@ using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Contracts.Strategies;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.ConfigurationManifest.Managed;
+using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Explore.Application.Management;
 using Explore.Application.Models;
 using Explore.Application.Services;
@@ -685,35 +686,25 @@ public static class InfrastructureServicesRegistration
         var aiProviderSettingsValidator = new AiProviderSettingsValidator(environment);
         services.AddSingleton(aiProviderSettingsValidator);
         services.AddSingleton<IValidateOptions<AiProviderSettings>>(aiProviderSettingsValidator);
+        services.AddScoped<AiProviderConfigurationResolver>();
+        services.AddScoped<IAiProviderCapabilityResolver>(sp => sp.GetRequiredService<AiProviderConfigurationResolver>());
+        services.AddScoped<IAiModelDiscoveryGateway, AiModelDiscoveryGateway>();
         services.AddScoped<AiProviderHealthReporter>();
         if (aiProviderSettingsValidator.FakeProviderAllowed)
         {
             services.AddScoped<FakeAiChatProvider>();
         }
-        services.AddHttpClient(OpenAiResponsesChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, OpenAiResponsesChatProvider.HttpClientName);
         services.AddScoped<OpenAiResponsesChatProvider>();
-        services.AddHttpClient(OpenAiCompatibleChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, OpenAiCompatibleChatProvider.HttpClientName);
         services.AddScoped<OpenAiCompatibleChatProvider>();
-        services.AddHttpClient(AnthropicCompatibleChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, AnthropicCompatibleChatProvider.HttpClientName);
         services.AddScoped<AnthropicCompatibleChatProvider>();
-        services.AddHttpClient(AnthropicChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, AnthropicChatProvider.HttpClientName);
         services.AddScoped<AnthropicChatProvider>();
         if (IsSdkBackedAiProvider(configuration))
         {
-            services.AddScoped<IChatClient>(sp => CreateSdkBackedChatClient(
-                sp.GetRequiredService<IOptions<AiProviderSettings>>().Value));
+            RegisterAiHttpClients(services, MicrosoftExtensionsAiChatProvider.HttpClientName);
             services.AddScoped<MicrosoftExtensionsAiChatProvider>();
         }
 
@@ -919,16 +910,32 @@ public static class InfrastructureServicesRegistration
         };
     }
 
-    private static IChatClient CreateSdkBackedChatClient(AiProviderSettings settings)
+    private static void RegisterAiHttpClients(IServiceCollection services, string name)
+    {
+        services.AddHttpClient(name, client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .ConfigurePrimaryHttpMessageHandler(_ =>
+                AiTransportAuthority.CreateHandler(new AiProviderSettings(), instanceScope: false));
+        services.AddHttpClient(name + AiTransportAuthority.InstanceClientSuffix,
+                client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .ConfigurePrimaryHttpMessageHandler(sp =>
+                AiTransportAuthority.CreateHandler(
+                    sp.GetRequiredService<IOptions<AiProviderSettings>>().Value, instanceScope: true));
+    }
+
+    internal static IChatClient CreateSdkBackedChatClient(AiProviderSettings settings, string apiKey, HttpClient httpClient)
     {
         if (settings.Provider == AiProviderSettings.ProviderAzureOpenAi)
         {
             var endpoint = new Uri(settings.EndpointUrl.Trim(), UriKind.Absolute);
+            var clientOptions = new AzureOpenAIClientOptions
+            {
+                Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient)
+            };
             var client = settings.AzureCredentialMode.Equals(
                 AiProviderSettings.AzureCredentialModeDefaultAzureCredential,
                 StringComparison.OrdinalIgnoreCase)
-                    ? new AzureOpenAIClient(endpoint, CreateDefaultAzureCredential(settings))
-                    : new AzureOpenAIClient(endpoint, new AzureKeyCredential(settings.ApiKey.Trim()));
+                    ? new AzureOpenAIClient(endpoint, CreateDefaultAzureCredential(settings), clientOptions)
+                    : new AzureOpenAIClient(endpoint, new AzureKeyCredential(apiKey.Trim()), clientOptions);
 
             return client
                 .GetChatClient(settings.ModelId.Trim())

@@ -5,39 +5,57 @@ using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Ai;
 
 public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiModelCatalog
 {
     public const string ProviderName = "microsoft-extensions-ai";
+    public const string HttpClientName = "AzureOpenAiClient";
 
     private const string CreateEventDraftToolName = "create_event_draft";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IChatClient _chatClient;
-    private readonly IOptions<AiProviderSettings> _options;
+    private readonly AiProviderConfigurationResolver _configuration;
     private readonly BusinessMetrics _metrics;
+    private readonly Func<ResolvedAiProviderConfiguration, IChatClient> _createClient;
 
     public MicrosoftExtensionsAiChatProvider(
-        IChatClient chatClient,
-        IOptions<AiProviderSettings> options,
-        BusinessMetrics metrics)
+        AiProviderConfigurationResolver configuration,
+        BusinessMetrics metrics,
+        IHttpClientFactory httpClientFactory)
     {
-        _chatClient = chatClient;
-        _options = options;
+        _configuration = configuration;
         _metrics = metrics;
+        _createClient = resolved => InfrastructureServicesRegistration.CreateSdkBackedChatClient(
+            resolved.Settings,
+            resolved.ApiKey,
+            httpClientFactory.CreateClient(
+                HttpClientName + (resolved.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty)));
     }
 
-    public Task<IReadOnlyList<AiModelDescriptor>> ListAvailableModelsAsync(CancellationToken cancellationToken = default)
+    internal MicrosoftExtensionsAiChatProvider(
+        AiProviderConfigurationResolver configuration,
+        BusinessMetrics metrics,
+        Func<AiProviderSettings, IChatClient> createClient)
+    {
+        _configuration = configuration;
+        _metrics = metrics;
+        _createClient = resolved => createClient(resolved.Settings);
+    }
+
+    public async Task<IReadOnlyList<AiModelDescriptor>> ListAvailableModelsAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var settings = _options.Value;
+        var resolved = await _configuration.ResolveAsync(request: null, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return [];
+        var settings = configuration.Settings;
 
-        if (!settings.Enabled || string.IsNullOrWhiteSpace(settings.ModelId))
+        if (!settings.Enabled || settings.Provider != AiProviderSettings.ProviderAzureOpenAi
+            || string.IsNullOrWhiteSpace(settings.ModelId))
         {
-            return Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
+            return [];
         }
 
         IReadOnlyList<AiModelDescriptor> models =
@@ -51,19 +69,24 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 SupportsStreaming: false)
         ];
 
-        return Task.FromResult(models);
+        return models;
     }
 
     public async Task<AiChatProviderResult> SendAsync(AiChatPayload request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var settings = _options.Value;
-        var providerName = ResolveTelemetryProvider(settings);
+        var providerName = AiProviderDefaults.ProviderAzureOpenAi;
         var startedAt = Stopwatch.GetTimestamp();
         using var telemetryActivity = AiProviderTelemetry.StartRequest(providerName, request);
+        var resolved = await _configuration.ResolveAsync(request, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return CompleteFailure(
+                RecordFailure(providerName, resolved.FailureCode!, "AI provider configuration or credential is unavailable."),
+                providerName, startedAt, telemetryActivity);
+        var settings = configuration.Settings;
 
-        if (!settings.Enabled)
+        if (!settings.Enabled || settings.Provider != AiProviderSettings.ProviderAzureOpenAi)
         {
             return CompleteFailure(
                 RecordFailure(providerName, "provider_disabled", "AI provider integration is disabled."),
@@ -115,7 +138,8 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
 
         try
         {
-            var response = await _chatClient.GetResponseAsync(
+            using var chatClient = _createClient(configuration);
+            var response = await chatClient.GetResponseAsync(
                 messages!,
                 chatOptions,
                 timeoutCts.Token);
@@ -170,11 +194,6 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 telemetryActivity);
         }
     }
-
-    private static string ResolveTelemetryProvider(AiProviderSettings settings) =>
-        settings.Provider == AiProviderSettings.ProviderAzureOpenAi
-            ? "azure-openai"
-            : ProviderName;
 
     private static TimeSpan GetTimeout(AiProviderSettings settings, AiChatOptions options)
     {

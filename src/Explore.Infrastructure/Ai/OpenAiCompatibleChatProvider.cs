@@ -8,7 +8,6 @@ using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
-using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Ai;
 
@@ -20,18 +19,18 @@ public sealed class OpenAiCompatibleChatProvider : IAiChatProvider, IAiModelCata
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptions<AiProviderSettings> _options;
+    private readonly AiProviderConfigurationResolver _configuration;
     private readonly AiProviderSettingsValidator _validator;
     private readonly BusinessMetrics _metrics;
 
     public OpenAiCompatibleChatProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<AiProviderSettings> options,
+        AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
         BusinessMetrics metrics)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options;
+        _configuration = configuration;
         _validator = validator;
         _metrics = metrics;
     }
@@ -39,7 +38,10 @@ public sealed class OpenAiCompatibleChatProvider : IAiChatProvider, IAiModelCata
     public async Task<IReadOnlyList<AiModelDescriptor>> ListAvailableModelsAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var settings = _options.Value;
+        var resolved = await _configuration.ResolveAsync(request: null, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return [];
+        var settings = configuration.Settings;
 
         if (!IsRunnableOpenAiCompatible(settings) || !ValidateSettings(settings).Succeeded)
         {
@@ -48,8 +50,9 @@ public sealed class OpenAiCompatibleChatProvider : IAiChatProvider, IAiModelCata
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient(HttpClientName);
-            var models = await DiscoverModelsAsync(httpClient, settings.EndpointUrl, settings.ApiKey, cancellationToken);
+            var httpClient = _httpClientFactory.CreateClient(
+                HttpClientName + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty));
+            var models = await DiscoverModelsAsync(httpClient, settings.EndpointUrl, configuration.ApiKey, cancellationToken);
             if (models.Count > 0)
             {
                 return models;
@@ -114,10 +117,15 @@ public sealed class OpenAiCompatibleChatProvider : IAiChatProvider, IAiModelCata
     public async Task<AiChatProviderResult> SendAsync(AiChatPayload request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var settings = ResolveSettings(request);
         var providerName = AiProviderDefaults.ProviderOpenAiCompatible;
         var startedAt = Stopwatch.GetTimestamp();
         using var telemetryActivity = AiProviderTelemetry.StartRequest(providerName, request);
+        var resolved = await _configuration.ResolveAsync(request, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return CompleteFailure(
+                RecordFailure(resolved.FailureCode!, "AI provider configuration or credential is unavailable."),
+                startedAt, telemetryActivity);
+        var settings = configuration.Settings;
 
         if (!IsRunnableOpenAiCompatible(settings))
         {
@@ -179,8 +187,9 @@ public sealed class OpenAiCompatibleChatProvider : IAiChatProvider, IAiModelCata
 
         try
         {
-            using var httpRequest = CreateHttpRequest(settings, payload!);
-            var client = _httpClientFactory.CreateClient(HttpClientName);
+            using var httpRequest = CreateHttpRequest(settings, configuration.ApiKey, payload!);
+            var client = _httpClientFactory.CreateClient(
+                HttpClientName + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty));
             using var response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
 
             if (!response.IsSuccessStatusCode)
@@ -243,38 +252,6 @@ public sealed class OpenAiCompatibleChatProvider : IAiChatProvider, IAiModelCata
         settings.Enabled
         && settings.Provider == AiProviderSettings.ProviderOpenAiCompatible;
 
-    private AiProviderSettings ResolveSettings(AiChatPayload request)
-    {
-        var defaults = _options.Value;
-        var providerConfiguration = request.ProviderConfiguration;
-
-        if (providerConfiguration is null
-            || providerConfiguration.Provider != AiProviderSettings.ProviderOpenAiCompatible)
-        {
-            return defaults;
-        }
-
-        return new AiProviderSettings
-        {
-            Enabled = true,
-            Provider = AiProviderSettings.ProviderOpenAiCompatible,
-            EndpointUrl = providerConfiguration.EndpointUrl.Trim(),
-            ApiKey = providerConfiguration.ApiKey.Trim(),
-            ModelId = providerConfiguration.ModelId.Trim(),
-            AzureCredentialMode = defaults.AzureCredentialMode,
-            AzureTenantId = defaults.AzureTenantId,
-            MaxInputTokens = request.Options.MaxInputTokens,
-            MaxOutputTokens = request.Options.MaxOutputTokens,
-            Temperature = request.Options.Temperature,
-            TimeoutSeconds = request.Options.TimeoutSeconds,
-            RetentionDays = defaults.RetentionDays,
-            DailyMessageLimit = defaults.DailyMessageLimit,
-            ToolProposalsEnabled = defaults.ToolProposalsEnabled,
-            StreamingEnabled = defaults.StreamingEnabled,
-            AllowLocalProviderEndpoints = defaults.AllowLocalProviderEndpoints
-        };
-    }
-
     private Microsoft.Extensions.Options.ValidateOptionsResult ValidateSettings(AiProviderSettings settings) =>
         _validator.Validate(null, settings);
 
@@ -285,12 +262,12 @@ public sealed class OpenAiCompatibleChatProvider : IAiChatProvider, IAiModelCata
         return TimeSpan.FromSeconds(Math.Min(boundedSettingsTimeout, boundedRequestTimeout));
     }
 
-    private static HttpRequestMessage CreateHttpRequest(AiProviderSettings settings, OpenAiChatCompletionRequest payload)
+    private static HttpRequestMessage CreateHttpRequest(AiProviderSettings settings, string apiKey, OpenAiChatCompletionRequest payload)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, BuildChatCompletionsUri(settings.EndpointUrl));
-        if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+        if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         }
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 

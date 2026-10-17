@@ -1,6 +1,5 @@
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
-using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Ai;
 
@@ -12,12 +11,12 @@ public sealed class AnthropicChatProvider : AnthropicCompatibleChatProvider
 
     public AnthropicChatProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<AiProviderSettings> options,
+        AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
         BusinessMetrics metrics)
         : base(
             httpClientFactory,
-            options,
+            configuration,
             validator,
             metrics,
             AiProviderSettings.ProviderAnthropic,

@@ -17,7 +17,7 @@ public partial class TenantPolicySettingService
         .. PublicationPolicySettingKeys.All,
         GovernanceSettingKeys.AiAssistant.AllowAnonymousAccess,
         GovernanceSettingKeys.AiAssistant.AllowedModelIds,
-        GovernanceSettingKeys.AiAssistant.ApiKey,
+        GovernanceSettingKeys.AiAssistant.CredentialScope,
         GovernanceSettingKeys.AiAssistant.Enabled,
         GovernanceSettingKeys.AiAssistant.EndpointUrl,
         GovernanceSettingKeys.AiAssistant.ModelId,
@@ -128,7 +128,9 @@ public partial class TenantPolicySettingService
         var lockMcpLegacySseSetting = systemSettings.GetValueOrDefault(GovernanceSettingKeys.TenantDelegation.LockMcpLegacySse);
         var isMultiTenant = DeserializeString(deploymentModeSetting?.Value, "SingleTenant").Equals("MultiTenant", StringComparison.OrdinalIgnoreCase);
         var canOverrideAiAssistant = !isMultiTenant || !DeserializeBoolean(lockAiAssistantSetting?.Value, true);
-        var aiAssistantProvider = NormalizeAiAssistantProvider(settings.AiAssistantProvider, settings.AiAssistantEnabled);
+        var aiAssistantProvider = CanOverride(GovernanceSettingKeys.AiAssistant.Provider, canOverrideAiAssistant)
+            ? NormalizeAiAssistantProvider(settings.AiAssistantProvider, settings.AiAssistantEnabled)
+            : DeserializeString(systemSettings.GetValueOrDefault(GovernanceSettingKeys.AiAssistant.Provider)?.Value, "none");
         var usesOfficialProvider = aiAssistantProvider is "openai" or "anthropic";
         var usesCompatibleProvider = aiAssistantProvider is "openai-compatible" or "anthropic-compatible";
         var usesExternalProvider = usesOfficialProvider || usesCompatibleProvider;
@@ -138,7 +140,27 @@ public partial class TenantPolicySettingService
 
         if (canOverrideAiAssistant)
         {
-            ValidateAiAssistantSettings(settings, aiAssistantProvider);
+            string EffectiveAiString(string key, string value, string fallback) =>
+                CanOverride(key, true) ? value
+                    : DeserializeString(systemSettings.GetValueOrDefault(key)?.Value, fallback);
+            var effectiveAiSettings = settings with
+            {
+                AiAssistantEnabled = CanOverride(GovernanceSettingKeys.AiAssistant.Enabled, true)
+                    ? settings.AiAssistantEnabled
+                    : DeserializeBoolean(systemSettings.GetValueOrDefault(GovernanceSettingKeys.AiAssistant.Enabled)?.Value, false),
+                AiAssistantProvider = EffectiveAiString(
+                    GovernanceSettingKeys.AiAssistant.Provider, aiAssistantProvider, "none"),
+                AiAssistantEndpointUrl = EffectiveAiString(
+                    GovernanceSettingKeys.AiAssistant.EndpointUrl, settings.AiAssistantEndpointUrl, string.Empty),
+                AiAssistantCredentialScope = EffectiveAiString(
+                    GovernanceSettingKeys.AiAssistant.CredentialScope, settings.AiAssistantCredentialScope, "none"),
+                AiAssistantModelId = EffectiveAiString(
+                    GovernanceSettingKeys.AiAssistant.ModelId, settings.AiAssistantModelId, string.Empty)
+            };
+            bool tenantOwnedTransport = CanOverride(GovernanceSettingKeys.AiAssistant.Provider, true)
+                || (CanOverride(GovernanceSettingKeys.AiAssistant.EndpointUrl, true)
+                    && usesCompatibleProvider && !string.IsNullOrWhiteSpace(settings.AiAssistantEndpointUrl));
+            ValidateAiAssistantSettings(effectiveAiSettings, effectiveAiSettings.AiAssistantProvider, tenantOwnedTransport);
         }
 
         var occurredAtUtc = DateTime.UtcNow;
@@ -396,8 +418,8 @@ public partial class TenantPolicySettingService
 
         await SetStringTenantOverrideAsync(
             tenantId,
-            GovernanceSettingKeys.AiAssistant.ApiKey,
-            usesExternalProvider ? settings.AiAssistantApiKey : string.Empty,
+            GovernanceSettingKeys.AiAssistant.CredentialScope,
+            settings.AiAssistantCredentialScope,
             canOverrideAiAssistant,
             actorUserId);
 
@@ -519,14 +541,42 @@ public partial class TenantPolicySettingService
             cancellationToken);
     }
 
-    private static void ValidateAiAssistantSettings(UpdateTenantPolicyRequest settings, string provider)
+    private static void ValidateAiAssistantSettings(
+        UpdateTenantPolicyRequest settings, string provider, bool tenantOwnedTransport)
     {
+        var failures = new List<ValidationFailure>();
+        if (settings.AiAssistantCredentialScope is not ("none" or "instance" or "tenant"))
+        {
+            failures.Add(new ValidationFailure(
+                nameof(settings.AiAssistantCredentialScope),
+                "AI Assistant credential scope must be none, instance, or tenant."));
+        }
+        else if (tenantOwnedTransport && settings.AiAssistantCredentialScope == "instance")
+        {
+            failures.Add(new ValidationFailure(
+                nameof(settings.AiAssistantCredentialScope),
+                "Tenant-owned AI provider or endpoint settings cannot use an instance credential reference."));
+        }
+        else if (provider is "none" or "fake" && settings.AiAssistantCredentialScope != "none")
+        {
+            failures.Add(new ValidationFailure(
+                nameof(settings.AiAssistantCredentialScope),
+                "This AI provider does not accept a credential reference."));
+        }
+        if (provider is "openai" or "anthropic" && settings.AiAssistantCredentialScope == "none")
+        {
+            failures.Add(new ValidationFailure(
+                nameof(settings.AiAssistantCredentialScope),
+                "Official AI providers require a credential reference."));
+        }
+
         if (!settings.AiAssistantEnabled)
         {
+            if (failures.Count > 0)
+                throw new ValidationException(new ValidationResult(failures));
             return;
         }
 
-        var failures = new List<ValidationFailure>();
         if (provider is not "fake" and not "openai" and not "openai-compatible" and not "anthropic" and not "anthropic-compatible")
         {
             failures.Add(new ValidationFailure(
@@ -536,13 +586,6 @@ public partial class TenantPolicySettingService
 
         if (provider is "openai" or "anthropic")
         {
-            if (string.IsNullOrWhiteSpace(settings.AiAssistantApiKey))
-            {
-                failures.Add(new ValidationFailure(
-                    nameof(settings.AiAssistantApiKey),
-                    "AI Assistant API key is required for official AI providers."));
-            }
-
             if (string.IsNullOrWhiteSpace(settings.AiAssistantModelId))
             {
                 failures.Add(new ValidationFailure(

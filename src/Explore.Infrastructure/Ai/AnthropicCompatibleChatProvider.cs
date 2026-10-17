@@ -7,7 +7,6 @@ using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
-using Microsoft.Extensions.Options;
 using Refit;
 
 namespace Explore.Infrastructure.Ai;
@@ -27,7 +26,7 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptions<AiProviderSettings> _options;
+    private readonly AiProviderConfigurationResolver _configuration;
     private readonly AiProviderSettingsValidator _validator;
     private readonly BusinessMetrics _metrics;
     private readonly int _providerId;
@@ -38,12 +37,12 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
 
     public AnthropicCompatibleChatProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<AiProviderSettings> options,
+        AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
         BusinessMetrics metrics)
         : this(
             httpClientFactory,
-            options,
+            configuration,
             validator,
             metrics,
             AiProviderSettings.ProviderAnthropicCompatible,
@@ -56,7 +55,7 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
 
     protected AnthropicCompatibleChatProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<AiProviderSettings> options,
+        AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
         BusinessMetrics metrics,
         int providerId,
@@ -66,7 +65,7 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
         string notConfiguredMessage)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options;
+        _configuration = configuration;
         _validator = validator;
         _metrics = metrics;
         _providerId = providerId;
@@ -79,10 +78,15 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
     public async Task<AiChatProviderResult> SendAsync(AiChatPayload request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var settings = ResolveSettings(request);
         var providerName = _providerName;
         var startedAt = Stopwatch.GetTimestamp();
         using var telemetryActivity = AiProviderTelemetry.StartRequest(providerName, request);
+        var resolved = await _configuration.ResolveAsync(request, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return CompleteFailure(
+                RecordFailure(resolved.FailureCode!, "AI provider configuration or credential is unavailable."),
+                startedAt, telemetryActivity);
+        var settings = configuration.Settings;
 
         if (!IsRunnableProvider(settings))
         {
@@ -136,8 +140,9 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
 
         try
         {
-            var api = CreateApiClient(settings);
-            using var providerResponse = await api.CreateMessageAsync(payload!, ResolveApiKey(settings), timeoutCts.Token);
+            var api = CreateApiClient(configuration);
+            using var providerResponse = await api.CreateMessageAsync(
+                payload!, string.IsNullOrWhiteSpace(configuration.ApiKey) ? null : configuration.ApiKey, timeoutCts.Token);
 
             if (!providerResponse.IsSuccessStatusCode)
             {
@@ -202,51 +207,18 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
         }
     }
 
-    private IAnthropicMessagesApi CreateApiClient(AiProviderSettings settings)
+    private IAnthropicMessagesApi CreateApiClient(ResolvedAiProviderConfiguration configuration)
     {
-        var client = _httpClientFactory.CreateClient(_httpClientName);
+        var settings = configuration.Settings;
+        var client = _httpClientFactory.CreateClient(
+            _httpClientName + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty));
         client.BaseAddress = BuildMessagesBaseUri(settings.EndpointUrl, _defaultEndpointUrl);
         return RestService.For<IAnthropicMessagesApi>(client, RefitSettings);
     }
 
-    private static string? ResolveApiKey(AiProviderSettings settings) =>
-        string.IsNullOrWhiteSpace(settings.ApiKey) ? null : settings.ApiKey;
-
     private bool IsRunnableProvider(AiProviderSettings settings) =>
         settings.Enabled
         && settings.Provider == _providerId;
-
-    private AiProviderSettings ResolveSettings(AiChatPayload request)
-    {
-        var defaults = _options.Value;
-        var providerConfiguration = request.ProviderConfiguration;
-
-        if (providerConfiguration is null
-            || providerConfiguration.Provider != _providerId)
-        {
-            return defaults;
-        }
-
-        return new AiProviderSettings
-        {
-            Enabled = true,
-            Provider = _providerId,
-            EndpointUrl = providerConfiguration.EndpointUrl.Trim(),
-            ApiKey = providerConfiguration.ApiKey.Trim(),
-            ModelId = providerConfiguration.ModelId.Trim(),
-            AzureCredentialMode = defaults.AzureCredentialMode,
-            AzureTenantId = defaults.AzureTenantId,
-            MaxInputTokens = request.Options.MaxInputTokens,
-            MaxOutputTokens = request.Options.MaxOutputTokens,
-            Temperature = request.Options.Temperature,
-            TimeoutSeconds = request.Options.TimeoutSeconds,
-            RetentionDays = defaults.RetentionDays,
-            DailyMessageLimit = defaults.DailyMessageLimit,
-            ToolProposalsEnabled = defaults.ToolProposalsEnabled,
-            StreamingEnabled = defaults.StreamingEnabled,
-            AllowLocalProviderEndpoints = defaults.AllowLocalProviderEndpoints
-        };
-    }
 
     private Microsoft.Extensions.Options.ValidateOptionsResult ValidateSettings(AiProviderSettings settings) =>
         _validator.Validate(null, settings);

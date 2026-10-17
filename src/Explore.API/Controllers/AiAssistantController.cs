@@ -59,7 +59,7 @@ public sealed class AiAssistantController : ControllerBase
     private readonly ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>> _confirmProposedActionHandler;
     private readonly ICommandHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>> _rejectProposedActionHandler;
     private readonly ICommandHandler<CancelAiRunCommand, BaseCommandResponse<Guid>> _cancelRunHandler;
-    private readonly IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> _tenantOnboardingStatus;
+    private readonly IQueryHandler<DiscoverAiAssistantModelsQuery, AiModelDiscoveryResult> _discoverModelsHandler;
     private readonly IHateoasLinkGenerator _linkGenerator;
     private readonly IResourceAssembler<AiConversationDto, AiConversationSummaryDto> _conversationAssembler;
     private readonly IAiAssistantRunQueue _runQueue;
@@ -76,7 +76,7 @@ public sealed class AiAssistantController : ControllerBase
         ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>> confirmProposedActionHandler,
         ICommandHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>> rejectProposedActionHandler,
         ICommandHandler<CancelAiRunCommand, BaseCommandResponse<Guid>> cancelRunHandler,
-        IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> tenantOnboardingStatus,
+        IQueryHandler<DiscoverAiAssistantModelsQuery, AiModelDiscoveryResult> discoverModelsHandler,
         IHateoasLinkGenerator linkGenerator,
         IResourceAssembler<AiConversationDto, AiConversationSummaryDto> conversationAssembler,
         IAiAssistantRunQueue runQueue,
@@ -92,7 +92,7 @@ public sealed class AiAssistantController : ControllerBase
         _confirmProposedActionHandler = confirmProposedActionHandler;
         _rejectProposedActionHandler = rejectProposedActionHandler;
         _cancelRunHandler = cancelRunHandler;
-        _tenantOnboardingStatus = tenantOnboardingStatus;
+        _discoverModelsHandler = discoverModelsHandler;
         _linkGenerator = linkGenerator;
         _conversationAssembler = conversationAssembler;
         _runQueue = runQueue;
@@ -130,96 +130,24 @@ public sealed class AiAssistantController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
     public async Task<ActionResult<IReadOnlyList<AiAssistantModelDto>>> GetModels(
         [FromBody] AiAssistantModelDiscoveryRequestDto request,
-        [FromServices] IHttpClientFactory httpClientFactory,
-        [FromServices] AiProviderSettingsValidator settingsValidator,
-        [FromServices] IOptions<AiProviderSettings> providerOptions,
         CancellationToken cancellationToken = default)
     {
-        var status = await _tenantOnboardingStatus.QueryAsync(new GetTenantOnboardingStatusQuery(), cancellationToken);
-        if (!status.IsCurrentUserTenantAdministrator && !status.IsCurrentUserPlatformAdministrator)
+        var result = await _discoverModelsHandler.QueryAsync(new DiscoverAiAssistantModelsQuery(request), cancellationToken);
+        if (result.FailureCode == "forbidden")
         {
-            return this.ToForbiddenProblem(detail: "Tenant or platform administrator authority is required to discover AI assistant models.");
+            return this.ToForbiddenProblem(detail: "Administrator authority for the requested AI scope is required.");
         }
-
-        if (string.IsNullOrWhiteSpace(request.EndpointUrl))
+        if (result.FailureCode is "invalid_scope" or "invalid_settings" or "credential_scope_invalid")
         {
             return this.ToValidationProblem(
                 ModelDiscoveryValidationProblem,
-                "Enter an OpenAI-compatible endpoint URL before fetching models.");
+                "The requested scope or provider endpoint is not permitted.");
         }
-
-        var settings = new AiProviderSettings
+        if (result.FailureCode is not null)
         {
-            Enabled = true,
-            Provider = AiProviderSettings.ProviderOpenAiCompatible,
-            EndpointUrl = request.EndpointUrl.Trim(),
-            ApiKey = request.ApiKey?.Trim() ?? string.Empty,
-            ModelId = "model-discovery",
-            MaxInputTokens = providerOptions.Value.MaxInputTokens,
-            MaxOutputTokens = providerOptions.Value.MaxOutputTokens,
-            Temperature = providerOptions.Value.Temperature,
-            TimeoutSeconds = providerOptions.Value.TimeoutSeconds,
-            RetentionDays = providerOptions.Value.RetentionDays,
-            DailyMessageLimit = providerOptions.Value.DailyMessageLimit,
-            AllowLocalProviderEndpoints = providerOptions.Value.AllowLocalProviderEndpoints
-        };
-
-        var validation = settingsValidator.Validate(null, settings);
-        if (!validation.Succeeded)
-        {
-            return this.ToValidationProblem(
-                ModelDiscoveryValidationProblem,
-                string.Join(" ", validation.Failures ?? []));
+            return this.ToBadGatewayProblem("Model discovery failed", "The provider could not return an available model catalog.");
         }
-
-        try
-        {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(settings.TimeoutSeconds, 1, 30)));
-
-            var client = httpClientFactory.CreateClient(OpenAiCompatibleChatProvider.HttpClientName);
-            var models = await OpenAiCompatibleChatProvider.DiscoverModelsAsync(
-                client,
-                settings.EndpointUrl,
-                settings.ApiKey,
-                timeout.Token);
-
-            IReadOnlyList<AiAssistantModelDto> response = models
-                .Select(model => new AiAssistantModelDto
-                {
-                    Id = model.Id,
-                    DisplayName = model.DisplayName,
-                    MaxInputTokens = model.MaxInputTokens,
-                    MaxOutputTokens = model.MaxOutputTokens,
-                    SupportsToolProposals = model.SupportsToolProposals,
-                    SupportsStreaming = model.SupportsStreaming
-                })
-                .ToList();
-
-            return Ok(response);
-        }
-        catch (UriFormatException)
-        {
-            return this.ToValidationProblem(
-                ModelDiscoveryValidationProblem,
-                "The endpoint URL must be an absolute HTTP or HTTPS URL.");
-        }
-        catch (JsonException)
-        {
-            return this.ToBadGatewayProblem(
-                "Invalid model response",
-                "The provider did not return a valid OpenAI-compatible models response.");
-        }
-        catch (HttpRequestException ex)
-        {
-            return this.ToBadGatewayProblem("Model discovery failed", ex.Message);
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return this.ToBadGatewayProblem(
-                "Model discovery timed out",
-                "The provider did not respond before the request timed out.");
-        }
+        return Ok(result.Models);
     }
 
     [HttpGet("conversations", Name = RouteNames.GetAiConversations)]

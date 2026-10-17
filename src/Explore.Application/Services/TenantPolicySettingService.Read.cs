@@ -49,7 +49,7 @@ public partial class TenantPolicySettingService
         var systemAiAssistantEnabled = GetSystem(GovernanceSettingKeys.AiAssistant.Enabled);
         var systemAiAssistantProvider = GetSystem(GovernanceSettingKeys.AiAssistant.Provider);
         var systemAiAssistantEndpointUrl = GetSystem(GovernanceSettingKeys.AiAssistant.EndpointUrl);
-        var systemAiAssistantApiKey = GetSystem(GovernanceSettingKeys.AiAssistant.ApiKey);
+        var systemAiAssistantCredentialScope = GetSystem(GovernanceSettingKeys.AiAssistant.CredentialScope);
         var systemAiAssistantModelId = GetSystem(GovernanceSettingKeys.AiAssistant.ModelId);
         var systemAiAssistantAllowedModelIds = GetSystem(GovernanceSettingKeys.AiAssistant.AllowedModelIds);
         var systemAiAssistantAllowAnonymousAccess = GetSystem(GovernanceSettingKeys.AiAssistant.AllowAnonymousAccess);
@@ -90,7 +90,7 @@ public partial class TenantPolicySettingService
         var tenantAiAssistantEnabled = GetTenant(GovernanceSettingKeys.AiAssistant.Enabled);
         var tenantAiAssistantProvider = GetTenant(GovernanceSettingKeys.AiAssistant.Provider);
         var tenantAiAssistantEndpointUrl = GetTenant(GovernanceSettingKeys.AiAssistant.EndpointUrl);
-        var tenantAiAssistantApiKey = GetTenant(GovernanceSettingKeys.AiAssistant.ApiKey);
+        var tenantAiAssistantCredentialScope = GetTenant(GovernanceSettingKeys.AiAssistant.CredentialScope);
         var tenantAiAssistantModelId = GetTenant(GovernanceSettingKeys.AiAssistant.ModelId);
         var tenantAiAssistantAllowedModelIds = GetTenant(GovernanceSettingKeys.AiAssistant.AllowedModelIds);
         var tenantAiAssistantAllowAnonymousAccess = GetTenant(GovernanceSettingKeys.AiAssistant.AllowAnonymousAccess);
@@ -310,10 +310,10 @@ public partial class TenantPolicySettingService
                 systemAiAssistantEndpointUrl?.Value,
                 string.Empty,
                 canOverrideAiAssistant),
-            AiAssistantApiKey = ResolveString(
-                tenantAiAssistantApiKey?.Value,
-                systemAiAssistantApiKey?.Value,
-                string.Empty,
+            AiAssistantCredentialScope = ResolveString(
+                tenantAiAssistantCredentialScope?.Value,
+                systemAiAssistantCredentialScope?.Value,
+                "none",
                 canOverrideAiAssistant),
             AiAssistantModelId = resolvedAiAssistantModelId,
             AiAssistantAllowedModelIds = resolvedAiAssistantAllowedModelIds,

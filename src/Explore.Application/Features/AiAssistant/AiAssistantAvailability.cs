@@ -15,7 +15,10 @@ internal static class AiAssistantAvailability
             ? AiProviderDefaults.ProviderNone
             : provider.Trim().ToLowerInvariant();
 
-    public static string? ResolveDisabledReason(AiAssistantSettingGroup settings)
+    public static async Task<string?> ResolveDisabledReasonAsync(
+        AiAssistantSettingGroup settings,
+        IAiProviderCapabilityResolver capabilityResolver,
+        CancellationToken cancellationToken)
     {
         var provider = NormalizeProvider(settings.Provider);
 
@@ -34,9 +37,6 @@ internal static class AiAssistantAvailability
 
         if (provider == AiProviderDefaults.ProviderOpenAi || provider == AiProviderDefaults.ProviderAnthropic)
         {
-            if (!settings.HasApiKey)
-                return "api_key_not_configured";
-
             if (!settings.HasModel)
                 return "model_not_configured";
         }
@@ -50,7 +50,8 @@ internal static class AiAssistantAvailability
                 return "model_not_configured";
         }
 
-        return null;
+        var capability = await capabilityResolver.ResolveAsync(settings, cancellationToken);
+        return capability.Available ? null : capability.DisabledReason ?? "provider_not_ready";
     }
 
     public static string ResolveModelId(AiAssistantSettingGroup settings)

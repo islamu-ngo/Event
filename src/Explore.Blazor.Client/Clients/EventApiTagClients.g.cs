@@ -157586,8 +157586,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("endpointUrl")]
         public string? EndpointUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("apiKeyConfigured")]
-        public bool? ApiKeyConfigured { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("credentialScope")]
+        public string? CredentialScope { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("modelId")]
         public string? ModelId { get; set; } = default!;
@@ -157619,11 +157619,16 @@ namespace Explore.Blazor.Client.Clients
     public partial class AiAssistantModelDiscoveryRequestDto
     {
 
+        [System.Text.Json.Serialization.JsonPropertyName("scope")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<AiModelDiscoveryScope>))]
+        public AiModelDiscoveryScope? Scope { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("endpointUrl")]
         public string? EndpointUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("apiKey")]
-        public string? ApiKey { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("credentialScope")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<AiCredentialScope>))]
+        public AiCredentialScope? CredentialScope { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -157686,8 +157691,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("endpointUrl")]
         public string? EndpointUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("apiKey")]
-        public string? ApiKey { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("credentialScope")]
+        public string? CredentialScope { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("modelId")]
         public string? ModelId { get; set; } = default!;
@@ -157833,6 +157838,21 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiCredentialScope
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Instance")]
+        Instance = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Tenant")]
+        Tenant = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AiMessageImageInputDto
     {
 
@@ -157857,6 +157877,18 @@ namespace Explore.Blazor.Client.Clients
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
         }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiModelDiscoveryScope
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Tenant")]
+        Tenant = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Instance")]
+        Instance = 1,
 
     }
 
@@ -209120,8 +209152,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("aiAssistantEndpointUrl")]
         public string? AiAssistantEndpointUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("aiAssistantApiKey")]
-        public string? AiAssistantApiKey { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("aiAssistantCredentialScope")]
+        public string? AiAssistantCredentialScope { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("aiAssistantModelId")]
         public string? AiAssistantModelId { get; set; } = default!;
@@ -213899,8 +213931,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("aiAssistantEndpointUrl")]
         public string? AiAssistantEndpointUrl { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("aiAssistantApiKey")]
-        public string? AiAssistantApiKey { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("aiAssistantCredentialScope")]
+        public string? AiAssistantCredentialScope { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("aiAssistantModelId")]
         public string? AiAssistantModelId { get; set; } = default!;

@@ -562,6 +562,25 @@ borrow instance credentials; compatible providers may explicitly select no
 credential when their endpoint permits it. These definitions alone do not enable
 a provider or authorize a transport.
 
+### Select And Repair AI Credentials
+
+Choose a credential scope instead of entering an API key in AI settings.
+Provision the provider-specific key through the selected secret authority, then
+select instance or tenant scope. Compatible providers may explicitly use no
+credential. A tenant-owned endpoint cannot borrow an instance key, including
+when its address matches the instance endpoint. Missing or inaccessible keys
+remain unavailable rather than falling back to another scope.
+
+For instance model discovery, use platform-administrator access and the configured
+compatible-provider endpoint. Tenant discovery does not inherit instance permission
+to use local-network endpoints. Correct the selected authority or configuration
+when discovery is unavailable; do not send key values in discovery requests.
+
+`AI_CREDENTIAL_SCOPE` selects metadata only. The legacy `AI_API_KEY` option and
+`ai_assistant.api_key` setting no longer configure credentials; writes to that
+retired setting are rejected. Rebind through the provider-specific key instead.
+Existing retired rows are not automatically removed.
+
 ## Getting-Started And Identity Controls
 
 An unavailable checklist is not a ready result. Use its Refresh status action and

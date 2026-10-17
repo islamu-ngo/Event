@@ -121992,8 +121992,8 @@
           "endpointUrl": {
             "type": "string"
           },
-          "apiKeyConfigured": {
-            "type": "boolean"
+          "credentialScope": {
+            "type": "string"
           },
           "modelId": {
             "type": "string"
@@ -122018,14 +122018,14 @@
       "AiAssistantModelDiscoveryRequestDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AiModelDiscoveryScope"
+          },
           "endpointUrl": {
             "type": "string"
           },
-          "apiKey": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "credentialScope": {
+            "$ref": "#/components/schemas/AiCredentialScope"
           }
         }
       },
@@ -122073,7 +122073,7 @@
           "endpointUrl": {
             "type": "string"
           },
-          "apiKey": {
+          "credentialScope": {
             "type": "string"
           },
           "modelId": {
@@ -122409,6 +122409,14 @@
           }
         }
       },
+      "AiCredentialScope": {
+        "enum": [
+          "None",
+          "Instance",
+          "Tenant"
+        ],
+        "type": "string"
+      },
       "AiMessageImageInputDto": {
         "type": "object",
         "properties": {
@@ -122434,6 +122442,13 @@
             "format": "int64"
           }
         }
+      },
+      "AiModelDiscoveryScope": {
+        "enum": [
+          "Tenant",
+          "Instance"
+        ],
+        "type": "string"
       },
       "AiRunDto": {
         "type": "object",
@@ -188608,7 +188623,7 @@
           "aiAssistantEndpointUrl": {
             "type": "string"
           },
-          "aiAssistantApiKey": {
+          "aiAssistantCredentialScope": {
             "type": "string"
           },
           "aiAssistantModelId": {
@@ -193121,7 +193136,7 @@
           "aiAssistantEndpointUrl": {
             "type": "string"
           },
-          "aiAssistantApiKey": {
+          "aiAssistantCredentialScope": {
             "type": "string"
           },
           "aiAssistantModelId": {

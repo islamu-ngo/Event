@@ -8,6 +8,7 @@ using Explore.Application.Notifications;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;
+using Explore.Domain.Ai;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
 using Microsoft.Extensions.Logging;
@@ -814,7 +815,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         var endpointUrl = usesCompatibleProvider
             ? NormalizeOptionalUrl(aiAssistant.EndpointUrl)
             : string.Empty;
-        var apiKey = usesExternalProvider ? aiAssistant.ApiKey?.Trim() ?? string.Empty : string.Empty;
+        var credentialScope = usesExternalProvider ? aiAssistant.CredentialScope : "none";
         var modelId = usesExternalProvider ? aiAssistant.ModelId?.Trim() ?? string.Empty : string.Empty;
         var allowedModelIds = usesExternalProvider
             ? NormalizeAiModelIds([modelId], aiAssistant.AllowedModelIds)
@@ -836,8 +837,8 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
             isLocked: aiAssistant.LockTenantAiAssistant, actorUserId);
 
         await _upsertService.UpsertValueAsync(
-            GovernanceSettingKeys.AiAssistant.ApiKey,
-            SettingValueSerializer.Serialize(apiKey),
+            GovernanceSettingKeys.AiAssistant.CredentialScope,
+            SettingValueSerializer.Serialize(credentialScope),
             isLocked: aiAssistant.LockTenantAiAssistant, actorUserId);
 
         await _upsertService.UpsertValueAsync(
@@ -881,7 +882,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         var endpointUrl = usesCompatibleProvider
             ? NormalizeOptionalUrl(aiAssistant.EndpointUrl)
             : string.Empty;
-        var apiKey = usesExternalProvider ? aiAssistant.ApiKey?.Trim() ?? string.Empty : string.Empty;
+        var credentialScope = usesExternalProvider ? aiAssistant.CredentialScope : "none";
         var modelId = usesExternalProvider ? aiAssistant.ModelId?.Trim() ?? string.Empty : string.Empty;
         var allowedModelIds = usesExternalProvider
             ? NormalizeAiModelIds([modelId], aiAssistant.AllowedModelIds)
@@ -921,8 +922,8 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
                 isLocked: aiAssistant.LockTenantAiAssistant,
                 cancellationToken: cancellationToken)).Notification);
             notifications.Add((await _upsertService.UpsertValueWithDeferredInvalidationAsync(
-                GovernanceSettingKeys.AiAssistant.ApiKey,
-                SettingValueSerializer.Serialize(apiKey),
+                GovernanceSettingKeys.AiAssistant.CredentialScope,
+                SettingValueSerializer.Serialize(credentialScope),
                 actorUserId,
                 isLocked: aiAssistant.LockTenantAiAssistant,
                 cancellationToken: cancellationToken)).Notification);
@@ -954,8 +955,8 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
                 actorUserId,
                 cancellationToken));
             notifications.Add(await _upsertService.UpsertLockAsync(
-                GovernanceSettingKeys.AiAssistant.ApiKey,
-                SettingValueSerializer.Serialize(apiKey),
+                GovernanceSettingKeys.AiAssistant.CredentialScope,
+                SettingValueSerializer.Serialize(credentialScope),
                 aiAssistant.LockTenantAiAssistant,
                 actorUserId,
                 cancellationToken));
@@ -1357,8 +1358,13 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
             Enabled = aiAssistant.Enabled,
             Provider = NormalizeAiAssistantProvider(aiAssistant.Provider, aiAssistant.Enabled),
             EndpointUrl = aiAssistant.EndpointUrl ?? string.Empty,
-            ApiKey = aiAssistant.ApiKey ?? string.Empty,
-            ApiKeyConfigured = !string.IsNullOrWhiteSpace(aiAssistant.ApiKey),
+            CredentialScope = aiAssistant.CredentialScope switch
+            {
+                AiCredentialScope.Instance => "instance",
+                AiCredentialScope.Tenant => "tenant",
+                AiCredentialScope.None => "none",
+                _ => throw new InvalidOperationException("AI credential scope is invalid.")
+            },
             ModelId = aiAssistant.ModelId ?? string.Empty,
             AllowedModelIds = NormalizeAiModelIds([aiAssistant.ModelId], aiAssistant.AllowedModelIds),
             AllowAnonymousAccess = aiAssistant.AllowAnonymousAccess,

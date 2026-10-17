@@ -31,6 +31,7 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
     private readonly AiProviderResponseResolver _providerResponseResolver;
     private readonly IAiContextGateway _contextGateway;
     private readonly IAiProviderTrustResolver _providerTrustResolver;
+    private readonly IAiProviderCapabilityResolver _capabilityResolver;
 
     public ProcessAiRunCommandHandler(
         IAiConversationRepository conversationRepository,
@@ -39,7 +40,8 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
         IAiChatProvider chatProvider,
         IQueryHandler<GetEventDetailsRequest, EventDto?> eventDetailsHandler,
         IAiContextGateway contextGateway,
-        IAiProviderTrustResolver providerTrustResolver)
+        IAiProviderTrustResolver providerTrustResolver,
+        IAiProviderCapabilityResolver capabilityResolver)
     {
         _conversationRepository = conversationRepository;
         _privacyErasureStateRepository = privacyErasureStateRepository;
@@ -47,6 +49,7 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
         _eventDetailsHandler = eventDetailsHandler;
         _contextGateway = contextGateway;
         _providerTrustResolver = providerTrustResolver;
+        _capabilityResolver = capabilityResolver;
         var toolRegistry = AiToolContractRegistry.CreateDefault();
         _promptContextBuilder = new AiPromptContextBuilder(new AiSystemPromptFactory(toolRegistry));
         _providerResponseResolver = new AiProviderResponseResolver(
@@ -86,7 +89,8 @@ public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCom
             return;
         }
 
-        var disabledReason = AiAssistantAvailability.ResolveDisabledReason(settings);
+        var disabledReason = await AiAssistantAvailability.ResolveDisabledReasonAsync(
+            settings, _capabilityResolver, cancellationToken);
         if (disabledReason is not null)
         {
             await FailAndActivateAsync(

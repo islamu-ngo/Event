@@ -1,17 +1,13 @@
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
-using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
-public sealed class MicrosoftExtensionsAiChatProviderTests
+public sealed class MicrosoftExtensionsAiChatProviderTests : AiProviderTestBase
 {
     [Test]
     public async Task SendAsync_MapsPayloadToChatClientAndResponseToProviderContract()
@@ -308,21 +304,20 @@ public sealed class MicrosoftExtensionsAiChatProviderTests
         await Assert.That(chatClient.Calls).IsEqualTo(0);
     }
 
-    private static MicrosoftExtensionsAiChatProvider CreateProvider(RecordingChatClient chatClient)
+    private MicrosoftExtensionsAiChatProvider CreateProvider(RecordingChatClient chatClient)
     {
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
-
         return new MicrosoftExtensionsAiChatProvider(
-            chatClient,
-            Options.Create(CreateSettings()),
-            new BusinessMetrics(meterFactory));
+            Fixture.Configuration(CreateSettings()),
+            Fixture.Metrics,
+            _ => chatClient);
     }
 
     private static AiProviderSettings CreateSettings() => new()
     {
         Enabled = true,
-        Provider = AiProviderSettings.ProviderOpenAiCompatible,
+        Provider = AiProviderSettings.ProviderAzureOpenAi,
+        EndpointUrl = "https://ai.example.openai.azure.com/",
+        CredentialScope = AiCredentialScope.Instance,
         ModelId = "gpt-test",
         MaxInputTokens = 8000,
         MaxOutputTokens = 1024,

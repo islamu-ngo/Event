@@ -730,6 +730,34 @@ The secret registry defines `ai.openai_compatible.api_key` and
 `AI_AZURE_API_KEY` under `/ai`. This value contract does not resolve credentials
 or replace transport admission and secret-consumer authorization.
 
+### Runtime Credential Custody
+
+AI governance and tenant DTOs carry `CredentialScope`, not plaintext `ApiKey`
+or `ApiKeyConfigured`. Prompt payloads carry the scope with provider, endpoint
+and model metadata. Infrastructure re-resolves hierarchical settings and requires
+the payload selection to match before resolving the provider-specific secret.
+The secret result must retain the requested key, scope and tenant identity.
+Missing, unavailable or unauthorized credentials never trigger scope fallback.
+
+Provider or endpoint source metadata establishes transport ownership, even when
+an override has the same value as its parent. Tenant transports use public-network
+clients; instance transports use separate clients constrained to the configured
+origin. Azure SDK requests use the same selected HTTP transport. Health reports
+credential capability asynchronously without exposing the value or probing a
+provider endpoint.
+
+Model discovery accepts explicit instance or tenant scope. Instance discovery
+requires platform-administrator authority and the configured compatible-provider
+origin; tenant discovery cannot use instance credentials or its local-network
+opt-in. Controllers delegate authorization to the registered discovery query.
+The OpenAPI enum catalog and generated client publish the same scope contract.
+
+Ordinary settings writes reject `ai_assistant.api_key` with
+`ai_credential_setting_retired`, including changes that rename a tracked retired
+key. Existing rows are not deleted or used as fallback. Deployment maps
+`AI_CREDENTIAL_SCOPE`; `AI_API_KEY` no longer populates provider options or seeds
+ordinary settings. Secret authority aliases remain provider-specific.
+
 ## Reserved Tenant Roots
 
 `ReservedTenantSlugs.IsReserved` rejects the operational roots `alive`,

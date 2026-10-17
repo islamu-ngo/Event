@@ -17,7 +17,8 @@ public interface ITenantOnboardingService
         string value,
         CancellationToken cancellationToken = default);
     Task<BaseCommandResponseOfGuid> CompleteAsync(TenantPolicySettingsDto settings);
-    Task<IReadOnlyList<AiAssistantModelDto>> GetAiModelsAsync(string endpointUrl, string? apiKey);
+    Task<IReadOnlyList<AiAssistantModelDto>> GetAiModelsAsync(
+        string endpointUrl, string credentialScope, AiModelDiscoveryScope scope);
 }
 
 public class TenantOnboardingService : ITenantOnboardingService
@@ -160,14 +161,23 @@ public class TenantOnboardingService : ITenantOnboardingService
                 cancellationToken: CancellationToken.None);
         });
 
-    public async Task<IReadOnlyList<AiAssistantModelDto>> GetAiModelsAsync(string endpointUrl, string? apiKey)
+    public async Task<IReadOnlyList<AiAssistantModelDto>> GetAiModelsAsync(
+        string endpointUrl, string credentialScope, AiModelDiscoveryScope scope)
     {
+        AiCredentialScope selectedScope = credentialScope switch
+        {
+            "none" => AiCredentialScope.None,
+            "instance" => AiCredentialScope.Instance,
+            "tenant" => AiCredentialScope.Tenant,
+            _ => throw new ArgumentException("AI credential scope is invalid.", nameof(credentialScope))
+        };
         try
         {
             var response = await _aiAssistantClient.GetAiAssistantModelsAsync(new AiAssistantModelDiscoveryRequestDto
             {
                 EndpointUrl = endpointUrl,
-                ApiKey = apiKey
+                Scope = scope,
+                CredentialScope = selectedScope
             }, cancellationToken: CancellationToken.None);
 
             return response.ToList();
@@ -267,7 +277,7 @@ public class TenantOnboardingService : ITenantOnboardingService
             AiAssistantEnabled = settings.AiAssistantEnabled,
             AiAssistantProvider = settings.AiAssistantProvider,
             AiAssistantEndpointUrl = settings.AiAssistantEndpointUrl,
-            AiAssistantApiKey = settings.AiAssistantApiKey,
+            AiAssistantCredentialScope = settings.AiAssistantCredentialScope ?? "none",
             AiAssistantModelId = settings.AiAssistantModelId,
             AiAssistantAllowedModelIds = settings.AiAssistantAllowedModelIds,
             AiAssistantAllowAnonymousAccess = settings.AiAssistantAllowAnonymousAccess,

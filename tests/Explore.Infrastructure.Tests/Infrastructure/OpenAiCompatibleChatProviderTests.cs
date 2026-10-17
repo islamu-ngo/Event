@@ -1,18 +1,14 @@
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
-using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
-using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
-public sealed class OpenAiCompatibleChatProviderTests
+public sealed class OpenAiCompatibleChatProviderTests : AiProviderTestBase
 {
     [Test]
     public async Task ListAvailableModels_WhenModelsEndpointResponds_ReturnsDiscoveredModels()
@@ -65,11 +61,11 @@ public sealed class OpenAiCompatibleChatProviderTests
         var models = await OpenAiCompatibleChatProvider.DiscoverModelsAsync(
             client,
             "https://ai.example.test/v1/chat/completions",
-            "secret-key");
+            Fixture.Credential);
 
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://ai.example.test/v1/models"));
         await Assert.That(handler.Authorization?.Scheme).IsEqualTo("Bearer");
-        await Assert.That(handler.Authorization?.Parameter).IsEqualTo("secret-key");
+        await Assert.That(handler.Authorization?.Parameter).IsEqualTo(Fixture.Credential);
         await Assert.That(models.Select(model => model.Id).ToArray()).IsEquivalentTo(["gpt-a", "gpt-z"]);
     }
 
@@ -87,15 +83,15 @@ public sealed class OpenAiCompatibleChatProviderTests
               "usage": { "prompt_tokens": 12, "completion_tokens": 4, "total_tokens": 16 }
             }
             """, response => response.Headers.Add("x-request-id", "req_test")));
-        var provider = CreateProvider(handler, CreateSettings(apiKey: "secret-key"));
+        var provider = CreateProvider(handler, CreateSettings());
 
         var result = await provider.SendAsync(CreateRequest("Plan a community dinner"));
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://ai.example.test/v1/chat/completions"));
         await Assert.That(handler.Authorization?.Scheme).IsEqualTo("Bearer");
-        await Assert.That(handler.Authorization?.Parameter).IsEqualTo("secret-key");
-        await Assert.That(handler.RequestBody).DoesNotContain("secret-key");
+        await Assert.That(handler.Authorization?.Parameter).IsEqualTo(Fixture.Credential);
+        await Assert.That(handler.RequestBody).DoesNotContain(Fixture.Credential);
         await Assert.That(result.Response!.AssistantMessage).IsEqualTo("Assistant response");
         await Assert.That(result.Response.ProviderRequestId).IsEqualTo("req_test");
         await Assert.That(result.Response.Usage.TotalTokens).IsEqualTo(16);
@@ -408,7 +404,7 @@ public sealed class OpenAiCompatibleChatProviderTests
         var handler = new RecordingMessageHandler(_ => JsonResponse(
             "{\"error\":{\"message\":\"secret prompt leaked\"}}",
             statusCode: HttpStatusCode.TooManyRequests));
-        var provider = CreateProvider(handler, CreateSettings(apiKey: "secret-key"));
+        var provider = CreateProvider(handler, CreateSettings());
 
         var result = await provider.SendAsync(CreateRequest("Sensitive prompt body"));
 
@@ -474,6 +470,11 @@ public sealed class OpenAiCompatibleChatProviderTests
         var settings = CreateSettings();
         settings.TimeoutSeconds = 1;
         var provider = CreateProvider(handler, settings);
+        await Fixture.SelectTenantAsync(
+            AiProviderSettings.ProviderOpenAiCompatible,
+            "https://tenant-ai.example.test/v1",
+            AiCredentialScope.None,
+            "tenant-model");
 
         var result = await provider.SendAsync(CreateRequest(
             "Hello",
@@ -481,35 +482,33 @@ public sealed class OpenAiCompatibleChatProviderTests
             providerConfiguration: new AiChatProviderConfiguration(
                 AiProviderSettings.ProviderOpenAiCompatible,
                 "https://tenant-ai.example.test/v1",
-                string.Empty,
+                AiCredentialScope.None,
                 "tenant-model")));
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.Calls).IsEqualTo(1);
     }
 
-    private static OpenAiCompatibleChatProvider CreateProvider(
+    private OpenAiCompatibleChatProvider CreateProvider(
         HttpMessageHandler handler,
         AiProviderSettings settings)
     {
-        var client = new HttpClient(handler);
+        var client = Fixture.CreateClient(handler);
         var factory = new StaticHttpClientFactory(client);
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
 
         return new OpenAiCompatibleChatProvider(
             factory,
-            Options.Create(settings),
-            new AiProviderSettingsValidator(),
-            new BusinessMetrics(meterFactory));
+            Fixture.Configuration(settings),
+            Fixture.Validator,
+            Fixture.Metrics);
     }
 
-    private static AiProviderSettings CreateSettings(string apiKey = "test-key") => new()
+    private static AiProviderSettings CreateSettings() => new()
     {
         Enabled = true,
         Provider = AiProviderSettings.ProviderOpenAiCompatible,
         EndpointUrl = "https://ai.example.test/v1",
-        ApiKey = apiKey,
+        CredentialScope = AiCredentialScope.Instance,
         ModelId = "gpt-test",
         MaxInputTokens = 8000,
         MaxOutputTokens = 1024,

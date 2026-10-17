@@ -17,6 +17,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
     private readonly IHierarchicalSettingsResolver _settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IAiAssistantActorContextService _actorContextService = Substitute.For<IAiAssistantActorContextService>();
+    private readonly IAiProviderCapabilityResolver _capabilityResolver = Substitute.For<IAiProviderCapabilityResolver>();
 
     [Test]
     public async Task QueryAsync_WhenDisabled_ReturnsDisabledBootstrapWithoutModels()
@@ -61,7 +62,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
         var handler = CreateHandler(Guid.NewGuid(), CreateSettings(
             enabled: true,
             provider: AiProviderDefaults.ProviderOpenAiCompatible,
-            apiKey: "secret",
+            credentialScope: "tenant",
             modelId: "gpt-test"));
 
         var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
@@ -78,7 +79,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             enabled: true,
             provider: AiProviderDefaults.ProviderOpenAiCompatible,
             endpointUrl: "https://ai.example.test/v1",
-            apiKey: "secret",
+            credentialScope: "tenant",
             modelId: "gpt-test",
             maxInputTokens: 16000,
             maxOutputTokens: 2048,
@@ -110,7 +111,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
         var handler = CreateHandler(Guid.NewGuid(), CreateSettings(
             enabled: true,
             provider: AiProviderDefaults.ProviderAnthropic,
-            apiKey: "secret",
+            credentialScope: "tenant",
             modelId: "claude-test",
             toolProposalsEnabled: true));
 
@@ -180,19 +181,22 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             .Returns(settings);
         _currentUserService.IsAuthenticated.Returns(false);
         _currentUserService.UserId.Returns((Guid?)null);
+        _capabilityResolver.ResolveAsync(settings, Arg.Any<CancellationToken>())
+            .Returns(new AiProviderCapability(true, null));
 
         return new GetAiAssistantBootstrapQueryHandler(
             _tenantContext,
             _settingsResolver,
             _currentUserService,
-            _actorContextService);
+            _actorContextService,
+            _capabilityResolver);
     }
 
     private static AiAssistantSettingGroup CreateSettings(
         bool enabled = false,
         string provider = AiProviderDefaults.ProviderNone,
         string endpointUrl = "",
-        string apiKey = "",
+        string credentialScope = "none",
         string modelId = "",
         int maxInputTokens = 8000,
         int maxOutputTokens = 1024,
@@ -208,7 +212,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             [GovernanceSettingKeys.AiAssistant.Enabled] = Setting(GovernanceSettingKeys.AiAssistant.Enabled, enabled),
             [GovernanceSettingKeys.AiAssistant.Provider] = Setting(GovernanceSettingKeys.AiAssistant.Provider, provider),
             [GovernanceSettingKeys.AiAssistant.EndpointUrl] = Setting(GovernanceSettingKeys.AiAssistant.EndpointUrl, endpointUrl),
-            [GovernanceSettingKeys.AiAssistant.ApiKey] = Setting(GovernanceSettingKeys.AiAssistant.ApiKey, apiKey),
+            [GovernanceSettingKeys.AiAssistant.CredentialScope] = Setting(GovernanceSettingKeys.AiAssistant.CredentialScope, credentialScope),
             [GovernanceSettingKeys.AiAssistant.ModelId] = Setting(GovernanceSettingKeys.AiAssistant.ModelId, modelId),
             [GovernanceSettingKeys.AiAssistant.MaxInputTokens] = Setting(GovernanceSettingKeys.AiAssistant.MaxInputTokens, maxInputTokens),
             [GovernanceSettingKeys.AiAssistant.MaxOutputTokens] = Setting(GovernanceSettingKeys.AiAssistant.MaxOutputTokens, maxOutputTokens),

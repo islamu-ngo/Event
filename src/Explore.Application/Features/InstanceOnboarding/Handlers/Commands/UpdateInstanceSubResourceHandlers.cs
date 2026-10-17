@@ -486,8 +486,7 @@ public class UpdateAiAssistantGovernanceSettingsCommandHandler : ICommandHandler
             var provider = request.Patch.ProviderConfiguration.Value!;
             settings.AiAssistant.Provider = provider.Provider;
             settings.AiAssistant.EndpointUrl = provider.EndpointUrl;
-            if (!string.IsNullOrWhiteSpace(provider.ApiKey))
-                settings.AiAssistant.ApiKey = provider.ApiKey;
+            settings.AiAssistant.CredentialScope = provider.CredentialScope;
             settings.AiAssistant.ModelId = provider.ModelId;
             settings.AiAssistant.AllowedModelIds = provider.AllowedModelIds;
         }

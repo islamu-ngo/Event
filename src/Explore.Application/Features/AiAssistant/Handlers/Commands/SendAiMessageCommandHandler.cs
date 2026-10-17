@@ -37,6 +37,7 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
     private readonly IAiModelCatalog _modelCatalog;
     private readonly IAiAssistantActorContextService _actorContextService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAiProviderCapabilityResolver _capabilityResolver;
 
     public SendAiMessageCommandHandler(
         IAiConversationRepository conversationRepository,
@@ -46,7 +47,8 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
         ICurrentUserService currentUserService,
         IAiModelCatalog modelCatalog,
         IAiAssistantActorContextService actorContextService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAiProviderCapabilityResolver capabilityResolver)
     {
         _conversationRepository = conversationRepository;
         _idempotencyRepository = idempotencyRepository;
@@ -56,6 +58,7 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
         _modelCatalog = modelCatalog;
         _actorContextService = actorContextService;
         _unitOfWork = unitOfWork;
+        _capabilityResolver = capabilityResolver;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -98,7 +101,8 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
 
         var settings = await _settingsResolver.ResolveGroupAsync<AiAssistantSettingGroup>(
             new SettingContext(TenantId: tenantId), cancellationToken);
-        var disabledReason = AiAssistantAvailability.ResolveDisabledReason(settings);
+        var disabledReason = await AiAssistantAvailability.ResolveDisabledReasonAsync(
+            settings, _capabilityResolver, cancellationToken);
 
         if (disabledReason is not null)
         {
@@ -437,7 +441,7 @@ public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageC
         return provider switch
         {
             AiProviderDefaults.ProviderOpenAi or AiProviderDefaults.ProviderAnthropic =>
-                !string.IsNullOrWhiteSpace(settings.ApiKey),
+                settings.CredentialScope is AiCredentialScope.Instance or AiCredentialScope.Tenant,
             AiProviderDefaults.ProviderOpenAiCompatible or AiProviderDefaults.ProviderAnthropicCompatible =>
                 !string.IsNullOrWhiteSpace(settings.EndpointUrl),
             _ => false

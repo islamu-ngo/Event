@@ -80,6 +80,12 @@ public partial class ExploreDbContext
 
         foreach (var entry in ChangeTracker.Entries())
         {
+            if (entry.Entity is SystemSetting or TenantSetting
+                && entry.State is EntityState.Added or EntityState.Modified
+                && (entry.Property(nameof(SystemSetting.SettingKey)).CurrentValue is Explore.Domain.Ai.AiCredentialReference.RetiredSettingKey
+                    || entry.Property(nameof(SystemSetting.SettingKey)).OriginalValue is Explore.Domain.Ai.AiCredentialReference.RetiredSettingKey))
+                throw new InvalidOperationException("ai_credential_setting_retired");
+
             if (entry.Entity is SystemSetting credentialSetting
                 && entry.State is EntityState.Added or EntityState.Modified
                 && (credentialSetting.SettingKey is InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret

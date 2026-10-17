@@ -16,17 +16,20 @@ public sealed class GetAiAssistantBootstrapQueryHandler : IQueryHandler<GetAiAss
     private readonly IHierarchicalSettingsResolver _settingsResolver;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAiAssistantActorContextService _actorContextService;
+    private readonly IAiProviderCapabilityResolver _capabilityResolver;
 
     public GetAiAssistantBootstrapQueryHandler(
         ITenantContext tenantContext,
         IHierarchicalSettingsResolver settingsResolver,
         ICurrentUserService currentUserService,
-        IAiAssistantActorContextService actorContextService)
+        IAiAssistantActorContextService actorContextService,
+        IAiProviderCapabilityResolver capabilityResolver)
     {
         _tenantContext = tenantContext;
         _settingsResolver = settingsResolver;
         _currentUserService = currentUserService;
         _actorContextService = actorContextService;
+        _capabilityResolver = capabilityResolver;
     }
 
     public async Task<AiAssistantBootstrapDto> QueryAsync(
@@ -39,7 +42,9 @@ public sealed class GetAiAssistantBootstrapQueryHandler : IQueryHandler<GetAiAss
 
         var provider = NormalizeProvider(settings.Provider);
         var models = BuildModels(provider, settings);
-        var disabledReason = ResolveDisabledReason(provider, settings, models);
+        var disabledReason = await AiAssistantAvailability.ResolveDisabledReasonAsync(
+            settings, _capabilityResolver, cancellationToken);
+        disabledReason ??= models.Count == 0 ? "model_not_configured" : null;
         var defaultModelId = ResolveDefaultModelId(settings, models);
         var actorContexts = await BuildActorContextsAsync(tenantId, cancellationToken);
 
@@ -122,45 +127,6 @@ public sealed class GetAiAssistantBootstrapQueryHandler : IQueryHandler<GetAiAss
         }
 
         return [];
-    }
-
-    private static string? ResolveDisabledReason(
-        string provider,
-        AiAssistantSettingGroup settings,
-        IReadOnlyCollection<AiAssistantModelDto> models)
-    {
-        if (!settings.Enabled)
-            return "disabled";
-
-        if (provider == AiProviderDefaults.ProviderNone)
-            return "provider_not_configured";
-
-        if (provider != AiProviderDefaults.ProviderFake
-            && provider != AiProviderDefaults.ProviderOpenAi
-            && provider != AiProviderDefaults.ProviderOpenAiCompatible
-            && provider != AiProviderDefaults.ProviderAnthropic
-            && provider != AiProviderDefaults.ProviderAnthropicCompatible)
-            return "provider_unsupported";
-
-        if (provider == AiProviderDefaults.ProviderOpenAi || provider == AiProviderDefaults.ProviderAnthropic)
-        {
-            if (!settings.HasApiKey)
-                return "api_key_not_configured";
-
-            if (!settings.HasModel)
-                return "model_not_configured";
-        }
-
-        if (provider == AiProviderDefaults.ProviderOpenAiCompatible || provider == AiProviderDefaults.ProviderAnthropicCompatible)
-        {
-            if (string.IsNullOrWhiteSpace(settings.EndpointUrl))
-                return "endpoint_not_configured";
-
-            if (!settings.HasModel)
-                return "model_not_configured";
-        }
-
-        return models.Count == 0 ? "model_not_configured" : null;
     }
 
     private static string? ResolveDefaultModelId(

@@ -4,16 +4,17 @@ namespace Explore.Infrastructure.Ai;
 
 public sealed class AiProviderHealthReporter(
     AiProviderSettingsValidator validator,
-    IAiProviderStrategyResolver resolver)
+    IAiProviderStrategyResolver resolver,
+    AiProviderConfigurationResolver configuration)
 {
-    public AiProviderHealth Check(AiProviderSettings settings)
+    public async Task<AiProviderHealth> CheckAsync(AiProviderSettings settings, CancellationToken cancellationToken = default)
     {
         Dictionary<string, object> data = new(StringComparer.Ordinal)
         {
             ["enabled"] = settings.Enabled,
             ["provider"] = settings.Provider,
             ["endpointConfigured"] = !string.IsNullOrWhiteSpace(settings.EndpointUrl),
-            ["apiKeyConfigured"] = !string.IsNullOrWhiteSpace(settings.ApiKey),
+            ["credentialConfigured"] = false,
             ["modelConfigured"] = !string.IsNullOrWhiteSpace(settings.ModelId),
             ["toolProposalsEnabled"] = settings.ToolProposalsEnabled,
             ["streamingEnabled"] = settings.StreamingEnabled,
@@ -45,16 +46,28 @@ public sealed class AiProviderHealthReporter(
         }
 
         var strategy = resolver.Resolve(settings.Provider);
-        if (strategy is not null)
-            return strategy.CheckHealth(data);
+        if (strategy is null)
+        {
+            data["reason"] = "provider_not_configured";
+            return new AiProviderHealth(
+                Enabled: true,
+                Healthy: false,
+                Status: "provider_not_configured",
+                Description: "AI provider integration is enabled but no runnable provider is configured.",
+                Data: data);
+        }
 
-        data["reason"] = "provider_not_configured";
-        return new AiProviderHealth(
-            Enabled: true,
-            Healthy: false,
-            Status: "provider_not_configured",
-            Description: "AI provider integration is enabled but no runnable provider is configured.",
-            Data: data);
+        var resolved = await configuration.ResolveInstanceAsync(settings, cancellationToken);
+        if (resolved.Configuration is null)
+        {
+            data["reason"] = resolved.FailureCode!;
+            return new AiProviderHealth(true, false, resolved.FailureCode!,
+                "AI provider configuration or credential is unavailable.", data);
+        }
+        data["credentialConfigured"] = !string.IsNullOrWhiteSpace(resolved.Configuration.ApiKey);
+
+        return strategy.CheckHealth(data);
+
     }
 
 }

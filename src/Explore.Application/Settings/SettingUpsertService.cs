@@ -235,6 +235,7 @@ public class SettingUpsertService
 
     private static void EnsureUnguarded(string settingKey)
     {
+        Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(settingKey);
         EventResourceSettingMutationGuard.RejectGenericMutation(settingKey);
         EventResourceProviderBindingDocument.RejectGenericMutation(settingKey);
         if (PublicationPolicySettingKeys.All.Contains(settingKey, StringComparer.Ordinal))

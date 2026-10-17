@@ -11,11 +11,11 @@ public sealed class AiProviderHealthCheck(
     AiProviderHealthReporter reporter,
     BusinessMetrics metrics) : IHealthCheck
 {
-    public Task<HealthCheckResult> CheckHealthAsync(
+    public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var health = reporter.Check(options.Value);
+        var health = await reporter.CheckAsync(options.Value, cancellationToken);
         var reason = health.Data.TryGetValue("reason", out var value) ? value?.ToString() : health.Status;
 
         metrics.RecordAiProviderHealthCheck(
@@ -23,8 +23,8 @@ public sealed class AiProviderHealthCheck(
             health.Healthy ? "healthy" : "unhealthy",
             reason);
 
-        return Task.FromResult(health.Healthy
+        return health.Healthy
             ? HealthCheckResult.Healthy(health.Description, health.Data)
-            : HealthCheckResult.Unhealthy(health.Description, data: health.Data));
+            : HealthCheckResult.Unhealthy(health.Description, data: health.Data);
     }
 }

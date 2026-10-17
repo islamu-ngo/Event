@@ -53,7 +53,7 @@ public static class ConfigurationExtensions
     ///   /keycloak: KEYCLOAK_ENDPOINT, KEYCLOAK_REALM
     ///   /cerbos:   CERBOS_GRPC_ENDPOINT, CERBOS_HTTP_ENDPOINT, CERBOS_USE_POLICY_SCOPE
     ///   /api|/mcp: MCP_ENABLED, MCP_ENDPOINT_PATH, MCP_STATELESS, MCP_ENABLE_LEGACY_SSE
-    ///   /ai:       AI_ENDPOINT, AI_MODEL_ID, AI_API_KEY, AI_PROVIDER
+    ///   /ai:       AI_ENDPOINT, AI_MODEL_ID, AI_CREDENTIAL_SCOPE, AI_PROVIDER
     ///   /storage:  STORAGE_S3_ENDPOINT, STORAGE_S3_BUCKET_NAME, STORAGE_S3_ACCESS_KEY_ID, etc.
     ///   /smtp:     MAIL_SMTP_HOST, MAIL_SMTP_PORT, MAIL_SMTP_USERNAME, MAIL_SMTP_PASSWORD, etc.
     ///   /api:      VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
@@ -178,11 +178,10 @@ public static class ConfigurationExtensions
                 "Api:Mcp:EnableLegacySse")) ?? "true";
         var aiEndpointUrl = ReadFirst(config, "AI_ENDPOINT", "AI__ENDPOINT", "AiProvider:EndpointUrl");
         var aiModelId = ReadFirst(config, "AI_MODEL_ID", "AI__MODEL_ID", "AiProvider:ModelId");
-        var aiApiKey = ReadFirst(config, "AI_API_KEY", "AI__API_KEY", "AiProvider:ApiKey");
         var aiProviderMasterCode = ReadFirst(config, "AI_PROVIDER", "AI__PROVIDER", "AiProvider:Provider")?.Trim().ToUpperInvariant().Replace('-', '_');
         var aiProviderId = MapProviderMasterCodeToId(aiProviderMasterCode);
         var aiProviderDefaultsAvailable = aiProviderMasterCode is "OPENAI" or "ANTHROPIC"
-            ? !string.IsNullOrWhiteSpace(aiApiKey) && !string.IsNullOrWhiteSpace(aiModelId)
+            ? !string.IsNullOrWhiteSpace(aiModelId)
             : !string.IsNullOrWhiteSpace(aiEndpointUrl) && !string.IsNullOrWhiteSpace(aiModelId);
         var smtpHost = ReadFirst(config, "MAIL_SMTP_HOST", "SMTP_HOST", "Smtp:Host");
         var smtpPort = ReadFirst(config, "MAIL_SMTP_PORT", "SMTP_PORT", "Smtp:Port");
@@ -473,11 +472,15 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Mcp:Stateless", mcpStateless);
         TrySet(mappedConfig, config, "Mcp:EnableLegacySse", mcpEnableLegacySse);
 
-        // AI provider defaults from deployment secrets. Runtime governance can still override
-        // application-managed settings through the hierarchical settings system.
+        // AI deployment metadata selects a credential reference, never secret material.
         TrySet(mappedConfig, config, "AiProvider:EndpointUrl", aiEndpointUrl);
         TrySet(mappedConfig, config, "AiProvider:ModelId", aiModelId);
-        TrySet(mappedConfig, config, "AiProvider:ApiKey", aiApiKey);
+        TrySet(mappedConfig, config, "AiProvider:CredentialScope",
+            ReadFirst(config, "AI_CREDENTIAL_SCOPE", "AiProvider:CredentialScope")
+                ?? (aiProviderMasterCode is "OPENAI" or "ANTHROPIC"
+                    || aiProviderMasterCode == "AZURE_OPENAI"
+                        && !string.Equals(config["AiProvider:AzureCredentialMode"], "default-azure-credential", StringComparison.OrdinalIgnoreCase)
+                    ? "instance" : "none"));
         if (aiProviderDefaultsAvailable)
         {
             TrySet(mappedConfig, config, "AiProvider:Enabled", "true");

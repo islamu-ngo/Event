@@ -154,7 +154,7 @@ public static class ExploreDatabaseMigrator
             await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresLocalizationSecretStatusContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresGlobalLookupCatalogueContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresExternalLoginAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresExternalLoginAuthenticationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresUserTenantMembershipContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);

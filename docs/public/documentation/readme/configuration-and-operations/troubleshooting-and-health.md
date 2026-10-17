@@ -6,6 +6,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+External-login authentication discovery requires the enrolled Global database
+login. Runtime must not inherit its executor role or the Global login.
+If native readiness rejects an enrollment or grant mismatch, reconcile the
+unauthorized authority before reinstalling rather than granting raw binding access.
+
 Cross-tenant membership discovery requires the enrolled Global database login,
 not Runtime inheritance of a discovery executor. Reconcile unexpected role grants
 through the approved database process before reinstalling. This does not change

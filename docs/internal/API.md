@@ -3,6 +3,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## External-Login Authentication Read Enrollment
+
+PostgresExternalLoginAuthenticationContract binds exact provider-account discovery
+to the configured Global session and explicit deployment enrollment.
+Native entry and reinstall attest exact role flags, grant options and dedicated
+read privileges before selecting bindings. Runtime cannot borrow executor
+authority directly or through the Global login. Existing drift is rejected before
+installer changes; the exact provider/account predicate, complete binding shape,
+and absence of user PII joins remain unchanged.
+
 ## Membership Discovery Read Enrollment
 
 PostgresUserTenantMembershipContract requires explicit deployment enrollment and

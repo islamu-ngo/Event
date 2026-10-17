@@ -1,10 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Event.Api.IntegrationTests.Fixtures;
+using Event.Api.IntegrationTests.Authentication;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Services;
-using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Domain.ValueObjects;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -17,7 +18,7 @@ public sealed class OperatorIdentityMetadataTests
     [Test]
     public async Task Anonymous_cannot_read_metadata()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync(administrator: false);
         using var client = factory.CreateClient();
         using var response = await client.GetAsync(Path);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
@@ -26,9 +27,9 @@ public sealed class OperatorIdentityMetadataTests
     [Test]
     public async Task Authenticated_metadata_uses_authoritative_codes_and_constraints()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync(administrator: false);
         using var client = factory.CreateClient();
-        Authenticate(client, Guid.CreateVersion7());
+        await factory.AuthorizeAsync(client);
         using var response = await client.GetAsync(Path);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -56,9 +57,9 @@ public sealed class OperatorIdentityMetadataTests
     [Test]
     public async Task Metadata_links_offer_refresh_without_identity_write_authority()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync(administrator: false);
         using var client = factory.CreateClient();
-        Authenticate(client, Guid.CreateVersion7());
+        await factory.AuthorizeAsync(client);
         using var response = await client.GetAsync(Path);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -72,47 +73,47 @@ public sealed class OperatorIdentityMetadataTests
     [Test]
     public async Task Metadata_payload_is_independent_of_authenticated_identity_and_secret_input()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync(administrator: false);
         using var client = factory.CreateClient();
-        var firstId = Guid.CreateVersion7();
-        Authenticate(client, firstId);
+        var firstId = factory.Actor;
+        await factory.AuthorizeAsync(client);
         using var first = await client.GetAsync(Path);
         await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string original = await first.Content.ReadAsStringAsync();
         var sentinel = Guid.CreateVersion7().ToString("N");
+        Guid grant = await factory.GrantAdministratorAsync();
         using (var scope = factory.Services.CreateScope())
         {
             var identity = scope.ServiceProvider.GetRequiredService<InstanceOperatorIdentityService>();
-            var saved = await identity.SaveAsync(new InstanceOperatorIdentitySettings
+            var saved = await factory.SaveAsync(new SaveInstanceOperatorIdentityRequestDto
             {
                 PublicName = sentinel,
                 LegalName = sentinel,
                 RegistrationIdentifier = sentinel,
                 PublicContactEmail = $"{sentinel}@example.test"
-            }, null, CancellationToken.None);
+            });
             await Assert.That(saved.IsSuccess).IsTrue();
             var persisted = await identity.GetCurrentAsync(CancellationToken.None);
             await Assert.That(persisted.Settings?.LegalName).IsEqualTo(sentinel);
         }
-        Authenticate(client, Guid.CreateVersion7());
-        client.DefaultRequestHeaders.Add("X-Setup-Secret", OnboardingWebApplicationFactory.SetupSecret);
+        await using (var database = factory.Local.Native.CreateDatabase())
+        {
+            database.PlatformUserRoles.Remove(await database.PlatformUserRoles.SingleAsync(row => row.Id == grant));
+            await database.SaveChangesAsync();
+        }
+        var otherReader = await factory.Local.Native.SeedLocalUserAsync(emailConfirmed: true);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", await factory.Local.SignInAsync(otherReader));
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.Local.Native.SetupSecret);
         using var second = await client.GetAsync(Path);
         await Assert.That(second.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string changed = await second.Content.ReadAsStringAsync();
         await Assert.That(changed).IsEqualTo(original);
         await Assert.That(changed.Contains(sentinel, StringComparison.Ordinal)).IsFalse();
         await Assert.That(changed.Contains(firstId.ToString(), StringComparison.OrdinalIgnoreCase)).IsFalse();
-        await Assert.That(changed.Contains(OnboardingWebApplicationFactory.SetupSecret, StringComparison.Ordinal)).IsFalse();
+        await Assert.That(changed.Contains(factory.Local.Native.SetupSecret, StringComparison.Ordinal)).IsFalse();
         using var document = JsonDocument.Parse(changed);
         var names = document.RootElement.EnumerateObject().Select(property => property.Name).ToHashSet();
         await Assert.That(names.SetEquals(["operatorKinds", "countries", "countryState",
             "registrationAuthorities", "registrationAuthorityState", "fields", "_links"])).IsTrue();
-    }
-
-    private static void Authenticate(HttpClient client, Guid userId)
-    {
-        client.DefaultRequestHeaders.Remove(TestAuthHandler.AuthHeaderName);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeaderName,
-            TestAuthHandler.CreateAuthHeaderValue(userId, "Metadata reader"));
     }
 }

@@ -8,12 +8,16 @@ using Explore.Application.Contracts.Operations;
 namespace Explore.Application.Features.Footer.Handlers.Queries;
 
 public sealed class GetFooterGovernanceSettingsQueryHandler(
-    IHierarchicalSettingsResolver settingsResolver)
+    IHierarchicalSettingsResolver settingsResolver,
+    IHumanCommitScopePreparation humanScope,
+    IFooterOperationExecution footerExecution)
     : IQueryHandler<GetFooterGovernanceSettingsQuery, FooterGovernanceSettingsDto>
 {
     public async Task<FooterGovernanceSettingsDto> QueryAsync(
         GetFooterGovernanceSettingsQuery request, CancellationToken cancellationToken)
     {
+        await humanScope.PrepareAsync(cancellationToken);
+        await footerExecution.RequireOwnedAsync(request, cancellationToken);
         var group = await settingsResolver.ResolveGroupAsync<FooterSettingGroup>(
             new SettingContext(), cancellationToken);
 

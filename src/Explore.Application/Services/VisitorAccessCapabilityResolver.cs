@@ -11,8 +11,7 @@ using Explore.Domain.Enums;
 namespace Explore.Application.Services;
 
 public sealed class VisitorAccessCapabilityResolver(
-    ISystemSettingRepository systemSettings,
-    ITenantSettingRepository tenantSettings,
+    IInstanceTenantSettingsReader settings,
     IVisitorAccessProviderReader providerReader,
     ITenantLifecycleAccessService lifecycle) : IVisitorAccessCapabilityResolver
 {
@@ -42,12 +41,14 @@ public sealed class VisitorAccessCapabilityResolver(
         if (!await lifecycle.IsPublicAsync(tenantId, cancellationToken))
             return new VisitorAccessCapability(VisitorAccessMode.DirectoryListingOnly, false, []);
 
-        SystemSetting? instance = await systemSettings.GetByKey(
-            GovernanceSettingKeys.PublicExperience.VisitorAccessMode, cancellationToken);
-        TenantSetting? tenant = await tenantSettings.GetByTenantAndKey(
-            tenantId, GovernanceSettingKeys.PublicExperience.VisitorAccessMode, cancellationToken);
+        var current = await settings.ReadAsync(tenantId,
+            AuthoritySettingKeys, cancellationToken);
+        SystemSetting? instance = current.System.SingleOrDefault(setting =>
+            setting.SettingKey == GovernanceSettingKeys.PublicExperience.VisitorAccessMode);
+        TenantSetting? tenant = current.Tenant.SingleOrDefault(setting =>
+            setting.SettingKey == GovernanceSettingKeys.PublicExperience.VisitorAccessMode);
         var mode = ResolveMode(instance, tenant);
-        var providers = await providerReader.ReadProvidersAsync(tenantId, cancellationToken);
+        var providers = providerReader.ReadProviders(current.System);
         return EvaluateProposedState(new VisitorAccessPolicyState(mode, providers));
     }
 

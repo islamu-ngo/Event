@@ -44,8 +44,7 @@ public class StrategyResolver : IStrategyResolver
             if (!isModuleEnabled)
             {
                 _logger.LogDebug(
-                    "Strategy {StrategyKey} skipped - module not enabled for tenant {TenantId}",
-                    strategy.ModuleKey, tenantId);
+                    "Strategy skipped because its module is disabled");
                 continue;
             }
 
@@ -54,8 +53,7 @@ public class StrategyResolver : IStrategyResolver
             {
                 applicableStrategies.Add(strategy);
                 _logger.LogDebug(
-                    "Strategy {StrategyKey} is applicable for event",
-                    strategy.ModuleKey);
+                    "Strategy is applicable for event");
             }
         }
 
@@ -82,19 +80,17 @@ public class StrategyResolver : IStrategyResolver
                 {
                     result.Errors.AddRange(strategyResult.Errors);
                     _logger.LogDebug(
-                        "Strategy {StrategyKey} validation failed with {ErrorCount} errors",
-                        strategy.ModuleKey, strategyResult.Errors.Count);
+                        "Strategy validation failed with {ErrorCount} errors",
+                        strategyResult.Errors.Count);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError(ex,
-                    "Error validating with strategy {StrategyKey}",
-                    strategy.ModuleKey);
+                _logger.LogError("Strategy validation failed unexpectedly");
 
                 result.Errors.Add(new ValidationFailure(
-                    strategy.ModuleKey,
-                    $"Strategy validation error: {ex.Message}"));
+                    "strategy",
+                    "Strategy validation is unavailable."));
             }
         }
 
@@ -115,15 +111,12 @@ public class StrategyResolver : IStrategyResolver
             {
                 await strategy.PostCreateAsync(@event, cancellationToken);
                 _logger.LogDebug(
-                    "Strategy {StrategyKey} post-create completed for event {EventId}",
-                    strategy.ModuleKey, @event.Id);
+                    "Strategy post-create completed");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Log but don't fail the operation - post-create is non-critical
-                _logger.LogError(ex,
-                    "Error executing post-create for strategy {StrategyKey} on event {EventId}",
-                    strategy.ModuleKey, @event.Id);
+                _logger.LogError("Strategy post-create failed");
             }
         }
     }
@@ -153,14 +146,11 @@ public class StrategyResolver : IStrategyResolver
             {
                 await strategy.PostUpdateAsync(@event, cancellationToken);
                 _logger.LogDebug(
-                    "Strategy {StrategyKey} post-update completed for event {EventId}",
-                    strategy.ModuleKey, @event.Id);
+                    "Strategy post-update completed");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError(ex,
-                    "Error executing post-update for strategy {StrategyKey} on event {EventId}",
-                    strategy.ModuleKey, @event.Id);
+                _logger.LogError("Strategy post-update failed");
             }
         }
     }
@@ -181,11 +171,9 @@ public class StrategyResolver : IStrategyResolver
                 var strategyLinks = strategy.GetLinks(@event);
                 links.AddRange(strategyLinks);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError(ex,
-                    "Error getting links from strategy {StrategyKey} for event {EventId}",
-                    strategy.ModuleKey, @event.Id);
+                _logger.LogError("Strategy link discovery failed");
             }
         }
 

@@ -4,9 +4,11 @@ using Explore.Application.Models;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema.ProviderPrimitives;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
@@ -16,15 +18,19 @@ internal static class EmailDeliveryPolicyRevisionTracker
     private static readonly ConditionalWeakTable<ExploreDbContext, TransactionBaselines> Baselines = new();
 
     public static async Task RecordInstanceAsync(ExploreDbContext context,
-        EmailDeliveryPolicySet before, Guid? actorId, CancellationToken cancellationToken)
+        EmailDeliveryPolicySet before, Guid? actorId, CancellationToken cancellationToken,
+        MixedSettingsBatchStore? mixed = null, TypedSettingsOriginalStore? governance = null)
     {
+        if (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql && mixed is null && governance is null)
+            await PostgresEmailDeliveryPolicyContract.RequireMutationAsync(context, null, cancellationToken);
         TransactionBaselines baselines = GetBaselines(context);
-        var after = await EmailDeliveryPolicyReader.ReadAllAsync(context, cancellationToken);
+        var after = governance is not null ? governance.GovernanceEmailPolicies()
+            : mixed is null ? await EmailDeliveryPolicyReader.ReadAllAsync(context, cancellationToken) : mixed.EmailPolicies();
         await using var claim = await RelationalNamedLock.AcquireTransactionAsync(context,
             EmailDispatchOutboxRepository.ClaimAdvisoryLockName, cancellationToken);
-        DateTime now = await RelationalDatabaseClock.GetUtcNowAsync(context, cancellationToken);
+        DateTime now = governance?.GovernanceOccurredAt ?? mixed?.OccurredAt ?? await RelationalDatabaseClock.GetUtcNowAsync(context, cancellationToken);
         await UpdateProcessorAsync(context, baselines, before.Instance, after.Instance,
-            now, actorId, cancellationToken);
+            now, actorId, cancellationToken, mixed, governance);
 
         var affected = new Dictionary<Guid, (EmailDeliveryPolicySnapshot Before, EmailDeliveryPolicySnapshot After)>();
         foreach (var (tenantId, current) in after.Tenants)
@@ -36,30 +42,40 @@ internal static class EmailDeliveryPolicyRevisionTracker
                 affected.Add(tenantId, (previous, current));
         }
 
-        await UpdateTenantsAsync(context, baselines, affected, now, actorId, cancellationToken);
+        await UpdateTenantsAsync(context, baselines, affected, now, actorId, cancellationToken, mixed, governance: governance);
     }
 
     public static async Task RecordTenantAsync(ExploreDbContext context, Guid tenantId,
-        EmailDeliveryPolicySnapshot before, Guid? actorId, CancellationToken cancellationToken)
+        EmailDeliveryPolicySnapshot before, Guid? actorId, CancellationToken cancellationToken,
+        MixedSettingsBatchStore? mixed = null, TypedSettingsOriginalStore? plan = null)
     {
+        if (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql && mixed is null && plan is null)
+            await PostgresEmailDeliveryPolicyContract.RequireMutationAsync(context, tenantId, cancellationToken);
         TransactionBaselines baselines = GetBaselines(context);
-        var after = await EmailDeliveryPolicyReader.ReadAsync(context, tenantId, cancellationToken);
+        var after = plan is not null ? plan.PlanEmailPolicies().Tenants[tenantId] : mixed is null
+            ? await EmailDeliveryPolicyReader.ReadAsync(context, tenantId, cancellationToken)
+            : mixed.EmailPolicies().Tenants[tenantId];
         await using var claim = await RelationalNamedLock.AcquireTransactionAsync(context,
             EmailDispatchOutboxRepository.ClaimAdvisoryLockName, cancellationToken);
-        DateTime now = await RelationalDatabaseClock.GetUtcNowAsync(context, cancellationToken);
+        DateTime now = plan?.PlanOccurredAt ?? mixed?.OccurredAt ?? await RelationalDatabaseClock.GetUtcNowAsync(context, cancellationToken);
         await UpdateTenantsAsync(context, baselines,
             new Dictionary<Guid, (EmailDeliveryPolicySnapshot Before, EmailDeliveryPolicySnapshot After)>
             {
                 [tenantId] = (before, after)
             },
-            now, actorId, cancellationToken);
+            now, actorId, cancellationToken, mixed, plan);
     }
 
     private static async Task UpdateProcessorAsync(ExploreDbContext context, TransactionBaselines baselines,
         EmailDeliveryPolicySnapshot before, EmailDeliveryPolicySnapshot after,
-        DateTime now, Guid? actorId, CancellationToken cancellationToken)
+        DateTime now, Guid? actorId, CancellationToken cancellationToken, MixedSettingsBatchStore? mixed,
+        TypedSettingsOriginalStore? governance = null)
     {
-        var existing = await context.EmailDispatchProcessorStates.AsNoTracking()
+        var existing = governance is not null ? governance.GovernanceRows<EmailDispatchProcessorState>()
+                .SingleOrDefault(state => state.ProcessorCode == EmailDispatchOutboxRepository.SmtpProcessorCode)
+            : mixed is not null ? mixed.Rows<EmailDispatchProcessorState>()
+                .SingleOrDefault(state => state.ProcessorCode == EmailDispatchOutboxRepository.SmtpProcessorCode)
+            : await context.EmailDispatchProcessorStates.AsNoTracking()
             .SingleOrDefaultAsync(state => state.ProcessorCode == EmailDispatchOutboxRepository.SmtpProcessorCode,
                 cancellationToken);
         PolicyBaseline baseline = baselines.Processor ??= new PolicyBaseline(
@@ -76,6 +92,25 @@ internal static class EmailDeliveryPolicyRevisionTracker
             SuppressionBoundary.CurrentRevision => revision,
             _ => throw new InvalidOperationException("Unexpected email suppression boundary.")
         };
+
+        if (mixed is not null || governance is not null)
+        {
+            var row = existing ?? new EmailDispatchProcessorState
+            {
+                Id = Guid.CreateVersion7(),
+                ProcessorCode = EmailDispatchOutboxRepository.SmtpProcessorCode
+            };
+            row.DeliveryPolicyRevision = revision;
+            row.OptionalSuppressedThroughRevision = cutoffRevision;
+            row.OptionalSuppressedThroughUtc = cutoff;
+            row.UpdatedAt = now;
+            row.UpdatedBy = actorId;
+            if (governance is not null)
+                await governance.WriteGovernanceEmailRowsAsync([(row, existing is null ? EntityState.Added : EntityState.Modified)], cancellationToken);
+            else
+                await mixed!.WriteEmailRowsAsync([(row, existing is null ? EntityState.Added : EntityState.Modified)], cancellationToken);
+            return;
+        }
 
         if (existing is not null)
         {
@@ -107,7 +142,8 @@ internal static class EmailDeliveryPolicyRevisionTracker
     private static async Task UpdateTenantsAsync(ExploreDbContext context, TransactionBaselines baselines,
         IReadOnlyDictionary<Guid, (EmailDeliveryPolicySnapshot Before, EmailDeliveryPolicySnapshot After)> policies,
         DateTime now, Guid? actorId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, MixedSettingsBatchStore? mixed, TypedSettingsOriginalStore? plan = null,
+        TypedSettingsOriginalStore? governance = null)
     {
         // Keep explicit tenant predicates below every supported provider's parameter ceiling.
         foreach (Guid[] tenantIds in policies.Keys.Chunk(500))
@@ -115,15 +151,28 @@ internal static class EmailDeliveryPolicyRevisionTracker
             var controls = context.EmailDispatchTenantControls
                 .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDeliveryPolicyReconciliation)
                 .Where(control => tenantIds.Contains(control.TenantId));
-            var existing = await controls.AsNoTracking()
-                .Select(control => new
-                {
-                    control.TenantId,
-                    control.DeliveryPolicyRevision,
-                    control.OptionalSuppressedThroughRevision,
-                    control.OptionalSuppressedThroughUtc
-                })
-                .ToDictionaryAsync(control => control.TenantId, cancellationToken);
+            var existing = governance is not null
+                ? governance.GovernanceRows<EmailDispatchTenantControl>().Where(control => tenantIds.Contains(control.TenantId))
+                    .ToDictionary(control => control.TenantId, control => new PostgresEmailDeliveryPolicyContract.ControlSnapshot(
+                        control.TenantId, control.DeliveryPolicyRevision,
+                        control.OptionalSuppressedThroughRevision, control.OptionalSuppressedThroughUtc))
+                : plan is not null
+                ? plan.PlanRows<EmailDispatchTenantControl>().Where(control => tenantIds.Contains(control.TenantId))
+                    .ToDictionary(control => control.TenantId, control => new PostgresEmailDeliveryPolicyContract.ControlSnapshot(
+                        control.TenantId, control.DeliveryPolicyRevision,
+                        control.OptionalSuppressedThroughRevision, control.OptionalSuppressedThroughUtc))
+                : mixed is not null
+                ? mixed.Rows<EmailDispatchTenantControl>().Where(control => tenantIds.Contains(control.TenantId))
+                    .ToDictionary(control => control.TenantId, control => new PostgresEmailDeliveryPolicyContract.ControlSnapshot(
+                        control.TenantId, control.DeliveryPolicyRevision,
+                        control.OptionalSuppressedThroughRevision, control.OptionalSuppressedThroughUtc))
+                : RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql
+                ? await PostgresEmailDeliveryPolicyContract.ReadControlsAsync(context, tenantIds, cancellationToken)
+                : await controls.AsNoTracking()
+                    .Select(control => new PostgresEmailDeliveryPolicyContract.ControlSnapshot(
+                        control.TenantId, control.DeliveryPolicyRevision,
+                        control.OptionalSuppressedThroughRevision, control.OptionalSuppressedThroughUtc))
+                    .ToDictionaryAsync(control => control.TenantId, cancellationToken);
             Guid[] firstTouches = tenantIds.Where(tenantId => !baselines.Tenants.ContainsKey(tenantId)).ToArray();
             foreach (Guid tenantId in firstTouches)
             {
@@ -136,6 +185,37 @@ internal static class EmailDeliveryPolicyRevisionTracker
 
             if (tenantIds.Any(tenantId => baselines.Tenants[tenantId].Revision == long.MaxValue))
                 throw new OverflowException("Email delivery policy revision is exhausted.");
+
+            if (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql || mixed is not null || plan is not null || governance is not null)
+            {
+                var changes = tenantIds.Select(tenantId =>
+                {
+                    var baseline = baselines.Tenants[tenantId];
+                    var current = existing.GetValueOrDefault(tenantId);
+                    long revision = checked(baseline.Revision + 1);
+                    var boundary = ResolveSuppressionBoundary(baseline.Policy, policies[tenantId].After);
+                    long? suppressed = boundary switch
+                    {
+                        SuppressionBoundary.PreviousRevision => baseline.Revision,
+                        SuppressionBoundary.CurrentRevision => revision,
+                        _ => baseline.SuppressedThroughRevision
+                    };
+                    DateTime? cutoff = boundary == SuppressionBoundary.None
+                        ? baseline.SuppressedThroughUtc
+                        : current?.OptionalSuppressedThroughUtc is { } previous && previous > now ? previous : now;
+                    return new PostgresEmailDeliveryPolicyContract.ControlChange(
+                        tenantId, baseline.Revision, current?.DeliveryPolicyRevision ?? 0, revision, suppressed, cutoff);
+                }).ToArray();
+                if (governance is not null)
+                    await governance.WriteGovernanceEmailControlsAsync(changes, now, actorId, cancellationToken);
+                else if (plan is not null)
+                    await plan.WritePlanEmailControlsAsync(changes, now, actorId, cancellationToken);
+                else if (mixed is not null)
+                    await mixed.WriteEmailControlsAsync(changes, now, actorId, cancellationToken);
+                else
+                    await PostgresEmailDeliveryPolicyContract.ApplyControlsAsync(context, changes, now, actorId, cancellationToken);
+                continue;
+            }
 
             if (firstTouches.Length > 0)
                 await controls.Where(control => firstTouches.Contains(control.TenantId))

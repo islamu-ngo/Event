@@ -7,11 +7,22 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using FluentValidation.Results;
+using Explore.Application.Features.Settings;
 
 namespace Explore.Application.Services;
 
 public partial class TenantPolicySettingService
 {
+    public Task<IReadOnlyList<SettingChangedNotification>> ApplyTenantSettingsAsync(
+        TypedSettingsOriginal original, ITypedSettingsOriginalStore store,
+        CancellationToken cancellationToken = default)
+    {
+        if (original.Onboarding is null)
+            throw new UnauthorizedAccessException("The original acquired onboarding request is required.");
+        return _mutationLock.ExecuteManyAsync(TenantPolicySettingKeys,
+            token => store.ApplyOnboardingAsync(original, token), cancellationToken);
+    }
+
     private static readonly string[] TenantPolicySettingKeys =
     [
         .. PublicationPolicySettingKeys.All,

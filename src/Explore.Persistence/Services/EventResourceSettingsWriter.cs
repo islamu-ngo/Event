@@ -1,45 +1,219 @@
 using System.Collections.Immutable;
+using Explore.Persistence.Database.ProviderPrimitives;
+using System.Data;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Notifications;
+using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Settings;
 using Explore.Domain;
-using Explore.Domain.Enums;
 using Explore.Domain.Settings;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Services;
 
-public sealed class EventResourceSettingsWriter(
-    ExploreDbContext context,
-    ISettingMutationLock mutationLock,
-    IUnitOfWork unitOfWork) : IEventResourceSettingsWriter
+public sealed class EventResourceSettingsWriter : IEventResourceSettingsWriter
 {
-    public Task<EventResourceSettingsWriteResult> ApplyAsync(
+    private readonly ExploreDbContext context;
+    private readonly ISettingMutationLock mutationLock;
+    private readonly IUnitOfWork unitOfWork;
+    private readonly IInstanceAdministratorCommitAuthority? instanceAuthority;
+    private readonly ITenantAdministratorCommitAuthority? tenantAuthority;
+    private readonly IHumanActionCommitFinalizer? finalizer;
+    private readonly HumanCommitSubject? originalSubject;
+    private readonly IHumanSettingsMutationPreparation? settingsPreparation;
+    private readonly IHumanConfigurationImportAdmission? importAdmission;
+    private readonly TimeProvider clock;
+
+    public EventResourceSettingsWriter(
+        ExploreDbContext context, ISettingMutationLock mutationLock, IUnitOfWork unitOfWork)
+    {
+        this.context = context;
+        this.mutationLock = mutationLock;
+        this.unitOfWork = unitOfWork;
+        clock = TimeProvider.System;
+    }
+
+    public EventResourceSettingsWriter(
+        ExploreDbContext context, ISettingMutationLock mutationLock, IUnitOfWork unitOfWork,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        ITenantAdministratorCommitAuthority tenantAuthority, IHumanActionCommitFinalizer finalizer,
+        HumanCommitSubject originalSubject, IHumanSettingsMutationPreparation settingsPreparation,
+        TimeProvider clock,
+        IHumanConfigurationImportAdmission? importAdmission = null)
+        : this(context, mutationLock, unitOfWork)
+    {
+        this.instanceAuthority = instanceAuthority;
+        this.tenantAuthority = tenantAuthority;
+        this.finalizer = finalizer;
+        this.originalSubject = originalSubject;
+        this.settingsPreparation = settingsPreparation;
+        this.importAdmission = importAdmission;
+        this.clock = clock;
+    }
+
+    public async Task<EventResourceSettingsWriteResult> ApplyAsync(
+        ImmutableArray<EventResourceSettingMutation> mutations,
+        HumanCommitSubject subject,
+        SettingsMutationOperation operation,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        if (finalizer is null || !ReferenceEquals(subject, originalSubject)
+            || !context.HasHumanCommitContextLease
+            || !ReferenceEquals(context.HumanCommitAuditSubject, subject)
+            || actorUserId is { } actor && actor != subject.PrincipalId)
+            throw new UnauthorizedAccessException("Human resource writes require a prepared committing owner.");
+        if (!Enum.IsDefined(operation))
+            throw new ArgumentOutOfRangeException(nameof(operation));
+        if ((operation == SettingsMutationOperation.ConfigurationInstanceImport)
+            != context.IsConfigurationInstanceImportOwner)
+            throw new InvalidOperationException("Resource mutation action must match the selected import owner.");
+        if (operation is SettingsMutationOperation.ConfigurationInstanceImport
+                or SettingsMutationOperation.ConfigurationTenantImport
+            && context.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Resource import must borrow its existing serializable owner.");
+        if (operation is SettingsMutationOperation.ConfigurationInstanceImport
+            or SettingsMutationOperation.ConfigurationTenantImport)
+        {
+            var producer = importAdmission
+                ?? throw new UnauthorizedAccessException("The original acquired import producer is required.");
+            var slice = mutations.Select(mutation => new HumanConfigurationImportSettingEffect(
+                mutation.TenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance,
+                mutation.TenantId, mutation.Key, mutation.Kind switch
+                {
+                    EventResourceSettingMutationKind.SetValue => HumanSettingsMutationKind.SetValue,
+                    EventResourceSettingMutationKind.SetLock => HumanSettingsMutationKind.SetLock,
+                    EventResourceSettingMutationKind.Remove => HumanSettingsMutationKind.Remove,
+                    _ => throw new ArgumentOutOfRangeException(nameof(mutations))
+                }, mutation.Value, mutation.IsLocked)).ToImmutableArray();
+            return await producer.ExecuteJoinedAsync(operation, slice,
+                (_, token) => ApplyCoreAsync(mutations, subject, operation, actorUserId, token), cancellationToken);
+        }
+        var preparation = settingsPreparation
+            ?? throw new UnauthorizedAccessException("Original resource source preparation is required.");
+        var effects = mutations.Select(mutation => new HumanSettingsMutation(
+            operation switch
+            {
+                SettingsMutationOperation.InstanceSettings => HumanSettingsOperation.InstanceSettings,
+                SettingsMutationOperation.TenantSettings => HumanSettingsOperation.TenantSettings,
+                SettingsMutationOperation.InstanceTenantSettings => HumanSettingsOperation.InstanceTenantSettings,
+                _ => throw new InvalidOperationException("The original resource Settings action is required.")
+            }, mutation.TenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance,
+            mutation.TenantId, null, mutation.Key, mutation.Kind switch
+            {
+                EventResourceSettingMutationKind.SetValue => HumanSettingsMutationKind.SetValue,
+                EventResourceSettingMutationKind.SetLock => HumanSettingsMutationKind.SetLock,
+                EventResourceSettingMutationKind.Remove => HumanSettingsMutationKind.Remove,
+                _ => throw new ArgumentOutOfRangeException(nameof(mutations))
+            }, mutation.Value, mutation.IsLocked)).ToImmutableArray();
+        if (context.Database.CurrentTransaction is not null)
+            return await preparation.ExecuteCurrentJoinedAsync(effects,
+                (_, token) => ApplyCoreAsync(mutations, subject, operation, actorUserId, token), cancellationToken);
+        var prepared = await preparation.PrepareResourceAsync(mutations, operation, actorUserId, cancellationToken);
+        return await mutationLock.ExecuteOrderedGroupsAsync([EventResourceSettingMutationGuard.Keys],
+            token => preparation.ExecutePreparedAsync(prepared,
+                (_, inner) => ApplyCoreAsync(mutations, subject, operation, actorUserId, inner), token),
+            cancellationToken);
+    }
+
+    public Task<EventResourceSettingsWriteResult> ApplyCurrentHumanAsync(
+        ImmutableArray<EventResourceSettingMutation> mutations, SettingsMutationOperation operation,
+        Guid? actorUserId, CancellationToken cancellationToken = default) =>
+        ApplyAsync(mutations, originalSubject
+            ?? throw new UnauthorizedAccessException("Direct human resource writes require a selected authenticated owner."),
+            operation, actorUserId, cancellationToken);
+
+    public Task<EventResourceSettingsWriteResult> ApplyInternalAsync(
         ImmutableArray<EventResourceSettingMutation> mutations,
         Guid? actorUserId,
         CancellationToken cancellationToken = default)
     {
+        if (originalSubject is not null || context.HumanCommitContextLease.HasValue
+            || context.HumanCommitAuditSubject is not null)
+            throw new UnauthorizedAccessException("A human resource writer cannot enter internal setup.");
+        if (context.IsConfigurationInstanceImportOwner)
+            throw new InvalidOperationException("Instance import requires its trusted human action.");
+        return ApplyCoreAsync(mutations, null, null, actorUserId, cancellationToken);
+    }
+
+    private Task<EventResourceSettingsWriteResult> ApplyCoreAsync(
+        ImmutableArray<EventResourceSettingMutation> mutations,
+        HumanCommitSubject? subject,
+        SettingsMutationOperation? operation,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
         if (mutations.IsDefault || mutations.Any(mutation => !IsValid(mutation))
             || mutations.Select(mutation => (mutation.TenantId, mutation.Key)).Distinct().Count() != mutations.Length)
             return Task.FromResult(Rejected("event_resource_policy_invalid"));
-        if (mutations.IsEmpty)
+        if (mutations.IsEmpty && subject is null)
             return Task.FromResult(new EventResourceSettingsWriteResult(true, null, []));
+        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && context.IsConfigurationInstanceImportOwner)
+        {
+            PostgresConfigurationImportEventResourceContract.ValidateMutations(mutations, actorUserId);
+            if (context.Database.CurrentTransaction is null)
+                throw new InvalidOperationException("Resource import must join its existing serializable transaction.");
+        }
+        if (context.Database.CurrentTransaction is null && subject is not null)
+            return mutationLock.ExecuteOrderedGroupsAsync([EventResourceSettingMutationGuard.Keys],
+                token => ((ISerializableAttemptOwner)unitOfWork).ExecuteAsync(
+                    inner => ApplyInsideTransactionAsync(mutations, subject, operation, actorUserId, inner), token),
+                cancellationToken);
         if (context.Database.CurrentTransaction is null)
             return mutationLock.ExecuteOrderedGroupsAsync([EventResourceSettingMutationGuard.Keys],
                 token => unitOfWork.ExecuteSerializableAsync(
-                    inner => ApplyInsideTransactionAsync(mutations, actorUserId, inner), token), cancellationToken);
+                    inner => ApplyInsideTransactionAsync(mutations, subject, operation, actorUserId, inner), token), cancellationToken);
+        if (context.Database.CurrentTransaction.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Resource policy writes require a serializable transaction.");
         return mutationLock.ExecuteManyAsync(EventResourceSettingMutationGuard.Keys,
-            token => ApplyInsideTransactionAsync(mutations, actorUserId, token), cancellationToken);
+            token => ApplyInsideTransactionAsync(mutations, subject, operation, actorUserId, token), cancellationToken);
     }
 
     private async Task<EventResourceSettingsWriteResult> ApplyInsideTransactionAsync(
-        ImmutableArray<EventResourceSettingMutation> mutations, Guid? actorUserId, CancellationToken token)
+        ImmutableArray<EventResourceSettingMutation> mutations, HumanCommitSubject? subject,
+        SettingsMutationOperation? operation, Guid? actorUserId, CancellationToken token)
     {
+        var mixed = MixedSettingsBatchStore.Current(context);
+        async Task RequireCurrentAuthorityAsync(CancellationToken cancellationToken)
+        {
+            if (mixed is not null)
+            {
+                await mixed.RequireSpecializedAsync(subject, operation, actorUserId,
+                    mutations.Select(mutation => mutation.Key), cancellationToken);
+                return;
+            }
+            if (subject is null)
+                return;
+            context.ValidateTenantLease();
+            bool tenantAction = operation is SettingsMutationOperation.TenantSettings
+                or SettingsMutationOperation.ConfigurationTenantImport;
+            bool targetsMatch = tenantAction || operation == SettingsMutationOperation.InstanceTenantSettings
+                ? context.TenantFilterTenantId is { } tenant
+                    && mutations.All(mutation => mutation.TenantId == tenant)
+                : context.TenantFilterTenantId is null
+                    && (operation != SettingsMutationOperation.InstanceSettings
+                        || mutations.All(mutation => mutation.TenantId is null));
+            bool allowed = targetsMatch && (tenantAction
+                ? tenantAuthority is not null && await tenantAuthority.IsTenantAdministratorForCommitAsync(
+                    subject.PrincipalId, context.TenantFilterTenantId!.Value, cancellationToken)
+                : instanceAuthority is not null && await instanceAuthority.IsInstanceAdministratorForCommitAsync(
+                    subject.PrincipalId, cancellationToken));
+            if (!allowed)
+                throw new UnauthorizedAccessException("Current resource settings administration is required.");
+        }
+        await RequireCurrentAuthorityAsync(token);
+        if (subject is not null)
+            finalizer!.Register(RequireCurrentAuthorityAsync, _ => { });
+        if (mutations.IsEmpty)
+            return new(true, null, []);
         string[] keys = EventResourceSettingMutationGuard.Keys.ToArray();
         Guid[] tenantIds = mutations.Where(mutation => mutation.TenantId.HasValue)
             .Select(mutation => mutation.TenantId!.Value).Distinct().ToArray();
@@ -49,15 +223,36 @@ public sealed class EventResourceSettingsWriter(
                 && keys.Contains(entry.Entity.SettingKey)
                 && entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
             return Rejected("event_resource_policy_invalid");
-        var systems = await context.SystemSettings.AsNoTracking().Where(row => keys.Contains(row.SettingKey))
-            .ToDictionaryAsync(row => row.SettingKey, token);
-        var tenants = await context.TenantSettingOverrides
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EventResourceGovernanceMutation)
-            .AsNoTracking().Where(row => tenantIds.Contains(row.TenantId) && keys.Contains(row.SettingKey))
-            .ToDictionaryAsync(row => (row.TenantId, row.SettingKey), token);
+        bool nativeImport = (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && context.IsConfigurationInstanceImportOwner;
+        var systems = mixed is not null
+            ? mixed.Rows<SystemSetting>().Where(row => keys.Contains(row.SettingKey))
+                .ToDictionary(row => row.SettingKey, StringComparer.Ordinal)
+            : nativeImport
+            ? await PostgresConfigurationImportEventResourceContract.ReadSystemsAsync(context, token)
+            : await context.SystemSettings.AsNoTracking().Where(row => keys.Contains(row.SettingKey))
+                .ToDictionaryAsync(row => row.SettingKey, token);
+        var tenants = mixed is not null
+            ? mixed.Rows<TenantSetting>().Where(row => tenantIds.Contains(row.TenantId) && keys.Contains(row.SettingKey))
+                .ToDictionary(row => (row.TenantId, row.SettingKey))
+            : nativeImport
+            ? await PostgresConfigurationImportEventResourceContract.ReadTenantsAsync(context, tenantIds, token)
+            : await context.TenantSettingOverrides
+                .IgnoreTenantFilter(TenantFilterBypassReasons.EventResourceGovernanceMutation)
+                .AsNoTracking().Where(row => tenantIds.Contains(row.TenantId) && keys.Contains(row.SettingKey))
+                .ToDictionaryAsync(row => (row.TenantId, row.SettingKey), token);
+        var originals = new Dictionary<(Guid? TenantId, string Key), string>();
+        if (nativeImport)
+        {
+            foreach (SystemSetting row in systems.Values)
+                originals.Add((null, row.SettingKey), PostgresConfigurationImportEventResourceContract.Capture(row));
+            foreach (TenantSetting row in tenants.Values)
+                originals.Add((row.TenantId, row.SettingKey), PostgresConfigurationImportEventResourceContract.Capture(row));
+        }
         var writes = new List<(object Entity, EntityState State)>();
         var notifications = ImmutableArray.CreateBuilder<SettingChangedNotification>();
-        DateTime now = DateTime.UtcNow;
+        DateTime now = mixed?.OccurredAt ?? clock.GetUtcNow().UtcDateTime;
+        if (nativeImport)
+            now = PostgresConfigurationImportEventResourceContract.Instant(now);
         foreach (var mutation in mutations.OrderBy(mutation => mutation.TenantId.HasValue))
         {
             SettingDefinition definition = SettingRegistry.Get(mutation.Key)!;
@@ -169,6 +364,23 @@ public sealed class EventResourceSettingsWriter(
         foreach (var entry in context.ChangeTracker.Entries<TenantSetting>()
                      .Where(entry => tenantIds.Contains(entry.Entity.TenantId) && keys.Contains(entry.Entity.SettingKey)).ToArray())
             entry.State = EntityState.Detached;
+        if (mixed is not null)
+        {
+            await mixed.WriteResourceAsync(this, mutations, writes.ToImmutableArray(), token);
+            return new(true, null, notifications.ToImmutable());
+        }
+        if (nativeImport)
+        {
+            foreach (var (entity, state) in writes)
+            {
+                (Guid? TenantId, string Key) identity = entity is TenantSetting tenant
+                    ? (tenant.TenantId, tenant.SettingKey) : (null, ((SystemSetting)entity).SettingKey);
+                await PostgresConfigurationImportEventResourceContract.WriteAsync(
+                    context, entity, state, originals.GetValueOrDefault(identity), subject!,
+                    instanceAuthority!, actorUserId, now, token);
+            }
+            return new(true, null, notifications.ToImmutable());
+        }
         foreach (var (entity, state) in writes)
             context.Entry(entity).State = state;
         await context.SaveChangesAsync(token);

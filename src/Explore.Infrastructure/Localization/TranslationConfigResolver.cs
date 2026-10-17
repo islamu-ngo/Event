@@ -13,7 +13,7 @@ namespace Explore.Infrastructure.Localization;
 /// </summary>
 public class TranslationConfigResolver : ITranslationConfigResolver
 {
-    private readonly IHierarchicalSettingsResolver _resolver;
+    private readonly IHierarchicalSettingsReader _resolver;
     private readonly ITenantContext _tenantContext;
     private readonly IMemoryCache _cache;
     private readonly ILogger<TranslationConfigResolver> _logger;
@@ -23,7 +23,7 @@ public class TranslationConfigResolver : ITranslationConfigResolver
     private const string SafeFallbackLanguage = "en";
 
     public TranslationConfigResolver(
-        IHierarchicalSettingsResolver resolver,
+        IHierarchicalSettingsReader resolver,
         ITenantContext tenantContext,
         IMemoryCache cache,
         ILogger<TranslationConfigResolver> logger)

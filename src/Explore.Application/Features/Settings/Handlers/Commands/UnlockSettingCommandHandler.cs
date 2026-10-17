@@ -27,6 +27,13 @@ public class UnlockSettingCommandHandler
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
     private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
+    private readonly IInstanceAdministratorCommitAuthority _instanceCommitAuthority;
+    private readonly ITenantAdministratorCommitAuthority _tenantCommitAuthority;
+    private readonly IHumanSubjectCommitAuthority _subjectCommitAuthority;
+    private readonly ISettingMutationLock _mutationLock;
+    private readonly IHumanCommitScopePreparation _humanCommitScope;
+    private readonly IHumanSettingsMutationPreparation _settingsPreparation;
+    private readonly ISystemSettingRepository _systemSettings;
 
     public UnlockSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -40,6 +47,13 @@ public class UnlockSettingCommandHandler
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IVisitorAccessSettingsWriter visitorSettings,
         IEventResourceSettingsWriter eventResourceSettingsWriter,
+        IInstanceAdministratorCommitAuthority instanceCommitAuthority,
+        ITenantAdministratorCommitAuthority tenantCommitAuthority,
+        IHumanSubjectCommitAuthority subjectCommitAuthority,
+        ISettingMutationLock mutationLock,
+        IHumanCommitScopePreparation humanCommitScope,
+        IHumanSettingsMutationPreparation settingsPreparation,
+        ISystemSettingRepository systemSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null)
     {
         _resolver = resolver;
@@ -54,6 +68,13 @@ public class UnlockSettingCommandHandler
         _emailSettingsWriter = emailSettingsWriter;
         _visitorSettings = visitorSettings;
         _eventResourceSettingsWriter = eventResourceSettingsWriter;
+        _instanceCommitAuthority = instanceCommitAuthority;
+        _tenantCommitAuthority = tenantCommitAuthority;
+        _subjectCommitAuthority = subjectCommitAuthority;
+        _mutationLock = mutationLock;
+        _humanCommitScope = humanCommitScope;
+        _settingsPreparation = settingsPreparation;
+        _systemSettings = systemSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -82,14 +103,19 @@ public class UnlockSettingCommandHandler
             return BaseCommandResponse.Authorization<Guid>(authError);
         }
 
+        Guid? resolvedUserId = await SettingCommandHelper.ResolveCurrentUserIdAsync(
+            _adminContext, _currentUserService, cancellationToken);
         var (scopeId, actorId) = SettingCommandHelper.GetScopeAndActorIds(
-            request.Scope, _tenantContext, _currentUserService);
+            request.Scope, _tenantContext, resolvedUserId);
 
         if (VisitorAccessSettingMutationGuard.Handles(request.Key))
         {
             var result = await _visitorSettings.ApplyAsync(
                 [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
-                    VisitorAccessSettingMutationKind.SetLock, IsLocked: false)], actorId, cancellationToken);
+                    VisitorAccessSettingMutationKind.SetLock, IsLocked: false)],
+                SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId),
+                request.Scope == SettingScope.Instance ? SettingsMutationOperation.InstanceSettings : SettingsMutationOperation.TenantSettings,
+                actorId, cancellationToken);
             return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, scopeId);
         }
 
@@ -99,6 +125,8 @@ public class UnlockSettingCommandHandler
                 [new EventResourceSettingMutation(
                     request.Scope == SettingScope.Tenant ? scopeId : null,
                     request.Key, EventResourceSettingMutationKind.SetLock, IsLocked: false)],
+                SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId),
+                request.Scope == SettingScope.Instance ? SettingsMutationOperation.InstanceSettings : SettingsMutationOperation.TenantSettings,
                 actorId, cancellationToken);
             return await result.CompleteAsync(
                 _resolver, _notificationHandlers, request.Scope, scopeId);
@@ -127,14 +155,19 @@ public class UnlockSettingCommandHandler
 
         if (isGuardedPublicationPolicyMutation)
         {
-            var context = SettingCommandHelper.BuildSettingContext(
-                request.Scope, _tenantContext, _currentUserService);
-            ResolvedSetting? resolved = await _resolver.ResolveWithMetadataAsync(
-                request.Key, context, cancellationToken);
-            string value = resolved?.Value ?? definition.DefaultValue;
+            var publicationPreparation = await _settingsPreparation.PrepareAsync(request, cancellationToken);
+            SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
             DateTime occurredAtUtc = DateTime.UtcNow;
-            PublicationPolicyMutationResult mutationResult = await _unitOfWork.ExecuteInTransactionAsync(
-                token => _publicationPolicyMutationBoundary.ApplyInstanceAsync(
+            PublicationPolicyMutationResult mutationResult = await _mutationLock.ExecuteOrderedGroupsAsync(
+                [PublicationPolicySettingKeys.All],
+                outerToken => _settingsPreparation.ExecutePreparedAsync(publicationPreparation, async (_, token) =>
+                {
+                    var resolved = await _systemSettings.GetByKey(request.Key, token);
+                    string value = resolved?.Value ?? definition.DefaultValue;
+                    await SettingCommandHelper.RequireCommitAuthorizationAsync(
+                        request.Scope, resolvedUserId, _tenantContext.TenantId,
+                        _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, token);
+                    return await _publicationPolicyMutationBoundary.ApplyInstanceAsync(
                     new PublicationPolicyInstanceMutationRequest(
                         actorId,
                         occurredAtUtc,
@@ -144,7 +177,8 @@ public class UnlockSettingCommandHandler
                             value,
                             TenantId: null,
                             IsLocked: false)]),
-                    token),
+                    token);
+                }, outerToken),
                 cancellationToken);
             if (!mutationResult.Success)
             {
@@ -168,8 +202,27 @@ public class UnlockSettingCommandHandler
                 $"Setting '{request.Key}' unlocked at {request.Scope} scope.");
         }
 
-        await _resolver.UnlockAsync(
-            request.Key, request.Scope, scopeId, actorId, cancellationToken);
+        var prepared = await _settingsPreparation.PrepareAsync(request, cancellationToken);
+        SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
+        await _mutationLock.ExecuteOrderedGroupsAsync(
+            [[request.Key]],
+            token => _settingsPreparation.ExecutePreparedAsync(prepared, async (_, transactionToken) =>
+            {
+                if (request.Scope == SettingScope.Instance)
+                {
+                    var setting = await _systemSettings.GetByKey(request.Key, transactionToken)
+                        ?? throw new InvalidOperationException($"Setting '{request.Key}' does not exist at Instance scope.");
+                    setting.IsLocked = false;
+                    setting.UpdatedAt = DateTime.UtcNow;
+                    setting.UpdatedBy = actorId;
+                    await _systemSettings.UpsertLockAsync(setting, transactionToken);
+                }
+                else
+                {
+                    await _resolver.UnlockAsync(request.Key, request.Scope, scopeId, actorId, transactionToken);
+                }
+                return true;
+            }, token), cancellationToken);
 
         _resolver.InvalidateCache(request.Scope, scopeId);
         CerbosSettingsCacheInvalidation.InvalidateIfCerbosSettingChanged(

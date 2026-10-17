@@ -1,6 +1,7 @@
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.TenantPolicy;
 using Explore.Application.Notifications;
+using Explore.Application.Features.Settings;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -9,6 +10,10 @@ namespace Explore.Application.Contracts.Services;
 /// </summary>
 public interface ITenantPolicySettingService
 {
+    Task<IReadOnlyList<SettingChangedNotification>> ApplyTenantSettingsAsync(
+        TypedSettingsOriginal original, ITypedSettingsOriginalStore store,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Reads effective tenant policy settings by merging tenant overrides with instance defaults.
     /// Includes read-only CanOverride* flags derived from instance governance locks.

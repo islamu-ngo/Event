@@ -2,10 +2,10 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Application.Settings;
-using Explore.Application.Settings.Groups;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
@@ -75,14 +75,9 @@ internal static class EmailDeliveryPolicyReader
         var tenantIds = await context.Tenants.AsNoTracking()
             .Where(tenant => tenantId == null || tenant.Id == tenantId)
             .Select(tenant => tenant.Id).ToListAsync(cancellationToken);
-        var rows = await context.TenantSettingOverrides
-            .IgnoreTenantFilter(tenantId.HasValue
-                ? TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate
-                : TenantFilterBypassReasons.EmailDeliveryPolicyReconciliation)
-            .AsNoTracking()
-            .Where(setting => (tenantId == null || setting.TenantId == tenantId) && Keys.Contains(setting.SettingKey)
-                && context.Tenants.Any(tenant => tenant.Id == setting.TenantId))
-            .ToListAsync(cancellationToken);
+        // Reconciliation must observe this mutation's uncommitted settings, not a
+        // second pool's committed snapshot. PostgreSQL exposes only the fixed policy keys.
+        var rows = await EmailDeliveryPolicyQuery.ReadOverridesAsync(context, tenantId, Keys, cancellationToken);
         var overrides = rows.GroupBy(setting => setting.TenantId)
             .ToDictionary(group => group.Key,
                 group => group.ToDictionary(setting => setting.SettingKey, StringComparer.Ordinal));

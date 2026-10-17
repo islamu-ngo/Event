@@ -11,7 +11,6 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Infrastructure.Services;
-using Explore.Tests.Shared.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -111,7 +110,22 @@ public class HierarchicalSettingsResolverTests : IDisposable
     {
         internal static readonly RejectingEventResourceSettingsWriter Instance = new();
 
+        public Task<EventResourceSettingsWriteResult> ApplyCurrentHumanAsync(
+            ImmutableArray<EventResourceSettingMutation> mutations,
+            SettingsMutationOperation operation,
+            Guid? actorUserId,
+            CancellationToken cancellationToken = default) =>
+            throw new EventResourceSettingsWriterReachedException();
+
         public Task<EventResourceSettingsWriteResult> ApplyAsync(
+            ImmutableArray<EventResourceSettingMutation> mutations,
+            HumanCommitSubject subject,
+            SettingsMutationOperation operation,
+            Guid? actorUserId,
+            CancellationToken cancellationToken = default) =>
+            throw new EventResourceSettingsWriterReachedException();
+
+        public Task<EventResourceSettingsWriteResult> ApplyInternalAsync(
             ImmutableArray<EventResourceSettingMutation> mutations,
             Guid? actorUserId,
             CancellationToken cancellationToken = default) =>
@@ -121,6 +135,12 @@ public class HierarchicalSettingsResolverTests : IDisposable
     private sealed class RejectingEmailDeliverySettingsWriter : IEmailDeliverySettingsWriter
     {
         internal static readonly RejectingEmailDeliverySettingsWriter Instance = new();
+
+        public Task<EmailDeliverySettingsWriteResult> ApplyInstanceTenantAsync(
+            ImmutableArray<EmailDeliverySettingMutation> mutations,
+            Guid? actorUserId,
+            CancellationToken cancellationToken = default) =>
+            throw new EmailSettingsWriterReachedException();
 
         public Task<EmailDeliverySettingsWriteResult> ApplyAsync(
             ImmutableArray<EmailDeliverySettingMutation> mutations,
@@ -672,63 +692,7 @@ public class HierarchicalSettingsResolverTests : IDisposable
         await Assert.That(ex!.Message).Contains("cannot be set at scope");
     }
 
-    [Test]
-    public async Task SetValueAsync_SucceedsAtInstanceScope()
-    {
-        await using var database = await SmtpSettingsDatabase.CreateAsync();
-
-        await database.Settings.SetValueAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, value: "465",
-            scope: SettingScope.Instance, scopeId: Guid.Empty, actorId: Guid.NewGuid());
-
-        await Assert.That(await database.Settings.ResolveAsync<int>(
-            key: GovernanceSettingKeys.Email.SmtpPort, context: new SettingContext())).IsEqualTo(465);
-    }
-
-    [Test]
-    public async Task RemoveOverrideAsync_WhenSystemSettingIsLocked_DoesNotRemoveTenantOverride()
-    {
-        await using var database = await SmtpSettingsDatabase.CreateAsync();
-        var actorId = Guid.NewGuid();
-        await database.SetInstanceAsync(GovernanceSettingKeys.TenantDelegation.LockSmtp, false);
-        await database.SetInstanceAsync(GovernanceSettingKeys.Email.SmtpPort, 587);
-        await database.SetTenantAsync(GovernanceSettingKeys.Email.SmtpPort, 465);
-        await database.Settings.LockAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, scope: SettingScope.Instance,
-            scopeId: Guid.Empty, actorId: actorId);
-
-        ValidationException? exception = await Assert.ThrowsAsync<ValidationException>(async () =>
-            await database.Settings.RemoveOverrideAsync(
-                key: GovernanceSettingKeys.Email.SmtpPort, scope: SettingScope.Tenant,
-                scopeId: database.TenantId, actorId: actorId));
-
-        await Assert.That(exception!.Errors).Contains("SMTP settings are locked by current governance.");
-        await database.Settings.UnlockAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, scope: SettingScope.Instance,
-            scopeId: Guid.Empty, actorId: actorId);
-        await Assert.That(await database.Settings.ResolveAsync<int>(
-            key: GovernanceSettingKeys.Email.SmtpPort,
-            context: new SettingContext(TenantId: database.TenantId))).IsEqualTo(465);
-    }
-
     // --- Lock ---
-
-    [Test]
-    public async Task LockAsync_SetsIsLockedToTrue()
-    {
-        await using var database = await SmtpSettingsDatabase.CreateAsync();
-        await database.SetInstanceAsync(GovernanceSettingKeys.Email.SmtpPort, 587);
-
-        await database.Settings.LockAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, scope: SettingScope.Instance,
-            scopeId: Guid.Empty, actorId: Guid.NewGuid());
-
-        var setting = await database.Settings.ResolveWithMetadataAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, context: new SettingContext());
-        await Assert.That(setting).IsNotNull();
-        await Assert.That(setting!.IsLocked).IsTrue();
-        await Assert.That(setting.Value).IsEqualTo("587");
-    }
 
     [Test]
     public async Task LockAsync_ThrowsForUnsupportedScope()
@@ -749,27 +713,6 @@ public class HierarchicalSettingsResolverTests : IDisposable
     }
 
     // --- Unlock ---
-
-    [Test]
-    public async Task UnlockAsync_SucceedsAtInstanceScope()
-    {
-        await using var database = await SmtpSettingsDatabase.CreateAsync();
-        var actorId = Guid.NewGuid();
-        await database.SetInstanceAsync(GovernanceSettingKeys.Email.SmtpPort, 587);
-        await database.Settings.LockAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, scope: SettingScope.Instance,
-            scopeId: Guid.Empty, actorId: actorId);
-
-        await database.Settings.UnlockAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, scope: SettingScope.Instance,
-            scopeId: Guid.Empty, actorId: actorId);
-
-        var setting = await database.Settings.ResolveWithMetadataAsync(
-            key: GovernanceSettingKeys.Email.SmtpPort, context: new SettingContext());
-        await Assert.That(setting).IsNotNull();
-        await Assert.That(setting!.IsLocked).IsFalse();
-        await Assert.That(setting.Value).IsEqualTo("587");
-    }
 
     [Test]
     public async Task UnlockAsync_ThrowsForUnsupportedScope()

@@ -22,7 +22,7 @@ namespace Explore.Infrastructure.Analytics;
 /// </summary>
 public class AnalyticsConfigResolver : IAnalyticsConfigResolver
 {
-    private readonly IHierarchicalSettingsResolver _resolver;
+    private readonly IHierarchicalSettingsReader _resolver;
     private readonly ITenantContext _tenantContext;
     private readonly IMemoryCache _cache;
     private readonly ILogger<AnalyticsConfigResolver> _logger;
@@ -32,7 +32,7 @@ public class AnalyticsConfigResolver : IAnalyticsConfigResolver
     private const string CacheKeyPrefix = "AnalyticsConfig:";
 
     public AnalyticsConfigResolver(
-        IHierarchicalSettingsResolver resolver,
+        IHierarchicalSettingsReader resolver,
         ITenantContext tenantContext,
         IMemoryCache cache,
         ISecretResolver secretResolver,
@@ -73,7 +73,7 @@ public class AnalyticsConfigResolver : IAnalyticsConfigResolver
 
     private async Task<AnalyticsConfiguration> ResolveFromSettingsAsync(Guid tenantId, CancellationToken cancellationToken)
     {
-        // IHierarchicalSettingsResolver handles the cascade:
+        // IHierarchicalSettingsReader handles the cascade:
         // 1. If setting is IsLocked at system level -> uses system value (instance admin control)
         // 2. If tenant has an override -> uses tenant value (tenant chooses own provider)
         // 3. Falls back to system default

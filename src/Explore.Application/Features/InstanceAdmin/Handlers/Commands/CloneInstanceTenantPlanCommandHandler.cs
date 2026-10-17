@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Responses;
@@ -8,12 +9,31 @@ using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.InstanceAdmin.Handlers.Commands;
 
-public sealed class CloneInstanceTenantPlanCommandHandler(ITenantPlanRepository tenantPlanRepository)
+public sealed class CloneInstanceTenantPlanCommandHandler(
+    ITenantPlanRepository tenantPlanRepository, ISerializableAttemptOwner owner,
+    ICurrentUserService currentUserService, IInstanceAdministratorCommitAuthority commitAuthority,
+    IHumanAdministrativeActionPreparation preparation)
     : ICommandHandler<CloneInstanceTenantPlanCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CloneInstanceTenantPlanCommand request,
         CancellationToken cancellationToken)
+    {
+        Guid? principalId = currentUserService.UserId;
+        if (principalId is not { } actorId || actorId == Guid.Empty)
+            return BaseCommandResponse.Authorization<Guid>("Current instance administrator authority is required.");
+        var prepared = await preparation.PrepareAsync(request, actorId, cancellationToken);
+        return await owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, actorId, token);
+            if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorId, token))
+                return BaseCommandResponse.Authorization<Guid>("Current instance administrator authority is required.");
+            return await ExecuteAuthorizedAsync(request, token);
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteAuthorizedAsync(
+        CloneInstanceTenantPlanCommand request, CancellationToken cancellationToken)
     {
         TenantPlanVersion? source = await tenantPlanRepository.GetVersionAsync(request.SourceVersionId, cancellationToken);
         if (source is null)

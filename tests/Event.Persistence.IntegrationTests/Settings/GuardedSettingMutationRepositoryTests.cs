@@ -52,27 +52,39 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
         }
 
         var saveObserver = new SaveObserver();
-        await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+            () => fixture.CreateDbContext(), fixture, saveObserver);
+        await authenticated.RunAsync(tenantId, async session =>
         {
-            var repository = new TenantSettingRepository(context,
-                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
-            Func<Task> guardedMutation = mutation switch
+            var context = session.Context;
+            var repository = new TenantSettingRepository(context, session.MutationLock, session.Boundary);
+            async Task<bool> Check(CancellationToken token)
             {
-                TenantMutation.Set => () => repository.SetValueAsync(tenantId, GuardedKey, "true"),
-                TenantMutation.Remove => async () => { await repository.RemoveOverrideAsync(tenantId, GuardedKey); }
-                ,
-                TenantMutation.Lock => async () => { await repository.LockAsync(tenantId, GuardedKey, Guid.NewGuid()); }
-                ,
-                TenantMutation.Unlock => async () => { await repository.UnlockAsync(tenantId, GuardedKey, Guid.NewGuid()); }
-                ,
+                Func<Task> guardedMutation = mutation switch
+                {
+                    TenantMutation.Set => () => repository.SetValueAsync(tenantId, GuardedKey, "true", token, session.ActorId),
+                    TenantMutation.Remove => () => repository.RemoveOverrideAsync(tenantId, GuardedKey, token),
+                    TenantMutation.Lock => () => repository.LockAsync(tenantId, GuardedKey, session.ActorId, token),
+                    TenantMutation.Unlock => () => repository.UnlockAsync(tenantId, GuardedKey, session.ActorId, token),
+                    _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
+                };
+                var rejected = await Assert.ThrowsAsync<InvalidOperationException>(guardedMutation);
+                await Assert.That(rejected!.Message).Contains("publication-policy");
+                return true;
+            }
+            _ = mutation switch
+            {
+                TenantMutation.Set => await session.ValueAsync(GuardedKey, "true", "true", Check),
+                TenantMutation.Remove => await session.RemoveAsync(GuardedKey, Check),
+                TenantMutation.Lock => await session.LockAsync(GuardedKey, true, Check),
+                TenantMutation.Unlock => await session.LockAsync(GuardedKey, false, Check),
                 _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
             };
-
-            await Assert.ThrowsAsync<InvalidOperationException>(guardedMutation);
             await Assert.That(saveObserver.SaveCount).IsEqualTo(0);
             await Assert.That(context.ChangeTracker.Entries().Any(entry =>
                 entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)).IsFalse();
-        }
+            return true;
+        });
 
         await using ExploreDbContext verificationContext = fixture.CreateDbContext();
         TenantSetting saved = await verificationContext.TenantSettingOverrides
@@ -102,23 +114,33 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
         }
 
         var saveObserver = new SaveObserver();
-        await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+            () => fixture.CreateDbContext(), fixture, saveObserver);
+        await authenticated.RunAsync(tenantId, session => session.ValueAsync(GuardedKey, "true", "true", async token =>
         {
-            var repository = new TenantSettingRepository(context,
-                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpsertManyForTenantAsync(
+            var context = session.Context;
+            var repository = new TenantSettingRepository(context, session.MutationLock, session.Boundary);
+            await session.Boundary.RequireAsync(context, Explore.Domain.Settings.SettingScope.Tenant,
+                tenantId, null, GuardedKey, HumanSettingsMutationKind.SetValue, "true",
+                auditActorId: session.ActorId, cancellationToken: token);
+            var guarded = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                repository.SetValueAsync(tenantId, GuardedKey, "true", token, session.ActorId));
+            await Assert.That(guarded!.Message).Contains("publication-policy");
+            // Tenant publication effects never carry a lock grant. A real value proof
+            // cannot be widened into this replacement batch, even by its own actor.
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => repository.UpsertManyForTenantAsync(
                 tenantId,
                 [
-                    new TenantSettingOverrideUpsert("email.smtp_port", "2525", false),
-                    new TenantSettingOverrideUpsert(GuardedKey, "true", true)
+                    new TenantSettingOverrideUpsert(GuardedKey, "true", true),
+                    new TenantSettingOverrideUpsert("email.smtp_port", "2525", false)
                 ],
-                Guid.NewGuid()));
+                session.ActorId, token));
 
             await Assert.That(saveObserver.SaveCount).IsEqualTo(0);
             await Assert.That(context.ChangeTracker.Entries().Any(entry =>
                 entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)).IsFalse();
-        }
+            return true;
+        }));
 
         await using ExploreDbContext verificationContext = fixture.CreateDbContext();
         int savedCount = await verificationContext.TenantSettingOverrides
@@ -138,9 +160,12 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
             .SingleAsync(setting => setting.SettingKey == GuardedKey);
 
         var saveObserver = new SaveObserver();
-        await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+            () => fixture.CreateDbContext(), fixture, saveObserver);
+        await authenticated.RunAsync(null, async session =>
         {
-            var repository = new SystemSettingRepository(context, RejectingMutationLock.Instance);
+            var context = session.Context;
+            var repository = new SystemSettingRepository(context, RejectingMutationLock.Instance, session.Boundary);
             var candidate = new SystemSetting
             {
                 SettingKey = GuardedKey,
@@ -151,7 +176,7 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
                 Description = "Changed",
                 DisplayOrder = 999,
                 UpdatedAt = DateTime.UtcNow,
-                UpdatedBy = Guid.NewGuid()
+                UpdatedBy = session.ActorId
             };
             Func<Task> guardedMutation = mutation switch
             {
@@ -162,11 +187,21 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
                 _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
             };
 
-            await Assert.ThrowsAsync<InvalidOperationException>(guardedMutation);
+            async Task<bool> Check(CancellationToken token)
+            {
+                var rejected = await Assert.ThrowsAsync<InvalidOperationException>(guardedMutation);
+                await Assert.That(rejected!.Message).Contains("publication-policy");
+                return true;
+            }
+            if (mutation == SystemMutation.Upsert)
+                await session.ValueAsync(GuardedKey, "true", "true", Check);
+            else
+                await session.LockAsync(GuardedKey, candidate.IsLocked, Check);
             await Assert.That(saveObserver.SaveCount).IsEqualTo(0);
             await Assert.That(context.ChangeTracker.Entries().Any(entry =>
                 entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)).IsFalse();
-        }
+            return true;
+        });
 
         await using ExploreDbContext verificationContext = fixture.CreateDbContext();
         SystemSetting saved = await verificationContext.SystemSettings

@@ -1,17 +1,15 @@
 
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
+using Explore.Domain;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Services;
 
-public sealed class VisitorAccessProviderReader(ISystemSettingRepository settings, IConfiguration configuration)
+public sealed class VisitorAccessProviderReader(IConfiguration configuration)
     : IVisitorAccessProviderReader
 {
-    public async Task<IReadOnlyList<VisitorAccessProviderState>> ReadProvidersAsync(
-        Guid tenantId, CancellationToken cancellationToken = default) =>
+    public IReadOnlyList<VisitorAccessProviderState> ReadProviders(IReadOnlyList<SystemSetting> instanceSettings) =>
         AuthProviderConfigurationService.ProjectVisitorProviders(
-            (await settings.GetAllSettings(cancellationToken: cancellationToken))
-                .ToDictionary(setting => setting.SettingKey, StringComparer.Ordinal), configuration);
+            instanceSettings.ToDictionary(setting => setting.SettingKey, StringComparer.Ordinal), configuration);
 }

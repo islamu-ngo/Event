@@ -3,13 +3,49 @@ using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.TenantSettingsDocuments;
 using Explore.Application.Hateoas;
-using TUnit.Assertions;
-using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 public sealed class TenantBrandingSettingsDocumentLinkPolicyTests
 {
+    [Test]
+    [Arguments(true, false, false, false)]
+    [Arguments(false, true, false, false)]
+    [Arguments(false, false, true, false)]
+    [Arguments(false, false, false, true)]
+    [Arguments(false, false, false, false)]
+    public async Task GetLinks_PreservesOnlyCurrentFieldCapabilities(
+        bool displayName, bool logoUrl, bool faviconUrl, bool customCssUrl)
+    {
+        var dto = new TenantBrandingSettingsDocumentDto
+        {
+            DocumentKey = "tenant.branding",
+            SchemaVersion = 1,
+            DefaultsVersion = "2026-05-branding",
+            Payload = new TenantBrandingSettingsPayloadDto(),
+            Source = "Tenant",
+            SourceScopeId = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            IsLockedByInstance = true,
+            CanChangeDisplayName = displayName,
+            CanChangeLogoUrl = logoUrl,
+            CanChangeFaviconUrl = faviconUrl,
+            CanChangeCustomCssUrl = customCssUrl
+        };
+        var policy = new TenantBrandingSettingsDocumentLinkPolicy();
+        var links = policy.GetLinks(dto, user: null).ToArray();
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.Self)).IsTrue();
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.Edit))
+            .IsEqualTo(displayName || logoUrl || faviconUrl || customCssUrl);
+        if (displayName || logoUrl || faviconUrl || customCssUrl)
+        {
+            var edit = links.Single(link => link.Rel == LinkRelations.Edit);
+            await Assert.That(edit.PermissionFacts).IsEqualTo(
+                new TenantSettingAuthorizationFacts(dto.SourceScopeId, "tenant.branding", IsLockedByInstance: true));
+            await Assert.That(edit.RequiresAuth).IsTrue();
+        }
+    }
+
     [Test]
     public async Task GetLinks_ShouldEmitSelfAndPermissionBoundEditLinks()
     {

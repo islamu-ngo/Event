@@ -6,9 +6,26 @@ using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Documents.Payloads;
 
-public sealed class TenantBrandingSettingsDocumentLockService(ISystemSettingRepository systemSettingRepository)
+public sealed class TenantBrandingSettingsDocumentLockService(
+    ISystemSettingRepository systemSettingRepository,
+    ISettingMutationLock mutationLock)
     : ITenantBrandingSettingsDocumentLockService
 {
+    public Task<T> ExecuteWithGovernanceLocksAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken = default) =>
+        mutationLock.ExecuteOrderedGroupsAsync(
+            [[
+                GovernanceSettingKeys.Deployment.Mode,
+                GovernanceSettingKeys.Tenants.WhiteLabelingEnabled,
+                GovernanceSettingKeys.Branding.DisplayName,
+                GovernanceSettingKeys.Branding.LogoUrl,
+                GovernanceSettingKeys.Branding.FaviconUrl,
+                GovernanceSettingKeys.Branding.CustomCssUrl
+            ]],
+            operation,
+            cancellationToken);
+
     public async Task<TenantBrandingSettingsDocumentLockState> GetLockStateAsync(CancellationToken cancellationToken = default)
     {
         var deploymentMode = await systemSettingRepository.GetByKey(GovernanceSettingKeys.Deployment.Mode, cancellationToken);

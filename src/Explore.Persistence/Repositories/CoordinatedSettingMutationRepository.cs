@@ -8,9 +8,13 @@ using Explore.Domain;
 using Explore.Domain.Settings;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
-public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbContext)
+public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbContext,
+    IHumanSettingsMutationPreparation preparation, HumanSettingsDataBoundary humanBoundary)
     : ICoordinatedSettingMutationStore
 {
     private const string ActiveTransactionRequiredMessage =
@@ -25,6 +29,12 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
         Guid tenantId,
         CancellationToken cancellationToken)
     {
+        await RequireReadAsync(tenantId, cancellationToken);
+        if (MixedSettingsBatchStore.Current(dbContext) is { } mixed)
+            return CreateSnapshot(mixed.Rows<SystemSetting>().Where(row => GuardedKeys.Contains(row.SettingKey)),
+                mixed.Rows<TenantSetting>().Where(row => row.TenantId == tenantId && GuardedKeys.Contains(row.SettingKey)));
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+            return await native.ReadTenantSnapshotAsync(tenantId, cancellationToken);
         List<SystemSetting> systemRows = await QuerySystemRows()
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -39,6 +49,12 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
     public async Task<PublicationPolicyMutationSnapshot> ReadInstanceSnapshotAsync(
         CancellationToken cancellationToken)
     {
+        await RequireReadAsync(null, cancellationToken);
+        if (MixedSettingsBatchStore.Current(dbContext) is { } mixed)
+            return CreateSnapshot(mixed.Rows<SystemSetting>().Where(row => GuardedKeys.Contains(row.SettingKey)),
+                mixed.Rows<TenantSetting>().Where(row => GuardedKeys.Contains(row.SettingKey)));
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+            return await native.ReadInstanceSnapshotAsync(cancellationToken);
         List<SystemSetting> systemRows = await QuerySystemRows()
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -58,14 +74,20 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
     {
         EnsureActiveTransaction();
         ValidateTenantMutations(tenantId, mutations);
+        await RequireWriteAsync(tenantId, mutations, actorUserId, occurredAtUtc, cancellationToken);
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+            return await native.WriteTenantAsync(tenantId, mutations, actorUserId, occurredAtUtc, cancellationToken);
 
         if (mutations.IsEmpty)
             return new CoordinatedSettingMutationWriteResult([]);
 
         string[] requestedKeys = mutations.Select(mutation => mutation.Key).ToArray();
-        List<TenantSetting> existingRows = await QueryTenantRows()
-            .Where(row => row.TenantId == tenantId && requestedKeys.Contains(row.SettingKey))
-            .ToListAsync(cancellationToken);
+        var mixed = MixedSettingsBatchStore.Current(dbContext);
+        List<TenantSetting> existingRows = mixed is not null
+            ? mixed.Rows<TenantSetting>().Where(row => row.TenantId == tenantId && requestedKeys.Contains(row.SettingKey)).ToList()
+            : await QueryTenantRows().Where(row => row.TenantId == tenantId && requestedKeys.Contains(row.SettingKey))
+                .ToListAsync(cancellationToken);
+        if (mixed is not null) dbContext.AttachRange(existingRows);
         Dictionary<string, TenantSetting> existingByKey = existingRows
             .ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
         var changes = ImmutableArray.CreateBuilder<CoordinatedSettingValueChange>();
@@ -111,6 +133,11 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
             changes.Add(new CoordinatedSettingValueChange(mutation.Key, oldValue, newValue));
         }
 
+        if (mixed is not null)
+        {
+            await mixed.WritePublicationAsync(this, tenantId, mutations, actorUserId, occurredAtUtc, cancellationToken);
+            return new(changes.ToImmutable());
+        }
         return await SaveChangesIfNeededAsync(changes, cancellationToken);
     }
 
@@ -122,14 +149,19 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
     {
         EnsureActiveTransaction();
         ValidateInstanceMutations(mutations);
+        await RequireWriteAsync(null, mutations, actorUserId, occurredAtUtc, cancellationToken);
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+            return await native.WriteInstanceAsync(mutations, actorUserId, occurredAtUtc, cancellationToken);
 
         if (mutations.IsEmpty)
             return new CoordinatedSettingMutationWriteResult([]);
 
         string[] requestedKeys = mutations.Select(mutation => mutation.Key).ToArray();
-        List<SystemSetting> existingRows = await QuerySystemRows()
-            .Where(row => requestedKeys.Contains(row.SettingKey))
-            .ToListAsync(cancellationToken);
+        var mixed = MixedSettingsBatchStore.Current(dbContext);
+        List<SystemSetting> existingRows = mixed is not null
+            ? mixed.Rows<SystemSetting>().Where(row => requestedKeys.Contains(row.SettingKey)).ToList()
+            : await QuerySystemRows().Where(row => requestedKeys.Contains(row.SettingKey)).ToListAsync(cancellationToken);
+        if (mixed is not null) dbContext.AttachRange(existingRows);
         Dictionary<string, SystemSetting> existingByKey = existingRows
             .ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
         var changes = ImmutableArray.CreateBuilder<CoordinatedSettingValueChange>();
@@ -197,7 +229,38 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
             changes.Add(new CoordinatedSettingValueChange(mutation.Key, oldValue, newValue));
         }
 
+        if (mixed is not null)
+        {
+            await mixed.WritePublicationAsync(this, null, mutations, actorUserId, occurredAtUtc, cancellationToken);
+            return new(changes.ToImmutable());
+        }
         return await SaveChangesIfNeededAsync(changes, cancellationToken);
+    }
+
+    private async Task RequireReadAsync(Guid? tenant, CancellationToken token)
+    {
+        var anchor = await preparation.RequirePublicationReadAsync(tenant, token);
+        await humanBoundary.RequireAsync(dbContext, anchor.Scope, anchor.TenantId, anchor.UserId,
+            anchor.Key, anchor.Kind, anchor.Value, anchor.IsLocked, cancellationToken: token);
+    }
+
+    private async Task RequireWriteAsync(Guid? tenant, ImmutableArray<PublicationPolicySettingMutation> mutations,
+        Guid? actor, DateTime occurred, CancellationToken token)
+    {
+        await PublicationPolicyMutationBoundary.RequireCurrentWriteAsync(tenant, mutations, actor, occurred, token);
+        await RequireReadAsync(tenant, token);
+        foreach (var mutation in mutations)
+        {
+            var scope = tenant.HasValue ? SettingScope.Tenant : SettingScope.Instance;
+            await humanBoundary.RequireAsync(dbContext, scope, tenant, null, mutation.Key,
+                mutation.Kind == PublicationPolicyMutationKind.Remove
+                    ? HumanSettingsMutationKind.Remove : HumanSettingsMutationKind.SetValue,
+                mutation.JsonValue, auditActorId: actor, cancellationToken: token);
+            if (mutation.IsLocked.HasValue)
+                await humanBoundary.RequireAsync(dbContext, scope, tenant, null, mutation.Key,
+                    HumanSettingsMutationKind.SetLock, isLocked: mutation.IsLocked,
+                    auditActorId: actor, cancellationToken: token);
+        }
     }
 
     private IQueryable<SystemSetting> QuerySystemRows() =>

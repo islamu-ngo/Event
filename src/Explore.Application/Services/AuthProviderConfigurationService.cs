@@ -1,11 +1,12 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Notifications;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Services;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.DTOs.Instance;
 using Explore.Application.Models;
 using Explore.Domain.Settings;
 using Explore.Domain;
@@ -13,6 +14,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Services;
 
@@ -20,31 +22,22 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
 {
     private readonly ISystemSettingRepository _systemSettingRepository;
     private readonly IConfiguration _configuration;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ISettingMutationLock _mutationLock;
-    private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly IPolicyMutationExecutionScopeFactory _scopeFactory;
     private readonly KeycloakConnectionResolver _keycloakConnectionResolver;
     private readonly ISecretResolver _secretResolver;
-    private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
     public AuthProviderConfigurationService(
         ISystemSettingRepository systemSettingRepository,
         IConfiguration configuration,
-        IUnitOfWork unitOfWork,
-        ISettingMutationLock mutationLock,
-        IVisitorAccessSettingsWriter visitorSettings,
+        IPolicyMutationExecutionScopeFactory scopeFactory,
         KeycloakConnectionResolver keycloakConnectionResolver,
-        ISecretResolver secretResolver,
-        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
+        ISecretResolver secretResolver)
     {
         _systemSettingRepository = systemSettingRepository;
         _configuration = configuration;
-        _unitOfWork = unitOfWork;
-        _mutationLock = mutationLock;
-        _visitorSettings = visitorSettings;
+        _scopeFactory = scopeFactory;
         _keycloakConnectionResolver = keycloakConnectionResolver;
         _secretResolver = secretResolver;
-        _notificationHandlers = notificationHandlers;
     }
 
     // This single projection is shared by authoritative reads and detached proposed-state validation.
@@ -109,12 +102,18 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
     }
 
     private async Task<AuthProviderConfigurationDto> ReadConfigurationCoreAsync(
-        KeycloakConnectionResolution connection)
+        KeycloakConnectionResolution connection, ProviderConfigurationState? original = null,
+        IConfiguration? deployment = null, SecretResolutionResult? googleOriginal = null)
     {
-        var primaryProviderSetting = await _systemSettingRepository.GetByKey(
+        Task<SystemSetting?> Read(string key) => original is null
+            ? _systemSettingRepository.GetByKey(key) : Task.FromResult(original.System[key]?.ToEntity());
+        var configuration = deployment ?? _configuration;
+        var primaryProviderSetting = await Read(
             GovernanceSettingKeys.Authentication.PrimaryProviderId);
-        AuthenticationProviderKind primaryProvider = ResolvePrimaryProvider(primaryProviderSetting);
-        var keycloak = await ResolveKeycloakConfigurationAsync(primaryProvider);
+        AuthenticationProviderKind primaryProvider = ResolvePrimaryProvider(primaryProviderSetting, configuration);
+        var keycloak = ProjectKeycloakConfiguration(primaryProvider,
+            await Read(GovernanceSettingKeys.Authentication.KeycloakAuthority),
+            await Read(GovernanceSettingKeys.Authentication.KeycloakClientId), configuration);
         if (connection.Status == KeycloakConnectionStatus.Resolved)
         {
             keycloak = (
@@ -123,18 +122,18 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 connection.BlazorClientId!,
                 true);
         }
-        var atprotoLoginEnabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled);
-        var atprotoPublicUrl = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.AtprotoPublicUrl);
-        var googleSsoEnabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled);
-        var googleClientId = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GoogleClientId);
-        SecretResolutionResult googleCredential = await _secretResolver.ResolveAsync(
+        var atprotoLoginEnabled = await Read(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled);
+        var atprotoPublicUrl = await Read(GovernanceSettingKeys.Authentication.AtprotoPublicUrl);
+        var googleSsoEnabled = await Read(GovernanceSettingKeys.Authentication.GoogleSsoEnabled);
+        var googleClientId = await Read(GovernanceSettingKeys.Authentication.GoogleClientId);
+        SecretResolutionResult googleCredential = googleOriginal ?? await _secretResolver.ResolveAsync(
             SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret, tenantId: null);
         return new AuthProviderConfigurationDto
         {
             PrimaryProviderId = (int)primaryProvider,
             PrimaryProviderCode = primaryProvider.ToAuthenticationProviderCode(),
             PrimaryProviderName = GetProviderDisplayName(primaryProvider),
-            LockPrimaryProvider = IsPrimaryProviderDeploymentManaged()
+            LockPrimaryProvider = IsPrimaryProviderDeploymentManaged(configuration)
                                   || primaryProviderSetting?.IsLocked == true,
             KeycloakAuthority = keycloak.Authority,
             KeycloakClientId = keycloak.ClientId,
@@ -145,7 +144,8 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 bootstrapAvailable: false,
                 applicationManagedDescription: "Keycloak runtime credentials must be bound through the selected deployment secret authority.",
                 deploymentManagedDescription: "Keycloak client credentials are deployment-owned. Event never stores or rotates an existing client secret.")
-                with { ResolutionStatus = connection.Status.ToString() },
+                with
+            { ResolutionStatus = connection.Status.ToString() },
             AtprotoLoginEnabled = primaryProvider == AuthenticationProviderKind.Atproto
                                   || DeserializeBoolean(atprotoLoginEnabled?.Value, false),
             AtprotoPublicUrl = DeserializeString(atprotoPublicUrl?.Value, string.Empty),
@@ -158,54 +158,84 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 bootstrapAvailable: false,
                 applicationManagedDescription: "Google runtime credentials must be bound through the selected deployment secret authority.",
                 deploymentManagedDescription: "Google client credentials are deployment-owned. Configure and rotate them through the selected secret authority.")
-                with { ResolutionStatus = googleCredential.Status.ToString() },
+                with
+            { ResolutionStatus = googleCredential.Status.ToString() },
             LockAtprotoLoginEnabled = atprotoLoginEnabled?.IsLocked == true,
             LockGoogleSsoEnabled = googleSsoEnabled?.IsLocked == true,
-            KeycloakPublicOnboardingPolicy = ReadOnboardingPolicy((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy))?.Value),
-            KeycloakPublicSignupUrl = DeserializeString((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl))?.Value, string.Empty),
-            GooglePublicOnboardingPolicy = ReadOnboardingPolicy((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy))?.Value),
-            GooglePublicSignupUrl = DeserializeString((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GooglePublicSignupUrl))?.Value, string.Empty),
+            KeycloakPublicOnboardingPolicy = ReadOnboardingPolicy((await Read(GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy))?.Value),
+            KeycloakPublicSignupUrl = DeserializeString((await Read(GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl))?.Value, string.Empty),
+            GooglePublicOnboardingPolicy = ReadOnboardingPolicy((await Read(GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy))?.Value),
+            GooglePublicSignupUrl = DeserializeString((await Read(GovernanceSettingKeys.Authentication.GooglePublicSignupUrl))?.Value, string.Empty),
         };
     }
 
-    public async Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration,
-        IReadOnlySet<string>? suppliedKeys = null, CancellationToken cancellationToken = default)
+    public async Task ApplyConfigurationAsync(UpdateAuthProviderConfigurationCommand command,
+        CancellationToken cancellationToken = default)
     {
-        var notifications = await _mutationLock.ExecuteOrderedGroupsAsync(
-            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
-            token => _unitOfWork.ExecuteSerializableAsync(
-                innerToken => ApplyConfigurationInCurrentTransactionAsync(configuration, suppliedKeys, innerToken), token),
-            cancellationToken);
-        foreach (var notification in notifications)
-            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+        await using var observation = await ObserveConfigurationAsync(command, cancellationToken);
+        await ApplyConfigurationAsync(observation, cancellationToken);
     }
 
-    private async Task<System.Collections.Immutable.ImmutableArray<Explore.Application.Notifications.SettingChangedNotification>> ApplyConfigurationInCurrentTransactionAsync(
-        AuthProviderConfigurationDto configuration,
-        IReadOnlySet<string>? suppliedKeys,
+    public async Task ApplySetupConfigurationAsync(UpdateAuthProviderConfigurationDuringSetupCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        await using var observation = await ObserveConfigurationAsync(command, cancellationToken);
+        await ApplyConfigurationAsync(observation, cancellationToken);
+    }
+
+    public Task<ProviderConfigurationMutation> ObserveConfigurationAsync(UpdateAuthProviderConfigurationCommand command, CancellationToken token) =>
+        ObserveConfigurationCoreAsync(command, token);
+
+    public Task<ProviderConfigurationMutation> ObserveConfigurationAsync(UpdateAuthProviderConfigurationDuringSetupCommand command, CancellationToken token) =>
+        ObserveConfigurationCoreAsync(command, token);
+
+    public Task ApplyConfigurationAsync(ProviderConfigurationMutation observation, CancellationToken token) =>
+        observation.ExecuteAsync(this, token);
+
+    private async Task<ProviderConfigurationMutation> ObserveConfigurationCoreAsync(object command, CancellationToken token)
+    {
+        var observation = await ProviderConfigurationMutation.ObserveAsync(command, this, _scopeFactory, token);
+        try
+        {
+            var core = observation.Services.GetRequiredService<AuthProviderConfigurationService>();
+            var materials = await observation.Source.ObserveMaterialsAsync(observation.Before, token);
+            var original = await core.ReadConfigurationCoreAsync(materials.Keycloak, observation.Before,
+                observation.Source.Deployment, materials.Google);
+            var rows = await core.CompileConfigurationAsync(observation.AuthenticationPatch,
+                observation.Source.Deployment, observation.OccurredAt, token);
+            observation.CompileAuthentication(original, rows);
+            await observation.Services.GetRequiredService<IProviderConfigurationSettingsWriter>()
+                .RequireUnchangedAsync(observation.Before, token);
+            return observation;
+        }
+        catch { await observation.DisposeAsync(); throw; }
+    }
+
+    private async Task<IReadOnlyList<SystemSetting>> CompileConfigurationAsync(
+        AuthProviderConfigurationWriteDto configuration, IConfiguration deployment, DateTime occurred,
         CancellationToken cancellationToken)
     {
         var writes = new List<SystemSetting>();
         Task UpsertSettingAsync(string key, string value, SettingValueType valueType, bool isLocked,
             string category, int displayOrder, string description, CancellationToken token)
         {
-            if (suppliedKeys is null || suppliedKeys.Contains(key))
-                writes.Add(new SystemSetting
-                {
-                    SettingKey = key,
-                    Value = value,
-                    ValueType = valueType,
-                    IsLocked = isLocked,
-                    Category = category,
-                    DisplayOrder = displayOrder,
-                    Description = description,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                });
+            writes.Add(new SystemSetting
+            {
+                SettingKey = key,
+                Value = value,
+                ValueType = valueType,
+                IsLocked = isLocked,
+                Category = category,
+                DisplayOrder = displayOrder,
+                Description = description,
+                CreatedAt = occurred,
+                UpdatedAt = occurred
+            });
             return Task.CompletedTask;
         }
-        AuthenticationProviderKind primaryProvider =
-            RequireSupportedPrimaryProvider(configuration.PrimaryProviderId);
+        // Validation of the retained proposed projection precedes every write. Keeping
+        // the supplied value here lets the actual handler retain its typed validation result.
+        AuthenticationProviderKind primaryProvider = (AuthenticationProviderKind)configuration.PrimaryProviderId;
         bool atprotoLoginEnabled =
             primaryProvider == AuthenticationProviderKind.Atproto
             || configuration.AtprotoLoginEnabled;
@@ -221,7 +251,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             "Normalized lookup identifier for the active primary authentication provider",
             cancellationToken);
 
-        if (!IsKeycloakAuthorityDeploymentManaged())
+        if (!IsKeycloakAuthorityDeploymentManaged(deployment))
         {
             await UpsertSettingAsync(
                 GovernanceSettingKeys.Authentication.KeycloakAuthority,
@@ -234,7 +264,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 cancellationToken);
         }
 
-        if (!IsKeycloakClientIdDeploymentManaged())
+        if (!IsKeycloakClientIdDeploymentManaged(deployment))
         {
             await UpsertSettingAsync(
                 GovernanceSettingKeys.Authentication.KeycloakClientId,
@@ -295,16 +325,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             await UpsertSettingAsync(key, JsonSerializer.Serialize(value), SettingValueType.String, true,
                 "Authentication", 0, "Public provider onboarding policy", cancellationToken);
 
-        var result = await _visitorSettings.ApplyAsync(
-            [.. writes.Where(setting => VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains(setting.SettingKey))
-                .Select(setting => new VisitorAccessSettingMutation(null, setting.SettingKey,
-                    VisitorAccessSettingMutationKind.SetValue, setting.Value, suppliedKeys is null ? setting.IsLocked : null))], null, cancellationToken);
-        if (!result.Success)
-            throw new Explore.Application.Exceptions.ConcurrencyConflictException(result.FailureCode!,
-                "The change would remove public signup required by an event participation configuration.");
-        foreach (var setting in writes.Where(setting => !VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains(setting.SettingKey)))
-            await _systemSettingRepository.UpsertInCurrentTransactionAsync(setting, cancellationToken);
-        return result.DeferredNotifications;
+        return writes;
     }
 
     public async Task<bool> IsConfiguredAsync()
@@ -392,11 +413,10 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             : (false, storedAuthority, storedClientId, false);
     }
 
-    private AuthenticationProviderKind ResolvePrimaryProvider(SystemSetting? storedSetting)
+    private AuthenticationProviderKind ResolvePrimaryProvider(SystemSetting? storedSetting, IConfiguration? deployment = null)
     {
-        string? deploymentProvider = ReadFirstConfigured(
-            "Authentication:Provider",
-            "AUTHENTICATION_PROVIDER");
+        string? deploymentProvider = new[] { "Authentication:Provider", "AUTHENTICATION_PROVIDER" }
+            .Select(key => (deployment ?? _configuration)[key]).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
         if (!string.IsNullOrWhiteSpace(deploymentProvider))
         {
             return RequireSupportedPrimaryProvider(
@@ -434,13 +454,12 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 "Primary authentication provider must be Local Identity, Keycloak, or AT Protocol.");
     }
 
-    private bool IsPrimaryProviderDeploymentManaged()
+    private bool IsPrimaryProviderDeploymentManaged(IConfiguration? deployment = null)
     {
-        return !string.IsNullOrWhiteSpace(ReadFirstConfigured(
-                   "Authentication:Provider",
-                   "AUTHENTICATION_PROVIDER"))
-               || IsDeploymentManaged(GovernanceSettingKeys.Authentication.PrimaryProviderId)
-               || IsDeploymentManaged("Authentication:Provider");
+        var configuration = deployment ?? _configuration;
+        return new[] { "Authentication:Provider", "AUTHENTICATION_PROVIDER" }.Any(key => !string.IsNullOrWhiteSpace(configuration[key]))
+               || IsDeploymentManaged(configuration, GovernanceSettingKeys.Authentication.PrimaryProviderId)
+               || IsDeploymentManaged(configuration, "Authentication:Provider");
     }
 
     private static string GetProviderDisplayName(AuthenticationProviderKind provider) =>
@@ -452,18 +471,20 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null),
         };
 
-    private bool IsKeycloakAuthorityDeploymentManaged()
+    private bool IsKeycloakAuthorityDeploymentManaged(IConfiguration? deployment = null)
     {
-        return IsDeploymentManaged(GovernanceSettingKeys.Authentication.KeycloakAuthority)
-               || IsDeploymentManaged(SecretDefinitionRegistry.Keys.Keycloak.Endpoint)
-               || IsDeploymentManaged("Keycloak:Authority");
+        var configuration = deployment ?? _configuration;
+        return IsDeploymentManaged(configuration, GovernanceSettingKeys.Authentication.KeycloakAuthority)
+               || IsDeploymentManaged(configuration, SecretDefinitionRegistry.Keys.Keycloak.Endpoint)
+               || IsDeploymentManaged(configuration, "Keycloak:Authority");
     }
 
-    private bool IsKeycloakClientIdDeploymentManaged()
+    private bool IsKeycloakClientIdDeploymentManaged(IConfiguration? deployment = null)
     {
-        return IsDeploymentManaged(GovernanceSettingKeys.Authentication.KeycloakClientId)
-               || IsDeploymentManaged(SecretDefinitionRegistry.Keys.Keycloak.ClientId)
-               || IsDeploymentManaged("Keycloak:ClientId");
+        var configuration = deployment ?? _configuration;
+        return IsDeploymentManaged(configuration, GovernanceSettingKeys.Authentication.KeycloakClientId)
+               || IsDeploymentManaged(configuration, SecretDefinitionRegistry.Keys.Keycloak.ClientId)
+               || IsDeploymentManaged(configuration, "Keycloak:ClientId");
     }
 
     private bool IsKeycloakClientSecretDeploymentManaged()

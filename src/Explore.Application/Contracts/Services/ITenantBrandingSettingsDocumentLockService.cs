@@ -6,6 +6,14 @@ public interface ITenantBrandingSettingsDocumentLockService
 {
     Task<TenantBrandingSettingsDocumentLockState> GetLockStateAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Holds all branding governance setting leases around the caller's committing transaction.
+    /// The caller must open its transaction and reread document and lock state inside the operation.
+    /// </summary>
+    Task<T> ExecuteWithGovernanceLocksAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken = default);
+
     IReadOnlyList<string> ValidateAllowedChanges(
         BrandingSettings currentPayload,
         BrandingSettings requestedPayload,

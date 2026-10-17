@@ -16,12 +16,14 @@ public sealed class CreateFooterLinkCommandHandler(
     IFooterLinkRepository footerLinkRepository,
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver settingsResolver,
-    FooterLinkMutationGuard mutationGuard)
+    FooterLinkMutationGuard mutationGuard,
+    IFooterOperationExecution footerExecution)
     : ICommandHandler<CreateFooterLinkCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateFooterLinkCommand request, CancellationToken cancellationToken)
     {
+        await footerExecution.RequireOwnedAsync(request, cancellationToken);
         bool requireHttps = await settingsResolver.ResolveAsync<bool>(
             GovernanceSettingKeys.Security.RequireHttpsExternalUrls,
             new SettingContext(),

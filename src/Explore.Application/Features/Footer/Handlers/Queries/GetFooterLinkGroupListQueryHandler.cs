@@ -9,12 +9,16 @@ namespace Explore.Application.Features.Footer.Handlers.Queries;
 
 public sealed class GetFooterLinkGroupListQueryHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
-    ITenantContext tenantContext)
+    ITenantContext tenantContext,
+    IHumanCommitScopePreparation humanScope,
+    IFooterOperationExecution footerExecution)
     : IQueryHandler<GetFooterLinkGroupListQuery, List<FooterLinkGroupListDto>>
 {
     public async Task<List<FooterLinkGroupListDto>> QueryAsync(
         GetFooterLinkGroupListQuery request, CancellationToken cancellationToken)
     {
+        await humanScope.PrepareAsync(cancellationToken);
+        await footerExecution.RequireOwnedAsync(request, cancellationToken);
         var groups = await footerLinkGroupRepository.GetByTenantIdAsync(
             tenantContext.TenantId, cancellationToken);
 

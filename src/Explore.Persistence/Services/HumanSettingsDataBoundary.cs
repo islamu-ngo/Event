@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Domain.Settings;
 using Explore.Persistence.Database;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,8 @@ namespace Explore.Persistence.Services;
 public sealed class HumanSettingsDataBoundary(IServiceProvider selectedServices)
 {
     internal IOrdinarySettingsSource? OrdinarySource =>
-        selectedServices.GetRequiredService<IHumanSettingsMutationPreparation>().CurrentOrdinarySource;
+        selectedServices.GetRequiredService<IHumanConfigurationImportAdmission>().CurrentProof is not null
+            ? null : selectedServices.GetRequiredService<IHumanSettingsMutationPreparation>().CurrentOrdinarySource;
 
     internal IOrdinarySettingsMutationStore OrdinaryStore =>
         selectedServices.GetRequiredService<IOrdinarySettingsMutationStore>();
@@ -23,10 +25,16 @@ public sealed class HumanSettingsDataBoundary(IServiceProvider selectedServices)
         Guid? auditActorId = null, CancellationToken cancellationToken = default)
     {
         var lease = RequireOriginalOwner(dataOwner, auditActorId);
-        if (dataOwner.IsConfigurationInstanceImportOwner)
-            throw new UnauthorizedAccessException("Settings imports require their original producer.");
-        await selectedServices.GetRequiredService<IHumanSettingsMutationPreparation>()
-            .RequireCurrentOwnedAsync(scope, tenantId, userId, key, kind, value, isLocked, cancellationToken);
+        var import = selectedServices.GetRequiredService<IHumanConfigurationImportAdmission>();
+        if (import.CurrentProof is not null)
+            await import.RequireCurrentOwnedAsync(scope, tenantId, userId, key, kind, value, isLocked, cancellationToken);
+        else
+        {
+            if (dataOwner.IsConfigurationInstanceImportOwner)
+                throw new UnauthorizedAccessException("Settings imports require the original active exact-effect producer.");
+            await selectedServices.GetRequiredService<IHumanSettingsMutationPreparation>()
+                .RequireCurrentOwnedAsync(scope, tenantId, userId, key, kind, value, isLocked, cancellationToken);
+        }
         lease.RequireOriginalOwner(dataOwner);
     }
 

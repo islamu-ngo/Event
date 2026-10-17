@@ -17,7 +17,7 @@ public class AnalyticsConfigResolverTests
     [Test]
     public async Task ResolveAsync_ValidSettings_ReturnsResolvedConfiguration()
     {
-        var settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
+        var settingsResolver = Substitute.For<IHierarchicalSettingsReader>();
         var tenantContext = Substitute.For<ITenantContext>();
         var tenantId = Guid.Parse("018e4e5c-7f00-7000-8000-000000009001");
         tenantContext.TenantId.Returns(tenantId);
@@ -63,7 +63,7 @@ public class AnalyticsConfigResolverTests
     [Test]
     public async Task ResolveAsync_InvalidProviderValue_FallsBackToNone()
     {
-        var settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
+        var settingsResolver = Substitute.For<IHierarchicalSettingsReader>();
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(Guid.Parse("018e4e5c-7f00-7000-8000-000000009002"));
         var secretResolver = Substitute.For<ISecretResolver>();

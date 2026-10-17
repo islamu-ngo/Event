@@ -658,7 +658,7 @@ public sealed partial class OrdinarySettingsNativeContractTests(PostgreSqlContai
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, fixture.GetNativeQueueOptions(role));
         if (role == PrimaryDatabaseRole.Runtime)
-            builder.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+            builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
         return new ExploreDbContext(builder.Options) { TenantContext = tenant.HasValue ? new SelectedTenant(tenant.Value) : null };
     }
 

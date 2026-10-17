@@ -4,19 +4,35 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Settings;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Explore.Persistence.Services;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 public class TenantSettingRepository : ITenantSettingRepository
 {
     private readonly ExploreDbContext _dbContext;
     private readonly ISettingMutationLock _mutationLock;
+    private readonly HumanSettingsDataBoundary? _humanBoundary;
 
-    public TenantSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock)
+    private TenantSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock)
     {
         _dbContext = dbContext;
         _mutationLock = mutationLock;
+    }
+
+    /// <summary>Creates an observation-only repository; every mutation requires a separate admitted owner.</summary>
+    public static TenantSettingRepository CreateReadOnly(
+        ExploreDbContext context, ISettingMutationLock mutationLock) => new(context, mutationLock);
+
+    public TenantSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock,
+        HumanSettingsDataBoundary humanBoundary)
+    {
+        _dbContext = dbContext;
+        _mutationLock = mutationLock;
+        _humanBoundary = humanBoundary;
     }
 
     public async Task<TenantSetting?> GetByTenantAndKey(
@@ -24,45 +40,23 @@ public class TenantSettingRepository : ITenantSettingRepository
         string key,
         CancellationToken cancellationToken = default)
     {
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+            return (await native.ReadTenantSettingsAsync(tenantId, [key], cancellationToken)).SingleOrDefault();
         return await _dbContext.TenantSettingOverrides
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.SettingKey == key, cancellationToken);
     }
 
-    public async Task<TenantSetting?> GetByDomainHostAsync(
-        string normalizedHost,
-        CancellationToken cancellationToken = default)
-    {
-        string normalizedValue = normalizedHost.Trim().TrimEnd('.').ToLowerInvariant();
-        string serializedValue = SettingValueSerializer.Serialize(normalizedValue);
-        string serializedValueWithTrailingDot = SettingValueSerializer.Serialize(normalizedValue + ".");
-        TenantSetting? match = await _dbContext.TenantSettingOverrides
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ManagedTenantDomainUniqueness)
-            .AsNoTracking()
-            .Where(setting => setting.SettingKey == "domains.tenant_subdomain"
-                || setting.SettingKey == "domains.tenant_custom_domain")
-            .FirstOrDefaultAsync(
-                setting => setting.Value.ToLower() == serializedValue
-                    || setting.Value.ToLower() == serializedValueWithTrailingDot,
-                cancellationToken);
-
-        if (match is null)
-        {
-            return null;
-        }
-
-        string matchedHost = SettingValueSerializer.DeserializeString(match.Value).Trim().TrimEnd('.');
-        return string.Equals(matchedHost, normalizedValue, StringComparison.OrdinalIgnoreCase) ? match : null;
-    }
-
-    public Task SetValueAsync(
+    public async Task SetValueAsync(
         Guid tenantId,
         string key,
         string value,
         CancellationToken cancellationToken = default,
         Guid? actorId = null)
     {
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetValue, value, null, actorId, cancellationToken);
         Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(key);
         EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
@@ -74,8 +68,11 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
+        await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
+            if (_humanBoundary!.OrdinarySource is { } ordinary)
+                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
+                    ordinary, tenantId, key, HumanSettingsMutationKind.SetValue, value, null, token);
             DateTime now = DateTime.UtcNow;
             int updated = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
@@ -103,6 +100,7 @@ public class TenantSettingRepository : ITenantSettingRepository
             await _dbContext.SaveChangesAsync(token);
             return true;
         }, cancellationToken, actorId);
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetValue, value, null, actorId, cancellationToken);
     }
 
     public async Task<List<TenantSetting>> GetAllForTenant(
@@ -127,6 +125,10 @@ public class TenantSettingRepository : ITenantSettingRepository
             return [];
         }
 
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.ReadTenantSettingsAsync(tenantId, keys, cancellationToken);
+
         return await _dbContext.TenantSettingOverrides
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .AsNoTracking()
@@ -146,11 +148,12 @@ public class TenantSettingRepository : ITenantSettingRepository
             .ToListAsync(cancellationToken);
     }
 
-    public Task<bool> RemoveOverrideAsync(
+    public async Task<bool> RemoveOverrideAsync(
         Guid tenantId,
         string key,
         CancellationToken cancellationToken = default)
     {
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.Remove, null, null, null, cancellationToken);
         EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
@@ -161,22 +164,28 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
+        bool changed = await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
+            if (_humanBoundary!.OrdinarySource is { } ordinary)
+                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
+                    ordinary, tenantId, key, HumanSettingsMutationKind.Remove, null, null, token);
             int removed = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
                 .Where(setting => setting.TenantId == tenantId && setting.SettingKey == key)
                 .ExecuteDeleteAsync(token);
             return removed > 0;
         }, cancellationToken);
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.Remove, null, null, null, cancellationToken);
+        return changed;
     }
 
-    public Task<bool> LockAsync(
+    public async Task<bool> LockAsync(
         Guid tenantId,
         string key,
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetLock, null, true, actorId, cancellationToken);
         Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(key);
         EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
@@ -188,8 +197,11 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
+        bool changed = await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
+            if (_humanBoundary!.OrdinarySource is { } ordinary)
+                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
+                    ordinary, tenantId, key, HumanSettingsMutationKind.SetLock, null, true, token);
             DateTime now = DateTime.UtcNow;
             int updated = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
@@ -203,14 +215,17 @@ public class TenantSettingRepository : ITenantSettingRepository
                         .SetProperty(setting => setting.UpdatedBy, actorId), token);
             return updated > 0;
         }, cancellationToken, actorId);
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetLock, null, true, actorId, cancellationToken);
+        return changed;
     }
 
-    public Task<bool> UnlockAsync(
+    public async Task<bool> UnlockAsync(
         Guid tenantId,
         string key,
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetLock, null, false, actorId, cancellationToken);
         Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(key);
         EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
@@ -222,8 +237,11 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
+        bool changed = await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
+            if (_humanBoundary!.OrdinarySource is { } ordinary)
+                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
+                    ordinary, tenantId, key, HumanSettingsMutationKind.SetLock, null, false, token);
             DateTime now = DateTime.UtcNow;
             int updated = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
@@ -237,6 +255,8 @@ public class TenantSettingRepository : ITenantSettingRepository
                         .SetProperty(setting => setting.UpdatedBy, actorId), token);
             return updated > 0;
         }, cancellationToken, actorId);
+        await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetLock, null, false, actorId, cancellationToken);
+        return changed;
     }
 
     public async Task<List<TenantSetting>> GetLockedForTenant(Guid tenantId)
@@ -248,16 +268,26 @@ public class TenantSettingRepository : ITenantSettingRepository
             .ToListAsync();
     }
 
-    public Task UpsertManyForTenantAsync(
+    public async Task UpsertManyForTenantAsync(
         Guid tenantId,
         IReadOnlyCollection<TenantSettingOverrideUpsert> overrides,
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(overrides);
+        overrides = overrides.ToArray();
+        await RequireOverridesAsync(tenantId, overrides, actorId, cancellationToken);
+        foreach (var setting in overrides)
+            Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(setting.SettingKey);
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+        {
+            await native.UpsertTenantSettingsAsync(tenantId, overrides, actorId, cancellationToken);
+            return;
+        }
+
         foreach (var setting in overrides)
         {
-            Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(setting.SettingKey);
             EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         }
@@ -274,13 +304,8 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        if (overrides.Count == 0)
-        {
-            return Task.CompletedTask;
-        }
-
         string[] keys = overrides.Select(overrideValue => overrideValue.SettingKey).Distinct().ToArray();
-        return ExecuteEmailPolicyMutationAsync(tenantId, keys, async token =>
+        await ExecuteEmailPolicyMutationAsync(tenantId, keys, async token =>
         {
             DetachTrackedSmtpSettings(tenantId, keys);
             DateTime now = DateTime.UtcNow;
@@ -317,9 +342,10 @@ public class TenantSettingRepository : ITenantSettingRepository
             await _dbContext.SaveChangesAsync(token);
             return true;
         }, cancellationToken, actorId);
+        await RequireOverridesAsync(tenantId, overrides, actorId, cancellationToken);
     }
 
-    public Task CreateManyForTenantAsync(
+    public async Task CreateManyForTenantAsync(
         Guid tenantId,
         IReadOnlyCollection<TenantSettingOverrideUpsert> overrides,
         Guid? actorId,
@@ -328,6 +354,10 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
         ArgumentNullException.ThrowIfNull(overrides);
+        overrides = overrides.ToArray();
+        await RequireOverridesAsync(tenantId, overrides, actorId, cancellationToken);
+        foreach (var setting in overrides)
+            Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(setting.SettingKey);
         foreach (var setting in overrides)
         {
             VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
@@ -336,7 +366,6 @@ public class TenantSettingRepository : ITenantSettingRepository
         }
         foreach (var setting in overrides)
         {
-            Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(setting.SettingKey);
             EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         }
@@ -359,12 +388,7 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new ArgumentException("Tenant setting keys must be unique.", nameof(overrides));
         }
 
-        if (overrides.Count == 0)
-        {
-            return Task.CompletedTask;
-        }
-
-        return ExecuteEmailPolicyMutationAsync(tenantId, overrides.Select(value => value.SettingKey), async token =>
+        await ExecuteEmailPolicyMutationAsync(tenantId, overrides.Select(value => value.SettingKey), async token =>
         {
             foreach (TenantSettingOverrideUpsert overrideValue in overrides)
             {
@@ -384,6 +408,29 @@ public class TenantSettingRepository : ITenantSettingRepository
             await _dbContext.SaveChangesAsync(token);
             return true;
         }, cancellationToken, actorId);
+        await RequireOverridesAsync(tenantId, overrides, actorId, cancellationToken);
+    }
+
+    private Task RequireAsync(Guid tenantId, string key, HumanSettingsMutationKind kind,
+        string? value, bool? isLocked, Guid? actorId, CancellationToken token) =>
+        (_humanBoundary ?? throw new InvalidOperationException("This settings observation cannot mutate data."))
+            .RequireAsync(_dbContext, SettingScope.Tenant, tenantId, null, key, kind,
+            value, isLocked, actorId, token);
+
+    private async Task RequireOverridesAsync(Guid tenantId,
+        IReadOnlyCollection<TenantSettingOverrideUpsert> overrides, Guid? actorId, CancellationToken token)
+    {
+        // These APIs replace both fields. A scalar value proof must never unlock a row.
+        // The original producer must admit both effects; an import mode is not that proof.
+        if (overrides.Count == 0)
+            throw new UnauthorizedAccessException("An empty data mutation has no admitted settings effect.");
+        foreach (var setting in overrides)
+        {
+            await RequireAsync(tenantId, setting.SettingKey, HumanSettingsMutationKind.SetValue,
+                setting.Value, null, actorId, token);
+            await RequireAsync(tenantId, setting.SettingKey, HumanSettingsMutationKind.SetLock,
+                null, setting.IsLocked, actorId, token);
+        }
     }
 
     private void DetachTrackedSmtpSettings(Guid tenantId, IEnumerable<string> keys)

@@ -60,7 +60,7 @@ public sealed class SettingsAuditDiagnosticConfidentialityTests
                     SecretSourceType.EnvironmentVariable, SecretScope.Tenant, database.TenantId, DateTimeOffset.UtcNow)));
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var logger = new TestListLogger<S3ConfigResolver>();
-        var resolver = new S3ConfigResolver(database.Settings, database, cache, database.Secrets, logger);
+        var resolver = new S3ConfigResolver(database.Settings, database, cache, new S3ConfigCacheRegistry(), database.Secrets, logger);
 
         var configuration = await resolver.ResolveAsync();
 

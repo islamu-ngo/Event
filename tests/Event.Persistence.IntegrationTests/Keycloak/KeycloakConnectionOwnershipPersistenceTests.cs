@@ -71,21 +71,12 @@ public sealed class KeycloakConnectionOwnershipPersistenceTests
         IConfiguration configuration = new ConfigurationBuilder().Build();
         var unitOfWork = new EfCoreUnitOfWork(fixture.Context);
         var mutationLock = new RelationalSettingMutationLock(fixture.Context, unitOfWork);
-        var writer = new VisitorAccessSettingsWriter(
-            fixture.Context,
-            mutationLock,
-            unitOfWork,
-            new EventParticipationConfigurationRepository(fixture.Context),
-            configuration);
         return new AuthProviderConfigurationService(
-            new SystemSettingRepository(fixture.Context, mutationLock),
+            SystemSettingRepository.CreateReadOnly(fixture.Context, mutationLock),
             configuration,
-            unitOfWork,
-            mutationLock,
-            writer,
+            fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.IPolicyMutationExecutionScopeFactory>(),
             new KeycloakConnectionResolver(secretResolver, configuration),
-            secretResolver,
-            fixture.Services.GetServices<INotificationHandler<SettingChangedNotification>>());
+            secretResolver);
     }
 
     private sealed class StaticSecretResolver(

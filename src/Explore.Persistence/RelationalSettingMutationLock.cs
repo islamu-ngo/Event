@@ -1,3 +1,4 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
@@ -59,7 +60,11 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
 
         bool visitorPolicy = RequiresVisitorAccessFence(orderedKeys);
         bool resourcePolicy = RequiresEventResourceGovernanceFence(orderedKeys);
-        if (RequiresEmailDeliveryFence(orderedKeys) || visitorPolicy || resourcePolicy)
+        bool locationPolicy = orderedKeys.Any(key => LocationPrivacySettingDefinitions.All.Any(definition => definition.Key == key));
+        if (locationPolicy && _dbContext.Database.CurrentTransaction is { } owner
+            && owner.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Location governance requires its original Serializable owner.");
+        if (RequiresEmailDeliveryFence(orderedKeys) || visitorPolicy || resourcePolicy || locationPolicy)
         {
             IReadOnlySet<string>? outerKeys = _outerOrderedKeys.Value;
             if (outerKeys is null)
@@ -72,7 +77,7 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                 // use the same order so a database writer cannot block its own lock holder.
                 return ExecuteOrderedGroupsAsync(
                     [orderedKeys],
-                    token => visitorPolicy || resourcePolicy
+                    token => visitorPolicy || resourcePolicy || locationPolicy
                         ? _unitOfWork.ExecuteSerializableAsync(
                             innerToken => ExecuteInsideTransactionAsync(orderedKeys, operation, innerToken), token)
                         : _unitOfWork.ExecuteInTransactionAsync(
@@ -119,9 +124,11 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                 "Ordered setting-lock groups must be acquired before the caller-owned transaction begins.");
         }
 
-        IExecutionStrategy strategy =
-            _dbContext.Database.CreateExecutionStrategy();
-        return strategy.ExecuteAsync(async () =>
+        return _dbContext.HasHumanCommitContextLease
+            ? ExecuteOnceAsync()
+            : _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(ExecuteOnceAsync);
+
+        async Task<T> ExecuteOnceAsync()
         {
             var leases = new List<IAsyncDisposable>(orderedKeys.Length);
             try
@@ -161,7 +168,7 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                     await leases[index].DisposeAsync();
                 }
             }
-        });
+        }
     }
 
     private async Task<T> ExecuteInsideTransactionAsync<T>(

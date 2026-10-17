@@ -59,7 +59,10 @@ public sealed class TypedSettingsDocumentResolver : ITypedSettingsDocumentResolv
             ValidateRequestedDocument(context, key);
         }
 
-        var tenantDocuments = await GetTenantDocumentsAsync(context.TenantId, requestedKeys, cancellationToken);
+        var tenantDocuments = context.RequireAuthoritativeReads
+            ? await _tenantSettingsDocumentRepository.GetManyForTenant(
+                context.TenantId, requestedKeys, cancellationToken)
+            : await GetTenantDocumentsAsync(context.TenantId, requestedKeys, cancellationToken);
         var documentsByKey = tenantDocuments.ToDictionary(document => document.DocumentKey, StringComparer.Ordinal);
         var resolved = new List<ResolvedSettingsDocument<TPayload>>(requestedKeys.Length);
 

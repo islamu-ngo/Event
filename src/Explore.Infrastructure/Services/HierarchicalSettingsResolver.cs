@@ -378,8 +378,10 @@ public class HierarchicalSettingsResolver : HierarchicalSettingsReader, IHierarc
         if (scope is not SettingScope.Instance and not SettingScope.Tenant)
             throw new InvalidOperationException(
                 "Resource governance settings can only be mutated at Instance or Tenant scope.");
-        EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
-            [mutation], actorId, cancellationToken);
+        EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyCurrentHumanAsync(
+            [mutation], scope == SettingScope.Instance
+                ? SettingsMutationOperation.InstanceSettings : SettingsMutationOperation.TenantSettings,
+            actorId, cancellationToken);
         result.EnsureAccepted();
         InvalidateCache(scope, mutation.TenantId);
     }

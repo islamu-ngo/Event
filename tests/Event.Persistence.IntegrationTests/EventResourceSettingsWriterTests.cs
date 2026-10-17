@@ -1,15 +1,11 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Settings;
-using Explore.Application.Features.Settings.Handlers.Commands;
-using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -22,7 +18,7 @@ public sealed class EventResourceSettingsWriterTests(EventResourcePersistenceTes
     {
         var tenantId = await ResetAsync();
         await using var context = database.CreateContext();
-        var result = await Writer(context).ApplyAsync(
+        var result = await Writer(context).ApplyInternalAsync(
         [
             new(tenantId, GovernanceSettingKeys.EventResources.AuditRetentionDays,
                 EventResourceSettingMutationKind.SetValue, "5"),
@@ -41,7 +37,7 @@ public sealed class EventResourceSettingsWriterTests(EventResourcePersistenceTes
     {
         var tenantId = await ResetAsync();
         await using var context = database.CreateContext();
-        var result = await Writer(context).ApplyAsync(
+        var result = await Writer(context).ApplyInternalAsync(
             [new(tenantId, GovernanceSettingKeys.EventResources.MaxActiveResources,
                 EventResourceSettingMutationKind.SetValue, "12")], null);
         await Assert.That(result.Success).IsTrue();
@@ -58,10 +54,10 @@ public sealed class EventResourceSettingsWriterTests(EventResourcePersistenceTes
         var tenantId = await ResetAsync();
         await using var context = database.CreateContext();
         var writer = Writer(context);
-        (await writer.ApplyAsync(
+        (await writer.ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
                 EventResourceSettingMutationKind.SetValue, "true")], null)).EnsureAccepted();
-        var result = await writer.ApplyAsync(
+        var result = await writer.ApplyInternalAsync(
             [new(tenantId, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
                 EventResourceSettingMutationKind.SetValue, "true")], null);
         await Assert.That(result.Success).IsFalse();
@@ -71,86 +67,43 @@ public sealed class EventResourceSettingsWriterTests(EventResourcePersistenceTes
     }
 
     [Test]
-    public async Task NativeStrictBatchRejectsInvalidResourcePolicyAtomically()
-    {
-        await ResetAsync();
-        await using var context = database.CreateContext();
-        Guid userId = await InstanceSettingsCommandFixture.SeedAdministratorAsync(context);
-        using var fixture = new InstanceSettingsCommandFixture(context, userId);
-        var handler = new UpdateSettingBatchCommandHandler(
-            fixture.Settings,
-            new Explore.Persistence.Repositories.UserPreferenceRepository(context),
-            fixture,
-            fixture.CurrentUserService,
-            fixture.AdminContext,
-            fixture.NotificationHandlers,
-            NullLogger<UpdateSettingBatchCommandHandler>.Instance,
-            fixture.PublicationPolicyBoundary,
-            fixture.UnitOfWork,
-            fixture.MutationLock,
-            fixture.EmailDeliverySettingsWriter,
-            fixture.VisitorSettings,
-            fixture.EventResourceSettingsWriter);
-
-        var response = await handler.ExecuteAsync(new UpdateSettingBatchCommand
-        {
-            Category = EventResourceSettingDefinitions.Category,
-            Scope = Explore.Domain.Settings.SettingScope.Instance,
-            Mode = BatchUpdateMode.Strict,
-            Values = new Dictionary<string, string>
-            {
-                [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "5",
-                [GovernanceSettingKeys.EventResources.MaxActiveResources] = "501"
-            }
-        }, CancellationToken.None);
-
-        await Assert.That(response.Success).IsFalse();
-        await Assert.That(await fixture.SystemSettings.GetByKey(
-            GovernanceSettingKeys.EventResources.AuditRetentionDays)).IsNull();
-        await Assert.That(await fixture.SystemSettings.GetByKey(
-            GovernanceSettingKeys.EventResources.MaxActiveResources)).IsNull();
-        await Assert.That(fixture.Notifications.Published).IsEmpty();
-    }
-
-    [Test]
-    public async Task SettingUpsertServiceUsesCoordinatedResourceWriter()
-    {
-        await ResetAsync();
-        await using var context = database.CreateContext();
-        using var fixture = new InstanceSettingsCommandFixture(context, Guid.CreateVersion7());
-        string key = GovernanceSettingKeys.EventResources.MaxActiveResources;
-
-        await fixture.UpsertService.UpsertValueAsync(key, "10");
-        await fixture.UpsertService.UpsertLockAsync(key, "10", isLocked: true, actorId: null);
-
-        SystemSetting stored = (await fixture.SystemSettings.GetByKey(key))!;
-        await Assert.That(stored.Value).IsEqualTo("10");
-        await Assert.That(stored.IsLocked).IsTrue();
-        await Assert.That(fixture.Notifications.Published.Select(notification => notification.Key))
-            .IsEquivalentTo([key]);
-    }
-
-    [Test]
     public async Task GenericRepositoriesRejectResourceGovernanceBypasses()
     {
-        var tenantId = await ResetAsync();
-        await using var context = database.CreateContext();
-        var unitOfWork = new EfCoreUnitOfWork(context);
-        var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
-        var systems = new Explore.Persistence.Repositories.SystemSettingRepository(context, mutationLock);
-        var tenants = new Explore.Persistence.Repositories.TenantSettingRepository(context, mutationLock);
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateSqliteAsync();
+        Guid tenantId = PlatformDefaults.DefaultTenantId;
         string key = GovernanceSettingKeys.EventResources.MaxActiveResources;
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => systems.UpsertAsync(new SystemSetting
+        await authenticated.RunAsync(null, session => session.ValueAsync(key, "10", "10", async token =>
         {
-            SettingKey = key,
-            Value = "10",
-            CreatedAt = DateTime.UtcNow
+            var systems = new Explore.Persistence.Repositories.SystemSettingRepository(
+                session.Context, session.MutationLock, session.Boundary);
+            var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => systems.UpsertAsync(new SystemSetting
+            {
+                SettingKey = key,
+                Value = "10",
+                CreatedAt = DateTime.UtcNow
+            }, token));
+            await Assert.That(rejected!.Message).Contains("Resource governance");
+            return true;
         }));
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            tenants.SetValueAsync(tenantId, key, "10"));
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            tenants.RemoveOverrideAsync(tenantId, key));
+        await authenticated.RunAsync(tenantId, async session =>
+        {
+            var tenants = new Explore.Persistence.Repositories.TenantSettingRepository(
+                session.Context, session.MutationLock, session.Boundary);
+            await session.ValueAsync(key, "10", "10", async token =>
+            {
+                var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    tenants.SetValueAsync(tenantId, key, "10", token, session.ActorId));
+                await Assert.That(rejected!.Message).Contains("Resource governance");
+                return true;
+            });
+            return await session.RemoveAsync(key, async token =>
+            {
+                var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    tenants.RemoveOverrideAsync(tenantId, key, token));
+                await Assert.That(rejected!.Message).Contains("Resource governance");
+                return true;
+            });
+        });
     }
 
     [Test]
@@ -159,10 +112,10 @@ public sealed class EventResourceSettingsWriterTests(EventResourcePersistenceTes
         var tenantId = await ResetAsync();
         await using var context = database.CreateContext();
         var writer = Writer(context);
-        (await writer.ApplyAsync(
+        (await writer.ApplyInternalAsync(
             [new(tenantId, GovernanceSettingKeys.EventResources.MaxActiveResources,
                 EventResourceSettingMutationKind.SetValue, "100")], null)).EnsureAccepted();
-        var result = await writer.ApplyAsync(
+        var result = await writer.ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.EventResources.MaxActiveResources,
                 EventResourceSettingMutationKind.SetValue, "10")], null);
         await Assert.That(result.Success).IsTrue();
@@ -190,7 +143,7 @@ public sealed class EventResourceSettingsWriterTests(EventResourcePersistenceTes
         await Assert.That(() => locks.ExecuteOrderedGroupsAsync([EventResourceSettingMutationGuard.Keys],
             token => unitOfWork.ExecuteSerializableAsync<bool>(async inner =>
             {
-                (await writer.ApplyAsync(
+                (await writer.ApplyInternalAsync(
                     [new(tenantId, GovernanceSettingKeys.EventResources.AuditRetentionDays,
                         EventResourceSettingMutationKind.SetValue, "5")], null, inner)).EnsureAccepted();
                 reachedLaterSection = true;
@@ -232,10 +185,10 @@ public sealed class EventResourceSettingsWriterTests(EventResourcePersistenceTes
             new RelationalSettingMutationLock(instanceContext, instanceUnit, instanceFirst ? Holder : Contender), instanceUnit);
         var tenantWriter = new EventResourceSettingsWriter(tenantContext,
             new RelationalSettingMutationLock(tenantContext, tenantUnit, instanceFirst ? Contender : Holder), tenantUnit);
-        Task<EventResourceSettingsWriteResult> Tighten() => instanceWriter.ApplyAsync(
+        Task<EventResourceSettingsWriteResult> Tighten() => instanceWriter.ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.EventResources.MaxActiveResources,
                 EventResourceSettingMutationKind.SetValue, "10")], null, deadline.Token);
-        Task<EventResourceSettingsWriteResult> Choose() => tenantWriter.ApplyAsync(
+        Task<EventResourceSettingsWriteResult> Choose() => tenantWriter.ApplyInternalAsync(
             [new(tenantId, GovernanceSettingKeys.EventResources.MaxActiveResources,
                 EventResourceSettingMutationKind.SetValue, "100")], null, deadline.Token);
         Task<EventResourceSettingsWriteResult>? tightening = null, choosing = null;

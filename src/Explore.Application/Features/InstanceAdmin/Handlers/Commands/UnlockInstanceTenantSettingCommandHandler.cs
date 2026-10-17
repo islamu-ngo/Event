@@ -2,6 +2,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
+using Explore.Application.Features.EmailDispatch;
+using Explore.Application.Features.Settings.Handlers;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
@@ -19,14 +21,19 @@ public sealed class UnlockInstanceTenantSettingCommandHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
-    IUnitOfWork unitOfWork,
-    IVisitorAccessSettingsWriter visitorSettings)
+    IVisitorAccessSettingsWriter visitorSettings,
+    IInstanceAdministratorCommitAuthority commitAuthority,
+    IHumanCommitScopePreparation humanCommitScope,
+    IHumanSettingsMutationPreparation settingsPreparation,
+    IEventResourceSettingsWriter eventResourceSettings,
+    IHumanEmailMutationPreparation emailPreparation)
     : ICommandHandler<UnlockInstanceTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UnlockInstanceTenantSettingCommand request,
         CancellationToken cancellationToken)
     {
+        await humanCommitScope.PrepareAsync(cancellationToken);
         Guid? actorUserId = currentUserService.UserId;
         if (actorUserId is null)
         {
@@ -61,14 +68,20 @@ public sealed class UnlockInstanceTenantSettingCommandHandler(
                 "The setting cannot be unlocked.");
         }
 
+        bool specialized = EmailDeliverySettingKeys.Contains(request.Key);
+        var prepared = specialized ? null : await settingsPreparation.PrepareAsync(request, cancellationToken);
+        var email = specialized ? await emailPreparation.PrepareAsync(request, cancellationToken) : null;
+        if (prepared is not null)
+            SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId);
         (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) outcome =
-            EmailDeliverySettingKeys.Contains(request.Key) || VisitorAccessSettingMutationGuard.Handles(request.Key)
-                ? await mutationLock.ExecuteOrderedGroupsAsync(
+            specialized
+                ? await emailPreparation.ExecutePreparedAsync(email!, ApplyAsync, cancellationToken)
+                : await mutationLock.ExecuteOrderedGroupsAsync(
                     [VisitorAccessSettingMutationGuard.Handles(request.Key)
-                        ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : EmailDeliverySettingKeys.All],
-                    token => unitOfWork.ExecuteSerializableAsync(ApplyAsync, token),
-                    cancellationToken)
-                : await mutationLock.ExecuteAsync(request.Key, ApplyAsync, cancellationToken);
+                        ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
+                     EventResourceSettingMutationGuard.Handles(request.Key) ? EventResourceSettingMutationGuard.Keys : [],
+                     [request.Key]], token => settingsPreparation.ExecutePreparedAsync(
+                        prepared!, (_, ownerToken) => ApplyAsync(ownerToken), token), cancellationToken);
 
         if (outcome.Notification is not null)
         {
@@ -81,6 +94,9 @@ public sealed class UnlockInstanceTenantSettingCommandHandler(
         async Task<(BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification)>
             ApplyAsync(CancellationToken token)
         {
+            if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorUserId.Value, token))
+                return (BaseCommandResponse.Authorization<Guid>(
+                    "Current instance administrator authority is required."), null);
             if (await systemSettingRepository.IsLocked(request.Key, token))
             {
                 return (InstanceTenantSettingSecurity.Failure(
@@ -107,13 +123,15 @@ public sealed class UnlockInstanceTenantSettingCommandHandler(
             {
                 var result = await visitorSettings.ApplyAsync(
                     [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetLock, IsLocked: false)],
+                    SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
+                    SettingsMutationOperation.InstanceTenantSettings,
                     actorUserId, token);
                 return (result.ToCommandResponse(request.TenantId), result.DeferredNotifications.SingleOrDefault());
             }
 
             if (EmailDeliverySettingKeys.Contains(request.Key))
             {
-                EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyAsync(
+                EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyInstanceTenantAsync(
                     [new EmailDeliverySettingMutation(
                             TenantId: request.TenantId,
                             Key: request.Key,
@@ -124,6 +142,18 @@ public sealed class UnlockInstanceTenantSettingCommandHandler(
                 return (
                     result.ToCommandResponse(request.TenantId, "Tenant setting unlocked."),
                     result.IsAccepted() ? result.ToNotifications(actorUserId).SingleOrDefault() : null);
+            }
+
+            if (EventResourceSettingMutationGuard.Handles(request.Key))
+            {
+                var result = await eventResourceSettings.ApplyAsync(
+                    [new(request.TenantId, request.Key, EventResourceSettingMutationKind.SetLock, IsLocked: false)],
+                    SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
+                    SettingsMutationOperation.InstanceTenantSettings, actorUserId, token);
+                return (result.Success ? BaseCommandResponse.Success(request.TenantId, "Resource policy updated.")
+                    : BaseCommandResponse.Failure<Guid>(result.FailureCode!,
+                        "The resource policy change conflicts with the current instance ceilings or setting locks."),
+                    result.DeferredNotifications.SingleOrDefault());
             }
 
             bool applied = await repository.UnlockAsync(

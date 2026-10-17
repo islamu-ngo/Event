@@ -2,6 +2,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence;
@@ -26,9 +27,10 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         seedContext.Tenants.AddRange(tenantA, tenantB);
         await seedContext.SaveChangesAsync();
 
-        const string sharedKey = "tenant.settings.shared";
-        const string lockedKey = "tenant.settings.locked";
-        const string removableKey = "tenant.settings.remove";
+        const string sharedKey = GovernanceSettingKeys.Branding.DisplayName;
+        const string lockedKey = GovernanceSettingKeys.Branding.SupportEmail;
+        const string removableKey = GovernanceSettingKeys.Branding.LogoUrl;
+        const string missingKey = GovernanceSettingKeys.Branding.FaviconUrl;
 
         seedContext.TenantSettingOverrides.AddRange(
             CreateSetting(tenantA.Id, sharedKey, "tenant-a-shared", isLocked: false),
@@ -45,19 +47,32 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
             .Select(setting => setting.TenantId)
             .ToListAsync();
 
-        var repository = new TenantSettingRepository(tenantBContext,
+        var repository = TenantSettingRepository.CreateReadOnly(tenantBContext,
             new RelationalSettingMutationLock(tenantBContext, new EfCoreUnitOfWork(tenantBContext)));
 
         var tenantAShared = await repository.GetByTenantAndKey(tenantA.Id, sharedKey);
-        var missingTenantASetting = await repository.GetByTenantAndKey(tenantA.Id, "tenant.settings.missing");
+        var missingTenantASetting = await repository.GetByTenantAndKey(tenantA.Id, missingKey);
         var tenantASettings = await repository.GetAllForTenant(tenantA.Id);
         var tenantALockedSettings = await repository.GetLockedForTenant(tenantA.Id);
 
-        Guid actorId = Guid.NewGuid();
-        var lockedTenantAShared = await repository.LockAsync(tenantA.Id, sharedKey, actorId);
-        var unlockedTenantALocked = await repository.UnlockAsync(tenantA.Id, lockedKey, actorId);
-        var removedTenantASetting = await repository.RemoveOverrideAsync(tenantA.Id, removableKey);
-        var removedMissingTenantASetting = await repository.RemoveOverrideAsync(tenantA.Id, "tenant.settings.missing");
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => authenticated.RunAsync(tenantB.Id,
+            session => session.LockAsync(sharedKey, true, token =>
+                new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .LockAsync(tenantA.Id, sharedKey, session.ActorId, token))));
+        var mutations = await authenticated.RunAsync(tenantA.Id, async session =>
+        {
+            var admitted = new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary);
+            bool locked = await session.LockAsync(sharedKey, true,
+                token => admitted.LockAsync(tenantA.Id, sharedKey, session.ActorId, token));
+            bool unlocked = await session.LockAsync(lockedKey, false,
+                token => admitted.UnlockAsync(tenantA.Id, lockedKey, session.ActorId, token));
+            bool removed = await session.RemoveAsync(removableKey,
+                token => admitted.RemoveOverrideAsync(tenantA.Id, removableKey, token));
+            bool removedMissing = await session.RemoveAsync(missingKey,
+                token => admitted.RemoveOverrideAsync(tenantA.Id, missingKey, token));
+            return (locked, unlocked, removed, removedMissing);
+        });
 
         await Assert.That(visibleWithoutBypass).IsEquivalentTo([tenantB.Id, tenantB.Id, tenantB.Id]);
         await Assert.That(tenantAShared).IsNotNull();
@@ -69,10 +84,10 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
             .IsEquivalentTo([sharedKey, lockedKey, removableKey]);
         await Assert.That(tenantALockedSettings.Select(setting => setting.SettingKey)).IsEquivalentTo([lockedKey]);
 
-        await Assert.That(lockedTenantAShared).IsTrue();
-        await Assert.That(unlockedTenantALocked).IsTrue();
-        await Assert.That(removedTenantASetting).IsTrue();
-        await Assert.That(removedMissingTenantASetting).IsFalse();
+        await Assert.That(mutations.locked).IsTrue();
+        await Assert.That(mutations.unlocked).IsTrue();
+        await Assert.That(mutations.removed).IsTrue();
+        await Assert.That(mutations.removedMissing).IsFalse();
 
         await using var verificationContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.Id));
         var remainingSettings = await verificationContext.TenantSettingOverrides
@@ -121,7 +136,7 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         await seedContext.SaveChangesAsync();
 
         await using var tenantBContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.Id));
-        var repository = new TenantSettingRepository(tenantBContext,
+        var repository = TenantSettingRepository.CreateReadOnly(tenantBContext,
             new RelationalSettingMutationLock(tenantBContext, new EfCoreUnitOfWork(tenantBContext)));
 
         var tenantASettings = await repository.GetAllForTenant(tenantA.Id);
@@ -147,7 +162,7 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         await seedContext.SaveChangesAsync();
 
         await using var tenantBContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.Id));
-        var repository = new TenantSettingRepository(tenantBContext,
+        var repository = TenantSettingRepository.CreateReadOnly(tenantBContext,
             new RelationalSettingMutationLock(tenantBContext, new EfCoreUnitOfWork(tenantBContext)));
 
         List<TenantSetting> settings = await repository.GetByTenantAndKeys(

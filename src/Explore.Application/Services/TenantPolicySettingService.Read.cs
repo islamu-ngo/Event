@@ -127,14 +127,14 @@ public partial class TenantPolicySettingService
             tenantAiAssistantModelId?.Value,
             systemAiAssistantModelId?.Value,
             string.Empty,
-            canOverrideAiAssistant);
+            canOverrideAiAssistant && systemAiAssistantModelId?.IsLocked != true);
         var resolvedAiAssistantAllowedModelIds = NormalizeAiModelIds(
             [resolvedAiAssistantModelId],
             ResolveStringList(
                 tenantAiAssistantAllowedModelIds?.Value,
                 systemAiAssistantAllowedModelIds?.Value,
                 [],
-                canOverrideAiAssistant));
+                canOverrideAiAssistant && systemAiAssistantAllowedModelIds?.IsLocked != true));
 
         return new TenantPolicySettingsDto
         {
@@ -299,29 +299,29 @@ public partial class TenantPolicySettingService
                 tenantAiAssistantEnabled?.Value,
                 systemAiAssistantEnabled?.Value,
                 false,
-                canOverrideAiAssistant),
+                canOverrideAiAssistant && systemAiAssistantEnabled?.IsLocked != true),
             AiAssistantProvider = ResolveString(
                 tenantAiAssistantProvider?.Value,
                 systemAiAssistantProvider?.Value,
                 "none",
-                canOverrideAiAssistant),
+                canOverrideAiAssistant && systemAiAssistantProvider?.IsLocked != true),
             AiAssistantEndpointUrl = ResolveString(
                 tenantAiAssistantEndpointUrl?.Value,
                 systemAiAssistantEndpointUrl?.Value,
                 string.Empty,
-                canOverrideAiAssistant),
+                canOverrideAiAssistant && systemAiAssistantEndpointUrl?.IsLocked != true),
             AiAssistantCredentialScope = ResolveString(
                 tenantAiAssistantCredentialScope?.Value,
                 systemAiAssistantCredentialScope?.Value,
                 "none",
-                canOverrideAiAssistant),
+                canOverrideAiAssistant && systemAiAssistantCredentialScope?.IsLocked != true),
             AiAssistantModelId = resolvedAiAssistantModelId,
             AiAssistantAllowedModelIds = resolvedAiAssistantAllowedModelIds,
             AiAssistantAllowAnonymousAccess = ResolveBoolean(
                 tenantAiAssistantAllowAnonymousAccess?.Value,
                 systemAiAssistantAllowAnonymousAccess?.Value,
                 false,
-                canOverrideAiAssistant),
+                canOverrideAiAssistant && systemAiAssistantAllowAnonymousAccess?.IsLocked != true),
             McpEnabled = ResolveBoolean(
                 tenantMcpEnabled?.Value,
                 systemMcpEnabled?.Value,

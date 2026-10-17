@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
@@ -28,26 +29,31 @@ public sealed class ReportProviderSyncDispatcher(
         ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (message.EventType != EventReportOutboxMessageFactory.EventReportProviderSyncRequestedEventType)
+        if (message.EventType != EventReportOutboxMessageFactory.EventReportProviderSyncRequestedEventType
+            || message.AggregateType != "EventReport" || message.AggregateId == Guid.Empty
+            || message.Id == Guid.Empty)
         {
             throw new InvalidOperationException(
                 $"Outbox message {message.Id} has unsupported event type '{message.EventType}' for report provider sync.");
         }
 
         var request = DeserializeRequest(message);
+        if (request.ReportId != message.AggregateId)
+        {
+            throw new InvalidOperationException("event_report_submission_custody_mismatch");
+        }
         var idempotencyKey = BuildIdempotencyKey(message);
         var currentOptions = options.CurrentValue;
         var configuredTargets = ResolveConfiguredTargets(currentOptions);
         var report = await LoadReportAsync(request, cancellationToken);
         var reportCase = ResolveCase(report, request.CaseId, message.Id);
+        RequireSubmissionCustody(message, request, report, reportCase);
 
         if (HasCompletedSyncMarker(report, configuredTargets, idempotencyKey))
         {
             RecordProviderSync(report.TenantId, configuredTargets, "skipped");
             logger.LogInformation(
-                "Skipping already-recorded event report provider sync for report {ReportId} from outbox message {MessageId}",
-                request.ReportId,
-                message.Id);
+                "Skipping already-recorded event report provider sync");
             return;
         }
 
@@ -59,9 +65,7 @@ public sealed class ReportProviderSyncDispatcher(
             await PersistDisabledAsync(report, reportCase.Id, configuredTargets, idempotencyKey, cancellationToken);
             RecordProviderSync(report.TenantId, configuredTargets, "disabled", "provider_disabled");
             logger.LogInformation(
-                "Event report provider sync disabled for report {ReportId} from outbox message {MessageId}",
-                request.ReportId,
-                message.Id);
+                "Event report provider sync disabled");
             return;
         }
 
@@ -75,9 +79,7 @@ public sealed class ReportProviderSyncDispatcher(
                 result.IsRetryable ? "retryable_failure" : "nonretryable_failure",
                 category);
             logger.LogWarning(
-                "Event report provider sync failed for report {ReportId} from outbox message {MessageId} with category {FailureCategory} retryable {IsRetryable}",
-                request.ReportId,
-                message.Id,
+                "Event report provider sync failed with category {FailureCategory} retryable {IsRetryable}",
                 category,
                 result.IsRetryable);
 
@@ -92,9 +94,7 @@ public sealed class ReportProviderSyncDispatcher(
         await PersistSuccessAsync(report, reportCase.Id, result, idempotencyKey, cancellationToken);
         RecordProviderSync(report.TenantId, configuredTargets, "succeeded");
         logger.LogInformation(
-            "Event report provider sync succeeded for report {ReportId} from outbox message {MessageId}",
-            request.ReportId,
-            message.Id);
+            "Event report provider sync succeeded");
     }
 
     private static EventReportProviderSyncRequested DeserializeRequest(OutboxMessage message)
@@ -112,7 +112,7 @@ public sealed class ReportProviderSyncDispatcher(
         EventReportProviderSyncRequested request,
         CancellationToken cancellationToken)
     {
-        var report = await eventReportRepository.GetByIdForUpdateAsync(
+        var report = await eventReportRepository.GetByIdForProviderSyncAsync(
             request.TenantId,
             request.ReportId,
             cancellationToken);
@@ -129,6 +129,30 @@ public sealed class ReportProviderSyncDispatcher(
                 $"Event report {report.Id} does not contain case {caseId} for provider sync message {messageId}.");
     }
 
+    private static void RequireSubmissionCustody(
+        OutboxMessage message,
+        EventReportProviderSyncRequested request,
+        EventReport report,
+        EventReportCase reportCase)
+    {
+        if (report.ProviderSyncOutboxId != message.Id
+            || report.Id != message.AggregateId || report.Id != request.ReportId
+            || report.TenantId != request.TenantId || report.EventId != request.EventId
+            || reportCase.TenantId != report.TenantId || reportCase.ReportId != report.Id
+            || report.ProviderSyncCaseId != reportCase.Id
+            || report.ProviderSyncCaseConcurrencyStamp is not { } submittedVersion
+            || submittedVersion == Guid.Empty || submittedVersion != request.CaseConcurrencyStamp
+            || report.ProviderSyncSubmittedAtUtc is not { } submittedAt
+            || submittedAt != request.SubmittedAtUtc || submittedAt != message.CreatedAt
+            || submittedAt != report.CreatedAt
+            || !string.Equals(report.ProviderSyncPayloadDigest,
+                Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(message.Payload!))),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("event_report_submission_custody_mismatch");
+        }
+    }
+
     private static EventReportProviderEnvelope CreateEnvelope(
         EventReportProviderSyncRequested request,
         EventReport report,
@@ -136,17 +160,17 @@ public sealed class ReportProviderSyncDispatcher(
         string idempotencyKey,
         ModerationProviderOptions currentOptions) =>
         new(
-            request.TenantId,
-            request.ReportId,
-            request.EventId,
-            request.CaseId,
-            request.CaseConcurrencyStamp,
+            report.TenantId,
+            report.Id,
+            report.EventId,
+            reportCase.Id,
+            report.ProviderSyncCaseConcurrencyStamp!.Value,
             report.ReasonCode,
             reportCase.QueueCode,
             ToCode(report.Status),
             ToCode(reportCase.Status),
             ToCode(reportCase.Priority),
-            request.SubmittedAtUtc,
+            report.ProviderSyncSubmittedAtUtc!.Value,
             Max(report.UpdatedAt, reportCase.UpdatedAt),
             idempotencyKey,
             NormalizeOptional(request.CorrelationId),

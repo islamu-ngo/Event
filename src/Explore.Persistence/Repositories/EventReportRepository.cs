@@ -19,6 +19,23 @@ public sealed class EventReportRepository : GenericRepository<EventReport, Guid>
         _dbContext = dbContext;
     }
 
+    public async Task<EventReport?> GetByIdForProviderSyncAsync(
+        Guid tenantId,
+        Guid reportId,
+        CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty || _dbContext.IsTenantFilterBypassed
+            || _dbContext.TenantFilterTenantId != tenantId)
+        {
+            return null;
+        }
+
+        return await IncludeSafeReportGraph(_dbContext.EventReports)
+            .AsSplitQuery()
+            .Where(report => report.TenantId == tenantId && report.Id == reportId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<EventReport?> GetByIdAsync(
         Guid tenantId,
         Guid reportId,
@@ -315,27 +332,18 @@ public sealed class EventReportRepository : GenericRepository<EventReport, Guid>
             .CountAsync(cancellationToken);
     }
 
-    public async Task<int> CountExternalLinksBySyncStateAsync(
+    internal async Task<int> CountOperationalExternalLinksAsync(
         EventReportSyncState syncState,
+        DateTime? olderThanUtc,
         CancellationToken cancellationToken)
     {
-        return await _dbContext.Set<EventReportExternalLink>()
+        var query = _dbContext.Set<EventReportExternalLink>()
             .IgnoreTenantFilter(TenantFilterBypassReasons.ControlPlaneModerationReportingOperations)
             .AsNoTracking()
-            .Where(link => link.SyncState == syncState)
-            .CountAsync(cancellationToken);
-    }
-
-    public async Task<int> CountExternalLinksBySyncStateBeforeAsync(
-        EventReportSyncState syncState,
-        DateTime olderThanUtc,
-        CancellationToken cancellationToken)
-    {
-        return await _dbContext.Set<EventReportExternalLink>()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ControlPlaneModerationReportingOperations)
-            .AsNoTracking()
-            .Where(link => link.SyncState == syncState && link.CreatedAt < olderThanUtc)
-            .CountAsync(cancellationToken);
+            .Where(link => link.SyncState == syncState);
+        if (olderThanUtc.HasValue)
+            query = query.Where(link => link.CreatedAt < olderThanUtc.Value);
+        return await query.CountAsync(cancellationToken);
     }
 
     private static IQueryable<EventReport> IncludeSafeReportGraph(IQueryable<EventReport> query)

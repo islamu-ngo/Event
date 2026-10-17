@@ -11,6 +11,8 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.Services.Registration;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -86,10 +88,16 @@ public sealed class AnonymousRetentionContactDeliveryTests
                 services.AddSingleton(resolver);
             }
             services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(save));
+            services.AddSingleton<ITenantExploreDbContextFactory>(provider =>
+                new ObservedTenantFactory(provider.GetRequiredService<IConfiguration>()["Database:Database"]!, save));
             services.AddSingleton<IAdmissionDeliveryEnvelopeProtector>(new AdmissionDeliveryEnvelopeProtector(protection));
             services.AddSingleton<IAdmissionRecoveryDeliveryEnvelopeProtector>(new AdmissionRecoveryDeliveryEnvelopeProtector(protection));
+            services.AddScoped<IAdmissionCredentialDeliveryOutboxHandler>(provider =>
+                new GatedCredentialDeliveryHandler(
+                    ActivatorUtilities.CreateInstance<AdmissionCredentialDeliveryOutboxHandler>(provider), gate));
             services.AddScoped<IOutboxMessageDispatcher>(provider =>
-                new GatedDispatcher(ActivatorUtilities.CreateInstance<CompositeOutboxMessageDispatcher>(provider), gate));
+                new GatedDispatcher(ActivatorUtilities.CreateInstance<CompositeOutboxMessageDispatcher>(provider),
+                    provider.GetRequiredService<IServiceScopeFactory>(), gate));
             var secrets = Substitute.For<ISecretResolver>();
             secrets.ResolveQualifiedAsync(Arg.Any<string>(), Arg.Any<SecretScope>(), Arg.Any<Guid?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(SecretResolutionResult.Resolved(new("admission-test", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
@@ -132,6 +140,7 @@ public sealed class AnonymousRetentionContactDeliveryTests
         smtpConfiguration = smtp?.Start();
         var issuance = fixture.Services.GetRequiredService<IAdmissionIssuanceService>();
         Task pending;
+        Task<OutboxMessage> dispatchEntered = gate.Entered.Task.WaitAsync(timeout.Token);
         if (recovery)
         {
             var issued = await issuance.IssueConfirmedAsync(seed.Request, timeout.Token);
@@ -155,7 +164,12 @@ public sealed class AnonymousRetentionContactDeliveryTests
 
         try
         {
-            OutboxMessage queued = await gate.Entered.Task.WaitAsync(timeout.Token);
+            if (await Task.WhenAny(dispatchEntered, pending) == pending)
+            {
+                await pending;
+                await Assert.That(gate.Entered.Task.IsCompletedSuccessfully).IsTrue();
+            }
+            OutboxMessage queued = await dispatchEntered;
             protection.Decryptions = 0;
             // The order expires later. The earlier deadline of the included contact must survive its source row.
             if (scenario == "deleted-source")
@@ -208,7 +222,8 @@ public sealed class AnonymousRetentionContactDeliveryTests
             bool allowed = scenario is "live" or "held-live" or "nonanonymous" or "smtp-live" or "smtp-accepted" or "account-live";
             if (!allowed && !accountContact)
             {
-                if (recovery) await Assert.That(failure is AdmissionContactRetentionExpiredException).IsEqualTo(scenario != "smtp-ambiguous");
+                if (recovery) await Assert.That(failure is AdmissionContactRetentionExpiredException)
+                    .IsEqualTo(scenario != "smtp-ambiguous").Because(failure?.GetType().Name ?? "No exception was raised.");
                 else
                 {
                     var result = await (Task<AdmissionIssuanceResult>)pending;
@@ -217,6 +232,7 @@ public sealed class AnonymousRetentionContactDeliveryTests
                     if (scenario != "smtp-ambiguous") await Assert.That(result.DeliveryFailure).IsEqualTo(AdmissionDeliveryFailure.RetentionExpired);
                 }
             }
+            if (allowed) await Assert.That(failure).IsNull();
             if (smtp is null) await Assert.That(transport.Messages.Count).IsEqualTo(allowed ? 1 : 0);
             else
             {
@@ -230,7 +246,6 @@ public sealed class AnonymousRetentionContactDeliveryTests
             if (scenario is "save-crossing" or "channel-crossing") await Assert.That(save.Triggered).IsTrue();
             if (allowed)
             {
-                await Assert.That(failure).IsNull();
                 if (smtp is null)
                 {
                     await Assert.That(transport.Messages.Single().To).IsEqualTo("queued@example.test");
@@ -331,19 +346,47 @@ public sealed class AnonymousRetentionContactDeliveryTests
         public TaskCompletionSource<OutboxMessage> Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
-    private sealed class GatedDispatcher(IOutboxMessageDispatcher inner, DispatchGate gate) : IOutboxMessageDispatcher
+    private sealed class GatedCredentialDeliveryHandler(
+        IAdmissionCredentialDeliveryOutboxHandler inner, DispatchGate gate) : IAdmissionCredentialDeliveryOutboxHandler
     {
-        public Task ReconcileDeadLetterAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
-            inner.ReconcileDeadLetterAsync(message, cancellationToken);
-
-        public async Task DispatchAsync(OutboxMessage message, CancellationToken cancellationToken = default)
+        public async Task HandleAsync(OutboxMessage message, CancellationToken cancellationToken)
         {
             if (gate.Armed)
             {
                 gate.Entered.TrySetResult(message);
                 await gate.Release.Task.WaitAsync(cancellationToken);
             }
-            await inner.DispatchAsync(message, cancellationToken);
+            await inner.HandleAsync(message, cancellationToken);
+        }
+    }
+    private sealed class GatedDispatcher(
+        IOutboxMessageDispatcher inner, IServiceScopeFactory scopes, DispatchGate gate) : IOutboxMessageDispatcher
+    {
+        public Task ReconcileDeadLetterAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
+            inner.ReconcileDeadLetterAsync(message, cancellationToken);
+
+        public async Task DispatchAsync(OutboxMessage message, CancellationToken cancellationToken = default)
+        {
+            await using var preparation = scopes.CreateAsyncScope();
+            var clock = preparation.ServiceProvider.GetRequiredService<TimeProvider>();
+            var claim = (await preparation.ServiceProvider.GetRequiredService<IGenericOutboxAdmission>()
+                .ClaimDueAsync(1000, clock.GetUtcNow().UtcDateTime, cancellationToken))
+                .Single(row => row.MessageId == message.Id);
+            await using var execution = await preparation.ServiceProvider
+                .GetRequiredService<IGenericOutboxExecutionScopeFactory>().CreateAsync(claim, cancellationToken);
+            var persisted = await execution.Services.GetRequiredService<IOutboxRepository>()
+                .GetClaimedGenericAsync(message.Id, claim.LeaseExpiresAt, claim.Status,
+                    clock.GetUtcNow().UtcDateTime, cancellationToken)
+                ?? throw new InvalidOperationException("The original contact-delivery claim is unavailable.");
+            await execution.Services.GetRequiredService<IGenericOutboxExecutionAuthority>()
+                .RequireAsync(persisted, cancellationToken);
+            if (gate.Armed)
+            {
+                gate.Entered.TrySetResult(persisted);
+                await gate.Release.Task.WaitAsync(cancellationToken);
+            }
+            await ActivatorUtilities.CreateInstance<CompositeOutboxMessageDispatcher>(execution.Services)
+                .DispatchAsync(persisted, cancellationToken);
         }
     }
     private sealed class SaveBoundary(Clock clock) : SaveChangesInterceptor
@@ -362,6 +405,20 @@ public sealed class AnonymousRetentionContactDeliveryTests
             }
             return ValueTask.FromResult(result);
         }
+    }
+    private sealed class ObservedTenantFactory(string path, SaveBoundary boundary) : ITenantExploreDbContextFactory
+    {
+        public Task<ExploreDbContext> CreateDbContextAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (tenantId == Guid.Empty) throw new ArgumentException("A selected tenant is required.", nameof(tenantId));
+            var context = EmailDispatchSqliteFixture.CreateContext(path, boundary);
+            context.TenantContext = new SelectedTenant(tenantId);
+            context.BindTenantLease();
+            return Task.FromResult(context);
+        }
+
+        private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
     }
     private sealed class CountingProtection(IDataProtectionProvider inner) : IDataProtectionProvider
     {

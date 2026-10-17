@@ -943,6 +943,7 @@ public static class InfrastructureServicesRegistration
             var endpoint = new Uri(settings.EndpointUrl.Trim(), UriKind.Absolute);
             var clientOptions = new AzureOpenAIClientOptions
             {
+                RetryPolicy = new System.ClientModel.Primitives.ClientRetryPolicy(0),
                 Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient)
             };
             var client = settings.AzureCredentialMode.Equals(

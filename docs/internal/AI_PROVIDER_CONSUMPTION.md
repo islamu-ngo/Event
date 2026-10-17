@@ -79,8 +79,13 @@ and `HttpClientPipelineTransport` SDK parsing happen only after it returns.
 It consumes and validates the original stream, then substitutes a bounded
 `ByteArrayContent` whose length is derived from accepted bytes.
 
-The production SDK factory uses this named transport. Its existing retry policy
-is unchanged by response admission. This is an Azure-specific construction
+The production SDK factory uses this named transport with
+`ClientRetryPolicy(0)`. One application dispatch makes one HTTP attempt, including
+HTTP 408, 429 and 5xx failures. Their transient classifications are preserved so
+the native operation owner, rather than the SDK transport, decides whether a
+new dispatch is authorized. The stream-observable regression uses the real SDK
+pipeline and verifies one attempt plus disposal without reading the error body.
+This is an Azure-specific construction
 contract, not a claim that an arbitrary `IChatClient` has a safe transport.
 Other provider IDs are rejected by the SDK adapter with
 `provider_transport_unsupported`; the factory also refuses non-Azure profiles.

@@ -393,18 +393,23 @@ public sealed class AiBoundedConsumptionTests : AiProviderTestBase
     }
 
     [Test]
-    public async Task AzureSdk_ErrorBodyIsDisposedWithoutReadingAndStatusRemainsTransient()
+    [Arguments(408)]
+    [Arguments(429)]
+    [Arguments(503)]
+    public async Task AzureSdk_TransientFailureDispatchesOnceAndDisposesUnreadBody(int statusCode)
     {
+        int dispatches = 0;
         using var body = new ObservedStream(Encoding.UTF8.GetBytes(new string('x', 4096)));
-        using var handler = new ResponseHandler(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+        using var handler = new ResponseHandler(() => new HttpResponseMessage((HttpStatusCode)statusCode)
         {
             Content = new StreamContent(body)
-        });
+        }, _ => dispatches++);
         using var client = new HttpClient(new AiResponseBudgetHandler(new()) { InnerHandler = handler });
         var result = await CreateProvider(AiProviderSettings.ProviderAzureOpenAi, client, new()).SendAsync(Payload());
 
-        await Assert.That(result.Error!.Code).IsEqualTo("http_503");
+        await Assert.That(result.Error!.Code).IsEqualTo($"http_{statusCode}");
         await Assert.That(result.Error.IsTransient).IsTrue();
+        await Assert.That(dispatches).IsEqualTo(1);
         await Assert.That(body.BytesRead).IsEqualTo(0);
         await Assert.That(body.Disposed).IsTrue();
     }

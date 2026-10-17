@@ -67,8 +67,10 @@ limit can be raised back to the documented ceiling, but there is no unlimited
 setting. Do not collect raw provider replies in support reports.
 
 Ordinary HTTP 408, 429 and server failures remain retryable according to the
-existing provider policy. User cancellation remains cancellation, while the
-configured request deadline reports a timeout.
+existing provider policy. Azure SDK dispatch makes only one HTTP attempt;
+transient status does not authorize an automatic SDK resend. Recovery belongs
+to the operation owner, not an invisible transport retry. User cancellation
+remains cancellation, while the configured request deadline reports a timeout.
 
 ## Assurance status
 

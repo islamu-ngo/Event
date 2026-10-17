@@ -81,8 +81,8 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
                 {
                     _logger.LogInformation(
                         "Keycloak config detected in environment variables — registering Keycloak scheme from env " +
-                        "(authority={Authority}, clientId={ClientId}, hasSecret={HasSecret})",
-                        envAuthority, envClientId, true);
+                        "(hasSecret={HasSecret})",
+                        true);
 
                     RegisterKeycloakScheme(envAuthority, envClientId, envClientSecret, envMetadataAddress);
                 }
@@ -118,11 +118,12 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
             {
                 dbConfig = await FetchConfigFromApiAsync();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogWarning(ex,
+                _logger.LogWarning(
                     "Could not read auth provider configuration from API at startup — " +
-                    "this is expected on first run before setup is completed");
+                    "this is expected on first run before setup is completed. FailureCategory={FailureCategory}",
+                    "auth_configuration_unavailable");
             }
 
             if (dbConfig is not null)
@@ -321,9 +322,9 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         }
 
         _logger.LogInformation(
-            "[OIDC-DIAG] Registered Keycloak OIDC scheme (authority={Authority}, clientId={ClientId}, " +
+            "[OIDC-DIAG] Registered Keycloak OIDC scheme (" +
             "hasClientSecret={HasClientSecret})",
-            authority, clientId, !string.IsNullOrWhiteSpace(clientSecret));
+            !string.IsNullOrWhiteSpace(clientSecret));
     }
 
     private void UpdateKeycloakSchemeOptions(string authority, string clientId, string? clientSecret)
@@ -337,8 +338,8 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
             optionsAdded);
 
         _logger.LogInformation(
-            "Updated Keycloak OIDC scheme options (authority: {Authority}, hasClientSecret: {HasClientSecret})",
-            authority, !string.IsNullOrWhiteSpace(clientSecret));
+            "Updated Keycloak OIDC scheme options (hasClientSecret: {HasClientSecret})",
+            !string.IsNullOrWhiteSpace(clientSecret));
     }
 
     private OpenIdConnectOptions CreateKeycloakOptions(

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M54PAQSE6GY8S3CHFVYTK60B
+Title: "Add deployment-bound signed Cerbos receipt verification"
+Type: fix
+Scope: access
+Summary: "Provide a bounded RSA-PSS receipt verifier that binds independently expected deployment coordinates and rejects invalid publication lifetime."
+Group: cerbos-receipt-verification
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Bind signed operator statements to independent deployment expectations with bounded parsing and publication lifetime; runtime integration remains separate.
+  Migration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable

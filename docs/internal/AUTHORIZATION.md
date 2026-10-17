@@ -399,6 +399,22 @@ infer it from roles.
 
 ## 4. Authorization Providers
 
+### Signed Publication Receipt Verification Primitive
+
+`CerbosPublicationReceiptVerifier` verifies an operator statement over exact JSON
+bytes using RSA-PSS with SHA-256 and an independently configured public key of at
+least 3072 bits. The private signing key is not an Event input. Callers supply the
+expected revision, content hash, environment, PDP endpoint, and observation time;
+receipt fields never define their own expected deployment authority.
+
+Verification rejects unsuccessful publication, future publication, expiry, a
+lifetime exceeding 24 hours, duplicate or unknown JSON properties, missing required
+constructor fields, and malformed signatures or keys. Documents are limited to
+8192 bytes, signatures to 1024 bytes, and PEM public keys to 16384 characters.
+The result is a boolean without raw provider diagnostics. A valid signature proves
+the signed statement, not the live PDP state. This primitive does not itself wire
+startup readiness or replace the existing provider-administration callers.
+
 ### 4.1. Cerbos
 
 -   **Description**: A powerful, open-source, stateless authorization service that allows policies to be defined in human-readable YAML files.

@@ -1,0 +1,31 @@
+Change-Id: CHG-01M54SM06G9Z4R9K933G24BC8R
+Title: "Bind Cerbos Admin API authority to the actual connection"
+Type: fix
+Scope: access
+Summary: "Separate public-only BYO and fixed-origin operator transports, reject redirects and metadata destinations, and retire unsafe BYO endpoint opt-outs."
+Group: cerbos-admin-transport-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/self-hosting/coolify-cerbos-traefik.md
+    Disposition: documented
+    Detail: Admin endpoints must be origins without paths and BYO endpoints must use public HTTPS; insecure and private BYO opt-outs are removed.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Preserve selected authority through DNS and actual sockets; reject mixed private BYO answers, metadata destinations, foreign instance origins and redirects.
+  Migration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/self-hosting/coolify-cerbos-traefik.md
+    Disposition: documented
+    Detail: Remove AllowInsecureByoAdminEndpoints and AllowPrivateByoAdminEndpoints and configure exact permitted operator origins.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/coolify-cerbos-traefik.md
+    Disposition: documented
+    Detail: Use public HTTPS tenant BYO origins; private operator services require explicit instance origins and cannot redirect credentials.

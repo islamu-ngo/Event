@@ -349,13 +349,13 @@ public class AuthorizationProviderConfigurationServiceTests
         {
             Provider = "cerbos",
             CerbosGrpcEndpoint = "https://cerbosgrpc.example.com:443",
-            CerbosAdminEndpoint = "https://tenant-cerbos.example.com/base"
+            CerbosAdminEndpoint = "https://tenant-cerbos.example.com"
         });
 
         await repository.Received(1).UpsertAsync(
             Arg.Is<SystemSetting>(x =>
                 x.SettingKey == GovernanceSettingKeys.Cerbos.CustomAdminEndpoint
-                && JsonSerializer.Deserialize<string>(x.Value) == "https://tenant-cerbos.example.com/base"),
+                && JsonSerializer.Deserialize<string>(x.Value) == "https://tenant-cerbos.example.com"),
             Arg.Any<CancellationToken>());
         await repository.DidNotReceive().UpsertAsync(
             Arg.Is<SystemSetting>(x =>
@@ -508,7 +508,7 @@ public class AuthorizationProviderConfigurationServiceTests
             repository,
             configuration,
             secretResolver,
-            new CerbosAdminEndpointValidator(options),
+            new CerbosAdminEndpointValidator(),
             invalidator ?? Substitute.For<IAuthorizationProviderModeCacheInvalidator>(),
             cerbosConfigResolver ?? Substitute.For<ICerbosConfigResolver>(),
             packageService ?? Substitute.For<IPolicyPackageService>(),

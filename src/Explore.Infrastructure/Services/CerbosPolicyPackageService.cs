@@ -443,7 +443,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
     {
         try
         {
-            var api = CreateAdminApi(target.PrimaryEndpoint);
+            var api = CreateAdminApi(target.PrimaryEndpoint, target.Source);
             var auth = GetBasicAuthHeader(target);
 
             using var response = await api.GetPoliciesAsync(auth, storePolicyIds, cancellationToken);
@@ -472,7 +472,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         AdminApiTarget target,
         CancellationToken cancellationToken)
     {
-        var api = CreateAdminApi(target.PrimaryEndpoint);
+        var api = CreateAdminApi(target.PrimaryEndpoint, target.Source);
         var auth = GetBasicAuthHeader(target);
 
         var response = await api.ListPoliciesAsync(auth, includeDisabled: "true", cancellationToken);
@@ -828,9 +828,11 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         }
     }
 
-    private ICerbosAdminApi CreateAdminApi(Uri endpoint)
+    private ICerbosAdminApi CreateAdminApi(Uri endpoint, AdminApiTargetSource source)
     {
-        var client = _httpClientFactory.CreateClient("CerbosAdminClient");
+        var client = _httpClientFactory.CreateClient(source == AdminApiTargetSource.Byo
+            ? Explore.Infrastructure.Http.CerbosAdminTransport.ByoClient
+            : Explore.Infrastructure.Http.CerbosAdminTransport.InstanceClient);
         if (client.BaseAddress is null)
         {
             client.BaseAddress = endpoint;
@@ -852,7 +854,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         IReadOnlyList<CerbosSchemaDefinition> schemas,
         CancellationToken cancellationToken)
     {
-        var api = CreateAdminApi(target.PrimaryEndpoint);
+        var api = CreateAdminApi(target.PrimaryEndpoint, target.Source);
         var auth = GetBasicAuthHeader(target);
 
         using var response = await SendAdminRequestAsync(
@@ -867,7 +869,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         IReadOnlyList<object> policies,
         CancellationToken cancellationToken)
     {
-        var api = CreateAdminApi(target.PrimaryEndpoint);
+        var api = CreateAdminApi(target.PrimaryEndpoint, target.Source);
         var auth = GetBasicAuthHeader(target);
 
         using var response = await SendAdminRequestAsync(
@@ -886,7 +888,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
 
     private async Task<bool> ReloadInstanceAsync(Uri endpoint, AdminApiTarget target, CancellationToken cancellationToken)
     {
-        var api = CreateAdminApi(endpoint);
+        var api = CreateAdminApi(endpoint, target.Source);
         var auth = GetBasicAuthHeader(target);
 
         IApiResponse response;

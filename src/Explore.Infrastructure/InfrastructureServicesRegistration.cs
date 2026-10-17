@@ -598,7 +598,6 @@ public static class InfrastructureServicesRegistration
                 options.PoliciesPath = policyPackagePath;
             }
         });
-        services.AddSingleton<CerbosAdminEndpointValidator>();
 
         // Cerbos gRPC SDK client (singleton — gRPC channels are long-lived and thread-safe)
         services.AddSingleton<ICerbosClient>(sp =>
@@ -621,10 +620,7 @@ public static class InfrastructureServicesRegistration
 
         // Admin API client for policy package publishing (HTTP-based, separate from gRPC runtime)
         services.AddTransient<CorrelationIdDelegatingHandler>();
-        services.AddHttpClient("CerbosAdminClient", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(10);
-        });
+        Explore.Infrastructure.Http.CerbosAdminTransport.AddClients(services);
 
         services.AddScoped<CerbosPrincipalBuilder>();
         services.AddScoped<CerbosAuthorizationService>();

@@ -322,7 +322,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             {
                 Endpoint = "tenant-grpc.example:3593",
                 Mode = CerbosMode.CustomEndpoint,
-                AdminEndpoint = "https://tenant-cerbos.example/base",
+                AdminEndpoint = "https://tenant-cerbos.example",
                 AdminUsername = "tenant-user",
                 AdminPassword = "tenant-secret",
                 IsInstanceDefault = false
@@ -332,7 +332,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.Requests.All(r => r.RequestUri?.Host == "tenant-cerbos.example")).IsTrue();
-        await Assert.That(handler.Requests.All(r => r.RequestUri?.AbsolutePath.StartsWith("/base/admin", StringComparison.Ordinal) == true)).IsTrue();
+        await Assert.That(handler.Requests.All(r => r.RequestUri?.AbsolutePath.StartsWith("/admin", StringComparison.Ordinal) == true)).IsTrue();
 
         var authorization = handler.Requests[0].Authorization;
         await Assert.That(authorization?.Scheme).IsEqualTo("Basic");
@@ -978,7 +978,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             adminOptions,
             configResolver,
             secretResolver,
-            new CerbosAdminEndpointValidator(options),
+            new CerbosAdminEndpointValidator(),
             new StaticHttpClientFactory(new HttpClient(handler)),
             logger ?? Substitute.For<ILogger<CerbosPolicyPackageService>>(),
             Substitute.For<IEventResourcePolicyPublicationFence>(),

@@ -306,7 +306,7 @@ public sealed class EventResourceProviderControlPlaneTests
             var factory = Substitute.For<IHttpClientFactory>();
             factory.CreateClient(Arg.Any<string>()).Returns(_client);
             Service = new(options, Options.Create(new CerbosAdminApiSettings { Endpoints = ["https://admin.example.test"] }),
-                resolver, Substitute.For<ISecretResolver>(), new CerbosAdminEndpointValidator(options), factory,
+                resolver, Substitute.For<ISecretResolver>(), new CerbosAdminEndpointValidator(), factory,
                 NullLogger<CerbosPolicyPackageService>.Instance, fixture.Control, Options.Create(new CerbosSettings { GrpcEndpoint = Endpoint }));
         }
         public PolicyPackageAdminCredentials Credentials { get; } = new(

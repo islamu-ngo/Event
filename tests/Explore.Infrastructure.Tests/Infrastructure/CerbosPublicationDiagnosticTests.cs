@@ -56,7 +56,7 @@ public sealed class CerbosPublicationDiagnosticTests
             var packageOptions = Options.Create(new CerbosPolicyPackageOptions { PoliciesPath = directory });
             var publisher = new CerbosPolicyPackageService(
                 packageOptions, settings, configuration, Substitute.For<ISecretResolver>(),
-                new CerbosAdminEndpointValidator(packageOptions), new ClientFactory(client), logger,
+                new CerbosAdminEndpointValidator(), new ClientFactory(client), logger,
                 Substitute.For<IEventResourcePolicyPublicationFence>(),
                 Options.Create(new CerbosSettings { GrpcEndpoint = "https://instance.example:3593" }));
             // Bound the native HTTP failure path; no external provider or vault is contacted.

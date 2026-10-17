@@ -477,6 +477,17 @@ User profile updates use the `islamuevent_user` resource with the target domain 
 
 ### 4.1.1 Cerbos Package Upload
 
+Admin HTTP calls carry the server-selected target classification into separate
+`CerbosByoAdminClient` and `CerbosInstanceAdminClient` transports. BYO targets
+require HTTPS, a root-only origin, and exclusively public DNS answers; a mixed
+public/private answer is rejected before connection. Instance targets may use a
+private operator service, but only at an exactly configured scheme/host/port.
+Both use the vetted-address connector, reject cloud metadata destinations, and
+disable redirects so administrator credentials cannot follow a redirected request.
+Endpoint paths, user information, query strings, and fragments are not admitted.
+The former `AllowInsecureByoAdminEndpoints` and `AllowPrivateByoAdminEndpoints`
+options are removed; neither can bypass the BYO boundary.
+
 ZIP export reopens each artifact through the bounded reader and compares both
 its byte length and SHA-256 with the completed manifest before creating its ZIP
 entry. It writes the verified byte array rather than reopening the path again.

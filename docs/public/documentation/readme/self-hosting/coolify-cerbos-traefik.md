@@ -283,6 +283,14 @@ docker run --rm -it \
 
 ## 10. Connecting ISLAMU Event to Cerbos
 
+For Event's Admin API operations, configure an origin such as
+`https://admin.example.org:3593`, without an endpoint path, credentials, query or
+fragment. Tenant BYO origins must use HTTPS and resolve only to public addresses.
+Private operator-managed origins are permitted only when explicitly configured
+for the instance. Redirects and cloud metadata destinations are blocked for both.
+The former insecure/private BYO opt-out options are removed; use a public HTTPS
+BYO endpoint rather than relying on those development switches.
+
 Keep policy and schema files stable while exporting a package from Event. Export
 checks each file against the manifest's recorded size and SHA-256 immediately
 before adding it to the ZIP. If a file changes, export fails instead of returning

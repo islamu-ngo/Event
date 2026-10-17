@@ -15,6 +15,25 @@ ISLAMU Event integrates with **Coop** (distributed review queue) and **Osprey** 
 
 ---
 
+### Coop response limits
+
+Configure the facade to return uncompressed JSON. The mirror accepts at most
+1 MiB, JSON depth 32 and 256 items per collection, counting unknown fields too.
+`Reporting:Coop:ResponseMaxBytes`, `ResponseMaxDepth` and
+`ResponseMaxCollectionItems` may lower these limits; startup rejects values
+outside 1 KiB..1 MiB, 1..32 and 1..256 respectively. Each encoded scalar is
+limited to 2,000 UTF-8 bytes; case IDs and URLs must fit 200 and 500 characters.
+Oversized identities are rejected, not shortened.
+
+Budget violations and compressed responses produce non-retryable
+`coop_response_*` failures without echoing the response. Correct the facade
+contract before redriving affected work. A 503 or network outage remains
+retryable, and caller cancellation remains cancellation. An empty successful
+response still tracks the local case ID; a rejected response does not claim a
+successful remote mirror. Response redirects are not followed.
+
+---
+
 ## 2. Osprey Advisory AI Signals
 
 Osprey acts strictly as an **advisory, signal-only evaluation coordinator**:

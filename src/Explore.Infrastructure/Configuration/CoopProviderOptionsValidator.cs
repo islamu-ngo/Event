@@ -35,6 +35,13 @@ public sealed class CoopProviderOptionsValidator : IValidateOptions<CoopProvider
             failures.Add("Reporting:Coop:TimeoutSeconds must be between 1 and 300.");
         }
 
+        if (options.ResponseMaxBytes is < 1024 or > 1_048_576 ||
+            options.ResponseMaxDepth is < 1 or > 32 ||
+            options.ResponseMaxCollectionItems is < 1 or > 256)
+        {
+            failures.Add("Reporting:Coop response budgets must remain within 1024..1048576 bytes, 1..32 depth and 1..256 collection items.");
+        }
+
         if (!string.IsNullOrWhiteSpace(options.ApiKey) && !IsValidHeaderName(options.ApiKeyHeaderName))
         {
             failures.Add("Reporting:Coop:ApiKeyHeaderName must be a valid HTTP header name.");

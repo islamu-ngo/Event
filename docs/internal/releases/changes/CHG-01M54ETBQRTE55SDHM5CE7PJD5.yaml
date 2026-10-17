@@ -1,0 +1,31 @@
+Change-Id: CHG-01M54ETBQRTE55SDHM5CE7PJD5
+Title: "Bound Coop review queue response consumption"
+Type: fix
+Scope: events
+Summary: "Reject oversized or structurally excessive Coop responses before accepting remote case tracking."
+Group: coop-bounded-response
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/integrations-and-ai/coop-and-osprey.md
+    Disposition: documented
+    Detail: Oversized, encoded or structurally excessive responses and overlength tracking identities are rejected instead of accepted or truncated.
+  Security:
+    Reference: docs/internal/COOP_INTEGRATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Bound response acquisition and JSON materialization before accepting remote review case tracking.
+  Migration:
+    Reference: docs/internal/COOP_INTEGRATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/COOP_INTEGRATION.md
+    Disposition: documented
+    Detail: Reporting:Coop response byte, depth and collection ceilings may be lowered within startup-validated ranges.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/coop-and-osprey.md
+    Disposition: documented
+    Detail: Return uncompressed bounded JSON and correct rejected provider contracts before redriving work.

@@ -7,6 +7,35 @@ This document details the architectural integration, routing flows, security mec
 
 ---
 
+## Outbound response admission
+
+`CoopReviewQueueProvider` uses headers-first completion and the shared
+`BoundedResponseReader` before deserializing the response. `Reporting:Coop`
+options `ResponseMaxBytes`, `ResponseMaxDepth` and `ResponseMaxCollectionItems`
+default to 1 MiB, 32 and 256; startup validation permits lowering them only
+(byte minimum 1 KiB, depth/item minimum 1). Unknown fields consume the same
+budget. Scalars are limited to 2,000 encoded UTF-8 bytes before materialization;
+recognized case identifiers and links must also fit their existing 200/500
+character limits. Overlength identities are rejected rather than truncated into
+a different tracking identity.
+
+Automatic decompression and redirects are disabled on the named client. An
+encoded response is rejected because this profile has no independently bounded
+compressed and decoded streams. Unknown or dishonest content lengths cannot
+bypass the maximum-plus-one read ceiling. Acquired streams and the enclosing
+response are disposed on failure.
+
+Budget, encoding and field violations return fixed non-transient
+`coop_response_*` categories, without provider body or parser exception
+reflection. Malformed JSON retains `coop_invalid_response`; caller cancellation
+propagates and network/503 failures retain their retryable classifications.
+Only the intentional empty/JSON-whitespace successful HTTP response uses the
+local authoritative case ID fallback; rejection never becomes successful
+tracking. Tenant target selection and local decision ownership remain with
+the existing resolver and case workflow.
+
+---
+
 ## 1. Overview
 
 **Coop** (developed by ROOST) is an open-source, web-based human review dashboard designed to aggregate event reports, assign cases to moderation teams, and record manual triage decisions.

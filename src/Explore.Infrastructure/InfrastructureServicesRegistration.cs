@@ -387,6 +387,11 @@ public static class InfrastructureServicesRegistration
         services.AddHttpClient(CoopReviewQueueProvider.HttpClientName, client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            AutomaticDecompression = System.Net.DecompressionMethods.None,
+            AllowAutoRedirect = false,
+            UseCookies = false
         });
         services.AddScoped<CoopReviewQueueProvider>();
         services.AddScoped<NoopReviewQueueProvider>();

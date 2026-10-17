@@ -12,6 +12,58 @@ namespace Explore.Infrastructure.Tests.Infrastructure.Moderation;
 public sealed class CoopReviewQueueProviderTests
 {
     [Test]
+    [Arguments(0, "coop_response_too_large")]
+    [Arguments(1, "coop_response_scalar_limit")]
+    [Arguments(2, "coop_response_depth_limit")]
+    [Arguments(3, "coop_response_item_limit")]
+    [Arguments(4, "coop_response_encoding_denied")]
+    [Arguments(5, "coop_response_field_limit")]
+    public async Task RejectedResponseCannotBecomeSuccessfulTracking(int scenario, string category)
+    {
+        string json = scenario switch
+        {
+            0 => "{\"unknown\":\"" + new string('x', 1024 * 1024) + "\"}",
+            1 => "{\"unknown\":\"" + new string('x', 2001) + "\"}",
+            2 => new string('[', 33) + "0" + new string(']', 33),
+            3 => "{\"unknown\":[" + string.Join(',', Enumerable.Repeat("0", 257)) + "]}",
+            5 => "{\"provider_case_id\":\"" + new string('x', 201) + "\"}",
+            _ => "{}"
+        };
+        var handler = new RecordingMessageHandler(_ =>
+        {
+            var response = JsonResponse(HttpStatusCode.OK, json);
+            if (scenario == 4) response.Content.Headers.ContentEncoding.Add("gzip");
+            return response;
+        });
+        var provider = CreateProvider(new CoopProviderOptions
+        {
+            Enabled = true,
+            EndpointUrl = "https://coop.example"
+        }, handler);
+        var result = await provider.MirrorCaseAsync(CreateEnvelope());
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.ProviderCaseId).IsNull();
+        await Assert.That(result.Error!.Category).IsEqualTo(category);
+        await Assert.That(result.Error.IsTransient).IsFalse();
+    }
+
+    [Test]
+    [Arguments("")]
+    [Arguments(" \r\n\t ")]
+    public async Task IntentionalEmptySuccessRemainsBoundedLocalTracking(string body)
+    {
+        var provider = CreateProvider(new CoopProviderOptions
+        {
+            Enabled = true,
+            EndpointUrl = "https://coop.example"
+        }, new RecordingMessageHandler(_ => JsonResponse(HttpStatusCode.Accepted, body)));
+        var envelope = CreateEnvelope();
+        var result = await provider.MirrorCaseAsync(envelope);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.ProviderCaseId).IsEqualTo($"coop-case:{envelope.CaseId:N}");
+    }
+
+    [Test]
     public async Task MirrorCaseAsync_WhenProviderDisabled_ReturnsDisabledWithoutHttpCall()
     {
         var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));

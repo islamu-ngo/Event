@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Infrastructure.Configuration;
+using Explore.Infrastructure.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -64,8 +65,15 @@ public sealed class CoopReviewQueueProvider(
                     failure.SafeDetail);
             }
 
-            var responseBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
-            var providerResponse = string.IsNullOrWhiteSpace(responseBody)
+            var responseBody = await BoundedResponseReader.ReadJsonAsync(
+                response.Content,
+                currentOptions.ResponseMaxBytes,
+                currentOptions.ResponseMaxDepth,
+                currentOptions.ResponseMaxCollectionItems,
+                maximumScalarBytes: MaxProviderUrlLength * 4,
+                cancellationToken: timeoutCts.Token,
+                allowEmptyDocument: true);
+            var providerResponse = responseBody.Length == 0
                 ? new CoopMirrorResponse()
                 : JsonSerializer.Deserialize<CoopMirrorResponse>(responseBody, JsonOptions);
 
@@ -75,6 +83,12 @@ public sealed class CoopReviewQueueProvider(
                     "coop_invalid_response",
                     isTransient: false,
                     "Coop returned an empty or invalid response.");
+            }
+
+            if (!HasBoundedResponseFields(providerResponse))
+            {
+                return ReviewCaseSyncResult.Failure(
+                    "coop_response_field_limit", false, "Coop returned an overlength identity or link.");
             }
 
             return ReviewCaseSyncResult.Success(
@@ -106,6 +120,13 @@ public sealed class CoopReviewQueueProvider(
                 "coop_invalid_response",
                 isTransient: false,
                 "Coop returned a response that could not be parsed.");
+        }
+        catch (ProviderResponseRejectedException exception)
+        {
+            return ReviewCaseSyncResult.Failure(
+                exception.Category == "response_invalid_json" ? "coop_invalid_response" : $"coop_{exception.Category}",
+                isTransient: false,
+                "Coop returned a response outside the permitted response contract.");
         }
         catch (UriFormatException)
         {
@@ -230,6 +251,16 @@ public sealed class CoopReviewQueueProvider(
             _ => new("coop_http_failure", false, $"HTTP {(int)statusCode}")
         };
     }
+
+    private static bool HasBoundedResponseFields(CoopMirrorResponse response) =>
+        (response.ProviderCaseId?.Length ?? 0) <= MaxProviderCaseIdLength &&
+        (response.CaseId?.Length ?? 0) <= MaxProviderCaseIdLength &&
+        (response.Id?.Length ?? 0) <= MaxProviderCaseIdLength &&
+        (response.Case?.Id?.Length ?? 0) <= MaxProviderCaseIdLength &&
+        (response.ProviderUrl?.Length ?? 0) <= MaxProviderUrlLength &&
+        (response.CaseUrl?.Length ?? 0) <= MaxProviderUrlLength &&
+        (response.Url?.Length ?? 0) <= MaxProviderUrlLength &&
+        (response.Case?.Url?.Length ?? 0) <= MaxProviderUrlLength;
 
     private static string ResolveProviderCaseId(
         CoopMirrorResponse response,

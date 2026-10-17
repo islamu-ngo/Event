@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Administrator checks require committed membership and the native administrative
+authority contract on the independent Global account. A role claim alone does
+not grant access. Revoked instance membership is reflected by subsequent reads;
+do not grant Runtime direct membership-table access to repair denied requests.
+
 Startup reference lookup caches require the native catalogue contract for the
 Runtime account. An empty role cache can make valid administrator checks fail
 closed. Verify catalogue readiness rather than granting direct role-table

@@ -50,7 +50,8 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
             }
         };
         CurrentUserService = new CurrentUserService(httpContext);
-        AdminContext = new AdminContext(httpContext, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
+        AdminContext = new AdminContext(httpContext,
+            new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context),
             new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
         Notifications = new CommittedNotificationObserver(context);

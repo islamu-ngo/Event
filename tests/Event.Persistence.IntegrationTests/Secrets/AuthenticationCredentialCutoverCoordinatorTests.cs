@@ -805,8 +805,9 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
         public DeploymentProfileReader Profile { get; } = new();
         public DbCommandInterceptor? CommandProbe { get; set; }
         public RelationalAuthenticationCredentialCutoverCoordinator Coordinator => new(this,
-            new AdminContext(HttpContext, new PlatformUserRoleRepository(_identityContext),
-                new TenantUserRoleGrantRepository(_identityContext), new OrganizationMemberRepository(_identityContext),
+            new AdminContext(HttpContext,
+                new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(_identityContext)),
+                new OrganizationMemberRepository(_identityContext),
                 new GroupMemberRepository(_identityContext), new UserExternalLoginRepository(_identityContext),
                 NullLogger<AdminContext>.Instance), HttpContext, Profile);
 

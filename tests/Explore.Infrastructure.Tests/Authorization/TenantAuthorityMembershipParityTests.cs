@@ -295,7 +295,7 @@ public sealed class TenantAuthorityMembershipParityTests
 
         public AdminContext CreateAdmin() => new(
             new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, UserId.ToString())], "test")) } },
-            new PlatformUserRoleRepository(Context), new TenantUserRoleGrantRepository(Context),
+            new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context)),
             new OrganizationMemberRepository(Context), new GroupMemberRepository(Context),
             new UserExternalLoginRepository(Context), NullLogger<AdminContext>.Instance);
 

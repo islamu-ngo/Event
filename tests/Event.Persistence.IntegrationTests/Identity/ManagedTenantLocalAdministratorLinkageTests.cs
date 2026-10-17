@@ -235,7 +235,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
         internal AdminContext Admin(AsyncServiceScope scope) => new(new HttpContextAccessor
         { HttpContext = PrincipalContext(_currentUserId) },
-            new PlatformUserRoleRepository(Application(scope)), new TenantUserRoleGrantRepository(Application(scope)),
+            new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Application(scope))),
             new OrganizationMemberRepository(Application(scope)), new GroupMemberRepository(Application(scope)),
             new UserExternalLoginRepository(Application(scope)),
             NullLogger<AdminContext>.Instance);
@@ -405,6 +405,9 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
             services.Configure<DeploymentSettings>(settings => settings.Mode = DeploymentMode.MultiTenant);
             services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
+            services.AddScoped<Explore.Persistence.Database.IGlobalExploreDbContextFactory>(provider =>
+                new SecurityTestSupport.AdministrativeAuthorityTestFactory(provider.GetRequiredService<ExploreDbContext>()));
+            services.AddScoped<IInstanceBootstrapStateReader, InstanceBootstrapStateReader>();
             services.AddSingleton<IDeploymentModeProvider, DeploymentModeProvider>();
             services.AddDbContext<ExploreDbContext>(options => Configure(options, _applicationPath).AddInterceptors(GrantFault));
             var identity = services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>()

@@ -271,6 +271,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<ITenantLookupSource, TenantLookupSource>();
         services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
         services.AddScoped<IInstanceBootstrapStateReader, InstanceBootstrapStateReader>();
+        services.AddScoped<IAdministrativeAuthorityRepository, AdministrativeAuthorityRepository>();
         services.AddScoped<IInstanceTenantSettingsReader, InstanceTenantSettingsReader>();
         services.AddScoped<ILocalizationSecretStatusReader, LocalizationSecretStatusReader>();
         services.AddScoped<IPlatformUserRoleRepository, PlatformUserRoleRepository>();

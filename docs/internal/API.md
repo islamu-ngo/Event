@@ -5,6 +5,13 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+AdminContext reads persisted administrative authority through
+IAdministrativeAuthorityRepository on an independent Global context. PostgreSQL
+projects a boolean instance result or primitive tenant, organization and group
+scope identifiers for one exact internal user. Role claims cannot substitute
+for committed membership, and Runtime retains no direct membership-table access.
+These discovery reads do not supply transactional mutation authority.
+
 LookupDataCache loads the closed reference catalogue through the native
 GlobalLookupCatalogueProviderOperations projection. Here "Global" names
 tenant-independent data, not the database login: only enrolled Runtime executes

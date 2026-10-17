@@ -506,8 +506,7 @@ public sealed class LocalCredentialBindingTests
                         User = principal ?? new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", InitiatorId.ToString("D"))], "Bearer"))
                     }
                 },
-                platformUserRoleRepository: new PlatformUserRoleRepository(application),
-                tenantAdminRepo: new TenantUserRoleGrantRepository(application),
+                administrativeAuthorityRepository: new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(application)),
                 orgMemberRepo: new OrganizationMemberRepository(application),
                 groupMemberRepo: new GroupMemberRepository(application),
                 userExternalLoginRepository: new UserExternalLoginRepository(application),

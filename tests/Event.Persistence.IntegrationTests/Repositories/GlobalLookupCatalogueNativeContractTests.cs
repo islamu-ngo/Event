@@ -20,6 +20,11 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlContainerFixture fixture)
 {
+    private sealed class CatalogueFactory(Func<ExploreDbContext> create) : IDbContextFactory<ExploreDbContext>
+    {
+        public ExploreDbContext CreateDbContext() => create();
+    }
+
     private static readonly Type[] LookupTypes =
     [
         typeof(EventType), typeof(EventFormat), typeof(EventStatus), typeof(AudienceAge),
@@ -70,7 +75,10 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlC
         {
             var services = new ServiceCollection();
             services.AddSingleton(fixture.NativeQueueEnrollment);
-            services.AddScoped(_ => Open(PrimaryDatabaseRole.Runtime));
+            services.AddSingleton<IDbContextFactory<ExploreDbContext>>(
+                new CatalogueFactory(() => Open(PrimaryDatabaseRole.Runtime)));
+            services.AddScoped<ExploreDbContext>(_ => throw new InvalidOperationException(
+                "Catalogue initialization must not resolve the tenant-selected scoped context."));
             await using var provider = services.BuildServiceProvider();
             var cache = new LookupDataCache(provider.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<LookupDataCache>.Instance);

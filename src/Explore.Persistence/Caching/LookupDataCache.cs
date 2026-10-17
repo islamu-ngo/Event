@@ -49,7 +49,9 @@ public class LookupDataCache : ILookupDataCache
         _logger.LogInformation("Initializing lookup data cache...");
 
         using var scope = _scopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var dbContext = await scope.ServiceProvider
+            .GetRequiredService<IDbContextFactory<ExploreDbContext>>()
+            .CreateDbContextAsync(cancellationToken);
         var enrollment = dbContext.Database.IsNpgsql()
             ? scope.ServiceProvider.GetRequiredService<PostgresNativeQueueEnrollment>() : null;
 

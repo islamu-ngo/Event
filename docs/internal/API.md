@@ -5,6 +5,11 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+LookupDataCache owns an identity-free Runtime context from IDbContextFactory for
+initialization and refresh. It never resolves the tenant-selected scoped context;
+a tenant-bound lease cannot execute the tenant-independent catalogue projection.
+The factory lease is disposed after materialization.
+
 AdminContext reads persisted administrative authority through
 IAdministrativeAuthorityRepository on an independent Global context. PostgreSQL
 projects a boolean instance result or primitive tenant, organization and group

@@ -8,6 +8,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Reference catalogue initialization uses a separate Runtime lease, not the
+request tenant scope or the Global account. If startup caches remain empty,
+check native catalogue readiness and factory registration without expanding
+table privileges.
+
 Administrator checks require committed membership and the native administrative
 authority contract on the independent Global account. A role claim alone does
 not grant access. Revoked instance membership is reflected by subsequent reads;

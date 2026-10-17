@@ -22,6 +22,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task HandlerCopiesRequestAndResponseWithoutCookieOrAmbientPrincipal()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
@@ -72,6 +73,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task CancellationAbortsDispatch()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
@@ -95,6 +97,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task ResponseCallbacksRunLifoAroundDispatch()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
@@ -160,6 +163,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task StartingFailureRejectsResponseAndStillRunsCompletionCallbacks()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
@@ -191,6 +195,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task RequestBodyStreamsWithoutEagerFullBuffering()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
@@ -229,6 +234,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task RequestBodyHonorsEndpointSizeCeilingWhileStreaming()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
@@ -255,6 +261,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task ResponseStreamsBeforeProducerCompletesAndDisposalCancelsIt()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         await using var provider = services.BuildServiceProvider();
@@ -302,6 +309,7 @@ public sealed class InProcessEventApiTransportTests
     public async Task NamedClientsPreserveAdminAndAtprotoPathsAndHeaders()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new Explore.ServiceDefaults.EarlyRequestAdmission(TimeProvider.System, enabled: true));
         services.AddLogging();
         services.AddHttpContextAccessor();
         services.AddScoped<ITenantRouteContextAccessor, TenantRouteContextAccessor>();

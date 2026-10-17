@@ -53,8 +53,7 @@ public sealed class UnmoderateEventCommandHandler(
         {
             metrics.RecordEventModerationAction(null, ActionKind, "failed", "user_unresolved", irreversible: false);
             logger.LogWarning(
-                "Event unmoderation rejected because the authenticated moderator user could not be resolved for event {EventId}.",
-                request.Id);
+                "Event unmoderation rejected because the authenticated moderator user could not be resolved");
 
             return Failure(
                 request.Id,
@@ -173,14 +172,12 @@ public sealed class UnmoderateEventCommandHandler(
             result = result with { MetricOutcome = null };
         }
 
-        await ApplyPostCommitEffectsAsync(result, request.Id, moderatorUserId, cancellationToken);
+        await ApplyPostCommitEffectsAsync(result, cancellationToken);
         return result.Response;
     }
 
     private async Task ApplyPostCommitEffectsAsync(
         UnmoderationCommandResult result,
-        Guid requestedEventId,
-        Guid moderatorUserId,
         CancellationToken cancellationToken)
     {
         if (result.CacheEventId is { } eventId && result.TenantId is { } tenantId)
@@ -202,40 +199,21 @@ public sealed class UnmoderateEventCommandHandler(
         switch (result.LogOutcome)
         {
             case "not_found":
-                logger.LogWarning(
-                    "Event unmoderation rejected because event {EventId} was not found.",
-                    requestedEventId);
+                logger.LogWarning("Event unmoderation rejected because event was not found.");
                 break;
             case "idempotent":
-                logger.LogInformation(
-                    "Event unmoderation skipped because event {EventId} in tenant {TenantId} is already published.",
-                    result.Response.Id,
-                    result.TenantId);
+                logger.LogInformation("Event unmoderation skipped because event is already published.");
                 break;
             case "invalid_status":
                 logger.LogWarning(
-                    "Event unmoderation rejected for event {EventId} in tenant {TenantId} because current status {CurrentStatusId} is not Moderated.",
-                    result.Response.Id,
-                    result.TenantId,
+                    "Event unmoderation rejected because current status {CurrentStatusId} is not Moderated.",
                     result.CurrentStatusId);
                 break;
             case "not_reversible":
-                logger.LogWarning(
-                    "Event unmoderation rejected for event {EventId} in tenant {TenantId} because the latest moderation record is not reversible.",
-                    result.Response.Id,
-                    result.TenantId);
+                logger.LogWarning("Event unmoderation rejected because the latest moderation record is not reversible.");
                 break;
             case "succeeded":
-                EventModerationRecord unmoderationRecord = result.ModerationRecord!;
-                logger.LogInformation(
-                    "Event unmoderation succeeded for event {EventId} in tenant {TenantId}; moderation record {ModerationRecordId}, source record {SourceModerationRecordId}, moderator {ModeratorUserId}, reason {ReasonCode}, correlation {CorrelationId}.",
-                    result.Response.Id,
-                    result.TenantId,
-                    unmoderationRecord.Id,
-                    unmoderationRecord.SourceModerationRecordId,
-                    moderatorUserId,
-                    unmoderationRecord.ReasonCode,
-                    unmoderationRecord.CorrelationId);
+                logger.LogInformation("Event unmoderation succeeded.");
                 break;
         }
     }

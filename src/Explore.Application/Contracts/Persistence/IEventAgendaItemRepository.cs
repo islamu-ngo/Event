@@ -10,6 +10,11 @@ public interface IEventAgendaItemRepository : IGenericRepository<EventAgendaItem
 
     Task<List<EventAgendaItem>> GetPublicByEventAsync(Guid eventId, CancellationToken cancellationToken);
 
+    Task<Event?> GetAuthorizedParentForMutationAsync(
+        Guid tenantId, Guid userId, Guid eventId, string action, CancellationToken cancellationToken);
+
+    Task<EventAgendaItem?> GetForMutationAsync(Guid id, CancellationToken cancellationToken);
+
     Task MoveToEventAsync(
         EventAgendaItem agendaItem,
         Guid eventId,

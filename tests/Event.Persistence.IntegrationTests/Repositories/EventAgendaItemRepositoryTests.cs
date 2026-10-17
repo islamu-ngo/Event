@@ -27,7 +27,7 @@ public class EventAgendaItemRepositoryTests
         // Arrange
         using var context = _fixture.CreateDbContext();
         var (tenant, @event) = await SetupEventAsync(context);
-        var repository = new EventAgendaItemRepository(context);
+        var repository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         var calculator = new EventScheduleProjectionCalculator();
 
         var item = new EventAgendaItem
@@ -62,7 +62,7 @@ public class EventAgendaItemRepositoryTests
         // Arrange
         using var context = _fixture.CreateDbContext();
         var (tenant, @event) = await SetupEventAsync(context);
-        var repository = new EventAgendaItemRepository(context);
+        var repository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         var calculator = new EventScheduleProjectionCalculator();
 
         var item1 = new EventAgendaItem
@@ -122,7 +122,7 @@ public class EventAgendaItemRepositoryTests
         // Arrange
         using var context = _fixture.CreateDbContext();
         var (_, @event) = await SetupEventAsync(context);
-        var repository = new EventAgendaItemRepository(context);
+        var repository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
 
         // Act
         var result = await repository.GetByEventAsync(@event.Id, CancellationToken.None);
@@ -137,7 +137,7 @@ public class EventAgendaItemRepositoryTests
         // Arrange
         using var context = _fixture.CreateDbContext();
         var (tenant, @event) = await SetupEventAsync(context);
-        var repository = new EventAgendaItemRepository(context);
+        var repository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         var calculator = new EventScheduleProjectionCalculator();
 
         var item = new EventAgendaItem

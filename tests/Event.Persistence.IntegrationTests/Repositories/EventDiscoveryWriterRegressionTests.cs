@@ -218,7 +218,8 @@ public sealed class EventDiscoveryWriterRegressionTests
         var failure = new FailFirstTerminalWrite();
         await using (var writer = Open(fixture, failure))
         {
-            bool settled = await new PdsSyncOutboxRepository(writer).TrySettleAsync(
+            bool settled = await new PdsSyncOutboxRepository(writer,
+                new SharedSettlementFactory(fixture, failure)).TrySettleAsync(
                 new PdsSyncClaim(outbox.Id, fixture.TenantId, fixture.UserId, outbox.LeaseToken!.Value, 1),
                 record.Uri, "new-cid", now.AddSeconds(1));
             await Assert.That(settled).IsTrue();
@@ -255,6 +256,29 @@ public sealed class EventDiscoveryWriterRegressionTests
     private static Task<long> EpochAsync(ExploreDbContext context, Guid tenant) =>
         context.Set<EventDiscoveryRevision>().AsNoTracking()
             .Where(row => row.TenantId == tenant).Select(row => row.DisclosureEpoch).SingleAsync();
+
+    private sealed class SharedSettlementFactory(
+        EventVisitorCapabilitySqliteFixture fixture, params IInterceptor[] interceptors)
+        : IPdsSettlementDbContextFactory
+    {
+        public async Task<ExploreDbContext> CreateDbContextAsync(
+            Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            var context = Open(fixture, interceptors);
+            try
+            {
+                if (tenantId != fixture.TenantId ||
+                    !await context.Tenants.AnyAsync(row => row.Id == tenantId, cancellationToken))
+                    throw new InvalidOperationException("Settlement tenant is not persisted.");
+                return context;
+            }
+            catch
+            {
+                await context.DisposeAsync();
+                throw;
+            }
+        }
+    }
 
     private sealed record TenantScope(Guid TenantId) : ITenantContext;
 

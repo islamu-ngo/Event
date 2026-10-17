@@ -236,11 +236,15 @@ public sealed class PublicEventLocationProjectionTests
             TenantId = tenantId,
             Tenant = null!
         });
-        eventRepository.GetEventWithDetails(eventId).Returns(parentEvent);
-        eventRepository.IsPubliclyEligibleAsync(tenantId, eventId, Arg.Any<CancellationToken>()).Returns(true);
+        parentEvent.SessionGroups.Add(group);
+        eventRepository.GetEventWithDetails(eventId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Explore.Domain.Event?>(new UnauthorizedAccessException("managed_event_read_denied")));
+        eventRepository.GetPublicEventWithDetailsByIdAsync(eventId, Arg.Any<CancellationToken>()).Returns(parentEvent);
         sessionRepository.GetPublicSessionsByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([session]);
-        groupRepository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([group]);
-        agendaRepository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([]);
+        groupRepository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<List<EventSessionGroup>>(new UnauthorizedAccessException("raw_program_group_read_denied")));
+        agendaRepository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<List<EventAgendaItem>>(new UnauthorizedAccessException("raw_program_agenda_read_denied")));
         var handler = new GetEventProgramSummaryRequestHandler(
             eventRepository,
             sessionRepository,

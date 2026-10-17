@@ -54,7 +54,7 @@ public sealed class EventVisitorCapabilityGateTests
         }
         if (onboardingAllowed)
         {
-            var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+            var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyInternalAsync(
                 [new(null, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, VisitorAccessSettingMutationKind.SetValue, "true"),
                  new(null, GovernanceSettingKeys.Authentication.GoogleClientId, VisitorAccessSettingMutationKind.SetValue, "\"public-client\""),
                  new(null, GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy, VisitorAccessSettingMutationKind.SetValue, "\"Allowed\""),
@@ -157,7 +157,8 @@ public sealed class EventVisitorCapabilityGateTests
         async Task<BaseCommandResponse<Guid>> StartAsync() => surface switch
         {
             "authenticated" => await fixture.ExecuteCommandAsync<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>(
-                new(entity.Id, ticket.CatalogId, BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)])),
+                new(entity.Id, ticket.CatalogId, BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)],
+                    Guid.CreateVersion7().ToString("N"))),
             "guest" => await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(
                 (await fixture.IssueGuestProofAsync(new(entity.Id, ticket.CatalogId,
                     BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]))).Request),
@@ -166,6 +167,7 @@ public sealed class EventVisitorCapabilityGateTests
                 EventId = entity.Id,
                 TicketCatalogVersionId = ticket.CatalogId,
                 AccountUserId = fixture.UserId,
+                OperationKey = Guid.CreateVersion7().ToString("N"),
                 BookingPartyType = BookingPartyTypeEnum.Individual,
                 Lines = [new(ticket.TicketId, 1, null)]
             })
@@ -173,7 +175,7 @@ public sealed class EventVisitorCapabilityGateTests
         var existing = await StartAsync();
         await Assert.That(existing.IsSuccess).IsTrue();
         var settings = fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>();
-        var changed = await settings.ApplyAsync(
+        var changed = await settings.ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.PublicExperience.VisitorAccessMode, VisitorAccessSettingMutationKind.SetValue,
                 "\"DirectoryListingOnly\"")], fixture.UserId);
         await Assert.That(changed.Success).IsTrue();
@@ -205,7 +207,7 @@ public sealed class EventVisitorCapabilityGateTests
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         var entity = await fixture.SeedEventAsync();
-        var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+        var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.PublicExperience.VisitorAccessMode, VisitorAccessSettingMutationKind.SetValue,
                 "\"DirectoryListingOnly\"")], fixture.UserId);
         await Assert.That(changed.Success).IsTrue();
@@ -230,7 +232,7 @@ public sealed class EventVisitorCapabilityGateTests
     public async Task UnknownExternalOnboarding_DoesNotAuthorizeAccountRequiredConfiguration()
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
-        var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+        var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, VisitorAccessSettingMutationKind.SetValue, "true"),
              new(null, GovernanceSettingKeys.Authentication.GoogleClientId, VisitorAccessSettingMutationKind.SetValue, "\"public-client\""),
              new(null, GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, VisitorAccessSettingMutationKind.SetValue, "\"https://accounts.example.test/signup\"")], fixture.UserId);

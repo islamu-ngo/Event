@@ -1,72 +1,47 @@
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
+using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Npgsql;
-using Testcontainers.PostgreSql;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests.Onboarding;
 
 [NotInParallel("PersistenceDb")]
-public sealed class TenantOnboardingAtomicRollbackTests
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+public sealed class TenantOnboardingAtomicRollbackTests(PostgreSqlContainerFixture database)
 {
     [Test]
     public async Task MandatoryIdentityWriteFailure_RollsBackPolicyBrandingOnboardingAndIdentity()
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("atomic_onboarding")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-        await database.StartAsync();
-        DbContextOptions<ExploreDbContext> seedOptions = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
-            .Options;
-        await using (var schema = new NpgsqlConnection(database.GetConnectionString()))
-        {
-            await schema.OpenAsync();
-            await using NpgsqlCommand command = schema.CreateCommand();
-            command.CommandText = """
-                CREATE SCHEMA islamu_event;
-                CREATE TABLE islamu_event."TenantSettingOverrides" (
-                    "Id" uuid PRIMARY KEY, "TenantId" uuid NOT NULL, "SettingKey" varchar(256) NOT NULL,
-                    "Value" text NOT NULL, "IsLocked" boolean NOT NULL DEFAULT false, "CreatedAt" timestamptz NOT NULL DEFAULT now(),
-                    "CreatedBy" uuid NULL, "UpdatedAt" timestamptz NULL, "UpdatedBy" uuid NULL);
-                CREATE UNIQUE INDEX "IX_TenantSettingOverrides_TenantId_SettingKey"
-                    ON islamu_event."TenantSettingOverrides" ("TenantId", "SettingKey");
-                CREATE TABLE islamu_event."TenantSettingsDocuments" (
-                    "Id" uuid PRIMARY KEY, "TenantId" uuid NOT NULL, "DocumentKey" varchar(128) NOT NULL,
-                    "SchemaVersion" integer NOT NULL, "DefaultsVersion" varchar(64) NOT NULL, "PayloadJson" jsonb NOT NULL,
-                    "ConcurrencyStamp" uuid NOT NULL, "CreatedAt" timestamptz NOT NULL DEFAULT now(), "CreatedBy" uuid NULL,
-                    "UpdatedAt" timestamptz NULL, "UpdatedBy" uuid NULL);
-                CREATE UNIQUE INDEX "IX_TenantSettingsDocuments_TenantId_DocumentKey"
-                    ON islamu_event."TenantSettingsDocuments" ("TenantId", "DocumentKey");
-                CREATE TABLE islamu_event."TenantOnboardingStates" (
-                    "Id" uuid PRIMARY KEY, "TenantId" uuid NOT NULL, "IsCompleted" boolean NOT NULL,
-                    "CurrentStep" integer NOT NULL, "TotalSteps" integer NOT NULL, "CompletedStepsJson" jsonb NULL,
-                    "CreatedAt" timestamptz NOT NULL DEFAULT now(), "CompletedAt" timestamptz NULL, "CompletedByUserId" uuid NULL);
-                CREATE UNIQUE INDEX "IX_TenantOnboardingStates_TenantId"
-                    ON islamu_event."TenantOnboardingStates" ("TenantId");
-                """;
-            await command.ExecuteNonQueryAsync();
-        }
-
+        await database.ResetAsync();
         Guid tenantId = Guid.CreateVersion7();
-
-        DbContextOptions<ExploreDbContext> writeOptions = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(database.GetConnectionString())
-            .AddInterceptors(new FailMandatoryIdentitySaveInterceptor())
-            .Options;
-        await using (var write = new ExploreDbContext(writeOptions))
+        const string policyKey = GovernanceSettingKeys.Branding.DisplayName;
+        await using (var seed = database.CreateDbContext())
         {
-            write.EnableTenantFilterBypass("Atomic onboarding rollback test.");
-            var unitOfWork = new EfCoreUnitOfWork(write);
-            var policyRepository = new TenantSettingRepository(write,
-                new RelationalSettingMutationLock(write, unitOfWork));
+            seed.Tenants.Add(new Tenant
+            {
+                Id = tenantId,
+                FullName = "Atomic onboarding",
+                Slug = $"atomic-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            });
+            await seed.SaveChangesAsync();
+        }
+        var failure = new FailMandatoryIdentitySaveInterceptor();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+            () => database.CreateDbContext(), database, failure);
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            authenticated.RunAsync(tenantId, session => session.ValueAsync(policyKey, "Atomic Policy", "\"Atomic Policy\"", async token =>
+        {
+            var write = session.Context;
+            var policyRepository = new TenantSettingRepository(write, session.MutationLock, session.Boundary);
             var documentRepository = new TenantSettingsDocumentRepository(write);
             var onboardingRepository = new TenantOnboardingStateRepository(write);
             TenantSettingsDocument branding = TenantBrandingSettingsDocumentDefaults.Create(tenantId, "Atomic Brand");
@@ -83,26 +58,25 @@ public sealed class TenantOnboardingAtomicRollbackTests
                     PrivacyUrl = "https://example.test/privacy"
                 });
 
-            await Assert.That(async () => await unitOfWork.ExecuteInTransactionAsync(async _ =>
+            await policyRepository.SetValueAsync(tenantId, policyKey, "\"Atomic Policy\"", token, session.ActorId);
+            await documentRepository.Create(branding);
+            await onboardingRepository.Create(new TenantOnboardingState
             {
-                await policyRepository.SetValueAsync(tenantId, "onboarding.atomic.policy", "true");
-                await documentRepository.Create(branding);
-                await onboardingRepository.Create(new TenantOnboardingState
-                {
-                    TenantId = tenantId,
-                    Tenant = null!,
-                    IsCompleted = true,
-                    CurrentStep = 4,
-                    TotalSteps = 4
-                });
-                await documentRepository.Create(identity);
-            })).Throws<InvalidOperationException>();
-        }
+                TenantId = tenantId,
+                Tenant = null!,
+                IsCompleted = true,
+                CurrentStep = 4,
+                TotalSteps = 4
+            });
+            await documentRepository.Create(identity);
+            return true;
+        })));
+        await Assert.That(rejected!.Message).IsEqualTo("Injected mandatory identity write failure.");
+        await Assert.That(failure.Reached).IsTrue();
 
-        await using var verify = new ExploreDbContext(seedOptions);
-        verify.EnableTenantFilterBypass("Atomic onboarding rollback test.");
+        await using var verify = database.CreateDbContext();
         await Assert.That(await verify.TenantSettingOverrides.AnyAsync(
-            setting => setting.TenantId == tenantId && setting.SettingKey == "onboarding.atomic.policy")).IsFalse();
+            setting => setting.TenantId == tenantId && setting.SettingKey == policyKey)).IsFalse();
         await Assert.That(await verify.TenantSettingsDocuments.AnyAsync(
             document => document.TenantId == tenantId
                 && (document.DocumentKey == SettingsDocumentKeys.Tenant.Branding
@@ -112,6 +86,7 @@ public sealed class TenantOnboardingAtomicRollbackTests
 
     private sealed class FailMandatoryIdentitySaveInterceptor : SaveChangesInterceptor
     {
+        internal bool Reached { get; private set; }
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
             DbContextEventData eventData,
             InterceptionResult<int> result,
@@ -122,7 +97,10 @@ public sealed class TenantOnboardingAtomicRollbackTests
                 .Any(entry => entry.State is EntityState.Added or EntityState.Modified
                     && entry.Entity.DocumentKey == SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity) == true;
             if (mandatoryIdentityWrite)
+            {
+                Reached = true;
                 throw new InvalidOperationException("Injected mandatory identity write failure.");
+            }
             return ValueTask.FromResult(result);
         }
     }

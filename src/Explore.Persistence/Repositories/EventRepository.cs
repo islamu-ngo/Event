@@ -6,21 +6,33 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Explore.Domain.Services.Discovery;
+using Explore.Application.Services;
+using Explore.Persistence.Security;
 
 namespace Explore.Persistence.Repositories;
 
-public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
+public partial class EventRepository : GenericRepository<Event, Guid>, IEventRepository
 {
     private readonly ExploreDbContext _dbContext;
     private readonly TimeProvider _timeProvider;
+    private readonly PublicEventDiscoveryReadBindingFactory? _publicDiscoveryBindings;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
+    private readonly Func<IPrivateEventManagementReader>? _privateManagement;
 
-    public EventRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null) : base(dbContext)
+    public EventRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null,
+        PublicEventDiscoveryReadBindingFactory? publicDiscoveryBindings = null,
+        PostgresNativeQueueEnrollment? nativeEnrollment = null,
+        Func<IPrivateEventManagementReader>? privateManagement = null) : base(dbContext)
     {
         _dbContext = dbContext;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _publicDiscoveryBindings = publicDiscoveryBindings;
+        _nativeEnrollment = nativeEnrollment;
+        _privateManagement = privateManagement;
     }
 
     public new async Task<Event?> GetById(Guid id)
@@ -40,14 +52,14 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             .ToListAsync();
     }
 
-    public async Task<Event?> GetEventWithDetails(Guid id)
+    public async Task<Event?> GetEventWithDetails(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Events
             .AsNoTrackingWithIdentityResolution()
             .AsSplitQuery()
             .IncludeStandardDetails()
             .Include(e => e.AtprotoRecord)
-            .FirstOrDefaultAsync(e => e.Id == id);
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
 
     public Task<Event?> GetEventWithDetailsAsync(
@@ -64,6 +76,9 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
 
     public async Task<Event?> GetPublicEventWithDetailsByCodeAsync(string publicCode, CancellationToken cancellationToken)
     {
+        if (DiscoveryRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.ReadPublicDetailAsync(
+                PublicDiscoveryBinding(), _nativeEnrollment, null, publicCode, cancellationToken);
         return await _dbContext.Events
             .AsNoTrackingWithIdentityResolution()
             .AsSplitQuery()
@@ -82,11 +97,30 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<bool> IsPubliclyEligibleAsync(Guid tenantId, Guid eventId, CancellationToken cancellationToken) =>
-        _dbContext.Events
+    public async Task<Event?> GetPublicEventWithDetailsByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (DiscoveryRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.ReadPublicDetailAsync(
+                PublicDiscoveryBinding(), _nativeEnrollment, id, null, cancellationToken);
+        return await _dbContext.Events.AsNoTrackingWithIdentityResolution().AsSplitQuery()
+            .IncludeStandardDetails().Include(target => target.AtprotoRecord)
+            .Include(target => target.SessionGroups.Where(group => group.IsPublished))
+            .Include(target => target.AgendaItems.Where(item => item.EventDayId == null || item.EventDay!.IsPublished))
+            .WherePubliclyEligible(_dbContext)
+            .FirstOrDefaultAsync(target => target.Id == id, cancellationToken);
+    }
+
+    public async Task<bool> IsPubliclyEligibleAsync(Guid tenantId, Guid eventId, CancellationToken cancellationToken)
+    {
+        if (DiscoveryRepositoryNativeOperations.For(_dbContext) is { } native)
+            return tenantId == _dbContext.BindTenantLease()
+                && await native.ReadPublicDetailAsync(
+                    PublicDiscoveryBinding(), _nativeEnrollment, eventId, null, cancellationToken) is not null;
+        return await _dbContext.Events
             .AsNoTracking()
             .WherePubliclyEligible(_dbContext)
             .AnyAsync(@event => @event.TenantId == tenantId && @event.Id == eventId, cancellationToken);
+    }
 
     public async Task<Event?> GetRegistrationStatusEventForUpdateAsync(Guid id, Guid tenantId, CancellationToken cancellationToken)
     {
@@ -99,13 +133,27 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
 
     public async Task<Event?> GetAuthorizationTargetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
+        if (PostgresOutboxExecutionContract.For(_dbContext) is { } outbox
+            && _dbContext.NotificationOutboxExecutionClaim is { } claim
+            && claim.EventType == EventPublishedOutboxMessageFactory.EventPublishedNotificationFanoutRequestedEventType)
+            return await outbox.ReadPublicationSourceAsync(
+                _nativeEnrollment ?? throw new UnauthorizedAccessException("outbox_execution_enrollment_required"),
+                id, cancellationToken);
+        if (PostgresPrivateEventManagementContract.For(_dbContext) is { } management
+            && _privateManagement is not null && _dbContext.Database.CurrentTransaction is null)
+            return (await management.ReadAuthorizationTargetsAsync(_privateManagement, [id], cancellationToken)).SingleOrDefault();
         return await _dbContext.Events
             .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.EventAuthorizationTargetResolution)
             .Include(e => e.ParticipationConfiguration)
+            .Include(e => e.Actor)
             .Include(e => e.OrganizerActor)
+            .Include(e => e.EventProvenanceType)
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
+
+    public Task<Event?> GetAiProposalAuthorizationTargetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        _dbContext.Events.IgnoreAutoIncludes().AsNoTracking()
+            .SingleOrDefaultAsync(value => value.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<Event>> GetAuthorizationTargetsByIdsAsync(
         IReadOnlyCollection<Guid> ids,
@@ -129,6 +177,10 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
         {
             return [];
         }
+
+        if (PostgresPrivateEventManagementContract.For(_dbContext) is { } management
+            && _privateManagement is not null && _dbContext.Database.CurrentTransaction is null)
+            return await management.ReadAuthorizationTargetsAsync(_privateManagement, normalizedIds, cancellationToken);
 
         return await _dbContext.Events
             .AsNoTracking()
@@ -327,6 +379,10 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
 
     public async Task<Event?> GetScheduleGraphForUpdateAsync(Guid id, CancellationToken cancellationToken)
     {
+        // The update owner must obtain its graph after current authority is held.
+        // A graph supplied through EF's identity map is not persisted evidence.
+        if (_dbContext.Events.Local.Any(row => row.Id == id))
+            return null;
         return await _dbContext.Events
             .AsSplitQuery()
             .Include(e => e.Days)
@@ -334,6 +390,16 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             .Include(e => e.AgendaItems)
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
+
+    public Task<Event?> GetAuthorizedForUpdateAsync(
+        Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken) =>
+        new EventMutationAuthority(_dbContext, _timeProvider)
+            .ForUpdateAsync(tenantId, userId, id, cancellationToken);
+
+    public Task<Event?> GetAuthorizedForDeleteAsync(
+        Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken) =>
+        new EventMutationAuthority(_dbContext, _timeProvider)
+            .ForDeleteAsync(tenantId, userId, id, cancellationToken);
 
     public async Task<List<Event>> GetMyEventsWithDetails(string userId)
     {
@@ -417,6 +483,10 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
                 return result;
             });
         }
+
+        if (DiscoveryRepositoryNativeOperations.For(_dbContext) is { } native && specification.Occurrence is not null)
+            return await native.PageLocalAsync(
+                PublicDiscoveryBinding(), specification, pageNumber, pageSize, cancellationToken);
 
         var query = _dbContext.Events
             .AsNoTrackingWithIdentityResolution()
@@ -506,6 +576,8 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
         CancellationToken cancellationToken)
     {
         RequireDiscoveryTransaction();
+        if (DiscoveryRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.SeekLocalAsync(PublicDiscoveryBinding(), specification, after, take, cancellationToken);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(take, 1000);
         var occurrences = MatchingOccurrences(specification.Occurrence
@@ -560,6 +632,8 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
         CancellationToken cancellationToken)
     {
         RequireDiscoveryTransaction();
+        if (DiscoveryRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.MembersLocalAsync(PublicDiscoveryBinding(), specification, matchingSessions, cancellationToken);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(matchingSessions.Count, 100);
         if (matchingSessions.Count == 0)
             return [];
@@ -572,6 +646,13 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
                 && occurrences.Any(session => session.EventId == entity.Id && sessionIds.Contains(session.Id)));
         return await MaterializeDiscoveryAsync(query, occurrences, matchingSessions, cancellationToken);
     }
+
+    private PublicEventDiscoveryReadBinding? _publicDiscoveryReadBinding;
+
+    private PublicEventDiscoveryReadBinding PublicDiscoveryBinding() =>
+        _publicDiscoveryReadBinding ??= (_publicDiscoveryBindings
+            ?? throw new UnauthorizedAccessException("Native public discovery requires its selected binding factory."))
+            .Create(_dbContext);
 
     private IQueryable<Event> PublicDiscoveryQuery(
         EventQuerySpecification specification, IQueryable<EventSession> occurrences)

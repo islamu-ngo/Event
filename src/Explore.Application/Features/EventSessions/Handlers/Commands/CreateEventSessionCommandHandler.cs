@@ -1,4 +1,7 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -11,6 +14,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
 
@@ -31,6 +35,13 @@ public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessi
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
+    private readonly ITenantContext _tenantContext;
+    private readonly IUserContext _userContext;
+    private readonly IAdminContext _adminContext;
+    private readonly IMachinePrincipalAccessor _machinePrincipal;
+    private readonly IMachineMutationCommitAuthority _machineAuthority;
+    private readonly RequestAuthorization<CreateEventSessionCommand> _authorization;
+    private readonly ILogger<CreateEventSessionCommandHandler> _logger;
 
     public CreateEventSessionCommandHandler(
         IEventSessionRepository eventSessionRepository,
@@ -47,7 +58,12 @@ public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessi
         IEventDayRepository eventDayRepository,
         IStorageObjectRepository storageObjectRepository,
         IUnitOfWork unitOfWork,
-        EventLocationAttachmentService eventLocationAttachmentService)
+        EventLocationAttachmentService eventLocationAttachmentService,
+        ITenantContext tenantContext, IUserContext userContext, IAdminContext adminContext,
+        RequestAuthorization<CreateEventSessionCommand> authorization,
+        IMachinePrincipalAccessor machinePrincipal,
+        IMachineMutationCommitAuthority machineAuthority,
+        ILogger<CreateEventSessionCommandHandler> logger)
     {
         _eventSessionRepository = eventSessionRepository;
         _eventRepository = eventRepository;
@@ -64,10 +80,21 @@ public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessi
         _storageObjectRepository = storageObjectRepository;
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
+        _tenantContext = tenantContext;
+        _userContext = userContext;
+        _adminContext = adminContext;
+        _machinePrincipal = machinePrincipal;
+        _machineAuthority = machineAuthority;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionCommand request, CancellationToken cancellationToken)
     {
+        Guid? userId = await _adminContext.ResolveUserIdAsync(cancellationToken);
+        bool machine = _machinePrincipal.IsMachineCaller;
+        if (!_userContext.IsAuthenticated || _tenantContext.TenantId == Guid.Empty || !machine && userId is null)
+            return BaseCommandResponse.Authentication<Guid>();
         var validator = new CreateEventSessionDtoValidator(
             _eventRepository,
             _locationRepository,
@@ -84,99 +111,122 @@ public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessi
                 "Event session creation failed.");
         }
 
-        // Fetch the parent event to inherit its TenantId (defense-in-depth: global query filter already scopes by tenant)
-        var parentEvent = await _eventRepository.GetById(request.EventSessionDto.EventId);
-        if (parentEvent == null)
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                ["Event not found in the current tenant."],
-                "Event not found in the current tenant.");
-        }
-
-        if (!await ImageReferenceEligibility.AreEligibleAsync(
-                _storageObjectRepository,
-                parentEvent.TenantId,
-                request.EventSessionDto.FeaturedImageId))
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                ["Featured image must be an active public safe-raster object in the current tenant."],
-                "Event session creation failed.");
-        }
-
-        // Allow only client-owned business fields. Scheduling, lifecycle and template state stay handler-owned.
         var input = request.EventSessionDto;
-        var eventSession = new EventSession(EventSessionStatusEnum.Draft)
-        {
-            EventId = input.EventId,
-            Event = null!,
-            Tenant = null!,
-            TenantId = parentEvent.TenantId,
-            LocationId = input.LocationId,
-            RoomId = input.RoomId,
-            FeaturedImageId = input.FeaturedImageId,
-            SortOrder = input.SortOrder,
-            Title = input.Title,
-            EventSessionKindId = input.EventSessionKindId,
-            Description = input.Description,
-            Slug = input.Slug,
-            MaxAudienceAttendees = input.MaxAudienceAttendees,
-            RegistrationModeId = input.RegistrationModeId,
-            CurrentAudienceAttendees = 0
-        };
-
-        // Populate cached local projection fields via the single authorized write path on EventSession.
-        // Handlers never touch LocalStart*/LocalEnd* directly; the aggregate method consumes the calculator.
-        string timezone = parentEvent.EventTimeZoneId ?? parentEvent.Timezone ?? string.Empty;
-
-        switch (request.EventSessionDto.EndTimeType)
-        {
-            case SessionEndTimeType.Fixed:
-                eventSession.Reschedule(
-                    UtcInstantRange.Create(request.EventSessionDto.StartTime, request.EventSessionDto.EndTime!.Value),
-                    timezone,
-                    _scheduleProjectionCalculator);
-                break;
-            case SessionEndTimeType.OpenEnded:
-                eventSession.ScheduleOpenEnded(
-                    request.EventSessionDto.StartTime,
-                    timezone,
-                    _scheduleProjectionCalculator);
-                break;
-            case SessionEndTimeType.RelativeToPrayer when request.EventSessionDto.EndTime is { } endTime:
-                eventSession.ScheduleRelativeToPrayer(
-                    UtcInstantRange.Create(request.EventSessionDto.StartTime, endTime),
-                    timezone,
-                    _scheduleProjectionCalculator);
-                break;
-            case SessionEndTimeType.RelativeToPrayer:
-                eventSession.ScheduleRelativeToPrayer(
-                    request.EventSessionDto.StartTime,
-                    timezone,
-                    _scheduleProjectionCalculator);
-                break;
-            default:
-                throw new InvalidOperationException("Event session end time type is not supported.");
-        }
-
-        // Auto-link to the matching EventDay by (EventId, LocalStartDate).
-        // Returns null when no EventDay exists for this date — EventDayId stays nullable during transition.
-        var matchingDay = eventSession.LocalStartDate is not null
-            ? await _eventDayRepository.FindByEventAndLocalDateAsync(
-                parentEvent.Id, eventSession.LocalStartDate.Value, cancellationToken)
-            : null;
-        eventSession.EventDayId = matchingDay?.Id;
-
+        var authoritativeRequest = request with { TenantId = _tenantContext.TenantId };
+        Guid sessionId = Guid.CreateVersion7();
+        DateTime createdAt = DateTime.UtcNow;
         try
         {
-            eventSession = await _unitOfWork.ExecuteSerializableAsync(async token =>
+            return await _unitOfWork.ExecuteSerializableAsync(async token =>
             {
+                await _authorization.AuthorizeAsync(authoritativeRequest, _logger, token);
+                var parentEvent = machine
+                    ? await _machineAuthority.GetAuthorizedSessionParentAsync(
+                        _tenantContext.TenantId, input.EventId, AuthorizationActions.Create, token)
+                    : userId is { } humanId
+                        ? await _eventSessionRepository.GetAuthorizedParentForMutationAsync(
+                            _tenantContext.TenantId, humanId, input.EventId, AuthorizationActions.Create, token)
+                        : null;
+                if (parentEvent is null)
+                    throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Create);
+                var currentValidation = await validator.ValidateAsync(input, token);
+                if (!currentValidation.IsValid)
+                    return BaseCommandResponse.Validation<Guid>(
+                        currentValidation.Errors.Select(error => error.ErrorMessage), "Event session creation failed.");
+                if (!await ImageReferenceEligibility.AreEligibleAsync(_storageObjectRepository, parentEvent.TenantId, input.FeaturedImageId))
+                    return BaseCommandResponse.Validation<Guid>(
+                        ["Featured image must be an active public safe-raster object in the current tenant."], "Event session creation failed.");
+                var eventSession = new EventSession(EventSessionStatusEnum.Draft)
+                {
+                    Id = sessionId,
+                    CreatedAt = createdAt,
+                    CreatedBy = userId,
+                    EventId = parentEvent.Id,
+                    TenantId = parentEvent.TenantId,
+                    Event = null!,
+                    Tenant = null!,
+                    LocationId = input.LocationId,
+                    RoomId = input.RoomId,
+                    FeaturedImageId = input.FeaturedImageId,
+                    SortOrder = input.SortOrder,
+                    Title = input.Title,
+                    EventSessionKindId = input.EventSessionKindId,
+                    Description = input.Description,
+                    Slug = input.Slug,
+                    MaxAudienceAttendees = input.MaxAudienceAttendees,
+                    RegistrationModeId = input.RegistrationModeId,
+                    CurrentAudienceAttendees = 0
+                };
+                string timezone = parentEvent.EventTimeZoneId ?? parentEvent.Timezone ?? string.Empty;
+                switch (input.EndTimeType)
+                {
+                    case SessionEndTimeType.Fixed:
+                        eventSession.Reschedule(UtcInstantRange.Create(input.StartTime, input.EndTime!.Value), timezone, _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.OpenEnded:
+                        eventSession.ScheduleOpenEnded(input.StartTime, timezone, _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.RelativeToPrayer when input.EndTime is { } endTime:
+                        eventSession.ScheduleRelativeToPrayer(UtcInstantRange.Create(input.StartTime, endTime), timezone, _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.RelativeToPrayer:
+                        eventSession.ScheduleRelativeToPrayer(input.StartTime, timezone, _scheduleProjectionCalculator);
+                        break;
+                    default:
+                        throw new InvalidOperationException("Event session end time type is not supported.");
+                }
+                var matchingDay = eventSession.LocalStartDate is { } localDate
+                    ? await _eventDayRepository.FindByEventAndLocalDateAsync(parentEvent.Id, localDate, token)
+                    : null;
+                eventSession.EventDayId = matchingDay?.Id;
                 EventLocation eventLocation = await _eventLocationAttachmentService.ResolveAsync(
                     parentEvent.Id,
                     eventSession.LocationId,
                     eventSession.EventLocationId,
                     token);
                 eventSession.AssignEventLocation(eventLocation);
-                return await _eventSessionRepository.CreateWithRoomOverlapGuardAsync(eventSession, token);
+                await _eventSessionRepository.CreateWithRoomOverlapGuardAsync(eventSession, token, machine ? async checkToken =>
+                {
+                    if (await _machineAuthority.GetAuthorizedSessionParentAsync(
+                            parentEvent.TenantId, parentEvent.Id, AuthorizationActions.Create, checkToken) is null)
+                        throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Create);
+                }
+                : null);
+                if (input.IslamicAspect is not null)
+                {
+                    var aspect = new EventSessionIslamicAspect { EventSessionId = eventSession.Id, EventSession = null };
+                    ApplyIslamicAspectDto(aspect, input.IslamicAspect, input.EndTimeType);
+                    await _eventSessionIslamicAspectRepository.Create(aspect);
+                }
+                if (input.SessionTemplateId is { } templateId)
+                {
+                    var template = await _eventSessionTemplateRepository.GetSessionTemplateWithDetails(templateId);
+                    if (template is { IsPublished: true, IsActive: true })
+                    {
+                        eventSession.SourceTemplateId = template.Id;
+                        eventSession.SourceTemplateKey = template.SessionTemplateKey;
+                        eventSession.SourceTemplateVersion = template.Version;
+                        eventSession.InstantiatedFromTemplateAt = createdAt;
+                        eventSession.LastSyncedFromTemplateAt = createdAt;
+                        await _eventSessionRepository.Update(eventSession);
+                        var instantiation = _instantiationService.InstantiateFromSessionTemplate(
+                            eventSession.Id, parentEvent.TenantId, template, _userContext.GetRequiredUserId().ToString("D"));
+                        foreach (var runtime in instantiation.Definitions)
+                        {
+                            runtime.Definition.DefaultOptionId = null;
+                            await _eventSessionCustomPropertyRepository.CreateWithOptions(
+                                runtime.Definition, runtime.Options, runtime.DefaultOptionId, token);
+                            if (runtime.DefaultValue is not null)
+                                await _eventSessionCustomPropertyRepository.SetValue(runtime.DefaultValue, token);
+                        }
+                        await _projectionUpdater.RefreshForEventSessionAsync(eventSession.Id, token);
+                    }
+                }
+                if (machine && await _machineAuthority.GetAuthorizedSessionParentAsync(
+                        parentEvent.TenantId, parentEvent.Id, AuthorizationActions.Create, token) is null)
+                    throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Create);
+                token.ThrowIfCancellationRequested();
+                return BaseCommandResponse.Success(eventSession.Id, "Event session created successfully.");
             }, cancellationToken);
         }
         catch (RoomScheduleConflictException ex)
@@ -187,60 +237,6 @@ public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessi
                 [ex.Message]);
         }
 
-        if (request.EventSessionDto.IslamicAspect != null)
-        {
-            var islamicAspect = new EventSessionIslamicAspect();
-            islamicAspect.EventSessionId = eventSession.Id;
-            islamicAspect.EventSession = null;
-            ApplyIslamicAspectDto(islamicAspect, request.EventSessionDto.IslamicAspect, request.EventSessionDto.EndTimeType);
-
-            await _eventSessionIslamicAspectRepository.Create(islamicAspect);
-        }
-
-        // Template instantiation: copy session template definitions to runtime
-        if (request.EventSessionDto.SessionTemplateId.HasValue)
-        {
-            var sessionTemplate = await _eventSessionTemplateRepository.GetSessionTemplateWithDetails(
-                request.EventSessionDto.SessionTemplateId.Value);
-
-            if (sessionTemplate is { IsPublished: true, IsActive: true })
-            {
-                eventSession.SourceTemplateId = sessionTemplate.Id;
-                eventSession.SourceTemplateKey = sessionTemplate.SessionTemplateKey;
-                eventSession.SourceTemplateVersion = sessionTemplate.Version;
-                eventSession.InstantiatedFromTemplateAt = DateTimeOffset.UtcNow;
-                eventSession.LastSyncedFromTemplateAt = DateTimeOffset.UtcNow;
-                await _eventSessionRepository.Update(eventSession);
-
-                var instantiationResult = _instantiationService.InstantiateFromSessionTemplate(
-                    eventSession.Id,
-                    parentEvent.TenantId,
-                    sessionTemplate,
-                    "system");
-
-                foreach (var runtimeDef in instantiationResult.Definitions)
-                {
-                    // Clear DefaultOptionId before initial save to avoid FK violation
-                    runtimeDef.Definition.DefaultOptionId = null;
-
-                    await _eventSessionCustomPropertyRepository.CreateWithOptions(
-                        runtimeDef.Definition,
-                        runtimeDef.Options,
-                        runtimeDef.DefaultOptionId,
-                        cancellationToken);
-
-                    if (runtimeDef.DefaultValue != null)
-                    {
-                        await _eventSessionCustomPropertyRepository.SetValue(
-                            runtimeDef.DefaultValue, cancellationToken);
-                    }
-                }
-
-                await _projectionUpdater.RefreshForEventSessionAsync(eventSession.Id, cancellationToken);
-            }
-        }
-
-        return BaseCommandResponse.Success(eventSession.Id, "Event session created successfully.");
     }
 
     private static void ApplyIslamicAspectDto(

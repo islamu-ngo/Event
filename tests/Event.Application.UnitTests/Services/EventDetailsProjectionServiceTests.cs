@@ -17,6 +17,7 @@ public sealed class EventDetailsProjectionServiceTests
     private readonly IEventTagsRepository _eventTagsRepository = Substitute.For<IEventTagsRepository>();
     private readonly IEventCategoriesRepository _eventCategoriesRepository = Substitute.For<IEventCategoriesRepository>();
     private readonly IObjectStorageService _objectStorageService = Substitute.For<IObjectStorageService>();
+    private readonly IPrivateEventManagementReader _privateManagement = Substitute.For<IPrivateEventManagementReader>();
     private readonly EventDetailsProjectionService _service;
 
     public EventDetailsProjectionServiceTests()
@@ -27,7 +28,8 @@ public sealed class EventDetailsProjectionServiceTests
             _eventTagsRepository,
             _eventCategoriesRepository,
             _objectStorageService,
-            Substitute.For<ILogger<EventDetailsProjectionService>>());
+            Substitute.For<ILogger<EventDetailsProjectionService>>(),
+            _privateManagement);
     }
 
     [Test]
@@ -97,11 +99,15 @@ public sealed class EventDetailsProjectionServiceTests
         };
         var expectedCategoryDtos = categoryDtos.ToArray();
 
-        _eventRepository.GetEventWithDetails(eventId).Returns(eventEntity);
-        _eventModerationRecordRepository.GetLatestByEventAsync(tenantId, eventId, Arg.Any<CancellationToken>())
-            .Returns(latestModerationRecord);
-        _eventTagsRepository.GetTagsByEvent(eventId).Returns(tags);
-        _eventCategoriesRepository.GetCategoriesByEvent(eventId).Returns(categories);
+        var graph = new PrivateEventManagementGraph();
+        graph.Events.Add(eventEntity);
+        graph.ModerationRecords.Add(latestModerationRecord);
+        graph.Tags.AddRange(tags);
+        graph.Categories.AddRange(categories);
+        _privateManagement.ReadAsync(
+            Arg.Is<PrivateEventManagementRead>(read =>
+                read.Kind == PrivateEventManagementReadKind.Details && read.EventId == eventId),
+            Arg.Any<CancellationToken>()).Returns(graph);
 
         var result = await _service.BuildAsync(eventId, CancellationToken.None);
 

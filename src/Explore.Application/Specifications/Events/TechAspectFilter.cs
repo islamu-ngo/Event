@@ -21,53 +21,67 @@ namespace Explore.Application.Specifications.Events;
 public sealed class TechAspectFilter : IFilterSpecification<Event>
 {
     public Expression<Func<Event, bool>> Predicate { get; }
+    public TechAspectFilterType FilterType { get; }
+    public EventFilterOperand Operand { get; }
 
-    private TechAspectFilter(Expression<Func<Event, bool>> predicate) => Predicate = predicate;
+    private TechAspectFilter(TechAspectFilterType type, Expression<Func<Event, bool>> predicate,
+        EventFilterOperand? operand = null)
+    {
+        FilterType = type;
+        Predicate = predicate;
+        Operand = operand ?? new();
+    }
 
     /// <summary>
     /// Filters events by required skill level.
     /// </summary>
     public static TechAspectFilter SkillLevel(SkillLevel skillLevel) =>
-        new(e => e.TechAspect != null && e.TechAspect.SkillLevel == skillLevel);
+        new(TechAspectFilterType.SkillLevel, e => e.TechAspect != null && e.TechAspect.SkillLevel == skillLevel,
+            new(Integer: (int)skillLevel));
 
     /// <summary>
     /// Filters events that are coding competitions.
     /// </summary>
     public static TechAspectFilter IsCodingCompetition() =>
-        new(e => e.TechAspect != null && e.TechAspect.IsCodingCompetition);
+        new(TechAspectFilterType.IsCodingCompetition, e => e.TechAspect != null && e.TechAspect.IsCodingCompetition);
 
     /// <summary>
     /// Filters events that are hackathons (have a hackathon track defined).
     /// </summary>
     public static TechAspectFilter IsHackathon() =>
-        new(e => e.TechAspect != null && e.TechAspect.HackathonTrack != null);
+        new(TechAspectFilterType.IsHackathon, e => e.TechAspect != null && e.TechAspect.HackathonTrack != null);
 
     /// <summary>
     /// Filters events by hackathon track name (case-insensitive contains).
     /// </summary>
     public static TechAspectFilter HackathonTrack(string trackName) =>
-        new(e => e.TechAspect != null &&
+        new(TechAspectFilterType.HackathonTrack, e => e.TechAspect != null &&
                  e.TechAspect.HackathonTrack != null &&
-                 e.TechAspect.HackathonTrack.Contains(trackName));
+                 e.TechAspect.HackathonTrack.Contains(trackName), new(Text: trackName));
 
     /// <summary>
     /// Filters events that require a laptop.
     /// </summary>
     public static TechAspectFilter RequiresLaptop() =>
-        new(e => e.TechAspect != null && e.TechAspect.RequiresLaptop);
+        new(TechAspectFilterType.RequiresLaptop, e => e.TechAspect != null && e.TechAspect.RequiresLaptop);
 
     /// <summary>
     /// Filters events by tech stack tags (case-insensitive contains search).
     /// Searches within the comma-separated TechStackTags field.
     /// </summary>
     public static TechAspectFilter TechStack(string techTag) =>
-        new(e => e.TechAspect != null &&
+        new(TechAspectFilterType.TechStack, e => e.TechAspect != null &&
                  e.TechAspect.TechStackTags != null &&
-                 e.TechAspect.TechStackTags.Contains(techTag));
+                 e.TechAspect.TechStackTags.Contains(techTag), new(Text: techTag));
 
     /// <summary>
     /// Filters events that have a prize pool (prize pool amount is not null and greater than 0).
     /// </summary>
     public static TechAspectFilter HasPrizePool() =>
-        new(e => e.TechAspect != null && e.TechAspect.PrizePool != null && e.TechAspect.PrizePool > 0);
+        new(TechAspectFilterType.HasPrizePool, e => e.TechAspect != null && e.TechAspect.PrizePool != null && e.TechAspect.PrizePool > 0);
+}
+
+public enum TechAspectFilterType
+{
+    SkillLevel, IsCodingCompetition, IsHackathon, HackathonTrack, RequiresLaptop, TechStack, HasPrizePool
 }

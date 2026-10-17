@@ -59,10 +59,10 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
 
         var snapshots = new EventDiscoverySnapshotRepository(context);
         var repository = Maintenance(context);
-        int deleted = await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async token =>
+        int deleted = maintenance
+            ? await repository.PurgeTenantBatchAsync(store.TenantId, Now, 1, default)
+            : await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async token =>
         {
-            if (maintenance)
-                return await repository.PurgeTenantBatchAsync(store.TenantId, Now, 1, token);
             await snapshots.AcquireFenceAsync(store.TenantId, token);
             await new EventDiscoveryDisclosureRepository(context).AcquireCurrentAsync(store.TenantId, token);
             return await snapshots.PurgeExpiredAsync(store.TenantId, Now, 1, token);
@@ -119,7 +119,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         await using var context = Open(store);
         var repository = Maintenance(context);
         var handler = new PurgeEventDiscoverySnapshotsCommandHandler(
-            repository, new EfCoreUnitOfWork(context), new FixedClock());
+            repository, new FixedClock());
 
         var first = await handler.ExecuteAsync(new());
         await Assert.That(first.DeletedSnapshots).IsEqualTo(14);
@@ -151,9 +151,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         var other = await SeedSnapshotAsync(store, store.OtherTenantId, Now);
         await using var context = Open(store, store.OtherTenantId);
         var repository = Maintenance(context);
-        var unitOfWork = new EfCoreUnitOfWork(context);
-        int deleted = await unitOfWork.ExecuteSerializableAsync(
-            token => repository.PurgeTenantBatchAsync(store.TenantId, Now, 1, token));
+        int deleted = await repository.PurgeTenantBatchAsync(store.TenantId, Now, 1, default);
         await Assert.That(deleted).IsEqualTo(1);
         await Assert.That(context.TenantFilterTenantId).IsEqualTo(store.OtherTenantId);
         await Assert.That(context.IsTenantFilterBypassed).IsFalse();
@@ -169,8 +167,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         await Assert.That((await otherReader.GetItemsAsync(store.OtherTenantId, other.Id, -1, 100, default)).Count)
             .IsEqualTo(1);
 
-        deleted = await unitOfWork.ExecuteSerializableAsync(
-            token => repository.PurgeTenantBatchAsync(store.TenantId, Now, 10, token));
+        deleted = await repository.PurgeTenantBatchAsync(store.TenantId, Now, 10, default);
         await Assert.That(deleted).IsEqualTo(1);
         await Assert.That(await primary.GetAsync(store.TenantId, boundary.Id, default)).IsNull();
         await Assert.That(await primary.GetAsync(store.TenantId, live.Id, default)).IsNotNull();
@@ -201,7 +198,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         await Assert.That(sourceTenants.Count(tenant => !tenant.IsActive)).IsEqualTo(4);
         await Assert.That(candidates.Select(owner => owner.TenantId).ToHashSet().SetEquals(tenants)).IsTrue();
         var handler = new PurgeEventDiscoverySnapshotsCommandHandler(
-            repository, new EfCoreUnitOfWork(context), new FixedClock());
+            repository, new FixedClock());
         var result = await handler.ExecuteAsync(new());
         await Assert.That(result.DeletedSnapshots).IsEqualTo(5);
         await Assert.That((await repository.GetExpiredOwnersAsync(null, Now, 5, default)).Count).IsEqualTo(0);
@@ -243,8 +240,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         await DeleteTenantSourceAsync(store, store.TenantId);
         await using var context = Open(store, store.OtherTenantId);
         var repository = Maintenance(context);
-        int deleted = await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(
-            token => repository.PurgeTenantBatchAsync(store.TenantId, Now, 10, token));
+        int deleted = await repository.PurgeTenantBatchAsync(store.TenantId, Now, 10, default);
         await Assert.That(deleted).IsEqualTo(1);
         await using var reader = Open(store);
         var snapshots = new EventDiscoverySnapshotRepository(reader);
@@ -266,7 +262,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         await using var context = Open(store);
         await context.Set<EventDiscoveryRevision>().ExecuteDeleteAsync();
         var handler = new PurgeEventDiscoverySnapshotsCommandHandler(
-            Maintenance(context), new EfCoreUnitOfWork(context), new FixedClock());
+            Maintenance(context), new FixedClock());
 
         var result = await handler.ExecuteAsync(new());
 
@@ -291,14 +287,14 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         var other = await SeedSnapshotAsync(store, store.OtherTenantId, Now);
         await using var context = Open(store, store.OtherTenantId);
         var repository = Maintenance(context);
-        var unitOfWork = new EfCoreUnitOfWork(context);
-        await Assert.ThrowsAsync<RollbackProbeException>(async () =>
-            await unitOfWork.ExecuteSerializableAsync<int>(async token =>
-            {
-                await Assert.That(await repository.PurgeTenantBatchAsync(store.TenantId, Now, 2, token))
-                    .IsEqualTo(2);
-                throw new RollbackProbeException();
-            }));
+        var header = context.Model.FindEntityType(typeof(EventDiscoverySnapshot))!;
+        string table = context.GetService<ISqlGenerationHelper>().DelimitIdentifier(header.GetTableName()!);
+        string guardSql = $"CREATE TRIGGER reject_header_delete BEFORE DELETE ON {table} " +
+            "BEGIN SELECT RAISE(ABORT, 'snapshot_header_delete_rejected'); END;";
+        await context.Database.ExecuteSqlRawAsync(guardSql);
+        var rejection = await Assert.ThrowsAsync<SqliteException>(async () =>
+            await repository.PurgeTenantBatchAsync(store.TenantId, Now, 2, default));
+        await Assert.That(rejection!.SqliteExtendedErrorCode).IsEqualTo(SQLitePCL.raw.SQLITE_CONSTRAINT_TRIGGER);
         await Assert.That(context.TenantFilterTenantId).IsEqualTo(store.OtherTenantId);
         await Assert.That(context.IsTenantFilterBypassed).IsFalse();
         await using var primaryContext = Open(store);
@@ -308,8 +304,8 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         await Assert.That((await primary.GetItemsAsync(store.TenantId, first.Id, -1, 100, default)).Count).IsEqualTo(2);
         await Assert.That((await primary.GetItemsAsync(store.TenantId, second.Id, -1, 100, default)).Count).IsEqualTo(1);
 
-        await Assert.That(await unitOfWork.ExecuteSerializableAsync(
-            token => repository.PurgeTenantBatchAsync(store.TenantId, Now, 2, token))).IsEqualTo(2);
+        await context.Database.ExecuteSqlRawAsync("DROP TRIGGER reject_header_delete;");
+        await Assert.That(await repository.PurgeTenantBatchAsync(store.TenantId, Now, 2, default)).IsEqualTo(2);
         await Assert.That(await primary.GetAsync(store.TenantId, first.Id, default)).IsNull();
         var otherReader = new EventDiscoverySnapshotRepository(context);
         await Assert.That(await otherReader.GetAsync(store.OtherTenantId, other.Id, default)).IsNotNull();
@@ -318,7 +314,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
     }
 
     [Test]
-    public async Task Invalid_bounds_and_missing_transaction_fail_without_deleting_membership()
+    public async Task Invalid_bounds_and_empty_tenant_fail_without_deleting_membership()
     {
         await using var store = await Store.CreateAsync();
         var snapshot = await SeedSnapshotAsync(store, store.TenantId, Now);
@@ -332,8 +328,8 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
             await repository.GetExpiredOwnersAsync(null, DateTime.SpecifyKind(Now, DateTimeKind.Unspecified), 1, default));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
             await repository.PurgeTenantBatchAsync(store.TenantId, Now, 11, default));
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await repository.PurgeTenantBatchAsync(store.TenantId, Now, 1, default));
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await repository.PurgeTenantBatchAsync(Guid.Empty, Now, 1, default));
         await Assert.That(await new EventDiscoverySnapshotRepository(context)
             .GetAsync(store.TenantId, snapshot.Id, default)).IsNotNull();
     }
@@ -345,7 +341,9 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
     {
         var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
         var runtimeOptions = PrimaryDatabaseConfiguration.BindRuntime(configuration);
+        var globalOptions = PrimaryDatabaseConfiguration.BindGlobal(configuration);
         var migrationOptions = PrimaryDatabaseConfiguration.BindMigrator(configuration);
+        await Assert.That(globalOptions.Username).IsNotEqualTo(runtimeOptions.Username);
         await Assert.That(migrationOptions.Provider).IsEqualTo(PrimaryDatabaseProvider.PostgreSql);
         await Assert.That((migrationOptions.Host, migrationOptions.Port, migrationOptions.Database, migrationOptions.Schema))
             .IsEqualTo((runtimeOptions.Host, runtimeOptions.Port, runtimeOptions.Database, runtimeOptions.Schema));
@@ -425,7 +423,7 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
                 """
                 SELECT NOT pg_has_role(CURRENT_USER, {0}, 'MEMBER')
                     AND NOT pg_has_role(CURRENT_USER, {1}, 'MEMBER')
-                    AND pg_has_role(CURRENT_USER, {2}, 'USAGE') AS "Value"
+                    AND NOT pg_has_role(CURRENT_USER, {2}, 'USAGE') AS "Value"
                 """, PostgresDiscoverySnapshotMaintenanceContract.OwnerRole,
                 PostgresDiscoverySnapshotMaintenanceContract.MigratorRole,
                 PostgresDiscoverySnapshotMaintenanceContract.RuntimeRole).SingleAsync(token)).IsTrue();
@@ -453,15 +451,22 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
                 .CountAsync(row => owners.Contains(row.TenantId), token)).IsEqualTo(0);
 
             var repository = Maintenance(context);
+            await using var global = await new GlobalExploreDbContextFactory(globalOptions).CreateDbContextAsync(token);
+            await Assert.That(await global.Database.SqlQueryRaw<bool>(
+                """
+                SELECT NOT rolsuper AND NOT rolbypassrls
+                    AND pg_has_role(CURRENT_USER, {0}, 'USAGE') AS "Value"
+                FROM pg_catalog.pg_roles WHERE rolname = CURRENT_USER
+                """, PostgresDiscoverySnapshotMaintenanceContract.RuntimeRole).SingleAsync(token)).IsTrue();
             var first = await repository.GetExpiredOwnersAsync(lower, now, 5, token);
             await Assert.That(first.Select(owner => owner.TenantId).SequenceEqual(owners.Take(5))).IsTrue();
             var last = await repository.GetExpiredOwnersAsync(first[^1].TenantId, now, 1, token);
             await Assert.That(last.Single().TenantId).IsEqualTo(owners[5]);
             // The database boundary, not only the C# guard, rejects oversized reads.
-            string oversizedRead = $"SELECT * FROM {PostgresDiscoverySnapshotMaintenanceContract.FunctionSql(context)}" +
+            string oversizedRead = $"SELECT * FROM {PostgresDiscoverySnapshotMaintenanceContract.FunctionSql(global)}" +
                 "({0}::uuid, {1}, 6)";
             var rejected = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await context.Database.ExecuteSqlRawAsync(oversizedRead, [lower, now], token));
+                await global.Database.ExecuteSqlRawAsync(oversizedRead, [lower, now], token));
             await Assert.That(rejected!.SqlState).IsEqualTo("22023");
 
             DateTime future = new(9999, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -469,9 +474,8 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
             await Assert.That(futureFirst.Select(owner => owner.TenantId).SequenceEqual(owners.Take(5))).IsTrue();
             var futureLast = await repository.GetExpiredOwnersAsync(futureFirst[^1].TenantId, future, 5, token);
             await Assert.That(futureLast.Select(owner => owner.TenantId).SequenceEqual([owners[5]])).IsTrue();
-            await Assert.That(await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(
-                ct => repository.PurgeTenantBatchAsync(liveOnlyOwner, future, 10, ct), token)).IsEqualTo(0);
-            var handler = new PurgeEventDiscoverySnapshotsCommandHandler(repository, new EfCoreUnitOfWork(context), new FixedClock(now));
+            await Assert.That(await repository.PurgeTenantBatchAsync(liveOnlyOwner, future, 10, token)).IsEqualTo(0);
+            var handler = new PurgeEventDiscoverySnapshotsCommandHandler(repository, new FixedClock(now));
             var purged = await handler.ExecuteAsync(new(lower), token);
             await Assert.That(purged.DeletedSnapshots).IsEqualTo(14);
             await Assert.That(purged.NextTenantId).IsEqualTo(owners[4]);
@@ -508,8 +512,23 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
     private static ExploreDbContext Open(Store store, Guid? tenantId = null) =>
         store.Open(tenantId, SqliteNamedLockTransactionInterceptor.Instance);
 
-    private static EventDiscoverySnapshotMaintenanceRepository Maintenance(ExploreDbContext context) =>
-        new(context);
+    private static EventDiscoverySnapshotMaintenanceRepository Maintenance(ExploreDbContext context)
+    {
+        if (context.Database.IsNpgsql())
+        {
+            var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+            return new(new GlobalExploreDbContextFactory(PrimaryDatabaseConfiguration.BindGlobal(configuration)),
+                new TenantExploreDbContextFactory(PrimaryDatabaseConfiguration.BindRuntime(configuration)));
+        }
+        var options = new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = new SqliteConnectionStringBuilder(context.Database.GetConnectionString()).DataSource
+        };
+        return new(new GlobalExploreDbContextFactory(options with { Role = PrimaryDatabaseRole.Global }),
+            new TenantExploreDbContextFactory(options));
+    }
 
     private static async Task DeleteTenantSourceAsync(Store store, Guid tenantId)
     {
@@ -576,7 +595,6 @@ public sealed class EventDiscoverySnapshotMaintenanceTests
         public override DateTimeOffset GetUtcNow() => new(instant ?? Now);
     }
 
-    private sealed class RollbackProbeException : Exception;
 }
 
 internal sealed class RequiresSnapshotMaintenancePostgreSqlAttribute()

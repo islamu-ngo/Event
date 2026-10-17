@@ -1,7 +1,13 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
+using Explore.Application.Services;
+using System.Text.Json;
+using System.Data;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -170,11 +176,6 @@ public sealed class EventLocationRepository(ExploreDbContext dbContext) : IEvent
             .ToListAsync(cancellationToken);
     }
 
-    public Task<int> CountNeedingPrivacyReviewAsync(CancellationToken cancellationToken) =>
-        dbContext.EventLocations
-            .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceLocationPrivacyReviewQueueDepth)
-            .CountAsync(item => item.NeedsPrivacyReview, cancellationToken);
-
     public async Task SaveGovernanceChangesAsync(
         IReadOnlyCollection<EventLocationDisclosureAudit> audits,
         IReadOnlyCollection<OutboxMessage> outboxMessages,
@@ -182,9 +183,40 @@ public sealed class EventLocationRepository(ExploreDbContext dbContext) : IEvent
     {
         ArgumentNullException.ThrowIfNull(audits);
         ArgumentNullException.ThrowIfNull(outboxMessages);
+        if (outboxMessages.Count > 0 && dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Correction custody requires the original governance transaction.");
+        foreach (OutboxMessage message in outboxMessages)
+            audits.Single(item => item.EventLocationId == message.AggregateId
+                && item.OccurredAtUtc == message.CreatedAt).BindCorrection(message.Id);
         dbContext.EventLocationDisclosureAudits.AddRange(audits);
         dbContext.OutboxMessages.AddRange(outboxMessages);
         await dbContext.SaveChangesAsync(cancellationToken);
+        foreach (OutboxMessage message in outboxMessages)
+        {
+            EventLocationDisclosureAudit audit = audits.Single(item =>
+                item.EventLocationId == message.AggregateId && item.OccurredAtUtc == message.CreatedAt);
+            if (LocationGovernanceCorrectionNativeOperations.For(dbContext) is { } native)
+            {
+                await native.RetainAsync(message.Id, audit.Id, cancellationToken);
+            }
+            else
+            {
+                EventLocation source = await dbContext.EventLocations.AsNoTracking()
+                    .SingleAsync(item => item.Id == audit.EventLocationId && item.TenantId == audit.TenantId,
+                        cancellationToken);
+                OutboxMessage expected = LocationPrivacyOutboxMessageFactory.CreateProjectionCorrection(
+                    message.Id, source, message.CreatedAt);
+                using var payload = JsonDocument.Parse(message.Payload!);
+                using var required = JsonDocument.Parse(expected.Payload!);
+                if (message.EventType != expected.EventType || message.AggregateType != expected.AggregateType
+                    || message.Status != OutboxMessageStatus.Pending || source.PolicyVersion != audit.NewPolicyVersion
+                    || !JsonElement.DeepEquals(payload.RootElement, required.RootElement))
+                    throw new InvalidOperationException("Correction must match the paired native policy transition.");
+                dbContext.Add(LocationPrivacyCorrectionReceipt.ForGovernance(
+                    message.Id, source.EventId, audit, message.CreatedAt));
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>

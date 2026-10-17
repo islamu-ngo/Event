@@ -207,8 +207,8 @@ public sealed class TemplateInstantiationPostgreSqlTests(PostgreSqlContainerFixt
         var statusRepository = new CustomPropertyProjectionStatusRepository(context);
         var dirtyScopeRepository = new CustomPropertyProjectionDirtyScopeRepository(context);
         var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
-        var tenantSettingRepository = new TenantSettingRepository(context, mutationLock);
-        var systemSettingRepository = new SystemSettingRepository(context, mutationLock);
+        var tenantSettingRepository = TenantSettingRepository.CreateReadOnly(context, mutationLock);
+        var systemSettingRepository = SystemSettingRepository.CreateReadOnly(context, mutationLock);
         var quotaResolver = new CustomPropertyQuotaResolver(tenantSettingRepository, systemSettingRepository);
 
         return new EventCustomPropertyProjectionUpdater(
@@ -224,8 +224,8 @@ public sealed class TemplateInstantiationPostgreSqlTests(PostgreSqlContainerFixt
         var statusRepository = new CustomPropertyProjectionStatusRepository(context);
         var dirtyScopeRepository = new CustomPropertyProjectionDirtyScopeRepository(context);
         var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
-        var tenantSettingRepository = new TenantSettingRepository(context, mutationLock);
-        var systemSettingRepository = new SystemSettingRepository(context, mutationLock);
+        var tenantSettingRepository = TenantSettingRepository.CreateReadOnly(context, mutationLock);
+        var systemSettingRepository = SystemSettingRepository.CreateReadOnly(context, mutationLock);
         var quotaResolver = new CustomPropertyQuotaResolver(tenantSettingRepository, systemSettingRepository);
 
         return new EventSessionCustomPropertyProjectionUpdater(

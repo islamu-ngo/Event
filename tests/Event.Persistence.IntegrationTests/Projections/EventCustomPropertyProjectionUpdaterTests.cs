@@ -19,6 +19,7 @@ namespace Event.Persistence.IntegrationTests.Projections;
 [ClassDataSource<ProjectionTestContainerFixture>(Shared = SharedType.PerAssembly)]
 public class EventCustomPropertyProjectionUpdaterTests
 {
+    private sealed record ProjectionTenant(Guid TenantId) : Explore.Application.Contracts.Infrastructure.ITenantContext;
     private readonly ProjectionTestContainerFixture _fixture;
 
     public EventCustomPropertyProjectionUpdaterTests(ProjectionTestContainerFixture fixture)
@@ -213,7 +214,6 @@ public class EventCustomPropertyProjectionUpdaterTests
     public async Task RebuildForTenantAsync_PopulatesStatusRowAndProcessesEvents()
     {
         using var context = _fixture.CreateDbContext();
-        var updater = CreateUpdater(context);
 
         var scope = await SeedEventWithDefinitionAsync(context, PropertyType.Text);
         var value = new EventCustomPropertyValue
@@ -227,7 +227,9 @@ public class EventCustomPropertyProjectionUpdaterTests
         context.EventCustomPropertyValues.Add(value);
         await context.SaveChangesAsync();
 
-        var result = await updater.RebuildForTenantAsync(scope.TenantId, batchSize: null, CancellationToken.None);
+        using var maintenance = _fixture.CreateDbContext(new ProjectionTenant(scope.TenantId));
+        var result = await new EfCoreUnitOfWork(maintenance)
+            .ExecuteSerializableAsync(token => CreateUpdater(maintenance).RebuildForTenantAsync(scope.TenantId, null, token));
 
         await Assert.That(result.LockAcquired).IsTrue();
         await Assert.That(result.RowsProcessed).IsGreaterThanOrEqualTo(1);
@@ -292,9 +294,9 @@ public class EventCustomPropertyProjectionUpdaterTests
                     .SingleAsync(p => p.EventId == scope.EventId);
             }
 
-            using var rebuildContext = _fixture.CreateDbContext();
-            var result = await CreateUpdater(rebuildContext)
-                .RebuildForTenantAsync(scope.TenantId, batchSize: null, CancellationToken.None);
+            using var rebuildContext = _fixture.CreateDbContext(new ProjectionTenant(scope.TenantId));
+            var result = await new EfCoreUnitOfWork(rebuildContext)
+                .ExecuteSerializableAsync(token => CreateUpdater(rebuildContext).RebuildForTenantAsync(scope.TenantId, null, token));
             await Assert.That(result.LockAcquired).IsTrue();
             await Assert.That(result.RowsFailed).IsEqualTo(0);
 
@@ -355,8 +357,8 @@ public class EventCustomPropertyProjectionUpdaterTests
         var statusRepo = new CustomPropertyProjectionStatusRepository(context);
         var dirtyScopeRepo = new CustomPropertyProjectionDirtyScopeRepository(context);
         var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
-        var tenantSettingRepo = new TenantSettingRepository(context, mutationLock);
-        var systemSettingRepo = new SystemSettingRepository(context, mutationLock);
+        var tenantSettingRepo = TenantSettingRepository.CreateReadOnly(context, mutationLock);
+        var systemSettingRepo = SystemSettingRepository.CreateReadOnly(context, mutationLock);
         var quotaResolver = new CustomPropertyQuotaResolver(tenantSettingRepo, systemSettingRepo);
 
         return new EventCustomPropertyProjectionUpdater(

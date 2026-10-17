@@ -120,10 +120,10 @@ public sealed class PublicEventEligibilityRepositoryTests
         await context.SaveChangesAsync();
         context.ClearTenantFilterBypass();
 
-        var sessionRepository = new EventSessionRepository(context);
+        var sessionRepository = new EventSessionRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         var groupRepository = new EventSessionGroupRepository(context);
         var assignmentRepository = new EventSessionGroupSessionRepository(context);
-        var agendaRepository = new EventAgendaItemRepository(context);
+        var agendaRepository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         var sessionAgendaRepository = new EventSessionAgendaItemRepository(context);
 
         await Assert.That((await sessionRepository.GetPublicSessionsByEventAsync(eligible.Event.Id, CancellationToken.None)).Select(session => session.Id))

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Application;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Operations.Decorators;
@@ -31,6 +32,7 @@ public sealed class EventCatalogMapperTests
         repository.GetById(8).Returns(sources[0]);
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton(Substitute.For<IMachinePrincipalAccessor>());
         services.AddSingleton(repository);
         services.AddSingleton(Substitute.For<IAuthorizationProvider>());
         services.AddNativeOperations(

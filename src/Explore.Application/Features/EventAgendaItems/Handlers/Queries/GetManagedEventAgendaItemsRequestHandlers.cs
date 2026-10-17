@@ -7,14 +7,17 @@ using Explore.Application.Contracts.Operations;
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Queries;
 
 public sealed class GetManagedEventAgendaItemsByEventRequestHandler(
-    IEventAgendaItemRepository repository)
+    IEventAgendaItemRepository repository,
+    IPrivateEventManagementReader? privateManagement = null)
     : IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>
 {
     public async Task<List<EventAgendaItemListDto>> QueryAsync(
         GetManagedEventAgendaItemsByEventRequest request,
         CancellationToken cancellationToken)
     {
-        var items = await repository.GetByEventAsync(request.EventId, cancellationToken);
+        var items = privateManagement is null ? await repository.GetByEventAsync(request.EventId, cancellationToken)
+            : (await privateManagement.ReadAsync(new(PrivateEventManagementReadKind.Program, request.EventId), cancellationToken))
+                .AgendaItems.OrderBy(item => item.SortOrder).ThenBy(item => item.StartTime).ToList();
         return items.Select(EventMapper.ToListItem).ToList();
     }
 }

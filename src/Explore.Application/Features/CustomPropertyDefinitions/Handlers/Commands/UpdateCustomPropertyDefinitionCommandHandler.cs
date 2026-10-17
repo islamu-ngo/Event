@@ -1,4 +1,6 @@
+using Explore.Application.Authorization;
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -13,6 +15,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
@@ -23,7 +26,14 @@ public class UpdateCustomPropertyDefinitionCommandHandler : ICommandHandler<Upda
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ICurrentUserService _currentUserService;
     private readonly HybridCache _cache;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISerializableAttemptOwner _owner;
+    private readonly ITenantContext _tenantContext;
+    private readonly IAdminContext _adminContext;
+    private readonly ITenantAdministratorCommitAuthority _tenantAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly RequestAuthorization<UpdateCustomPropertyDefinitionCommand> _authorization;
+    private readonly ILogger<UpdateCustomPropertyDefinitionCommandHandler> _logger;
+    private readonly IHumanAdministrativeActionPreparation _preparation;
 
     public UpdateCustomPropertyDefinitionCommandHandler(
         ICustomPropertyDefinitionRepository customPropertyDefinitionRepository,
@@ -31,31 +41,74 @@ public class UpdateCustomPropertyDefinitionCommandHandler : ICommandHandler<Upda
         ICustomPropertyQuotaResolver quotaResolver,
         ICurrentUserService currentUserService,
         HybridCache cache,
-        IUnitOfWork unitOfWork)
+        ISerializableAttemptOwner owner,
+        ITenantContext tenantContext,
+        IAdminContext adminContext,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        RequestAuthorization<UpdateCustomPropertyDefinitionCommand> authorization,
+        ILogger<UpdateCustomPropertyDefinitionCommandHandler> logger,
+        IHumanAdministrativeActionPreparation preparation)
     {
         _customPropertyDefinitionRepository = customPropertyDefinitionRepository;
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
         _quotaResolver = quotaResolver;
         _currentUserService = currentUserService;
         _cache = cache;
-        _unitOfWork = unitOfWork;
+        _owner = owner;
+        _tenantContext = tenantContext;
+        _adminContext = adminContext;
+        _tenantAuthority = tenantAuthority;
+        _instanceAuthority = instanceAuthority;
+        _authorization = authorization;
+        _logger = logger;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    {
+        Guid tenantId = _tenantContext.TenantId;
+        if (!_currentUserService.IsAuthenticated || tenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            return BaseCommandResponse.Authentication<Guid>();
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
+        var validation = await new UpdateCustomPropertyDefinitionDtoValidator()
+            .ValidateAsync(request.DefinitionDto, cancellationToken);
+        if (!validation.IsValid)
+            return BaseCommandResponse.Validation<Guid>(
+                validation.Errors.Select(error => error.ErrorMessage), "Custom-property definition update failed.");
+        Guid[] optionIds = request.DefinitionDto.Options?.Items?.Select(_ => Guid.CreateVersion7()).ToArray() ?? [];
+        DateTime changedAt = DateTime.UtcNow;
+        CustomPropertyDefinition? updatedDefinition = null;
+        EntityTypeName? previousType = null;
+        var prepared = await _preparation.PrepareAsync(request, userId, cancellationToken);
+        var response = await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, userId, token);
+            updatedDefinition = null;
+            previousType = null;
+            if (!await _instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await _tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return BaseCommandResponse.Authorization<Guid>();
+            return await UpdateAuthorizedAsync(request, tenantId, optionIds, changedAt, (definition, priorType) =>
+            {
+                updatedDefinition = definition;
+                previousType = priorType;
+            }, token);
+        }, cancellationToken);
+        if (response.IsSuccess && updatedDefinition is not null && previousType is { } oldType)
+            await InvalidateCaches(updatedDefinition.TenantId, oldType, updatedDefinition.EntityTypeName);
+        return response;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> UpdateAuthorizedAsync(
+        UpdateCustomPropertyDefinitionCommand request, Guid tenantId, Guid[] optionIds, DateTime changedAt,
+        Action<CustomPropertyDefinition, EntityTypeName> committed, CancellationToken cancellationToken)
     {
         if (request.DefinitionId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["DefinitionId and ExpectedConcurrencyStamp are required."],
-                "Custom-property definition update failed.");
-        }
-
-        var validator = new UpdateCustomPropertyDefinitionDtoValidator();
-        var validationResult = await validator.ValidateAsync(request.DefinitionDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                validationResult.Errors.Select(e => e.ErrorMessage),
                 "Custom-property definition update failed.");
         }
 
@@ -65,9 +118,7 @@ public class UpdateCustomPropertyDefinitionCommandHandler : ICommandHandler<Upda
             return BaseCommandResponse.NotFound<Guid>("Custom-property definition not found.");
         }
 
-        request = request with { TenantId = definition.TenantId };
-
-        if (request.TenantId == Guid.Empty || request.TenantId != definition.TenantId)
+        if (definition.TenantId != tenantId || definition.IsDeleted)
         {
             return BaseCommandResponse.NotFound<Guid>("Custom-property definition not found.");
         }
@@ -196,34 +247,35 @@ public class UpdateCustomPropertyDefinitionCommandHandler : ICommandHandler<Upda
         definition.Namespace = governance.NormalizedNamespace;
         definition.Key = governance.NormalizedKey;
         definition.UpdatedBy = _currentUserService.UserId;
-        definition.UpdatedAt = DateTime.UtcNow;
+        definition.UpdatedAt = changedAt;
 
         if (request.DefinitionDto.Options is null)
         {
-            await _unitOfWork.ExecuteInTransactionAsync(
-                _ => _customPropertyDefinitionRepository.Update(definition),
-                cancellationToken);
+            await _customPropertyDefinitionRepository.Update(definition);
         }
         else
         {
-            var options = CreateOptionEntities(candidate.Options, definition.Id);
+            var options = CreateOptionEntities(candidate.Options, definition.Id, optionIds, changedAt);
             var defaultOption = options.SingleOrDefault(x => x.IsDefault);
-            await _unitOfWork.ExecuteInTransactionAsync(
-                ct => _customPropertyDefinitionRepository.UpdateWithOptions(definition, options, defaultOption?.Id, ct),
-                cancellationToken);
+            await _customPropertyDefinitionRepository.UpdateWithOptions(
+                definition, options, defaultOption?.Id, cancellationToken);
         }
 
-        await InvalidateCaches(definition.TenantId, previousEntityTypeName, definition.EntityTypeName);
+        cancellationToken.ThrowIfCancellationRequested();
+        committed(definition, previousEntityTypeName);
 
         return BaseCommandResponse.Success(definition.Id, "Custom-property definition updated successfully.");
     }
 
-    private List<CustomPropertyOption> CreateOptionEntities(IReadOnlyCollection<CreateCustomPropertyOptionDto> optionDtos, Guid definitionId)
+    private List<CustomPropertyOption> CreateOptionEntities(
+        IReadOnlyCollection<CreateCustomPropertyOptionDto> optionDtos, Guid definitionId,
+        Guid[] optionIds, DateTime createdAt)
     {
         return optionDtos
-            .Select(optionDto => new CustomPropertyOption
+            .Select((optionDto, index) => new CustomPropertyOption
             {
-                Id = Guid.CreateVersion7(),
+                Id = optionIds[index],
+                CreatedAt = createdAt,
                 CustomPropertyDefinitionId = definitionId,
                 Namespace = CustomPropertyIdentity.NormalizeNamespace(optionDto.Namespace),
                 Key = CustomPropertyIdentity.NormalizeKey(optionDto.Key),

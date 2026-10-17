@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Explore.Application.Services;
 
 public sealed class EventLocationReviewQueueMonitor(
-    IEventLocationRepository eventLocations,
+    IEventLocationPrivacyReviewReader eventLocations,
     EventLocationPrivacyMetrics metrics,
     IOptions<EventLocationPrivacyObservabilityOptions> options) : IEventLocationReviewQueueMonitor
 {

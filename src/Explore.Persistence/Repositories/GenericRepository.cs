@@ -21,6 +21,7 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
 
     public virtual async Task<T> Create(T entity)
     {
+        RequireTenantMutationScope(entity);
         try
         {
             await _dbContext.AddAsync(entity);
@@ -44,6 +45,7 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
     /// </summary>
     public virtual async Task Delete(T entity)
     {
+        RequireTenantMutationScope(entity);
         // Check if entity supports soft delete
         if (entity is ISoftDeletable)
         {
@@ -70,6 +72,11 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
 
     public async Task<bool> Exists(TKey id)
     {
+        return await VisibleRows().AnyAsync(KeyPredicate(id));
+    }
+
+    private Expression<Func<T, bool>> KeyPredicate(TKey id)
+    {
         var entityType = _dbContext.Model.FindEntityType(typeof(T))
             ?? throw new InvalidOperationException($"Entity type metadata not found for {typeof(T).Name}.");
         var primaryKey = entityType.FindPrimaryKey()
@@ -88,24 +95,21 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
             [keyProperty.ClrType],
             entity,
             Expression.Constant(keyProperty.Name));
-        var keyValue = Expression.Convert(Expression.Constant(id, typeof(TKey)), keyProperty.ClrType);
-        var predicate = Expression.Lambda<Func<T, bool>>(
+        Expression<Func<TKey>> selectedId = () => id;
+        var keyValue = Expression.Convert(selectedId.Body, keyProperty.ClrType);
+        return Expression.Lambda<Func<T, bool>>(
             Expression.Equal(property, keyValue),
             entity);
-
-        return await _dbContext.Set<T>()
-            .AsNoTracking()
-            .AnyAsync(predicate);
     }
 
     public async Task<IReadOnlyList<T>> GetAll()
     {
-        return await _dbContext.Set<T>().AsNoTracking().ToListAsync();
+        return await VisibleRows().ToListAsync();
     }
 
     public async Task<(IReadOnlyList<T> Items, int TotalCount)> GetAllPaged(int pageNumber, int pageSize)
     {
-        var query = _dbContext.Set<T>().AsNoTracking();
+        var query = VisibleRows();
         var totalCount = await query.CountAsync();
         var items = await query
             .Skip((pageNumber - 1) * pageSize)
@@ -116,11 +120,14 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
 
     public async Task<T?> GetById(TKey id)
     {
-        return await _dbContext.Set<T>().FindAsync(id);
+        // FindAsync can return an identity-map entry without applying tenant or
+        // soft-delete filters. Reads must reflect the persisted row, not local edits.
+        return await VisibleRows().SingleOrDefaultAsync(KeyPredicate(id));
     }
 
     public virtual async Task Update(T entity)
     {
+        RequireTenantMutationScope(entity);
         var entry = _dbContext.Entry(entity);
         if (entry.State != EntityState.Detached)
         {
@@ -147,6 +154,37 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         }
 
         await _dbContext.SaveChangesAsync();
+    }
+
+    private IQueryable<T> VisibleRows()
+    {
+        var query = _dbContext.Set<T>().AsNoTracking();
+        var tenant = _dbContext.Model.FindEntityType(typeof(T))?.FindProperty("TenantId");
+        if (tenant is null || tenant.ClrType != typeof(Guid) && tenant.ClrType != typeof(Guid?))
+            return query;
+
+        Guid? tenantId = _dbContext.TenantFilterTenantId;
+        if (tenantId == Guid.Empty)
+            tenantId = null;
+        var entity = Expression.Parameter(typeof(T), "entity");
+        var column = Expression.Call(typeof(EF), nameof(EF.Property), [tenant.ClrType],
+            entity, Expression.Constant(tenant.Name));
+        Expression<Func<Guid?>> selectedTenant = () => tenantId;
+        Expression predicate = Expression.Equal(Expression.Convert(column, typeof(Guid?)), selectedTenant.Body);
+        if (tenant.ClrType == typeof(Guid?))
+            predicate = Expression.OrElse(Expression.Equal(column, Expression.Constant(null, typeof(Guid?))), predicate);
+        return query.Where(Expression.Lambda<Func<T, bool>>(predicate, entity));
+    }
+
+    private void RequireTenantMutationScope(T entity)
+    {
+        var entry = _dbContext.Entry(entity);
+        var tenant = entry.Metadata.FindProperty("TenantId");
+        if (tenant is not null && (tenant.ClrType == typeof(Guid) || tenant.ClrType == typeof(Guid?))
+            && entry.Property(tenant.Name).CurrentValue is Guid targetTenant
+            && (targetTenant == Guid.Empty || _dbContext.TenantFilterTenantId != targetTenant
+                || _dbContext.IsTenantFilterBypassed))
+            throw new InvalidOperationException("tracked_tenant_authority_mismatch");
     }
 
     private bool HasSamePrimaryKey(T trackedEntity, T candidateEntity, IReadOnlyList<Microsoft.EntityFrameworkCore.Metadata.IProperty> keyProperties)

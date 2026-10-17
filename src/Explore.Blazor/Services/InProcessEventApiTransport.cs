@@ -29,7 +29,8 @@ public sealed class InProcessEventApiDispatcher
     {
         var pipeline = Volatile.Read(ref _pipeline)
             ?? throw new InvalidOperationException("The in-process Event API pipeline is not bound.");
-        return pipeline(context);
+        return context.RequestServices.GetRequiredService<Explore.ServiceDefaults.EarlyRequestAdmission>()
+            .InvokeAsync(context, pipeline);
     }
 
     public void BindEndpointSelector(RequestDelegate endpointSelector)
@@ -48,7 +49,11 @@ public sealed class InProcessEventApiDispatcher
         return endpointSelector(context);
     }
 
-    public void MarkRequest(HttpContext context) => context.Items[RequestMarker] = true;
+    public void MarkRequest(HttpContext context)
+    {
+        context.Items[RequestMarker] = true;
+        Explore.ServiceDefaults.EarlyRequestAdmission.MarkInternalRequest(context);
+    }
 
     public bool IsMarkedRequest(HttpContext context) => context.Items.ContainsKey(RequestMarker);
 }

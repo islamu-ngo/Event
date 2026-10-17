@@ -1,3 +1,5 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -11,6 +13,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventSessionTemplates.Handlers.Commands;
 
@@ -21,7 +24,14 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ICurrentUserService _currentUserService;
     private readonly HybridCache _cache;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISerializableAttemptOwner _owner;
+    private readonly IHumanAdministrativeActionPreparation _preparation;
+    private readonly ITenantContext _tenantContext;
+    private readonly IAdminContext _adminContext;
+    private readonly ITenantAdministratorCommitAuthority _tenantAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly RequestAuthorization<UpdateEventSessionTemplateCommand> _authorization;
+    private readonly ILogger<UpdateEventSessionTemplateCommandHandler> _logger;
 
     public UpdateEventSessionTemplateCommandHandler(
         IEventSessionTemplateRepository sessionTemplateRepository,
@@ -29,31 +39,70 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
         ICustomPropertyQuotaResolver quotaResolver,
         ICurrentUserService currentUserService,
         HybridCache cache,
-        IUnitOfWork unitOfWork)
+        ISerializableAttemptOwner owner,
+        ITenantContext tenantContext,
+        IAdminContext adminContext,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        RequestAuthorization<UpdateEventSessionTemplateCommand> authorization,
+        ILogger<UpdateEventSessionTemplateCommandHandler> logger,
+        IHumanAdministrativeActionPreparation preparation)
     {
         _sessionTemplateRepository = sessionTemplateRepository;
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
         _quotaResolver = quotaResolver;
         _currentUserService = currentUserService;
         _cache = cache;
-        _unitOfWork = unitOfWork;
+        _owner = owner;
+        _preparation = preparation;
+        _tenantContext = tenantContext;
+        _adminContext = adminContext;
+        _tenantAuthority = tenantAuthority;
+        _instanceAuthority = instanceAuthority;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionTemplateCommand request, CancellationToken cancellationToken)
+    {
+        Guid tenantId = _tenantContext.TenantId;
+        if (!_currentUserService.IsAuthenticated || tenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            return BaseCommandResponse.Authentication<Guid>();
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
+        var validationResult = await new UpdateEventSessionTemplateDtoValidator()
+            .ValidateAsync(request.SessionTemplateDto, cancellationToken);
+        if (!validationResult.IsValid)
+            return BaseCommandResponse.Validation<Guid>(
+                validationResult.Errors.Select(error => error.ErrorMessage), "Event session template update failed.");
+        DateTime createdAt = DateTime.UtcNow;
+        var definitionIds = (request.SessionTemplateDto.Definitions?.Items ?? []).Select(definition =>
+            (Id: Guid.CreateVersion7(), OptionIds: definition.Options.Select(_ => Guid.CreateVersion7()).ToArray())).ToArray();
+        EventSessionTemplate? updatedTemplate = null;
+        var prepared = await _preparation.PrepareAsync(request, userId, cancellationToken);
+        var response = await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, userId, token);
+            updatedTemplate = null;
+            if (!await _instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await _tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return BaseCommandResponse.Authorization<Guid>();
+            return await UpdateAuthorizedAsync(request, tenantId, createdAt, definitionIds, template => updatedTemplate = template, token);
+        }, cancellationToken);
+        if (response.IsSuccess && updatedTemplate is not null)
+            await InvalidateCaches(updatedTemplate.EventTemplateId, updatedTemplate.Id, cancellationToken);
+        return response;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> UpdateAuthorizedAsync(
+        UpdateEventSessionTemplateCommand request, Guid executionTenantId, DateTime createdAt,
+        (Guid Id, Guid[] OptionIds)[] definitionIds,
+        Action<EventSessionTemplate> recordChange, CancellationToken cancellationToken)
     {
         if (request.SessionTemplateId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["SessionTemplateId and ExpectedConcurrencyStamp are required."],
-                "Event session template update failed.");
-        }
-
-        var validator = new UpdateEventSessionTemplateDtoValidator();
-        var validationResult = await validator.ValidateAsync(request.SessionTemplateDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                validationResult.Errors.Select(e => e.ErrorMessage),
                 "Event session template update failed.");
         }
 
@@ -63,9 +112,7 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
             return BaseCommandResponse.NotFound<Guid>("Event session template not found.");
         }
 
-        request = request with { TenantId = sessionTemplate.TenantId };
-
-        if (request.TenantId == Guid.Empty || request.TenantId != sessionTemplate.TenantId)
+        if (sessionTemplate.TenantId != executionTenantId)
         {
             return BaseCommandResponse.NotFound<Guid>("Event session template not found.");
         }
@@ -151,7 +198,7 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
                         sessionTemplate.TenantId));
             }
 
-            var definitionsResult = BuildDefinitionEntities(candidate.Definitions, sessionTemplate.TenantId);
+            var definitionsResult = BuildDefinitionEntities(candidate.Definitions, sessionTemplate.TenantId, createdAt, definitionIds);
             if (definitionsResult.Errors.Count > 0)
             {
                 return BaseCommandResponse.Validation<Guid>(
@@ -174,18 +221,15 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
 
         if (definitions is null)
         {
-            await _unitOfWork.ExecuteInTransactionAsync(
-                _ => _sessionTemplateRepository.Update(sessionTemplate),
-                cancellationToken);
+            await _sessionTemplateRepository.Update(sessionTemplate);
         }
         else
         {
-            await _unitOfWork.ExecuteInTransactionAsync(
-                ct => _sessionTemplateRepository.UpdateWithDefinitions(sessionTemplate, definitions, ct),
-                cancellationToken);
+            await _sessionTemplateRepository.UpdateWithDefinitions(sessionTemplate, definitions, cancellationToken);
         }
 
-        await InvalidateCaches(sessionTemplate.EventTemplateId, sessionTemplate.Id, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        recordChange(sessionTemplate);
 
         return BaseCommandResponse.Success(sessionTemplate.Id, "Event session template updated successfully.");
     }
@@ -209,14 +253,15 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
 
     private (IReadOnlyCollection<SessionTemplateDefinitionWithOptions> Definitions, List<string> Errors) BuildDefinitionEntities(
         IReadOnlyList<CreateEventSessionTemplateDefinitionDto> definitionDtos,
-        Guid tenantId)
+        Guid tenantId, DateTime createdAt, (Guid Id, Guid[] OptionIds)[] definitionIds)
     {
         var errors = new List<string>();
         var definitions = new List<SessionTemplateDefinitionWithOptions>();
         var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var defDto in definitionDtos)
+        for (int index = 0; index < definitionDtos.Count; index++)
         {
+            var defDto = definitionDtos[index];
             var governance = _customPropertyGovernancePolicy.EvaluateDefinition(defDto.Namespace, defDto.Key);
             if (!governance.IsValid)
             {
@@ -233,6 +278,8 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
 
             var definition = new EventSessionTemplateCustomPropertyDefinition
             {
+                Id = definitionIds[index].Id,
+                CreatedAt = createdAt,
                 Namespace = governance.NormalizedNamespace,
                 Key = governance.NormalizedKey,
                 DisplayName = defDto.DisplayName,
@@ -266,7 +313,7 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
                 UpdatedBy = _currentUserService.UserId
             };
 
-            var options = CreateOptionEntities(defDto.Options, definition.Id);
+            var options = CreateOptionEntities(defDto.Options, definition.Id, createdAt, definitionIds[index].OptionIds);
             var defaultOption = options.SingleOrDefault(x => x.IsDefault);
 
             definitions.Add(new SessionTemplateDefinitionWithOptions(definition, options, defaultOption?.Id));
@@ -277,12 +324,13 @@ public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEv
 
     private List<EventSessionTemplateCustomPropertyOption> CreateOptionEntities(
         IReadOnlyCollection<CreateEventSessionTemplateOptionDto> optionDtos,
-        Guid definitionId)
+        Guid definitionId, DateTime createdAt, Guid[] optionIds)
     {
         return optionDtos
-            .Select(optionDto => new EventSessionTemplateCustomPropertyOption
+            .Select((optionDto, index) => new EventSessionTemplateCustomPropertyOption
             {
-                Id = Guid.CreateVersion7(),
+                Id = optionIds[index],
+                CreatedAt = createdAt,
                 EventSessionTemplateCustomPropertyDefinitionId = definitionId,
                 Namespace = CustomPropertyIdentity.NormalizeNamespace(optionDto.Namespace),
                 Key = CustomPropertyIdentity.NormalizeKey(optionDto.Key),

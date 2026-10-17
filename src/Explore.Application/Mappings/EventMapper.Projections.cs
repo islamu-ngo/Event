@@ -3,6 +3,7 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
+using Explore.Domain.ValueObjects;
 using Riok.Mapperly.Abstractions;
 
 namespace Explore.Application.Mappings;
@@ -14,9 +15,18 @@ public static partial class EventMapper
         if (source is null)
             return null;
 
-        return MapEventDetail(source) with
+        var mapped = MapEventDetail(source);
+        var presentation = source.DiscoveryPresentation;
+        return mapped with
         {
             FeaturedImageId = source.FeaturedImageId ?? Guid.Empty,
+            FeaturedImageUri = presentation is null ? mapped.FeaturedImageUri : presentation.FeaturedImageUri,
+            ActorProfilePictureUri = presentation is null ? mapped.ActorProfilePictureUri : presentation.ActorProfilePictureUri,
+            ParticipationConfiguration = presentation is null || mapped.ParticipationConfiguration is null
+                ? mapped.ParticipationConfiguration : mapped.ParticipationConfiguration with
+                {
+                    HasValidOptionalQuestionnaire = presentation.HasValidOptionalQuestionnaire
+                },
             ActorTypeId = source.Actor?.ActorTypeId ?? 0,
             TicketPriceSummary = EventTicketPriceSummaryMapper.Map(source),
             PublicActions = PublicActions(source),
@@ -26,6 +36,19 @@ public static partial class EventMapper
 
     public static EventListDto ToListItem(Event source)
     {
+        var presentation = source.DiscoveryPresentation;
+        EventTicketPriceSummaryDto? nativeTicket = null;
+        if (presentation?.TicketSummary is { } summary)
+        {
+            var currency = CurrencyMetadata.Get(summary.CurrencyCode);
+            nativeTicket = new()
+            {
+                SummaryCode = summary.SummaryCode,
+                CurrencyCode = currency.IsNoCurrency ? null : currency.Code,
+                CurrencyMinorUnitDigits = currency.MinorUnitDigits,
+                FromAmountMinor = summary.FromAmountMinor
+            };
+        }
         EventSession? matchingSession = source.DiscoveryAdditionalSessionCount.HasValue
             ? source.Sessions.SingleOrDefault()
             : null;
@@ -35,9 +58,21 @@ public static partial class EventMapper
             EventTypeId = source.EventTypeId ?? 0,
             AudienceGenderId = source.AudienceGenderId ?? 0,
             AudienceAgeId = source.AudienceAgeId ?? 0,
-            ActorTypeId = source.Actor?.ActorTypeId ?? 0,
+            ActorTypeId = presentation is null ? source.Actor?.ActorTypeId ?? 0 : presentation.ActorTypeId,
+            ActorTypeFullName = presentation is null ? EventActorTypeName(source.Actor) : presentation.ActorTypeFullName,
+            ActorDisplayName = presentation is null ? EventActorName(source.Actor) : presentation.ActorDisplayName,
+            ActorUserId = presentation is null ? EventActorUserId(source.Actor) : presentation.ActorUserId,
+            ActorOrganizationId = presentation is null ? EventActorOrganizationId(source.Actor) : presentation.ActorOrganizationId,
+            ActorGroupId = presentation is null ? EventActorGroupId(source.Actor) : presentation.ActorGroupId,
+            ActorProfilePictureUri = presentation is null ? EventActorPicture(source.Actor) : presentation.ActorProfilePictureUri,
+            FeaturedImageUri = presentation is null ? EventFeaturedImageUri(source) : presentation.FeaturedImageUri,
+            ParticipationConfiguration = presentation is null ? Participation(source.ParticipationConfiguration)
+                : source.ParticipationConfiguration is null ? null : MapParticipation(source.ParticipationConfiguration) with
+                {
+                    HasValidOptionalQuestionnaire = presentation.HasValidOptionalQuestionnaire
+                },
             IsPast = source.LastSessionEndUtc is not null && source.LastSessionEndUtc <= DateTimeOffset.UtcNow,
-            TicketPriceSummary = EventTicketPriceSummaryMapper.Map(source),
+            TicketPriceSummary = presentation is null ? EventTicketPriceSummaryMapper.Map(source) : nativeTicket,
             MatchingSession = matchingSession is null ? null : new EventMatchingSessionDto(
                 matchingSession.Id,
                 matchingSession.Title,
@@ -143,6 +178,7 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.IslamicAspect), nameof(EventDto.IslamicAspect), Use = nameof(MapIslamicAspect))]
     [MapProperty(nameof(Event.TechAspect), nameof(EventDto.TechAspect), Use = nameof(MapTechAspect))]
     [MapperIgnoreSource(nameof(Event.DiscoveryAdditionalSessionCount))]
+    [MapperIgnoreSource(nameof(Event.DiscoveryPresentation))]
     [MapperIgnoreSource(nameof(Event.DiscoveryTitleSortKey))]
     [MapperIgnoreSource(nameof(Event.DiscoverySourceSortKey))]
     private static partial EventDto MapEventDetail(Event source);
@@ -231,6 +267,7 @@ public static partial class EventMapper
     [MapProperty(nameof(Event.ParticipationConfiguration), nameof(EventListDto.ParticipationConfiguration), Use = nameof(Participation))]
     [MapProperty(nameof(Event.CreatedAt), nameof(EventListDto.CreatedAtUtc), Use = nameof(CreatedAtUtc))]
     [MapperIgnoreSource(nameof(Event.DiscoveryAdditionalSessionCount))]
+    [MapperIgnoreSource(nameof(Event.DiscoveryPresentation))]
     [MapperIgnoreSource(nameof(Event.DiscoveryTitleSortKey))]
     [MapperIgnoreSource(nameof(Event.DiscoverySourceSortKey))]
     private static partial EventListDto MapEventList(Event source);

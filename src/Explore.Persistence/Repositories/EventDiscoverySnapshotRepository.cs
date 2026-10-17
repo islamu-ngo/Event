@@ -4,6 +4,7 @@ using Explore.Domain;
 using Explore.Domain.Services.Discovery;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -29,14 +30,12 @@ public sealed class EventDiscoverySnapshotRepository(ExploreDbContext dbContext)
             dbContext.ChangeTracker.Entries<EventDiscoverySnapshotReservation>().Any(entry => entry.State != EntityState.Unchanged))
             throw new InvalidOperationException("Snapshot writes cannot precede the budget fence.");
 
-        await EventDiscoverySnapshotProviderOperations.BootstrapReservationAsync(
+        await DiscoveryRepositoryNativeOperations.AcquireReservationAsync(
             dbContext, tenantId, cancellationToken);
         // This native no-op write is essential even after a successful bootstrap/read.
         // PostgreSQL Serializable must abort stale capacity snapshots, not merely wait on SELECT FOR UPDATE.
         // Order: reservation -> candidate/source work -> terminal epoch -> snapshot rows.
         // Public authority writers never acquire this reservation and no process semaphore participates.
-        await RelationalEntityRowFence.AcquireGlobalAsync<EventDiscoverySnapshotReservation>(
-            dbContext, tenantId, cancellationToken);
         _tenantId = tenantId;
         _transactionId = transaction.TransactionId;
     }
@@ -48,6 +47,9 @@ public sealed class EventDiscoverySnapshotRepository(ExploreDbContext dbContext)
         RequireUtc(nowUtc);
         if (!HasTenant(tenantId))
             return null;
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.FindReusableAsync(
+                tenantId, criteriaHash, identityEpoch, disclosureEpoch, nowUtc, cancellationToken);
         return await dbContext.Set<EventDiscoverySnapshot>().AsNoTracking()
             .Where(snapshot => snapshot.TenantId == tenantId && snapshot.CriteriaHash == criteriaHash &&
                 snapshot.IdentityEpoch == identityEpoch && snapshot.DisclosureEpoch == disclosureEpoch &&
@@ -69,6 +71,9 @@ public sealed class EventDiscoverySnapshotRepository(ExploreDbContext dbContext)
             snapshot.ItemCount != snapshot.Items.Count || snapshot.Items.Count > limits.MaxIdentities ||
             snapshot.Items.Any(item => item.TenantId != snapshot.TenantId || item.SnapshotId != snapshot.Id))
             throw new ArgumentException("Snapshot membership, tenant, and lifetime must match the capture budget.", nameof(snapshot));
+
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.CaptureAsync(snapshot, limits, nowUtc, cancellationToken);
 
         var reusable = await FindReusableAsync(snapshot.TenantId, snapshot.CriteriaHash,
             snapshot.IdentityEpoch, snapshot.DisclosureEpoch, nowUtc, cancellationToken);
@@ -98,7 +103,9 @@ public sealed class EventDiscoverySnapshotRepository(ExploreDbContext dbContext)
         Guid tenantId, Guid snapshotId, CancellationToken cancellationToken) =>
         !HasTenant(tenantId)
             ? Task.FromResult<EventDiscoverySnapshot?>(null)
-            : dbContext.Set<EventDiscoverySnapshot>().AsNoTracking()
+            : DiscoveryRepositoryNativeOperations.For(dbContext) is { } native
+                ? native.GetSnapshotAsync(tenantId, snapshotId, cancellationToken)
+                : dbContext.Set<EventDiscoverySnapshot>().AsNoTracking()
                 .SingleOrDefaultAsync(snapshot => snapshot.TenantId == tenantId && snapshot.Id == snapshotId,
                     cancellationToken);
 
@@ -110,6 +117,8 @@ public sealed class EventDiscoverySnapshotRepository(ExploreDbContext dbContext)
         ArgumentOutOfRangeException.ThrowIfGreaterThan(take, EventDiscoveryTraversalLimits.PageSizeCeiling);
         if (!HasTenant(tenantId))
             return [];
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.GetItemsAsync(tenantId, snapshotId, afterOrdinal, take, cancellationToken);
         return await dbContext.Set<EventDiscoverySnapshotItem>().AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId && item.Ordinal > afterOrdinal)
             .OrderBy(item => item.Ordinal).Take(take).ToListAsync(cancellationToken);
@@ -122,6 +131,8 @@ public sealed class EventDiscoverySnapshotRepository(ExploreDbContext dbContext)
         RequireUtc(nowUtc);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxSnapshots, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxSnapshots, EventDiscoveryTraversalLimits.PurgeBatchCeiling);
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.PurgeAsync(tenantId, nowUtc, maxSnapshots, cancellationToken);
         DateTime expiryCutoff = await EventDiscoverySnapshotProviderOperations.BoundExpiryAsync(
             dbContext, nowUtc, cancellationToken);
         var ids = await dbContext.Set<EventDiscoverySnapshot>().AsNoTracking()

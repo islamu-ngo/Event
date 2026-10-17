@@ -8,15 +8,16 @@ using Explore.Domain;
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
 public class GetEventPublishReadinessRequestHandler(
-    IEventRepository eventRepository,
-    IEventLocationRepository eventLocationRepository,
     IEventLifecyclePolicyProvider policyProvider,
-    IEventLifecycleReadinessEvaluator readinessEvaluator)
+    IEventLifecycleReadinessEvaluator readinessEvaluator,
+    IPrivateEventManagementReader privateManagement)
     : IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?>
 {
     public async Task<EventPublishReadinessDto?> QueryAsync(GetEventPublishReadinessRequest request, CancellationToken cancellationToken)
     {
-        var @event = await eventRepository.GetById(request.Id);
+        var graph = await privateManagement.ReadAsync(
+            new(PrivateEventManagementReadKind.Readiness, request.Id), cancellationToken);
+        var @event = graph.Events.SingleOrDefault();
         if (@event is null)
         {
             return null;
@@ -24,10 +25,7 @@ public class GetEventPublishReadinessRequestHandler(
 
         EventLifecyclePolicy policy = await policyProvider.GetEffectivePolicyAsync(@event.TenantId, ValidationProfile.EventPublish, cancellationToken);
         LifecycleReadinessResult result = readinessEvaluator.Evaluate(@event, policy.Profile, policy);
-        IReadOnlyList<EventLocation> eventLocations = await eventLocationRepository.GetByEventIdAsync(
-            @event.Id,
-            cancellationToken);
-        result = EventLocationPublicationReadinessEvaluator.Include(result, eventLocations);
+        result = EventLocationPublicationReadinessEvaluator.Include(result, graph.Locations);
 
         return MapToDto(@event.Id, result);
     }

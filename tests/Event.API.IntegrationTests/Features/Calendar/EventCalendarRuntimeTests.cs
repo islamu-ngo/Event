@@ -9,11 +9,9 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
-using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Features.Calendar;
@@ -104,8 +102,7 @@ public sealed class EventCalendarRuntimeTests(CalendarRouteRuntimeFixture fixtur
 
     private async Task<CalendarRouteScenario> SeedScenarioAsync()
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = fixture.CreateDbContext();
         TenantScenarioSeed.TenantScenarioResult tenant =
             await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
         DateTime now = DateTime.UtcNow;
@@ -323,31 +320,19 @@ public sealed class EventCalendarRuntimeTests(CalendarRouteRuntimeFixture fixtur
 
 public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDisposable
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:18-alpine")
-        .WithDatabase("calendar_routes")
-        .WithUsername("postgres")
-        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
-        .Build();
+    private readonly Event.Persistence.IntegrationTests.Fixtures.PostgreSqlContainerFixture _database = new();
 
     public PostgreSqlApiWebApplicationFactory Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
 
+    public ExploreDbContext CreateDbContext() => _database.CreateDbContext();
+
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
-            .UseSnakeCaseNamingConvention()
-            .Options;
-        await using (var context = new ExploreDbContext(options))
-        {
-            await context.Database.MigrateAsync();
-            await LookupTableSeeder.SeedAsync(context);
-        }
+        await _database.InitializeAsync();
 
         Factory = new PostgreSqlApiWebApplicationFactory(
-            _container.GetConnectionString(),
+            _database,
             new Dictionary<string, string?>
             {
                 ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
@@ -381,7 +366,7 @@ public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDispo
             await Factory.DisposeAsync();
         }
 
-        await _container.DisposeAsync();
+        await _database.DisposeAsync();
         GC.SuppressFinalize(this);
     }
 

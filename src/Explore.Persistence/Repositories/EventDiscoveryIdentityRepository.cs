@@ -3,6 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Services.Discovery;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -77,6 +78,11 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
     {
         if (!HasTenant(tenantId))
             return null;
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+        {
+            var bindings = await native.GetBindingsAsync(tenantId, sourceKind, [sourceKey], cancellationToken);
+            return bindings.SingleOrDefault(identity => !identity.IsDeleted);
+        }
         var hash = EventDiscoveryIdentity.HashSourceKey(sourceKey);
         var identity = await dbContext.Set<EventDiscoveryIdentity>().AsNoTracking()
             .Include(identity => identity.Alias)
@@ -93,6 +99,8 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
             throw new ArgumentException("Discovery binding reads are bounded to 1000 source keys.", nameof(sourceKeys));
         if (!HasTenant(tenantId) || sourceKeys.Count == 0)
             return [];
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.GetBindingsAsync(tenantId, sourceKind, sourceKeys, cancellationToken);
         var exactKeys = sourceKeys.ToHashSet(StringComparer.Ordinal);
         var hashes = exactKeys.Select(EventDiscoveryIdentity.HashSourceKey).ToArray();
         var bindings = await dbContext.Set<EventDiscoveryIdentity>().AsNoTracking()
@@ -138,6 +146,8 @@ public sealed class EventDiscoveryIdentityRepository(ExploreDbContext dbContext)
     {
         if (!HasTenant(tenantId))
             return Task.FromResult<EventDiscoveryRevision?>(null);
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return native.ReadRevisionAsync(tenantId, cancellationToken);
         return dbContext.Set<EventDiscoveryRevision>().AsNoTracking()
             .SingleOrDefaultAsync(revision => revision.TenantId == tenantId, cancellationToken);
     }

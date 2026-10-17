@@ -20,7 +20,7 @@ internal static class RelationalEntityRowFence
         where TEntity : class =>
         AcquirePrimaryKeyAsync<TEntity>(dbContext, [key], cancellationToken);
 
-    private static async Task AcquirePrimaryKeyAsync<TEntity>(
+    internal static async Task AcquirePrimaryKeyAsync<TEntity>(
         ExploreDbContext dbContext, IReadOnlyList<object> keys, CancellationToken cancellationToken)
         where TEntity : class
     {

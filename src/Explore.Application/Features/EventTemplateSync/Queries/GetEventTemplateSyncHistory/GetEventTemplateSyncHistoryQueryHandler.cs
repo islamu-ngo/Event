@@ -11,10 +11,12 @@ public sealed class GetEventTemplateSyncHistoryQueryHandler
     : IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>
 {
     private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IPrivateEventManagementReader? _privateManagement;
 
-    public GetEventTemplateSyncHistoryQueryHandler(IAuditLogRepository auditLogRepository)
+    public GetEventTemplateSyncHistoryQueryHandler(IAuditLogRepository auditLogRepository, IPrivateEventManagementReader? privateManagement = null)
     {
         _auditLogRepository = auditLogRepository;
+        _privateManagement = privateManagement;
     }
 
     public async Task<PaginatedResult<EventTemplateSyncHistoryItemDto>> QueryAsync(
@@ -22,7 +24,11 @@ public sealed class GetEventTemplateSyncHistoryQueryHandler
         CancellationToken cancellationToken)
     {
         (int pageNumber, int pageSize) = PaginatedResult<EventTemplateSyncHistoryItemDto>.NormalizeParameters(request.PageNumber, request.PageSize);
-        (IReadOnlyList<AuditLog> items, int totalCount) = await _auditLogRepository.GetTemplateSyncHistoryAsync(
+        var graph = _privateManagement is null ? null :
+            await _privateManagement.ReadAsync(new(PrivateEventManagementReadKind.EventSyncHistory, request.EventId), cancellationToken);
+        (IReadOnlyList<AuditLog> items, int totalCount) = graph is not null
+            ? (graph.History.OrderByDescending(row => row.Timestamp).Skip(checked((pageNumber - 1) * pageSize)).Take(pageSize).ToArray(), graph.History.Count)
+            : await _auditLogRepository.GetTemplateSyncHistoryAsync(
             nameof(Event),
             request.EventId.ToString(),
             pageNumber,

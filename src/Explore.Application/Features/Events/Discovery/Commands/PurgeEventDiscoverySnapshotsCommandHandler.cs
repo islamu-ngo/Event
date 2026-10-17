@@ -5,7 +5,6 @@ namespace Explore.Application.Features.Events.Discovery.Commands;
 
 public sealed class PurgeEventDiscoverySnapshotsCommandHandler(
     IEventDiscoverySnapshotMaintenanceRepository repository,
-    IUnitOfWork unitOfWork,
     TimeProvider clock)
     : ICommandHandler<PurgeEventDiscoverySnapshotsCommand, PurgeEventDiscoverySnapshotsResult>
 {
@@ -16,14 +15,12 @@ public sealed class PurgeEventDiscoverySnapshotsCommandHandler(
         PurgeEventDiscoverySnapshotsCommand request, CancellationToken cancellationToken = default)
     {
         DateTime nowUtc = clock.GetUtcNow().UtcDateTime;
-        var owners = await unitOfWork.ExecuteReadCommittedAsync(
-            token => repository.GetExpiredOwnersAsync(
-                request.AfterTenantId, nowUtc, TenantBatchSize, token), cancellationToken);
+        var owners = await repository.GetExpiredOwnersAsync(
+            request.AfterTenantId, nowUtc, TenantBatchSize, cancellationToken);
         int deleted = 0;
         foreach (var owner in owners)
-            deleted += await unitOfWork.ExecuteSerializableAsync(
-                token => repository.PurgeTenantBatchAsync(owner.TenantId, nowUtc, SnapshotBatchSize, token),
-                cancellationToken);
+            deleted += await repository.PurgeTenantBatchAsync(
+                owner.TenantId, nowUtc, SnapshotBatchSize, cancellationToken);
         return new(deleted, owners.Count == TenantBatchSize ? owners[^1].TenantId : null);
     }
 }

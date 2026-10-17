@@ -6,6 +6,7 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
@@ -67,8 +68,8 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
 
     internal void Enlist(IEnumerable<Guid> tenantIds)
     {
-        RequireGenericAccumulation();
         EnsureTransaction();
+        RequireGenericAccumulation();
         if (_terminal)
             throw new InvalidOperationException("Source writes cannot follow the terminal discovery fence.");
         foreach (Guid tenantId in tenantIds)
@@ -103,7 +104,6 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
 
     internal async Task EnlistQueryAsync(IQueryable<Guid> tenantIds, CancellationToken cancellationToken)
     {
-        RequireGenericAccumulation();
         Enlist([]);
         Guid[] ids = await tenantIds.Distinct().Take(MaximumAffectedTenants + 1).ToArrayAsync(cancellationToken);
         Enlist(ids);
@@ -112,6 +112,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
     internal void RecordTenantDeletion(Guid tenantId)
     {
         EnsureTransaction();
+        RequireGenericAccumulation();
         // The repository records only a successful physical delete, within the
         // owning transaction. Its late flush must never recreate this Tenant FK.
         _deletedTenants.Add(tenantId);
@@ -121,10 +122,13 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
 
     internal async Task EnlistAllTenantsAsync(CancellationToken cancellationToken)
     {
-        RequireGenericAccumulation();
         await FenceTenantEnrollmentAsync(cancellationToken);
-        await GloballyAsync(() => EnlistQueryAsync(
-            context.Tenants.IgnoreAllFilters(Reason).Select(tenant => tenant.Id), cancellationToken), cancellationToken);
+        EventDiscoverySourceProviderOperations.RequireCurrentGlobalRead(context);
+        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+            Enlist(await PostgresDiscoveryDisclosureContract.DependenciesAsync(context, "all", [], cancellationToken));
+        else
+            await EnlistQueryAsync(
+                context.Tenants.IgnoreAllFilters(Reason).Select(tenant => tenant.Id), cancellationToken);
         Enlist(context.ChangeTracker.Entries<Tenant>().Where(entry => entry.State == EntityState.Added)
             .Select(entry => entry.Entity.Id));
     }
@@ -140,11 +144,11 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
 
     internal async Task EnlistActorsAsync(IReadOnlyCollection<Guid> actorIds, CancellationToken cancellationToken)
     {
-        RequireGenericAccumulation();
         EnsureTransaction();
         Guid[] ids = actorIds.Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
         if (ids.Length == 0)
             return;
+        RequireGenericAccumulation();
         if (_terminal)
             throw new InvalidOperationException("Source writes cannot follow the terminal discovery fence.");
         ids = ids.Where(id => !_actors.Contains(id) && !_newActors.Contains(id)).ToArray();
@@ -152,23 +156,27 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             return;
         foreach (Guid id in ids)
             await RelationalEntityRowFence.AcquireGlobalAsync<Actor>(context, id, cancellationToken);
-        await GloballyAsync(() => EnlistQueryAsync(
-            context.Events.IgnoreAllFilters(Reason)
-                .Where(value => ids.Contains(value.ActorId)
-                    || value.OrganizerActorId != null && ids.Contains(value.OrganizerActorId.Value))
-                .Select(value => value.TenantId)
-                .Union(context.EventSessionSpeakers.IgnoreAllFilters(Reason)
-                    .Where(value => ids.Contains(value.ActorId)).Select(value => value.TenantId))
-                .Union(context.EventSeries.IgnoreAllFilters(Reason)
-                    .Where(value => ids.Contains(value.ActorId)).Select(value => value.TenantId)),
-            cancellationToken), cancellationToken);
+        EventDiscoverySourceProviderOperations.RequireCurrentGlobalRead(context);
+        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+            Enlist(await PostgresDiscoveryDisclosureContract.DependenciesAsync(context, "actor", ids, cancellationToken));
+        else
+            await EnlistQueryAsync(
+                context.Events.IgnoreAllFilters(Reason)
+                    .Where(value => ids.Contains(value.ActorId)
+                        || value.OrganizerActorId != null && ids.Contains(value.OrganizerActorId.Value))
+                    .Select(value => value.TenantId)
+                    .Union(context.EventSessionSpeakers.IgnoreAllFilters(Reason)
+                        .Where(value => ids.Contains(value.ActorId)).Select(value => value.TenantId))
+                    .Union(context.EventSeries.IgnoreAllFilters(Reason)
+                        .Where(value => ids.Contains(value.ActorId)).Select(value => value.TenantId)),
+                cancellationToken);
         _actors.UnionWith(ids);
     }
 
     internal async Task EnlistUserAsync(Guid userId, CancellationToken cancellationToken)
     {
-        RequireGenericAccumulation();
         EnsureTransaction();
+        RequireGenericAccumulation();
         if (_terminal)
             throw new InvalidOperationException("Source writes cannot follow the terminal discovery fence.");
         if (_users.Contains(userId))
@@ -177,24 +185,28 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         Guid[] actors = await context.Actors.IgnoreAllFilters(Reason)
             .Where(actor => actor.UserId == userId).Select(actor => actor.Id).ToArrayAsync(cancellationToken);
         await EnlistActorsAsync(actors, cancellationToken);
-        await GloballyAsync(() => EnlistQueryAsync(
-            context.TenantUsers.IgnoreAllFilters(Reason).Where(value => value.UserId == userId)
-                .Select(value => value.TenantId)
-                .Union(context.Events.IgnoreAllFilters(Reason).Where(value => value.SubmittedByUserId == userId)
-                    .Select(value => value.TenantId))
-                .Union(context.StorageObjects.IgnoreAllFilters(Reason)
-                    .Where(value => value.Actor != null && value.Actor.UserId == userId)
-                    .Select(value => value.TenantId)), cancellationToken), cancellationToken);
+        EventDiscoverySourceProviderOperations.RequireCurrentGlobalRead(context);
+        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+            Enlist(await PostgresDiscoveryDisclosureContract.DependenciesAsync(context, "user", [userId], cancellationToken));
+        else
+            await EnlistQueryAsync(
+                context.TenantUsers.IgnoreAllFilters(Reason).Where(value => value.UserId == userId)
+                    .Select(value => value.TenantId)
+                    .Union(context.Events.IgnoreAllFilters(Reason).Where(value => value.SubmittedByUserId == userId)
+                        .Select(value => value.TenantId))
+                    .Union(context.StorageObjects.IgnoreAllFilters(Reason)
+                        .Where(value => value.Actor != null && value.Actor.UserId == userId)
+                        .Select(value => value.TenantId)), cancellationToken);
         _users.Add(userId);
     }
 
     internal async Task EnlistRecordsAsync(IReadOnlyCollection<Guid> recordIds, CancellationToken cancellationToken)
     {
-        RequireGenericAccumulation();
         EnsureTransaction();
         Guid[] ids = recordIds.Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
         if (ids.Length == 0)
             return;
+        RequireGenericAccumulation();
         if (_terminal)
             throw new InvalidOperationException("Source writes cannot follow the terminal discovery fence.");
         ids = ids.Where(id => !_records.Contains(id) && !_newRecords.Contains(id)).ToArray();
@@ -202,15 +214,19 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             return;
         foreach (Guid id in ids)
             await RelationalEntityRowFence.AcquireGlobalAsync<AtprotoRecord>(context, id, cancellationToken);
-        await GloballyAsync(() => EnlistQueryAsync(
-            context.Events.IgnoreAllFilters(Reason)
-                .Where(value => value.AtprotoRecordId != null && ids.Contains(value.AtprotoRecordId.Value))
-                .Select(value => value.TenantId)
-                .Union(context.AtprotoRecordTenantPresentations.IgnoreAllFilters(Reason)
-                    .Where(value => ids.Contains(value.AtprotoRecordId)).Select(value => value.TenantId))
-                .Union(context.AtprotoOutboundRecordOwnerships.IgnoreAllFilters(Reason)
-                    .Where(value => ids.Contains(value.AtprotoRecordId)).Select(value => value.TenantId)),
-            cancellationToken), cancellationToken);
+        EventDiscoverySourceProviderOperations.RequireCurrentGlobalRead(context);
+        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+            Enlist(await PostgresDiscoveryDisclosureContract.DependenciesAsync(context, "record", ids, cancellationToken));
+        else
+            await EnlistQueryAsync(
+                context.Events.IgnoreAllFilters(Reason)
+                    .Where(value => value.AtprotoRecordId != null && ids.Contains(value.AtprotoRecordId.Value))
+                    .Select(value => value.TenantId)
+                    .Union(context.AtprotoRecordTenantPresentations.IgnoreAllFilters(Reason)
+                        .Where(value => ids.Contains(value.AtprotoRecordId)).Select(value => value.TenantId))
+                    .Union(context.AtprotoOutboundRecordOwnerships.IgnoreAllFilters(Reason)
+                        .Where(value => ids.Contains(value.AtprotoRecordId)).Select(value => value.TenantId)),
+                cancellationToken);
         _records.UnionWith(ids);
     }
 
@@ -418,11 +434,18 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         {
             if (_tenantParents.Contains(tenantId))
                 continue;
-            await EventDiscoveryDisclosureProviderOperations.InTenantAsync(context, tenantId, async () =>
+            if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && context.TenantFilterTenantId != tenantId)
+            {
+                if (context.IsConfigurationInstanceImportOwner)
+                    await PostgresConfigurationImportTenantIdentityContract.FenceTenantsAsync(
+                        context, [tenantId], cancellationToken);
+                else
+                    await PostgresDiscoveryDisclosureContract.FenceTenantsAsync(context, [tenantId], cancellationToken);
+            }
+            else
             {
                 await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, tenantId, cancellationToken);
-                return true;
-            }, cancellationToken);
+            }
             _tenantParents.Add(tenantId);
         }
     }
@@ -468,20 +491,19 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
     {
         if (!context.Database.IsRelational() || context.Database.CurrentTransaction is null)
             return;
-        if (_nativeOrdinarySettings)
-        {
-            EnsureTransaction();
-            if (_tenants.Count != 0 || _identityRevisions.Count != 0 || _actors.Count != 0
-                || _users.Count != 0 || _records.Count != 0)
-                throw new InvalidOperationException("Native disclosure cannot borrow generic accumulated owners.");
-            _flushed = true;
-            return;
-        }
         EnsureTransaction();
         if (_finalizationFailed)
             throw new InvalidOperationException("A failed disclosure finalization requires transaction rollback.");
         try
         {
+            if (_nativeOrdinarySettings)
+            {
+                // The private ordinary attempt owns tenant discovery and the single
+                // deferred epoch write. Managed flush only seals this same transaction.
+                _flushed = true;
+                _terminal = true;
+                return;
+            }
             // Reservation bootstrap uses native SQL and has no Tenant FK. Even a
             // late bootstrap without a tracked snapshot must not resurrect it.
             foreach (Guid tenantId in _deletedTenants)
@@ -491,8 +513,16 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
                     throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
             if (_flushed || _tenants.Count == 0 && _identityRevisions.Count == 0 && _deletedTenants.Count == 0)
                 return;
-            await new EventDiscoveryDisclosureRepository(context)
-                .FinalizeAsync(_tenants.ToArray(), _identityRevisions, cancellationToken);
+            if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && context.IsConfigurationInstanceImportOwner)
+            {
+                Guid[] ordered = _tenants.Union(_identityRevisions.Keys)
+                    .OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
+                await PostgresConfigurationImportTenantIdentityContract.FinalizeAsync(
+                    context, ordered, _tenants, _identityRevisions, cancellationToken);
+            }
+            else
+                await new EventDiscoveryDisclosureRepository(context)
+                    .FinalizeAsync(_tenants.ToArray(), _identityRevisions, cancellationToken);
             _flushed = true;
             _terminal = true;
         }
@@ -511,7 +541,6 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
 
     internal void Reset()
     {
-        _nativeOrdinarySettings = false;
         _transactionId = null;
         _tenants.Clear();
         _tenantParents.Clear();
@@ -527,23 +556,24 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _flushed = false;
         _finalizationFailed = false;
         _tenantEnrollmentFenced = false;
+        _nativeOrdinarySettings = false;
     }
 
     internal void EnlistNativeOrdinarySettings()
     {
         EnsureTransaction();
-        if (!context.Database.IsNpgsql() || _terminal || _finalizationFailed
+        if (!(RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) || _terminal || _finalizationFailed
             || _tenants.Count != 0 || _identityRevisions.Count != 0 || _deletedTenants.Count != 0
             || _tenantParents.Count != 0 || _tenantEnrollmentFenced || _actors.Count != 0
             || _users.Count != 0 || _records.Count != 0 || _newActors.Count != 0 || _newRecords.Count != 0)
-            throw new InvalidOperationException("Native settings disclosure requires its original ordinary-settings owner.");
+            throw new InvalidOperationException("Native ordinary Settings cannot mix discovery mutation owners.");
         _nativeOrdinarySettings = true;
     }
 
     private void RequireGenericAccumulation()
     {
         if (_nativeOrdinarySettings)
-            throw new InvalidOperationException("Generic disclosure accumulation cannot join a native ordinary-settings owner.");
+            throw new InvalidOperationException("Native ordinary Settings cannot mix discovery mutation owners.");
     }
 
     private void EnsureTransaction()
@@ -628,7 +658,4 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         foreach (Guid id in ordered)
             await RelationalEntityRowFence.AcquireGlobalAsync<TEntity>(context, id, cancellationToken);
     }
-
-    private Task GloballyAsync(Func<Task> operation, CancellationToken cancellationToken) =>
-        EventDiscoverySourceProviderOperations.GloballyAsync(context, operation, cancellationToken);
 }

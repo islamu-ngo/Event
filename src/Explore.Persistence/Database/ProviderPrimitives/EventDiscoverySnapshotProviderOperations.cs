@@ -26,6 +26,8 @@ internal static class EventDiscoverySnapshotProviderOperations
     internal static Task BootstrapReservationAsync(
         ExploreDbContext dbContext, Guid tenantId, CancellationToken cancellationToken)
     {
+        if (dbContext.Database.IsNpgsql())
+            return PostgresDiscoveryTraversalContract.FenceReservationAsync(dbContext, tenantId, cancellationToken);
         var entity = dbContext.Model.FindEntityType(typeof(EventDiscoverySnapshotReservation))!;
         string tableName = entity.GetTableName()!;
         var mapping = StoreObjectIdentifier.Table(tableName, entity.GetSchema());

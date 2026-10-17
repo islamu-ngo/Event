@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -16,6 +17,7 @@ internal static class EventDiscoverySourceProviderOperations
     internal static async Task FenceTenantEnrollmentAsync(
         ExploreDbContext context, CancellationToken cancellationToken)
     {
+        RequireCurrentGlobalRead(context);
         if (context.Database.ProviderName == RelationalNamedLock.SqlServerProvider
             && context.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel == IsolationLevel.Snapshot)
             throw new InvalidOperationException("Discovery tenant enrollment requires a current-read transaction.");
@@ -25,22 +27,23 @@ internal static class EventDiscoverySourceProviderOperations
         // writer fence below, not a process semaphore acquired behind a writer lock.
         if (context.Database.ProviderName != RelationalNamedLock.SqliteProvider)
             await RelationalNamedLock.AcquireTransactionAsync(context, TenantEnrollmentResource, cancellationToken);
-        await GloballyAsync(context, async () =>
+        if (context.Database.IsNpgsql())
+        {
+            // A no-op minimum-row write rejects a stale nonempty snapshot.
+            // With no row, retain the gate and probe through the same authority.
+            string query = $"SELECT {PostgresDiscoveryDisclosureContract.FunctionSql(context, "enrollment")}() AS \"Value\"";
+            Guid anchor = await context.Database.SqlQueryRaw<Guid>(query).SingleAsync(cancellationToken);
+            if (anchor == Guid.Empty
+                && context.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.ReadCommitted)
+                await RequireEmptyCurrentCatalogAsync(context, cancellationToken);
+        }
+        else
         {
             Guid anchor = await context.Tenants
                 .IgnoreAllFilters(TenantFilterBypassReasons.DiscoveryDisclosureMutation)
                 .OrderBy(tenant => tenant.Id).Select(tenant => tenant.Id).FirstOrDefaultAsync(cancellationToken);
-            // ReadCommitted already sees the current catalog under the enrollment gate.
-            // A separate probe would wait on this transaction's own reset TRUNCATE lock.
-            if (anchor == Guid.Empty && context.Database.ProviderName == RelationalNamedLock.PostgreSqlProvider
-                && context.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.ReadCommitted)
-                await RequireEmptyCurrentCatalogAsync(context, cancellationToken);
-            // A named gate cannot refresh a PostgreSQL snapshot. Every insertion
-            // touches the old minimum before adding a possibly smaller key, so a
-            // stale nonempty snapshot conflicts even when the minimum has changed.
-            // For SQLite, an absent row still acquires the database writer lock.
             await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, anchor, cancellationToken);
-        }, cancellationToken);
+        }
     }
 
     private static async Task RequireEmptyCurrentCatalogAsync(
@@ -62,12 +65,9 @@ internal static class EventDiscoverySourceProviderOperations
         {
             await using var transaction = await current.Database.BeginTransactionAsync(
                 IsolationLevel.ReadCommitted, cancellationToken);
-            await GloballyAsync(current, async () =>
-            {
-                if (await current.Tenants.IgnoreAllFilters(TenantFilterBypassReasons.DiscoveryDisclosureMutation)
-                    .AnyAsync(cancellationToken))
-                    throw new DbUpdateConcurrencyException("Discovery tenant enrollment changed after the empty snapshot.");
-            }, cancellationToken);
+            string query = $"SELECT {PostgresDiscoveryDisclosureContract.FunctionSql(current, "catalog")}() AS \"Value\"";
+            if (await current.Database.SqlQueryRaw<bool>(query).SingleAsync(cancellationToken))
+                throw new DbUpdateConcurrencyException("Discovery tenant enrollment changed after the empty snapshot.");
             await transaction.CommitAsync(cancellationToken);
         });
     }
@@ -119,26 +119,11 @@ internal static class EventDiscoverySourceProviderOperations
         });
     }
 
-    internal static async Task GloballyAsync(
-        ExploreDbContext context, Func<Task> operation, CancellationToken cancellationToken)
+    internal static void RequireCurrentGlobalRead(ExploreDbContext context)
     {
         if (context.Database.ProviderName == RelationalNamedLock.MySqlProvider
             && context.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel
                 is not (IsolationLevel.ReadCommitted or IsolationLevel.Serializable))
             throw new InvalidOperationException("Discovery global fanout requires a current-read transaction.");
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider)
-        {
-            await operation();
-            return;
-        }
-        // PostgreSQL row_security=off does NOT bypass RLS. It raises an error if RLS
-        // would silently omit dependencies. Only an existing trusted global database
-        // authority can perform this fanout; ordinary roles fail closed.
-        string previous = await context.Database.SqlQueryRaw<string>(
-            "SELECT current_setting('row_security') AS \"Value\"").SingleAsync(cancellationToken);
-        await context.Database.ExecuteSqlRawAsync("SET LOCAL row_security = off", cancellationToken);
-        await operation();
-        await context.Database.ExecuteSqlRawAsync(
-            "SELECT set_config('row_security', {0}, true)", [previous], cancellationToken);
     }
 }

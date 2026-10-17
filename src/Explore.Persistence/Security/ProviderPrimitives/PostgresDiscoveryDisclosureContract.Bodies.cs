@@ -30,13 +30,13 @@ public static partial class PostgresDiscoveryDisclosureContract
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
             {
                 [dependencies] =
-                    ["event_atproto_materialization_owner", "event_subject_erasure_owner",
+                    [PostgresAtprotoMaterializationContract.OwnerRole, PostgresSubjectPrivacyErasureContract.OwnerRole,
                         PostgresOrdinarySettingsContract.OwnerRole],
                 [fence] =
-                    ["event_storage_reconciliation_owner", "event_subject_erasure_owner",
-                        "event_subject_erasure_global", PostgresOrdinarySettingsContract.OwnerRole],
+                    [PostgresStorageReconciliationContract.OwnerRole, PostgresSubjectPrivacyErasureContract.OwnerRole,
+                        PostgresSubjectPrivacyErasureContract.GlobalRole, PostgresOrdinarySettingsContract.OwnerRole],
                 [finalize] =
-                    ["event_storage_reconciliation_owner", "event_subject_erasure_global",
+                    [PostgresStorageReconciliationContract.OwnerRole, PostgresSubjectPrivacyErasureContract.GlobalRole,
                         PostgresOrdinarySettingsContract.OwnerRole]
             };
         return PostgresPrivilegeGuard.BuildRoutineAclAssertSql(signatures, OwnerRole, RuntimeRole, complete, nestedExecutors);

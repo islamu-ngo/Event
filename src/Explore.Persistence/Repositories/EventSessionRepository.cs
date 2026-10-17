@@ -5,8 +5,13 @@ using Explore.Application.Specifications.EventSessions;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Extensions;
+using Explore.Persistence.Services;
+using Explore.Persistence.Security;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace Explore.Persistence.Repositories;
@@ -15,10 +20,43 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
 {
     private const string ExclusionViolationSqlState = "23P01";
     private readonly ExploreDbContext _dbContext;
+    private readonly IHttpContextAccessor _httpContext;
+    private readonly PublicEventDiscoveryReadBindingFactory? _publicDiscoveryBindings;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
 
-    public EventSessionRepository(ExploreDbContext dbContext) : base(dbContext)
+    public EventSessionRepository(ExploreDbContext dbContext, IHttpContextAccessor httpContext,
+        PublicEventDiscoveryReadBindingFactory? publicDiscoveryBindings = null,
+        PostgresNativeQueueEnrollment? nativeEnrollment = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _httpContext = httpContext;
+        _publicDiscoveryBindings = publicDiscoveryBindings;
+        _nativeEnrollment = nativeEnrollment;
+    }
+
+    public Task<Event?> GetAuthorizedParentForMutationAsync(
+        Guid tenantId, Guid userId, Guid eventId, string action, CancellationToken cancellationToken) =>
+        new EventMutationAuthority(_dbContext, null).ForSessionAsync(
+            tenantId, userId, eventId, action, _httpContext, cancellationToken);
+
+    public async Task<EventSession?> GetForMutationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_dbContext.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty
+            || _dbContext.IsTenantFilterBypassed
+            || _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Session mutation requires the exact tenant Serializable transaction.");
+        await RelationalEntityRowFence.AcquireAsync<EventSession>(
+            _dbContext, tenantId, session => session.Id, id, cancellationToken);
+        var current = await _dbContext.EventSessions.AsNoTracking()
+            .SingleOrDefaultAsync(session => session.Id == id && session.TenantId == tenantId, cancellationToken);
+        var tracked = _dbContext.ChangeTracker.Entries<EventSession>().SingleOrDefault(entry => entry.Entity.Id == id);
+        if (tracked is not null && current is not null
+            && (tracked.Entity.TenantId != current.TenantId || tracked.Entity.EventId != current.EventId
+                || tracked.Entity.ConcurrencyStamp != current.ConcurrencyStamp))
+            throw new InvalidOperationException("Tracked session ownership must match the persisted row.");
+        if (tracked is not null)
+            tracked.State = EntityState.Detached;
+        return current;
     }
 
     public Task<EventSession?> GetByIdForEventAsync(
@@ -50,13 +88,13 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
             cancellationToken);
     }
 
-    public async Task<EventSession?> GetSessionWithDetails(Guid id)
+    public async Task<EventSession?> GetSessionWithDetails(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.EventSessions
             .AsNoTracking()
             .AsSplitQuery()
             .IncludeStandardDetails()
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
     public async Task<EventSession?> GetPublicSessionWithDetailsAsync(
@@ -67,15 +105,16 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
-    public async Task<List<EventSession>> GetSessionsByEvent(Guid eventId)
+    public async Task<List<EventSession>> GetSessionsByEvent(Guid eventId, CancellationToken cancellationToken = default)
     {
         List<EventSession> sessions = await _dbContext.EventSessions
             .AsNoTracking()
             .AsSplitQuery()
             .IncludeStandardDetails()
             .Where(s => s.EventId == eventId)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
+        // Compare absolute instants after materialization; SQLite stores offset timestamps as text.
         return sessions.OrderBy(s => s.StartTime).ToList();
     }
 
@@ -83,6 +122,18 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
         Guid eventId,
         CancellationToken cancellationToken)
     {
+        if (DiscoveryRepositoryNativeOperations.For(_dbContext) is { } native)
+        {
+            var binding = (_publicDiscoveryBindings
+                ?? throw new UnauthorizedAccessException("Public sessions require their selected native binding."))
+                .Create(_dbContext);
+            if (_nativeEnrollment is null || _nativeEnrollment != binding.Enrollment)
+                throw new UnauthorizedAccessException("public_sessions_original_enrollment_required");
+            var parent = await native.ReadPublicDetailAsync(
+                binding, eventId, null, cancellationToken);
+            return parent is null ? [] : parent.Sessions.OrderBy(session => session.StartTime).ToList();
+        }
+
         List<EventSession> sessions = await BuildPublicSessionQuery()
             .Where(s => s.EventId == eventId)
             .ToListAsync(cancellationToken);
@@ -225,17 +276,24 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
 
     public async Task<EventSession> CreateWithRoomOverlapGuardAsync(
         EventSession session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation = null)
     {
         // Null schedule skips overlap; the GiST exclusion is partial (NULL schedule exempt).
         if (session.RoomId is null || session.StartTime is null || session.EndTime is null)
         {
+            if (beforeMutation is not null)
+            {
+                if (session.RoomId is { } roomId)
+                    await RelationalEntityRowFence.AcquireAsync<LocationRoom>(_dbContext, session.TenantId, row => row.Id, roomId, cancellationToken);
+                await beforeMutation(cancellationToken);
+            }
             return await Create(session);
         }
 
         if (_dbContext.Database.CurrentTransaction != null)
         {
-            return await CreateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken);
+            return await CreateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken, beforeMutation);
         }
 
         await using var tx = await _dbContext.Database
@@ -243,7 +301,7 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
 
         try
         {
-            await CreateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken);
+            await CreateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken, beforeMutation);
             await _dbContext.FlushDisclosureAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
         }
@@ -258,8 +316,12 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
 
     private async Task<EventSession> CreateWithRoomOverlapGuardInCurrentTransactionAsync(
         EventSession session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation)
     {
+        if (beforeMutation is not null)
+            await RelationalEntityRowFence.AcquireAsync<LocationRoom>(
+                _dbContext, session.TenantId, row => row.Id, session.RoomId!.Value, cancellationToken);
         var conflicts = await BuildOverlapQuery(
                 session.RoomId!.Value,
                 session.StartTime!.Value,
@@ -272,6 +334,8 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
             throw new RoomScheduleConflictException(session.RoomId.Value, conflicts);
         }
 
+        if (beforeMutation is not null)
+            await beforeMutation(cancellationToken);
         await _dbContext.EventSessions.AddAsync(session, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return session;
@@ -279,17 +343,24 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
 
     public async Task UpdateWithRoomOverlapGuardAsync(
         EventSession session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation = null)
     {
         if (session.RoomId is null || session.StartTime is null || session.EndTime is null)
         {
+            if (beforeMutation is not null)
+            {
+                if (session.RoomId is { } roomId)
+                    await RelationalEntityRowFence.AcquireAsync<LocationRoom>(_dbContext, session.TenantId, row => row.Id, roomId, cancellationToken);
+                await beforeMutation(cancellationToken);
+            }
             await Update(session);
             return;
         }
 
         if (_dbContext.Database.CurrentTransaction != null)
         {
-            await UpdateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken);
+            await UpdateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken, beforeMutation);
             return;
         }
 
@@ -298,7 +369,7 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
 
         try
         {
-            await UpdateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken);
+            await UpdateWithRoomOverlapGuardInCurrentTransactionAsync(session, cancellationToken, beforeMutation);
             await _dbContext.FlushDisclosureAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
         }
@@ -314,24 +385,53 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
         Guid eventId,
         EventLocation eventLocation,
         Guid? roomId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation = null)
     {
-        if (_dbContext.Database.CurrentTransaction is null)
+        var current = await GetForMutationAsync(session.Id, cancellationToken);
+        if (current is null || current.TenantId != session.TenantId
+            || current.EventId != session.EventId || current.ConcurrencyStamp != session.ConcurrencyStamp)
+            throw new InvalidOperationException("The session move must use its current persisted source.");
+        foreach (Guid parentId in new[] { current.EventId, eventId }.Distinct().Order())
         {
-            throw new InvalidOperationException("Moving an event session requires an active transaction.");
+            await RelationalEntityRowFence.AcquireAsync<Event>(
+                _dbContext, current.TenantId, parent => parent.Id, parentId, cancellationToken);
+            if (!await _dbContext.Events.AsNoTracking().AnyAsync(
+                    parent => parent.Id == parentId && parent.TenantId == current.TenantId, cancellationToken))
+                throw new InvalidOperationException("The session move requires active same-tenant parents.");
+        }
+        await RelationalEntityRowFence.AcquireAsync<EventLocation>(
+            _dbContext, current.TenantId, placement => placement.Id, eventLocation.Id, cancellationToken);
+        var placement = await _dbContext.EventLocations.AsNoTracking().SingleOrDefaultAsync(
+            row => row.Id == eventLocation.Id && row.TenantId == current.TenantId && row.EventId == eventId,
+            cancellationToken);
+        if (placement is null || eventLocation.TenantId != placement.TenantId
+            || eventLocation.EventId != placement.EventId || eventLocation.LocationId != placement.LocationId)
+            throw new InvalidOperationException("The session move requires its current persisted destination placement.");
+        if (roomId is { } selectedRoom)
+        {
+            await RelationalEntityRowFence.AcquireAsync<LocationRoom>(
+                _dbContext, current.TenantId, room => room.Id, selectedRoom, cancellationToken);
+            if (!await _dbContext.LocationRooms.AsNoTracking().AnyAsync(
+                    room => room.Id == selectedRoom && room.TenantId == current.TenantId
+                        && room.LocationId == placement.LocationId, cancellationToken))
+                throw new InvalidOperationException("The session room must belong to its destination location.");
         }
 
-        _dbContext.DisclosureMutations.Enlist([session.TenantId, eventLocation.TenantId]);
+        if (beforeMutation is not null)
+            await beforeMutation(cancellationToken);
+        _dbContext.DisclosureMutations.Enlist([current.TenantId]);
         _dbContext.Entry(session).State = EntityState.Detached;
         int affectedRows = await _dbContext.EventSessions
             .Where(candidate =>
-                candidate.TenantId == session.TenantId &&
-                candidate.Id == session.Id)
+                candidate.TenantId == current.TenantId &&
+                candidate.Id == current.Id && candidate.EventId == current.EventId
+                && candidate.ConcurrencyStamp == current.ConcurrencyStamp)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(candidate => candidate.EventId, eventId)
-                    .SetProperty(candidate => candidate.EventLocationId, eventLocation.Id)
-                    .SetProperty(candidate => candidate.LocationId, eventLocation.LocationId)
+                    .SetProperty(candidate => candidate.EventLocationId, placement.Id)
+                    .SetProperty(candidate => candidate.LocationId, placement.LocationId)
                     .SetProperty(candidate => candidate.RoomId, roomId)
                     .SetProperty(candidate => candidate.EventDayId, (Guid?)null),
             cancellationToken);
@@ -349,8 +449,12 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
 
     private async Task UpdateWithRoomOverlapGuardInCurrentTransactionAsync(
         EventSession session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation)
     {
+        if (beforeMutation is not null)
+            await RelationalEntityRowFence.AcquireAsync<LocationRoom>(
+                _dbContext, session.TenantId, row => row.Id, session.RoomId!.Value, cancellationToken);
         var conflicts = await BuildOverlapQuery(session.RoomId!.Value, session.StartTime!.Value, session.EndTime!.Value, session.Id)
             .Select(s => s.Id)
             .ToListAsync(cancellationToken);
@@ -360,6 +464,8 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
             throw new RoomScheduleConflictException(session.RoomId.Value, conflicts);
         }
 
+        if (beforeMutation is not null)
+            await beforeMutation(cancellationToken);
         var entry = _dbContext.Entry(session);
         if (entry.State == EntityState.Detached)
         {

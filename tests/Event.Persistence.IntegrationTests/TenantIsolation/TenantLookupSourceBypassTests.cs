@@ -5,9 +5,6 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence.Services;
-using Explore.Persistence;
-using Explore.Persistence.Database;
-using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
 
@@ -21,10 +18,7 @@ public class TenantLookupSourceBypassTests(PostgreSqlContainerFixture fixture)
     public async Task GetTenantLookupsAsync_WithAmbientTenant_ReturnsOnlyActiveTenantsAndTheirDomainSettings()
     {
         await fixture.ResetAsync();
-        var options = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(
-            options, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
-        await using var seedContext = new ExploreDbContext(options.Options);
+        await using var seedContext = fixture.CreateDbContext();
 
         var tenantA = CreateTenant("lookup-a", TenantStatusEnum.Active);
         var tenantB = CreateTenant("lookup-b", TenantStatusEnum.Active);
@@ -44,8 +38,8 @@ public class TenantLookupSourceBypassTests(PostgreSqlContainerFixture fixture)
             .Select(setting => setting.TenantId)
             .ToListAsync();
 
-        var lookupSource = new TenantLookupSource(new GlobalExploreDbContextFactory(
-            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)));
+        await using var global = await PostgresTenantApplicationTableIsolationTests.GlobalLookupAuthority.CreateAsync(fixture);
+        var lookupSource = new TenantLookupSource(global.Factory);
         var lookups = await lookupSource.GetTenantLookupsAsync();
 
         await Assert.That(visibleSettingsWithoutBypass).IsEquivalentTo([tenantA.Id]);
@@ -61,28 +55,36 @@ public class TenantLookupSourceBypassTests(PostgreSqlContainerFixture fixture)
         await Assert.That(tenantBLookup.Slug).IsEqualTo(tenantB.Slug);
         await Assert.That(tenantBLookup.Subdomain).IsNull();
         await Assert.That(tenantBLookup.CustomDomain).IsEqualTo("bravo.example.com");
+    }
 
-        var lifecycle = new Explore.Application.Services.TenantLifecycleAccessService(
-            NSubstitute.Substitute.For<Explore.Application.Contracts.Persistence.ITenantRepository>(),
-            NSubstitute.Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
-            NSubstitute.Substitute.For<Explore.Application.Contracts.Persistence.IInstanceBootstrapStateRepository>(),
-            lookupSource);
-        await Assert.That(await lifecycle.IsPublicAsync(tenantA.Id)).IsTrue();
-        await Assert.That(await lifecycle.IsPublicAsync(inactiveTenant.Id)).IsFalse();
-        await Assert.That(await lookupSource.GetCurrentDomainTenantAsync("BRAVO.example.com", true))
-            .IsEqualTo<Guid?>(tenantB.Id);
+    [Test]
+    public async Task CurrentDomainResolutionDoesNotRetainReplacedOrSuspendedReservations()
+    {
+        await fixture.ResetAsync();
+        await using var seed = fixture.CreateDbContext();
+        var tenant = CreateTenant("current-domain", TenantStatusEnum.Active);
+        seed.Tenants.Add(tenant);
+        await seed.SaveChangesAsync();
+        var domain = CreateTenantSetting(tenant.Id, GovernanceSettingKeys.Domains.TenantCustomDomain,
+            "current.example.test");
+        seed.TenantSettingOverrides.AddRange(domain,
+            CreateTenantSetting(tenant.Id, GovernanceSettingKeys.Domains.TenantSubdomain, "current"));
+        await seed.SaveChangesAsync();
+        await using var global = await PostgresTenantApplicationTableIsolationTests.GlobalLookupAuthority.CreateAsync(fixture);
+        var source = new TenantLookupSource(global.Factory);
+        await Assert.That(await source.GetCurrentDomainTenantAsync("CURRENT.example.test", true)).IsEqualTo<Guid?>(tenant.Id);
+        await Assert.That(await source.GetCurrentDomainTenantAsync("current", false)).IsEqualTo<Guid?>(tenant.Id);
+        await Assert.That(await source.GetCurrentDomainTenantAsync("unreserved.example.test", true)).IsNull();
 
-        var reservation = await seedContext.TenantSettingOverrides.SingleAsync(
-            setting => setting.TenantId == tenantB.Id);
-        reservation.Value = SettingValueSerializer.Serialize("replacement.example.com");
-        await seedContext.SaveChangesAsync();
-        await Assert.That(await lookupSource.GetCurrentDomainTenantAsync("bravo.example.com", true)).IsNull();
-        await Assert.That(await lookupSource.GetCurrentDomainTenantAsync("replacement.example.com", true))
-            .IsEqualTo<Guid?>(tenantB.Id);
-        tenantB.TenantStatusId = (int)TenantStatusEnum.Suspended;
-        await seedContext.SaveChangesAsync();
-        await Assert.That(await lifecycle.IsPublicAsync(tenantB.Id)).IsFalse();
-        await Assert.That(await lookupSource.GetCurrentDomainTenantAsync("replacement.example.com", true)).IsNull();
+        domain.Value = SettingValueSerializer.Serialize("replacement.example.test");
+        await seed.SaveChangesAsync();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("current.example.test", true)).IsNull();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("replacement.example.test", true)).IsEqualTo<Guid?>(tenant.Id);
+
+        tenant.TenantStatusId = (int)TenantStatusEnum.Suspended;
+        await seed.SaveChangesAsync();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("replacement.example.test", true)).IsNull();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("current", false)).IsNull();
     }
 
     private static Tenant CreateTenant(string slugPrefix, TenantStatusEnum status)

@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -8,10 +9,13 @@ namespace Explore.Persistence.Repositories;
 public class EventRoleAssignmentRepository : GenericRepository<EventRoleAssignment, Guid>, IEventRoleAssignmentRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly Func<IPrivateEventManagementReader> _privateManagement;
 
-    public EventRoleAssignmentRepository(ExploreDbContext dbContext) : base(dbContext)
+    public EventRoleAssignmentRepository(ExploreDbContext dbContext,
+        Func<IPrivateEventManagementReader> privateManagement) : base(dbContext)
     {
         _dbContext = dbContext;
+        _privateManagement = privateManagement;
     }
 
     public async Task<EventRoleAssignment?> GetByEventUserRoleAsync(
@@ -103,12 +107,13 @@ public class EventRoleAssignmentRepository : GenericRepository<EventRoleAssignme
     {
         var utcNow = DateTime.UtcNow;
 
-        var query = _dbContext.EventRoleAssignments
-            .AsNoTracking()
-            .Include(a => a.User)
-                .ThenInclude(u => u.Pii)
-            .Include(a => a.Role)
-            .Where(a => a.TenantId == tenantId && a.EventId == eventId);
+        var graph = await _privateManagement().ReadTeamAsync(new GetEventTeamListRequest
+        {
+            TenantId = tenantId,
+            EventId = eventId,
+            IncludeInactive = includeInactive
+        }, cancellationToken);
+        IEnumerable<EventRoleAssignment> query = graph.Team;
 
         if (!includeInactive)
         {
@@ -118,11 +123,12 @@ public class EventRoleAssignmentRepository : GenericRepository<EventRoleAssignme
                 (a.ExpiresAtUtc == null || a.ExpiresAtUtc > utcNow));
         }
 
-        return await query
+        return query
             .OrderBy(a => a.RoleId)
-            .ThenBy(a => a.User.Pii.FirstName)
-            .ThenBy(a => a.User.Pii.LastName)
-            .ToListAsync(cancellationToken);
+            .ThenBy(a => a.User.Pii.FirstName, StringComparer.Ordinal)
+            .ThenBy(a => a.User.Pii.LastName, StringComparer.Ordinal)
+            .ThenBy(a => a.Id)
+            .ToList();
     }
 
     public async Task<IReadOnlyList<EventRoleAssignment>> GetEffectiveOwnersForEventAsync(

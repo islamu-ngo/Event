@@ -17,7 +17,8 @@ public interface IEventRepository : IGenericRepository<Event, Guid>
         EventQuerySpecification specification, IReadOnlyDictionary<Guid, Guid> matchingSessions,
         CancellationToken cancellationToken);
 
-    Task<Event?> GetEventWithDetails(Guid id);
+    Task<Event?> GetEventWithDetails(Guid id, CancellationToken cancellationToken = default);
+    Task<Event?> GetPublicEventWithDetailsByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<Event?> GetEventWithDetailsAsync(
         Guid id,
         Guid tenantId,
@@ -26,7 +27,13 @@ public interface IEventRepository : IGenericRepository<Event, Guid>
     Task<Event?> GetPublicEventForOpenGraphAsync(string publicCode, CancellationToken cancellationToken);
     Task<bool> IsPubliclyEligibleAsync(Guid tenantId, Guid eventId, CancellationToken cancellationToken);
     Task<Event?> GetScheduleGraphForUpdateAsync(Guid id, CancellationToken cancellationToken);
+    /// <summary>Holds current update authority through the caller-owned Serializable transaction.</summary>
+    Task<Event?> GetAuthorizedForUpdateAsync(Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken);
+    /// <summary>Holds current delete authority through the caller-owned Serializable transaction.</summary>
+    Task<Event?> GetAuthorizedForDeleteAsync(Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken);
     Task<Event?> GetAuthorizationTargetByIdAsync(Guid id, CancellationToken cancellationToken);
+    /// <summary>Reads a selected-tenant proposal target without private navigation hydration.</summary>
+    Task<Event?> GetAiProposalAuthorizationTargetByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<Event?> GetRegistrationStatusEventForUpdateAsync(Guid id, Guid tenantId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Event>> GetAuthorizationTargetsByIdsAsync(
         IReadOnlyCollection<Guid> ids,

@@ -1,3 +1,5 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -10,6 +12,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Commands;
 
@@ -21,7 +24,13 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly HybridCache _cache;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISerializableAttemptOwner _owner;
+    private readonly IAdminContext _adminContext;
+    private readonly ITenantAdministratorCommitAuthority _tenantAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly RequestAuthorization<CreateEventTemplateCommand> _authorization;
+    private readonly ILogger<CreateEventTemplateCommandHandler> _logger;
+    private readonly IHumanAdministrativeActionPreparation _preparation;
 
     public CreateEventTemplateCommandHandler(
         IEventTemplateRepository eventTemplateRepository,
@@ -30,7 +39,13 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         HybridCache cache,
-        IUnitOfWork unitOfWork)
+        ISerializableAttemptOwner owner,
+        IAdminContext adminContext,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        RequestAuthorization<CreateEventTemplateCommand> authorization,
+        ILogger<CreateEventTemplateCommandHandler> logger,
+        IHumanAdministrativeActionPreparation preparation)
     {
         _eventTemplateRepository = eventTemplateRepository;
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
@@ -38,22 +53,54 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
         _cache = cache;
-        _unitOfWork = unitOfWork;
+        _owner = owner;
+        _adminContext = adminContext;
+        _tenantAuthority = tenantAuthority;
+        _instanceAuthority = instanceAuthority;
+        _authorization = authorization;
+        _logger = logger;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventTemplateCommand request, CancellationToken cancellationToken)
     {
-        var validator = new CreateEventTemplateDtoValidator();
-        var validationResult = await validator.ValidateAsync(request.TemplateDto, cancellationToken);
+        Guid tenantId = _tenantContext.TenantId;
+        if (!_currentUserService.IsAuthenticated || tenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            return BaseCommandResponse.Authentication<Guid>();
+        request = request with { TemplateDto = request.TemplateDto with { } };
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
+        var validationResult = await new CreateEventTemplateDtoValidator()
+            .ValidateAsync(request.TemplateDto, cancellationToken);
         if (!validationResult.IsValid)
-        {
             return BaseCommandResponse.Validation<Guid>(
-                validationResult.Errors.Select(e => e.ErrorMessage),
-                "Event template creation failed.");
-        }
+                validationResult.Errors.Select(error => error.ErrorMessage), "Event template creation failed.");
+        Guid templateId = Guid.CreateVersion7();
+        DateTime createdAt = DateTime.UtcNow;
+        var definitionIds = request.TemplateDto.Definitions.Select(definition =>
+            (Id: Guid.CreateVersion7(), OptionIds: definition.Options.Select(_ => Guid.CreateVersion7()).ToArray())).ToArray();
+        var prepared = await _preparation.PrepareAsync(request, userId, cancellationToken);
+        var response = await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, userId, token);
+            if (!await _instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await _tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return BaseCommandResponse.Authorization<Guid>();
+            return await CreateAuthorizedAsync(request, tenantId, templateId, createdAt, definitionIds, token);
+        }, cancellationToken);
+        if (response.IsSuccess)
+            await _cache.RemoveAsync(
+                GetListCacheKey(tenantId, null, 1, PaginatedResult<object>.DefaultPageSize),
+                cancellationToken);
+        return response;
+    }
 
+    private async Task<BaseCommandResponse<Guid>> CreateAuthorizedAsync(
+        CreateEventTemplateCommand request, Guid tenantId, Guid templateId, DateTime createdAt,
+        (Guid Id, Guid[] OptionIds)[] definitionIds, CancellationToken cancellationToken)
+    {
         if (await _eventTemplateRepository.ExistsTemplateKey(
-                _tenantContext.TenantId,
+                tenantId,
                 request.TemplateDto.TemplateKey,
                 request.TemplateDto.Version))
         {
@@ -64,7 +111,7 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
 
         var maxDefinitions = await _quotaResolver.GetIntAsync(
             CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerTemplate.Key,
-            _tenantContext.TenantId,
+            tenantId,
             cancellationToken);
         if (request.TemplateDto.Definitions.Count > maxDefinitions)
         {
@@ -76,12 +123,12 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
                     null,
                     request.TemplateDto.Definitions.Count,
                     "event_template_definitions",
-                    _tenantContext.TenantId));
+                    tenantId));
         }
 
         var maxOptions = await _quotaResolver.GetIntAsync(
             CustomPropertyQuotaSettingDefinitions.MaxOptionsPerDefinition.Key,
-            _tenantContext.TenantId,
+            tenantId,
             cancellationToken);
         var overOptionDefinition = request.TemplateDto.Definitions
             .FirstOrDefault(definition => definition.Options.Count > maxOptions);
@@ -95,10 +142,10 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
                     null,
                     overOptionDefinition.Options.Count,
                     "event_template_definition_options",
-                    _tenantContext.TenantId));
+                    tenantId));
         }
 
-        var definitionsResult = BuildDefinitionEntities(request.TemplateDto.Definitions);
+        var definitionsResult = BuildDefinitionEntities(request.TemplateDto.Definitions, tenantId, createdAt, definitionIds);
         if (definitionsResult.Errors.Count > 0)
         {
             return BaseCommandResponse.Validation<Guid>(
@@ -109,6 +156,8 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
         var dto = request.TemplateDto;
         var template = new EventTemplate
         {
+            Id = templateId,
+            CreatedAt = createdAt,
             TemplateKey = dto.TemplateKey,
             DisplayName = dto.DisplayName,
             Description = dto.Description,
@@ -117,31 +166,29 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
             IsPublished = dto.IsPublished,
             IsActive = dto.IsActive,
             SortOrder = dto.SortOrder,
-            TenantId = _tenantContext.TenantId,
+            TenantId = tenantId,
             CreatedBy = _currentUserService.UserId,
             UpdatedBy = _currentUserService.UserId
         };
 
-        template = await _unitOfWork.ExecuteInTransactionAsync(
-            ct => _eventTemplateRepository.CreateWithDefinitions(template, definitionsResult.Definitions, ct),
-            cancellationToken);
-
-        await _cache.RemoveAsync(
-            GetListCacheKey(_tenantContext.TenantId, null, 1, PaginatedResult<object>.DefaultPageSize),
-            cancellationToken);
+        template = await _eventTemplateRepository.CreateWithDefinitions(
+            template, definitionsResult.Definitions, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return BaseCommandResponse.Success(template.Id, "Event template created successfully.");
     }
 
     private (IReadOnlyCollection<TemplateDefinitionWithOptions> Definitions, List<string> Errors) BuildDefinitionEntities(
-        IReadOnlyList<CreateEventTemplateDefinitionDto> definitionDtos)
+        IReadOnlyList<CreateEventTemplateDefinitionDto> definitionDtos, Guid tenantId, DateTime createdAt,
+        (Guid Id, Guid[] OptionIds)[] definitionIds)
     {
         var errors = new List<string>();
         var definitions = new List<TemplateDefinitionWithOptions>();
         var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var defDto in definitionDtos)
+        for (int index = 0; index < definitionDtos.Count; index++)
         {
+            var defDto = definitionDtos[index];
             var governance = _customPropertyGovernancePolicy.EvaluateDefinition(defDto.Namespace, defDto.Key);
             if (!governance.IsValid)
             {
@@ -158,6 +205,8 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
 
             var definition = new EventTemplateCustomPropertyDefinition
             {
+                Id = definitionIds[index].Id,
+                CreatedAt = createdAt,
                 Namespace = governance.NormalizedNamespace,
                 Key = governance.NormalizedKey,
                 DisplayName = defDto.DisplayName,
@@ -186,12 +235,12 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
                 MinDateTime = defDto.MinDateTime,
                 MaxDateTime = defDto.MaxDateTime,
                 AllowedUrlSchemes = defDto.AllowedUrlSchemes,
-                TenantId = _tenantContext.TenantId,
+                TenantId = tenantId,
                 CreatedBy = _currentUserService.UserId,
                 UpdatedBy = _currentUserService.UserId
             };
 
-            var options = CreateOptionEntities(defDto.Options, definition.Id);
+            var options = CreateOptionEntities(defDto.Options, definition.Id, createdAt, definitionIds[index].OptionIds);
             var defaultOption = options.SingleOrDefault(x => x.IsDefault);
 
             definitions.Add(new TemplateDefinitionWithOptions(definition, options, defaultOption?.Id));
@@ -202,12 +251,13 @@ public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemp
 
     private List<EventTemplateCustomPropertyOption> CreateOptionEntities(
         IReadOnlyCollection<CreateEventTemplateOptionDto> optionDtos,
-        Guid definitionId)
+        Guid definitionId, DateTime createdAt, Guid[] optionIds)
     {
         return optionDtos
-            .Select(optionDto => new EventTemplateCustomPropertyOption
+            .Select((optionDto, index) => new EventTemplateCustomPropertyOption
             {
-                Id = Guid.CreateVersion7(),
+                Id = optionIds[index],
+                CreatedAt = createdAt,
                 EventTemplateCustomPropertyDefinitionId = definitionId,
                 Namespace = CustomPropertyIdentity.NormalizeNamespace(optionDto.Namespace),
                 Key = CustomPropertyIdentity.NormalizeKey(optionDto.Key),

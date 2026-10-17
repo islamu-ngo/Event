@@ -32,7 +32,7 @@ public sealed class EventDiscoveryLocalSource
     private readonly ITenantContext _tenantContext;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantLifecycleAccessService _lifecycle;
-    private readonly IHierarchicalSettingsResolver _settingsResolver;
+    private readonly IHierarchicalSettingsReader _settingsResolver;
     private readonly ILocationRepository _locationRepository;
     private readonly TimeProvider _clock;
     private readonly ILocationPrivacyGovernanceService _locationPrivacy;
@@ -47,7 +47,7 @@ public sealed class EventDiscoveryLocalSource
         ITenantContext tenantContext,
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantLifecycleAccessService lifecycle,
-        IHierarchicalSettingsResolver settingsResolver,
+        IHierarchicalSettingsReader settingsResolver,
         ILocationRepository locationRepository,
         TimeProvider clock,
         ILocationPrivacyGovernanceService locationPrivacy,

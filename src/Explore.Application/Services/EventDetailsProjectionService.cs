@@ -15,6 +15,7 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
     private readonly IEventCategoriesRepository _eventCategoriesRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<EventDetailsProjectionService> _logger;
+    private readonly IPrivateEventManagementReader _privateManagement;
 
     public EventDetailsProjectionService(
         IEventRepository eventRepository,
@@ -22,7 +23,8 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
         IEventTagsRepository eventTagsRepository,
         IEventCategoriesRepository eventCategoriesRepository,
         IObjectStorageService objectStorageService,
-        ILogger<EventDetailsProjectionService> logger)
+        ILogger<EventDetailsProjectionService> logger,
+        IPrivateEventManagementReader privateManagement)
     {
         _eventRepository = eventRepository;
         _eventModerationRecordRepository = eventModerationRecordRepository;
@@ -30,17 +32,32 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
         _eventCategoriesRepository = eventCategoriesRepository;
         _objectStorageService = objectStorageService;
         _logger = logger;
+        _privateManagement = privateManagement;
     }
 
     public async Task<EventDto?> BuildAsync(Guid eventId, CancellationToken cancellationToken)
     {
-        var @event = await _eventRepository.GetEventWithDetails(eventId);
-        return await BuildAsync(@event, cancellationToken);
+        var graph = await _privateManagement.ReadAsync(new(PrivateEventManagementReadKind.Details, eventId), cancellationToken);
+        var dto = EventMapper.ToDetail(graph.Events.SingleOrDefault());
+        if (dto is null) return null;
+        dto.IsUnmoderationEligible = graph.ModerationRecords.OrderByDescending(row => row.CreatedAt)
+            .ThenByDescending(row => row.Id).FirstOrDefault()?.AllowsUnmoderation == true;
+        return dto with
+        {
+            Tags = graph.Tags.Select(TagMapper.ToListItem).ToList(),
+            Categories = graph.Categories.Select(CustomPropertyMapper.ToListItem).ToList()
+        };
     }
 
     public async Task<EventDto?> BuildByPublicCodeAsync(string publicCode, CancellationToken cancellationToken)
     {
         var @event = await _eventRepository.GetPublicEventWithDetailsByCodeAsync(publicCode, cancellationToken);
+        return await BuildAsync(@event, cancellationToken);
+    }
+
+    public async Task<EventDto?> BuildPublicAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        var @event = await _eventRepository.GetPublicEventWithDetailsByIdAsync(eventId, cancellationToken);
         return await BuildAsync(@event, cancellationToken);
     }
 
@@ -50,6 +67,23 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
 
         if (dto is null)
             return null;
+
+        if (@event!.DiscoveryPresentation is { } presentation)
+        {
+            dto.IsUnmoderationEligible = presentation.IsUnmoderationEligible;
+            return dto with
+            {
+                Tags = presentation.Tags.Select(tag => new Explore.Application.DTOs.Tag.TagListDto
+                {
+                    Id = tag.Id, MasterCode = tag.MasterCode, FullName = tag.FullName
+                }).ToList(),
+                Categories = presentation.Categories.Select(category => new Explore.Application.DTOs.Category.CategoryListDto
+                {
+                    Id = category.Id, ConcurrencyStamp = category.ConcurrencyStamp,
+                    MasterCode = category.MasterCode, FullName = category.FullName, ParentId = category.ParentId
+                }).ToList()
+            };
+        }
 
         var eventId = dto.Id;
 

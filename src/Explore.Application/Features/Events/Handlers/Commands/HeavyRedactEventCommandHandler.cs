@@ -64,8 +64,7 @@ public sealed class HeavyRedactEventCommandHandler(
         {
             metrics.RecordEventModerationAction(null, ActionKind, "failed", "user_unresolved", irreversible: true);
             logger.LogWarning(
-                "Heavy event moderation rejected because the authenticated moderator user could not be resolved for event {EventId}.",
-                request.Id);
+                "Heavy event moderation rejected because the authenticated moderator user could not be resolved");
 
             return Failure(
                 request.Id,
@@ -77,7 +76,6 @@ public sealed class HeavyRedactEventCommandHandler(
         var tenantId = Guid.Empty;
         var eventId = Guid.Empty;
         var wasIdempotent = false;
-        EventModerationRecord? moderationRecordForLog = null;
         var moderationRecordId = Guid.CreateVersion7();
         var federationOutboxId = Guid.CreateVersion7();
         DateTimeOffset redactedAt = timeProvider.GetUtcNow();
@@ -181,7 +179,6 @@ public sealed class HeavyRedactEventCommandHandler(
                 occurrenceId,
                 pointerOutboxMessageId,
                 token);
-            moderationRecordForLog = moderationRecord;
 
             return Success(
                 @event.Id,
@@ -192,9 +189,7 @@ public sealed class HeavyRedactEventCommandHandler(
         {
             if (eventNotFound)
             {
-                logger.LogWarning(
-                    "Heavy event moderation rejected because event {EventId} was not found.",
-                    request.Id);
+                logger.LogWarning("Heavy event moderation rejected because event was not found.");
             }
 
             return transactionResponse;
@@ -203,9 +198,7 @@ public sealed class HeavyRedactEventCommandHandler(
         if (wasIdempotent)
         {
             logger.LogInformation(
-                "Heavy event moderation skipped because event {EventId} in tenant {TenantId} is already heavy-redacted; delete-requested image cleanup will still be checked.",
-                eventId,
-                tenantId);
+                "Heavy event moderation skipped because event is already heavy-redacted; delete-requested image cleanup will still be checked.");
         }
 
         if (shouldInvalidateCache)
@@ -220,11 +213,8 @@ public sealed class HeavyRedactEventCommandHandler(
             wasIdempotent ? "idempotent" : "succeeded",
             irreversible: true);
         logger.LogInformation(
-            "Heavy event moderation {Outcome} for event {EventId} in tenant {TenantId}; moderation record {ModerationRecordId}. Detached eligible image cleanup is durably queued.",
-            wasIdempotent ? "idempotent" : "succeeded",
-            eventId,
-            tenantId,
-            moderationRecordForLog?.Id);
+            "Heavy event moderation {Outcome}. Detached eligible image cleanup is durably queued.",
+            wasIdempotent ? "idempotent" : "succeeded");
 
         return transactionResponse;
     }

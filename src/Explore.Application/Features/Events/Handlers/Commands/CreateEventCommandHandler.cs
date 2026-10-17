@@ -79,6 +79,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
     private readonly TimeProvider _timeProvider;
     private readonly ISettingMutationLock _mutationLock;
     private readonly IVisitorAccessCapabilityResolver _visitorCapabilities;
+    private readonly IAiEventDraftRecoveryRepository _aiDraftRecovery;
 
     public CreateEventCommandHandler(
         IEventRepository eventRepository,
@@ -134,7 +135,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         AtprotoEventPublicationPlanner atprotoPublicationPlanner,
         TimeProvider timeProvider,
         ISettingMutationLock mutationLock,
-        IVisitorAccessCapabilityResolver visitorCapabilities)
+        IVisitorAccessCapabilityResolver visitorCapabilities,
+        IAiEventDraftRecoveryRepository aiDraftRecovery)
     {
         _eventRepository = eventRepository;
         _eventSessionRepository = eventSessionRepository;
@@ -190,11 +192,14 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         _timeProvider = timeProvider;
         _mutationLock = mutationLock;
         _visitorCapabilities = visitorCapabilities;
+        _aiDraftRecovery = aiDraftRecovery;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventCommand request, CancellationToken cancellationToken)
     {
         var dto = request.EventDto;
+        if (!request.HasUnchangedAiDraftPayload())
+            return AiDraftAuthorityFailure();
 
         var validationErrors = await ValidateRequestAsync(dto, cancellationToken);
         if (validationErrors.Count > 0)
@@ -214,6 +219,10 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         }
 
         var currentUserId = _userContext.GetRequiredUserId();
+        var aiOrigin = request.AiDraftOrigin;
+        if (aiOrigin is not null && (aiOrigin.Identity.PrincipalUserId != currentUserId
+            || aiOrigin.Identity.TenantId != _tenantContext.TenantId))
+            return AiDraftAuthorityFailure();
 
         Guid?[] imageIds =
         [
@@ -239,6 +248,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 [actorResult.ErrorDetail!],
                 actorResult.ErrorMessage!);
         }
+        if (aiOrigin is not null && aiOrigin.Identity.ActingActorId != actorResult.ActorId)
+            return AiDraftAuthorityFailure();
 
         List<AddressGovernancePolicyDecision> addressDecisions = [];
         Guid? verifiedOrganizationId = !actorResult.IsCommunitySubmission
@@ -280,7 +291,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         var createdAt = now;
         DateTime occurredAt = now.UtcDateTime;
         bool publishOnCreate = requestedStatusId == (int)EventStatusEnum.Published;
-        var eventEntity = BuildEventEntity(dto, actorResult, timezoneId, currentUserId, createdAt, publishOnCreate);
+        var eventEntity = BuildEventEntity(dto, actorResult, timezoneId, currentUserId, createdAt, publishOnCreate,
+            aiOrigin?.ReservedEventId ?? Guid.CreateVersion7());
         var federationOutboxId = Guid.CreateVersion7();
         var notificationFanoutOutboxId = Guid.CreateVersion7();
         var federationCreatedAt = occurredAt;
@@ -292,6 +304,16 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
                 token => _unitOfWork.ExecuteSerializableAsync(async ct =>
             {
+                if (aiOrigin is not null)
+                {
+                    var execution = await _aiDraftRecovery.ReadForPrimaryCreationAsync(
+                        aiOrigin.Identity, aiOrigin.ExecutionId, aiOrigin.ReservedEventId, ct);
+                    if (execution is null)
+                        return AiDraftAuthorityFailure();
+                    if (execution.PrimaryEventId is { } primaryEventId)
+                        return BaseCommandResponse.Success(primaryEventId, "Event created successfully.");
+                }
+
                 var capability = await _visitorCapabilities.ResolveAsync(eventEntity.TenantId, ct);
                 if (dto.ParticipationConfiguration.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
                     && !capability.AllowsAccountRequiredParticipation)
@@ -364,6 +386,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                         publishedAt));
                 }
 
+                if (aiOrigin is not null)
+                    await _aiDraftRecovery.LinkPrimaryAsync(aiOrigin.Identity, aiOrigin.ExecutionId, eventEntity, ct);
                 return BaseCommandResponse.Success(eventEntity.Id, "Event created successfully.");
             }, token), cancellationToken);
             if (!response.IsSuccess)
@@ -431,7 +455,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         string timezoneId,
         Guid currentUserId,
         DateTimeOffset createdAt,
-        bool includePublicScheduleRollup)
+        bool includePublicScheduleRollup,
+        Guid eventId)
     {
         var publicSessionRequests = includePublicScheduleRollup
             ? dto.Sessions
@@ -449,7 +474,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             ? EventStatusEnum.Published
             : EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(),
+            Id = eventId,
             Title = dto.Title,
             Subtitle = dto.Subtitle,
             Description = dto.Description,
@@ -506,6 +531,11 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
     }
 
     private static string GeneratePublicCode() => Guid.CreateVersion7().ToString("N")[..12];
+
+    private static BaseCommandResponse<Guid> AiDraftAuthorityFailure() =>
+        BaseCommandResponse.Failure<Guid>(
+            "ai_event_draft_authority_changed",
+            "The confirmed AI event draft is not available for this creation or recovery.");
 
     private static BaseCommandResponse<Guid> AddressGovernanceFailure() =>
         BaseCommandResponse.Failure<Guid>(

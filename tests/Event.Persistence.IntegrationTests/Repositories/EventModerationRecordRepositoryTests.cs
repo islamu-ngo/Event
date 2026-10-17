@@ -69,7 +69,9 @@ public sealed class EventModerationRecordRepositoryTests(PostgreSqlContainerFixt
     }
 
     [Test]
-    public async Task GetByIdAsync_UsesExplicitTenantPredicate_ForOutboxWorkerLookup()
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task GetByIdAsync_RequiresSelectedTenant_ForRetainedRecordLookup(bool selectedTenant)
     {
         await fixture.ResetAsync();
         await using var setupContext = fixture.CreateDbContext();
@@ -86,15 +88,19 @@ public sealed class EventModerationRecordRepositoryTests(PostgreSqlContainerFixt
         setupContext.EventModerationRecords.Add(record);
         await setupContext.SaveChangesAsync();
 
-        await using var filteredContext = fixture.CreateTenantFilteredDbContext(new StaticTenantContext(Guid.NewGuid()));
+        await using var filteredContext = fixture.CreateTenantFilteredDbContext(
+            new StaticTenantContext(selectedTenant ? tenant.Id : Guid.CreateVersion7()));
         var repository = new EventModerationRecordRepository(filteredContext);
 
         var result = await repository.GetByIdAsync(tenant.Id, record.Id, CancellationToken.None);
         var wrongTenantResult = await repository.GetByIdAsync(Guid.NewGuid(), record.Id, CancellationToken.None);
 
-        await Assert.That(result).IsNotNull();
-        await Assert.That(result!.Id).IsEqualTo(record.Id);
-        await Assert.That(result.EventId).IsEqualTo(@event.Id);
+        await Assert.That(result is not null).IsEqualTo(selectedTenant);
+        if (selectedTenant)
+        {
+            await Assert.That(result!.Id).IsEqualTo(record.Id);
+            await Assert.That(result.EventId).IsEqualTo(@event.Id);
+        }
         await Assert.That(wrongTenantResult).IsNull();
     }
 

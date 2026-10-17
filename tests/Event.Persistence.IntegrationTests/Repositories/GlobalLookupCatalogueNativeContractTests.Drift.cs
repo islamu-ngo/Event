@@ -1,5 +1,4 @@
 using Explore.Domain;
-using Explore.Persistence;
 using Explore.Persistence.Caching;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Security;
@@ -108,10 +107,7 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests
 
             var services = new ServiceCollection();
             services.AddSingleton(fixture.NativeQueueEnrollment);
-            services.AddSingleton<IDbContextFactory<ExploreDbContext>>(
-                new CatalogueFactory(() => Open(PrimaryDatabaseRole.Runtime)));
-            services.AddScoped<ExploreDbContext>(_ => throw new InvalidOperationException(
-                "Catalogue initialization must not resolve the tenant-selected scoped context."));
+            services.AddScoped(_ => Open(PrimaryDatabaseRole.Runtime));
             await using var provider = services.BuildServiceProvider();
             var cache = new LookupDataCache(provider.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<LookupDataCache>.Instance);

@@ -42,7 +42,7 @@ public sealed class AiModelDiscoveryGateway(
             return new([], AiResponseReader.FindRejection(exception)!.Category);
         }
         catch (Exception exception) when (exception is HttpRequestException
-            or JsonException or UriFormatException)
+            or JsonException or UriFormatException or OutboundEndpointDeniedException)
         {
             return new([], "provider_failure");
         }

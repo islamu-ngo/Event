@@ -179,6 +179,12 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 startedAt,
                 telemetryActivity);
         }
+        catch (Exception exception) when (OutboundEndpointDeniedException.Find(exception) is not null)
+        {
+            return CompleteFailure(
+                RecordFailure(providerName, "provider_endpoint_denied", "The AI provider endpoint is not permitted."),
+                providerName, startedAt, telemetryActivity);
+        }
         catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { })
         {
             return CompleteFailure(

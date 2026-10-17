@@ -68,6 +68,9 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
         {
             throw new ProviderResponseRejectedException(rejection.Category);
         }
+        catch (OutboundEndpointDeniedException)
+        {
+        }
         catch (HttpRequestException)
         {
         }
@@ -238,6 +241,12 @@ public sealed class OpenAiResponsesChatProvider : IAiChatProvider, IAiModelCatal
                 RecordFailure("provider_timeout", "AI provider request timed out.", isTransient: true),
                 startedAt,
                 telemetryActivity);
+        }
+        catch (Exception exception) when (OutboundEndpointDeniedException.Find(exception) is not null)
+        {
+            return CompleteFailure(
+                RecordFailure("provider_endpoint_denied", "The AI provider endpoint is not permitted."),
+                startedAt, telemetryActivity);
         }
         catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { })
         {

@@ -52,6 +52,19 @@ Automatic response decompression is disabled. Providers and intermediate
 proxies must return identity-encoded responses; compressed replies are rejected
 because this release does not separately bound compressed and decoded streams.
 
+## Endpoint and cloud identity boundaries
+
+Tenant AI traffic uses public-network transport. An instance may opt in to a
+local provider, but that exception is limited to its selected origin and never
+admits cloud metadata endpoints. Reusing the same endpoint text in tenant
+settings does not grant the instance exception. DNS changes are checked at the
+actual connection, and TLS still validates the provider hostname.
+
+Azure default credentials are instance-owned. Their token traffic always uses
+public-only transport, and managed identity is excluded; enabling local
+instance endpoints does not enable metadata-based token acquisition. Configure
+an admitted credential mechanism rather than relying on a metadata route.
+
 ## Rejection and recovery
 
 A size, nesting, collection, identifier, scalar, argument or encoding rejection

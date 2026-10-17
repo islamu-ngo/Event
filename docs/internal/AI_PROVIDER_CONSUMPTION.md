@@ -100,6 +100,30 @@ claimed. The Azure catalogue is a configured deployment descriptor, not a
 successful remote-discovery result. Azure credential acquisition remains in the
 separately owned credential-custody workstream.
 
+## Endpoint and cloud identity authority
+
+`AiProviderSettingsValidator` applies the same outbound URL policy as the
+connection-time `VettedAddressConnector`; it does not treat configuration
+validation as authorization to connect to a later DNS answer. Each connection
+validates the resolved address set and opens the socket to an admitted address,
+while TLS authenticates the original hostname.
+
+`AiProviderConfigurationResolver` compares the requested and freshly selected
+origins as parsed scheme, normalized hostname and port. Equivalent spellings
+retain instance transport ownership; tenant-owned endpoint or provider metadata
+cannot borrow that ownership merely by repeating an instance value. Public and
+instance clients remain separate, and instance dispatch cannot escape its
+configured origin. Local instance opt-in never admits metadata destinations.
+Adapters and discovery map outbound denial to fixed categories without provider
+addresses or exception prose.
+
+The Azure `DefaultAzureCredential` chain excludes managed identity. Its token
+HTTP transport uses a shared process-lifetime client with the public-only
+connection policy, independent of instance local-endpoint opt-in. Reusing that
+client gives its handler durable ownership rather than allocating an unowned
+client for every credential chain. Tenant metadata cannot replace instance
+Azure identity fields.
+
 ## Safe failures
 
 Security rejections are nontransient categories, never body text or exception

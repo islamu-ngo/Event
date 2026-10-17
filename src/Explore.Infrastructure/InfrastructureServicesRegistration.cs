@@ -86,6 +86,9 @@ namespace Explore.Infrastructure;
 
 public static class InfrastructureServicesRegistration
 {
+    private static readonly HttpClient AzureIdentityHttpClient = new(
+        AiTransportAuthority.CreateHandler(new AiProviderSettings(), instanceScope: false));
+
     public static IServiceCollection ConfigureInfrastructureServices(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -962,14 +965,12 @@ public static class InfrastructureServicesRegistration
 
     private static DefaultAzureCredential CreateDefaultAzureCredential(AiProviderSettings settings)
     {
-        if (string.IsNullOrWhiteSpace(settings.AzureTenantId))
-        {
-            return new DefaultAzureCredential();
-        }
-
         return new DefaultAzureCredential(new DefaultAzureCredentialOptions
         {
-            TenantId = settings.AzureTenantId.Trim()
+            TenantId = string.IsNullOrWhiteSpace(settings.AzureTenantId) ? null : settings.AzureTenantId.Trim(),
+            // Instance cloud identity never creates an exception for metadata traffic.
+            ExcludeManagedIdentityCredential = true,
+            Transport = new Azure.Core.Pipeline.HttpClientTransport(AzureIdentityHttpClient)
         });
     }
 }

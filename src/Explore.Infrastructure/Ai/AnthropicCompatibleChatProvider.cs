@@ -196,6 +196,12 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
                 startedAt,
                 telemetryActivity);
         }
+        catch (Exception exception) when (OutboundEndpointDeniedException.Find(exception) is not null)
+        {
+            return CompleteFailure(
+                RecordFailure("provider_endpoint_denied", "The AI provider endpoint is not permitted."),
+                startedAt, telemetryActivity);
+        }
         catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { })
         {
             return CompleteFailure(

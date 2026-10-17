@@ -55,8 +55,7 @@ public sealed class AiProviderConfigurationResolver(
         var defaults = options.Value;
         if (instance && (defaults.Provider != AiProviderSettings.ProviderOpenAiCompatible
             || !defaults.Enabled || request.CredentialScope != defaults.CredentialScope
-            || !Uri.TryCreate(defaults.EndpointUrl, UriKind.Absolute, out var configuredEndpoint)
-            || endpoint.AbsoluteUri.TrimEnd('/') != configuredEndpoint.AbsoluteUri.TrimEnd('/')))
+            || endpoint.AbsoluteUri.TrimEnd('/') != AiTransportAuthority.ResolveInstanceEndpoint(defaults).AbsoluteUri.TrimEnd('/')))
             return new(null, "invalid_settings");
         if (!instance && request.CredentialScope == AiCredentialScope.Instance)
             return new(null, "credential_scope_invalid");
@@ -81,8 +80,6 @@ public sealed class AiProviderConfigurationResolver(
         EndpointUrl = group.EndpointUrl?.Trim() ?? "",
         CredentialScope = group.CredentialScope,
         ModelId = modelId,
-        AzureCredentialMode = options.Value.AzureCredentialMode,
-        AzureTenantId = options.Value.AzureTenantId,
         MaxInputTokens = group.MaxInputTokens,
         MaxOutputTokens = group.MaxOutputTokens,
         Temperature = group.Temperature,
@@ -112,6 +109,11 @@ public sealed class AiProviderConfigurationResolver(
                 new SettingContext(), cancellationToken))
             return new(null, "credential_scope_invalid");
 
+        bool instanceTransport = !tenantOwnedTransport
+            && selected.Provider != AiProviderSettings.ProviderFake
+            && options.Value.Provider == selected.Provider
+            && AiTransportAuthority.HasSameOrigin(AiTransportAuthority.ResolveInstanceEndpoint(selected),
+                AiTransportAuthority.ResolveInstanceEndpoint(options.Value));
         if (selected.Provider == AiProviderSettings.ProviderAzureOpenAi
             && string.Equals(selected.AzureCredentialMode, AiProviderSettings.AzureCredentialModeDefaultAzureCredential,
                 StringComparison.OrdinalIgnoreCase))
@@ -124,7 +126,7 @@ public sealed class AiProviderConfigurationResolver(
             tenantOwnedTransport, out var reference))
             return new(null, "credential_scope_invalid");
         if (reference is null)
-            return new(new ResolvedAiProviderConfiguration(selected, "", !tenantOwnedTransport), null);
+            return new(new ResolvedAiProviderConfiguration(selected, "", instanceTransport), null);
 
         var resolved = reference.Scope == SecretScope.Instance && reference.Qualifier.Length == 0
             ? await secrets.ResolveAsync(reference.SettingKey, null, cancellationToken)
@@ -141,7 +143,7 @@ public sealed class AiProviderConfigurationResolver(
         if (resolved.Secret?.SettingKey != reference.SettingKey || resolved.Scope != reference.Scope
             || resolved.ScopeId != reference.ScopeId || string.IsNullOrWhiteSpace(resolved.Value))
             return new(null, "credential_invalid");
-        return new(new ResolvedAiProviderConfiguration(selected, resolved.Value, !tenantOwnedTransport), null);
+        return new(new ResolvedAiProviderConfiguration(selected, resolved.Value, instanceTransport), null);
     }
 }
 

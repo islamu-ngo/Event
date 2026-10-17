@@ -3,6 +3,25 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Original User Tenant Navigation
+
+ResolveUserTenantRedirectionRequestHandler requires an authenticated request whose
+user identifier matches the server-resolved subject before accessing navigation
+data. IUserTenantNavigationRepository returns only a live user's identity and
+saved tenant preference; this path does not load UserPii through UserRepository.
+Membership enumeration uses the separate Global membership capability, independent
+of the request tenant. A saved preference is selected only when it appears in the
+current active-membership result. Otherwise navigation chooses the latest active
+membership, or returns no target when no active memberships remain.
+The navigation response grants no tenant access and never changes the preference.
+
+PostgresUserTenantNavigationContract installs a dedicated execute-only Global
+reader with a single UUID selector. Its owner can select only User.Id,
+User.IsDeleted and User.LastActiveTenantId; it has no mutation or PII privileges.
+Admission attests the enrolled login and role graph, effective privileges, exact
+routine body and invocation metadata. Reinstalling an existing contract rejects
+drift rather than repairing unexpected grants or replacing a changed definition.
+
 ## Original Human Tenant Preference Mutation
 
 UpdateUserLastActiveTenantCommand selects an original Global owner before handler

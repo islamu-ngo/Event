@@ -159,6 +159,7 @@ public static class ExploreDatabaseMigrator
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresUserTenantMembershipContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresTenantPreferenceContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresUserTenantNavigationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresTenantLookupContract.ApplyAsync(executionDatabase, cancellationToken);
             foreach (string role in new[]

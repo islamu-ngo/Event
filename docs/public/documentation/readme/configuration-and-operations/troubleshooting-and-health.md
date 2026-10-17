@@ -6,6 +6,15 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Tenant navigation reads the authenticated user's saved preference without loading
+their personal profile. A saved target is used only while it remains in that
+user's active tenant memberships. If it no longer qualifies, navigation chooses
+the latest active membership; users without active memberships receive no target.
+Navigation does not write preferences or bypass tenant access checks.
+If native navigation readiness rejects deployment enrollment or routine drift,
+restore the approved read contract through the database preparation process;
+do not grant Runtime direct access to user records.
+
 Changing the current user's active tenant requires the original authenticated
 session and a current active membership in the selected target tenant through
 transaction settlement. Revoked or foreign memberships do not change the saved

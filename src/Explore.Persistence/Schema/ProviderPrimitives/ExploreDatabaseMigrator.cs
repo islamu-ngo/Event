@@ -157,6 +157,7 @@ public static class ExploreDatabaseMigrator
             await PostgresExternalLoginAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresUserTenantMembershipContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresTenantLookupContract.ApplyAsync(executionDatabase, cancellationToken);
             foreach (string role in new[]
@@ -164,6 +165,7 @@ public static class ExploreDatabaseMigrator
                 PostgresExternalLoginAuthenticationContract.GlobalRole,
                 PostgresExternalApiKeyAuthenticationContract.GlobalRole,
                 PostgresAdmissionScannerAuthenticationContract.GlobalRole,
+                PostgresUserTenantMembershipContract.GlobalRole,
                 PostgresAdministrativeAuthorityContract.GlobalRole,
                 PostgresTenantLookupContract.GlobalRole
             })

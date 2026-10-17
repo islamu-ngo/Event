@@ -5,6 +5,13 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Preliminary Tenant Routing Leases
 
+IUserTenantMembershipRepository provides a read-only, exact-user membership
+capability on an independent Global lease. PostgreSQL materializes active,
+nondeleted memberships with active tenant/status navigation in one statement;
+the repository returns detached domain entities, not database projection DTOs.
+Native entry and installer guards reject undeclared routine executors.
+This capability supplies no preference-write or resource-management authority.
+
 Scanner authentication uses IAdmissionScannerAuthenticationRepository on an
 independent Global lease. PostgreSQL matches each key version with its paired
 digest, not the cross product of the candidate lists. The native function returns

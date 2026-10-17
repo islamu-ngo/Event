@@ -96,6 +96,13 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresExternalLoginAuthenticationContract.ApplyAsync(migratorContext);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migratorContext);
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migratorContext);
+            await PostgresUserTenantMembershipContract.ApplyAsync(migratorContext);
+            await migratorContext.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresUserTenantMembershipContract.GlobalRole}"
+                TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""
                 GRANT "{PostgresAdmissionScannerAuthenticationContract.GlobalRole}"

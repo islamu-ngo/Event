@@ -6,6 +6,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+The native membership discovery capability requires its Global execution group.
+It returns active memberships for one user and excludes inactive tenants.
+If its native guard rejects an undeclared function executor, remove that
+unauthorized grant through the approved database process before reinstalling;
+the installer does not silently repair it. Discovery does not authorize writes.
+
 Scanner authentication requires its native Global execution group. Version and
 digest must match as a pair; a credential matching more than one scanner fails
 closed rather than selecting a tenant. Check digest-key rotation configuration

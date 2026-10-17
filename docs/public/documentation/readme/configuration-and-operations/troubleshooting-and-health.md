@@ -518,6 +518,12 @@ or set `PUBLIC_BASE_URL` and restart. Anonymous requests never establish a perma
 address. Subdomain routing requires an explicit base domain when enabled;
 path-based multi-tenancy does not.
 
+Tenant slugs cannot use `alive`, `vapid-public-key`, `scalar` or `quartz`, or
+contain a dot. These roots are reserved for operational endpoints, assets and
+metadata, including fingerprinted build filenames. Choose a distinct,
+hyphen-separated tenant slug instead. Existing tenant names are not
+automatically changed.
+
 If email delivery is enabled but secure public links cannot be constructed, setup
 shows a non-blocking warning to configure `PUBLIC_BASE_URL`. Background email uses
 this override or the established address; recovery links still require HTTPS.

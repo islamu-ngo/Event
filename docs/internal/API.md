@@ -714,6 +714,15 @@ Storage readiness reports `provider_unavailable` or `policy_unavailable`
 instead of exception subtype names. Sink tests exercise scheduler and startup
 worker outcomes with private canaries and colliding inherited field names.
 
+## Reserved Tenant Roots
+
+`ReservedTenantSlugs.IsReserved` rejects the operational roots `alive`,
+`vapid-public-key`, `scalar` and `quartz`, as well as any root containing a dot.
+The dotted-root rule covers generated asset fingerprints and metadata filenames
+without enumerating each build output. Tenant create/update validators consume
+this predicate; the finite `All` set is not an exhaustive list of rejected values.
+This validation does not rename existing tenants or change endpoint authorization.
+
 ## Structured Legal-Identity Contracts
 
 ### Value-Free Operator Form Metadata

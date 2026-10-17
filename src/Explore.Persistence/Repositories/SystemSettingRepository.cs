@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Settings;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +12,13 @@ public class SystemSettingRepository : ISystemSettingRepository
 {
     private readonly ExploreDbContext _dbContext;
     private readonly ISettingMutationLock _mutationLock;
+    private readonly HumanSettingsDataBoundary? _humanBoundary;
+
+    public SystemSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock,
+        HumanSettingsDataBoundary humanBoundary) : this(dbContext, mutationLock)
+    {
+        _humanBoundary = humanBoundary;
+    }
 
     public SystemSettingRepository(
         ExploreDbContext dbContext,
@@ -155,6 +163,10 @@ public class SystemSettingRepository : ISystemSettingRepository
         SystemSetting setting,
         CancellationToken cancellationToken)
     {
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+            return await boundary.RequireOriginalOrdinaryWriter(
+                    _dbContext, ordinary, setting.UpdatedBy ?? setting.CreatedBy)
+                .WriteSystemAsync(ordinary, setting, HumanSettingsMutationKind.SetValue, cancellationToken);
         var policyBefore = RelationalSettingMutationLock.RequiresEmailDeliveryFence([setting.SettingKey])
             ? await EmailDeliveryPolicyReader.ReadAllAsync(_dbContext, cancellationToken)
             : null;

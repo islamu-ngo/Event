@@ -1,4 +1,6 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Notifications;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Localization;
 using Explore.Application.DTOs.Localization.Validators;
@@ -15,6 +17,9 @@ public class UpdateLocalizationGovernanceCommandHandler
     : ICommandHandler<UpdateLocalizationGovernanceCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
+    private readonly IHumanSettingsMutationPreparation _preparation;
+    private readonly IHierarchicalSettingsReader _settings;
+    private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
     private readonly SettingUpsertService _upsertService;
     private readonly ITranslationConfigResolver _configResolver;
     private readonly ITenantContext _tenantContext;
@@ -22,12 +27,18 @@ public class UpdateLocalizationGovernanceCommandHandler
 
     public UpdateLocalizationGovernanceCommandHandler(
         IAdminContext adminContext,
+        IHumanSettingsMutationPreparation preparation,
+        IHierarchicalSettingsReader settings,
+        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers,
         SettingUpsertService upsertService,
         ITranslationConfigResolver configResolver,
         ITenantContext tenantContext,
         ILogger<UpdateLocalizationGovernanceCommandHandler> logger)
     {
         _adminContext = adminContext;
+        _preparation = preparation;
+        _settings = settings;
+        _notificationHandlers = notificationHandlers;
         _upsertService = upsertService;
         _configResolver = configResolver;
         _tenantContext = tenantContext;
@@ -54,29 +65,28 @@ public class UpdateLocalizationGovernanceCommandHandler
                 "Localization governance update failed.");
         }
 
+        var effects = OrdinarySettingsMutation.CaptureLocalization(request);
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        var notifications = await _preparation.ExecutePreparedAsync(prepared, async (_, token) =>
+        {
+            var committed = new List<SettingChangedNotification>();
+            var occurredAt = DateTime.UtcNow;
+            foreach (var effect in effects)
+            {
+                var result = await _upsertService.UpsertInstanceValueInCurrentTransactionAsync(
+                    new(effect.Key, effect.Value!, actor, occurredAt), token);
+                committed.Add(result.Notification);
+            }
+            return committed;
+        }, cancellationToken);
+
+        _settings.InvalidateCache();
+        foreach (var notification in notifications)
+            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
         var dto = request.Dto;
-        if (dto.Tms is { } tms)
-        {
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.TmsProvider, SettingValueSerializer.Serialize(tms.Provider.Trim().ToLowerInvariant()), actor, cancellationToken);
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.TmsApiUrl, SettingValueSerializer.Serialize(tms.ApiUrl ?? string.Empty), actor, cancellationToken);
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.TmsProjectId, SettingValueSerializer.Serialize(tms.ProjectId ?? string.Empty), actor, cancellationToken);
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.TmsComponent, SettingValueSerializer.Serialize(tms.Component ?? string.Empty), actor, cancellationToken);
-        }
-
-        var enabledLanguagesCsv = string.Empty;
-        if (dto.Languages is { } languages)
-        {
-            enabledLanguagesCsv = string.Join(",", languages.EnabledLanguages.Select(c => c.Trim().ToLowerInvariant()));
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.DefaultLanguage, SettingValueSerializer.Serialize(languages.DefaultLanguage.Trim().ToLowerInvariant()), actor, cancellationToken);
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.EnabledLanguages, SettingValueSerializer.Serialize(enabledLanguagesCsv), actor, cancellationToken);
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.FallbackLanguage, SettingValueSerializer.Serialize(languages.FallbackLanguage.Trim().ToLowerInvariant()), actor, cancellationToken);
-        }
-
-        if (dto.Runtime is { } runtime)
-        {
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.ClientPickerEnabled, runtime.ClientPickerEnabled ? "true" : "false", actor, cancellationToken);
-            await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Localization.ForceOfflineMode, runtime.ForceOfflineMode ? "true" : "false", actor, cancellationToken);
-        }
+        var enabledLanguagesCsv = dto.Languages is { } languages
+            ? string.Join(",", languages.EnabledLanguages.Select(code => code.Trim().ToLowerInvariant()))
+            : string.Empty;
 
         _configResolver.InvalidateCache(_tenantContext.TenantId);
 

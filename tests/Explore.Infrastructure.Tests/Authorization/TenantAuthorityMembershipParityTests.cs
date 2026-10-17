@@ -297,7 +297,8 @@ public sealed class TenantAuthorityMembershipParityTests
             new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, UserId.ToString())], "test")) } },
             new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context)),
             new OrganizationMemberRepository(Context), new GroupMemberRepository(Context),
-            new UserExternalLoginRepository(Context), NullLogger<AdminContext>.Instance);
+            new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context)),
+            NullLogger<AdminContext>.Instance);
 
         public RuntimeAuthorizationProvider CreateProvider(string providerName, IMemoryCache cache,
             IMachinePrincipalAccessor machine, CategoryPolicyBoundary remote)

@@ -1,3 +1,5 @@
+using Explore.Application.Features.Localization.Requests.Commands;
+using Explore.Domain.Settings;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
@@ -15,6 +17,12 @@ public interface IPreparedHumanSettingsMutation;
 /// <summary>Prepares provider effects outside the original owner's transaction.</summary>
 public interface IHumanSettingsMutationPreparation
 {
+    IOrdinarySettingsSource? CurrentOrdinarySource { get; }
+    Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateLocalizationGovernanceCommand command,
+        CancellationToken cancellationToken = default);
+    Task RequireCurrentOwnedAsync(SettingScope scope, Guid? tenantId, Guid? userId, string key,
+        HumanSettingsMutationKind kind, string? value = null, bool? isLocked = null,
+        CancellationToken cancellationToken = default);
     Task<IPreparedHumanSettingsMutation> PrepareAsync(UpdateInstanceStorageSettingsCommand command,
         StorageSettingsMutation mutation, CancellationToken cancellationToken = default);
     Task<IPreparedHumanSettingsMutation> PrepareAsync(PatchTenantStorageSettingsCommand command,

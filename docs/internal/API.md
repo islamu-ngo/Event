@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Human Commit Identity and Source Contracts
 
+Localization governance binds the original UpdateLocalizationGovernanceCommand
+to its exact normalized instance effects before BEGIN. The selected Global owner
+retains the validated credential lifetime, committed subject and administrator
+sources through one Serializable attempt. Native ordinary settings writes share
+that owner; completeness and source/deadline checks precede commit. Settings
+notifications and translation-cache invalidation happen only after settlement.
+Signed provider identities resolve through the independent execute-only Global
+authentication projection, not Runtime identity-table reads.
+
 LookupDataCache owns an identity-free Runtime context from IDbContextFactory for
 initialization and refresh. It never resolves the tenant-selected scoped context;
 a tenant-bound lease cannot execute the tenant-independent catalogue projection.

@@ -145,6 +145,29 @@ public static class ExploreDatabaseMigrator
                 executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
             await PostgresIdempotencyReceiptContract.ApplyAsync(
                 executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
+            var localizationEnrollment = PostgresNativeQueueEnrollment.Bind(configuration);
+            await PostgresHumanAdministratorCommitAuthorityContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresPolicySourceSetContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresHumanPrincipalSourceContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresHumanSupportAccessSourceContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresProviderConfigurationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresLocalizationSecretStatusContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresGlobalLookupCatalogueContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
+            await PostgresExternalLoginAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresTenantLookupContract.ApplyAsync(executionDatabase, cancellationToken);
+            foreach (string role in new[]
+            {
+                PostgresExternalLoginAuthenticationContract.GlobalRole,
+                PostgresAdministrativeAuthorityContract.GlobalRole,
+                PostgresTenantLookupContract.GlobalRole
+            })
+                await executionDatabase.Database.ExecuteSqlRawAsync(
+                    $"""
+                    GRANT "{role}" TO "{localizationEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                    WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                    """, cancellationToken);
         }
     }
 

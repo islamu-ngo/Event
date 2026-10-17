@@ -808,7 +808,8 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
             new AdminContext(HttpContext,
                 new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(_identityContext)),
                 new OrganizationMemberRepository(_identityContext),
-                new GroupMemberRepository(_identityContext), new UserExternalLoginRepository(_identityContext),
+                new GroupMemberRepository(_identityContext),
+                new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(_identityContext)),
                 NullLogger<AdminContext>.Instance), HttpContext, Profile);
 
         public AuthenticationCredentialCutover CreateOperation(Guid? instanceId = null,

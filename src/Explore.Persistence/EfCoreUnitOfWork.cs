@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,7 @@ using Npgsql;
 
 namespace Explore.Persistence;
 
-public sealed class EfCoreUnitOfWork : IUnitOfWork
+public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttemptOwner
 {
     private const int BootstrapConvergenceAttemptLimit = 4;
     private const int SqliteConstraintPrimaryKey = 1555;
@@ -76,6 +77,16 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         }
     }
 
+    Task<T> ISerializableAttemptOwner.ExecuteAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        if (!_dbContext.Database.IsRelational())
+            throw new InvalidOperationException("Prepared authority requires a relational Serializable owner.");
+        if (ExecutionStrategy.Current?.RetriesOnFailure == true)
+            throw new InvalidOperationException("Prepared authority cannot execute inside a replaying outer strategy.");
+        return ExecuteCoreAsync(operation, IsolationLevel.Serializable, cancellationToken, allowReplay: false);
+    }
+
     public Task<T> ExecuteBootstrapConvergenceAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct = default) =>
@@ -111,7 +122,8 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
     private async Task<T> ExecuteCoreAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         IsolationLevel? isolationLevel,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool allowReplay = true)
     {
         // Co-located SQLite shares the authority write transaction: the gate
         // commits both contexts after this operation returns.
@@ -121,6 +133,7 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
                 throw new InvalidOperationException("The identity enrollment transaction has failed.");
             try
             {
+                _dbContext.HumanCommitAttemptOwnsTransaction = !allowReplay;
                 var result = await operation(ct);
                 if (_dbContext.StorageReferenceTransactionFailed)
                     throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
@@ -156,25 +169,45 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             }
         }
 
-        var strategy = _createExecutionStrategy();
+        var strategy = allowReplay ? _createExecutionStrategy() : new SingleAttemptExecutionStrategy(_dbContext);
         return await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = isolationLevel.HasValue
                 ? await _dbContext.Database.BeginTransactionAsync(isolationLevel.Value, ct)
                 : await _beginTransaction(ct);
+            DbTransaction physicalTransaction = transaction.GetDbTransaction();
+            bool commitAttempted = false;
             try
             {
+                _dbContext.HumanCommitAttemptOwnsTransaction = !allowReplay;
                 var result = await operation(ct);
                 if (_dbContext.StorageReferenceTransactionFailed)
                     throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                         "The storage reference transaction has failed.");
                 await _dbContext.FlushDisclosureAsync(ct);
+                await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
+                commitAttempted = true;
                 await transaction.CommitAsync(ct);
                 return result;
+            }
+            catch (Exception ex) when (!allowReplay && commitAttempted
+                && (!IsSerializableRetryConflict(ex)
+                    || !RelationalConnectionIdentity.Capture(_dbContext).Owns(physicalTransaction)))
+            {
+                // A completed/ended provider transaction cannot be certified as rolled back
+                // by a later exception or rollback call. Retain unknown settlement explicitly.
+                await RollbackAndClearTrackingAsync(transaction);
+                throw new HumanMutationOutcomeUnknownException(ex);
             }
             catch (DbUpdateConcurrencyException ex)
             {
                 var translatedException = TranslateConcurrencyException(ex);
+                if (!allowReplay)
+                {
+                    if (!await RollbackAndClearTrackingAsync(transaction, confirmRollback: true))
+                        throw new HumanMutationOutcomeUnknownException(ex);
+                    throw translatedException;
+                }
                 await RollbackAndClearTrackingAsync(transaction);
                 throw translatedException;
             }
@@ -182,25 +215,61 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
                 isolationLevel == IsolationLevel.Serializable
                 && IsProviderWriteConflict(ex))
             {
+                if (!allowReplay && IsSerializableRetryConflict(ex))
+                {
+                    bool acknowledged = await RollbackAndClearTrackingAsync(transaction, confirmRollback: true);
+                    if (acknowledged)
+                        throw new HumanMutationAttemptRolledBackException(ex);
+                    throw new HumanMutationOutcomeUnknownException(ex);
+                }
                 await RollbackAndClearTrackingAsync(transaction);
                 throw new ConcurrencyConflictException(
                     ConcurrencyConflictException.ConcurrentUpdate,
                     "A concurrent writer changed the serializable transaction.",
                     innerException: ex);
             }
-            catch
+            catch (Exception ex)
             {
+                if (!allowReplay)
+                {
+                    if (!await RollbackAndClearTrackingAsync(transaction, confirmRollback: true))
+                        throw new HumanMutationOutcomeUnknownException(ex);
+                    throw;
+                }
                 await RollbackAndClearTrackingAsync(transaction);
                 throw;
+            }
+            finally
+            {
+                _dbContext.ResetHumanCommitAdmissions();
             }
         });
     }
 
-    private async Task RollbackAndClearTrackingAsync(IDbContextTransaction transaction)
+    private sealed class SingleAttemptExecutionStrategy(DbContext context)
+        : ExecutionStrategy(context, maxRetryCount: 0, maxRetryDelay: TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => false;
+    }
+
+    private async Task<bool> RollbackAndClearTrackingAsync(IDbContextTransaction transaction, bool confirmRollback = false)
     {
         try
         {
-            await RollbackBestEffortAsync(transaction);
+            if (!confirmRollback)
+            {
+                await RollbackBestEffortAsync(transaction);
+                return false;
+            }
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                return true;
+            }
+            catch (Exception exception) when (exception is ObjectDisposedException or InvalidOperationException or DbException)
+            {
+                return false;
+            }
         }
         finally
         {

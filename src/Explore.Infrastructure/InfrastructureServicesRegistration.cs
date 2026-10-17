@@ -471,6 +471,7 @@ public static class InfrastructureServicesRegistration
         // Settings and Module Governance services
         services.AddScoped<IHierarchicalSettingsResolver, HierarchicalSettingsResolver>();
         services.AddHierarchicalSettingsReader();
+        services.AddHumanSettingsMutationPreparation();
         services.AddScoped<ITypedSettingsDocumentResolver, TypedSettingsDocumentResolver>();
         services.AddScoped<IResolverConfigService, ResolverConfigService>();
         services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();

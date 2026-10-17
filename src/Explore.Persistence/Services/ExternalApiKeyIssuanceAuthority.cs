@@ -4,18 +4,40 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 
 namespace Explore.Persistence.Services;
 
 /// <summary>
-/// Holds the actual user, ownership, membership and permission rows through the issuance commit.
+/// Holds the actual user, ownership, membership and permission rows through the caller-owned commit.
 /// </summary>
-public sealed class ExternalApiKeyIssuanceAuthority(
-    ExploreDbContext dbContext, IHttpContextAccessor httpContextAccessor)
-    : IExternalApiKeyIssuanceAuthority, IInstanceAdministratorCommitAuthority
+public sealed class ExternalApiKeyIssuanceAuthority
+    : IExternalApiKeyIssuanceAuthority, IInstanceAdministratorCommitAuthority, ITenantAdministratorCommitAuthority,
+        IHumanSubjectCommitAuthority
 {
+    private readonly ExploreDbContext dbContext;
+    private readonly IHttpContextAccessor httpContextAccessor;
+    private readonly HumanAdministratorCommitScope? humanScope;
+
+    /// <summary>The existing API-key issuance path; unbound human administrator ports deny.</summary>
+    public ExternalApiKeyIssuanceAuthority(ExploreDbContext dbContext, IHttpContextAccessor httpContextAccessor)
+    {
+        this.dbContext = dbContext;
+        this.httpContextAccessor = httpContextAccessor;
+    }
+
+    /// <summary>Human administration requires the immutable subject from the selected scope owner.</summary>
+    public ExternalApiKeyIssuanceAuthority(
+        ExploreDbContext dbContext, IHttpContextAccessor httpContextAccessor, HumanAdministratorCommitScope humanScope)
+        : this(dbContext, httpContextAccessor)
+    {
+        ArgumentNullException.ThrowIfNull(humanScope);
+        this.humanScope = humanScope;
+    }
+
     /// <summary>
     /// Reacquires persisted issuance authority in the caller-owned transaction before creation
     /// or recovery metadata is accessed. Fences principal identity before owner authority;
@@ -28,7 +50,8 @@ public sealed class ExternalApiKeyIssuanceAuthority(
         if (!HasValidIssuanceScope(principalId, tenantId, ownerType, ownerId))
             return false;
         if (ownerType == ExternalApiKeyOwnerType.InstanceAdmin)
-            return await IsInstanceAdministratorForCommitAsync(principalId, cancellationToken);
+            return await FencePrincipalAsync(principalId, cancellationToken)
+                && await FencePlatformAdministratorAsync(principalId, cancellationToken);
         if (!await FencePrincipalAsync(principalId, cancellationToken))
             return false;
 
@@ -48,11 +71,78 @@ public sealed class ExternalApiKeyIssuanceAuthority(
         };
     }
 
+    /// <summary>
+    /// Persisted source predicate retained for existing API-key and machine owners.
+    /// Human operations use the subject-bound IInstanceAdministratorCommitAuthority port.
+    /// </summary>
     public async Task<bool> IsInstanceAdministratorForCommitAsync(
         Guid principalId, CancellationToken cancellationToken) =>
         principalId != Guid.Empty
         && await FencePrincipalAsync(principalId, cancellationToken)
         && await FencePlatformAdministratorAsync(principalId, cancellationToken);
+
+    /// <summary>Persisted issuance predicate; human callers use ITenantAdministratorCommitAuthority.</summary>
+    public Task<bool> IsTenantAdministratorForCommitAsync(
+        Guid principalId, Guid tenantId, CancellationToken cancellationToken) =>
+        IsAuthorizedForCommitAsync(
+            principalId, tenantId, ExternalApiKeyOwnerType.Tenant, tenantId, cancellationToken);
+
+    async Task<bool> IHumanSubjectCommitAuthority.IsSubjectCurrentForCommitAsync(
+        Guid principalId, CancellationToken cancellationToken)
+    {
+        if (humanScope is null || principalId != humanScope.Subject.PrincipalId)
+            return false;
+        humanScope.RequireOwner(dbContext);
+        var native = await HumanAdministratorCommitAuthoritySql.TryFenceNativeAsync(
+            dbContext, humanScope, tenant: false, cancellationToken, subjectOnly: true);
+        if (native is { } nativeCurrent) return nativeCurrent;
+        bool current = await FencePrincipalAsync(principalId, cancellationToken, humanScope.Subject);
+        humanScope.RequireOwner(dbContext);
+        return current;
+    }
+
+    async Task<bool> IInstanceAdministratorCommitAuthority.IsInstanceAdministratorForCommitAsync(
+        Guid principalId, CancellationToken cancellationToken)
+    {
+        if (humanScope is null || principalId != humanScope.Subject.PrincipalId)
+            return false;
+        humanScope.RequireOwner(dbContext);
+        var native = await HumanAdministratorCommitAuthoritySql.TryFenceNativeAsync(
+            dbContext, humanScope, tenant: false, cancellationToken);
+        if (native is { } nativeAllowed) return nativeAllowed;
+        bool allowed = await FencePrincipalAsync(principalId, cancellationToken, humanScope.Subject)
+            && await FencePlatformAdministratorAsync(principalId, cancellationToken);
+        humanScope.RequireOwner(dbContext);
+        return allowed;
+    }
+
+    async Task<bool> ITenantAdministratorCommitAuthority.IsTenantAdministratorForCommitAsync(
+        Guid principalId, Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (humanScope is null || principalId != humanScope.Subject.PrincipalId
+            || tenantId == Guid.Empty || tenantId != humanScope.TenantId)
+            return false;
+        humanScope.RequireOwner(dbContext);
+        var native = await HumanAdministratorCommitAuthoritySql.TryFenceNativeAsync(
+            dbContext, humanScope, tenant: true, cancellationToken);
+        if (native is { } nativeAllowed) return nativeAllowed;
+        if (!await FencePrincipalAsync(principalId, cancellationToken, humanScope.Subject)
+            || !await FenceActiveTenantAsync(tenantId, cancellationToken))
+            return false;
+        // The Serializable source-set read protects absence/ranges on SQL Server and MySQL;
+        // SQLite already holds the principal write fence. Retain inactive candidates too.
+        Guid[] memberships = await dbContext.TenantUsers
+            .IgnoreQueryFilters([QueryFilterNames.SoftDelete]).AsNoTracking()
+            .Where(member => member.TenantId == tenantId && member.UserId == principalId)
+            .Select(member => member.Id).ToArrayAsync(cancellationToken);
+        foreach (Guid membership in memberships.Order())
+            await RelationalEntityRowFence.AcquireAsync<TenantUser>(
+                dbContext, tenantId, member => member.Id, membership, cancellationToken);
+        bool allowed = await FenceTenantOwnerAsync(
+            principalId, tenantId, ExternalApiKeyOwnerType.Tenant, tenantId, cancellationToken);
+        humanScope.RequireOwner(dbContext);
+        return allowed;
+    }
 
     /// <summary>
     /// Rejects invalid owner identities before any fence. Global ownership requires the principal
@@ -81,14 +171,17 @@ public sealed class ExternalApiKeyIssuanceAuthority(
     /// Fences the nondeleted principal first, then the exact authenticated provider binding
     /// when present. Rechecking both rows prevents removed or reassigned identities from issuing.
     /// </summary>
-    private async Task<bool> FencePrincipalAsync(Guid principalId, CancellationToken cancellationToken)
+    private async Task<bool> FencePrincipalAsync(
+        Guid principalId, CancellationToken cancellationToken, HumanCommitSubject? subject = null)
     {
         await RelationalEntityRowFence.AcquireGlobalAsync<User>(dbContext, principalId, cancellationToken);
         if (!await dbContext.Users.AsNoTracking()
                 .AnyAsync(user => user.Id == principalId && !user.IsDeleted, cancellationToken))
             return false;
 
-        var accountKey = httpContextAccessor.HttpContext?.User.GetProviderIdentity()?.AccountKey;
+        var accountKey = subject is null
+            ? httpContextAccessor.HttpContext?.User.GetProviderIdentity()?.AccountKey
+            : subject.AccountKey;
         if (accountKey is not null)
         {
             Guid bindingId = await dbContext.UserExternalLogins.AsNoTracking()

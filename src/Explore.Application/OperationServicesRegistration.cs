@@ -100,13 +100,19 @@ public static class OperationServicesRegistration
                     : typeof(PerformanceQueryHandlerDecorator<,>);
                 var authorizeFactory = ActivatorUtilities.CreateFactory(authorization.MakeGenericType(arguments), [contract]);
                 var performanceFactory = ActivatorUtilities.CreateFactory(performance.MakeGenericType(arguments), [contract]);
+                var mutationScopeFactory = definition == typeof(ICommandHandler<,>)
+                    && PolicyMutationCommandScope.Handles(arguments[0])
+                    ? ActivatorUtilities.CreateFactory(typeof(MutationScopeCommandHandler<,>).MakeGenericType(arguments), [typeof(Type)])
+                    : null;
                 var entry = ServiceDescriptor.Scoped(contract, provider =>
                 {
                     var guard = provider.GetRequiredService<OperationConstructionGuard>();
                     guard.Enter(contract);
                     try
                     {
-                        var inner = provider.GetRequiredService(implementation);
+                        var inner = mutationScopeFactory is null
+                            ? provider.GetRequiredService(implementation)
+                            : mutationScopeFactory(provider, [implementation]);
                         var timed = performanceFactory(provider, [inner]);
                         return authorizeFactory(provider, [timed]);
                     }

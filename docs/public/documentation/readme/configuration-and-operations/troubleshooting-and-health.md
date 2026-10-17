@@ -8,6 +8,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 ## Human mutation admission contracts
 
+Localization governance updates require a currently valid authenticated session
+and committed administrator membership through transaction settlement. An omitted
+configuration section leaves its settings unchanged; supplied sections settle
+together. Diagnose a rejected update through credential lifetime and native
+source readiness rather than granting direct settings or identity-table access.
+
 Reference catalogue initialization uses a separate Runtime lease, not the
 request tenant scope or the Global account. If startup caches remain empty,
 check native catalogue readiness and factory registration without expanding

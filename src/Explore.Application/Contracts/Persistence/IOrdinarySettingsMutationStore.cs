@@ -1,4 +1,7 @@
 using System.Collections.Immutable;
+using Explore.Application.DTOs.Localization.Validators;
+using Explore.Application.Features.Localization.Requests.Commands;
+using Explore.Domain.Constants;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Features.Settings.Handlers;
@@ -31,6 +34,12 @@ public sealed class OrdinarySettingsMutation
 
     public static OrdinarySettingsMutation? Capture(object original, ImmutableArray<HumanSettingsMutation> effects)
     {
+        if (original is UpdateLocalizationGovernanceCommand localization)
+        {
+            if (!effects.SequenceEqual(CaptureLocalization(localization)))
+                throw new UnauthorizedAccessException("Localization effects must match the original governance command.");
+            return new(original, effects);
+        }
         if (original is not (UpdateSettingCommand or UpdateSettingBatchCommand or ResetSettingCommand
             or LockSettingCommand or UnlockSettingCommand or SetInstanceTenantSettingCommand
             or LockInstanceTenantSettingCommand or UnlockInstanceTenantSettingCommand))
@@ -76,6 +85,39 @@ public sealed class OrdinarySettingsMutation
             }
         }
         return new(original, effects);
+    }
+
+    public static ImmutableArray<HumanSettingsMutation> CaptureLocalization(UpdateLocalizationGovernanceCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        var validator = new UpdateLocalizationGovernanceDtoValidator();
+        if (!validator.Validate(command.Dto).IsValid)
+            throw new UnauthorizedAccessException("Localization effects require valid original governance inputs.");
+        var effects = ImmutableArray.CreateBuilder<HumanSettingsMutation>();
+        if (command.Dto.Tms is { } tms)
+        {
+            Add(GovernanceSettingKeys.Localization.TmsProvider, SettingValueSerializer.Serialize(tms.Provider.Trim().ToLowerInvariant()));
+            Add(GovernanceSettingKeys.Localization.TmsApiUrl, SettingValueSerializer.Serialize(tms.ApiUrl ?? string.Empty));
+            Add(GovernanceSettingKeys.Localization.TmsProjectId, SettingValueSerializer.Serialize(tms.ProjectId ?? string.Empty));
+            Add(GovernanceSettingKeys.Localization.TmsComponent, SettingValueSerializer.Serialize(tms.Component ?? string.Empty));
+        }
+        if (command.Dto.Languages is { } languages)
+        {
+            Add(GovernanceSettingKeys.Localization.DefaultLanguage, SettingValueSerializer.Serialize(languages.DefaultLanguage.Trim().ToLowerInvariant()));
+            Add(GovernanceSettingKeys.Localization.EnabledLanguages, SettingValueSerializer.Serialize(
+                string.Join(",", languages.EnabledLanguages.Select(code => code.Trim().ToLowerInvariant()))));
+            Add(GovernanceSettingKeys.Localization.FallbackLanguage, SettingValueSerializer.Serialize(languages.FallbackLanguage.Trim().ToLowerInvariant()));
+        }
+        if (command.Dto.Runtime is { } runtime)
+        {
+            Add(GovernanceSettingKeys.Localization.ClientPickerEnabled, runtime.ClientPickerEnabled ? "true" : "false");
+            Add(GovernanceSettingKeys.Localization.ForceOfflineMode, runtime.ForceOfflineMode ? "true" : "false");
+        }
+        return effects.ToImmutable();
+
+        void Add(string key, string value) => effects.Add(new(
+            HumanSettingsOperation.InstanceSettings, SettingScope.Instance, null, null,
+            key, HumanSettingsMutationKind.SetValue, value));
     }
 
     private static bool IsSpecialized(string key) => EmailDeliverySettingKeys.Contains(key)

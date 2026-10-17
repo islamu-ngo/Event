@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
-using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Constants;
 using Microsoft.AspNetCore.Authentication;
@@ -11,21 +10,21 @@ namespace Explore.Infrastructure.Identity;
 
 /// <summary>
 /// Transforms the authenticated ClaimsPrincipal by adding admin authority claims
-/// resolved from the database via <see cref="IAdminContext"/>.
+/// resolved from the database via <see cref="IAdministrativeAuthorityRepository"/>.
 /// These claims remain server-side; browser UI authority must come from BFF/API/HAL/status endpoints.
 /// </summary>
 public sealed class AdminClaimsTransformation : IClaimsTransformation
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IUserExternalLoginRepository _userExternalLoginRepository;
+    private readonly IAdministrativeAuthorityRepository _administrativeAuthorityRepository;
+    private readonly IExternalLoginAuthenticationRepository _userExternalLoginRepository;
     private readonly ILogger<AdminClaimsTransformation> _logger;
 
     public AdminClaimsTransformation(
-        IAdminContext adminContext,
-        IUserExternalLoginRepository userExternalLoginRepository,
+        IAdministrativeAuthorityRepository administrativeAuthorityRepository,
+        IExternalLoginAuthenticationRepository userExternalLoginRepository,
         ILogger<AdminClaimsTransformation> logger)
     {
-        _adminContext = adminContext;
+        _administrativeAuthorityRepository = administrativeAuthorityRepository;
         _userExternalLoginRepository = userExternalLoginRepository;
         _logger = logger;
     }
@@ -63,27 +62,27 @@ public sealed class AdminClaimsTransformation : IClaimsTransformation
         try
         {
             // Resolve instance admin authority
-            var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(userId.Value);
+            var isInstanceAdmin = await _administrativeAuthorityRepository.IsInstanceAdminAsync(userId.Value);
             if (isInstanceAdmin)
             {
                 identity.AddClaim(new Claim(AdminClaimTypes.InstanceAdmin, "true"));
             }
 
             // Resolve tenant admin authority (one claim per tenant)
-            var tenantIds = await _adminContext.GetAdminTenantIdsAsync(userId.Value);
+            var tenantIds = await _administrativeAuthorityRepository.GetAdminTenantIdsAsync(userId.Value);
             foreach (var tenantId in tenantIds)
             {
                 identity.AddClaim(new Claim(AdminClaimTypes.TenantAdmin, tenantId.ToString()));
             }
 
             // Resolve organization admin authority (one claim per organization)
-            var orgIds = await _adminContext.GetAdminOrganizationIdsAsync(userId.Value);
+            var orgIds = await _administrativeAuthorityRepository.GetAdminOrganizationIdsAsync(userId.Value);
             foreach (var orgId in orgIds)
             {
                 identity.AddClaim(new Claim(AdminClaimTypes.OrganizationAdmin, orgId.ToString()));
             }
 
-            var groupIds = await _adminContext.GetAdminGroupIdsAsync(userId.Value);
+            var groupIds = await _administrativeAuthorityRepository.GetAdminGroupIdsAsync(userId.Value);
             foreach (var groupId in groupIds)
             {
                 identity.AddClaim(new Claim(AdminClaimTypes.GroupAdmin, groupId.ToString()));
@@ -95,11 +94,11 @@ public sealed class AdminClaimsTransformation : IClaimsTransformation
                 _logger.LogDebug("AdminClaimsTransformation: Added administrative authority claims");
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Fail open for claims transformation — log the error but don't block authentication.
             // The authorization layer (Cerbos / native operation pipeline) provides the hard security boundary.
-            _logger.LogWarning(ex,
+            _logger.LogWarning(
                 "AdminClaimsTransformation: Failed to resolve admin authority. " +
                 "Admin UI will be hidden but server-side authorization remains enforced.");
         }

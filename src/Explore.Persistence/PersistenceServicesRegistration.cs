@@ -127,6 +127,8 @@ public static class PersistenceServicesRegistration
             // This follows EF Core's recommended pattern for pooled contexts with scoped dependencies
             services.AddScoped(sp =>
             {
+                if (sp.GetService<ExploreDbContextExecutionLease>()?.Context is { } selectedPolicy)
+                    return selectedPolicy;
                 if (InventoryHoldExpiryExecutionScopeFactory.GetSelectedRuntimeContext(sp) is { } selected)
                     return selected;
                 var factory = sp.GetRequiredService<IDbContextFactory<ExploreDbContext>>();
@@ -167,6 +169,7 @@ public static class PersistenceServicesRegistration
             required: primaryProvider is null or AuthenticationProviderDeploymentOptions.LocalProvider);
 
         IdentityDatabaseTopology identityTopology = IdentityDatabaseConfiguration.GetTopology(configuration);
+        services.AddHumanSettingsMutationSources(identityTopology);
         if (identityTopology == IdentityDatabaseTopology.External)
         {
             services.AddDbContext<ExternalIdentityDbContext>(options =>
@@ -291,7 +294,6 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
         services.AddScoped<IExternalApiKeyIssuanceReceiptRepository, ExternalApiKeyIssuanceReceiptRepository>();
         services.AddScoped<IExternalApiKeyIssuanceAuthority, ExternalApiKeyIssuanceAuthority>();
-        services.AddScoped<IInstanceAdministratorCommitAuthority, ExternalApiKeyIssuanceAuthority>();
         services.AddScoped<IManagedControlPlaneRegistrationRepository, ManagedControlPlaneRegistrationRepository>();
         services.AddScoped<IManagedTenantProvisioningOperationRepository, ManagedTenantProvisioningOperationRepository>();
         services.AddScoped<IConfigurationManifestOperationRepository, ConfigurationManifestOperationRepository>();
@@ -301,6 +303,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IUserNotificationPreferenceRepository, UserNotificationPreferenceRepository>();
         services.AddScoped<IUserAuthenticationTokenRepository, UserAuthenticationTokenRepository>();
         services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
+        services.AddScoped<IExternalLoginAuthenticationRepository, ExternalLoginAuthenticationRepository>();
         services.AddScoped<IUserIdentityEmailRepository, UserIdentityEmailRepository>();
         services.AddScoped<IExternalBindingRepository, ExternalBindingRepository>();
 

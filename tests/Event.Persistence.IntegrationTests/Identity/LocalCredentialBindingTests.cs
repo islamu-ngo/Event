@@ -509,7 +509,7 @@ public sealed class LocalCredentialBindingTests
                 administrativeAuthorityRepository: new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(application)),
                 orgMemberRepo: new OrganizationMemberRepository(application),
                 groupMemberRepo: new GroupMemberRepository(application),
-                userExternalLoginRepository: new UserExternalLoginRepository(application),
+                userExternalLoginRepository: new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(application)),
                 logger: NullLogger<AdminContext>.Instance);
         }
 

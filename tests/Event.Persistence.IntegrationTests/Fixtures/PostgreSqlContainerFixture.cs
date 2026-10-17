@@ -81,6 +81,10 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventResourceAuditRetentionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresIdempotencyReceiptContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanAdministratorCommitAuthorityContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPolicySourceSetContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanPrincipalSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanSupportAccessSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresStorageProbeSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresStorageConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresProviderConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
@@ -89,6 +93,13 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresLocalizationSecretStatusContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresGlobalLookupCatalogueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAdministrativeAuthorityContract.ApplyAsync(migratorContext);
+            await PostgresExternalLoginAuthenticationContract.ApplyAsync(migratorContext);
+            await migratorContext.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresExternalLoginAuthenticationContract.GlobalRole}"
+                TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""
                 GRANT "{PostgresAdministrativeAuthorityContract.GlobalRole}"

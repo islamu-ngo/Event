@@ -170,7 +170,7 @@ public class AdminContextTests
         var userId = Guid.NewGuid();
         const string subject = "sXzmb2sFh0rG8tVveiNrP3td";
 
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         externalLoginRepository.GetByProviderAndKey(OidcAccountKey(subject))
             .Returns(NewExternalLogin(userId, AuthSchemeNames.Google.ToLowerInvariant(), OidcAccountKey(subject).Value));
 
@@ -193,7 +193,7 @@ public class AdminContextTests
         Guid internalAdminId = Guid.CreateVersion7();
         var platformRoles = Substitute.For<IAdministrativeAuthorityRepository>();
         platformRoles.IsInstanceAdminAsync(internalAdminId).Returns(true);
-        var externalLogins = Substitute.For<IUserExternalLoginRepository>();
+        var externalLogins = Substitute.For<IExternalLoginAuthenticationRepository>();
         externalLogins.GetByProviderAndKey(PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
             "https://attacker.example.test/realms/event",
             internalAdminId.ToString("D")))
@@ -223,7 +223,7 @@ public class AdminContextTests
     {
         var subUserId = Guid.NewGuid();
         var internalUserId = Guid.NewGuid();
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
         [
             new Claim("sub", subUserId.ToString("D")),
@@ -245,7 +245,7 @@ public class AdminContextTests
     [Test]
     public async Task ResolveUserIdAsync_PurposeBoundPrincipalFailsClosedWithoutProviderLookup()
     {
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim("sub", "provider-subject")],
             ApiAuthenticationSchemeNames.ApiKey));
@@ -265,7 +265,7 @@ public class AdminContextTests
     [Test]
     public async Task ResolveUserIdAsync_MixedAuthenticatedIdentitiesFailClosedWithoutProviderLookup()
     {
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         var principal = new ClaimsPrincipal(
         [
             new ClaimsIdentity([new Claim("sub", "provider-subject")], "Bearer"),
@@ -289,7 +289,7 @@ public class AdminContextTests
     {
         const string subject = "handle.example.com";
         const string did = "did:plc:example";
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         externalLoginRepository.GetByProviderAndKey(OidcAccountKey(subject))
             .Returns((UserExternalLogin?)null);
         var sut = CreateSut(
@@ -311,7 +311,7 @@ public class AdminContextTests
         var userId = Guid.NewGuid();
         const string subject = "keycloak-subject";
 
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         externalLoginRepository.GetByProviderAndKey(OidcAccountKey(subject))
             .Returns(NewExternalLogin(userId, AuthSchemeNames.Keycloak.ToLowerInvariant(), OidcAccountKey(subject).Value));
 
@@ -332,7 +332,7 @@ public class AdminContextTests
     public async Task ResolveUserIdAsync_WithOnlySidClaim_FailsClosedWithoutProviderLookup()
     {
         const string sid = "keycloak-session-id";
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sid", sid)], "TestAuth"));
         var sut = CreateSut(
             CreateHttpContextAccessor(principal),
@@ -353,7 +353,7 @@ public class AdminContextTests
         const string subject = "google-subject";
         const string email = "USER@Example.COM";
 
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         externalLoginRepository.GetByProviderAndKey(OidcAccountKey(subject))
             .Returns((UserExternalLogin?)null);
 
@@ -380,7 +380,7 @@ public class AdminContextTests
     {
         const string subject = "google-subject";
 
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         externalLoginRepository.GetByProviderAndKey(OidcAccountKey(subject))
             .Returns((UserExternalLogin?)null);
 
@@ -407,7 +407,7 @@ public class AdminContextTests
         var userId = Guid.NewGuid();
         const string subject = "keycloak-onboarding-subject";
         UserExternalLogin? externalLogin = null;
-        var externalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var externalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         externalLoginRepository.GetByProviderAndKey(OidcAccountKey(subject))
             .Returns(_ => externalLogin);
 
@@ -612,7 +612,7 @@ public class AdminContextTests
         IOrganizationMemberRepository organizationMemberRepository,
         IGroupMemberRepository groupMemberRepository)
     {
-        var userExternalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        var userExternalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         var logger = Substitute.For<ILogger<AdminContext>>();
 
         return new AdminContext(
@@ -703,7 +703,7 @@ public class AdminContextTests
         IAdministrativeAuthorityRepository platformUserRoleRepository,
         ITenantUserRoleGrantRepository tenantUserRoleGrantRepository,
         IOrganizationMemberRepository organizationMemberRepository,
-        IUserExternalLoginRepository? userExternalLoginRepository = null)
+        IExternalLoginAuthenticationRepository? userExternalLoginRepository = null)
     {
         var groupMemberRepository = Substitute.For<IGroupMemberRepository>();
         var logger = Substitute.For<ILogger<AdminContext>>();
@@ -713,7 +713,7 @@ public class AdminContextTests
             platformUserRoleRepository,
             organizationMemberRepository,
             groupMemberRepository,
-            userExternalLoginRepository ?? Substitute.For<IUserExternalLoginRepository>(),
+            userExternalLoginRepository ?? Substitute.For<IExternalLoginAuthenticationRepository>(),
             logger);
     }
 

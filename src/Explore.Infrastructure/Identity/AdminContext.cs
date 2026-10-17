@@ -18,7 +18,7 @@ public class AdminContext : IAdminContext
     private readonly IAdministrativeAuthorityRepository _administrativeAuthorityRepository;
     private readonly IOrganizationMemberRepository _orgMemberRepo;
     private readonly IGroupMemberRepository _groupMemberRepo;
-    private readonly IUserExternalLoginRepository _userExternalLoginRepository;
+    private readonly IExternalLoginAuthenticationRepository _userExternalLoginRepository;
     private readonly ILogger<AdminContext> _logger;
 
     public AdminContext(
@@ -26,7 +26,7 @@ public class AdminContext : IAdminContext
         IAdministrativeAuthorityRepository administrativeAuthorityRepository,
         IOrganizationMemberRepository orgMemberRepo,
         IGroupMemberRepository groupMemberRepo,
-        IUserExternalLoginRepository userExternalLoginRepository,
+        IExternalLoginAuthenticationRepository userExternalLoginRepository,
         ILogger<AdminContext> logger)
     {
         _httpContextAccessor = httpContextAccessor;
@@ -66,7 +66,7 @@ public class AdminContext : IAdminContext
             return user.GetPlatformUserId();
 
         var externalLogin = await _userExternalLoginRepository.GetByProviderAndKey(
-            providerIdentity.AccountKey);
+            providerIdentity.AccountKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return externalLogin?.UserId;
     }

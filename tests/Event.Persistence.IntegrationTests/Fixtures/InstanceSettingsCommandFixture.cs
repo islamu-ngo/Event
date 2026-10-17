@@ -53,7 +53,8 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
         AdminContext = new AdminContext(httpContext,
             new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context),
-            new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            NullLogger<AdminContext>.Instance);
         Notifications = new CommittedNotificationObserver(context);
         _provider = new ServiceCollection()
             .AddSingleton<INotificationHandler<SettingChangedNotification>>(Notifications)

@@ -158,6 +158,7 @@ public sealed partial class EventResourceContentTests
         }
 
         bool opened = false, disposed = false;
+        ObservedRead? openedContent = null;
         HttpClient? administrator = null;
         var disposal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var provider = Substitute.For<IFileStorageProvider>();
@@ -213,11 +214,12 @@ public sealed partial class EventResourceContentTests
                     });
                 await mutate.SaveChangesAsync();
             }
-            return new FileStorageReadResult(new ObservedRead(bytes, () =>
+            openedContent = new ObservedRead(bytes, () =>
                 {
                     disposed = true;
                     disposal.TrySetResult();
-                }),
+                });
+            return new FileStorageReadResult(openedContent,
                 EventResourceGovernancePolicy.PdfMediaType, bytes.Length, null);
         });
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
@@ -345,6 +347,8 @@ public sealed partial class EventResourceContentTests
         await Assert.That(opened).IsTrue();
         await disposal.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(disposed).IsTrue();
+        if (change != "allow")
+            await Assert.That(openedContent!.BytesRead).IsEqualTo(0L);
         await Assert.That(System.Text.Encoding.UTF8.GetString(body)).DoesNotContain(objectKey);
         if (change == "tighten")
         {
@@ -415,6 +419,39 @@ public sealed partial class EventResourceContentTests
 
     private sealed class ObservedRead(byte[] bytes, Action disposed) : MemoryStream(bytes, writable: false)
     {
+        public long BytesRead { get; private set; }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int read = base.Read(buffer, offset, count);
+            BytesRead += read;
+            return read;
+        }
+        public override int Read(Span<byte> buffer)
+        {
+            int read = base.Read(buffer);
+            BytesRead += read;
+            return read;
+        }
+        public override int ReadByte()
+        {
+            int read = base.ReadByte();
+            if (read != -1) BytesRead++;
+            return read;
+        }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            int read = base.Read(buffer.Span);
+            BytesRead += read;
+            return ValueTask.FromResult(read);
+        }
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        public override async Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
+        {
+            long available = Length - Position;
+            await base.CopyToAsync(destination, bufferSize, cancellationToken);
+            BytesRead += available;
+        }
         protected override void Dispose(bool disposing)
         {
             if (disposing) disposed();

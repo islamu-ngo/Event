@@ -196,6 +196,12 @@ public sealed partial class CombinedEventResourceTransportTests
             await Assert.That(response.Headers.CacheControl.NoStore).IsTrue();
             await Assert.That(response.Headers.GetValues("Referrer-Policy").Single()).IsEqualTo("no-referrer");
             await Assert.That(response.Content.Headers.ContentDisposition!.DispositionType).IsEqualTo("attachment");
+            var directives = response.Headers.GetValues("Content-Security-Policy").Single()
+                .Split(';', StringSplitOptions.TrimEntries);
+            await Assert.That(directives).Contains("default-src 'none'");
+            await Assert.That(directives).Contains("frame-ancestors 'none'");
+            await Assert.That(directives).Contains("sandbox");
+            await Assert.That(response.Headers.GetValues("X-Content-Type-Options").Single()).IsEqualTo("nosniff");
         }
         if (heavyModeration)
         {

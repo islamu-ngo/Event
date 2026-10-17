@@ -12,6 +12,9 @@ public interface IStorageObjectDeletionTombstoneRepository
         DateTime utcNow, int limit, CancellationToken cancellationToken);
     Task<StorageObjectDeletionTombstone?> TryClaimAsync(
         Guid objectId, Guid expectedStamp, DateTime utcNow, DateTime leaseExpiresAtUtc, CancellationToken cancellationToken);
+    /// <summary>Reads exact persisted custody without renewing or replacing the original claim.</summary>
+    Task<bool> HasLiveClaimAsync(
+        StorageObjectDeletionTombstone claim, DateTime utcNow, CancellationToken cancellationToken);
     Task<bool> TrySettleProducerAsync(Guid objectId, Guid bindingId, string objectKey, string? providerVersion,
         DateTime utcNow, CancellationToken cancellationToken);
     Task<bool> TryRecordAbsenceAsync(Guid objectId, Guid claimStamp, DateTime utcNow, CancellationToken cancellationToken);

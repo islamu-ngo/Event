@@ -21,9 +21,16 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.EventResourceProviderActivation.Requests.Commands;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Data.Common;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
+[NotInParallel]
 public sealed class EventResourceProviderControlPlaneTests
 {
     private const string Endpoint = "https://pdp.example.test";
@@ -47,9 +54,7 @@ public sealed class EventResourceProviderControlPlaneTests
             networkObserved.TrySetResult((state.State, state.Epoch));
             return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         });
-        var result = instanceOnly
-            ? await package.Service.PublishInstanceAsync(oneTimeCredentials: package.Credentials)
-            : await package.Service.PublishAsync(oneTimeCredentials: package.Credentials);
+        var result = await package.PublishAsync(instanceOnly);
         await Assert.That(result.Succeeded).IsFalse();
         var observed = await networkObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(observed.State).IsEqualTo(EventResourceProviderActivationStateEnum.Transitioning);
@@ -71,7 +76,7 @@ public sealed class EventResourceProviderControlPlaneTests
             token.ThrowIfCancellationRequested();
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
         });
-        await Assert.ThrowsAsync<OperationCanceledException>(() => package.Service.PublishInstanceAsync(cancellation.Token, package.Credentials));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => package.PublishAsync(true, cancellation.Token));
         await Assert.That((await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!.IsUsable).IsFalse();
     }
 
@@ -81,9 +86,32 @@ public sealed class EventResourceProviderControlPlaneTests
         await using var fixture = await Fixture.CreateAsync();
         await fixture.BindAndActivateAsync();
         await using var package = new Package(fixture, _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
-        var result = await package.Service.PublishInstanceAsync(oneTimeCredentials: package.Credentials);
+        var result = await package.PublishAsync(true);
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That((await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!.IsUsable).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RejectedOrUnknownClosureNeverGrantsRemotePublication(bool unknownCommit)
+    {
+        var settlement = new LostClosureAcknowledgement();
+        await using var fixture = await Fixture.CreateAsync(settlement);
+        await fixture.BindAndActivateAsync();
+        int remoteWrites = 0;
+        await using var package = new Package(fixture, _ =>
+        {
+            Interlocked.Increment(ref remoteWrites);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        if (unknownCommit) settlement.Armed = true;
+        else await fixture.RevokeAdministratorAsync();
+        var result = await package.PublishAsync(true);
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(remoteWrites).IsEqualTo(0);
+        if (unknownCommit)
+            await Assert.That((await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!.IsUsable).IsFalse();
     }
 
     [Test]
@@ -122,12 +150,13 @@ public sealed class EventResourceProviderControlPlaneTests
         await using var fixture = await Fixture.CreateAsync();
         await fixture.BindAndActivateAsync();
         var first = (await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!;
-        await fixture.Database.SetInstanceAsync(GovernanceSettingKeys.Cerbos.GrpcEndpoint, "HTTPS://ALIAS.EXAMPLE.TEST:443/");
+        fixture.Cerbos.GrpcEndpoint = "HTTPS://ALIAS.EXAMPLE.TEST:443/";
         var second = (await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!;
         await Assert.That(second.GrpcEndpoint).IsEqualTo(Alias);
         await Assert.That(second.DeploymentId).IsEqualTo(first.DeploymentId);
         await Assert.That(second.ActivationEpoch).IsEqualTo(first.ActivationEpoch);
-        await fixture.Control.BeginPublicationAsync(Endpoint, default);
+        await using var package = new Package(fixture, _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
+        await Assert.That((await package.PublishAsync(true)).Succeeded).IsTrue();
         await Assert.That((await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!.IsUsable).IsFalse();
         var document = await fixture.Control.ReadBindingsAsync(default);
         await Assert.ThrowsAsync<ArgumentException>(() => fixture.Control.BindAsync(
@@ -139,9 +168,9 @@ public sealed class EventResourceProviderControlPlaneTests
     {
         await using var fixture = await Fixture.CreateAsync();
         await fixture.BindAndActivateAsync();
-        await fixture.Database.SetInstanceAsync(GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled, true);
-        await fixture.Database.SetTenantAsync(GovernanceSettingKeys.Cerbos.Mode, "custom_endpoint");
-        await fixture.Database.SetTenantAsync(GovernanceSettingKeys.Cerbos.CustomEndpoint, "https://unbound.example.test");
+        await fixture.SetInstanceAsync(GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled, true);
+        await fixture.SetTenantAsync(GovernanceSettingKeys.Cerbos.Mode, "custom_endpoint");
+        await fixture.SetTenantAsync(GovernanceSettingKeys.Cerbos.CustomEndpoint, "https://unbound.example.test");
         await Assert.That(await fixture.Reader.ReadAsync(fixture.Database.TenantId, default)).IsNull();
         var tracked = await fixture.Database.Context.SystemSettings.SingleAsync(
             value => value.SettingKey == GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled);
@@ -163,12 +192,12 @@ public sealed class EventResourceProviderControlPlaneTests
     {
         await using var fixture = await Fixture.CreateAsync();
         await Assert.That(await fixture.Reader.ReadAsync(fixture.Database.TenantId, default)).IsNull();
-        await fixture.Database.SetInstanceAsync(GovernanceSettingKeys.Security.AuthorizationProvider, "local");
+        fixture.Deployment.Provider = "local";
         var local = (await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!;
         await Assert.That(local.Mode).IsEqualTo(Explore.Application.Contracts.Services.EventResourceProviderMode.Local);
         await Assert.That(local.IsUsable).IsTrue();
         await fixture.BindAndActivateAsync();
-        await fixture.Database.SetInstanceAsync(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos");
+        fixture.Deployment.Provider = "cerbos";
         await using (var writer = fixture.CreateContext())
         {
             var document = await writer.SystemSettings.SingleAsync(setting => setting.SettingKey == EventResourceProviderBindingDocument.SettingKey);
@@ -183,13 +212,14 @@ public sealed class EventResourceProviderControlPlaneTests
     {
         await using var fixture = await Fixture.CreateAsync();
         await fixture.BindAndActivateAsync();
-        fixture.Admin.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
+        await fixture.RevokeAdministratorAsync();
         await Assert.ThrowsAsync<AuthorizationException>(() => fixture.Control.BeginAsync(fixture.DeploymentId, default));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Settings.UpsertAsync(new SystemSetting
-        {
-            SettingKey = EventResourceProviderBindingDocument.SettingKey,
-            Value = "{}"
-        }));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Authenticated.RunAsync(null, session =>
+            session.Services.GetRequiredService<ISystemSettingRepository>().UpsertInCurrentTransactionAsync(new SystemSetting
+            {
+                SettingKey = EventResourceProviderBindingDocument.SettingKey,
+                Value = "{}"
+            })));
         await Assert.That((await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!.IsUsable).IsTrue();
     }
 
@@ -216,45 +246,49 @@ public sealed class EventResourceProviderControlPlaneTests
     public async Task MalformedCustomizationCannotDowngradeAnExplicitLocalRoute()
     {
         await using var fixture = await Fixture.CreateAsync();
-        await fixture.Database.SetInstanceAsync(GovernanceSettingKeys.Security.AuthorizationProvider, "local");
-        await fixture.Database.SetInstanceAsync(GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled, "invalid");
+        fixture.Deployment.Provider = "local";
+        await fixture.SetInstanceAsync(GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled, false);
+        var corrupt = await fixture.Database.Context.SystemSettings.SingleAsync(
+            row => row.SettingKey == GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled);
+        corrupt.Value = "\"invalid\"";
+        await fixture.Database.Context.SaveChangesAsync();
         await Assert.That(await fixture.Reader.ReadAsync(fixture.Database.TenantId, default)).IsNull();
-    }
-
-    private sealed class FixedTimeProvider : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => new(2026, 9, 22, 12, 0, 0, TimeSpan.Zero);
     }
 
     private sealed class Fixture : IAsyncDisposable
     {
-        private Fixture(SmtpSettingsDatabase database)
+        private Fixture(SmtpSettingsDatabase database, AuthenticatedSettingsFixture authenticated)
         {
             Database = database;
-            Settings = new(database.Context, database.MutationLock);
+            Authenticated = authenticated;
+            var settings = SystemSettingRepository.CreateReadOnly(database.Context, database.MutationLock);
             var activations = new EventResourceProviderActivationRepository(database.Context);
-            Admin.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
-            Control = new(Settings, activations, database.MutationLock, new EfCoreUnitOfWork(database.Context), Admin, new FixedTimeProvider());
-            Reader = new(Settings, new TenantSettingRepository(database.Context, database.MutationLock), activations,
-                Options.Create(new AuthorizationProviderDeploymentOptions()), Options.Create(new CerbosSettings { GrpcEndpoint = Endpoint }),
+            Control = new(this);
+            Reader = new(settings, TenantSettingRepository.CreateReadOnly(database.Context, database.MutationLock), activations,
+                Options.Create(Deployment), Options.Create(Cerbos),
                 new ConfigurationBuilder().Build(), NullLogger<EventResourceProviderSnapshotReader>.Instance);
         }
 
         public SmtpSettingsDatabase Database { get; }
-        public IAdminContext Admin { get; } = Substitute.For<IAdminContext>();
-        public SystemSettingRepository Settings { get; }
-        public EventResourceProviderControlPlane Control { get; }
+        public AuthenticatedSettingsFixture Authenticated { get; }
+        public SelectedControl Control { get; }
         public EventResourceProviderSnapshotReader Reader { get; }
+        public AuthorizationProviderDeploymentOptions Deployment { get; } = new() { Provider = "cerbos" };
+        public CerbosSettings Cerbos { get; } = new() { GrpcEndpoint = Endpoint };
         public Guid DeploymentId { get; } = Guid.CreateVersion7();
 
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(IInterceptor? interceptor = null)
         {
             var database = await SmtpSettingsDatabase.CreateAsync();
-            database.Context.Add(new SettingValueTypeLookup { Id = (int)SettingValueType.Json, MasterCode = "Json", FullName = "Json" });
-            await database.Context.SaveChangesAsync();
-            await database.SetInstanceAsync(GovernanceSettingKeys.Security.AuthorizationProvider, "cerbos");
-            await database.SetInstanceAsync(GovernanceSettingKeys.Cerbos.GrpcEndpoint, Endpoint);
-            return new(database);
+            if (!await database.Context.Set<SettingValueTypeLookup>().AnyAsync(row => row.Id == (int)SettingValueType.Json))
+            {
+                database.Context.Add(new SettingValueTypeLookup { Id = (int)SettingValueType.Json, MasterCode = "Json", FullName = "Json" });
+                await database.Context.SaveChangesAsync();
+            }
+            var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+                () => AuthenticatedPolicyPackageTestService.CreateContextFor(database), interceptor);
+            var fixture = new Fixture(database, authenticated);
+            return fixture;
         }
 
         public ExploreDbContext CreateContext()
@@ -278,7 +312,39 @@ public sealed class EventResourceProviderControlPlaneTests
 
         public Task<bool> ActivateAsync(EventResourceProviderOperation operation) => Control.ActivateAsync(
             operation.DeploymentId, operation.OperationId, operation.Epoch, Scope, Version, true, 2, 2, true, default);
-        public ValueTask DisposeAsync() => Database.DisposeAsync();
+        public Task SetInstanceAsync<T>(string key, T value) =>
+            AuthenticatedPolicyPackageTestService.SetValueAsync(Authenticated, null, key, value);
+        public Task SetTenantAsync<T>(string key, T value) =>
+            AuthenticatedPolicyPackageTestService.SetValueAsync(Authenticated, Database.TenantId, key, value);
+        public async Task RevokeAdministratorAsync()
+        {
+            await using var writer = CreateContext();
+            await writer.PlatformUserRoles.Where(row => row.UserId == Authenticated.ActorId).ExecuteDeleteAsync();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Authenticated.DisposeAsync();
+            await Database.DisposeAsync();
+        }
+    }
+
+    private sealed class SelectedControl(Fixture fixture)
+    {
+        public Task<EventResourceProviderBindingDocument> ReadBindingsAsync(CancellationToken token) =>
+            fixture.Authenticated.RunAsync(null, session =>
+                session.Services.GetRequiredService<EventResourceProviderControlPlane>().ReadBindingsAsync(token), cancellationToken: token);
+        public Task<EventResourceProviderOperation> BindAsync(EventResourceDeploymentBinding binding, Guid revision, CancellationToken token) =>
+            fixture.Authenticated.RunAsync(null, session =>
+                session.Services.GetRequiredService<EventResourceProviderControlPlane>().BindAsync(new(binding, revision), token), cancellationToken: token);
+        public Task<EventResourceProviderOperation> BeginAsync(Guid deployment, CancellationToken token) =>
+            fixture.Authenticated.RunAsync(null, session =>
+                session.Services.GetRequiredService<EventResourceProviderControlPlane>().BeginAsync(new(deployment), token), cancellationToken: token);
+        public Task<bool> ActivateAsync(Guid deployment, Guid operation, long epoch, string scope, string version,
+            bool stopped, int reachable, int declared, bool confirmed, CancellationToken token) =>
+            fixture.Authenticated.RunAsync(null, session =>
+                session.Services.GetRequiredService<EventResourceProviderControlPlane>().ActivateAsync(
+                    new(deployment, operation, epoch, scope, version, stopped, reachable, declared, confirmed), token), cancellationToken: token);
     }
 
     private sealed class Package : IAsyncDisposable
@@ -286,13 +352,18 @@ public sealed class EventResourceProviderControlPlaneTests
         private readonly string _path = Path.Combine(Path.GetTempPath(), $"resource-policy-{Guid.CreateVersion7():N}");
         private readonly HttpClient _client;
         private readonly Handler _handler;
+        private readonly Fixture _fixture;
+        private readonly IOptions<CerbosPolicyPackageOptions> _options;
+        private readonly ICerbosConfigResolver _resolver;
+        private readonly IHttpClientFactory _factory;
         public Package(Fixture fixture, Func<CancellationToken, Task<HttpResponseMessage>> response)
         {
+            _fixture = fixture;
             Directory.CreateDirectory(Path.Combine(_path, "_schemas"));
             File.WriteAllText(Path.Combine(_path, "islamuevent_event_resource.yaml"),
                 "apiVersion: api.cerbos.dev/v1\nresourcePolicy:\n  resource: islamuevent_event_resource\n  version: default\n  rules: []\n");
             File.WriteAllText(Path.Combine(_path, "_schemas", "islamuevent_event_resource.json"), "{\"type\":\"object\"}");
-            var options = Options.Create(new CerbosPolicyPackageOptions { PoliciesPath = _path });
+            _options = Options.Create(new CerbosPolicyPackageOptions { PoliciesPath = _path });
             var resolver = Substitute.For<ICerbosConfigResolver>();
             resolver.ResolveAsync(Arg.Any<CancellationToken>()).Returns(new CerbosConfiguration
             {
@@ -305,13 +376,33 @@ public sealed class EventResourceProviderControlPlaneTests
             _client = new(_handler, disposeHandler: false);
             var factory = Substitute.For<IHttpClientFactory>();
             factory.CreateClient(Arg.Any<string>()).Returns(_client);
-            Service = new(options, Options.Create(new CerbosAdminApiSettings { Endpoints = ["https://admin.example.test"] }),
-                resolver, Substitute.For<ISecretResolver>(), new CerbosAdminEndpointValidator(), factory,
-                NullLogger<CerbosPolicyPackageService>.Instance, fixture.Control, Options.Create(new CerbosSettings { GrpcEndpoint = Endpoint }));
+            _resolver = resolver;
+            _factory = factory;
         }
         public PolicyPackageAdminCredentials Credentials { get; } = new(
             Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
-        public CerbosPolicyPackageService Service { get; }
+        public async Task<Explore.Application.Authorization.PolicyPackagePublishResult> PublishAsync(
+            bool managed, CancellationToken token = default)
+        {
+            if (!managed)
+            {
+                await _fixture.SetInstanceAsync(GovernanceSettingKeys.Cerbos.TenantCustomizationEnabled, true);
+                await _fixture.SetInstanceAsync(GovernanceSettingKeys.Cerbos.Mode, "custom_endpoint");
+                await _fixture.SetInstanceAsync(GovernanceSettingKeys.Cerbos.CustomEndpoint, Alias);
+                await _fixture.SetInstanceAsync(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint, "https://admin.example.test");
+            }
+            return await _fixture.Authenticated.RunAsync(null, session =>
+            {
+                var selected = new ResourceProviderTestServices(session.Services);
+                var publisher = new CerbosPolicyPackageService(_options,
+                    Options.Create(new CerbosAdminApiSettings { Endpoints = ["https://admin.example.test"] }),
+                    _resolver, new CerbosAdminEndpointValidator(), _factory, NullLogger<CerbosPolicyPackageService>.Instance,
+                    selected.Control, Options.Create(_fixture.Cerbos), selected,
+                    Options.Create(new AuthorizationProviderDeploymentOptions { Provider = managed ? "cerbos" : null }));
+                selected.Publisher = publisher;
+                return publisher.PublishAsync(AuthenticatedPolicyPackageTestService.Command(Credentials), token);
+            }, cancellationToken: token);
+        }
         public ValueTask DisposeAsync()
         {
             _client.Dispose();
@@ -324,5 +415,17 @@ public sealed class EventResourceProviderControlPlaneTests
     private sealed class Handler(Func<CancellationToken, Task<HttpResponseMessage>> response) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => response(cancellationToken);
+    }
+
+    private sealed class LostClosureAcknowledgement : DbTransactionInterceptor
+    {
+        internal bool Armed { get; set; }
+        public override Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            if (!Armed) return Task.CompletedTask;
+            Armed = false;
+            throw new Microsoft.Data.Sqlite.SqliteException("Lost resource closure commit acknowledgement.", 5);
+        }
     }
 }

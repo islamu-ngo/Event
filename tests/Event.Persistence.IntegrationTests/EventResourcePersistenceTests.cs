@@ -4,6 +4,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Microsoft.Data.Sqlite;
@@ -483,6 +484,8 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             await connection.OpenAsync();
             DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connection, sqlite => sqlite.MigrationsAssembly("Explore.Persistence.Migrations.Sqlite"))
+                .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,
+                    SqliteProjectionLockTransactionInterceptor.Instance)
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var context = new ExploreDbContext(options);

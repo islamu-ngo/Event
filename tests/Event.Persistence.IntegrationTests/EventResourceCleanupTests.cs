@@ -141,7 +141,7 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         string checksum = Convert.ToHexString(SHA256.HashData("%PDF-1.7\ncleanup\n%%EOF"u8));
         var settings = new EventResourceSettingsWriter(context,
             new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)), new EfCoreUnitOfWork(context));
-        var setting = await settings.ApplyAsync([new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
+        var setting = await settings.ApplyInternalAsync([new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
             EventResourceSettingMutationKind.SetValue, "true")], null);
         await Assert.That(setting.Success).IsTrue();
         context.AddRange(resource, binding, new StorageObject
@@ -225,7 +225,7 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         var retentionFactory = new EventResourceAuditRetentionManualContextFactory(() => database.CreateContext());
         var retention = new EventResourceAuditRetentionService(
             new EventResourceAuditOwnerDiscoveryRepository(retentionFactory),
-            new Explore.Persistence.Services.EventResourceAuditRetentionExecutionScopeFactory(retentionFactory), clock);
+            new EventResourceAuditRetentionExecutionScopeFactory(retentionFactory), clock);
         await retention.CleanupAsync(default);
         var auditAfterExpiry = await context.EventResourceAuditEntries.AsNoTracking()
             .SingleAsync(item => item.EventResourceId == resource.Id);
@@ -261,7 +261,7 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
             var readUnit = new EfCoreUnitOfWork(read);
             var mutationLock = new RelationalSettingMutationLock(read, readUnit);
             var policy = new EventResourceGovernancePolicyReader(
-                new SystemSettingRepository(read, mutationLock), new TenantSettingRepository(read, mutationLock));
+                SystemSettingRepository.CreateReadOnly(read, mutationLock), TenantSettingRepository.CreateReadOnly(read, mutationLock));
             var repository = new EventResourceRepository(read);
             var authority = new EventResourceAuthorityOrchestrator(readUnit,
                 new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(read), policy),

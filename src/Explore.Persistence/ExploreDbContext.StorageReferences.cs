@@ -128,6 +128,8 @@ public partial class ExploreDbContext
         List<(EntityEntry Entry, IProperty Property)> carriers, Func<Task<int>> persist,
         CancellationToken cancellationToken)
     {
+        if (carriers.Count == 0)
+            return await persist();
         try
         {
             if (StorageReferenceTransactionFailed)

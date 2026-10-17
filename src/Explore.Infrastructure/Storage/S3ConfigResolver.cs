@@ -15,9 +15,10 @@ namespace Explore.Infrastructure.Storage;
 /// </summary>
 public class S3ConfigResolver : IS3ConfigResolver
 {
-    private readonly IHierarchicalSettingsResolver _resolver;
+    private readonly IHierarchicalSettingsReader _resolver;
     private readonly ITenantContext _tenantContext;
     private readonly IMemoryCache _cache;
+    private readonly S3ConfigCacheRegistry _cacheRegistry;
     private readonly ISecretResolver _secretResolver;
     private readonly ILogger<S3ConfigResolver> _logger;
 
@@ -25,15 +26,17 @@ public class S3ConfigResolver : IS3ConfigResolver
     private const string CacheKeyPrefix = "S3Config:";
 
     public S3ConfigResolver(
-        IHierarchicalSettingsResolver resolver,
+        IHierarchicalSettingsReader resolver,
         ITenantContext tenantContext,
         IMemoryCache cache,
+        S3ConfigCacheRegistry cacheRegistry,
         ISecretResolver secretResolver,
         ILogger<S3ConfigResolver> logger)
     {
         _resolver = resolver;
         _tenantContext = tenantContext;
         _cache = cache;
+        _cacheRegistry = cacheRegistry;
         _secretResolver = secretResolver;
         _logger = logger;
     }
@@ -43,7 +46,7 @@ public class S3ConfigResolver : IS3ConfigResolver
         var tenantId = _tenantContext.TenantId;
         var cacheKey = $"{CacheKeyPrefix}{tenantId}";
 
-        if (_cache.TryGetValue(cacheKey, out S3Configuration? cached))
+        if (_cacheRegistry.TryGet(_cache, cacheKey, out var cached, out long generation))
         {
             return cached;
         }
@@ -52,7 +55,7 @@ public class S3ConfigResolver : IS3ConfigResolver
 
         if (config is not null)
         {
-            _cache.Set(cacheKey, config, CacheExpiration);
+            _cacheRegistry.Store(_cache, cacheKey, config, generation, CacheExpiration);
         }
 
         return config;
@@ -65,13 +68,12 @@ public class S3ConfigResolver : IS3ConfigResolver
     {
         if (tenantId.HasValue)
         {
-            _cache.Remove($"{CacheKeyPrefix}{tenantId.Value}");
+            _cacheRegistry.Invalidate(_cache, $"{CacheKeyPrefix}{tenantId.Value}");
         }
         else
         {
-            // Can't enumerate MemoryCache keys — callers should invalidate specific tenants.
-            // For a full flush, the SettingsResolver also has its own cache invalidation.
-            _logger.LogInformation("S3 config cache invalidation requested for all tenants");
+            _cacheRegistry.Invalidate(_cache, null);
+            _logger.LogInformation("S3 config cache invalidated for all tenants");
         }
     }
 
@@ -169,5 +171,49 @@ public class S3ConfigResolver : IS3ConfigResolver
             SecretResolutionStatus.Unconfigured => null,
             _ => throw new InvalidOperationException("storage_secret_unavailable")
         };
+    }
+}
+
+/// <summary>Shares cache ownership and invalidation generations across scoped resolvers.</summary>
+public sealed class S3ConfigCacheRegistry
+{
+    private readonly object _gate = new();
+    private readonly HashSet<string> _keys = new(StringComparer.Ordinal);
+    private long _generation;
+
+    internal bool TryGet(IMemoryCache cache, string key, out S3Configuration? configuration, out long generation)
+    {
+        lock (_gate)
+        {
+            generation = _generation;
+            return cache.TryGetValue(key, out configuration);
+        }
+    }
+
+    internal void Store(IMemoryCache cache, string key, S3Configuration configuration,
+        long generation, TimeSpan expiration)
+    {
+        lock (_gate)
+        {
+            if (generation != _generation) return;
+            _keys.Add(key);
+            cache.Set(key, configuration, expiration);
+        }
+    }
+
+    internal void Invalidate(IMemoryCache cache, string? key)
+    {
+        lock (_gate)
+        {
+            _generation++;
+            if (key is not null)
+            {
+                _keys.Remove(key);
+                cache.Remove(key);
+                return;
+            }
+            foreach (string cachedKey in _keys) cache.Remove(cachedKey);
+            _keys.Clear();
+        }
     }
 }

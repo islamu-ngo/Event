@@ -11,6 +11,81 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 public sealed class LocalFileStorageProviderTests
 {
     [Test]
+    [Arguments("root")]
+    [Arguments("ancestor")]
+    [Arguments("object")]
+    public async Task LinkedCustodyPathsCannotReadDeleteOrWriteOutsideRoot(string location)
+    {
+        string parent = Directory.CreateTempSubdirectory("storage-custody-").FullName;
+        string outside = Directory.CreateTempSubdirectory("storage-outside-").FullName;
+        Guid tenant = Guid.CreateVersion7();
+        string root = Path.Combine(parent, "storage");
+        string key = $"tenants/{tenant:N}/file.pdf";
+        string outsideFile = Path.Combine(outside, "file.pdf");
+        byte[] bytes = "%PDF-1.7\ncustody canary"u8.ToArray();
+        await File.WriteAllBytesAsync(outsideFile, bytes);
+        try
+        {
+            if (location == "root")
+                Directory.CreateSymbolicLink(root, outside);
+            else
+            {
+                Directory.CreateDirectory(root);
+                if (location == "ancestor")
+                    Directory.CreateSymbolicLink(Path.Combine(root, "tenants"), outside);
+                else
+                {
+                    string directory = Directory.CreateDirectory(Path.Combine(root, "tenants", tenant.ToString("N"))).FullName;
+                    File.CreateSymbolicLink(Path.Combine(directory, "file.pdf"), outsideFile);
+                }
+            }
+            var provider = new LocalFileStorageProvider(
+                Options.Create(new LocalFileStorageOptions { RootPath = root }),
+                NullLogger<LocalFileStorageProvider>.Instance);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.OpenReadAsync(new(key, null), default));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.ExistsAsync(new(key), default));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.DeleteAsync(new(key), default));
+            await using var custody = await LocalQuarantineClaimFixture.CreateAsync(
+                root, key, bytes.Length, File.GetLastWriteTimeUtc(outsideFile));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.QuarantineAsync(
+                custody.Input, custody.Owner, TimeProvider.System, default));
+            using var content = new MemoryStream(bytes);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.WriteAsync(
+                new(tenant, content, "application/pdf", "file.pdf", "pdf", bytes.Length, bytes.Length, key), default));
+            await Assert.That(await File.ReadAllBytesAsync(outsideFile)).IsEquivalentTo(bytes);
+        }
+        finally
+        {
+            Directory.Delete(parent, recursive: true);
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task InventoryNeverDescendsIntoLinkedDirectories()
+    {
+        string root = Directory.CreateTempSubdirectory("storage-inventory-custody-").FullName;
+        string outside = Directory.CreateTempSubdirectory("storage-inventory-outside-").FullName;
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(outside, "private.txt"), "outside");
+            Directory.CreateSymbolicLink(Path.Combine(root, "linked"), outside);
+            var provider = new LocalFileStorageProvider(
+                Options.Create(new LocalFileStorageOptions { RootPath = root }),
+                NullLogger<LocalFileStorageProvider>.Instance);
+            var inventory = new List<FileStorageInventoryObject>();
+            await foreach (var item in provider.ListObjectsAsync(100, default)) inventory.Add(item);
+            await Assert.That(inventory).IsEmpty();
+            await Assert.That((await provider.TestAsync(default)).IsAvailable).IsTrue();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task BoundWriteInitializesItsCapturedRootButAbsenceChecksNeverRecreateIt(bool rootExists)
@@ -273,12 +348,10 @@ public sealed class LocalFileStorageProviderTests
             var objectPath = Path.Combine(root, "tenants", "a", "orphan.txt");
             await File.WriteAllTextAsync(objectPath, "orphan");
 
+            await using var custody = await LocalQuarantineClaimFixture.CreateAsync(
+                root, "tenants/a/orphan.txt", new FileInfo(objectPath).Length, File.GetLastWriteTimeUtc(objectPath));
             var result = await provider.QuarantineAsync(
-                new FileStorageQuarantineInput(
-                    "tenants/a/orphan.txt",
-                    "metadata_record_missing",
-                    new DateTime(2026, 6, 2, 9, 0, 0, DateTimeKind.Utc)),
-                CancellationToken.None);
+                custody.Input, custody.Owner, TimeProvider.System, CancellationToken.None);
 
             var objects = new List<FileStorageInventoryObject>();
             await foreach (var item in provider.ListObjectsAsync(10, CancellationToken.None))
@@ -288,7 +361,7 @@ public sealed class LocalFileStorageProviderTests
 
             await Assert.That(result.Quarantined).IsTrue();
             await Assert.That(File.Exists(objectPath)).IsFalse();
-            await Assert.That(Directory.Exists(Path.Combine(root, ".quarantine", "20260602"))).IsTrue();
+            await Assert.That(Directory.Exists(Path.Combine(root, ".quarantine", "reconciliation"))).IsTrue();
             await Assert.That(objects).IsEmpty();
         }
         finally
@@ -317,23 +390,36 @@ public sealed class LocalFileStorageProviderTests
     }
 
     [Test]
-    public async Task TestAsync_WithWritableRoot_ReturnsAvailable()
+    public async Task TestAsync_WithReadableRoot_DoesNotProbeWrites()
     {
         var provider = CreateProvider(out var root);
 
         try
         {
+            Directory.CreateDirectory(root);
             var status = await provider.TestAsync(CancellationToken.None);
 
             await Assert.That(status.Provider).IsEqualTo(StorageProviders.Local);
             await Assert.That(status.IsAvailable).IsTrue();
             await Assert.That(status.SupportsServerSideStreaming).IsTrue();
             await Assert.That(status.SupportsBrowserDirectUpload).IsFalse();
+            await Assert.That(Directory.EnumerateFileSystemEntries(root).ToArray()).IsEmpty();
         }
         finally
         {
             DeleteRootIfExists(root);
         }
+    }
+
+    [Test]
+    public async Task TestAsync_CannotCreateRootOrAcceptBooleanWriteAuthority()
+    {
+        var provider = CreateProvider(out var root);
+        var status = await provider.TestAsync(CancellationToken.None);
+        await Assert.That(status.IsAvailable).IsFalse();
+        await Assert.That(Directory.Exists(root)).IsFalse();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => provider.TestAsync(CancellationToken.None, true));
+        await Assert.That(Directory.Exists(root)).IsFalse();
     }
 
     [Test]

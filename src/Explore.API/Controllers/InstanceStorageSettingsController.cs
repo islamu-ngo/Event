@@ -4,28 +4,17 @@ using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
-using Explore.API.Extensions;
 using Explore.API.Hateoas;
-using Explore.API.Models;
-using Explore.Application.Authorization;
-using Explore.Application.Constants;
-using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Analytics;
-using Explore.Application.DTOs.Footer;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
-using Explore.Application.Features.Footer.Requests.Commands;
-using Explore.Application.Features.Footer.Requests.Queries;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OutputCaching;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace Explore.API.Controllers;
 
@@ -49,7 +38,10 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
     private readonly IQueryHandler<GetInstanceStorageSettingsQuery, InstanceStorageSettingsDto> _instanceStorageQuery;
     private readonly ICommandHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>> _updateStorageHandler;
     private readonly IQueryHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto> _testStorageHandler;
+    private readonly IQueryHandler<TestInstanceStorageProviderDuringSetupQuery, InstanceStorageProviderStatusDto> _testStorageDuringSetupHandler;
     private readonly ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto> _recalculateStorageHandler;
+    private readonly ICommandHandler<RecalculateInstanceStorageUsageDuringSetupCommand, InstanceStorageUsageDto> _recalculateStorageDuringSetupHandler;
+    private readonly ISetupSecretProvider _accountingSetupSecretProvider;
 
     public InstanceStorageSettingsController(
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
@@ -57,7 +49,9 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
         IQueryHandler<GetInstanceStorageSettingsQuery, InstanceStorageSettingsDto> instanceStorageQuery,
         ICommandHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>> updateStorageHandler,
         IQueryHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto> testStorageHandler,
+        IQueryHandler<TestInstanceStorageProviderDuringSetupQuery, InstanceStorageProviderStatusDto> testStorageDuringSetupHandler,
         ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto> recalculateStorageHandler,
+        ICommandHandler<RecalculateInstanceStorageUsageDuringSetupCommand, InstanceStorageUsageDto> recalculateStorageDuringSetupHandler,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
@@ -67,7 +61,10 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
         _instanceStorageQuery = instanceStorageQuery;
         _updateStorageHandler = updateStorageHandler;
         _testStorageHandler = testStorageHandler;
+        _testStorageDuringSetupHandler = testStorageDuringSetupHandler;
         _recalculateStorageHandler = recalculateStorageHandler;
+        _recalculateStorageDuringSetupHandler = recalculateStorageDuringSetupHandler;
+        _accountingSetupSecretProvider = setupSecretProvider;
     }
 
     [HttpGet("storage", Name = RouteNames.GetInstanceStorageSettings)]
@@ -108,9 +105,17 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<InstanceStorageProviderStatusDto>> TestStorageConnection(CancellationToken cancellationToken = default)
     {
-        if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-
-        var status = await _testStorageHandler.QueryAsync(new TestInstanceStorageProviderQuery(), cancellationToken);
+        if (!await AdminContext.IsInstanceAdminAsync(cancellationToken))
+        {
+            if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken))
+                return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
+            return Ok(await _testStorageDuringSetupHandler.QueryAsync(
+                new TestInstanceStorageProviderDuringSetupQuery(), cancellationToken));
+        }
+        var actor = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
+        if (!actor.HasValue)
+            return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
+        var status = await _testStorageHandler.QueryAsync(new TestInstanceStorageProviderQuery { UserId = actor.Value }, cancellationToken);
         return Ok(status);
     }
 
@@ -121,9 +126,22 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<InstanceStorageUsageDto>> RecalculateStorageUsage(CancellationToken cancellationToken = default)
     {
-        if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
+        if (!await AdminContext.IsInstanceAdminAsync(cancellationToken))
+        {
+            var secret = Request.Headers.TryGetValue("X-Setup-Secret", out var value) ? value.ToString() : null;
+            if (await _accountingSetupSecretProvider.ValidateSecretAsync(secret, cancellationToken)
+                != SetupSecretValidationOutcome.Accepted)
+                return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
+            var setupUsage = await _recalculateStorageDuringSetupHandler.ExecuteAsync(
+                new RecalculateInstanceStorageUsageDuringSetupCommand(), cancellationToken);
+            return Ok(setupUsage);
+        }
 
-        var usage = await _recalculateStorageHandler.ExecuteAsync(new RecalculateInstanceStorageUsageCommand(), cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
+        if (!userId.HasValue)
+            return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
+        var usage = await _recalculateStorageHandler.ExecuteAsync(
+            new RecalculateInstanceStorageUsageCommand { UserId = userId.Value }, cancellationToken);
         return Ok(usage);
     }
 }

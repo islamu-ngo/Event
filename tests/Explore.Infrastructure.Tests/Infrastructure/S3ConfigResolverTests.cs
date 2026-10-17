@@ -17,6 +17,7 @@ public sealed class S3ConfigResolverTests : IDisposable
     private readonly ITenantContext _tenant = Substitute.For<ITenantContext>();
     private readonly ISecretResolver _secrets = Substitute.For<ISecretResolver>();
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+    private readonly S3ConfigCacheRegistry _cacheRegistry = new();
     private readonly Guid _tenantId = Guid.NewGuid();
 
     public S3ConfigResolverTests() => _tenant.TenantId.Returns(_tenantId);
@@ -61,13 +62,89 @@ public sealed class S3ConfigResolverTests : IDisposable
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => CreateResolver().ResolveAsync());
 
-        await Assert.That(exception.Message).IsEqualTo("storage_secret_unavailable");
+        await Assert.That(exception?.Message).IsEqualTo("storage_secret_unavailable");
+    }
+
+    [Test]
+    public async Task InstanceInvalidationClearsEveryPublishedScopeAcrossResolvers()
+    {
+        ConfigureGovernance();
+        ConfigureResolvedCredentials(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        Guid[] scopes = [_tenantId, Guid.NewGuid(), Guid.Empty];
+        foreach (Guid scope in scopes)
+        {
+            _tenant.TenantId.Returns(scope);
+            await Assert.That((await CreateResolver().ResolveAsync())!.Endpoint)
+                .IsEqualTo("https://storage.example.test");
+        }
+        _settings.ResolveAsync<string>(GovernanceSettingKeys.Storage.Endpoint,
+            Arg.Any<SettingContext>(), Arg.Any<CancellationToken>()).Returns("https://updated.example.test");
+        CreateResolver().InvalidateCache();
+        foreach (Guid scope in scopes)
+        {
+            _tenant.TenantId.Returns(scope);
+            await Assert.That((await CreateResolver().ResolveAsync())!.Endpoint)
+                .IsEqualTo("https://updated.example.test");
+        }
+    }
+
+    [Test]
+    public async Task TenantInvalidationPreservesOtherPublishedScopes()
+    {
+        ConfigureGovernance();
+        ConfigureResolvedCredentials(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        Guid other = Guid.NewGuid();
+        await CreateResolver().ResolveAsync();
+        _tenant.TenantId.Returns(other);
+        await CreateResolver().ResolveAsync();
+        _settings.ResolveAsync<string>(GovernanceSettingKeys.Storage.Endpoint,
+            Arg.Any<SettingContext>(), Arg.Any<CancellationToken>()).Returns("https://updated.example.test");
+        CreateResolver().InvalidateCache(_tenantId);
+        await Assert.That((await CreateResolver().ResolveAsync())!.Endpoint)
+            .IsEqualTo("https://storage.example.test");
+        _tenant.TenantId.Returns(_tenantId);
+        await Assert.That((await CreateResolver().ResolveAsync())!.Endpoint)
+            .IsEqualTo("https://updated.example.test");
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task InFlightResolutionCannotRepublishAfterInvalidation(bool instanceWide)
+    {
+        ConfigureGovernance();
+        ConfigureResolvedCredentials(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var endpoint = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _settings.ResolveAsync<string>(GovernanceSettingKeys.Storage.Endpoint,
+            Arg.Any<SettingContext>(), Arg.Any<CancellationToken>()).Returns(_ =>
+            {
+                entered.TrySetResult();
+                return endpoint.Task;
+            });
+        var resolution = CreateResolver().ResolveAsync();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            _settings.ResolveAsync<string>(GovernanceSettingKeys.Storage.Endpoint,
+                Arg.Any<SettingContext>(), Arg.Any<CancellationToken>()).Returns("https://updated.example.test");
+            CreateResolver().InvalidateCache(instanceWide ? null : _tenantId);
+            endpoint.SetResult("https://storage.example.test");
+            await Assert.That((await resolution)!.Endpoint).IsEqualTo("https://storage.example.test");
+            await Assert.That((await CreateResolver().ResolveAsync())!.Endpoint)
+                .IsEqualTo("https://updated.example.test");
+        }
+        finally
+        {
+            endpoint.TrySetResult("https://storage.example.test");
+        }
     }
 
     private S3ConfigResolver CreateResolver() => new(
         _settings,
         _tenant,
         _cache,
+        _cacheRegistry,
         _secrets,
         Substitute.For<ILogger<S3ConfigResolver>>());
 

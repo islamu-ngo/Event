@@ -203,6 +203,8 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         CancellationToken cancellationToken,
         bool testWritePermissions = false)
     {
+        if (testWritePermissions)
+            throw new UnauthorizedAccessException("Write probes require original storage action custody.");
         using var instrumentation = _boundTarget ? SuppressInstrumentationScope.Begin() : default;
         var preflight = await _preflightVerifier.VerifyAsync(
             new S3PreflightRequest { TestWritePermissions = testWritePermissions },

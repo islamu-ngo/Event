@@ -5,7 +5,6 @@ using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Users.Requests.Queries;
-using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.TenantStorageSettings.Requests.Commands;
@@ -100,7 +99,11 @@ public sealed class TenantStorageSettingsController(
     public async Task<ActionResult<InstanceStorageProviderStatusDto>> TestStorageConnection(
         CancellationToken cancellationToken = default)
     {
-        var status = await testProvider.ExecuteAsync(new TestTenantStorageProviderCommand(), cancellationToken);
+        var actor = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
+        if (!actor.HasValue)
+            return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
+        var status = await testProvider.ExecuteAsync(
+            new TestTenantStorageProviderCommand { UserId = actor.Value }, cancellationToken);
         return Ok(status);
     }
 }

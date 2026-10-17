@@ -161,14 +161,6 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
         return (items, totalCount);
     }
 
-    public async Task<IReadOnlyList<StorageObject>> GetAllForInstanceStorageReportAsync(CancellationToken cancellationToken)
-    {
-        return await _dbContext.StorageObjects
-            .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceStorageAdministration)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<IReadOnlyList<StorageObject>> ListActiveForReconciliationAsync(
         DateTime createdBeforeUtc,
         int limit,

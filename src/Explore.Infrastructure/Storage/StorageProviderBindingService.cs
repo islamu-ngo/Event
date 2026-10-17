@@ -8,16 +8,18 @@ using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Explore.Infrastructure.Storage;
 
 public sealed class StorageProviderBindingService(
     IStorageProviderBindingRepository repository,
-    IHierarchicalSettingsResolver settings,
+    IHierarchicalSettingsReader settings,
     IRetainedSecretResolver secrets,
     IOptions<LocalFileStorageOptions> localOptions,
     IS3ClientFactory clientFactory,
-    ILoggerFactory loggerFactory) : IStorageProviderBindingService
+    ILoggerFactory loggerFactory,
+    IWebHostEnvironment? environment = null) : IStorageProviderBindingService
 {
     public async Task<StorageProviderBinding> CaptureAsync(
         string provider, Guid tenantId, CancellationToken cancellationToken)
@@ -52,11 +54,24 @@ public sealed class StorageProviderBindingService(
     {
         var binding = await repository.GetByIdAsync(bindingId, cancellationToken)
             ?? throw new InvalidOperationException("storage_provider_binding_unavailable");
+        if (binding.Provider == StorageProviders.Local)
+        {
+            var boundOptions = new LocalFileStorageOptions
+            {
+                RootPath = binding.LocalRootPath!,
+                CreateRootIfMissing = false
+            };
+            var validation = new LocalFileStorageOptionsValidator(environment).Validate(Options.DefaultName, boundOptions);
+            if (validation.Failed)
+            {
+                throw new OptionsValidationException(
+                    Options.DefaultName, typeof(LocalFileStorageOptions), validation.Failures);
+            }
+            return new LocalFileStorageProvider(
+                Options.Create(boundOptions), loggerFactory.CreateLogger<LocalFileStorageProvider>(), boundTarget: true);
+        }
         return binding.Provider switch
         {
-            StorageProviders.Local => new LocalFileStorageProvider(
-                Options.Create(new LocalFileStorageOptions { RootPath = binding.LocalRootPath!, CreateRootIfMissing = false }),
-                loggerFactory.CreateLogger<LocalFileStorageProvider>(), boundTarget: true),
             StorageProviders.S3Compatible => CreateS3(binding),
             _ => throw new InvalidOperationException("storage_provider_binding_unsupported")
         };

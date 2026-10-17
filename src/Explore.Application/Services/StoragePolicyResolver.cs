@@ -28,12 +28,12 @@ public sealed class StoragePolicyResolver : IStoragePolicyResolver
         GovernanceSettingKeys.Storage.RouteMatrix
     ];
 
-    private readonly IHierarchicalSettingsResolver _settingsResolver;
+    private readonly IHierarchicalSettingsReader _settingsResolver;
     private readonly IFileStorageProviderResolver _providerResolver;
     private readonly IS3ConfigResolver? _s3ConfigResolver;
 
     public StoragePolicyResolver(
-        IHierarchicalSettingsResolver settingsResolver,
+        IHierarchicalSettingsReader settingsResolver,
         IFileStorageProviderResolver providerResolver,
         IS3ConfigResolver? s3ConfigResolver = null)
     {

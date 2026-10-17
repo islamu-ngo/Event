@@ -200,7 +200,7 @@ public sealed class NativeTenantStorageHttpTests
         SetPrincipal(scope, data.AdminId, data.OtherTenantId);
         var probe = scope.ServiceProvider.GetRequiredService<ICommandHandler<TestTenantStorageProviderCommand, InstanceStorageProviderStatusDto>>();
         var query = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetTenantStorageSettingsQuery, TenantStorageSettingsDto>>();
-        await Assert.That(async () => { await probe.ExecuteAsync(new(), default); }).Throws<AuthorizationException>();
+        await Assert.That(async () => { await probe.ExecuteAsync(new() { UserId = data.AdminId }, default); }).Throws<AuthorizationException>();
         await Assert.That(async () => { await query.QueryAsync(new(), default); }).Throws<AuthorizationException>();
         var patch = await scope.ServiceProvider.GetRequiredService<ICommandHandler<PatchTenantStorageSettingsCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(new() { UserId = data.AdminId, Settings = new() { Policy = new() { MaxUploadBytes = OptionalUpdate<long>.Set(4096) } } }, default);
@@ -209,12 +209,12 @@ public sealed class NativeTenantStorageHttpTests
         SetPrincipal(scope, data.InstanceAdminId, data.OtherTenantId);
         var foreign = await query.QueryAsync(new(), default);
         await Assert.That(foreign.S3BucketName).IsEqualTo("foreign-storage");
-        await Assert.That((await probe.ExecuteAsync(new(), default)).IsAvailable).IsTrue();
+        await Assert.That((await probe.ExecuteAsync(new() { UserId = data.InstanceAdminId }, default)).IsAvailable).IsTrue();
         await Assert.That(factory.Boundary.Operations.All(operation => operation.Bucket == "foreign-storage")).IsTrue();
         SetPrincipal(scope, data.AdminId, PlatformDefaults.DefaultTenantId);
         factory.Boundary.BlockHead = true;
         using var cancellation = new CancellationTokenSource();
-        var pending = probe.ExecuteAsync(new(), cancellation.Token);
+        var pending = probe.ExecuteAsync(new() { UserId = data.AdminId }, cancellation.Token);
         await factory.Boundary.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await cancellation.CancelAsync();
         await Assert.That(async () => await pending.WaitAsync(TimeSpan.FromSeconds(10))).Throws<OperationCanceledException>();

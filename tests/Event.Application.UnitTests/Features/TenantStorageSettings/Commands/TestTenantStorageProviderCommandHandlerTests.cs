@@ -30,13 +30,20 @@ public sealed class TestTenantStorageProviderCommandHandlerTests
             IsAvailable = true,
             Preflight = new S3PreflightResult { IsSuccess = true }
         };
+        var command = new TestTenantStorageProviderCommand { UserId = Guid.CreateVersion7() };
+        TestTenantStorageProviderCommand? handedOff = null;
         _adminContext.IsTenantAdminAsync(TenantId, Arg.Any<CancellationToken>()).Returns(true);
-        _storageService.TestProviderAsync(TenantId, Arg.Any<CancellationToken>()).Returns(expected);
+        _storageService.TestProviderAsync(Arg.Any<TestTenantStorageProviderCommand>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                handedOff = call.Arg<TestTenantStorageProviderCommand>();
+                return expected;
+            });
 
-        var result = await CreateHandler().ExecuteAsync(new TestTenantStorageProviderCommand(), CancellationToken.None);
+        var result = await CreateHandler().ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result).IsSameReferenceAs(expected);
-        await _storageService.Received(1).TestProviderAsync(TenantId, Arg.Any<CancellationToken>());
+        await Assert.That(handedOff).IsSameReferenceAs(command);
     }
 
     [Test]
@@ -46,8 +53,8 @@ public sealed class TestTenantStorageProviderCommandHandlerTests
         _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
 
         await Assert.ThrowsAsync<AuthorizationException>(() =>
-            CreateHandler().ExecuteAsync(new TestTenantStorageProviderCommand(), CancellationToken.None));
-        await _storageService.DidNotReceive().TestProviderAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+            CreateHandler().ExecuteAsync(new TestTenantStorageProviderCommand { UserId = Guid.CreateVersion7() }, CancellationToken.None));
+        await _storageService.DidNotReceive().TestProviderAsync(Arg.Any<TestTenantStorageProviderCommand>(), Arg.Any<CancellationToken>());
     }
 
     private TestTenantStorageProviderCommandHandler CreateHandler() =>

@@ -1,15 +1,14 @@
+using Explore.Persistence.Services;
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
-using Explore.Application.Models.Storage;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Infrastructure;
 using Explore.Infrastructure.Storage;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Secrets.Database;
 using Explore.Tests.Shared.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,8 +21,6 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 [NotInParallel("StorageTargetSqlite")]
 public sealed class StorageReconciliationServiceTests
 {
-    private static readonly StorageProviderBinding Binding = StorageProviderBinding.Local(Path.GetTempPath());
-
     [Test]
     [Arguments("shared", false)]
     [Arguments("held", false)]
@@ -74,7 +71,8 @@ public sealed class StorageReconciliationServiceTests
             if (dryRun)
                 await Assert.That(source.ConcurrencyStamp).IsEqualTo(fixture.Object.ConcurrencyStamp);
             if (scenario == "shared")
-                await Assert.That((await fixture.Database.Context.ActorPii.AsNoTracking().SingleAsync())
+                await Assert.That((await fixture.Database.Context.ActorPii.AsNoTracking()
+                    .SingleAsync(pii => pii.ProfilePictureStorageObjectId == fixture.Object.Id))
                     .ProfilePictureStorageObjectId).IsEqualTo(fixture.Object.Id);
         }
     }
@@ -82,160 +80,63 @@ public sealed class StorageReconciliationServiceTests
     [Test]
     public async Task ReconcileAsync_WhenDryRun_DoesNotMutateMissingMetadata()
     {
-        var utcNow = new DateTime(2026, 6, 2, 9, 0, 0, DateTimeKind.Utc);
-        var storageObject = CreateStorageObject();
-        var repository = CreateRepository(activeObjects: [storageObject]);
-        var provider = Substitute.For<IFileStorageProvider>();
-        provider.Provider.Returns(StorageProviders.Local);
-        provider.ExistsAsync(Arg.Any<FileStorageExistsInput>(), Arg.Any<CancellationToken>()).Returns(false);
-        var resolver = Substitute.For<IStorageProviderBindingService>();
-        resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
-        var service = CreateService(repository, resolver, [], new StorageReconciliationSettings
-        {
-            DryRun = true,
-            QuarantineMissingObjects = true
-        });
-
-        var result = await service.ReconcileAsync(utcNow, CancellationToken.None);
+        await using var fixture = await NativeFixture.CreateAsync("missing");
+        File.Delete(fixture.TargetPath);
+        var result = await fixture.CreateService(true).ReconcileAsync(NativeFixture.Now, default);
 
         await Assert.That(result.DryRun).IsTrue();
         await Assert.That(result.MissingBackingObjectCount).IsEqualTo(1);
         await Assert.That(result.QuarantinedMetadataCount).IsEqualTo(0);
-        await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
+        var source = await fixture.Database.Context.StorageObjects.AsNoTracking()
+            .SingleAsync(item => item.Id == fixture.Object.Id);
+        await Assert.That(source.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
     }
 
     [Test]
     public async Task ReconcileAsync_WhenQuarantineEnabled_QuarantinesMissingMetadata()
     {
-        var utcNow = new DateTime(2026, 6, 2, 9, 0, 0, DateTimeKind.Utc);
-        var storageObject = CreateStorageObject();
-        var repository = CreateRepository(activeObjects: [storageObject]);
-        var provider = Substitute.For<IFileStorageProvider>();
-        provider.Provider.Returns(StorageProviders.Local);
-        provider.ExistsAsync(Arg.Any<FileStorageExistsInput>(), Arg.Any<CancellationToken>()).Returns(false);
-        var resolver = Substitute.For<IStorageProviderBindingService>();
-        resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(provider);
-        var service = CreateService(repository, resolver, [], new StorageReconciliationSettings
-        {
-            DryRun = false,
-            QuarantineMissingObjects = true
-        });
-
-        var result = await service.ReconcileAsync(utcNow, CancellationToken.None);
+        await using var fixture = await NativeFixture.CreateAsync("missing");
+        File.Delete(fixture.TargetPath);
+        var result = await fixture.CreateService(false).ReconcileAsync(NativeFixture.Now, default);
 
         await Assert.That(result.QuarantinedMetadataCount).IsEqualTo(1);
-        await Assert.That(storageObject.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Quarantined);
-        await Assert.That(storageObject.QuarantineReason).IsEqualTo("backing_object_missing");
+        var source = await fixture.Database.Context.StorageObjects.AsNoTracking()
+            .SingleAsync(item => item.Id == fixture.Object.Id);
+        await Assert.That(source.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Quarantined);
+        await Assert.That(source.QuarantineReason).IsEqualTo("backing_object_missing");
     }
 
     [Test]
     public async Task ReconcileAsync_WhenDryRun_ReportsLocalOrphanWithoutQuarantine()
     {
-        var utcNow = new DateTime(2026, 6, 2, 9, 0, 0, DateTimeKind.Utc);
-        var repository = CreateRepository(knownObjectKeys: []);
-        var inventoryProvider = new FakeInventoryProvider(
-            [new FileStorageInventoryObject(StorageProviders.Local, "tenants/a/orphan.txt", 10, utcNow.AddDays(-2))]);
-        var service = CreateService(repository, Substitute.For<IStorageProviderBindingService>(), [inventoryProvider], new StorageReconciliationSettings
-        {
-            DryRun = true,
-            QuarantineOrphanLocalFiles = true
-        });
-
-        var result = await service.ReconcileAsync(utcNow, CancellationToken.None);
+        await using var fixture = await NativeFixture.CreateAsync("inventory");
+        await File.WriteAllBytesAsync(fixture.OrphanPath, [7, 8, 9]);
+        File.SetLastWriteTimeUtc(fixture.OrphanPath, new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var result = await fixture.CreateService(true).ReconcileAsync(DateTime.UtcNow, default);
 
         await Assert.That(result.OrphanBackingObjectCount).IsEqualTo(1);
         await Assert.That(result.QuarantinedBackingObjectCount).IsEqualTo(0);
-        await Assert.That(inventoryProvider.QuarantineCalls).IsEqualTo(0);
+        await Assert.That(await File.ReadAllBytesAsync(fixture.OrphanPath)).IsEquivalentTo(new byte[] { 7, 8, 9 });
+        await Assert.That(await fixture.Database.Context.Set<LocalStorageQuarantine>().AnyAsync()).IsFalse();
     }
 
     [Test]
     public async Task ReconcileAsync_WhenOrphanQuarantineEnabled_QuarantinesLocalOrphan()
     {
-        var utcNow = new DateTime(2026, 6, 2, 9, 0, 0, DateTimeKind.Utc);
-        var repository = CreateRepository(knownObjectKeys: []);
-        var inventoryProvider = new FakeInventoryProvider(
-            [new FileStorageInventoryObject(StorageProviders.Local, "tenants/a/orphan.txt", 10, utcNow.AddDays(-2))]);
-        var service = CreateService(repository, Substitute.For<IStorageProviderBindingService>(), [inventoryProvider], new StorageReconciliationSettings
-        {
-            DryRun = false,
-            QuarantineOrphanLocalFiles = true
-        });
-
-        var result = await service.ReconcileAsync(utcNow, CancellationToken.None);
+        await using var fixture = await NativeFixture.CreateAsync("inventory");
+        await File.WriteAllBytesAsync(fixture.OrphanPath, [7, 8, 9]);
+        File.SetLastWriteTimeUtc(fixture.OrphanPath, new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var result = await fixture.CreateService(false).ReconcileAsync(DateTime.UtcNow, default);
 
         await Assert.That(result.OrphanBackingObjectCount).IsEqualTo(1);
         await Assert.That(result.QuarantinedBackingObjectCount).IsEqualTo(1);
-        await Assert.That(inventoryProvider.QuarantineCalls).IsEqualTo(1);
+        await Assert.That(File.Exists(fixture.OrphanPath)).IsFalse();
+        var work = await fixture.Database.Context.Set<LocalStorageQuarantine>().AsNoTracking().SingleAsync();
+        await Assert.That(work.Outcome).IsEqualTo(LocalStorageQuarantineOutcome.Moved);
+        string destination = Path.Combine(Path.GetDirectoryName(fixture.OrphanPath)!,
+            ".quarantine", "reconciliation", work.Id.ToString("N"));
+        await Assert.That(await File.ReadAllBytesAsync(destination)).IsEquivalentTo(new byte[] { 7, 8, 9 });
     }
-
-    private static StorageReconciliationService CreateService(
-        IStorageObjectRepository repository,
-        IStorageProviderBindingService resolver,
-        IReadOnlyList<IFileStorageProvider> providers,
-        StorageReconciliationSettings settings)
-    {
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
-        var resourceCleanup = Substitute.For<IEventResourceStorageCleanupService>();
-        resourceCleanup.ProcessDueAsync(Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(new StorageObjectDeletionResult(0, 0, 0, 0));
-        var bindings = Substitute.For<IStorageProviderBindingRepository>();
-        bindings.ListLocalAsync(Arg.Any<CancellationToken>())
-            .Returns(providers.Count == 0 ? [] : new[] { Binding });
-        if (providers.Count > 0)
-            resolver.ResolveAsync(Binding.Id, Arg.Any<CancellationToken>()).Returns(providers.Single());
-
-        return new StorageReconciliationService(
-            repository,
-            resolver,
-            bindings,
-            (IStorageProducerOperationRepository)repository,
-            Options.Create(settings),
-            new BusinessMetrics(meterFactory),
-            NullLogger<StorageReconciliationService>.Instance,
-            resourceCleanup,
-            Substitute.For<IEventResourceStorageLifecycleRepository>(),
-            Substitute.For<IUnitOfWork>());
-    }
-
-    private static IStorageObjectRepository CreateRepository(
-        IReadOnlyList<StorageObject>? activeObjects = null,
-        IReadOnlyList<StorageObject>? deleteEligibleObjects = null,
-        IReadOnlyList<string>? knownObjectKeys = null)
-    {
-        var repository = Substitute.For<IStorageObjectRepository, IStorageProducerOperationRepository>();
-        repository.ListActiveForReconciliationAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(activeObjects ?? []);
-        repository.ListDeleteEligibleForReconciliationAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(deleteEligibleObjects ?? []);
-        ((IStorageProducerOperationRepository)repository).ListKnownObjectKeysAsync(
-            Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
-            .Returns(knownObjectKeys ?? []);
-        repository.Update(Arg.Any<StorageObject>()).Returns(Task.CompletedTask);
-        return repository;
-    }
-
-    private static StorageObject CreateStorageObject()
-        => new()
-        {
-            Id = Guid.CreateVersion7(),
-            ObjectKey = "tenants/a/2026/06/02/file.txt",
-            Provider = StorageProviders.Local,
-            StorageProviderBindingId = Binding.Id,
-            FullName = "file.txt",
-            SafeDisplayName = "file.txt",
-            Extension = ".txt",
-            ContentType = "text/plain",
-            Size = 10,
-            Visibility = StorageObjectVisibilities.AuthenticatedTenant,
-            Purpose = StorageObjectPurposes.Attachment,
-            LifecycleState = StorageObjectLifecycleStates.Active,
-            TenantId = Guid.CreateVersion7(),
-            Tenant = null!,
-            FileTypeId = 1,
-            FileType = null!,
-            CreatedAt = new DateTime(2026, 5, 1, 9, 0, 0, DateTimeKind.Utc)
-        };
 
     private sealed class NativeFixture : IAsyncDisposable
     {
@@ -243,6 +144,7 @@ public sealed class StorageReconciliationServiceTests
         private readonly string _root = Directory.CreateTempSubdirectory("reconciliation-").FullName;
         private readonly ServiceProvider _metrics = new ServiceCollection().AddMetrics().BuildServiceProvider();
         private readonly IStorageProviderBindingService _resolver = Substitute.For<IStorageProviderBindingService>();
+        private bool _quarantineOrphans;
 
         private NativeFixture(SmtpSettingsDatabase database)
         {
@@ -280,16 +182,17 @@ public sealed class StorageReconciliationServiceTests
         public StorageObject Object { get; }
         public string TargetPath => Path.Combine(_root, "objects/target.png");
         public string NeighborPath => Path.Combine(_root, "objects/neighbor.png");
+        public string OrphanPath => Path.Combine(_root, "orphan.bin");
 
         public static async Task<NativeFixture> CreateAsync(string scenario)
         {
             var fixture = new NativeFixture(await SmtpSettingsDatabase.CreateAsync());
+            fixture._quarantineOrphans = scenario == "inventory";
             Directory.CreateDirectory(Path.GetDirectoryName(fixture.TargetPath)!);
             await File.WriteAllBytesAsync(fixture.TargetPath, [1, 2, 3]);
             await File.WriteAllBytesAsync(fixture.NeighborPath, [4, 5, 6]);
             var context = fixture.Database.Context;
-            context.AddRange(fixture.Binding, fixture.Object,
-                new FileType { Id = (int)FileTypeEnum.Image, MasterCode = "Image", FullName = "Image" });
+            context.AddRange(fixture.Binding, fixture.Object);
             context.Add(new StorageObject
             {
                 Id = Guid.CreateVersion7(),
@@ -320,7 +223,7 @@ public sealed class StorageReconciliationServiceTests
                     Group = group,
                     GroupId = group.Id,
                     ActorTypeId = (int)ActorTypeEnum.Group,
-                    ActorType = new ActorType { Id = (int)ActorTypeEnum.Group, MasterCode = "Group", FullName = "Group" },
+                    ActorType = null!,
                     Pii = new ActorPii { DisplayName = "Surviving owner" }
                 };
                 actor.Pii.SetProfilePicture(fixture.Object.Id, null);
@@ -343,7 +246,8 @@ public sealed class StorageReconciliationServiceTests
             if (scenario == "invalid")
                 context.Add(StorageProducerOperation.Create(fixture.Object.Id, fixture.Object.TenantId,
                     fixture.Binding, "objects/neighbor.png", Now.AddDays(-40)));
-            fixture.Object.MarkQuarantined(null, "backing_object_missing", Now.AddDays(-31));
+            if (scenario is not ("missing" or "inventory"))
+                fixture.Object.MarkQuarantined(null, "backing_object_missing", Now.AddDays(-31));
             await context.SaveChangesAsync();
             context.ChangeTracker.Clear();
             return fixture;
@@ -358,16 +262,24 @@ public sealed class StorageReconciliationServiceTests
                 new StorageObjectDeletionTombstoneRepository(Database.Context), _resolver,
                 new Clock(), NullLogger<Explore.Application.Services.EventResourceStorageCleanupService>.Instance,
                 lifecycle, unit);
+            var reconciliation = new StorageReconciliationOwner(new GlobalExploreDbContextFactory(
+                new PrimaryDatabaseConnectionOptions
+                {
+                    Role = PrimaryDatabaseRole.Global,
+                    Provider = PrimaryDatabaseProvider.Sqlite,
+                    Database = Database.Context.Database.GetDbConnection().DataSource
+                }));
             return new StorageReconciliationService(repository, _resolver,
-                new StorageProviderBindingRepository(Database.Context), repository,
+                new StorageProviderBindingRepository(Database.Context), reconciliation, reconciliation,
                 Options.Create(new StorageReconciliationSettings
                 {
                     DryRun = dryRun,
+                    QuarantineMissingObjects = true,
                     DeleteQuarantinedObjects = true,
-                    QuarantineOrphanLocalFiles = true
+                    QuarantineOrphanLocalFiles = _quarantineOrphans
                 }),
                 new BusinessMetrics(_metrics.GetRequiredService<IMeterFactory>()),
-                NullLogger<StorageReconciliationService>.Instance, cleanup, lifecycle, unit);
+                NullLogger<StorageReconciliationService>.Instance, cleanup, lifecycle, unit, TimeProvider.System);
         }
 
         public async ValueTask DisposeAsync()
@@ -383,46 +295,4 @@ public sealed class StorageReconciliationServiceTests
         }
     }
 
-    private sealed class FakeInventoryProvider(IReadOnlyList<FileStorageInventoryObject> inventory) : IFileStorageInventoryProvider
-    {
-        public string Provider => StorageProviders.Local;
-        public int QuarantineCalls { get; private set; }
-
-        public Task<FileStorageWriteResult> WriteAsync(FileStorageWriteInput input, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public Task<bool> ExistsAsync(FileStorageExistsInput input, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public Task<FileStorageReadResult> OpenReadAsync(FileStorageReadInput input, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public Task<FileStorageDeleteResult> DeleteAsync(FileStorageDeleteInput input, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public Task<FileStorageProviderStatus> TestAsync(
-            CancellationToken cancellationToken,
-            bool testWritePermissions = false)
-            => throw new NotSupportedException();
-
-        public async IAsyncEnumerable<FileStorageInventoryObject> ListObjectsAsync(
-            int limit,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            foreach (var item in inventory.Take(limit))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return item;
-                await Task.Yield();
-            }
-        }
-
-        public Task<FileStorageQuarantineResult> QuarantineAsync(
-            FileStorageQuarantineInput input,
-            CancellationToken cancellationToken)
-        {
-            QuarantineCalls++;
-            return Task.FromResult(new FileStorageQuarantineResult(Provider, input.ObjectKey, Quarantined: true));
-        }
-    }
 }

@@ -1,7 +1,7 @@
 using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
-using Explore.Application.Authorization;
+using System.Security.Claims;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
@@ -96,6 +96,7 @@ public sealed class InstanceStorageAdminControllerTests : IDisposable
     [Test]
     public async Task RecalculateStorageUsage_WhenInstanceAdmin_ReturnsUsageSummary()
     {
+        Guid actor = Guid.CreateVersion7();
         var recalculateStorageHandler = Substitute.For<ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto>>();
         var adminContext = Substitute.For<IAdminContext>();
         adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
@@ -106,7 +107,7 @@ public sealed class InstanceStorageAdminControllerTests : IDisposable
                 ReservedBytes = 1024,
                 ObjectCount = 2
             });
-        var controller = CreateController(adminContext, recalculateStorageHandler: recalculateStorageHandler);
+        var controller = CreateController(adminContext, recalculateStorageHandler: recalculateStorageHandler, actor: actor);
 
         var result = await controller.RecalculateStorageUsage(CancellationToken.None);
 
@@ -117,7 +118,9 @@ public sealed class InstanceStorageAdminControllerTests : IDisposable
         await Assert.That(usage!.UsedBytes).IsEqualTo(4096);
         await Assert.That(usage.ReservedBytes).IsEqualTo(1024);
         await Assert.That(usage.ObjectCount).IsEqualTo(2);
-        await recalculateStorageHandler.Received(1).ExecuteAsync(Arg.Any<RecalculateInstanceStorageUsageCommand>(), Arg.Any<CancellationToken>());
+        await recalculateStorageHandler.Received(1).ExecuteAsync(
+            Arg.Is<RecalculateInstanceStorageUsageCommand>(command => command != null && command.UserId == actor),
+            Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -145,7 +148,8 @@ public sealed class InstanceStorageAdminControllerTests : IDisposable
         IQueryHandler<GetInstanceStorageSettingsQuery, InstanceStorageSettingsDto>? instanceStorageQuery = null,
         ICommandHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>>? updateStorageHandler = null,
         IQueryHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto>? testStorageHandler = null,
-        ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto>? recalculateStorageHandler = null)
+        ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto>? recalculateStorageHandler = null,
+        Guid? actor = null)
     {
         return new InstanceStorageSettingsController(
             _identity.Query,
@@ -153,13 +157,21 @@ public sealed class InstanceStorageAdminControllerTests : IDisposable
             instanceStorageQuery ?? Substitute.For<IQueryHandler<GetInstanceStorageSettingsQuery, InstanceStorageSettingsDto>>(),
             updateStorageHandler ?? Substitute.For<ICommandHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>>>(),
             testStorageHandler ?? Substitute.For<IQueryHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto>>(),
+            Substitute.For<IQueryHandler<TestInstanceStorageProviderDuringSetupQuery, InstanceStorageProviderStatusDto>>(),
             recalculateStorageHandler ?? Substitute.For<ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto>>(),
+            Substitute.For<ICommandHandler<RecalculateInstanceStorageUsageDuringSetupCommand, InstanceStorageUsageDto>>(),
             adminContext,
             setupSecretProvider ?? Substitute.For<ISetupSecretProvider>())
         {
             ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext()
+                HttpContext = new DefaultHttpContext
+                {
+                    User = actor.HasValue
+                        ? new ClaimsPrincipal(new ClaimsIdentity(
+                            [new Claim(ClaimTypes.NameIdentifier, actor.Value.ToString("D"))], "ControllerFixture"))
+                        : new ClaimsPrincipal()
+                }
             }
         };
     }

@@ -1,12 +1,14 @@
 using System.Reflection;
 using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Api.IntegrationTests.Helpers;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Users.Handlers.Queries;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Explore.API.Controllers;
@@ -39,8 +41,10 @@ public sealed class TenantStorageSettingsControllerTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<ExploreDbContext>(options => options.UseInMemoryDatabase(Guid.CreateVersion7().ToString()));
-        services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
+        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+            .UseInMemoryDatabase(Guid.CreateVersion7().ToString()).Options;
+        services.AddSingleton<IGlobalExploreDbContextFactory>(new IdentityQueryInMemoryContextFactory(options));
+        services.AddScoped<IExternalLoginAuthenticationRepository, ExternalLoginAuthenticationRepository>();
         services.AddSingleton(Substitute.For<IAuthorizationProvider>());
         services.AddNativeOperations([typeof(ResolveCurrentUserIdByIdentityRequest), typeof(ResolveCurrentUserIdByIdentityRequestHandler)]);
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });

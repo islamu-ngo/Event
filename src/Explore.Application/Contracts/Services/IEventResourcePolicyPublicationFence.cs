@@ -1,3 +1,5 @@
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+
 namespace Explore.Application.Contracts.Services;
 
 /// <summary>
@@ -6,5 +8,12 @@ namespace Explore.Application.Contracts.Services;
 /// </summary>
 public interface IEventResourcePolicyPublicationFence
 {
-    Task BeginPublicationAsync(string grpcEndpoint, CancellationToken cancellationToken);
+    Task<IEventResourceProviderPublicationSelection> BeginPublicationAsync(
+        SyncAuthorizationPolicyPackageCommand command, CancellationToken cancellationToken);
+}
+
+/// <summary>Nonsecret target metadata; the package service accepts only its own issued selection.</summary>
+public interface IEventResourceProviderPublicationSelection
+{
+    string GrpcEndpoint { get; }
 }

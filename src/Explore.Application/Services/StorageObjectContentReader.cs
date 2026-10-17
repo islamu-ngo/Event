@@ -84,7 +84,7 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
 
         if (string.IsNullOrWhiteSpace(storageObject.ObjectKey))
         {
-            _logger.LogWarning("Storage object {StorageObjectId} has no provider object key.", storageObjectId);
+            _logger.LogWarning("Storage content unavailable. FailureCategory={FailureCategory}", "missing_object_key");
             _metrics.RecordStorageRead(
                 storageObject.Provider,
                 "failed",
@@ -135,8 +135,7 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
         catch (FileNotFoundException)
         {
             _logger.LogWarning(
-                "Storage provider object was not found for storage object {StorageObjectId}. FailureType={FailureType}",
-                storageObjectId,
+                "Storage content unavailable. FailureCategory={FailureCategory}",
                 "object_not_found");
             _metrics.RecordStorageRead(
                 storageObject.Provider,
@@ -149,9 +148,7 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
         catch (InvalidOperationException)
         {
             _logger.LogWarning(
-                "Storage provider {Provider} is unavailable for storage object {StorageObjectId}. FailureType={FailureType}",
-                storageObject.Provider,
-                storageObjectId,
+                "Storage content unavailable. FailureCategory={FailureCategory}",
                 "provider_unavailable");
             _metrics.RecordStorageRead(
                 storageObject.Provider,

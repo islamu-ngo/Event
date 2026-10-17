@@ -20,6 +20,23 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 
 public class CerbosPolicyPackageServiceTests : IDisposable
 {
+    private sealed class ManifestReplacementLogger(Action replace) : ILogger<CerbosPolicyPackageService>
+    {
+        public bool Replaced { get; private set; }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (!Replaced && state is IEnumerable<KeyValuePair<string, object?>> properties
+                && properties.Any(property => property.Key == "ArtifactCount"))
+            {
+                replace();
+                Replaced = true;
+            }
+        }
+    }
+
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"cerbos-package-{Guid.NewGuid():N}");
 
     [Test]
@@ -204,6 +221,24 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         await Assert.That(instructions).Contains("cerbosctl put policy --recursive .");
         await Assert.That(instructions).Contains("cerbosctl put schema --recursive _schemas");
         await Assert.That(await ReadEntryAsync(zipArchive, "manifest.json")).Contains("test-policy-package");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExportArchiveRejectsArtifactReplacementAfterManifest(bool sameLength)
+    {
+        var root = CreatePackageRoot();
+        var path = Path.Combine(root, "islamuevent_event.json");
+        const string original = "{\"resourcePolicy\":{\"resource\":\"islamuevent_event\",\"version\":\"1\"}}";
+        await File.WriteAllTextAsync(path, original);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{}");
+        var logger = new ManifestReplacementLogger(() =>
+            File.WriteAllText(path, original.Replace("\"1\"", sameLength ? "\"2\"" : "\"changed\"", StringComparison.Ordinal)));
+        var service = CreateService(root, logger: logger);
+
+        await Assert.ThrowsAsync<PolicyPackageUnavailableException>(() => service.ExportArchiveAsync());
+        await Assert.That(logger.Replaced).IsTrue();
     }
 
     [Test]

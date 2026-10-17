@@ -477,6 +477,13 @@ User profile updates use the `islamuevent_user` resource with the target domain 
 
 ### 4.1.1 Cerbos Package Upload
 
+ZIP export reopens each artifact through the bounded reader and compares both
+its byte length and SHA-256 with the completed manifest before creating its ZIP
+entry. It writes the verified byte array rather than reopening the path again.
+Replacement after manifest construction fails with `PolicyPackageUnavailableException`,
+including replacement by different bytes of the same length. No inconsistent
+archive is returned; export does not perform a provider publication.
+
 Publication and status diagnostics retain artifact counts, typed HTTP status, and
 closed failure categories rather than exception objects/types, package identity,
 content hashes, provider endpoints, or private transport details. Refit failures

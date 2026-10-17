@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54S0E54D6ZPV820GWX23J84
+Title: "Bind exported Cerbos archive bytes to the completed manifest"
+Type: fix
+Scope: access
+Summary: "Reject policy or schema replacement between manifest construction and ZIP assembly using exact byte length and SHA-256."
+Group: cerbos-archive-byte-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Verify exact artifact size and SHA-256 before writing the same verified bytes into the exported archive.
+  Migration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/coolify-cerbos-traefik.md
+    Disposition: documented
+    Detail: Stabilize policy and schema files and request a fresh export if manifest custody validation fails.

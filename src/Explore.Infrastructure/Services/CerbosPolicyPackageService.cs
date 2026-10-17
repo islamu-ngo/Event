@@ -504,7 +504,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var artifactPath = ResolveArtifactPath(packageRoot, artifact.LogicalId);
-                await AddFileEntryAsync(archive, artifact.LogicalId, artifactPath, cancellationToken);
+                await AddFileEntryAsync(archive, artifact, artifactPath, cancellationToken);
             }
 
             await AddTextEntryAsync(
@@ -1030,14 +1030,17 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
 
     private static async Task AddFileEntryAsync(
         ZipArchive archive,
-        string entryName,
+        PolicyPackageArtifact artifact,
         string filePath,
         CancellationToken cancellationToken)
     {
-        var entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
+        byte[] bytes = await ReadArtifactBytesAsync(filePath, cancellationToken);
+        if (bytes.LongLength != artifact.SizeInBytes
+            || !Convert.ToHexString(SHA256.HashData(bytes)).Equals(artifact.Sha256, StringComparison.OrdinalIgnoreCase))
+            throw CreatePackageUnavailableException();
+        var entry = archive.CreateEntry(artifact.LogicalId, CompressionLevel.Optimal);
         await using var entryStream = entry.Open();
-        await using var fileStream = File.OpenRead(filePath);
-        await fileStream.CopyToAsync(entryStream, cancellationToken);
+        await entryStream.WriteAsync(bytes, cancellationToken);
     }
 
     private static async Task AddTextEntryAsync(

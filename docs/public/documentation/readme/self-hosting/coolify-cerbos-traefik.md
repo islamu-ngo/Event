@@ -283,6 +283,11 @@ docker run --rm -it \
 
 ## 10. Connecting ISLAMU Event to Cerbos
 
+Keep policy and schema files stable while exporting a package from Event. Export
+checks each file against the manifest's recorded size and SHA-256 immediately
+before adding it to the ZIP. If a file changes, export fails instead of returning
+an archive with mismatched contents. Stabilize the package and request a new export.
+
 Event publication and status logs report bounded categories and HTTP status,
 not provider exception types, endpoints, package identifiers, content hashes, or
 raw transport errors. Use the operation's issue code for recovery. If an unexpected

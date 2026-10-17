@@ -16,20 +16,23 @@ public sealed record ProcessProviderSubmissionEffectCommand(
     Guid BindingId,
     string Provider,
     ReadOnlyMemory<byte> PayloadBytes,
-    IReadOnlyDictionary<string, string> Headers) : ICommand<ProviderSubmissionEffectResult>;
+    IReadOnlyDictionary<string, string> Headers,
+    RegistrationProviderSubmissionEffectCustody Custody) : ICommand<ProviderSubmissionEffectResult>;
 
 public sealed record ProviderSubmissionEffectResult(ProviderSubmissionEffectOutcome Outcome, string Code)
 {
     public static ProviderSubmissionEffectResult Completed(string code = "completed") => new(ProviderSubmissionEffectOutcome.Completed, code);
     public static ProviderSubmissionEffectResult NeedsReconciliation(string code) => new(ProviderSubmissionEffectOutcome.NeedsReconciliation, code);
     public static ProviderSubmissionEffectResult Retryable(string code) => new(ProviderSubmissionEffectOutcome.Retryable, code);
+    public static ProviderSubmissionEffectResult LeaseLost() => new(ProviderSubmissionEffectOutcome.LeaseLost, "EFFECT_CLAIM_LOST");
 }
 
 public enum ProviderSubmissionEffectOutcome
 {
     Completed = 1,
     NeedsReconciliation = 2,
-    Retryable = 3
+    Retryable = 3,
+    LeaseLost = 4
 }
 
 public sealed class ProcessProviderSubmissionEffectCommandValidator : AbstractValidator<ProcessProviderSubmissionEffectCommand>
@@ -42,12 +45,22 @@ public sealed class ProcessProviderSubmissionEffectCommandValidator : AbstractVa
         RuleFor(command => command.Provider).NotEmpty().MaximumLength(100);
         RuleFor(command => command.PayloadBytes.Length).InclusiveBetween(1, 256 * 1024);
         RuleFor(command => command.Headers).NotNull();
+        RuleFor(command => command.Custody).NotNull();
+        RuleFor(command => command).Must(command =>
+            command.Custody is { } custody &&
+            custody.Claim.TenantId == command.TenantId &&
+            custody.IncomingWebhookMessageId == command.IncomingWebhookMessageId &&
+            custody.EffectKind == ProcessProviderSubmissionEffectCommandHandler.StableEffectKind &&
+            custody.SourceEventType is ProcessProviderSubmissionEffectCommandHandler.StableEffectKind or "registration.provider_manual_import" &&
+            custody.PayloadSha256 == "sha256:" + Convert.ToHexString(SHA256.HashData(command.PayloadBytes.Span)).ToLowerInvariant())
+            .WithMessage("The original effect custody must match the retained submission source.");
     }
 }
 
 public sealed class ProcessProviderSubmissionEffectCommandHandler(
     IRegistrationProviderRepository providerRepository,
     IRegistrationSubmissionRepository submissionRepository,
+    IRegistrationProviderSubmissionEffectRepository effectSubmissionRepository,
     IRegistrationInventoryRepository inventoryRepository,
     IRegistrationFormAuthoringRepository formRepository,
     IEventParticipationConfigurationRepository participationConfigurationRepository,
@@ -66,6 +79,10 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
         CancellationToken cancellationToken)
     {
         await new ProcessProviderSubmissionEffectCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        if (!await effectSubmissionRepository.HasCustodyAsync(request.Custody, cancellationToken))
+        {
+            return ProviderSubmissionEffectResult.LeaseLost();
+        }
 
         RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(
             request.TenantId, request.BindingId, cancellationToken);
@@ -137,6 +154,11 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
             }
         }
 
+        if (!await effectSubmissionRepository.HasCustodyAsync(request.Custody, cancellationToken))
+        {
+            return ProviderSubmissionEffectResult.LeaseLost();
+        }
+
         if (!string.Equals(verifiedReceipt.ProviderSubmissionId, envelope.ProviderSubmissionId, StringComparison.Ordinal))
         {
             return await ParkAsync(request, null, "UNVERIFIABLE_EVIDENCE", cancellationToken);
@@ -187,7 +209,8 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
         {
             if (HasCapability(binding, RegistrationProviderCapabilityCodes.SubmissionSink))
             {
-                RegistrationSubmissionPersistenceResult mirrorPersisted = await submissionRepository.PersistEvidenceOnlyAsync(RegistrationSubmission.CreateProviderEvidenceOnly(
+                RegistrationSubmissionPersistenceResult mirrorPersisted = await effectSubmissionRepository.PersistEvidenceAsync(
+                    request.Custody, RegistrationSubmission.CreateProviderEvidenceOnly(
                     attempt,
                     evidenceHash,
                     receivedAt,
@@ -195,8 +218,12 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
                     envelope.ProviderSubmissionId,
                     envelope.ProviderResponseRevision,
                     envelope.ProviderSubjectId,
-                    envelope.ProviderCorrelationId),
+                    envelope.ProviderCorrelationId), [],
                     cancellationToken);
+                if (mirrorPersisted.Outcome == RegistrationSubmissionPersistenceOutcome.EffectClaimLost)
+                {
+                    return ProviderSubmissionEffectResult.LeaseLost();
+                }
                 return mirrorPersisted.Outcome is RegistrationSubmissionPersistenceOutcome.Inserted or RegistrationSubmissionPersistenceOutcome.Existing
                     ? ProviderSubmissionEffectResult.Completed("mirror_only_recorded")
                     : ProviderSubmissionEffectResult.NeedsReconciliation("PERSISTENCE_CONFLICT");
@@ -231,12 +258,17 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
         RegistrationSubmissionPersistenceResult persisted = (RegistrationAnswerSyncModeEnum)requirement.AnswerSyncModeId switch
         {
             RegistrationAnswerSyncModeEnum.COMPLETION_ONLY => await PersistCompletionOnlyAsync(
-                attempt, submission, requirement, expectedAttemptConcurrencyStamp, cancellationToken),
+                request.Custody, attempt, submission, requirement, expectedAttemptConcurrencyStamp, cancellationToken),
             RegistrationAnswerSyncModeEnum.SELECTED_FIELDS or RegistrationAnswerSyncModeEnum.FULL_SYNC =>
                 await PersistNormalizedAsync(
-                    attempt, submission, binding, envelope, expectedAttemptConcurrencyStamp, cancellationToken),
-            _ => await PersistEvidenceOnlyAsync(submission, "UNSUPPORTED_SYNC_MODE", cancellationToken)
+                    request.Custody, attempt, submission, binding, envelope, expectedAttemptConcurrencyStamp, cancellationToken),
+            _ => await PersistEvidenceOnlyAsync(request.Custody, submission, "UNSUPPORTED_SYNC_MODE", cancellationToken)
         };
+
+        if (persisted.Outcome == RegistrationSubmissionPersistenceOutcome.EffectClaimLost)
+        {
+            return ProviderSubmissionEffectResult.LeaseLost();
+        }
 
         return persisted.Outcome is RegistrationSubmissionPersistenceOutcome.Inserted or RegistrationSubmissionPersistenceOutcome.Existing
             ? ProviderSubmissionEffectResult.Completed(persisted.Outcome.ToString().ToLowerInvariant())
@@ -244,6 +276,7 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
     }
 
     private async Task<RegistrationSubmissionPersistenceResult> PersistCompletionOnlyAsync(
+        RegistrationProviderSubmissionEffectCustody custody,
         RegistrationAttempt attempt,
         RegistrationSubmission submission,
         RegistrationRequirement requirement,
@@ -254,8 +287,8 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
             submission.RegistrationOrderId, submission.TenantId, cancellationToken)
             ?? throw new InvalidOperationException("Registration order was not found.");
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-        return await submissionRepository.PersistAcceptedWithNormalizationAsync(
-            attempt,
+        return await effectSubmissionRepository.PersistAcceptedAsync(
+            custody, attempt,
             submission,
             expectedAttemptConcurrencyStamp,
             [],
@@ -272,6 +305,7 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
     }
 
     private async Task<RegistrationSubmissionPersistenceResult> PersistNormalizedAsync(
+        RegistrationProviderSubmissionEffectCustody custody,
         RegistrationAttempt attempt,
         RegistrationSubmission submission,
         RegistrationProviderBinding binding,
@@ -291,8 +325,8 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
         RegistrationSubmissionNormalizationDraft draft = await NormalizeRegistrationSubmissionCommandHandler.PrepareAsync(
             submission, inputs, order, participants, assignments, submissionRepository, formRepository,
             protector, timeProvider, cancellationToken);
-        return await submissionRepository.PersistAcceptedWithNormalizationAsync(
-            attempt,
+        return await effectSubmissionRepository.PersistAcceptedAsync(
+            custody, attempt,
             submission,
             expectedAttemptConcurrencyStamp,
             draft.Answers,
@@ -341,6 +375,11 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
         string code,
         CancellationToken cancellationToken)
     {
+        if (!await effectSubmissionRepository.HasCustodyAsync(request.Custody, cancellationToken))
+        {
+            return ProviderSubmissionEffectResult.LeaseLost();
+        }
+
         if (attempt is null)
         {
             return ProviderSubmissionEffectResult.NeedsReconciliation(code);
@@ -355,28 +394,22 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
             "parked",
             null,
             null);
-        await PersistEvidenceOnlyAsync(submission, code, cancellationToken);
-        return ProviderSubmissionEffectResult.NeedsReconciliation(code);
+        RegistrationSubmissionPersistenceResult persisted = await PersistEvidenceOnlyAsync(request.Custody, submission, code, cancellationToken);
+        return persisted.Outcome == RegistrationSubmissionPersistenceOutcome.EffectClaimLost
+            ? ProviderSubmissionEffectResult.LeaseLost()
+            : ProviderSubmissionEffectResult.NeedsReconciliation(code);
     }
 
     private async Task<RegistrationSubmissionPersistenceResult> PersistEvidenceOnlyAsync(
+        RegistrationProviderSubmissionEffectCustody custody,
         RegistrationSubmission submission,
         string code,
         CancellationToken cancellationToken)
     {
-        RegistrationSubmissionPersistenceResult result = await submissionRepository.PersistEvidenceOnlyAsync(
-            submission,
+        return await effectSubmissionRepository.PersistEvidenceAsync(
+            custody, submission,
+            [RegistrationSubmissionIssue.Create(submission, code, timeProvider.GetUtcNow().UtcDateTime)],
             cancellationToken);
-        if (result.Outcome == RegistrationSubmissionPersistenceOutcome.Inserted)
-        {
-            await submissionRepository.PersistNormalizationAsync(
-                [],
-                [],
-                [RegistrationSubmissionIssue.Create(submission, code, timeProvider.GetUtcNow().UtcDateTime)],
-                cancellationToken);
-        }
-
-        return result;
     }
 
     private static RegistrationProviderTuple ResolveTuple(RegistrationProviderBinding binding, string provider)

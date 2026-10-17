@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -10,8 +11,6 @@ using System.Security.Cryptography;
 using Npgsql;
 using TUnit.Core.Interfaces;
 using Testcontainers.PostgreSql;
-using TUnit.Assertions;
-using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -20,6 +19,78 @@ namespace Event.Persistence.IntegrationTests;
 public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSqlContainerFixture fixture)
 {
     private static readonly DateTime UtcNow = new(2026, 8, 25, 12, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    public async Task RacingFullNativeOperationsRecoverSameReservationBeforeCapacityValidation()
+    {
+        string connectionString = fixture.ConnectionString;
+        Guid tenantId = Guid.CreateVersion7();
+        PaymentAttempt payment;
+        await using (ExploreDbContext seed = await CreateContextAsync(connectionString))
+            payment = await SeedCapturedPaymentAsync(seed, tenantId, Guid.CreateVersion7(), Guid.CreateVersion7());
+        Guid actorId = Guid.CreateVersion7();
+        string operationKey = $"refund:exact:{payment.Id:N}";
+        RefundAttempt first = Refund(payment, 1_000, operationKey);
+        RefundAttempt second = Refund(payment, 1_000, operationKey);
+        first.BindNativeInput(null, actorId, "system", "operator_refund");
+        second.BindNativeInput(null, actorId, "system", "operator_refund");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        RefundReservationResult[] results = await Task.WhenAll(
+            ReserveAsync(connectionString, first, timeout.Token),
+            ReserveAsync(connectionString, second, timeout.Token));
+
+        await Assert.That(results.Count(value => value.Disposition == RefundReservationDisposition.Reserved)).IsEqualTo(1);
+        await Assert.That(results.Count(value => value.Disposition == RefundReservationDisposition.Duplicate)).IsEqualTo(1);
+        await Assert.That(results[0].Attempt!.Id).IsEqualTo(results[1].Attempt!.Id);
+        await using ExploreDbContext verification = await CreateContextAsync(connectionString, ensureCreated: false);
+        await Assert.That(await new RefundAttemptRepository(verification)
+            .GetRefundableCapacityAsync(tenantId, payment.Id, timeout.Token)).IsEqualTo(0L);
+    }
+
+    [Test]
+    public async Task IndependentOwnersCanCommitOnlyOneNativeRefundHandoffAndRecoveryTrigger()
+    {
+        string connectionString = fixture.ConnectionString;
+        Guid tenantId = Guid.CreateVersion7();
+        Guid refundId;
+        await using (ExploreDbContext seed = await CreateContextAsync(connectionString))
+        {
+            PaymentAttempt payment = await SeedCapturedPaymentAsync(
+                seed, tenantId, Guid.CreateVersion7(), Guid.CreateVersion7());
+            RefundAttempt attempt = Refund(payment, 500, $"refund:dispatch:{payment.Id:N}");
+            refundId = attempt.Id;
+            await new RefundAttemptRepository(seed).ReserveAsync(attempt, CancellationToken.None);
+        }
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var firstLoaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondLoaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        RefundAttempt?[] claims = await Task.WhenAll(
+            ClaimAsync(firstLoaded, secondLoaded),
+            ClaimAsync(secondLoaded, firstLoaded));
+        await Assert.That(claims.Count(value => value is not null)).IsEqualTo(1);
+        await using ExploreDbContext verification = await CreateContextAsync(connectionString, ensureCreated: false);
+        RefundAttempt persisted = await verification.RefundAttempts.SingleAsync(
+            value => value.TenantId == tenantId && value.Id == refundId, timeout.Token);
+        await Assert.That(persisted.DispatchToken).IsEqualTo(claims.Single(value => value is not null)!.DispatchToken);
+        await Assert.That(persisted.DispatchPhase).IsEqualTo(RefundDispatchPhase.BuyerHandoffCommitted);
+        await Assert.That(await verification.OutboxMessages.CountAsync(
+            value => value.AggregateId == refundId &&
+                     value.EventType == RefundOutboxMessageFactory.ReconciliationRequested, timeout.Token)).IsEqualTo(1);
+
+        async Task<RefundAttempt?> ClaimAsync(TaskCompletionSource loaded, TaskCompletionSource otherLoaded)
+        {
+            await using ExploreDbContext owner = await CreateContextAsync(connectionString, ensureCreated: false);
+            var repository = new RefundAttemptRepository(owner);
+            RefundAttempt expected = (await repository.GetByIdAsync(tenantId, refundId, timeout.Token))!;
+            loaded.SetResult();
+            await otherLoaded.Task.WaitAsync(timeout.Token);
+            return await repository.TryBeginDispatchAsync(
+                expected, Guid.CreateVersion7(), false, UtcNow.AddMinutes(2), UtcNow.AddHours(23),
+                RefundOutboxMessageFactory.CreateReconciliation(expected, UtcNow, UtcNow.AddMinutes(3)),
+                timeout.Token);
+        }
+    }
 
     [Test]
     public async Task TwoRacingReservationsCannotExceedCapturedCapacity()

@@ -52,9 +52,16 @@ public sealed class AuthenticatedRegistrationOrderController(
     ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>> mutateParticipantsCommandHandler,
     ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>> csvHandler) : RegistrationOrderControllerBase
 {
+    private static readonly CommandFailurePolicy CreationFailures = AuthenticatedStartFailures
+        .Conflict("Registration operation conflict",
+            "The operation key belongs to a different registration request.", "registration_order_creation_conflict");
+
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
+    [RequireIdempotencyKey]
+    [SuppressIdempotencyResponseStorage]
+    [PrivateNoStore]
     [HttpPost("", Name = RouteNames.StartAuthenticatedRegistrationOrder)]
     [EndpointSummary("Start authenticated registration order")]
     [EndpointDescription("Creates a registration order owned by the authenticated current account.")]
@@ -67,6 +74,7 @@ public sealed class AuthenticatedRegistrationOrderController(
     public async Task<ActionResult<BaseCommandResponse<Guid>>> StartAuthenticated(
         Guid eventId,
         [FromBody] StartRegistrationOrderRequest? request,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? operationKey,
         CancellationToken cancellationToken = default)
     {
         if (request is null)
@@ -80,11 +88,12 @@ public sealed class AuthenticatedRegistrationOrderController(
                 request.TicketCatalogVersionId,
                 request.BookingPartyType,
                 request.Lines,
+                operationKey ?? string.Empty,
                 request.PlatformContributionBasisPoints),
             cancellationToken);
         return response.IsSuccess
             ? CreatedAtRoute(RouteNames.GetCurrentRegistrationOrder, new { eventId, orderId = response.Id }, response)
-            : AuthenticatedStartFailures.Map(this, response);
+            : CreationFailures.Map(this, response);
     }
 
     [Authorize]

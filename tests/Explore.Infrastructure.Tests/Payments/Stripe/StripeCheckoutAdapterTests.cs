@@ -57,6 +57,7 @@ public sealed class StripeCheckoutAdapterTests
 
         await Assert.That(descriptor.ProviderCode).IsEqualTo("stripe");
         await Assert.That(descriptor.ProfileCode).IsEqualTo("OrganizerDirect");
+        await Assert.That(descriptor.CheckoutMutationIdempotencyRetentionFloor).IsEqualTo(TimeSpan.FromHours(24));
         await Assert.That(descriptor.ApiRevision).IsEqualTo("2026-07-29.dahlia");
         await Assert.That(descriptor.ApiRevision).IsEqualTo(global::Stripe.StripeConfiguration.ApiVersion);
     }
@@ -187,7 +188,7 @@ public sealed class StripeCheckoutAdapterTests
 
         await Assert.That(result.Outcome).IsEqualTo(HostedCheckoutOperationOutcome.Unknown);
         await Assert.That(result.Failure!.Kind).IsEqualTo(HostedCheckoutFailureKind.Network);
-        await Assert.That(handler.Requests).Count().IsEqualTo(3);
+        await Assert.That(handler.Requests).Count().IsEqualTo(1);
     }
 
     [Test]

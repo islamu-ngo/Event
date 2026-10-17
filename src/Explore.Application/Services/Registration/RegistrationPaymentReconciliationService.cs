@@ -20,7 +20,8 @@ public sealed record RegistrationPaymentReconciliationResult(
     int RequeuedDispatches = 0);
 
 public sealed class RegistrationPaymentReconciliationService(
-    IRegistrationPaymentAttemptRepository repository,
+    IPaymentReconciliationAdmission admission,
+    IPaymentReconciliationExecutionScopeFactory executionScopeFactory,
     IHostedCheckoutSessionRetriever checkoutRetriever,
     IPaymentIntentRetriever paymentIntentRetriever,
     TimeProvider timeProvider)
@@ -49,40 +50,36 @@ public sealed class RegistrationPaymentReconciliationService(
 
         cancellationToken.ThrowIfCancellationRequested();
         DateTime claimTime = timeProvider.GetUtcNow().UtcDateTime;
-        IReadOnlyList<PaymentReconciliationClaim> claims = await repository.ClaimDueReconciliationsAsync(
-            request.LeaseOwner,
-            request.BatchSize,
-            claimTime,
-            request.LeaseDuration ?? DefaultLeaseDuration,
-            cancellationToken);
+        PaymentReconciliationAcquisition acquisition = PaymentReconciliationAcquisition.Create(
+            request.LeaseOwner, request.BatchSize, claimTime, request.LeaseDuration ?? DefaultLeaseDuration);
+        IReadOnlyList<PaymentReconciliationClaim> claims = await admission.ClaimDueReconciliationsAsync(
+            acquisition, claimTime, cancellationToken);
         foreach (PaymentReconciliationClaim claim in claims)
         {
             cancellationToken.ThrowIfCancellationRequested();
             DateTime now = timeProvider.GetUtcNow().UtcDateTime;
             claimed++;
-            PaymentAttempt? attempt = await repository.GetReconciliationAttemptAsync(claim, now, cancellationToken);
-            if (string.IsNullOrWhiteSpace(attempt?.ProviderCheckoutSessionId))
+            await using var scope = await executionScopeFactory.CreateAsync(claim.TenantId, cancellationToken);
+            PaymentAttempt? attempt = await scope.GetAttemptAsync(claim, now, cancellationToken);
+            if (attempt is null)
             {
-                DateTime recoveryObservedAt = attempt is null ? now : NextObservation(attempt, now);
-                bool requeued = await repository.RequeueLatestUnknownDispatchAsync(
-                    claim.TenantId,
-                    claim.PaymentAttemptId,
-                    recoveryObservedAt,
-                    recoveryObservedAt,
-                    cancellationToken);
-                if (requeued)
-                {
-                    requeuedDispatches++;
-                }
-                stale += await Settle(
+                stale++;
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(attempt.ProviderCheckoutSessionId))
+            {
+                DateTime recoveryObservedAt = NextObservation(attempt, now);
+                PaymentReconciliationRecoveryResult recovery = await scope.RecoverUnknownDispatchAsync(
                     claim,
                     Retry(
                         PaymentAttemptStatusEnum.Unknown,
                         "payment_reconciliation_awaiting_idempotent_dispatch",
                         recoveryObservedAt,
                         UnknownRetryDelay,
-                        attempt?.LastProviderRequestId),
-                    cancellationToken) ? 0 : 1;
+                        attempt.LastProviderRequestId),
+                    cancellationToken);
+                requeuedDispatches += recovery.RequeuedDispatch ? 1 : 0;
+                stale += recovery.Settled ? 0 : 1;
                 unknown++;
                 continue;
             }
@@ -100,14 +97,14 @@ public sealed class RegistrationPaymentReconciliationService(
                 PaymentReconciliationDecision decision = isPermanent
                     ? Park(PaymentAttemptStatusEnum.Unknown, Code(checkout.Failure?.Code), observedAt, checkout.ProviderRequestId)
                     : Retry(PaymentAttemptStatusEnum.Unknown, Code(checkout.Failure?.Code), observedAt, isConfiguration ? TimeSpan.FromMinutes(15) : UnknownRetryDelay, checkout.ProviderRequestId);
-                stale += await Settle(claim, decision, cancellationToken) ? 0 : 1;
+                stale += await scope.SettleAsync(claim, decision, cancellationToken) ? 0 : 1;
                 if (isPermanent) parked++; else unknown++;
                 continue;
             }
 
             if (!SessionMatches(attempt, session))
             {
-                stale += await Settle(claim, Park(PaymentAttemptStatusEnum.Unknown, "payment_reconciliation_checkout_mismatch", observedAt, checkout.ProviderRequestId), cancellationToken) ? 0 : 1;
+                stale += await scope.SettleAsync(claim, Park(PaymentAttemptStatusEnum.Unknown, "payment_reconciliation_checkout_mismatch", observedAt, checkout.ProviderRequestId), cancellationToken) ? 0 : 1;
                 parked++;
                 continue;
             }
@@ -116,7 +113,7 @@ public sealed class RegistrationPaymentReconciliationService(
                 session.PaymentStatus == HostedCheckoutPaymentStatus.Unpaid &&
                 session.PaymentId is null)
             {
-                stale += await Settle(
+                stale += await scope.SettleAsync(
                     claim,
                     Complete(PaymentAttemptStatusEnum.Cancelled, session, null, observedAt, checkout.ProviderRequestId),
                     cancellationToken) ? 0 : 1;
@@ -131,7 +128,7 @@ public sealed class RegistrationPaymentReconciliationService(
                 PaymentReconciliationDecision decision = ambiguousCompletion
                     ? Retry(PaymentAttemptStatusEnum.Unknown, "payment_reconciliation_payment_id_missing", observedAt, UnknownRetryDelay, checkout.ProviderRequestId, session.SessionId)
                     : Retry(PaymentAttemptStatusEnum.RequiresAction, "payment_reconciliation_buyer_action", observedAt, NonTerminalRetryDelay, checkout.ProviderRequestId, session.SessionId);
-                stale += await Settle(claim, decision, cancellationToken) ? 0 : 1;
+                stale += await scope.SettleAsync(claim, decision, cancellationToken) ? 0 : 1;
                 if (ambiguousCompletion) unknown++; else nonTerminal++;
                 continue;
             }
@@ -150,20 +147,20 @@ public sealed class RegistrationPaymentReconciliationService(
                     payment.ProviderRequestId ?? checkout.ProviderRequestId,
                     session.SessionId,
                     session.PaymentId);
-                stale += await Settle(claim, decision, cancellationToken) ? 0 : 1;
+                stale += await scope.SettleAsync(claim, decision, cancellationToken) ? 0 : 1;
                 unknown++;
                 continue;
             }
 
             if (!PaymentMatches(attempt, session, intent))
             {
-                stale += await Settle(claim, Park(PaymentAttemptStatusEnum.Unknown, "payment_reconciliation_money_mismatch", observedAt, payment.ProviderRequestId), cancellationToken) ? 0 : 1;
+                stale += await scope.SettleAsync(claim, Park(PaymentAttemptStatusEnum.Unknown, "payment_reconciliation_money_mismatch", observedAt, payment.ProviderRequestId), cancellationToken) ? 0 : 1;
                 parked++;
                 continue;
             }
 
             PaymentReconciliationDecision authoritative = Map(session, intent, observedAt, payment.ProviderRequestId);
-            bool settled = await Settle(claim, authoritative, cancellationToken);
+            bool settled = await scope.SettleAsync(claim, authoritative, cancellationToken);
             stale += settled ? 0 : 1;
             if (authoritative.Status == PaymentAttemptStatusEnum.Succeeded) succeeded++;
             else if (authoritative.Status == PaymentAttemptStatusEnum.Unknown) unknown++;
@@ -213,9 +210,6 @@ public sealed class RegistrationPaymentReconciliationService(
 
     private static PaymentReconciliationDecision Park(PaymentAttemptStatusEnum status, string code, DateTime at, string? requestId = null) =>
         new(PaymentReconciliationDisposition.Park, status, null, null, requestId, code, at);
-
-    private Task<bool> Settle(PaymentReconciliationClaim claim, PaymentReconciliationDecision decision, CancellationToken cancellationToken) =>
-        repository.SettleReconciliationAsync(claim, decision, cancellationToken);
 
     private static DateTime NextObservation(PaymentAttempt attempt, DateTime now) => now > attempt.LastStatusObservedAt ? now : attempt.LastStatusObservedAt.AddTicks(1);
 

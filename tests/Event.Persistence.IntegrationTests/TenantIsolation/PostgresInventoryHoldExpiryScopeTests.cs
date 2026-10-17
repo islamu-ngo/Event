@@ -52,7 +52,7 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
             // repository constructed on a frozen null lease, then ambient tenancy changed.
             var options = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
-            options.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+            options.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
             var ambient = new TenantContextAccessor(new Microsoft.AspNetCore.Http.HttpContextAccessor());
             await using var oldContext = new ExploreDbContext(options.Options) { TenantContext = new TenantFacts(ambient) };
             oldContext.BindTenantLease();

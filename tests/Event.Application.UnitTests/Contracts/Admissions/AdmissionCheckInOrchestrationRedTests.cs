@@ -768,10 +768,6 @@ internal sealed class CheckInPortFake(CheckInScenario scenario) :
         Guid eventId,
         CancellationToken cancellationToken) => throw new NotSupportedException();
 
-    public Task<AdmissionScannerCapability?> FindByDigestCandidatesAsync(
-        IReadOnlyList<AdmissionScannerCapabilityDigestCandidate> candidates,
-        CancellationToken cancellationToken) => throw new NotSupportedException();
-
     public Task<AdmissionScannerCapabilityDigestCandidates> DigestCandidatesAsync(
         AdmissionScannerCapabilityDigestCandidatesRequest request,
         CancellationToken cancellationToken) => throw new NotSupportedException();

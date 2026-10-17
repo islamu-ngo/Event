@@ -134,11 +134,11 @@ public sealed class GuestRegistrationStatusTests
             case "foreign-event": query = query with { EventId = Guid.CreateVersion7() }; break;
             case "foreign-order": query = query with { OrderId = Guid.CreateVersion7() }; break;
             case "foreign-tenant":
-                await using (var scope = fixture.CreateScope())
+                var foreignTenant = new TenantScope(Guid.CreateVersion7());
+                await using (var replica = fixture.CreateReplica(foreignTenant))
+                await using (var scope = replica.CreateAsyncScope())
                 {
-                    var foreignTenant = new TenantScope(Guid.CreateVersion7());
                     var services = scope.ServiceProvider;
-                    services.GetRequiredService<ExploreDbContext>().TenantContext = foreignTenant;
                     var handler = new GetGuestRegistrationStatusQueryHandler(
                         services.GetRequiredService<IGuestRegistrationCapabilityRepository>(),
                         services.GetRequiredService<IEventRepository>(),

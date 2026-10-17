@@ -379,61 +379,6 @@ public sealed class TicketingRecoveryRepository(
             occurredAtUtc,
             cancellationToken);
 
-    public async Task<TicketingRecoveryAggregateHealth>
-        GetAggregateHealthAsync(
-            CancellationToken cancellationToken)
-    {
-        IQueryable<TicketingRecoveryCheckpoint> checkpoints =
-            QueryCheckpoints().AsNoTracking();
-        int recoveryOnly = await checkpoints.CountAsync(value =>
-            value.Status == TicketingRecoveryStatus.RecoveryOnly,
-            cancellationToken);
-        int failed = await checkpoints.CountAsync(value =>
-            value.Status == TicketingRecoveryStatus.Failed,
-            cancellationToken);
-        int pendingReissues =
-            await dbContext.TicketingRecoveryReissueIntents
-                .IgnoreTenantFilter(
-                    TenantFilterBypassReasons.TicketingRecoveryTenantOperation)
-                .CountAsync(value =>
-                    value.Status == TicketingRecoveryReissueStatus.Pending,
-                    cancellationToken);
-        IQueryable<FairReturnOrchestrationEffect> effects =
-            dbContext.FairReturnOrchestrationEffects
-                .IgnoreTenantFilter(
-                    TenantFilterBypassReasons.TicketingRecoveryTenantOperation)
-                .AsNoTracking();
-        int ambiguous = await effects.CountAsync(value =>
-            value.StatusId ==
-            (int)FairReturnOrchestrationEffectStatus.Unknown,
-            cancellationToken);
-        int deadLettered = await effects.CountAsync(value =>
-            value.StatusId ==
-            (int)FairReturnOrchestrationEffectStatus.DeadLettered,
-            cancellationToken);
-        int poison = await effects.CountAsync(value =>
-            value.LastFailureCode != null &&
-            value.LastFailureCode.StartsWith("POISON_"),
-            cancellationToken);
-        DateTime? oldestDue = await effects
-            .Where(value =>
-                value.StatusId ==
-                    (int)FairReturnOrchestrationEffectStatus.Pending ||
-                value.StatusId ==
-                    (int)FairReturnOrchestrationEffectStatus.Unknown)
-            .MinAsync(
-                value => (DateTime?)value.NextAttemptAt,
-                cancellationToken);
-        return new TicketingRecoveryAggregateHealth(
-            recoveryOnly,
-            failed,
-            pendingReissues,
-            ambiguous,
-            deadLettered,
-            poison,
-            oldestDue);
-    }
-
     private IQueryable<TicketingRecoveryCheckpoint> QueryCheckpoints() =>
         dbContext.TicketingRecoveryCheckpoints
             .IgnoreTenantFilter(

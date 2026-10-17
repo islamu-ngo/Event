@@ -208,10 +208,13 @@ public sealed class ParticipantReadinessApiTests(
     }
 
     [Test]
-    public async Task InvalidCapabilityIsGenericPrivateProblemDetails()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task InvalidCapabilityIsGenericPrivateProblemDetails(bool issuedCapability)
     {
-        string capability = Guid.CreateVersion7()
-            .ToString("N");
+        string capability = issuedCapability
+            ? new Explore.Infrastructure.Services.GuestCapabilityTokenService().Issue().RawToken
+            : Guid.CreateVersion7().ToString("N");
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             ExactResourcePath());

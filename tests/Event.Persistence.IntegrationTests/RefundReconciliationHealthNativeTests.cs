@@ -301,7 +301,7 @@ public sealed class RefundReconciliationHealthNativeTests(PostgreSqlContainerFix
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
             fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
-        builder.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+        builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
         return new ExploreDbContext(builder.Options) { TenantContext = tenant is { } id ? new TenantIdentity(id) : null };
     }
 

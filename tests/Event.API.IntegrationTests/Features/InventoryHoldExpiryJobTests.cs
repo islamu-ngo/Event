@@ -182,7 +182,7 @@ public sealed class InventoryHoldExpiryJobTests
                 return new RegistrationOrderLifecycleService(
                     inventory, new PromotionRedemptionRepository(context), new RegistrationParticipantRepository(context),
                     new EventTicketCatalogRepository(context), new PlatformContributionSettingRepository(context),
-                    new EventSessionRepository(context),
+                    new EventSessionRepository(context, provider.GetRequiredService<IHttpContextAccessor>()),
                     new OutboxRepository(context), new EfCoreUnitOfWork(context), new RegistrationFinalizationRepository(context),
                     new RegistrationPaymentAttemptRepository(context), Substitute.For<IScheduledDeadlineDispatcher>(),
                     TimeProvider.System, new UnusedPaidAcceptance(), new RegistrationOrderTransitionCoordinator(inventory));

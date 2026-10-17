@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
@@ -6,6 +7,7 @@ using Explore.Domain.Services.Registration;
 using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
@@ -36,7 +38,10 @@ public sealed class CreateOrderWithHoldCommandHandler(
     ISettingMutationLock mutationLock,
     IVisitorAccessCapabilityResolver visitorCapabilities,
     ISystemSettingRepository systemSettings,
-    ITenantSettingRepository tenantSettings) :
+    ITenantSettingRepository tenantSettings,
+    IRegistrationOrderCreationReceiptRepository creationReceipts,
+    IRegistrationCreationPrincipal creationPrincipal,
+    IPrivacyIdentityFenceAuthority privacyAuthority) :
     ICommandHandler<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>,
     IRegistrationOrderStarter
 {
@@ -48,6 +53,74 @@ public sealed class CreateOrderWithHoldCommandHandler(
         CreateRegistrationOrderWithHoldCommand request,
         CancellationToken cancellationToken)
     {
+        if (request.GuestAccessTokenHash is not null || request.ChallengeAuthority is not null)
+            return await StartCoreAsync(request, null, cancellationToken);
+
+        if (!RegistrationOrderCreationReceipt.IsValidOperationKey(request.OperationKey))
+            return OperationKeyInvalid(request.EventId);
+
+        var principal = creationPrincipal.GetCurrent();
+        if (principal is null || principal.AccountUserId != request.AccountUserId
+            || tenant.TenantId == Guid.Empty || request.PurchaserActorId is not null
+            || request.VerifiedContactNormalizedEmail is not null)
+            return AuthenticationRequired(request.EventId);
+
+        string fingerprint = RegistrationOrderCreationReceipt.ComputeOperationFingerprint(
+            tenant.TenantId, principal.AccountUserId, principal.ScopeFingerprint, request.OperationKey!);
+        string digest = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            Version = 1,
+            request.EventId,
+            request.TicketCatalogVersionId,
+            request.BookingPartyType,
+            request.PurchaserActorId,
+            request.VerifiedContactNormalizedEmail,
+            request.PlatformContributionBasisPoints,
+            Lines = request.Lines?.OrderBy(line => line.TicketTypeId).Select(line => new
+            {
+                line.TicketTypeId,
+                line.Quantity,
+                line.ChosenUnitPriceMinor
+            }).ToArray()
+        })));
+
+        var attempt = new AuthenticatedCreationAttempt(principal, fingerprint, digest);
+        try
+        {
+            // The retained subject gate encloses the existing creation transaction, not a
+            // second business transaction. Guest creation retains its original ownership.
+            var response = await privacyAuthority.ExecuteSerializedAsync(
+                token => StartCoreAsync(request, attempt, token), cancellationToken);
+            // CoLocated SQLite commits the enlisted application transaction at the
+            // privacy gate's exit. Never publish a scheduler wake-up before that exit.
+            if (response.IsSuccess && attempt.Deadline is { } deadline)
+                await RegisterHoldExpiryDeadlineAsync(deadline.OrderId, deadline.ExpiresAt, cancellationToken);
+            return response;
+        }
+        catch (Exception exception)
+        {
+            // A commit can outlive request cancellation or lose its acknowledgement.
+            // A bounded independent read may recover only this exact committed identity.
+            using var recoveryTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var recovered = await privacyAuthority.ExecuteSerializedAsync(
+                token => ReadCommittedAuthenticatedAsync(
+                    request, principal, fingerprint, digest, fresh: true, token), recoveryTimeout.Token);
+            if (recovered is not null)
+                return recovered;
+            if (exception is ArgumentException or InvalidOperationException)
+                return Invalid(request.EventId, exception.Message);
+            throw;
+        }
+    }
+
+    private async Task<BaseCommandResponse<Guid>> StartCoreAsync(
+        CreateRegistrationOrderWithHoldCommand request,
+        AuthenticatedCreationAttempt? authenticated,
+        CancellationToken cancellationToken)
+    {
+        var principal = authenticated?.Principal;
+        var fingerprint = authenticated?.Fingerprint;
+        var inputDigest = authenticated?.InputDigest;
         var authority = request.ChallengeAuthority;
         if ((request.GuestAccessTokenHash is not null || authority is not null) &&
             (authority is null || !authority.Matches(request) || !AllowsRecovery(authority)))
@@ -68,6 +141,15 @@ public sealed class CreateOrderWithHoldCommandHandler(
             return ChallengeExpired(request.EventId);
         }
 
+        if (principal is not null)
+        {
+            if (!await AllowsAuthenticatedAsync(principal, cancellationToken))
+                return AuthenticationRequired(request.EventId);
+            if (await ReadCommittedAuthenticatedAsync(
+                    request, principal, fingerprint!, inputDigest!, fresh: false, cancellationToken) is { } recovered)
+                return recovered;
+        }
+
         var validation = await new CreateRegistrationOrderWithHoldCommandValidator()
             .ValidateAsync(request, cancellationToken);
         if (!validation.IsValid)
@@ -77,6 +159,9 @@ public sealed class CreateOrderWithHoldCommandHandler(
 
         Guid orderId = authority?.OrderId ?? Guid.CreateVersion7();
         DateTime createdAt = timeProvider.GetUtcNow().UtcDateTime;
+        RegistrationOrderCreationReceipt? receipt = principal is null ? null :
+            RegistrationOrderCreationReceipt.Create(
+                Guid.CreateVersion7(), tenant.TenantId, fingerprint!, inputDigest!, orderId, createdAt);
         IReadOnlyDictionary<Guid, StableLineIds> stableLineIds = request.Lines
             .OrderBy(line => line.TicketTypeId)
             .ToDictionary(
@@ -94,6 +179,15 @@ public sealed class CreateOrderWithHoldCommandHandler(
                 outerToken => unitOfWork.ExecuteSerializableAsync(async token =>
             {
                 earliestHoldExpiry = null;
+                if (principal is not null)
+                {
+                    if (!await AllowsAuthenticatedAsync(principal, token)
+                        || !await creationReceipts.FenceCurrentAccountAsync(tenant.TenantId, principal.AccountUserId, token))
+                        return AuthenticationRequired(request.EventId);
+                    if (await ReadCommittedAuthenticatedAsync(
+                            request, principal, fingerprint!, inputDigest!, fresh: false, token) is { } recovered)
+                        return recovered;
+                }
                 if (authority is not null)
                 {
                     if (!AllowsRecovery(authority))
@@ -147,6 +241,8 @@ public sealed class CreateOrderWithHoldCommandHandler(
                 RegistrationOrder? existing = await inventory.GetOrderByIdAsync(orderId, tenant.TenantId, token);
                 if (existing is not null)
                 {
+                    if (principal is not null)
+                        return Missing(request.EventId);
                     return authority is null
                         ? Success(existing.Id, "Registration order already created.")
                         : ChallengeInvalid(request.EventId);
@@ -332,7 +428,11 @@ public sealed class CreateOrderWithHoldCommandHandler(
                     return ChallengeExpired(request.EventId);
                 }
 
+                if (principal is not null && !await AllowsAuthenticatedAsync(principal, token))
+                    return AuthenticationRequired(request.EventId);
                 await inventory.AddOrderWithHoldsAsync(order, holds, token);
+                if (receipt is not null)
+                    await creationReceipts.AddAsync(receipt, token);
                 await inventory.SaveChangesAsync(token);
                 earliestHoldExpiry = holds.Length == 0 ? null : holds.Min(hold => hold.ExpiresAt);
                 return Success(order.Id, isWaitlisted ? "Registration order waitlisted." : "Registration order created.");
@@ -340,21 +440,69 @@ public sealed class CreateOrderWithHoldCommandHandler(
 
             if (response.IsSuccess && earliestHoldExpiry is not null)
             {
-                await RegisterHoldExpiryDeadlineAsync(orderId, earliestHoldExpiry.Value, cancellationToken);
+                if (authenticated is not null)
+                    authenticated.Deadline = (orderId, earliestHoldExpiry.Value);
+                else
+                    await RegisterHoldExpiryDeadlineAsync(orderId, earliestHoldExpiry.Value, cancellationToken);
             }
 
             return authority is not null && response.IsSuccess && !AllowsRecovery(authority)
                 ? ChallengeInvalid(request.EventId)
                 : response;
         }
-        catch (ArgumentException exception)
+        catch (ArgumentException exception) when (principal is null)
         {
             return Invalid(request.EventId, exception.Message);
         }
-        catch (InvalidOperationException exception)
+        catch (InvalidOperationException exception) when (principal is null)
         {
             return Invalid(request.EventId, exception.Message);
         }
+    }
+
+    private async Task<bool> AllowsAuthenticatedAsync(
+        RegistrationCreationPrincipal principal, CancellationToken cancellationToken) =>
+        principal == creationPrincipal.GetCurrent()
+        && !await privacyAuthority.IsSubjectFencedAsync(principal.AccountUserId, cancellationToken);
+
+    private async Task<BaseCommandResponse<Guid>?> ReadCommittedAuthenticatedAsync(
+        CreateRegistrationOrderWithHoldCommand request, RegistrationCreationPrincipal principal,
+        string fingerprint, string inputDigest, bool fresh, CancellationToken cancellationToken)
+    {
+        if (!await AllowsAuthenticatedAsync(principal, cancellationToken))
+            return AuthenticationRequired(request.EventId);
+        var receipt = fresh
+            ? await creationReceipts.FindFreshAsync(tenant.TenantId, fingerprint, cancellationToken)
+            : await creationReceipts.FindAsync(tenant.TenantId, fingerprint, cancellationToken);
+        if (receipt is null)
+            return null;
+        var order = await creationReceipts.GetRecoverableOrderAsync(
+            tenant.TenantId, receipt.RegistrationOrderId, principal.AccountUserId,
+            timeProvider.GetUtcNow().UtcDateTime, fresh, cancellationToken);
+        if (!await AllowsAuthenticatedAsync(principal, cancellationToken))
+            return AuthenticationRequired(request.EventId);
+        if (order is null || order.ExpiresAt is { } expiry && expiry <= timeProvider.GetUtcNow().UtcDateTime)
+            return Missing(request.EventId);
+        if (receipt.InputDigest != inputDigest)
+            return BaseCommandResponse.Failure<Guid>(
+                "registration_order_creation_conflict", "The operation key belongs to a different registration request.",
+                id: request.EventId);
+        return Success(order.Id, "Registration order already created.");
+    }
+
+    private static BaseCommandResponse<Guid> AuthenticationRequired(Guid eventId) => BaseCommandResponse.Failure<Guid>(
+        "registration_order_authentication_required", "Registration order requires a current authenticated account.", id: eventId);
+
+    private static BaseCommandResponse<Guid> OperationKeyInvalid(Guid eventId) => BaseCommandResponse.Failure<Guid>(
+        "registration_order_operation_key_invalid", "A bounded registration operation key is required.", id: eventId);
+
+    private sealed class AuthenticatedCreationAttempt(
+        RegistrationCreationPrincipal principal, string fingerprint, string inputDigest)
+    {
+        public RegistrationCreationPrincipal Principal { get; } = principal;
+        public string Fingerprint { get; } = fingerprint;
+        public string InputDigest { get; } = inputDigest;
+        public (Guid OrderId, DateTime ExpiresAt)? Deadline { get; set; }
     }
 
     public async Task<BaseCommandResponse<Guid>?> TryRecoverCommittedGuestAsync(
@@ -445,7 +593,7 @@ public sealed class CreateOrderWithHoldCommandHandler(
                 continue;
             }
 
-            int allocated = await inventory.GetAllocatedQuantityAsync(pool.Id, tenant.TenantId, cancellationToken);
+            long allocated = await inventory.GetAllocatedQuantityAsync(pool.Id, tenant.TenantId, cancellationToken);
             int requested = checked(group.Sum(line => line.Selection.Quantity));
             if (allocated > pool.MaximumQuantity.Value - requested)
             {
@@ -526,9 +674,9 @@ public sealed class CreateOrderWithHoldCommandHandler(
         foreach (PreparedLine line in lines)
         {
             usageByTicket.TryGetValue(line.Ticket.Id, out RegistrationTicketLimitUsage? usage);
-            int accountQuantity = usage?.AccountQuantity ?? 0;
-            int verifiedContactQuantity = usage?.VerifiedContactQuantity ?? 0;
-            int bookingPartyQuantity = usage?.BookingPartyQuantity ?? 0;
+            long accountQuantity = usage?.AccountQuantity ?? 0L;
+            long verifiedContactQuantity = usage?.VerifiedContactQuantity ?? 0L;
+            long bookingPartyQuantity = usage?.BookingPartyQuantity ?? 0L;
 
             if ((request.AccountUserId.HasValue && line.Ticket.PerAccountLimit is int accountLimit &&
                  accountQuantity > accountLimit - line.Selection.Quantity) ||

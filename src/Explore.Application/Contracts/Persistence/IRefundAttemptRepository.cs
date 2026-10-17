@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Application.Contracts.Payments;
 
 namespace Explore.Application.Contracts.Persistence;
 
@@ -11,7 +12,8 @@ public enum RefundReservationDisposition
     AuthorityMismatch,
     MaterialChangeChoiceConflict,
     OpenDispute,
-    CapacityExceeded
+    CapacityExceeded,
+    OperationConflict
 }
 
 public sealed record RefundReservationResult(
@@ -20,6 +22,21 @@ public sealed record RefundReservationResult(
 
 public interface IRefundAttemptRepository
 {
+    Task<RefundAttempt?> TryBeginDispatchAsync(
+        RefundAttempt expected, Guid dispatchToken, bool applicationFee, DateTime committedAt,
+        DateTime mutationExpiresAt, OutboxMessage recoveryTrigger, CancellationToken cancellationToken);
+
+    Task<RefundAttempt?> SettleAndScheduleAsync(
+        RefundAttempt expected, Guid? dispatchToken, RefundProviderResult result, DateTime observedAt,
+        OutboxMessage recoveryTrigger, CancellationToken cancellationToken);
+
+    Task<RefundReservationResult?> RecoverOperationAsync(
+        Guid tenantId,
+        Guid paymentAttemptId,
+        string nativeOperationKey,
+        string nativeInputDigest,
+        CancellationToken cancellationToken);
+
     Task<RefundReservationResult> ReserveAsync(
         RefundAttempt attempt,
         CancellationToken cancellationToken);

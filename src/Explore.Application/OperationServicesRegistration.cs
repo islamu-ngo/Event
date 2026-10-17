@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Operations;
 using Explore.Application.Operations.Decorators;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,17 +61,48 @@ public static class OperationServicesRegistration
         services.TryAddScoped<OperationConstructionGuard>();
         services.TryAddScoped(typeof(RequestAuthorization<>));
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddScoped<IHumanCommitScopePreparation>(provider =>
+            (IHumanCommitScopePreparation)provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>());
 
         foreach (var group in planned.GroupBy(item => item.Implementation))
         {
             var implementation = group.Key;
+            var parameters = implementation.GetConstructors().Select(constructor => constructor.GetParameters()).ToArray();
+            var humanDependencies = parameters.SelectMany(constructor => constructor)
+                .Select(parameter => parameter.ParameterType)
+                .Where(type => type == typeof(IInstanceAdministratorCommitAuthority)
+                    || type == typeof(ITenantAdministratorCommitAuthority)
+                    || type == typeof(IHumanSubjectCommitAuthority)).Distinct().ToArray();
+            bool requiresHumanPreparation = humanDependencies.Length != 0
+                || parameters.SelectMany(constructor => constructor)
+                    .Any(parameter => parameter.ParameterType == typeof(IHumanCommitScopePreparation));
             var existing = services.Where(descriptor => descriptor.ServiceType == implementation).ToArray();
             if (existing.Length > 1 || existing.Any(descriptor => descriptor.IsKeyedService
                 || descriptor.Lifetime != ServiceLifetime.Scoped || descriptor.ImplementationType != implementation))
                 throw OperationCompositionValidation.Error("competing concrete registration", implementation);
-            var concrete = existing.SingleOrDefault() ?? ServiceDescriptor.Scoped(implementation, implementation);
-            if (existing.Length == 0)
+            ServiceDescriptor concrete;
+            if (humanDependencies.Length != 0)
+            {
+                // Dependency inspection selects construction deferral only. Permissions remain
+                // the actual handler's interface calls, never a reflected administrator policy.
+                var construct = ActivatorUtilities.CreateFactory(implementation, humanDependencies);
+                concrete = ServiceDescriptor.Scoped(implementation, provider =>
+                {
+                    if (provider.GetRequiredService<IHumanCommitScopePreparation>().Subject is not null)
+                        return construct(provider, humanDependencies.Select(provider.GetRequiredService).ToArray());
+                    var deferred = new DeferredHumanAdministratorCommitAuthority(provider);
+                    return construct(provider, humanDependencies.Select(_ => (object)deferred).ToArray());
+                });
+                if (existing.Length != 0)
+                    services.Remove(existing[0]);
                 services.Add(concrete);
+            }
+            else
+            {
+                concrete = existing.SingleOrDefault() ?? ServiceDescriptor.Scoped(implementation, implementation);
+                if (existing.Length == 0)
+                    services.Add(concrete);
+            }
 
             // Existing direct service ports use the same concrete scoped owner, just like explicit
             // factory aliases. Their authority disposition remains capability-owned.
@@ -85,7 +117,6 @@ public static class OperationServicesRegistration
                 services[index] = ServiceDescriptor.Scoped(descriptor.ServiceType,
                     provider => provider.GetRequiredService(implementation));
             }
-            var parameters = implementation.GetConstructors().Select(constructor => constructor.GetParameters()).ToArray();
             foreach (var (_, contract) in group)
             {
                 if (services.Any(descriptor => descriptor.ServiceType == contract))
@@ -100,9 +131,15 @@ public static class OperationServicesRegistration
                     : typeof(PerformanceQueryHandlerDecorator<,>);
                 var authorizeFactory = ActivatorUtilities.CreateFactory(authorization.MakeGenericType(arguments), [contract]);
                 var performanceFactory = ActivatorUtilities.CreateFactory(performance.MakeGenericType(arguments), [contract]);
-                var mutationScopeFactory = definition == typeof(ICommandHandler<,>)
-                    && PolicyMutationCommandScope.Handles(arguments[0])
-                    ? ActivatorUtilities.CreateFactory(typeof(MutationScopeCommandHandler<,>).MakeGenericType(arguments), [typeof(Type)])
+                var mutationFactory = definition == typeof(ICommandHandler<,>) &&
+                    (PolicyMutationCommandScope.Handles(arguments[0]) || ModerationMutationCommandScope.Handles(arguments[0])
+                        || requiresHumanPreparation)
+                    ? ActivatorUtilities.CreateFactory(typeof(MutationScopeCommandHandler<,>).MakeGenericType(arguments),
+                        [typeof(IServiceProvider), typeof(Type)])
+                    : null;
+                var queryFactory = definition == typeof(IQueryHandler<,>) && requiresHumanPreparation
+                    ? ActivatorUtilities.CreateFactory(typeof(HumanScopeQueryHandler<,>).MakeGenericType(arguments),
+                        [typeof(IServiceProvider), typeof(Type)])
                     : null;
                 var entry = ServiceDescriptor.Scoped(contract, provider =>
                 {
@@ -110,9 +147,11 @@ public static class OperationServicesRegistration
                     guard.Enter(contract);
                     try
                     {
-                        var inner = mutationScopeFactory is null
-                            ? provider.GetRequiredService(implementation)
-                            : mutationScopeFactory(provider, [implementation]);
+                        var inner = mutationFactory is not null
+                            ? mutationFactory(provider, [provider, implementation])
+                            : queryFactory is not null
+                                ? queryFactory(provider, [provider, implementation])
+                                : provider.GetRequiredService(implementation);
                         var timed = performanceFactory(provider, [inner]);
                         return authorizeFactory(provider, [timed]);
                     }

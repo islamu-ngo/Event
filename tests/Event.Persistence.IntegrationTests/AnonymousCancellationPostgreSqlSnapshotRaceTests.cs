@@ -17,6 +17,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Registration;
 using Explore.Persistence;
+using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,7 +50,26 @@ public sealed class AnonymousCancellationPostgreSqlSnapshotRaceTests(PostgreSqlC
                         SecretScope.Instance, null, clock.Now)));
                 services.AddSingleton<IAdmissionCredentialDigestService>(new AdmissionCredentialDigestService(
                     secrets, Options.Create(new AdmissionCredentialOptions())));
-            });
+            }, configureDatabase: database =>
+            {
+                foreach (var purpose in new[]
+                {
+                    PrimaryDatabaseRole.Runtime,
+                    PrimaryDatabaseRole.Global,
+                    PrimaryDatabaseRole.Migrator,
+                    PrimaryDatabaseRole.EmailPolicyInstanceMutation,
+                    PrimaryDatabaseRole.EmailPolicyTenantMutation,
+                    PrimaryDatabaseRole.InstanceKeyRead,
+                    PrimaryDatabaseRole.InstanceKeyWrite,
+                    PrimaryDatabaseRole.InstanceKeyIssuance,
+                    PrimaryDatabaseRole.PlatformKeyReport
+                })
+                {
+                    var options = postgres.GetNativeQueueOptions(purpose);
+                    database[$"Database:{purpose}:Username"] = options.Username;
+                    database[$"Database:{purpose}:Password"] = options.Password;
+                }
+            }, createSeedContext: () => postgres.CreateDbContext());
         CancelConfirmedGuestRegistrationCommand command = await ConfirmAsync(fixture, clock);
         await IssueAsync(fixture, command);
 

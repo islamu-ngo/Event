@@ -1,5 +1,3 @@
-using System.Collections.ObjectModel;
-
 namespace Explore.Domain.Secrets;
 
 /// <summary>
@@ -25,6 +23,6 @@ public sealed record AuthenticationCredentialCleanupInventory
     public Guid DeploymentRevision { get; }
     public Guid HeadStamp { get; }
     public Guid OperationStamp { get; }
-    public ReadOnlyCollection<Target> Settings { get; }
-    public ReadOnlyCollection<Target> Bindings { get; }
+    public IReadOnlyList<Target> Settings { get; }
+    public IReadOnlyList<Target> Bindings { get; }
 }

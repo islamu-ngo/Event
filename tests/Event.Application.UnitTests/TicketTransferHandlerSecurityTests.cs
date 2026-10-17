@@ -54,16 +54,13 @@ public sealed class TicketTransferHandlerSecurityTests
                 Uninitialized<
                     RegistrationParticipant>(),
                 null);
-        IAdmissionTicketTransferRepository repository =
-            Substitute.For<
-                IAdmissionTicketTransferRepository>();
-        repository.GetAccessAsync(
-                tenantId,
-                eventId,
-                ticketId,
-                transferId,
+        IRegistrationPrivateReader reader =
+            Substitute.For<IRegistrationPrivateReader>();
+        reader.ReadAsync(
+                Arg.Any<RegistrationPrivateRead>(),
+                rawCapability,
                 Arg.Any<CancellationToken>())
-            .Returns(access);
+            .Returns(new RegistrationPrivateGraph { Order = access.Order, Transfer = access });
         ITenantContext tenant =
             Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(tenantId);
@@ -79,9 +76,7 @@ public sealed class TicketTransferHandlerSecurityTests
             .Returns(true);
         var handler =
             new GetTicketTransferQueryHandler(
-                repository,
-                tenant,
-                currentUser,
+                reader,
                 capabilities,
                 new FixedTimeProvider(UtcNow));
 

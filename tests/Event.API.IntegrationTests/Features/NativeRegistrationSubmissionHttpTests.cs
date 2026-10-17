@@ -4,6 +4,7 @@ using System.Text.Json;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.API.Services;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
@@ -18,6 +19,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Repositories;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Operations;
@@ -28,11 +30,11 @@ using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
-using Testcontainers.PostgreSql;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -494,22 +496,10 @@ public sealed class NativeRegistrationSubmissionHttpTests
     [Test]
     public async Task ProviderCallback_RealEffectProcessor_PersistsProviderSubmissionFulfillmentAndFinalizationOnce()
     {
-        await using var database = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("registration_callback_phase9")
-            .WithUsername("postgres")
-            .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
-            .Build();
-        await database.StartAsync();
-        string connectionString = database.GetConnectionString();
-        await using (var migrationContext = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseNpgsql(connectionString)
-            .UseSnakeCaseNamingConvention()
-            .Options))
-        {
-            await migrationContext.Database.MigrateAsync();
-        }
+        await using var database = new PostgreSqlContainerFixture();
+        await database.InitializeAsync();
 
-        await using WebApplicationFactory<Program> factory = CreatePostgreSqlCallbackFactory(connectionString);
+        await using WebApplicationFactory<Program> factory = CreatePostgreSqlCallbackFactory(database);
         RealNativeFlow scenario = await SeedRealNativeFlowAsync(factory, publishedFormCount: 1, consentField: false);
         Guid bindingId = await SeedRegistrationProviderBindingAsync(factory, "external-form", scenario);
         Guid attemptId = await SeedProviderAttemptAsync(factory, scenario, bindingId);
@@ -690,6 +680,214 @@ public sealed class NativeRegistrationSubmissionHttpTests
         await Assert.That(payload).DoesNotContain(PlatformDefaults.DefaultTenantId.ToString("D"));
     }
 
+    [Test]
+    [Arguments("current", false)]
+    [Arguments("expired", false)]
+    [Arguments("replaced", false)]
+    [Arguments("retained_type_changed", false)]
+    [Arguments("retained_hash_changed", false)]
+    [Arguments("effect_fence_changed", false)]
+    [Arguments("renewed", false)]
+    [Arguments("transaction_expired", false)]
+    [Arguments("save_failure", false)]
+    [Arguments("current", true)]
+    [Arguments("expired", true)]
+    [Arguments("replaced", true)]
+    [Arguments("transaction_expired", true)]
+    [Arguments("save_failure", true)]
+    public async Task ProviderRead_OriginalEffectCustodyControlsAllSubmissionMutation(string custodyChange, bool parkEvidence)
+    {
+        await using var database = new PostgreSqlContainerFixture();
+        await database.InitializeAsync();
+
+        var clock = new SubmissionCustodyClock(DateTime.UtcNow);
+        var reader = new SuspendedSubmissionReader();
+        var boundary = new SubmissionPersistenceBoundary(clock, custodyChange);
+        await using WebApplicationFactory<Program> factory = new PostgreSqlApiWebApplicationFactory(
+            database, configureTestServices: services =>
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<TimeProvider>(clock);
+                services.AddSingleton<IRegistrationProviderDescriptor>(reader);
+                services.AddScoped<IRegistrationProviderSubmissionEffectRepository, RegistrationProviderSubmissionEffectRepository>();
+                services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+            });
+        RealNativeFlow scenario = await SeedRealNativeFlowAsync(factory, 1, consentField: false);
+        Guid bindingId = await SeedRegistrationProviderBindingAsync(factory, "external-form", scenario);
+        reader.AttemptId = await SeedProviderAttemptAsync(factory, scenario, bindingId);
+        clock.UtcNow = DateTime.UtcNow;
+        if (parkEvidence)
+        {
+            using IServiceScope setupScope = factory.Services.CreateScope();
+            ExploreDbContext setup = setupScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await setup.RegistrationRequirements.Where(value => value.Id == scenario.RequirementId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.AnswerSyncModeId,
+                    (int)RegistrationAnswerSyncModeEnum.MIRROR_ONLY));
+        }
+        using HttpClient client = factory.CreateClient();
+        using HttpResponseMessage callback = await PostCallbackAsync(client, "external-form", bindingId,
+            new { providerSubmissionId = "suspended-submission", providerResponseRevision = "revision-1" });
+        await Assert.That(callback.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await DrainIncomingWebhookMessagesAsync(factory);
+
+        using IServiceScope processingScope = factory.Services.CreateScope();
+        var pointers = processingScope.ServiceProvider.GetRequiredService<IIncomingWebhookEffectOutboxRepository>();
+        IncomingWebhookEffectClaim original = (await pointers.ClaimDueAsync(
+            new IncomingWebhookEffectClaimRequest("original", 10, clock.UtcNow, TimeSpan.FromMinutes(5)),
+            CancellationToken.None)).Single();
+        Task<IncomingWebhookClaimExecutionResult> processing = processingScope.ServiceProvider
+            .GetRequiredService<IIncomingWebhookEffectProcessingService>().ProcessAsync(original, CancellationToken.None);
+        await reader.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        boundary.LeaseExpiresAt = clock.UtcNow.AddMinutes(5);
+        boundary.Armed = true;
+        try
+        {
+            using IServiceScope replacementScope = factory.Services.CreateScope();
+            var replacementPointers = replacementScope.ServiceProvider.GetRequiredService<IIncomingWebhookEffectOutboxRepository>();
+            if (custodyChange is "expired" or "replaced")
+            {
+                clock.UtcNow = clock.UtcNow.AddMinutes(5);
+                if (custodyChange == "replaced")
+                {
+                    IncomingWebhookEffectClaim replacement = (await replacementPointers.ClaimDueAsync(
+                        new IncomingWebhookEffectClaimRequest("replacement", 10, clock.UtcNow, TimeSpan.FromMinutes(5)),
+                        CancellationToken.None)).Single();
+                    await Assert.That(replacement.LeaseToken == original.LeaseToken).IsFalse();
+                }
+            }
+            else if (custodyChange is "retained_type_changed" or "retained_hash_changed")
+            {
+                ExploreDbContext db = replacementScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+                Guid messageId = await db.IncomingWebhookEffectOutboxes.Where(pointer => pointer.Id == original.EffectOutboxId)
+                    .Select(pointer => pointer.IncomingWebhookMessageId).SingleAsync();
+                if (custodyChange == "retained_type_changed")
+                {
+                    await db.IncomingWebhookMessages.Where(value => value.Id == messageId)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.EventType, "changed"));
+                }
+                else
+                {
+                    string changedHash = "sha256:" + Convert.ToHexString(
+                        System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("changed"))).ToLowerInvariant();
+                    await db.IncomingWebhookMessages.Where(value => value.Id == messageId)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.PayloadHash, changedHash));
+                }
+            }
+            else if (custodyChange == "effect_fence_changed")
+            {
+                ExploreDbContext db = replacementScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+                await db.IncomingWebhookEffectOutboxes.Where(value => value.Id == original.EffectOutboxId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ProcessingFence, original.ProcessingFence + 1));
+            }
+            else if (custodyChange == "renewed")
+            {
+                await Assert.That(await replacementPointers.TryRenewClaimAsync(original, clock.UtcNow,
+                    clock.UtcNow.AddMinutes(6), CancellationToken.None)).IsTrue();
+            }
+        }
+        finally
+        {
+            reader.Release.TrySetResult();
+        }
+
+        IncomingWebhookClaimExecutionResult result = await processing.WaitAsync(TimeSpan.FromSeconds(30));
+        using IServiceScope verificationScope = factory.Services.CreateScope();
+        ExploreDbContext verification = verificationScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        bool current = custodyChange == "current";
+        bool accepted = current && !parkEvidence;
+        await Assert.That(result.Outcome).IsEqualTo(current
+            || custodyChange == "save_failure" ? IncomingWebhookClaimExecutionOutcome.Completed : IncomingWebhookClaimExecutionOutcome.LeaseLost);
+        await Assert.That(await verification.RegistrationSubmissions.CountAsync()).IsEqualTo(current ? 1 : 0);
+        await Assert.That(await verification.RegistrationAnswers.CountAsync()).IsEqualTo(accepted ? 1 : 0);
+        await Assert.That(await verification.RegistrationConsentRecords.CountAsync()).IsEqualTo(0);
+        await Assert.That(await verification.RegistrationSubmissionIssues.CountAsync()).IsEqualTo(current && parkEvidence ? 1 : 0);
+        await Assert.That(await verification.RegistrationRequirementFulfillments.CountAsync()).IsEqualTo(accepted ? 1 : 0);
+        await Assert.That(await verification.RegistrationFinalizationEffects.CountAsync()).IsEqualTo(accepted ? 1 : 0);
+        await Assert.That(await verification.IncomingWebhookEffectReceipts.CountAsync()).IsEqualTo(accepted ? 1 : 0);
+        RegistrationAttempt attempt = await verification.RegistrationAttempts.AsNoTracking()
+            .SingleAsync(value => value.Id == reader.AttemptId);
+        await Assert.That(attempt.SubmissionConsumptionClaimId.HasValue).IsEqualTo(accepted);
+        if (current && parkEvidence)
+        {
+            RegistrationSubmissionIssue issue = await verification.RegistrationSubmissionIssues.AsNoTracking().SingleAsync();
+            RegistrationSubmission evidence = await verification.RegistrationSubmissions.AsNoTracking().SingleAsync();
+            await Assert.That(issue.RegistrationSubmissionId).IsEqualTo(evidence.Id);
+            await Assert.That(issue.Code).IsEqualTo("MIRROR_SINK_UNSUPPORTED");
+            await Assert.That(evidence.IsFinalizable).IsFalse();
+        }
+        if (custodyChange == "save_failure")
+        {
+            await Assert.That(result.FailureCategory).IsEqualTo("retry_scheduled");
+        }
+        else if (!current)
+        {
+            IncomingWebhookEffectOutbox pointer = await verification.IncomingWebhookEffectOutboxes.AsNoTracking().SingleAsync();
+            await Assert.That(pointer.Status).IsEqualTo(OutboxMessageStatus.Processing);
+            await Assert.That(pointer.CompletedAt).IsNull();
+            await Assert.That(pointer.DeadLetteredAt).IsNull();
+        }
+    }
+
+    private sealed class SubmissionPersistenceBoundary(SubmissionCustodyClock clock, string mode) : SaveChangesInterceptor
+    {
+        public bool Armed { get; set; }
+        public DateTime LeaseExpiresAt { get; set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (Armed && mode == "save_failure" &&
+                eventData.Context!.ChangeTracker.Entries<RegistrationSubmission>().Any(value => value.State == EntityState.Added))
+            {
+                Armed = false;
+                throw new InvalidOperationException("Injected submission save failure.");
+            }
+            return ValueTask.FromResult(result);
+        }
+
+        public override ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
+        {
+            if (Armed && mode == "transaction_expired" &&
+                eventData.Context!.ChangeTracker.Entries<RegistrationSubmission>().Any())
+            {
+                Armed = false;
+                clock.UtcNow = LeaseExpiresAt;
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class SubmissionCustodyClock(DateTime utcNow) : TimeProvider
+    {
+        public DateTime UtcNow { get; set; } = utcNow;
+        public override DateTimeOffset GetUtcNow() => new(UtcNow, TimeSpan.Zero);
+    }
+
+    private sealed class SuspendedSubmissionReader :
+        IRegistrationProviderDescriptor, IRegistrationProviderCallbackVerifier, IRegistrationProviderSubmissionReader
+    {
+        public Guid AttemptId { get; set; }
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public RegistrationProviderTuple Tuple { get; } = new("external-form", "hosted", "v1", "policy", "evidence");
+        public RegistrationProviderCapabilitySet ProvenCapabilities { get; } = RegistrationProviderCapabilitySet.FromCodes(
+            [RegistrationProviderCapabilityCodes.CallbackVerification, RegistrationProviderCapabilityCodes.SubmissionRead]);
+
+        public Task<RegistrationProviderCallbackVerificationResult> VerifyCallbackAsync(
+            RegistrationProviderCallbackVerificationRequest request, CancellationToken cancellationToken) =>
+            new FakeRegistrationProviderCallbackVerifier().VerifyCallbackAsync(request, cancellationToken);
+
+        public async Task<RegistrationProviderSubmissionReadResult> ReadSubmissionAsync(
+            RegistrationProviderSubmissionReadRequest request, CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            await Release.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            return new("suspended-submission", "revision-1", null, AttemptId,
+                new Dictionary<string, JsonElement> { ["provider.event_updates"] = JsonSerializer.SerializeToElement(true) });
+        }
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(Action<IServiceCollection>? configureServices = null) =>
         new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true }.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
@@ -734,9 +932,9 @@ public sealed class NativeRegistrationSubmissionHttpTests
                 configureServices?.Invoke(services);
             }));
 
-    private static WebApplicationFactory<Program> CreatePostgreSqlCallbackFactory(string connectionString) =>
+    private static WebApplicationFactory<Program> CreatePostgreSqlCallbackFactory(PostgreSqlContainerFixture database) =>
         new PostgreSqlApiWebApplicationFactory(
-            connectionString,
+            database,
             configureTestServices: services =>
             {
                 services.RemoveAll<IRegistrationProviderCallbackVerifier>();

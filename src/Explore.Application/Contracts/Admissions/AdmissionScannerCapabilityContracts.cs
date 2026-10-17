@@ -188,10 +188,6 @@ public interface IAdmissionScannerCapabilityRepository
         Guid targetId,
         CancellationToken cancellationToken);
 
-    Task<AdmissionScannerCapability?> FindByDigestCandidatesAsync(
-        IReadOnlyList<AdmissionScannerCapabilityDigestCandidate> candidates,
-        CancellationToken cancellationToken);
-
     Task<AdmissionScannerCapability> UpdateAsync(
         AdmissionScannerCapability capability,
         CancellationToken cancellationToken);

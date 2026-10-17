@@ -110,23 +110,33 @@ public sealed partial class RegistrationPaymentAttemptRepository
                 return outcome;
             });
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (
+            dbContext.Database.CurrentTransaction is null &&
+            RegistrationUniqueConflictClassifier.IsPaymentClaimIdentityConflict(dbContext, exception))
         {
             dbContext.ChangeTracker.Clear();
-            active = await GetActiveByOrderAsync(
-                claim.Attempt.TenantId, claim.Attempt.RegistrationOrderId, cancellationToken);
-            if (active is not null)
+            var recovered = await (from attempt in dbContext.PaymentAttempts.Include(value => value.AcceptanceSnapshot)
+                                   join effect in dbContext.CheckoutDispatchEffects
+                                       on new { attempt.TenantId, PaymentAttemptId = attempt.Id }
+                                       equals new { effect.TenantId, effect.PaymentAttemptId }
+                                   where attempt.TenantId == claim.Attempt.TenantId &&
+                                         attempt.RegistrationOrderId == claim.Attempt.RegistrationOrderId &&
+                                         attempt.ProviderIdempotencyKey == claim.Attempt.ProviderIdempotencyKey &&
+                                         attempt.CompositionRevision == claim.Attempt.CompositionRevision &&
+                                         attempt.ProviderCode == claim.Attempt.ProviderCode &&
+                                         attempt.ProfileCode == claim.Attempt.ProfileCode &&
+                                         attempt.CurrencyCode == claim.Attempt.CurrencyCode &&
+                                         attempt.OrganizerAmountMinor == claim.Attempt.OrganizerAmountMinor &&
+                                         attempt.PlatformFeeMinor == claim.Attempt.PlatformFeeMinor &&
+                                         attempt.PlatformContributionMinor == claim.Attempt.PlatformContributionMinor &&
+                                         attempt.RecipientSnapshot.OrganizerPaymentProviderConnectionId ==
+                                             claim.Attempt.RecipientSnapshot.OrganizerPaymentProviderConnectionId &&
+                                         attempt.RecipientSnapshot.ExternalAccountId == claim.Attempt.RecipientSnapshot.ExternalAccountId
+                                   select new { Attempt = attempt, Effect = effect })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (recovered is not null)
             {
-                return new(active.Value.Attempt, active.Value.DispatchEffect, Created: false);
-            }
-
-            historical = await GetByOrderCompositionAsync(
-                claim.Attempt.TenantId, claim.Attempt.RegistrationOrderId, claim.Attempt.CompositionRevision, cancellationToken);
-            if (historical is not null &&
-                (historical.Value.Attempt.ActiveUniquenessSlot == PaymentAttempt.ActiveUniquenessSlotValue ||
-                 string.Equals(historical.Value.Attempt.ProviderIdempotencyKey, claim.Attempt.ProviderIdempotencyKey, StringComparison.Ordinal)))
-            {
-                return new(historical.Value.Attempt, historical.Value.DispatchEffect, Created: false);
+                return new(recovered.Attempt, recovered.Effect, Created: false);
             }
 
             throw;

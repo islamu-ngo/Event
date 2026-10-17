@@ -26,6 +26,10 @@ public interface IRegistrationOrderLifecycleService
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<RegistrationOrderLifecycleResponseDto> ReadyForCheckoutAsync(
+        RegistrationFinalizationClaim claim,
+        CancellationToken cancellationToken);
+
     Task<RegistrationOrderLifecycleResponseDto> FinalizeFreeAsync(
         Guid orderId,
         Guid tenantId,
@@ -34,6 +38,10 @@ public interface IRegistrationOrderLifecycleService
     Task<RegistrationOrderLifecycleResponseDto> FinalizePaidAsync(
         Guid orderId,
         Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task<RegistrationOrderLifecycleResponseDto> FinalizePaidAsync(
+        RegistrationFinalizationClaim claim,
         CancellationToken cancellationToken);
 
     Task<RegistrationOrderLifecycleResponseDto> CancelAsync(

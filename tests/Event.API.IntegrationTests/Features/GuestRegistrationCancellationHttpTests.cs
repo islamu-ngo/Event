@@ -2,6 +2,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -61,8 +62,8 @@ public sealed partial class GuestRegistrationStatusHttpTests
         await Assert.That(repeated.RootElement.GetProperty("cancelledAt").GetDateTime()).IsEqualTo(cancelledAt);
         await using AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope();
         await Assert.That(await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
-            .IdempotencyRecords.AsNoTracking().SingleOrDefaultAsync(record =>
-                record.Key == key && record.TenantId == PlatformDefaults.DefaultTenantId)).IsNull();
+            .IdempotencyRecords.AsNoTracking().SingleOrDefaultAsync(row =>
+                row.Key == key && row.TenantId == PlatformDefaults.DefaultTenantId)).IsNull();
     }
 
     [Test]

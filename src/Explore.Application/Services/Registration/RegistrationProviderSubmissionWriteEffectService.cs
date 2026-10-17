@@ -1,9 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;
-using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Application.Contracts.Operations;
 using FluentValidation;
@@ -27,41 +27,40 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandValida
 }
 
 public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandler(
-    IRegistrationProviderSubmissionWriteEffectRepository effects,
-    IRegistrationProviderRegistry providerRegistry,
-    ITenantContextAccessor tenantContextAccessor,
-    IRegistrationSensitiveValueProtector sensitiveValueProtector,
+    IRegistrationProviderSubmissionWriteQueueRepository queue,
+    IRegistrationProviderSubmissionWriteExecutionScopeFactory executionScopes,
     TimeProvider timeProvider)
     : ICommandHandler<DrainRegistrationProviderSubmissionWriteEffectsCommand, int>
 {
-    private const int MaxAttempts = 5;
-
     public async Task<int> ExecuteAsync(
         DrainRegistrationProviderSubmissionWriteEffectsCommand command,
         CancellationToken cancellationToken)
     {
         await new DrainRegistrationProviderSubmissionWriteEffectsCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-        IReadOnlyList<RegistrationProviderSubmissionWriteClaim> claims = await effects.ClaimDueAsync(
+        IReadOnlyList<RegistrationProviderSubmissionWriteClaim> claims = await queue.ClaimDueAsync(
             command.LeaseOwner, command.BatchSize, now, TimeSpan.FromSeconds(command.LeaseSeconds), cancellationToken);
         int completed = 0;
         foreach (RegistrationProviderSubmissionWriteClaim claim in claims)
         {
-            tenantContextAccessor.SetTenant(claim.TenantId);
-            try
-            {
-                completed += await DrainOneAsync(claim, cancellationToken) ? 1 : 0;
-            }
-            finally
-            {
-                tenantContextAccessor.Clear();
-            }
+            await using var execution = await executionScopes.CreateAsync(claim.TenantId, cancellationToken);
+            completed += await execution.DrainAsync(claim, cancellationToken) ? 1 : 0;
         }
 
         return completed;
     }
 
-    private async Task<bool> DrainOneAsync(RegistrationProviderSubmissionWriteClaim claim, CancellationToken cancellationToken)
+}
+
+public sealed class RegistrationProviderSubmissionWriteEffectDeliveryService(
+    IRegistrationProviderSubmissionWriteEffectRepository effects,
+    IRegistrationProviderRegistry providerRegistry,
+    IRegistrationSensitiveValueProtector sensitiveValueProtector,
+    TimeProvider timeProvider)
+{
+    private const int MaxAttempts = 5;
+
+    public async Task<bool> DrainAsync(RegistrationProviderSubmissionWriteClaim claim, CancellationToken cancellationToken)
     {
         RegistrationProviderSubmissionWriteDelivery? delivery = await effects.GetDeliveryAsync(claim, cancellationToken);
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
@@ -70,6 +69,9 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
             await SettleFailureAsync(claim, "provider_delivery_graph_missing", retryable: false, ambiguous: false, now, cancellationToken);
             return false;
         }
+
+        if (claim.LeaseExpiresAt <= now)
+            return false;
 
         if (!AnonymousRegistrationRetentionPolicy.CanDisclose(delivery.Order, null, now))
         {
@@ -85,6 +87,7 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
         }
 
         IReadOnlyDictionary<string, string> answers = BuildProviderAnswers(delivery, out DateTime? disclosureUntilUtc, out bool retentionExpired);
+        now = timeProvider.GetUtcNow().UtcDateTime;
         if (answers.Count == 0)
         {
             if (retentionExpired)
@@ -105,6 +108,20 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
 
         try
         {
+            // Preparation can decrypt values or resolve an adapter after acquisition.
+            // Re-read the original source; settlement cannot undo a stale disclosure.
+            if (!await effects.IsDeliveryCurrentAsync(claim, delivery, cancellationToken))
+                return false;
+            now = timeProvider.GetUtcNow().UtcDateTime;
+            if (claim.LeaseExpiresAt <= now)
+                return false;
+            if (!AnonymousRegistrationRetentionPolicy.CanDisclose(delivery.Order, disclosureUntilUtc, now))
+            {
+                await SettleFailureAsync(claim, "registration_data_retention_expired", retryable: false, ambiguous: false,
+                    now, cancellationToken);
+                return false;
+            }
+
             RegistrationProviderSubmissionSinkResult result = await sink.AcceptAsync(
                 new RegistrationProviderSubmissionSinkRequest(
                     claim.TenantId,
@@ -142,7 +159,7 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
     private bool TryResolveSink(
         RegistrationProviderBinding binding,
         out RegistrationProviderTuple tuple,
-        out IRegistrationProviderSubmissionSink? sink)
+        [NotNullWhen(true)] out IRegistrationProviderSubmissionSink? sink)
     {
         sink = null;
         tuple = binding.Connection is null

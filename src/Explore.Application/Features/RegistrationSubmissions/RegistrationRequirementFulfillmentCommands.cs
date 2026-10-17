@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
 using Explore.Application.Contracts.Operations;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Features.RegistrationSubmissions.Commands;
 
@@ -90,11 +90,9 @@ public sealed class DrainRegistrationFinalizationEffectsCommandValidator
 }
 
 public sealed class DrainRegistrationFinalizationEffectsCommandHandler(
-    IRegistrationFinalizationRepository finalization,
-    IRegistrationOrderLifecycleService lifecycle,
-    ITenantContextAccessor tenantContextAccessor,
-    TimeProvider timeProvider,
-    IAdmissionIssuanceService? admissionIssuance = null)
+    IRegistrationFinalizationQueueRepository queue,
+    IServiceScopeFactory scopeFactory,
+    TimeProvider timeProvider)
     : ICommandHandler<DrainRegistrationFinalizationEffectsCommand, int>
 {
     public async Task<int> ExecuteAsync(
@@ -103,25 +101,32 @@ public sealed class DrainRegistrationFinalizationEffectsCommandHandler(
     {
         await new DrainRegistrationFinalizationEffectsCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-        IReadOnlyList<RegistrationFinalizationClaim> claims = await finalization.ClaimDueAsync(
+        IReadOnlyList<RegistrationFinalizationClaim> claims = await queue.ClaimDueAsync(
             request.LeaseOwner, request.BatchSize, now, TimeSpan.FromSeconds(request.LeaseSeconds), cancellationToken);
         int completed = 0;
         foreach (RegistrationFinalizationClaim claim in claims)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+            var tenantContextAccessor = scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
             tenantContextAccessor.SetTenant(claim.TenantId);
             try
             {
+                // Bind the persisted tenant before resolving any Runtime context.
+                // Each claim owns a new scope; no open lease changes identity.
+                var finalization = scope.ServiceProvider.GetRequiredService<IRegistrationFinalizationRepository>();
+                var lifecycle = scope.ServiceProvider.GetRequiredService<IRegistrationOrderLifecycleService>();
+                var admissionIssuance = scope.ServiceProvider.GetService<IAdmissionIssuanceService>();
                 var result = await lifecycle.ReadyForCheckoutAsync(
-                    claim.RegistrationOrderId, claim.TenantId, cancellationToken);
+                    claim, cancellationToken);
                 if (result.IsSuccess && result.Order?.StatusId is
                     (int)RegistrationOrderStatusEnum.AwaitingPayment or
                     (int)RegistrationOrderStatusEnum.NeedsReconciliation)
                 {
                     result = await lifecycle.FinalizePaidAsync(
-                        claim.RegistrationOrderId, claim.TenantId, cancellationToken);
+                        claim, cancellationToken);
                 }
 
-                DateTime settledAt = timeProvider.GetUtcNow().UtcDateTime;
                 bool issuanceAllowsCompletion = true;
                 if (result.IsSuccess && result.Order?.StatusId == (int)RegistrationOrderStatusEnum.Confirmed &&
                     admissionIssuance is not null)
@@ -131,7 +136,10 @@ public sealed class DrainRegistrationFinalizationEffectsCommandHandler(
                             claim.TenantId,
                             claim.RegistrationOrderId,
                             claim.EffectId,
-                            AdmissionIssuanceAuthority.ForOrderTotal(result.Order.TotalDueMinor)),
+                            AdmissionIssuanceAuthority.ForOrderTotal(result.Order.TotalDueMinor))
+                        {
+                            FinalizationClaim = claim
+                        },
                         cancellationToken);
                     issuanceAllowsCompletion =
                         issuance.Outcome is (
@@ -142,6 +150,7 @@ public sealed class DrainRegistrationFinalizationEffectsCommandHandler(
                             AdmissionDeliveryOutcome.NotRequired or
                             AdmissionDeliveryOutcome.Delivered;
                 }
+                DateTime settledAt = timeProvider.GetUtcNow().UtcDateTime;
                 if (result.IsSuccess && result.Order is not null && IsSettled(result.Order.StatusId) && issuanceAllowsCompletion)
                 {
                     completed += await finalization.CompleteAsync(claim, settledAt, cancellationToken) ? 1 : 0;

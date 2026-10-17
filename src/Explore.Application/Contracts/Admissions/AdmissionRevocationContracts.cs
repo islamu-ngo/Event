@@ -10,6 +10,18 @@ public enum AdmissionRevocationOutcome
     NotFound
 }
 
+public enum AdmissionCancellationSource
+{
+    Order,
+    Event
+}
+
+public sealed record AdmissionCommittedCancellationRequest(
+    Guid TenantId,
+    Guid RegistrationOrderId,
+    Guid EventId,
+    AdmissionCancellationSource Source);
+
 public sealed record AdmissionRefundAllocationFact(
     Guid OrderLineId,
     bool IsAdmissionLine,
@@ -97,6 +109,14 @@ public sealed record AdmissionRevocationResult
 
 public interface IAdmissionRevocationService
 {
+    /// <summary>
+    /// Rechecks persisted cancellation under the owning order/Event fences.
+    /// This worker entry owns its transaction; immediate authorized callers use ReconcileAsync instead.
+    /// </summary>
+    Task<AdmissionRevocationResult> ReconcileCommittedCancellationAsync(
+        AdmissionCommittedCancellationRequest request,
+        CancellationToken cancellationToken);
+
     Task<AdmissionRevocationResult> ReconcileAsync(
         AdmissionRevocationRequest request,
         CancellationToken cancellationToken);
@@ -121,6 +141,12 @@ public interface IAdmissionEventCancellationService
 
 public interface IAdmissionRevocationRepository
 {
+    void RequireCommittedCancellationScope(Guid tenantId);
+
+    Task<AdmissionRevocationContext?> LoadCommittedCancellationAsync(
+        AdmissionCommittedCancellationRequest request,
+        CancellationToken cancellationToken);
+
     Task<AdmissionRevocationContext?> LoadAsync(
         AdmissionRevocationRequest request,
         CancellationToken cancellationToken);
@@ -132,6 +158,8 @@ public interface IAdmissionRevocationRepository
 
 public interface IAdmissionEventCancellationRepository
 {
+    void RequireCommittedCancellationScope(Guid tenantId);
+
     Task<IReadOnlyList<Guid>> ListRevocableOrderIdsAsync(
         Guid tenantId,
         Guid eventId,

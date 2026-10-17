@@ -14,6 +14,7 @@ public sealed record CheckoutDispatchClaim(
     Guid PaymentAttemptId,
     Guid LeaseToken,
     long ProcessingFence,
+    DateTime LeaseExpiresAt,
     CheckoutDispatchReplayKind ReplayKind = CheckoutDispatchReplayKind.None,
     int AttemptCount = 0);
 
@@ -229,11 +230,10 @@ public interface IRegistrationPaymentAttemptRepository
         int? checkoutDispatchAttemptCount = null);
 
     Task<IReadOnlyList<PaymentReconciliationClaim>> ClaimDueReconciliationsAsync(
-        string leaseOwner,
-        int batchSize,
-        DateTime claimedAt,
-        TimeSpan leaseDuration,
-        CancellationToken cancellationToken);
+        PaymentReconciliationAcquisition acquisition, DateTime observedAt, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PaymentReconciliationClaim>> RecoverReconciliationAcquisitionAsync(
+        PaymentReconciliationAcquisition acquisition, DateTime observedAt, CancellationToken cancellationToken);
 
     Task<PaymentAttempt?> GetReconciliationAttemptAsync(
         PaymentReconciliationClaim claim,

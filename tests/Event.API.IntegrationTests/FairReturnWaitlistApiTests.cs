@@ -389,7 +389,9 @@ public sealed class FairReturnWaitlistApiTests(
     }
 
     [Test]
-    public async Task UnknownIdentityAndSellerConflictRemainGenericAndPrivate()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UnknownIdentityAndSellerConflictRemainGenericAndPrivate(bool issuedCapability)
     {
         string path =
             $"/api/events/{Guid.CreateVersion7()}" +
@@ -402,7 +404,8 @@ public sealed class FairReturnWaitlistApiTests(
                 path);
         request.Headers.Add(
             CapabilityHeader,
-            Guid.CreateVersion7().ToString("N"));
+            issuedCapability ? new Explore.Infrastructure.Services.GuestCapabilityTokenService().Issue().RawToken
+                : Guid.CreateVersion7().ToString("N"));
 
         using HttpResponseMessage response =
             await fixture.Client.SendAsync(request);

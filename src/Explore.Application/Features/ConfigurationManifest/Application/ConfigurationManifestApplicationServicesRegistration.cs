@@ -31,6 +31,15 @@ public static class ConfigurationManifestApplicationServicesRegistration
             throw new ArgumentOutOfRangeException(nameof(effectDeliveryMode));
         }
 
+        services.TryAddScoped<IConfigurationManifestApplier, ConfigurationManifestApplier>();
+        services.TryAddSingleton<LegalDocumentRenderingService>();
+        if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
+        {
+            services.TryAddScoped<IConfigurationManifestEffectDeliveryStrategy,
+                DeferredConfigurationManifestEffectDelivery>();
+            return services;
+        }
+
         services.TryAddScoped<IPublicationPolicyMutationBoundary, PublicationPolicyMutationBoundary>();
         services.TryAddScoped<SettingUpsertService>();
         services.TryAddScoped<
@@ -49,37 +58,25 @@ public static class ConfigurationManifestApplicationServicesRegistration
         services.TryAddScoped<
             IConfigurationManifestPreflight,
             ConfigurationManifestPreflight>();
-        services.TryAddScoped<IConfigurationManifestApplier, ConfigurationManifestApplier>();
-        services.TryAddSingleton<LegalDocumentRenderingService>();
-
-        if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
-        {
-            services.TryAddScoped<
-                IConfigurationManifestEffectDeliveryStrategy,
-                DeferredConfigurationManifestEffectDelivery>();
-        }
-        else
-        {
-            services.TryAddScoped<ConfigurationManifestCurrentStateReader>();
-            services.TryAddSingleton<ConfigurationImportArtifactParser>();
-            services.TryAddSingleton<ConfigurationImportPreviewComposer>();
-            services.TryAddScoped<ConfigurationImportSessionManager>();
-            services.TryAddScoped<ConfigurationImportSessionApplicationService>();
-            services.TryAddScoped<IConfigurationImportTenantIdentityMutationBoundary,
-                ConfigurationImportTenantIdentityMutationBoundary>();
-            services.TryAddScoped<ConfigurationImportSectionApplier>();
-            services.TryAddScoped<ConfigurationImportApplyService>();
-            services.TryAddScoped<ConfigurationManagedApplyScheduleService>();
-            services.TryAddScoped<ConfigurationDirectTransferService>();
-            services.TryAddScoped<IConfigurationImportEffectDelivery,
-                ConfigurationImportEffectDelivery>();
-            services.TryAddScoped<
-                IConfigurationManifestEffectDispatcher,
-                ConfigurationManifestEffectDispatcher>();
-            services.TryAddScoped<
-                IConfigurationManifestEffectDeliveryStrategy,
-                ConfigurationManifestEffectDelivery>();
-        }
+        services.TryAddScoped<ConfigurationManifestCurrentStateReader>();
+        services.TryAddSingleton<ConfigurationImportArtifactParser>();
+        services.TryAddSingleton<ConfigurationImportPreviewComposer>();
+        services.TryAddScoped<ConfigurationImportSessionManager>();
+        services.TryAddScoped<ConfigurationImportSessionApplicationService>();
+        services.TryAddScoped<IConfigurationImportTenantIdentityMutationBoundary,
+            ConfigurationImportTenantIdentityMutationBoundary>();
+        services.TryAddScoped<ConfigurationImportSectionApplier>();
+        services.TryAddScoped<ConfigurationImportApplyService>();
+        services.TryAddScoped<ConfigurationManagedApplyScheduleService>();
+        services.TryAddScoped<ConfigurationDirectTransferService>();
+        services.TryAddScoped<IConfigurationImportEffectDelivery,
+            ConfigurationImportEffectDelivery>();
+        services.TryAddScoped<
+            IConfigurationManifestEffectDispatcher,
+            ConfigurationManifestEffectDispatcher>();
+        services.TryAddScoped<
+            IConfigurationManifestEffectDeliveryStrategy,
+            ConfigurationManifestEffectDelivery>();
 
         return services;
     }

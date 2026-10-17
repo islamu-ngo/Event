@@ -32,43 +32,54 @@ public sealed class RefundReconciliationService(
             return attempt;
         }
 
-        if (attempt.Status is RefundAttemptStatusEnum.Requested or
-            RefundAttemptStatusEnum.DispatchPending ||
-            attempt.Status == RefundAttemptStatusEnum.RequiresAction &&
+        if (attempt.CanDispatchBuyer)
+            return await new RefundDispatchService(repository, creator, timeProvider, addOns)
+                .DispatchAsync(tenantId, refundAttemptId, cancellationToken);
+
+        if (attempt.Status == RefundAttemptStatusEnum.RequiresAction &&
             attempt.FailureCode is not null)
         {
             return attempt;
         }
 
-        RefundProviderResult result = attempt.ProviderRefundId is null
-            ? await creator.CreateAsync(RefundDispatchService.CreateRequest(attempt), cancellationToken)
-            : await retriever.RetrieveAsync(
+        DateTime startedAt = NextObservation(attempt);
+        Guid? dispatchToken = null;
+        if (attempt.CanDispatchApplicationFee && attempt.ProviderMutationExpiresAt > startedAt)
+        {
+            dispatchToken = Guid.CreateVersion7();
+            attempt = await repository.TryBeginDispatchAsync(
+                attempt, dispatchToken.Value, applicationFee: true, startedAt, attempt.ProviderMutationExpiresAt.Value,
+                RefundOutboxMessageFactory.CreateReconciliation(attempt, startedAt, startedAt.AddMinutes(1)),
+                cancellationToken);
+            if (attempt is null)
+                return await repository.GetByIdAsync(tenantId, refundAttemptId, cancellationToken);
+        }
+
+        // An ambiguous buyer/fee handoff is recovered by provider observation, never
+        // by repeating a mutation merely because its durable row says pending/unknown.
+        RefundProviderResult result = await retriever.RetrieveAsync(
                 RefundRetrieveRequest.Create(
                     attempt.ProviderCode,
                     attempt.ExternalAccountId,
                     attempt.ProviderPaymentId,
-                    attempt.ProviderRefundId,
+                    attempt.ProviderRefundId ?? string.Empty,
                     attempt.ProviderIdempotencyKey,
                     attempt.Allocation.TotalMinor,
                     attempt.CurrencyCode,
-                    checked(attempt.Allocation.PlatformFeeMinor + attempt.Allocation.PlatformContributionMinor)),
+                    checked(attempt.Allocation.PlatformFeeMinor + attempt.Allocation.PlatformContributionMinor)) with
+                {
+                    RefundAttemptId = attempt.Id,
+                    AllowApplicationFeeMutation = dispatchToken.HasValue,
+                    MutationExpiresAt = attempt.ProviderMutationExpiresAt
+                },
                 cancellationToken);
         DateTime observedAt = NextObservation(attempt);
-        if (result.Outcome == RefundProviderOutcome.Observed && result.Observation is not null)
-        {
-            RefundAttemptEvidence.Apply(attempt, result.Observation, observedAt, result.ProviderRequestId);
-        }
-        else if (result.Outcome == RefundProviderOutcome.Failed && result.Failure is not null)
-        {
-            attempt.MarkProviderBlocked(observedAt, result.ProviderRequestId, result.Failure.Code);
-        }
-        else
-        {
-            attempt.MarkUnknown(observedAt, result.ProviderRequestId);
-        }
-
-        await repository.SaveChangesAsync(cancellationToken);
-        await ResolveAddOnAllocationAsync(attempt, cancellationToken);
+        attempt = await repository.SettleAndScheduleAsync(
+            attempt, dispatchToken, result, observedAt,
+            RefundOutboxMessageFactory.CreateReconciliation(attempt, observedAt, observedAt.AddMinutes(1)),
+            cancellationToken);
+        if (attempt is not null)
+            await ResolveAddOnAllocationAsync(attempt, cancellationToken);
         return attempt;
     }
 

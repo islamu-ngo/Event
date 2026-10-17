@@ -9,6 +9,9 @@ public sealed record RegistrationFinalizationClaim(
     Guid LeaseToken,
     long ProcessingFence);
 
+public sealed class RegistrationFinalizationCustodyLostException()
+    : Exception("Registration finalization execution custody is no longer current.");
+
 public enum SucceededPaymentLookupStatus
 {
     Missing,
@@ -38,6 +41,15 @@ public sealed record SucceededPaymentLookupResult(
 
 public interface IRegistrationFinalizationRepository
 {
+    /// <summary>
+    /// Locks the original effect until the caller's transaction ends and checks
+    /// its persisted tenant, order, token, fence, status and current expiry.
+    /// Call again after awaited work, before returning from that transaction.
+    /// </summary>
+    Task<bool> TryAcquireExecutionAsync(
+        RegistrationFinalizationClaim claim,
+        CancellationToken cancellationToken);
+
     Task<bool> RecordFulfillmentAsync(
         RegistrationRequirementFulfillment fulfillment,
         DateTime recordedAt,
@@ -69,13 +81,6 @@ public interface IRegistrationFinalizationRepository
         Guid tenantId,
         Guid registrationOrderId,
         Guid registrationRequirementId,
-        CancellationToken cancellationToken);
-
-    Task<IReadOnlyList<RegistrationFinalizationClaim>> ClaimDueAsync(
-        string leaseOwner,
-        int batchSize,
-        DateTime claimedAt,
-        TimeSpan leaseDuration,
         CancellationToken cancellationToken);
 
     Task<bool> CompleteAsync(

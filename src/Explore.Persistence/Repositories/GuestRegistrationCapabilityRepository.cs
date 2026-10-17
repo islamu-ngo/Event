@@ -2,11 +2,15 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence.Database;
+using Explore.Persistence.Security;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class GuestRegistrationCapabilityRepository(ExploreDbContext dbContext)
+public sealed class GuestRegistrationCapabilityRepository(
+    ExploreDbContext dbContext, IConfiguration configuration,
+    Func<ISerializableAttemptOwner> resolveAttempt, TimeProvider clock)
     : IGuestRegistrationCapabilityRepository
 {
     public Task<RegistrationOrder?> GetExactGuestOrderAsync(
@@ -14,8 +18,13 @@ public sealed class GuestRegistrationCapabilityRepository(ExploreDbContext dbCon
         Guid tenantId,
         Guid eventId,
         CapabilityTokenHash guestAccessTokenHash,
-        CancellationToken cancellationToken) =>
-        dbContext.RegistrationOrders
+        CancellationToken cancellationToken)
+    {
+        if (PostgresRegistrationPrivateReadContract.For(dbContext) is { } native)
+            return native.ReadGuestRecoveryAsync(
+                PostgresNativeQueueEnrollment.Bind(configuration), resolveAttempt, clock.GetUtcNow().UtcDateTime,
+                orderId, tenantId, eventId, guestAccessTokenHash, cancellationToken);
+        return dbContext.RegistrationOrders
             .AsNoTracking()
             .Include(order => order.Lines)
             .Include(order => order.PlatformContribution)
@@ -23,6 +32,7 @@ public sealed class GuestRegistrationCapabilityRepository(ExploreDbContext dbCon
                 order => order.Id == orderId && order.TenantId == tenantId &&
                          order.EventId == eventId && order.GuestAccessTokenHash == guestAccessTokenHash,
                 cancellationToken);
+    }
 
     public async Task<RegistrationOrder?> GetGuestStatusOrderForUpdateAsync(
         Guid orderId, Guid tenantId, CancellationToken cancellationToken)

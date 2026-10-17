@@ -1,36 +1,18 @@
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Services.Registration;
+using RegistrationPaymentCheckoutDispatchRequest = Explore.Application.Contracts.Payments.RegistrationPaymentCheckoutDispatchRequest;
+using RegistrationPaymentCheckoutDispatchResult = Explore.Application.Contracts.Payments.RegistrationPaymentCheckoutDispatchResult;
 using Explore.Domain;
 using Explore.Domain.Enums;
 
-namespace Explore.Application.Services.Registration;
-
-public sealed record RegistrationPaymentCheckoutDispatchRequest(
-    string LeaseOwner,
-    int BatchSize,
-    TimeSpan LeaseDuration,
-    Uri AllowedReturnOrigin,
-    Uri SuccessUrl,
-    Uri CancelUrl);
-
-public sealed record RegistrationPaymentCheckoutDispatchResult(
-    int Claimed,
-    int Completed,
-    int Unknown,
-    int Parked,
-    int Retried,
-    int Stale);
+namespace Explore.Infrastructure.Services;
 
 public sealed class RegistrationPaymentCheckoutDispatchService(
-    IRegistrationPaymentAttemptRepository repository,
-    IHostedCheckoutSessionCreator checkoutCreator,
-    IHostedCheckoutSessionRetriever checkoutRetriever,
-    IPaymentIntentRetriever paymentIntentRetriever,
-    IRegistrationOrderLifecycleService orderLifecycle,
-    TimeProvider timeProvider,
-    IPaidCheckoutActivationService checkoutActivation,
-    IPaidOrderAcceptanceFreshnessService acceptanceFreshness)
+    ICheckoutDispatchAdmission admission,
+    ICheckoutDispatchExecutionScopeFactory executions,
+    TimeProvider timeProvider)
 {
     private static readonly TimeSpan ProviderCutoffMinimum = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ProviderCutoffTransportMargin = TimeSpan.FromMinutes(1);
@@ -51,7 +33,7 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
         for (int index = 0; index < batchSize; index++)
         {
             DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-            IReadOnlyList<CheckoutDispatchClaim> claims = await repository.ClaimDueDispatchEffectsAsync(
+            IReadOnlyList<CheckoutDispatchClaim> claims = await admission.ClaimDueDispatchEffectsAsync(
                 leaseOwner, 1, now, leaseDuration, cancellationToken);
             if (claims.Count == 0)
             {
@@ -59,13 +41,20 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
             }
 
             claimed++;
+            await using var execution = await executions.CreateAsync(claims[0], now, cancellationToken);
+            if (execution is null)
+            {
+                stale++;
+                continue;
+            }
+            var repository = execution.Repository;
             CheckoutDispatchConfigurationDisposition disposition = await repository.DeferCheckoutDispatchForConfigurationAsync(
                 claims[0],
                 failureCode,
                 now.AddMinutes(5),
                 now,
                 cancellationToken);
-            disposition = await ResolveConfigurationDispositionAsync(claims[0], disposition, now, cancellationToken);
+            disposition = await ResolveConfigurationDispositionAsync(execution.OrderLifecycle, claims[0], disposition, now, cancellationToken);
             bool deferred = disposition is CheckoutDispatchConfigurationDisposition.Deferred or CheckoutDispatchConfigurationDisposition.CancelledExpired;
             Increment(deferred, ref retried, ref stale);
         }
@@ -102,7 +91,7 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
                 cancellationToken.ThrowIfCancellationRequested();
             }
             DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-            IReadOnlyList<CheckoutDispatchClaim> claims = await repository.ClaimDueDispatchEffectsAsync(
+            IReadOnlyList<CheckoutDispatchClaim> claims = await admission.ClaimDueDispatchEffectsAsync(
                 request.LeaseOwner, 1, now, request.LeaseDuration, cancellationToken);
             if (claims.Count == 0)
             {
@@ -111,6 +100,18 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
 
             claimed++;
             CheckoutDispatchClaim claim = claims[0];
+            await using var execution = await executions.CreateAsync(claim, now, cancellationToken);
+            if (execution is null)
+            {
+                stale++;
+                continue;
+            }
+            var repository = execution.Repository;
+            var checkoutCreator = execution.CheckoutCreator;
+            var checkoutRetriever = execution.CheckoutRetriever;
+            var paymentIntentRetriever = execution.PaymentIntentRetriever;
+            var checkoutActivation = execution.CheckoutActivation;
+            var acceptanceFreshness = execution.AcceptanceFreshness;
             PaymentAttempt? attempt = await repository.GetClaimedAttemptAsync(claim, now, cancellationToken);
             if (attempt is null)
             {
@@ -184,8 +185,17 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
                 continue;
             }
 
-            bool safeReplay = status == PaymentAttemptStatusEnum.Unknown ||
-                              claim.ReplayKind == CheckoutDispatchReplayKind.PreHandoffRetry;
+            bool unknownReplay = status == PaymentAttemptStatusEnum.Unknown ||
+                                 claim.ReplayKind == CheckoutDispatchReplayKind.UnknownRedrive;
+            if (unknownReplay && !AllowsUnknownReplay(execution.PaymentProviderDescriptor, attempt, now))
+            {
+                bool settled = await repository.MarkCheckoutDispatchUnknownAsync(
+                    claim, attempt.LastProviderRequestId, now, CancellationToken.None);
+                Increment(settled, ref unknown, ref stale);
+                continue;
+            }
+
+            bool safeReplay = unknownReplay || claim.ReplayKind == CheckoutDispatchReplayKind.PreHandoffRetry;
             if (status is PaymentAttemptStatusEnum.DispatchPending or PaymentAttemptStatusEnum.Unknown && !safeReplay)
             {
                 bool settled = await repository.MarkCheckoutDispatchUnknownAsync(
@@ -200,7 +210,7 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
             if (attempt.AcceptanceSnapshot is not { } acceptance)
             {
                 CheckoutDispatchConfigurationDisposition disposition = await DeferActivationAsync(
-                    claim, "payment_acceptance_missing", now, cancellationToken);
+                    execution, claim, "payment_acceptance_missing", now, cancellationToken);
                 CountDisposition(disposition, ref retried, ref parked, ref stale);
                 continue;
             }
@@ -210,7 +220,7 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
             if (!activation.IsActive)
             {
                 CheckoutDispatchConfigurationDisposition disposition = await DeferActivationAsync(
-                    claim, activation.FailureCode ?? "payment_activation_unavailable", now, cancellationToken);
+                    execution, claim, activation.FailureCode ?? "payment_activation_unavailable", now, cancellationToken);
                 CountDisposition(disposition, ref retried, ref parked, ref stale);
                 continue;
             }
@@ -218,7 +228,7 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
             if (!await acceptanceFreshness.IsCurrentAsync(attempt, cancellationToken))
             {
                 CheckoutDispatchConfigurationDisposition disposition = await DeferActivationAsync(
-                    claim, "payment_acceptance_stale", now, cancellationToken);
+                    execution, claim, "payment_acceptance_stale", now, cancellationToken);
                 CountDisposition(disposition, ref retried, ref parked, ref stale);
                 continue;
             }
@@ -229,6 +239,15 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
             if (attempt is null)
             {
                 stale++;
+                continue;
+            }
+
+            DateTime handoffAt = timeProvider.GetUtcNow().UtcDateTime;
+            if (unknownReplay && !AllowsUnknownReplay(execution.PaymentProviderDescriptor, attempt, handoffAt))
+            {
+                bool settled = await repository.MarkCheckoutDispatchUnknownAsync(
+                    claim, attempt.LastProviderRequestId, handoffAt, CancellationToken.None);
+                Increment(settled, ref unknown, ref stale);
                 continue;
             }
 
@@ -283,7 +302,7 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
                             : TimeSpan.FromMinutes(15)),
                         settledAt,
                         settlementToken);
-                    disposition = await ResolveConfigurationDispositionAsync(claim, disposition, settledAt, settlementToken);
+                    disposition = await ResolveConfigurationDispositionAsync(execution.OrderLifecycle, claim, disposition, settledAt, settlementToken);
                     if (disposition == CheckoutDispatchConfigurationDisposition.Deferred) retried++;
                     else if (disposition == CheckoutDispatchConfigurationDisposition.CancelledExpired) parked++;
                     else stale++;
@@ -296,6 +315,7 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
                         settledAt,
                         settlementToken);
                     configurationDisposition = await ResolveConfigurationDispositionAsync(
+                        execution.OrderLifecycle,
                         claim,
                         configurationDisposition,
                         settledAt,
@@ -319,6 +339,16 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
         }
 
         return new(claimed, completed, unknown, parked, retried, stale);
+    }
+
+    private static bool AllowsUnknownReplay(IPaymentProviderDescriptor paymentProviderDescriptor, PaymentAttempt attempt, DateTime observedAt)
+    {
+        PaymentProviderDescriptor descriptor = paymentProviderDescriptor.Describe();
+        return descriptor.ProviderCode == attempt.ProviderCode && descriptor.ProfileCode == attempt.ProfileCode &&
+               descriptor.ApiRevision == attempt.ProviderApiRevision &&
+               descriptor.CheckoutMutationIdempotencyRetentionFloor is { } retention &&
+               retention > ProviderCutoffTransportMargin && observedAt >= attempt.CreatedAt &&
+               observedAt - attempt.CreatedAt < retention - ProviderCutoffTransportMargin;
     }
 
     private static void ValidateRequest(RegistrationPaymentCheckoutDispatchRequest request)
@@ -374,14 +404,15 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
     }
 
     private async Task<CheckoutDispatchConfigurationDisposition> DeferActivationAsync(
+        ICheckoutDispatchExecutionScope execution,
         CheckoutDispatchClaim claim,
         string failureCode,
         DateTime observedAt,
         CancellationToken cancellationToken)
     {
-        CheckoutDispatchConfigurationDisposition disposition = await repository.DeferCheckoutDispatchForConfigurationAsync(
+        CheckoutDispatchConfigurationDisposition disposition = await execution.Repository.DeferCheckoutDispatchForConfigurationAsync(
             claim, failureCode, observedAt.AddMinutes(5), observedAt, cancellationToken);
-        return await ResolveConfigurationDispositionAsync(claim, disposition, observedAt, cancellationToken);
+        return await ResolveConfigurationDispositionAsync(execution.OrderLifecycle, claim, disposition, observedAt, cancellationToken);
     }
 
     private static void CountDisposition(
@@ -395,7 +426,8 @@ public sealed class RegistrationPaymentCheckoutDispatchService(
         else stale++;
     }
 
-    private Task<CheckoutDispatchConfigurationDisposition> ResolveConfigurationDispositionAsync(
+    private static Task<CheckoutDispatchConfigurationDisposition> ResolveConfigurationDispositionAsync(
+        IRegistrationOrderLifecycleService orderLifecycle,
         CheckoutDispatchClaim claim,
         CheckoutDispatchConfigurationDisposition disposition,
         DateTime observedAt,

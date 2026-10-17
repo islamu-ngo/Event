@@ -1,5 +1,7 @@
 using System.Data;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Payments;
+using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
@@ -10,6 +12,94 @@ namespace Explore.Persistence.Repositories;
 
 public sealed class RefundAttemptRepository(ExploreDbContext dbContext) : IRefundAttemptRepository
 {
+    public Task<RefundAttempt?> TryBeginDispatchAsync(
+        RefundAttempt expected, Guid dispatchToken, bool applicationFee, DateTime committedAt,
+        DateTime mutationExpiresAt, OutboxMessage recoveryTrigger, CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.CurrentTransaction is not null)
+            throw new InvalidOperationException("Refund handoff ownership must commit outside an ambient transaction.");
+        Guid stamp = expected.ConcurrencyStamp;
+        return ExecuteLockedAsync<RefundAttempt?>(expected.TenantId, expected.PaymentAttemptId, async token =>
+        {
+            RefundAttempt? current = await LoadCurrentAsync(expected.TenantId, expected.Id, token);
+            if (current is null || current.ConcurrencyStamp != stamp ||
+                (applicationFee ? !current.CanDispatchApplicationFee : !current.CanDispatchBuyer) ||
+                current.ProviderMutationExpiresAt <= committedAt)
+                return null;
+
+            current.BeginDispatch(dispatchToken, applicationFee, committedAt, mutationExpiresAt);
+            dbContext.OutboxMessages.Add(recoveryTrigger);
+            await dbContext.SaveChangesAsync(token);
+            return current;
+        }, cancellationToken);
+    }
+
+    public Task<RefundAttempt?> SettleAndScheduleAsync(
+        RefundAttempt expected, Guid? dispatchToken, RefundProviderResult result, DateTime observedAt,
+        OutboxMessage recoveryTrigger, CancellationToken cancellationToken)
+    {
+        Guid stamp = expected.ConcurrencyStamp;
+        return ExecuteLockedAsync<RefundAttempt?>(expected.TenantId, expected.PaymentAttemptId, async token =>
+        {
+            RefundAttempt? current = await LoadCurrentAsync(expected.TenantId, expected.Id, token);
+            if (current is null ||
+                current.Status is RefundAttemptStatusEnum.Succeeded or RefundAttemptStatusEnum.Failed or RefundAttemptStatusEnum.Cancelled)
+                return current;
+            if (current.ConcurrencyStamp != stamp ||
+                dispatchToken.HasValue && current.DispatchToken != dispatchToken)
+                return null;
+
+            if (result.Outcome == RefundProviderOutcome.Observed && result.Observation is not null)
+            {
+                if (dispatchToken.HasValue &&
+                    current.DispatchPhase == RefundDispatchPhase.ApplicationFeeHandoffCommitted &&
+                    result.Observation.ApplicationFeeHandoffStarted == false)
+                    current.ProveNoProviderHandoff(dispatchToken.Value, observedAt);
+                RefundAttemptEvidence.Apply(current, result.Observation, observedAt, result.ProviderRequestId);
+            }
+            else
+            {
+                if (dispatchToken.HasValue && result.Failure?.ProviderHandoffStarted == false)
+                    current.ProveNoProviderHandoff(dispatchToken.Value, observedAt);
+                else
+                    current.MarkUnknown(observedAt, result.ProviderRequestId);
+
+                if (result.Outcome == RefundProviderOutcome.Failed && result.Failure is not null)
+                    current.MarkProviderBlocked(observedAt, result.ProviderRequestId, result.Failure.Code);
+            }
+
+            // Outcome and its next native work commit together. This also survives an
+            // acknowledgement lost after SaveChanges/Commit and a worker dying before return.
+            dbContext.OutboxMessages.Add(recoveryTrigger);
+            await dbContext.SaveChangesAsync(token);
+            return current;
+        }, cancellationToken, allowReadCommittedAmbient: true);
+    }
+
+    private async Task<RefundAttempt?> LoadCurrentAsync(Guid tenantId, Guid id, CancellationToken cancellationToken)
+    {
+        RefundAttempt? current = await GetByIdAsync(tenantId, id, cancellationToken);
+        if (current is not null)
+            await dbContext.Entry(current).ReloadAsync(cancellationToken);
+        return current;
+    }
+
+    public async Task<RefundReservationResult?> RecoverOperationAsync(
+        Guid tenantId, Guid paymentAttemptId, string nativeOperationKey, string nativeInputDigest,
+        CancellationToken cancellationToken)
+    {
+        RefundAttempt? existing = await dbContext.RefundAttempts.AsNoTracking()
+            .Include(value => value.Lines)
+            .SingleOrDefaultAsync(value => value.TenantId == tenantId &&
+                value.NativeOperationKey == nativeOperationKey, cancellationToken);
+        if (existing is null)
+            return null;
+        return existing.PaymentAttemptId == paymentAttemptId &&
+               string.Equals(existing.NativeInputDigest, nativeInputDigest, StringComparison.Ordinal)
+            ? new(RefundReservationDisposition.Duplicate, existing)
+            : new(RefundReservationDisposition.OperationConflict, null);
+    }
+
     public Task<RefundAttempt?> GetByIdAsync(
         Guid tenantId,
         Guid refundAttemptId,
@@ -182,11 +272,28 @@ public sealed class RefundAttemptRepository(ExploreDbContext dbContext) : IRefun
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 existing => existing.TenantId == attempt.TenantId &&
-                            existing.ProviderIdempotencyKey == attempt.ProviderIdempotencyKey,
+                            (existing.NativeOperationKey == attempt.NativeOperationKey ||
+                             existing.ProviderIdempotencyKey == attempt.ProviderIdempotencyKey),
                 cancellationToken);
         if (duplicate is not null)
         {
-            return new(RefundReservationDisposition.Duplicate, duplicate);
+            bool exact = duplicate.NativeOperationKey == attempt.NativeOperationKey &&
+                duplicate.NativeInputDigest == attempt.NativeInputDigest &&
+                duplicate.RequestedAmountMinor == attempt.RequestedAmountMinor &&
+                duplicate.CreatedBy == attempt.CreatedBy &&
+                duplicate.PaymentAttemptId == attempt.PaymentAttemptId &&
+                duplicate.RegistrationOrderId == attempt.RegistrationOrderId &&
+                duplicate.PaidOrderAcceptanceSnapshotId == attempt.PaidOrderAcceptanceSnapshotId &&
+                duplicate.SourceCampaignId == attempt.SourceCampaignId &&
+                duplicate.ProviderCode == attempt.ProviderCode &&
+                duplicate.ExternalAccountId == attempt.ExternalAccountId &&
+                duplicate.ProviderPaymentId == attempt.ProviderPaymentId &&
+                duplicate.ProviderIdempotencyKey == attempt.ProviderIdempotencyKey &&
+                duplicate.CurrencyCode == attempt.CurrencyCode &&
+                duplicate.AuthorityCode == attempt.AuthorityCode && duplicate.ReasonCode == attempt.ReasonCode;
+            return exact
+                ? new(RefundReservationDisposition.Duplicate, duplicate)
+                : new(RefundReservationDisposition.OperationConflict, null);
         }
 
         PaymentAttempt? payment = await dbContext.PaymentAttempts
@@ -231,13 +338,18 @@ public sealed class RefundAttemptRepository(ExploreDbContext dbContext) : IRefun
             .Include(existing => existing.Lines)
             .Where(existing => existing.TenantId == attempt.TenantId && existing.PaymentAttemptId == attempt.PaymentAttemptId)
             .ToListAsync(cancellationToken);
+        long requestedAmount = attempt.RequestedAmountMinor ??
+            checked(payment.TotalMinor - existingAttempts.Where(value => value.ReservesCapacity)
+                .Sum(value => value.Allocation.TotalMinor));
+        if (requestedAmount <= 0)
+            return new(RefundReservationDisposition.CapacityExceeded, null);
         try
         {
             RefundReservationRules.EnsureReservable(
                 payment.TotalMinor,
                 existingAttempts,
                 disputes,
-                attempt.Allocation.TotalMinor);
+                requestedAmount);
         }
         catch (InvalidOperationException)
         {
@@ -334,13 +446,14 @@ public sealed class RefundAttemptRepository(ExploreDbContext dbContext) : IRefun
         Guid tenantId,
         Guid paymentAttemptId,
         Func<CancellationToken, Task<T>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowReadCommittedAmbient = false)
     {
         if (dbContext.Database.CurrentTransaction is not null)
         {
-            if (dbContext.Database.CurrentTransaction
-                    .GetDbTransaction()
-                    .IsolationLevel != IsolationLevel.Serializable)
+            IsolationLevel ambientIsolation = dbContext.Database.CurrentTransaction.GetDbTransaction().IsolationLevel;
+            if (ambientIsolation != IsolationLevel.Serializable &&
+                !(allowReadCommittedAmbient && ambientIsolation == IsolationLevel.ReadCommitted))
             {
                 throw new InvalidOperationException(
                     "Ambient refund reservation requires a serializable transaction.");

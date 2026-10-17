@@ -8,15 +8,6 @@ public sealed record TicketingRecoveryHealth(
     int AmbiguousEffects,
     DateTime? OldestPendingAt);
 
-public sealed record TicketingRecoveryAggregateHealth(
-    int RecoveryOnly,
-    int Failed,
-    int PendingReissues,
-    int AmbiguousEffects,
-    int DeadLetteredEffects,
-    int PoisonEffects,
-    DateTime? OldestDueAt);
-
 public interface ITicketingRecoveryOperatorStore
 {
     Task<TicketingRecoveryCheckpoint> BeginRecoveryAsync(
@@ -91,6 +82,4 @@ public interface ITicketingRecoveryOperatorStore
         Guid recoveryOperationId,
         CancellationToken cancellationToken);
 
-    Task<TicketingRecoveryAggregateHealth> GetAggregateHealthAsync(
-        CancellationToken cancellationToken);
 }

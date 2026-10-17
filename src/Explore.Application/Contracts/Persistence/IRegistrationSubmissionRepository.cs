@@ -66,7 +66,8 @@ public enum RegistrationSubmissionPersistenceOutcome
     Inserted,
     Existing,
     EvidenceOnlyConflict,
-    AttemptUnavailable
+    AttemptUnavailable,
+    EffectClaimLost
 }
 
 public sealed record RegistrationSubmissionPersistenceResult(

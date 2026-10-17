@@ -6,10 +6,9 @@ using Quartz;
 namespace Explore.API.Scheduling;
 
 /// <summary>
-/// Replaces a hand-rolled <c>BackgroundService</c> polling loop. Only the timer moved: the drain's fencing,
-/// claim, and retry semantics live in <see cref="DrainRegistrationFinalizationEffectsCommand"/> and are
-/// untouched, which is the whole point of migrating this worker first — it is the smallest candidate whose
-/// loop carried no logic of its own, so it proves the pattern without putting claim semantics at risk.
+/// Runs one fenced finalization pass. <see cref="DrainRegistrationFinalizationEffectsCommand"/>
+/// claims identities under explicit Global authority and executes each order in a
+/// fresh ordinary Runtime tenant scope; the timer owns neither authority nor settlement.
 /// <para>
 /// <see cref="DisallowConcurrentExecutionAttribute"/> preserves the guarantee the <c>while</c> loop gave for
 /// free: a slow pass delays the next one instead of overlapping with it.
@@ -30,8 +29,8 @@ public sealed class RegistrationFinalizationDrainJob(
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        // A scope per pass, matching the worker: the drain command resolves scoped persistence services and
-        // must not accumulate tracked state across passes.
+        // This scope owns queue discovery only. The command owns a fresh Runtime
+        // scope per claim, bound before any order persistence service is resolved.
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
         var drainHandler = scope.ServiceProvider.GetRequiredService<ICommandHandler<DrainRegistrationFinalizationEffectsCommand, int>>();
 

@@ -10,7 +10,8 @@ public sealed class RegistrationPaymentCancellationService(
     IRefundAttemptRepository refunds,
     IRefundCampaignRepository campaigns,
     IPaymentCancellationProvider provider,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IRegistrationInventoryRepository inventory)
 {
     public async Task<bool> CancelAsync(
         Guid tenantId,
@@ -23,8 +24,11 @@ public sealed class RegistrationPaymentCancellationService(
             tenantId, paymentAttemptId, cancellationToken);
         if (campaign is null || payment is null || campaign.Kind != RefundCampaignKind.EventCancellation)
         {
-            return true;
+            return false;
         }
+        var order = await inventory.GetOrderByIdAsync(payment.RegistrationOrderId, tenantId, cancellationToken);
+        if (order is null || order.EventId != campaign.EventId)
+            return false;
 
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         if (payment.PaymentAttemptStatusId == (int)PaymentAttemptStatusEnum.Succeeded)

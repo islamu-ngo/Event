@@ -17,6 +17,18 @@ internal static class RegistrationUniqueConflictClassifier
     private const int SqlServerUniqueConstraintViolation = 2627;
     private const int MySqlDuplicateEntry = 1062;
 
+    internal static bool IsPaymentClaimIdentityConflict(
+        ExploreDbContext context,
+        DbUpdateException exception) =>
+        IsExpectedConflict(
+            exception,
+            [
+                RelationalConstraintDescriptorResolver.UniqueIndex<PaymentAttempt>(
+                    context, nameof(PaymentAttempt.ActiveScopeKey), nameof(PaymentAttempt.ActiveUniquenessSlot)),
+                RelationalConstraintDescriptorResolver.UniqueIndex<PaymentAttempt>(
+                    context, nameof(PaymentAttempt.ProviderIdempotencyKey))
+            ]);
+
     internal static bool IsSubmissionIdentityConflict(
         ExploreDbContext context,
         DbUpdateException exception) =>

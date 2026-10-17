@@ -149,9 +149,9 @@ public sealed class AdmissionCompositeDispatchTests
         var envelopeProtector = new AdmissionDeliveryEnvelopeProtector(new EphemeralDataProtectionProvider());
         AdmissionProtectedDeliveryMaterial protectedMaterial = envelopeProtector.Protect(
             new AdmissionCredentialDeliveryEnvelope(recipient, bearer));
-        AdmissionTicket ticket = await SeedOwningOrderAsync(context, tenantId, now);
+        var (ticket, effectId) = await SeedOwningOrderAsync(context, tenantId, now);
         var intent = new AdmissionDeliveryIntent(
-            Guid.CreateVersion7(), tenantId, Guid.CreateVersion7(), ticket.RegistrationTicketAssignmentId, ticket.Id,
+            Guid.CreateVersion7(), tenantId, effectId, ticket.RegistrationTicketAssignmentId, ticket.Id,
             protectedMaterial.Ciphertext, protectedMaterial.ProtectionVersion, now);
         context.AdmissionDeliveryIntents.Add(intent);
         await context.SaveChangesAsync();
@@ -161,10 +161,11 @@ public sealed class AdmissionCompositeDispatchTests
             .Returns(EmailResult.Ok("accepted"));
         var channel = new AdmissionEmailCredentialDeliveryChannel(email);
 
-        CompositeOutboxMessageDispatcher composite = CreateComposite(
-            new AdmissionCredentialDeliveryOutboxHandler(context, envelopeProtector, channel, new FixedTimeProvider(now)));
+        var handler = new AdmissionCredentialDeliveryOutboxHandler(
+            context, envelopeProtector, channel, new FixedTimeProvider(now));
+        CompositeOutboxMessageDispatcher composite = CreateComposite(handler);
         var dispatcher = new AdmissionDeliveryIntentDispatcher(
-            context, composite, NullLogger<AdmissionDeliveryIntentDispatcher>.Instance);
+            context, handler, NullLogger<AdmissionDeliveryIntentDispatcher>.Instance);
         var unsafeMessage = new OutboxMessage
         {
             Id = intent.Id,
@@ -234,23 +235,24 @@ public sealed class AdmissionCompositeDispatchTests
         await context.Database.EnsureCreatedAsync();
         await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;");
         DateTime now = new(2026, 8, 27, 12, 0, 0, DateTimeKind.Utc);
+        var (ticket, effectId) = await SeedOwningOrderAsync(context, tenantId, now);
         var protectedMaterial = new AdmissionDeliveryEnvelopeProtector(
                 new EphemeralDataProtectionProvider())
             .Protect(new AdmissionCredentialDeliveryEnvelope(pii, "protected-bearer"));
         var intent = new AdmissionDeliveryIntent(
             Guid.CreateVersion7(),
             tenantId,
-            Guid.CreateVersion7(),
-            Guid.CreateVersion7(),
-            Guid.CreateVersion7(),
+            effectId,
+            ticket.RegistrationTicketAssignmentId,
+            ticket.Id,
             protectedMaterial.Ciphertext,
             protectedMaterial.ProtectionVersion,
             now);
         context.AdmissionDeliveryIntents.Add(intent);
         await context.SaveChangesAsync();
 
-        var downstream = Substitute.For<IOutboxMessageDispatcher>();
-        downstream.DispatchAsync(Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>())
+        var downstream = Substitute.For<IAdmissionCredentialDeliveryOutboxHandler>();
+        downstream.HandleAsync(Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new InvalidOperationException(providerFault)));
         var logger = new CaptureLogger<AdmissionDeliveryIntentDispatcher>();
         var dispatcher = new AdmissionDeliveryIntentDispatcher(context, downstream, logger);
@@ -270,9 +272,39 @@ public sealed class AdmissionCompositeDispatchTests
         }
     }
 
-    private static async Task<AdmissionTicket> SeedOwningOrderAsync(ExploreDbContext context, Guid tenantId, DateTime now)
+    private static async Task<(AdmissionTicket Ticket, Guid EffectId)> SeedOwningOrderAsync(
+        ExploreDbContext context, Guid tenantId, DateTime now)
     {
+        await Explore.Persistence.Seed.LookupTableSeeder.SeedAsync(context);
         Guid eventId = Guid.CreateVersion7();
+        var user = new User
+        {
+            Id = Guid.CreateVersion7(), CreatedAt = now,
+            Pii = new UserPii { Email = string.Empty, FirstName = "Admission", LastName = "Owner" }
+        };
+        var tenant = new Tenant
+        {
+            Id = tenantId, FullName = "Admission dispatch", Slug = $"admission-{tenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = now
+        };
+        var actor = new Actor
+        {
+            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            UserId = user.Id, User = user, Pii = new ActorPii { DisplayName = "Admission owner" }
+        };
+        context.AddRange(user, tenant, actor, new TenantUser
+        {
+            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = tenant,
+            UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
+            StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = now, JoinedAt = now
+        }, new Explore.Domain.Event(EventStatusEnum.Published)
+        {
+            Id = eventId, TenantId = tenantId, Tenant = tenant, ActorId = actor.Id, Actor = actor,
+            Title = "Admission dispatch", VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, CreatedAt = now
+        });
+        await context.SaveChangesAsync();
         var catalog = EventTicketCatalogVersion.Create(tenantId, eventId, "EUR", 1);
         var type = EventTicketType.Create(Guid.CreateVersion7(), tenantId, catalog.Id, "Admission", "EUR",
             TicketPricingModeEnum.Free, null, null, null, ParticipantDataCollectionModeEnum.None,
@@ -280,7 +312,7 @@ public sealed class AdmissionCompositeDispatchTests
         catalog.AddTicketType(type, null);
         catalog.AddEntitlement(type, TicketTypeEntitlement.CreateForEvent(type.Id, tenantId, eventId, 1));
         catalog.Publish();
-        var order = RegistrationOrder.Create(tenantId, eventId, Guid.CreateVersion7(), null,
+        var order = RegistrationOrder.Create(tenantId, eventId, user.Id, null,
             BookingPartyTypeEnum.Individual, catalog.Id,
             RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(), (int)ParticipationHandlingModeEnum.PlatformManaged,
                 (int)AdvanceRegistrationObligationEnum.Required, (int)IdentityAccessModeEnum.AccountRequired, null),
@@ -295,12 +327,13 @@ public sealed class AdmissionCompositeDispatchTests
         order.TransitionTo(RegistrationOrderStatusEnum.AwaitingRequirements, now);
         order.TransitionTo(RegistrationOrderStatusEnum.ReadyForCheckout, now);
         order.TransitionTo(RegistrationOrderStatusEnum.Confirmed, now);
+        var effect = RegistrationFinalizationEffect.Create(order, now);
         var ticket = AdmissionTicket.Issue(order, line, assignment, participant, catalog, type,
             Guid.CreateVersion7(), "COMPOSITE", Guid.CreateVersion7(), 1, 1,
             Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), now);
-        context.AddRange(catalog, order, ticket);
+        context.AddRange(catalog, order, ticket, effect);
         await context.SaveChangesAsync();
-        return ticket;
+        return (ticket, effect.Id);
     }
 
     private static CompositeOutboxMessageDispatcher CreateComposite(
@@ -323,8 +356,9 @@ public sealed class AdmissionCompositeDispatchTests
             Substitute.For<IReportProviderSyncDispatcher>(),
             new EventDiscoveryIdentityCorrectionDispatcher(
                 Substitute.For<IEventDiscoveryIdentityCorrectionNotificationService>(),
-                Substitute.For<ITenantContextAccessor>()),
-            new LocationPrivacyCorrectionDispatcher(cache, correctionPlanner, EventLocationPrivacyMetricsFactory.Create()),
+                Substitute.For<INotificationOutboxExecutionAuthority>()),
+            new LocationPrivacyCorrectionDispatcher(cache, correctionPlanner, EventLocationPrivacyMetricsFactory.Create(),
+                Substitute.For<ILocationPrivacyCorrectionReceiptRepository>()),
             new PrivacyErasureCacheInvalidationDispatcher(cache),
             admissionHandler,
             recoveryRequestHandler ?? Substitute.For<IAdmissionRecoveryRequestOutboxHandler>(),
@@ -340,7 +374,8 @@ public sealed class AdmissionCompositeDispatchTests
                 refundRepository, refundCreator, Substitute.For<IRefundRetriever>(), TimeProvider.System),
             new RegistrationPaymentCancellationService(
                 Substitute.For<IRegistrationPaymentAttemptRepository>(), refundRepository, campaignRepository,
-                Substitute.For<IPaymentCancellationProvider>(), TimeProvider.System),
+                Substitute.For<IPaymentCancellationProvider>(), TimeProvider.System,
+                Substitute.For<IRegistrationInventoryRepository>()),
             Substitute.For<IAdmissionRevocationService>(),
             Substitute.For<IAdmissionRefundRevocationService>(),
             Substitute.For<IAdmissionEventCancellationService>(),
@@ -350,7 +385,9 @@ public sealed class AdmissionCompositeDispatchTests
             Substitute.For<ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>>(),
             NullLogger<CompositeOutboxMessageDispatcher>.Instance,
             Substitute.For<IConfigurationManifestEffectDispatcher>(),
-            Substitute.For<IConfigurationImportEffectDelivery>());
+            Substitute.For<IConfigurationImportEffectDelivery>(),
+            Substitute.For<INotificationOutboxExecutionAuthority>(),
+            Substitute.For<IGenericOutboxExecutionAuthority>());
     }
 
     private static NotificationFanoutOccurrenceHandoffService CreateNotificationHandoff()

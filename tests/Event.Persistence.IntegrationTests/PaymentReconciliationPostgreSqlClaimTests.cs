@@ -1,10 +1,14 @@
 using System.Data.Common;
 using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Persistence;
+using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -15,6 +19,49 @@ namespace Event.Persistence.IntegrationTests;
 public sealed class PaymentReconciliationPostgreSqlClaimTests(PostgreSqlContainerFixture fixture)
 {
     private static readonly DateTime Now = new(2026, 8, 24, 12, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    public async Task DirectExecutionStrategyReplayRecoversOriginalCommittedBatchWithoutRenewal()
+    {
+        await fixture.ResetAsync();
+        await using ExploreDbContext seed = fixture.CreateDbContext();
+        await SeedDueRowsWithoutParentFixturesAsync(seed, 3);
+        PaymentReconciliationAcquisition acquisition = PaymentReconciliationAcquisition.Create(
+            "postgres-lost-ack", 2, Now, TimeSpan.FromMinutes(2));
+        var lostAck = new LostAcquisitionAcknowledgement(acquisition.LeaseToken);
+        var options = new DbContextOptionsBuilder<ExploreDbContext>(
+            (DbContextOptions<ExploreDbContext>)seed.GetService<IDbContextOptions>())
+            .AddInterceptors(lostAck)
+            .ReplaceService<IExecutionStrategyFactory, AcquisitionRetryStrategyFactory>()
+            .Options;
+        await using var context = new ExploreDbContext(options);
+        var repository = new RegistrationPaymentAttemptRepository(context);
+
+        IReadOnlyList<PaymentReconciliationClaim> claims = await repository.ClaimDueReconciliationsAsync(
+            acquisition, Now, CancellationToken.None);
+
+        await Assert.That(lostAck.CommittedEffectIds.Count).IsEqualTo(2);
+        await Assert.That(claims.Select(value => value.EffectId).Order()
+            .SequenceEqual(lostAck.CommittedEffectIds.Order())).IsTrue();
+        PaymentReconciliationEffect[] effects = await seed.PaymentReconciliationEffects.AsNoTracking().ToArrayAsync();
+        await Assert.That(effects.Count(value => value.Status == OutboxMessageStatus.Pending)).IsEqualTo(1);
+        foreach (PaymentReconciliationEffect effect in effects.Where(value => value.Status == OutboxMessageStatus.Processing))
+        {
+            await Assert.That(effect.ProcessingLeaseToken).IsEqualTo(acquisition.LeaseToken);
+            await Assert.That(effect.ProcessingLeaseExpiresAt).IsEqualTo(acquisition.LeaseExpiresAt);
+            await Assert.That(effect.UpdatedAt).IsEqualTo(acquisition.ClaimedAt);
+            await Assert.That(effect.AttemptCount).IsEqualTo(1);
+            await Assert.That(effect.ProcessingFence).IsEqualTo(1);
+        }
+        await Assert.That(await repository.RecoverReconciliationAcquisitionAsync(
+            acquisition with { LeaseOwner = "other-owner" }, Now.AddSeconds(1), CancellationToken.None)).IsEmpty();
+        await Assert.That(await repository.RecoverReconciliationAcquisitionAsync(
+            acquisition with { LeaseToken = Guid.CreateVersion7() }, Now.AddSeconds(1), CancellationToken.None)).IsEmpty();
+        await Assert.That(await repository.RecoverReconciliationAcquisitionAsync(
+            acquisition, acquisition.LeaseExpiresAt, CancellationToken.None)).IsEmpty();
+        await Assert.That(await seed.PaymentReconciliationEffects.CountAsync(
+            value => value.Status == OutboxMessageStatus.Pending)).IsEqualTo(1);
+    }
 
     [Test]
     public async Task ClaimDueUsesOnePostgreSqlCommandAndStableBoundedFiftyRowStrategy()
@@ -30,7 +77,8 @@ public sealed class PaymentReconciliationPostgreSqlClaimTests(PostgreSqlContaine
 
         var elapsed = Stopwatch.StartNew();
         var first = await repository.ClaimDueReconciliationsAsync(
-            "postgres-command-proof", 50, Now, TimeSpan.FromMinutes(2), CancellationToken.None);
+            PaymentReconciliationAcquisition.Create("postgres-command-proof", 50, Now, TimeSpan.FromMinutes(2)),
+            Now, CancellationToken.None);
         elapsed.Stop();
         PersistenceQueryBaselineEvidence.Record(baseline
             .Snapshot("payment_reconciliation_claim", first.Count, elapsed.Elapsed));
@@ -40,7 +88,8 @@ public sealed class PaymentReconciliationPostgreSqlClaimTests(PostgreSqlContaine
         await Assert.That(counter.CommandCount).IsEqualTo(1);
         counter.Reset();
         var second = await repository.ClaimDueReconciliationsAsync(
-            "postgres-command-proof", 50, Now, TimeSpan.FromMinutes(2), CancellationToken.None);
+            PaymentReconciliationAcquisition.Create("postgres-command-proof", 50, Now, TimeSpan.FromMinutes(2)),
+            Now, CancellationToken.None);
         await Assert.That(second.Count).IsEqualTo(5);
         await Assert.That(counter.CommandCount).IsEqualTo(1);
     }
@@ -59,11 +108,8 @@ public sealed class PaymentReconciliationPostgreSqlClaimTests(PostgreSqlContaine
         {
             IReadOnlyList<Explore.Application.Contracts.Persistence.PaymentReconciliationClaim> claims =
                 await repository.ClaimDueReconciliationsAsync(
-                    "postgres-throughput-proof",
-                    50,
-                    Now,
-                    TimeSpan.FromMinutes(2),
-                    CancellationToken.None);
+                    PaymentReconciliationAcquisition.Create("postgres-throughput-proof", 50, Now, TimeSpan.FromMinutes(2)),
+                    Now, CancellationToken.None);
 
             await Assert.That(claims.Count).IsEqualTo(50);
             foreach (Explore.Application.Contracts.Persistence.PaymentReconciliationClaim claim in claims)
@@ -76,11 +122,8 @@ public sealed class PaymentReconciliationPostgreSqlClaimTests(PostgreSqlContaine
         await Assert.That(claimedIds.Count).IsEqualTo(1_000);
         await Assert.That(elapsed.Elapsed).IsLessThan(TimeSpan.FromMinutes(10));
         await Assert.That((await repository.ClaimDueReconciliationsAsync(
-            "postgres-throughput-proof",
-            50,
-            Now,
-            TimeSpan.FromMinutes(2),
-            CancellationToken.None)).Count).IsEqualTo(0);
+            PaymentReconciliationAcquisition.Create("postgres-throughput-proof", 50, Now, TimeSpan.FromMinutes(2)),
+            Now, CancellationToken.None)).Count).IsEqualTo(0);
     }
 
     private static async Task SeedDueRowsWithoutParentFixturesAsync(ExploreDbContext context, int count)
@@ -135,5 +178,39 @@ public sealed class PaymentReconciliationPostgreSqlClaimTests(PostgreSqlContaine
             CommandCount++;
             return ValueTask.FromResult(result);
         }
+    }
+
+    private sealed class LostAcquisitionAcknowledgement(Guid leaseToken) : DbCommandInterceptor
+    {
+        internal List<Guid> CommittedEffectIds { get; } = [];
+        private bool interrupted;
+
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!interrupted && command.Parameters.Cast<DbParameter>().Any(value => Equals(value.Value, leaseToken)))
+            {
+                interrupted = true;
+                while (await result.ReadAsync(cancellationToken))
+                    CommittedEffectIds.Add(result.GetGuid(1));
+                while (await result.NextResultAsync(cancellationToken)) { }
+                await result.DisposeAsync();
+                throw new IOException("PostgreSQL acquisition committed before acknowledgement was lost.");
+            }
+            return result;
+        }
+    }
+
+    private sealed class AcquisitionRetryStrategyFactory(ExecutionStrategyDependencies dependencies)
+        : IExecutionStrategyFactory
+    {
+        public IExecutionStrategy Create() => new AcquisitionRetryStrategy(dependencies);
+    }
+
+    private sealed class AcquisitionRetryStrategy(ExecutionStrategyDependencies dependencies)
+        : ExecutionStrategy(dependencies, 1, TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => exception is IOException;
     }
 }

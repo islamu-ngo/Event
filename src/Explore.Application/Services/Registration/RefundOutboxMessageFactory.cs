@@ -67,18 +67,39 @@ public static class RefundOutboxMessageFactory
             MaxRetries = 10
         };
 
-    public static RefundCampaignProcessPayload ReadCampaign(OutboxMessage message) =>
-        JsonSerializer.Deserialize<RefundCampaignProcessPayload>(message.Payload
+    public static RefundCampaignProcessPayload ReadCampaign(OutboxMessage message)
+    {
+        var payload = JsonSerializer.Deserialize<RefundCampaignProcessPayload>(message.Payload
             ?? throw new InvalidOperationException("Refund campaign trigger payload is required."))
         ?? throw new InvalidOperationException("Refund campaign trigger payload is invalid.");
+        if (message.EventType != CampaignProcessRequested || message.AggregateType != nameof(RefundCampaign)
+            || payload.TenantId == Guid.Empty || payload.CampaignId == Guid.Empty
+            || message.AggregateId != payload.CampaignId)
+            throw new InvalidOperationException("Refund campaign trigger envelope is invalid.");
+        return payload;
+    }
 
-    public static RefundAttemptProcessPayload ReadAttempt(OutboxMessage message) =>
-        JsonSerializer.Deserialize<RefundAttemptProcessPayload>(message.Payload
+    public static RefundAttemptProcessPayload ReadAttempt(OutboxMessage message)
+    {
+        var payload = JsonSerializer.Deserialize<RefundAttemptProcessPayload>(message.Payload
             ?? throw new InvalidOperationException("Refund attempt trigger payload is required."))
         ?? throw new InvalidOperationException("Refund attempt trigger payload is invalid.");
+        if (message.EventType is not (DispatchRequested or ReconciliationRequested)
+            || message.AggregateType != nameof(RefundAttempt) || payload.TenantId == Guid.Empty
+            || payload.RefundAttemptId == Guid.Empty || message.AggregateId != payload.RefundAttemptId)
+            throw new InvalidOperationException("Refund attempt trigger envelope is invalid.");
+        return payload;
+    }
 
-    public static PaymentCancellationProcessPayload ReadPaymentCancellation(OutboxMessage message) =>
-        JsonSerializer.Deserialize<PaymentCancellationProcessPayload>(message.Payload
+    public static PaymentCancellationProcessPayload ReadPaymentCancellation(OutboxMessage message)
+    {
+        var payload = JsonSerializer.Deserialize<PaymentCancellationProcessPayload>(message.Payload
             ?? throw new InvalidOperationException("Payment cancellation trigger payload is required."))
         ?? throw new InvalidOperationException("Payment cancellation trigger payload is invalid.");
+        if (message.EventType != PaymentCancellationRequested || message.AggregateType != nameof(PaymentAttempt)
+            || payload.TenantId == Guid.Empty || payload.CampaignId == Guid.Empty
+            || payload.PaymentAttemptId == Guid.Empty || message.AggregateId != payload.PaymentAttemptId)
+            throw new InvalidOperationException("Payment cancellation trigger envelope is invalid.");
+        return payload;
+    }
 }

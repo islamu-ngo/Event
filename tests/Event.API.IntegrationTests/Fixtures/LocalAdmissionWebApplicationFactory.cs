@@ -3,6 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Event.Testing.DataProtection;
 using Explore.API.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -20,6 +21,7 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -54,7 +56,11 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         Path.GetTempPath(), $"local-admission-{Guid.CreateVersion7():N}.db");
     private readonly string _identityDatabasePath = Path.Combine(
         Path.GetTempPath(), $"local-admission-identity-{Guid.CreateVersion7():N}.db");
+    private readonly string _passwordBlocklistPath = Path.Combine(
+        Path.GetTempPath(), $"local-admission-passwords-{Guid.CreateVersion7():N}.json");
+    private string? _passwordBlocklistHash;
     private readonly Dictionary<string, string?> _previousEnvironment = [];
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
     private string? _connectionString;
     private IInterceptor? _persistenceInterceptor;
     private ILoggerProvider? _logCapture;
@@ -114,6 +120,18 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         };
         try
         {
+            byte[] passwordPolicy = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                Version = 1,
+                Revision = Guid.CreateVersion7().ToString("N"),
+                Source = "Runtime-generated Local admission fixture authority",
+                License = "Project-owned test data",
+                Passwords = new[] { Convert.ToHexString(RandomNumberGenerator.GetBytes(32)) }
+            });
+            await File.WriteAllBytesAsync(factory._passwordBlocklistPath, passwordPolicy);
+            factory._passwordBlocklistHash = Convert.ToHexString(SHA256.HashData(passwordPolicy));
+            factory.SetEnvironment("Authentication__Local__PasswordBlocklistPath", factory._passwordBlocklistPath);
+            factory.SetEnvironment("Authentication__Local__PasswordBlocklistSha256", factory._passwordBlocklistHash);
             if (postgreSqlConnectionString is not null)
             {
                 var databaseSettings = new Dictionary<string, string?>();
@@ -154,6 +172,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             var settings = new Dictionary<string, string?>
             {
                 ["Authentication:Provider"] = primaryProvider,
+                ["Authentication:Local:PasswordBlocklistPath"] = _passwordBlocklistPath,
+                ["Authentication:Local:PasswordBlocklistSha256"] = _passwordBlocklistHash,
                 ["IdentityDatabase:Topology"] = _identityTopology.ToString().ToLowerInvariant(),
                 ["IdentityDatabase:Provider"] = "Sqlite",
                 ["IdentityDatabase:Name"] = _identityDatabasePath,
@@ -191,6 +211,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         });
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             services.RemoveExploreDbContextRegistrations();
             services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
             if (_postgreSqlConnectionString is null)
@@ -207,6 +229,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             }
             services.AddScoped(provider =>
             {
+                if (provider.GetRequiredService<ExploreDbContextExecutionLease>().Context is { } selected)
+                    return selected;
                 var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>()
                     .CreateDbContext();
                 context.TenantContext = provider.GetService<ITenantContext>();
@@ -419,7 +443,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             email: email, firstName: "Local", lastName: "Member"), CancellationToken.None);
         if (created.Outcome != LocalCredentialCreateOutcome.Created)
         {
-            throw new InvalidOperationException("The native Identity fixture could not create its account.");
+            throw new InvalidOperationException($"The native Identity fixture could not create its account: {created.Outcome}.");
         }
         LocalCredentialOperationReceipt receipt = created.Receipt!;
         DateTime createdAt = DateTime.UtcNow;
@@ -518,6 +542,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             File.Delete(_databasePath + "-wal");
             File.Delete(_databasePath + "-shm");
             File.Delete(_databasePath + ".setup");
+            File.Delete(_passwordBlocklistPath);
             if (_identityTopology == IdentityDatabaseTopology.External)
             {
                 File.Delete(_identityDatabasePath);

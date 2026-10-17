@@ -218,14 +218,14 @@ public sealed class RegistrationInventoryRepository(ExploreDbContext dbContext) 
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<int> GetAllocatedQuantityAsync(Guid capacityPoolId, Guid tenantId, CancellationToken cancellationToken) =>
+    public async Task<long> GetAllocatedQuantityAsync(Guid capacityPoolId, Guid tenantId, CancellationToken cancellationToken) =>
         await dbContext.RegistrationInventoryHolds
             .Where(hold => hold.TenantId == tenantId
                 && hold.CapacityPoolId == capacityPoolId
                 && !hold.IsDeleted
                 && (hold.RegistrationInventoryHoldStatusId == (int)RegistrationInventoryHoldStatusEnum.Active
                     || hold.RegistrationInventoryHoldStatusId == (int)RegistrationInventoryHoldStatusEnum.Consumed))
-            .SumAsync(hold => (int?)hold.Quantity, cancellationToken) ?? 0;
+            .SumAsync(hold => (long?)hold.Quantity, cancellationToken) ?? 0L;
 
     public async Task<IReadOnlyDictionary<Guid, RegistrationTicketLimitUsage>> GetTicketLimitUsageAsync(
         Guid eventId,
@@ -259,14 +259,14 @@ public sealed class RegistrationInventoryRepository(ExploreDbContext dbContext) 
             select new RegistrationTicketLimitUsage(
                 grouped.Key,
                 accountUserId.HasValue
-                    ? grouped.Where(value => value.order.AccountUserId == accountUserId).Sum(value => (int?)value.line.Quantity) ?? 0
-                    : 0,
+                    ? grouped.Where(value => value.order.AccountUserId == accountUserId).Sum(value => (long?)value.line.Quantity) ?? 0L
+                    : 0L,
                 verifiedContactNormalizedEmail != null
-                    ? grouped.Where(value => value.pii != null && value.pii.NormalizedEmail == verifiedContactNormalizedEmail).Sum(value => (int?)value.line.Quantity) ?? 0
-                    : 0,
+                    ? grouped.Where(value => value.pii != null && value.pii.NormalizedEmail == verifiedContactNormalizedEmail).Sum(value => (long?)value.line.Quantity) ?? 0L
+                    : 0L,
                 bookingPartyActorId.HasValue
-                    ? grouped.Where(value => value.order.PurchaserActorId == bookingPartyActorId).Sum(value => (int?)value.line.Quantity) ?? 0
-                    : 0))
+                    ? grouped.Where(value => value.order.PurchaserActorId == bookingPartyActorId).Sum(value => (long?)value.line.Quantity) ?? 0L
+                    : 0L))
             .ToListAsync(cancellationToken);
 
         return usage.ToDictionary(item => item.TicketTypeId);
@@ -579,7 +579,7 @@ public sealed class RegistrationInventoryRepository(ExploreDbContext dbContext) 
                 continue;
             }
 
-            int allocated = await GetAllocatedQuantityAsync(pool.Id, tenantId, cancellationToken);
+            long allocated = await GetAllocatedQuantityAsync(pool.Id, tenantId, cancellationToken);
             int requested = checked(group.Sum(reservation => reservation.Quantity));
             if (allocated > pool.MaximumQuantity.Value - requested)
             {

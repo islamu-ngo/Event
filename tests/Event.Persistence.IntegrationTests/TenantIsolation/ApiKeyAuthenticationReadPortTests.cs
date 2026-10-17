@@ -136,6 +136,47 @@ public sealed class ApiKeyAuthenticationReadPortTests(PostgreSqlContainerFixture
         await Assert.That(reinstall.SqlState).IsEqualTo("55000");
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AuthenticationUsageTouchOwnsOnlyItsExactKeyAndTwoMetadataFields(bool platformKey)
+    {
+        Guid ownerTenant = Guid.CreateVersion7();
+        Guid otherTenant = Guid.CreateVersion7();
+        var tenantKey = Key(ownerTenant);
+        var other = Key(otherTenant);
+        var platform = Key(null);
+        await using var migrator = Open(PrimaryDatabaseRole.Migrator);
+        migrator.Tenants.AddRange(Tenant(ownerTenant), Tenant(otherTenant));
+        migrator.ExternalApiKeys.AddRange(tenantKey, other, platform);
+        await migrator.SaveChangesAsync();
+        var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        var repository = new ExternalApiKeyAuthenticationRepository(factory);
+        ExternalApiKey key = platformKey ? platform : tenantKey;
+        DateTime first = new(2028, 4, 5, 12, 0, 0, DateTimeKind.Utc);
+        TimeSpan interval = TimeSpan.FromMinutes(5);
+
+        await Assert.That(await repository.TouchUsageMetadata(key.Id, first, "192.0.2.1", interval)).IsTrue();
+        await Assert.That(await repository.TouchUsageMetadata(
+            key.Id, first.AddMinutes(5), "192.0.2.2", interval)).IsFalse();
+        await Assert.That(await repository.TouchUsageMetadata(
+            key.Id, first.AddMinutes(5).AddSeconds(1), "192.0.2.3", interval)).IsTrue();
+
+        migrator.ChangeTracker.Clear();
+        ExternalApiKey actual = await migrator.ExternalApiKeys.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == key.Id);
+        await Assert.That(actual.LastUsedAt).IsEqualTo(first.AddMinutes(5).AddSeconds(1));
+        await Assert.That(actual.LastUsedIp).IsEqualTo("192.0.2.3");
+        await Assert.That(actual.SecretHash).IsEqualTo(key.SecretHash);
+        await Assert.That(actual.ExternalApiKeyStatusId).IsEqualTo(key.ExternalApiKeyStatusId);
+        await Assert.That(actual.Scopes).IsEqualTo(key.Scopes);
+        await Assert.That(actual.OwnerId).IsEqualTo(key.OwnerId);
+        await Assert.That(actual.OwnerType).IsEqualTo(key.OwnerType);
+        await Assert.That(actual.TenantId).IsEqualTo(key.TenantId);
+        await Assert.That(actual.UpdatedAt).IsEqualTo(key.UpdatedAt);
+        await Assert.That(await migrator.ExternalApiKeys.IgnoreQueryFilters().Where(row => row.Id == other.Id)
+            .Select(row => row.LastUsedAt).SingleAsync()).IsNull();
+    }
+
     private ExploreDbContext Open(PrimaryDatabaseRole role)
     {
         var options = new DbContextOptionsBuilder<ExploreDbContext>();
@@ -150,11 +191,13 @@ public sealed class ApiKeyAuthenticationReadPortTests(PostgreSqlContainerFixture
         TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
     };
 
-    private static ExternalApiKey Key(Guid tenantId) => new()
+    private static ExternalApiKey Key(Guid? tenantId) => new()
     {
         Id = Guid.CreateVersion7(), TenantId = tenantId, Name = "Authentication key",
         KeyId = ApiKeyHashing.CreateKeyId(), SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
-        Scopes = "events:read", OwnerType = ExternalApiKeyOwnerType.Tenant, OwnerId = tenantId,
+        Scopes = "events:read",
+        OwnerType = tenantId.HasValue ? ExternalApiKeyOwnerType.Tenant : ExternalApiKeyOwnerType.InstanceAdmin,
+        OwnerId = tenantId ?? Guid.CreateVersion7(),
         ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.PendingRotation, ExternalApiKeyStatus = null!,
         ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
     };

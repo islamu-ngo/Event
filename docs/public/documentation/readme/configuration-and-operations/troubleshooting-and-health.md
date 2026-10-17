@@ -6,6 +6,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Native scanner credential discovery requires the enrolled Global database login.
+Runtime must not inherit its executor role or the Global login. If readiness
+rejects enrollment or role drift, reconcile unauthorized grants through the
+approved database process before reinstalling; do not broaden Runtime privileges.
+
 Native API-key authentication requires the enrolled Global database login.
 Runtime must not inherit its executor role or the Global login, including through
 intermediate roles. Reconcile unauthorized grants through the approved database

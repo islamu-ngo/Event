@@ -3,6 +3,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Scanner Authentication Read Enrollment
+
+PostgresAdmissionScannerAuthenticationContract requires explicit deployment
+enrollment and the configured Global session for paired credential discovery.
+Entry and reinstall attest exact role flags, membership options and dedicated
+data grants. Runtime cannot borrow executor authority directly or through the
+Global login; installers reject drift before changing roles or grants.
+Paired version/digest validation, the two-match ambiguity bound and result shape
+are unchanged. Ordinary Runtime data privileges are not broadened.
+
 ## API-Key Authentication Read Enrollment
 
 PostgresExternalApiKeyAuthenticationContract requires explicit deployment

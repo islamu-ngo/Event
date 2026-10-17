@@ -65,6 +65,11 @@ evidence from generated empty defaults. Do not downgrade after writing new recov
 records: the Down migration removes those fields and narrows regex storage.
 Use a coordinated application/database backup restoration if rollback is required.
 
+Localization bundle import requests have a 4 MiB bundle budget with 1 KiB of
+HTTP envelope allowance. Oversized requests can return 413; malformed translation
+JSON returns 400 without replacing the existing bundle. Check for duplicate keys,
+nested values, unknown fields, unsupported key families or excessive value length.
+
 Static bundle imports reject oversized or invalid flat text even when invoked
 directly by an application command. Provider export and file-write failures
 return fixed messages without provider details or filesystem exception text;

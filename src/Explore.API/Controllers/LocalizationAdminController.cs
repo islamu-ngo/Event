@@ -174,11 +174,13 @@ public class LocalizationAdminController : ControllerBase
     }
 
     [HttpPost("bundle", Name = RouteNames.ImportLocalizationBundle)]
+    [RequestSizeLimit(Explore.Domain.Common.Localization.LocalizationBundlePolicy.MaximumBytes + 1024)]
     [EndpointSummary("Import Static Localization Bundle")]
     [EndpointDescription("Validates and writes a flat static localization bundle, then invalidates translation caches.")]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status413PayloadTooLarge)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ImportBundle(
         [FromBody] ImportLocalizationBundleDto dto,
         CancellationToken cancellationToken = default)

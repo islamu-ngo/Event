@@ -81,6 +81,13 @@ authority. Existing rows require the native recovery policy, not inference from
 empty digests or zero identifiers. Down migration removes recovery evidence and
 narrows regex columns; it is not a safe operational rollback after new writes.
 
+The localization bundle import endpoint declares a 4,195,328-byte request limit
+(the 4 MiB bundle budget plus 1 KiB envelope allowance) and a 413 response.
+The strict converter rejects malformed candidates before handler execution.
+HTTP regressions verify 400 ProblemDetails and unchanged existing bundle bytes
+for duplicate keys, nested values, unknown fields, unsupported keys and excessive
+value length. These TestServer checks do not prove Kestrel's 413 enforcement.
+
 ImportLocalizationBundleCommandHandler independently applies LocalizationBundlePolicy
 to direct command candidates before file effects. Import and TMS export handlers
 return fixed failure responses and log stable categories without attaching provider

@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using System.Security.Cryptography;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Constants;
 using Explore.Persistence;
@@ -27,11 +27,7 @@ namespace Event.Api.IntegrationTests.Fixtures;
 /// </summary>
 public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:18-alpine")
-        .WithDatabase("authenticated_api")
-        .WithUsername("postgres")
-        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
-        .Build();
+    private readonly PostgreSqlContainerFixture _database = new();
 
     /// <summary>
     /// When non-null, replaces the real IAuthorizationProvider with this instance.
@@ -52,7 +48,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         if (UsesPostgreSqlContainer)
-            _database.StartAsync().GetAwaiter().GetResult();
+            _database.InitializeAsync().GetAwaiter().GetResult();
         builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((context, config) =>
@@ -87,7 +83,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
             };
 
             if (UsesPostgreSqlContainer)
-                TestDatabaseConfiguration.AddPostgreSql(inMemoryConfig, _database.GetConnectionString());
+                TestDatabaseConfiguration.AddPostgreSql(inMemoryConfig, _database.ConnectionString);
             foreach (var pair in AdditionalConfiguration)
             {
                 inMemoryConfig[pair.Key] = pair.Value;
@@ -101,20 +97,24 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
             if (UsesPostgreSqlContainer)
             {
                 services.RemoveExploreDbContextRegistrations();
+                services.RemoveAll<Explore.Persistence.Security.PostgresNativeQueueEnrollment>();
+                services.AddSingleton(_database.NativeQueueEnrollment);
 
-                var options = new DbContextOptionsBuilder<ExploreDbContext>();
-                ConfigureDatabase(options);
-                using (var database = new ExploreDbContext(options.Options))
-                {
-                    database.Database.Migrate();
-                }
+                services.AddGlobalExploreDbContextFactory(
+                    _database.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+                services.AddSingleton<ITenantExploreDbContextFactory>(
+                    new TenantExploreDbContextFactory(
+                        _database.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime)));
                 services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
                 services.AddScoped(provider =>
                 {
+                    if (provider.GetService<ExploreDbContextExecutionLease>()?.Context is { } selectedOwner)
+                        return selectedOwner;
                     var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
                     database.ClearTenantFilterBypass();
                     database.TenantContext = provider.GetRequiredService<ITenantContext>();
                     database.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
+                    database.BindTenantLease();
                     return database;
                 });
             }
@@ -125,7 +125,8 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
 
             // Register background seeder to ensure lookup data (roles, etc.) is available in tests
             services.AddHostedService(provider => new SeedingHostedService(
-                provider, provider.GetRequiredService<IHostEnvironment>(), SeedActiveDefaultTenant));
+                provider, provider.GetRequiredService<IHostEnvironment>(), SeedActiveDefaultTenant,
+                UsesPostgreSqlContainer ? this : null));
         });
 
         // ConfigureTestServices runs AFTER the app's ConfigureServices,
@@ -188,7 +189,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
         {
             if (UsesPostgreSqlContainer)
             {
-                using var connection = new NpgsqlConnection(_database.GetConnectionString());
+                using var connection = new NpgsqlConnection(_database.ConnectionString);
                 NpgsqlConnection.ClearPool(connection);
             }
             await _database.DisposeAsync();
@@ -197,27 +198,28 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
 
     private void ConfigureDatabase(DbContextOptionsBuilder options)
     {
-        var connection = new NpgsqlConnectionStringBuilder(_database.GetConnectionString());
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
-        {
-            Role = PrimaryDatabaseRole.Runtime,
-            Provider = PrimaryDatabaseProvider.PostgreSql,
-            Host = connection.Host,
-            Port = connection.Port,
-            Database = connection.Database,
-            Username = connection.Username,
-            Password = connection.Password,
-            TlsMode = PrimaryDatabaseTlsMode.Disabled
-        });
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            _database.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+        options.AddInterceptors(Explore.Persistence.Security.PostgresTenantSessionInterceptor.Instance);
+    }
+
+    /// <summary>Creates an independent migration-owned context for fixture arrangement.</summary>
+    public ExploreDbContext CreateMigratorContext()
+    {
+        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            _database.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        return new ExploreDbContext(options.Options);
     }
 
     private sealed class SeedingHostedService(IServiceProvider serviceProvider, IHostEnvironment environment,
-        bool seedActiveDefaultTenant) : IHostedService
+        bool seedActiveDefaultTenant, AuthenticatedWebApplicationFactory? factory) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            using var arrangement = factory?.CreateMigratorContext();
+            var db = arrangement ?? scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             await DatabaseSeeder.SeedAsync(db, environment, cancellationToken: cancellationToken);
             if (seedActiveDefaultTenant && await db.Tenants.FindAsync([PlatformDefaults.DefaultTenantId], cancellationToken) is null)
             {

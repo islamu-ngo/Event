@@ -277,7 +277,7 @@ public sealed class PersistedApiKeyProofTests
             ExpiresAt = failure == "expired" ? DateTime.UnixEpoch : ExpiresAt,
             Scopes = "events:read, events:write"
         };
-        var repository = Substitute.For<IExternalApiKeyRepository>();
+        var repository = Substitute.For<IExternalApiKeyAuthenticationRepository>();
         if (!configured && failure != "unknown")
         {
             repository.GetByKeyIdForAuthentication(KeyId, Arg.Any<CancellationToken>()).Returns(entity);

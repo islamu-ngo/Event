@@ -5,6 +5,14 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Preliminary Tenant Routing Leases
 
+ApiKeyAuthenticationHandler acquires persisted credentials through
+IExternalApiKeyAuthenticationRepository, which owns an independent Global
+context for each exact-key lookup or usage update. PostgreSQL exposes only
+execute-only functions: the usage function can change LastUsedAt and LastUsedIp,
+subject to the original throttle threshold. Runtime receives neither direct
+credential-table access nor execution authority for these functions. Native
+entry and installer checks reject undeclared routine executors.
+
 ApiTenantResolutionMiddleware resolves slug, host configuration and bootstrap
 directory dependencies in an independent asynchronous service scope. That scope
 is disposed before binding the request tenant or invoking authentication.

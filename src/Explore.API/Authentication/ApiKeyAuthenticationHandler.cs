@@ -16,14 +16,14 @@ namespace Explore.API.Authentication;
 public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationOptions>
 {
     private static readonly TimeSpan UsageUpdateInterval = TimeSpan.FromMinutes(5);
-    private readonly IExternalApiKeyRepository _externalApiKeyRepository;
+    private readonly IExternalApiKeyAuthenticationRepository _externalApiKeyRepository;
     private readonly BusinessMetrics _metrics;
 
     public ApiKeyAuthenticationHandler(
         IOptionsMonitor<ApiKeyAuthenticationOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        IExternalApiKeyRepository externalApiKeyRepository,
+        IExternalApiKeyAuthenticationRepository externalApiKeyRepository,
         BusinessMetrics metrics)
         : base(options, logger, encoder)
     {

@@ -6,6 +6,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Persisted API-key authentication requires the native authentication projection
+on the Global database account. Its usage update is restricted to the exact
+key's last-used time and IP address. Diagnose a failed projection through native
+installation and Global execution-group enrollment; do not grant Runtime direct
+access to credential tables or authentication functions.
+
 Tenant routing performs preliminary directory/configuration reads on a separate
 scope before selecting the request tenant. A `tenant_lease_identity_changed`
 failure indicates an attempt to retarget an already-bound database lease;

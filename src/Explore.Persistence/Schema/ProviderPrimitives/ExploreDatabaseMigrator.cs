@@ -155,11 +155,13 @@ public static class ExploreDatabaseMigrator
             await PostgresLocalizationSecretStatusContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresGlobalLookupCatalogueContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
             await PostgresExternalLoginAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
             await PostgresTenantLookupContract.ApplyAsync(executionDatabase, cancellationToken);
             foreach (string role in new[]
             {
                 PostgresExternalLoginAuthenticationContract.GlobalRole,
+                PostgresExternalApiKeyAuthenticationContract.GlobalRole,
                 PostgresAdministrativeAuthorityContract.GlobalRole,
                 PostgresTenantLookupContract.GlobalRole
             })

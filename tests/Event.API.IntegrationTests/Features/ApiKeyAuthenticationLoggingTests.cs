@@ -97,7 +97,7 @@ public sealed class ApiKeyAuthenticationLoggingTests
         string secret = $"private-{scenario}-secret";
         string persistedCredential = ApiKeyHashing.FormatPersistedApiKey(keyId, secret);
         var optionsValue = new ApiKeyAuthenticationOptions();
-        var repository = Substitute.For<IExternalApiKeyRepository>();
+        var repository = Substitute.For<IExternalApiKeyAuthenticationRepository>();
         string presentedCredential;
 
         if (scenario.StartsWith("configured_", StringComparison.Ordinal))

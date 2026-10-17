@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -9,8 +10,20 @@ namespace Explore.Persistence.Repositories;
 public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbContext)
     : IUserLocationPrivacyErasureRepository, IUserPrivacyErasureRepository
 {
+    public ISubjectPrivacyErasureSettlement? NativeSettlement { get; } =
+        SubjectPrivacyErasureSettlementSelection.Create(dbContext);
+
     public Task FenceSubjectAsync(Guid subjectId, CancellationToken cancellationToken) =>
         dbContext.DisclosureMutations.EnlistUserAsync(subjectId, cancellationToken);
+
+    public async Task RetainCorrectionReceiptsAsync(
+        IReadOnlyCollection<LocationPrivacyCorrectionReceipt> receipts, CancellationToken cancellationToken)
+    {
+        if (NativeSettlement is not null || dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Portable correction receipts require the original erasure transaction.");
+        dbContext.AddRange(receipts);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<PrivacyErasureProviderCandidate>> GetProviderCandidatesAsync(
         Guid subjectId,

@@ -15,19 +15,25 @@ public static class LocationPrivacyOutboxMessageFactory
         Location location,
         DateTime createdAtUtc)
     {
-        Validate(messageId, intent, createdAtUtc);
         ArgumentNullException.ThrowIfNull(location);
+        return CreateLocationErased(messageId, intent, location.Id, location.ConcurrencyStamp, createdAtUtc);
+    }
+
+    public static OutboxMessage CreateLocationErased(
+        Guid messageId, PrivacyErasureIntent intent, Guid locationId, Guid locationVersion, DateTime createdAtUtc)
+    {
+        Validate(messageId, intent, createdAtUtc);
         return Create(
             messageId,
             nameof(Location),
-            location.Id,
+            locationId,
             LocationPiiErasedEventType,
             new LocationPiiErasedPayload(
                 1,
                 intent.IntentId,
                 intent.AuthoritySequence,
-                location.Id,
-                location.ConcurrencyStamp),
+                locationId,
+                locationVersion),
             createdAtUtc);
     }
 
@@ -37,22 +43,30 @@ public static class LocationPrivacyOutboxMessageFactory
         EventLocation eventLocation,
         DateTime createdAtUtc)
     {
-        Validate(messageId, intent, createdAtUtc);
         ArgumentNullException.ThrowIfNull(eventLocation);
+        return CreateCorrectionRequested(messageId, intent, eventLocation.Id, eventLocation.TenantId,
+            eventLocation.EventId, eventLocation.LocationId, eventLocation.PolicyVersion, createdAtUtc);
+    }
+
+    public static OutboxMessage CreateCorrectionRequested(
+        Guid messageId, PrivacyErasureIntent intent, Guid eventLocationId, Guid tenantId,
+        Guid eventId, Guid? locationId, int policyVersion, DateTime createdAtUtc)
+    {
+        Validate(messageId, intent, createdAtUtc);
         return Create(
             messageId,
             nameof(EventLocation),
-            eventLocation.Id,
+            eventLocationId,
             LocationPrivacyCorrectionRequestedEventType,
             new LocationPrivacyCorrectionPayload(
                 1,
                 intent.IntentId,
                 intent.AuthoritySequence,
-                eventLocation.TenantId,
-                eventLocation.EventId,
-                eventLocation.Id,
-                eventLocation.LocationId,
-                eventLocation.PolicyVersion),
+                tenantId,
+                eventId,
+                eventLocationId,
+                locationId,
+                policyVersion),
             createdAtUtc);
     }
 
@@ -61,19 +75,26 @@ public static class LocationPrivacyOutboxMessageFactory
         EventLocation eventLocation,
         DateTime createdAtUtc)
     {
-        Validate(messageId, createdAtUtc);
         ArgumentNullException.ThrowIfNull(eventLocation);
+        return CreateProjectionCorrection(messageId, eventLocation.Id, eventLocation.TenantId,
+            eventLocation.EventId, eventLocation.PolicyVersion, createdAtUtc);
+    }
+
+    public static OutboxMessage CreateProjectionCorrection(
+        Guid messageId, Guid eventLocationId, Guid tenantId, Guid eventId, int policyVersion, DateTime createdAtUtc)
+    {
+        Validate(messageId, createdAtUtc);
         return Create(
             messageId,
             nameof(EventLocation),
-            eventLocation.Id,
+            eventLocationId,
             ProjectionCorrectionEventType,
             new ProjectionCorrectionPayload(
                 1,
-                eventLocation.TenantId,
-                eventLocation.EventId,
-                eventLocation.Id,
-                eventLocation.PolicyVersion),
+                tenantId,
+                eventId,
+                eventLocationId,
+                policyVersion),
             createdAtUtc);
     }
 

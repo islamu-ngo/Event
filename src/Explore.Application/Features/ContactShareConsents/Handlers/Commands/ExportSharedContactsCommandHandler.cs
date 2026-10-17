@@ -116,8 +116,8 @@ public class ExportSharedContactsCommandHandler : ICommandHandler<ExportSharedCo
         export = await _exportRepository.Create(export);
 
         _logger.LogInformation(
-            "Exported {RowCount} shared contacts for actor {ActorId} by user {UserId} in {Format} format (export {ExportId})",
-            consents.Count, request.RecipientActorId, request.ExportedByUserId, format, export.Id);
+            "Exported {RowCount} shared contacts in {Format} format",
+            consents.Count, format);
 
         return BaseCommandResponse.Success(
             new SharedContactExportResultDto

@@ -158,10 +158,10 @@ public sealed class EventLocationDualWriteTests(PostgreSqlContainerFixture fixtu
         {
             EventLocation resolved = await service.ResolveAsync(
                 graph.EventTwoId, graph.LocationOneId, first.Id, token);
-            var repository = new EventSessionRepository(context);
+            var repository = new EventSessionRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
             await repository.MoveToEventAsync(session, graph.EventTwoId, resolved, null, token);
             await repository.UpdateWithRoomOverlapGuardAsync(session, token);
-            var agendaRepository = new EventAgendaItemRepository(context);
+            var agendaRepository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
             await agendaRepository.MoveToEventAsync(agendaItem, graph.EventTwoId, resolved, null, token);
             await agendaRepository.Update(agendaItem);
             await service.DetachIfUnreferencedAsync(first.Id, token);

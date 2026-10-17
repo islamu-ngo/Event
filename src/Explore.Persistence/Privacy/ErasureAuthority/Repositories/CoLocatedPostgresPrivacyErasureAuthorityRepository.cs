@@ -69,6 +69,9 @@ public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
                 intent.IdentityFences);
             dbContext.ErasureIntents.Add(fact);
             await dbContext.SaveChangesAsync(token);
+            // Native custody compares the committed tuple exactly, including
+            // PostgreSQL's microsecond timestamp precision.
+            await dbContext.Entry(fact).ReloadAsync(token);
             return fact;
         }, cancellationToken);
     }

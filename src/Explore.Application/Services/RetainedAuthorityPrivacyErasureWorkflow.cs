@@ -187,7 +187,7 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                         intent,
                         cancellationToken);
                     PrivacyErasureApplier.AppliedErasure applied = await unitOfWork.ExecuteSerializableAsync(
-                        ct => applier.ApplyInCurrentTransactionAsync(intent, prepared, ct),
+                        ct => applier.ApplyInCurrentTransactionAsync(intent, prepared, authority, ct),
                         cancellationToken);
                     await applier.InvalidateAfterCommitAsync(applied);
                     latest = await checkpointRepository.GetLatestAsync(cancellationToken);

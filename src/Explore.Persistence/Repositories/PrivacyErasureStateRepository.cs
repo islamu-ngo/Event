@@ -1,18 +1,22 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class PrivacyErasureStateRepository(ExploreDbContext dbContext)
+public sealed class PrivacyErasureStateRepository(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null)
     : IPrivacyErasureStateRepository
 {
     public Task<PrivacyErasureSaga?> GetBySubjectAsync(
         Guid subjectId,
         CancellationToken cancellationToken) =>
-        dbContext.PrivacyErasureSagas.SingleOrDefaultAsync(
-            item => item.SubjectId == subjectId,
-            cancellationToken);
+        PostgresPublicationFanoutExecutionContract.Applies(dbContext)
+            ? PostgresPublicationFanoutExecutionContract.ReadAsync<PrivacyErasureSaga>(
+                dbContext, nativeEnrollment, "privacy",
+                new { TenantId = dbContext.TenantFilterTenantId, UserId = subjectId }, cancellationToken)
+            : dbContext.PrivacyErasureSagas.SingleOrDefaultAsync(
+                item => item.SubjectId == subjectId, cancellationToken);
 
     public Task<PrivacyErasureSaga?> GetByIntentAsync(
         Guid intentId,

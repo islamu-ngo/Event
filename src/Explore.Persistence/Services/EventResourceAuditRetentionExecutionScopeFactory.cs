@@ -29,8 +29,8 @@ public sealed class EventResourceAuditRetentionExecutionScopeFactory(ITenantExpl
             Repository = new EventResourceAuditRetentionRepository(context);
             var mutationLock = new RelationalSettingMutationLock(context, UnitOfWork);
             Governance = new EventResourceGovernancePolicyReader(
-                new SystemSettingRepository(context, mutationLock),
-                new TenantSettingRepository(context, mutationLock));
+                SystemSettingRepository.CreateReadOnly(context, mutationLock),
+                TenantSettingRepository.CreateReadOnly(context, mutationLock));
         }
 
         public IEventResourceAuditRetentionRepository Repository { get; }

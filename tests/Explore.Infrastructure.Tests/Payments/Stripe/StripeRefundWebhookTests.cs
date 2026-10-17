@@ -5,12 +5,19 @@ using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Webhooks;
+using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Payments.Stripe;
+using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Repositories;
+using Explore.Secrets.Database;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -47,8 +54,8 @@ public sealed class StripeRefundWebhookTests
         RefundAttempt attempt = RefundAttempt.Create(
             RefundAttemptId, TenantId, Guid.CreateVersion7(), Acceptance(), AccountId,
             "pi_original", "refund:stable", 500, CreatedAt.AddMinutes(-1));
-        var repository = Substitute.For<IRefundAttemptRepository>();
-        repository.GetByIdAsync(TenantId, RefundAttemptId, Arg.Any<CancellationToken>()).Returns(attempt);
+        await using ExploreDbContext database = await CreateRefundContextAsync(attempt);
+        var repository = new RefundAttemptRepository(database);
         var handler = new StripeRefundIncomingWebhookHandler(repository);
         IncomingWebhookProcessingContext context = ProcessingContext(
             "evt_refund", "refund.updated", new
@@ -73,7 +80,9 @@ public sealed class StripeRefundWebhookTests
         await Assert.That(duplicate.Outcome).IsEqualTo(IncomingWebhookProcessingOutcome.Processed);
         await Assert.That(attempt.Status).IsEqualTo(RefundAttemptStatusEnum.Unknown);
         await Assert.That(attempt.ProviderRefundId).IsEqualTo("re_123");
-        await repository.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await Assert.That(await database.OutboxMessages.CountAsync(message =>
+            message.AggregateId == attempt.Id &&
+            message.EventType == RefundOutboxMessageFactory.ReconciliationRequested)).IsEqualTo(2);
     }
 
     [Test]
@@ -84,8 +93,8 @@ public sealed class StripeRefundWebhookTests
             "pi_original", "refund:fee-blocked", 500, CreatedAt.AddMinutes(-2));
         attempt.MarkDispatchPending(CreatedAt.AddMinutes(-1), null);
         attempt.MarkProviderBlocked(CreatedAt.AddSeconds(-1), "req_fee", "refund_provider_fee_rejected");
-        var repository = Substitute.For<IRefundAttemptRepository>();
-        repository.GetByIdAsync(TenantId, RefundAttemptId, Arg.Any<CancellationToken>()).Returns(attempt);
+        await using ExploreDbContext database = await CreateRefundContextAsync(attempt);
+        var repository = new RefundAttemptRepository(database);
         var handler = new StripeRefundIncomingWebhookHandler(repository);
 
         IncomingWebhookProcessingResult result = await handler.HandleAsync(
@@ -111,7 +120,7 @@ public sealed class StripeRefundWebhookTests
         await Assert.That(attempt.BuyerRefundSucceededAt).IsEqualTo(CreatedAt);
         await Assert.That(attempt.Status).IsEqualTo(RefundAttemptStatusEnum.RequiresAction);
         await Assert.That(attempt.FailureCode).IsEqualTo("refund_provider_fee_rejected");
-        await repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await Assert.That(await database.OutboxMessages.CountAsync()).IsEqualTo(1);
     }
 
     [Test]
@@ -120,8 +129,8 @@ public sealed class StripeRefundWebhookTests
         RefundAttempt attempt = RefundAttempt.Create(
             RefundAttemptId, TenantId, Guid.CreateVersion7(), Acceptance(), AccountId,
             "pi_original", "refund:stable", 500, CreatedAt.AddMinutes(-1));
-        var repository = Substitute.For<IRefundAttemptRepository>();
-        repository.GetByIdAsync(TenantId, RefundAttemptId, Arg.Any<CancellationToken>()).Returns(attempt);
+        await using ExploreDbContext database = await CreateRefundContextAsync(attempt);
+        var repository = new RefundAttemptRepository(database);
         var handler = new StripeRefundIncomingWebhookHandler(repository);
         IncomingWebhookProcessingContext context = ProcessingContext(
             "evt_wrong_payment", "refund.failed", new
@@ -143,7 +152,85 @@ public sealed class StripeRefundWebhookTests
         await Assert.That(result.Outcome).IsEqualTo(IncomingWebhookProcessingOutcome.RejectedPermanent);
         await Assert.That(attempt.Status).IsEqualTo(RefundAttemptStatusEnum.Requested);
         await Assert.That(attempt.ReservesCapacity).IsTrue();
-        await repository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await Assert.That(await database.OutboxMessages.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task OlderSignedSuccessSurvivesLaterLocalUnknownAndAtomicallySchedulesRecovery()
+    {
+        RefundAttempt attempt = RefundAttempt.Create(
+            RefundAttemptId, TenantId, Guid.CreateVersion7(), Acceptance(), AccountId,
+            "pi_original", "refund:older-success", 500, CreatedAt.AddMinutes(-2));
+        attempt.BeginDispatch(Guid.CreateVersion7(), false, CreatedAt.AddMinutes(-1), CreatedAt.AddHours(23));
+        attempt.MarkUnknown(CreatedAt.AddMinutes(1), "req_local_unknown");
+        await using ExploreDbContext database = await CreateRefundContextAsync(attempt);
+        var repository = new RefundAttemptRepository(database);
+        var handler = new StripeRefundIncomingWebhookHandler(repository);
+        IncomingWebhookProcessingResult result = await handler.HandleAsync(
+            ProcessingContext("evt_older_success", "refund.updated", new
+            {
+                EventId = "evt_older_success",
+                EventType = "refund.updated",
+                RefundAttemptId,
+                ProviderRefundId = "re_123",
+                ProviderPaymentId = "pi_original",
+                AccountId,
+                AmountMinor = 500,
+                CurrencyCode = "EUR",
+                Status = RefundProviderStatus.Succeeded,
+                CreatedAt
+            }), CancellationToken.None);
+        database.ChangeTracker.Clear();
+        RefundAttempt persisted = (await repository.GetByIdAsync(TenantId, RefundAttemptId, CancellationToken.None))!;
+        OutboxMessage recovery = await database.OutboxMessages.SingleAsync();
+        RefundAttemptProcessPayload payload = RefundOutboxMessageFactory.ReadAttempt(recovery);
+
+        await Assert.That(result.Outcome).IsEqualTo(IncomingWebhookProcessingOutcome.Processed);
+        await Assert.That(persisted.BuyerRefundSucceededAt).IsNotNull();
+        await Assert.That(persisted.LastObservedAt).IsEqualTo(CreatedAt.AddMinutes(1));
+        await Assert.That(persisted.ProviderRefundId).IsEqualTo("re_123");
+        await Assert.That(persisted.ReservesCapacity).IsTrue();
+        await Assert.That(payload.TenantId).IsEqualTo(TenantId);
+        await Assert.That(payload.RefundAttemptId).IsEqualTo(RefundAttemptId);
+        await Assert.That(recovery.EventType).IsEqualTo(RefundOutboxMessageFactory.ReconciliationRequested);
+    }
+
+    private static async Task<ExploreDbContext> CreateRefundContextAsync(RefundAttempt attempt)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"refund-callback-{Guid.CreateVersion7():N}.db");
+        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = path
+        });
+        options.UseSqlite(new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Pooling = false
+        }.ToString()), contextOwnsConnection: true)
+            .UseSnakeCaseNamingConvention();
+        var database = new RefundTestDbContext(options.Options, path);
+        database.EnableTenantFilterBypass("Native refund callback regression.");
+        await database.Database.OpenConnectionAsync();
+        await database.Database.EnsureCreatedAsync();
+        await database.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;");
+        database.RefundAttempts.Add(attempt);
+        await database.SaveChangesAsync();
+        return database;
+    }
+
+    private sealed class RefundTestDbContext(DbContextOptions<ExploreDbContext> options, string path)
+        : ExploreDbContext(options)
+    {
+        public override async ValueTask DisposeAsync()
+        {
+            await base.DisposeAsync();
+            File.Delete(path);
+            File.Delete(path + "-wal");
+            File.Delete(path + "-shm");
+        }
     }
 
     [Test]

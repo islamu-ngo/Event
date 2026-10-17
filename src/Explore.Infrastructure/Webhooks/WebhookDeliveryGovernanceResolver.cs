@@ -1,15 +1,13 @@
 using System.Globalization;
-using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
-using Explore.Application.Settings;
-using Explore.Application.Settings.Groups;
 using Explore.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Webhooks;
 
 public sealed class WebhookDeliveryGovernanceResolver(
-    IHierarchicalSettingsResolver settingsResolver,
+    IWebhookLocalDeliveryAdmission admission,
     IOptions<WebhookDeliveryProcessorSettings> processorSettings,
     IOptionsMonitor<WebhookOptions> webhookOptions) : IWebhookDeliveryGovernanceResolver
 {
@@ -19,9 +17,7 @@ public sealed class WebhookDeliveryGovernanceResolver(
         Guid? tenantId,
         CancellationToken cancellationToken = default)
     {
-        var governed = await settingsResolver.ResolveGroupAsync<WebhookDeliverySettingGroup>(
-            new SettingContext(TenantId: tenantId),
-            cancellationToken);
+        var governed = await admission.GetGovernanceSettingsAsync(tenantId, cancellationToken);
         var local = webhookOptions.CurrentValue.Local;
 
         var globalLimit = Math.Min(

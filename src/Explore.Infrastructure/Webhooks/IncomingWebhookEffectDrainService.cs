@@ -100,9 +100,9 @@ public sealed class IncomingWebhookEffectDrainService(
         CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookEffectOutboxRepository>();
+        var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookQueueRepository>();
         var claimedAt = GetUtcNow();
-        return await repository.ClaimDueAsync(
+        return await repository.ClaimEffectsAsync(
             new IncomingWebhookEffectClaimRequest(
                 CreateLeaseOwner(),
                 _settings.BatchSize,
@@ -160,8 +160,8 @@ public sealed class IncomingWebhookEffectDrainService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookEffectOutboxRepository>();
-                renewed = await repository.TryRenewClaimAsync(
+                var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookQueueRepository>();
+                renewed = await repository.TryRenewEffectAsync(
                     claim,
                     observedAt,
                     leaseExpiresAt,

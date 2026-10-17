@@ -1,5 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Settings;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings.Groups;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;
@@ -14,7 +14,7 @@ public sealed class WebhookDeliveryGovernanceResolverTests
     public async Task ResolveAsync_AppliesTenantSettingsWithoutExceedingStartupCeilings()
     {
         var tenantId = Guid.CreateVersion7();
-        var settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
+        var admission = Substitute.For<IWebhookLocalDeliveryAdmission>();
         var governed = new WebhookDeliverySettingGroup();
         governed.Populate(new Dictionary<string, ResolvedSetting>
         {
@@ -26,12 +26,10 @@ public sealed class WebhookDeliveryGovernanceResolverTests
             ["webhook.delivery.endpoint_timeout_seconds"] = Value("webhook.delivery.endpoint_timeout_seconds", 30),
             ["webhook.delivery.auto_pause_threshold"] = Value("webhook.delivery.auto_pause_threshold", 7)
         });
-        settingsResolver.ResolveGroupAsync<WebhookDeliverySettingGroup>(
-                Arg.Any<SettingContext>(),
-                Arg.Any<CancellationToken>())
+        admission.GetGovernanceSettingsAsync(tenantId, Arg.Any<CancellationToken>())
             .Returns(governed);
         var resolver = new WebhookDeliveryGovernanceResolver(
-            settingsResolver,
+            admission,
             Options.Create(new WebhookDeliveryProcessorSettings
             {
                 MaxConcurrentDeliveries = 16,
@@ -58,9 +56,8 @@ public sealed class WebhookDeliveryGovernanceResolverTests
         await Assert.That(policy.EndpointTimeoutSeconds).IsEqualTo(15);
         await Assert.That(policy.AutoPauseThreshold).IsEqualTo(7);
         await Assert.That(policy.ResolutionVersion).IsEqualTo("webhook-delivery-v1:g16:t4:e2:c8:a8:o15:p7");
-        await settingsResolver.Received(1).ResolveGroupAsync<WebhookDeliverySettingGroup>(
-            Arg.Is<SettingContext>(context => context.TenantId == tenantId),
-            Arg.Any<CancellationToken>());
+        await admission.Received(1).GetGovernanceSettingsAsync(
+            Arg.Is<Guid?>(owner => owner == tenantId), Arg.Any<CancellationToken>());
     }
 
     private static ResolvedSetting Value(string key, int value) => new()

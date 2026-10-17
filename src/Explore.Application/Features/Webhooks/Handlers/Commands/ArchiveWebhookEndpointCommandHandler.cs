@@ -12,7 +12,7 @@ public sealed class ArchiveWebhookEndpointCommandHandler(
     IWebhookEndpointRepository endpointRepository,
     IWebhookProviderCapabilityResolver capabilityResolver,
     IWebhookAuditEventWriter auditWriter,
-    IUnitOfWork unitOfWork)
+    IHumanWebhookMutationPreparation preparation)
     : ICommandHandler<ArchiveWebhookEndpointCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -24,35 +24,19 @@ public sealed class ArchiveWebhookEndpointCommandHandler(
             return Failure("webhook_endpoint_validation_failed", ["Endpoint id is required."]);
         }
 
-        var endpoint = await endpointRepository.GetByIdForOwnerOperationAsync(
-            request.EndpointId,
-            forUpdate: false,
-            cancellationToken);
-        if (endpoint is null)
+        return await preparation.ExecuteAsync(request, async token =>
         {
-            return Failure("webhook_endpoint_not_found", ["Webhook endpoint was not found."]);
-        }
+            var endpoint = await endpointRepository.GetByIdForOwnerOperationAsync(
+                request.EndpointId, forUpdate: false, token);
+            if (endpoint is null)
+                return Failure("webhook_endpoint_not_found", ["Webhook endpoint was not found."]);
+            if (endpoint.Consumer is null)
+                return Failure("webhook_endpoint_management_unavailable", ["Webhook consumer was not found."]);
+            if (!WebhookEndpointCapabilityPolicy.CanManageLocalEndpoint(
+                    capabilityResolver, endpoint.Consumer.ProviderMode, out var capabilityFailure))
+                return Failure("webhook_endpoint_management_unavailable", [capabilityFailure]);
 
-        if (endpoint.Consumer is null)
-        {
-            return Failure(
-                "webhook_endpoint_management_unavailable",
-                ["Webhook consumer was not found."]);
-        }
-
-        if (!WebhookEndpointCapabilityPolicy.CanManageLocalEndpoint(
-                capabilityResolver,
-                endpoint.Consumer.ProviderMode,
-                out var capabilityFailure))
-        {
-            return Failure(
-                "webhook_endpoint_management_unavailable",
-                [capabilityFailure]);
-        }
-
-        if (endpoint.Status != WebhookEndpointStatus.Archived)
-        {
-            await unitOfWork.ExecuteInTransactionAsync(async token =>
+            if (endpoint.Status != WebhookEndpointStatus.Archived)
             {
                 await endpointRepository.ArchiveAsync(
                     endpoint.TenantId,
@@ -81,10 +65,9 @@ public sealed class ArchiveWebhookEndpointCommandHandler(
                         EffectiveScopeKind: endpoint.Consumer.Ownership.AuditScopeKind,
                         EffectiveScopeId: endpoint.Consumer.OwnerId),
                     token);
-            }, cancellationToken);
-        }
-
-        return BaseCommandResponse.Success(request.EndpointId, "Webhook endpoint archived.");
+            }
+            return BaseCommandResponse.Success(request.EndpointId, "Webhook endpoint archived.");
+        }, cancellationToken);
     }
 
     private static BaseCommandResponse<Guid> Failure(string code, IReadOnlyList<string> errors) =>

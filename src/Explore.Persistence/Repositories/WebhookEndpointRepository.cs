@@ -1,6 +1,8 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -368,30 +370,31 @@ public class WebhookEndpointRepository : IWebhookEndpointRepository
         return updated == 1;
     }
 
-    public async Task MarkSuccessAsync(
+    public async Task<bool> MarkSuccessAsync(
         Guid tenantId,
         Guid endpointId,
+        Guid localTargetId,
+        Guid leaseToken,
+        long deliveryFence,
         DateTime succeededAt,
         CancellationToken cancellationToken)
     {
-        await _dbContext.WebhookEndpoints
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookTenantOperation)
-            .Where(e => e.Id == endpointId &&
-                (e.TenantId == tenantId || e.TenantId == null && e.InstanceId != null))
+        RequireClaimSettlement(tenantId);
+        var observedAt = new DateTimeOffset(DateTime.SpecifyKind(succeededAt, DateTimeKind.Utc));
+        if (WebhookClaimEndpointNativeOperations.For(_dbContext) is { } native)
+            return await native.MarkSuccessAsync(
+                tenantId, endpointId, localTargetId, leaseToken, deliveryFence, observedAt, cancellationToken);
+        if (!await FenceOriginalClaimAsync(tenantId, endpointId, localTargetId, leaseToken, deliveryFence, observedAt, cancellationToken))
+            return false;
+        return await ClaimedEndpointQuery(tenantId, endpointId, localTargetId, leaseToken, deliveryFence, observedAt)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.LastSuccessAt, succeededAt)
-                .SetProperty(
-                    e => e.ConsecutiveFailureCount,
-                    e => e.StatusId == (int)WebhookEndpointStatus.Active ? 0 : e.ConsecutiveFailureCount)
-                .SetProperty(
-                    e => e.DeliveryStateVersion,
-                    e => e.StatusId == (int)WebhookEndpointStatus.Active
-                        ? e.DeliveryStateVersion + 1
-                        : e.DeliveryStateVersion)
-                .SetProperty(e => e.UpdatedAt, succeededAt), cancellationToken);
+                .SetProperty(e => e.ConsecutiveFailureCount, 0)
+                .SetProperty(e => e.DeliveryStateVersion, e => e.DeliveryStateVersion + 1)
+                .SetProperty(e => e.UpdatedAt, succeededAt), cancellationToken) == 1;
     }
 
-    public async Task<WebhookEndpointFailureState> RecordFailureAsync(
+    public async Task<WebhookEndpointFailureState?> RecordFailureAsync(
         Guid tenantId,
         Guid endpointId,
         Guid localTargetId,
@@ -402,25 +405,19 @@ public class WebhookEndpointRepository : IWebhookEndpointRepository
         int autoPauseThreshold,
         CancellationToken cancellationToken)
     {
+        RequireClaimSettlement(tenantId);
         ArgumentOutOfRangeException.ThrowIfLessThan(autoPauseThreshold, 1);
+        ArgumentException.ThrowIfNullOrWhiteSpace(failureCategory);
         var normalizedFailureCategory = Truncate(failureCategory, 100);
         var failedAtUtc = new DateTimeOffset(DateTime.SpecifyKind(failedAt, DateTimeKind.Utc));
+        if (WebhookClaimEndpointNativeOperations.For(_dbContext) is { } native)
+            return await native.RecordFailureAsync(
+                tenantId, endpointId, localTargetId, leaseToken, deliveryFence,
+                failedAtUtc, normalizedFailureCategory, autoPauseThreshold, cancellationToken);
+        if (!await FenceOriginalClaimAsync(tenantId, endpointId, localTargetId, leaseToken, deliveryFence, failedAtUtc, cancellationToken))
+            return null;
 
-        var updated = await _dbContext.WebhookEndpoints
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookTenantOperation)
-            .Where(e => e.Id == endpointId
-                && (e.TenantId == tenantId || e.TenantId == null && e.InstanceId != null)
-                && e.StatusId == (int)WebhookEndpointStatus.Active
-                && _dbContext.WebhookLocalTargetSnapshots
-                    .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookTenantOperation)
-                    .Any(target =>
-                        target.TenantId == tenantId
-                        && target.Id == localTargetId
-                        && target.WebhookEndpointId == endpointId
-                        && target.DeliveryStatusId == (int)WebhookLocalDeliveryStatus.Delivering
-                        && target.ProcessingLeaseToken == leaseToken
-                        && target.DeliveryFence == deliveryFence
-                        && target.ProcessingLeaseExpiresAtUtc > failedAtUtc))
+        var updated = await ClaimedEndpointQuery(tenantId, endpointId, localTargetId, leaseToken, deliveryFence, failedAtUtc)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.LastFailureAt, failedAt)
                 .SetProperty(e => e.ConsecutiveFailureCount, e => e.ConsecutiveFailureCount + 1)
@@ -447,7 +444,8 @@ public class WebhookEndpointRepository : IWebhookEndpointRepository
                 .SetProperty(e => e.DeliveryStateVersion, e => e.DeliveryStateVersion + 1)
                 .SetProperty(e => e.UpdatedAt, failedAt), cancellationToken);
 
-        var state = await _dbContext.WebhookEndpoints
+        if (updated != 1) return null;
+        return await _dbContext.WebhookEndpoints
             .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookTenantOperation)
             .AsNoTracking()
             .Where(e => e.Id == endpointId &&
@@ -458,7 +456,63 @@ public class WebhookEndpointRepository : IWebhookEndpointRepository
                 updated == 1 && e.StatusId == (int)WebhookEndpointStatus.AutoPaused))
             .SingleOrDefaultAsync(cancellationToken);
 
-        return state ?? new WebhookEndpointFailureState(0, false);
+    }
+
+    private void RequireClaimSettlement(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty || _dbContext.IsTenantFilterBypassed || _dbContext.BindTenantLease() != tenantId)
+            throw new InvalidOperationException("Webhook endpoint health requires selected-tenant Runtime authority.");
+        if (_dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Webhook endpoint health requires the settlement transaction.");
+    }
+
+    private async Task<bool> FenceOriginalClaimAsync(
+        Guid tenantId, Guid endpointId, Guid targetId, Guid leaseToken, long fence, DateTimeOffset observedAt,
+        CancellationToken cancellationToken)
+    {
+        var currentTime = DateTimeOffset.UtcNow;
+        var cutoff = observedAt > currentTime ? observedAt : currentTime;
+        // A no-op write locks the original persisted lease without advancing or reconstructing it.
+        var locked = await _dbContext.WebhookLocalTargetSnapshots
+            .Where(target => target.TenantId == tenantId && target.Id == targetId &&
+                target.DeliveryStatusId == (int)WebhookLocalDeliveryStatus.Delivering &&
+                target.ProcessingLeaseToken == leaseToken && target.DeliveryFence == fence &&
+                target.ProcessingLeaseExpiresAtUtc > cutoff)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(target => target.ConcurrencyVersion,
+                target => target.ConcurrencyVersion), cancellationToken);
+        if (locked != 1) return false;
+        // Wait for any endpoint owner operation before taking the final lifetime observation.
+        // The caller rebuilds its claim predicate after both row fences have been acquired.
+        return await ClaimedEndpointQuery(tenantId, endpointId, targetId, leaseToken, fence, observedAt)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(endpoint => endpoint.DeliveryStateVersion,
+                endpoint => endpoint.DeliveryStateVersion), cancellationToken) == 1;
+    }
+
+    private IQueryable<WebhookEndpoint> ClaimedEndpointQuery(
+        Guid tenantId, Guid endpointId, Guid targetId, Guid leaseToken, long fence, DateTimeOffset observedAt)
+    {
+        var currentTime = DateTimeOffset.UtcNow;
+        var cutoff = observedAt > currentTime ? observedAt : currentTime;
+        return _dbContext.WebhookEndpoints
+            .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookTenantOperation)
+            .Where(endpoint => endpoint.Id == endpointId && endpoint.StatusId == (int)WebhookEndpointStatus.Active &&
+                (endpoint.TenantId == tenantId && endpoint.Consumer!.TenantId == tenantId ||
+                    endpoint.TenantId == null && endpoint.InstanceId != null &&
+                    endpoint.Consumer!.TenantId == null && endpoint.Consumer.InstanceId == endpoint.InstanceId &&
+                    endpoint.Consumer.ConsumerKindId == (int)WebhookConsumerKind.Instance) &&
+                _dbContext.WebhookLocalTargetSnapshots
+                    .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookTenantOperation)
+                    .Any(target => target.TenantId == tenantId && target.Id == targetId &&
+                        target.WebhookEndpointId == endpointId && target.WebhookMessage.TenantId == tenantId &&
+                        target.DeliveryPlanSnapshot.TenantId == tenantId &&
+                        target.DeliveryPlanSnapshot.WebhookMessageId == target.WebhookMessageId &&
+                        target.DeliveryPlanSnapshot.WebhookConsumerId == endpoint.ConsumerId &&
+                        (target.DeliveryPlanSnapshot.ProviderModeId == (int)WebhookProviderMode.Local ||
+                            target.DeliveryPlanSnapshot.ProviderModeId == (int)WebhookProviderMode.Composite) &&
+                        target.DeliveryPlanSnapshot.AttemptRetentionUntilUtc > cutoff &&
+                        target.DeliveryStatusId == (int)WebhookLocalDeliveryStatus.Delivering &&
+                        target.ProcessingLeaseToken == leaseToken && target.DeliveryFence == fence &&
+                        target.ProcessingLeaseExpiresAtUtc > cutoff));
     }
 
     public async Task<bool> TryResumeAsync(

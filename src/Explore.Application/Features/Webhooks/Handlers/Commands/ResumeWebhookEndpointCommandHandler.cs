@@ -12,7 +12,7 @@ namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 public sealed class ResumeWebhookEndpointCommandHandler(
     IWebhookEndpointRepository endpointRepository,
     IWebhookAuditEventWriter auditWriter,
-    IUnitOfWork unitOfWork,
+    IHumanWebhookMutationPreparation preparation,
     TimeProvider timeProvider)
     : ICommandHandler<ResumeWebhookEndpointCommand, BaseCommandResponse<Guid>>
 {
@@ -30,46 +30,24 @@ public sealed class ResumeWebhookEndpointCommandHandler(
                 "Webhook endpoint resume request failed validation.");
         }
 
-        var endpoint = await endpointRepository.GetByIdForOwnerOperationAsync(
-            request.EndpointId,
-            forUpdate: false,
-            cancellationToken);
-        if (endpoint is null || endpoint.Status == WebhookEndpointStatus.Archived)
+        return await preparation.ExecuteAsync(request, async token =>
         {
-            return Failure(
-                request.EndpointId,
-                "webhook_endpoint_not_found",
-                "Webhook endpoint was not found.");
-        }
+            var endpoint = await endpointRepository.GetByIdForOwnerOperationAsync(
+                request.EndpointId, forUpdate: false, token);
+            if (endpoint is null || endpoint.Status == WebhookEndpointStatus.Archived)
+                return Failure(request.EndpointId, "webhook_endpoint_not_found",
+                    "Webhook endpoint was not found.");
+            if (endpoint.Consumer?.ProviderMode is not (WebhookProviderMode.Local or WebhookProviderMode.Composite))
+                return Failure(request.EndpointId, "webhook_endpoint_resume_unsupported",
+                    "Only Local or Composite webhook endpoints can be resumed by this operation.");
+            if (endpoint.Status is not (WebhookEndpointStatus.AutoPaused or WebhookEndpointStatus.Disabled))
+                return Failure(request.EndpointId, "webhook_endpoint_not_paused",
+                    "Only a paused webhook endpoint can be resumed.");
+            if (endpoint.DeliveryStateVersion != request.ExpectedDeliveryStateVersion)
+                return Failure(request.EndpointId, "webhook_endpoint_resume_conflict",
+                    "Webhook endpoint delivery state changed. Reload it before resuming.");
 
-        if (endpoint.Consumer?.ProviderMode is not (WebhookProviderMode.Local or WebhookProviderMode.Composite))
-        {
-            return Failure(
-                request.EndpointId,
-                "webhook_endpoint_resume_unsupported",
-                "Only Local or Composite webhook endpoints can be resumed by this operation.");
-        }
-
-        if (endpoint.Status is not (WebhookEndpointStatus.AutoPaused or WebhookEndpointStatus.Disabled))
-        {
-            return Failure(
-                request.EndpointId,
-                "webhook_endpoint_not_paused",
-                "Only a paused webhook endpoint can be resumed.");
-        }
-
-        if (endpoint.DeliveryStateVersion != request.ExpectedDeliveryStateVersion)
-        {
-            return Failure(
-                request.EndpointId,
-                "webhook_endpoint_resume_conflict",
-                "Webhook endpoint delivery state changed. Reload it before resuming.");
-        }
-
-        var resumedAt = timeProvider.GetUtcNow().UtcDateTime;
-
-        return await unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
+            var resumedAt = timeProvider.GetUtcNow().UtcDateTime;
             var resumed = await endpointRepository.TryResumeAsync(
                 endpoint.TenantId,
                 request.EndpointId,

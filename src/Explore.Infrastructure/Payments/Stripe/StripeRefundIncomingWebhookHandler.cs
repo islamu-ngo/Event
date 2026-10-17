@@ -42,29 +42,37 @@ public sealed class StripeRefundIncomingWebhookHandler(IRefundAttemptRepository 
             !string.Equals(attempt.ProviderCode, StripeConnectIncomingWebhookVerifier.PaymentProviderCode, StringComparison.Ordinal) ||
             !string.Equals(attempt.ExternalAccountId, envelope.AccountId, StringComparison.Ordinal) ||
             !string.Equals(attempt.ProviderPaymentId, envelope.ProviderPaymentId, StringComparison.Ordinal) ||
+            attempt.Allocation.TotalMinor != envelope.AmountMinor ||
+            !string.Equals(attempt.CurrencyCode, envelope.CurrencyCode, StringComparison.Ordinal) ||
             (attempt.ProviderRefundId is not null && !string.Equals(attempt.ProviderRefundId, envelope.ProviderRefundId, StringComparison.Ordinal)))
         {
             return IncomingWebhookProcessingResult.RejectedPermanent("stripe_refund_attempt_context_mismatch");
         }
-        if (envelope.CreatedAt < attempt.LastObservedAt)
+        if (envelope.CreatedAt < attempt.LastObservedAt && envelope.Status != RefundProviderStatus.Succeeded)
         {
             return IncomingWebhookProcessingResult.Processed(attempt.Id.ToString("N"));
         }
 
         try
         {
-            RefundAttemptEvidence.Apply(
+            DateTime observedAt = envelope.CreatedAt < attempt.LastObservedAt ? attempt.LastObservedAt : envelope.CreatedAt;
+            RefundAttempt? settled = await repository.SettleAndScheduleAsync(
                 attempt,
-                new RefundProviderObservation(
+                null,
+                RefundProviderResult.Observed(new RefundProviderObservation(
                     envelope.ProviderRefundId,
                     envelope.ProviderPaymentId,
                     envelope.Status,
                     envelope.AmountMinor,
                     envelope.CurrencyCode,
-                    null),
-                envelope.CreatedAt,
-                null);
-            await repository.SaveChangesAsync(cancellationToken);
+                    null), null),
+                observedAt,
+                RefundOutboxMessageFactory.CreateReconciliation(attempt, observedAt, observedAt.AddMinutes(1)),
+                cancellationToken);
+            if (settled is null)
+                return IncomingWebhookProcessingResult.RetryDue("stripe_refund_observation_contention");
+            if (envelope.Status == RefundProviderStatus.Succeeded && !settled.BuyerRefundSucceededAt.HasValue)
+                return IncomingWebhookProcessingResult.RejectedPermanent("stripe_refund_evidence_conflict");
             return IncomingWebhookProcessingResult.Processed(attempt.Id.ToString("N"));
         }
         catch (InvalidOperationException)

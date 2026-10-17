@@ -97,13 +97,16 @@ public interface IWebhookEndpointRepository
         Guid actorUserId,
         CancellationToken cancellationToken);
 
-    Task MarkSuccessAsync(
+    Task<bool> MarkSuccessAsync(
         Guid tenantId,
         Guid endpointId,
+        Guid localTargetId,
+        Guid leaseToken,
+        long deliveryFence,
         DateTime succeededAt,
         CancellationToken cancellationToken);
 
-    Task<WebhookEndpointFailureState> RecordFailureAsync(
+    Task<WebhookEndpointFailureState?> RecordFailureAsync(
         Guid tenantId,
         Guid endpointId,
         Guid localTargetId,

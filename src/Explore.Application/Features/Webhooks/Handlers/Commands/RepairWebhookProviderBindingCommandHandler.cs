@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
@@ -21,9 +20,11 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
     IWebhookProviderBindingAuthorityService authorityService,
     IWebhookAuditEventWriter auditWriter,
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHumanWebhookMutationPreparation preparation,
+    IOriginalOwnerSettlementBoundary settlementBoundary,
+    IHumanActionCommitFinalizer finalizer)
     : ICommandHandler<RepairWebhookProviderBindingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -41,13 +42,9 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                 validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        if (!HasAuthenticatedActor())
-        {
-            return Failure(
-                request.ConsumerId,
-                "webhook_provider_binding_repair_actor_required",
-                "An authenticated operator identity is required.");
-        }
+        var prepared = machinePrincipalAccessor.Current is null
+            ? await preparation.PrepareRepairAsync(request, cancellationToken)
+            : null;
 
         var consumer = await consumerRepository.GetByIdForOwnerOperationAsync(
             request.ConsumerId,
@@ -60,6 +57,9 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                 "webhook_consumer_not_found",
                 "Webhook consumer was not found.");
         }
+
+        if (prepared is not null)
+            RequireConsumer(prepared.Consumer, consumer);
 
         if (consumer.Status != WebhookConsumerStatus.Active ||
             consumer.ProviderMode is not (WebhookProviderMode.Svix or WebhookProviderMode.Composite))
@@ -94,6 +94,16 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
             profile.ProviderKind,
             profile.ProviderEnvironment,
             cancellationToken);
+        var originalBinding = existing is null ? null : BindingFact(existing);
+        if (prepared is not null)
+        {
+            var selected = prepared.Bindings.SingleOrDefault(row =>
+                row.ProviderKindId == (int)profile.ProviderKind &&
+                row.NormalizedEnvironment == WebhookConsumerProviderBinding.NormalizeIdentity(
+                    profile.ProviderEnvironment, nameof(profile.ProviderEnvironment)));
+            if (selected != originalBinding)
+                throw new UnauthorizedAccessException("The original repair binding observation changed.");
+        }
         if (existing?.VerificationState is WebhookProviderBindingVerificationState.Rejected or
             WebhookProviderBindingVerificationState.Revoked)
         {
@@ -107,6 +117,14 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
         var expectedApplicationUid = WebhookConsumerProviderBinding.CreateApplicationUid(
             bootstrap.Id,
             consumer.Id);
+        var originalBootstrap = new HumanWebhookInstanceFact(
+            bootstrap.Id, (int)bootstrap.Status, bootstrap.Generation, bootstrap.CreatedAt);
+        if (prepared is not null)
+        {
+            RequireBootstrap(originalBootstrap, await bootstrapStateRepository.GetCurrent(cancellationToken));
+            RequireProfile(profile);
+            await prepared.ValidateAsync(request, cancellationToken);
+        }
         var ownership = await authorityService.VerifyOwnershipAsync(
             new WebhookProviderBindingOwnershipRequest(
                 consumer.Ownership,
@@ -118,8 +136,14 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                 profile.CapabilityProfile.ProviderVersion,
                 profile.CapabilityProfile.ResolutionVersion),
             cancellationToken);
-        var occurredAt = timeProvider.GetUtcNow().UtcDateTime;
-        if (!ownership.Succeeded)
+        var occurredAt = timeProvider.GetUtcNow();
+        if (prepared is not null)
+        {
+            await prepared.ValidateAsync(request, cancellationToken);
+            RequireProfile(profile);
+            RequireBootstrap(originalBootstrap, await bootstrapStateRepository.GetCurrent(cancellationToken));
+        }
+        if (!ownership.Succeeded && prepared is null)
         {
             await WriteRejectedAuditAsync(
                 request,
@@ -135,12 +159,49 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                 ownership.FailureCategory ?? "webhook_provider_binding_mismatched",
                 "The provider application does not prove typed ownership by this consumer.");
         }
+        // Only the authority service's two fixed ownership-business classifications can
+        // enter the evidence owner. Retryability, arbitrary provider errors and exceptions
+        // are neither original-human admission nor physical rollback acknowledgement.
+        if (!ownership.Succeeded && (ownership.IsRetryable || ownership.FailureCategory is not
+            ("webhook_provider_binding_mismatched" or "webhook_provider_application_not_found")))
+            return Failure(existing?.Id ?? consumer.Id,
+                ownership.FailureCategory ?? "webhook_provider_binding_mismatched",
+                "The provider application ownership could not be verified.");
 
         var expectedBindingId = existing?.Id;
         var expectedConcurrencyVersion = existing?.ConcurrencyVersion;
         var expectedVerificationFence = existing?.VerificationFence;
-        return await unitOfWork.ExecuteInTransactionAsync(async token =>
+        // Allocate once, outside the physical owner. The human settlement boundary executes
+        // one attempt only; no provider operation or allocated identity is replayed on error.
+        var pending = prepared is not null && existing is null && ownership.Succeeded
+            ? WebhookConsumerProviderBinding.CreatePending(consumer.TenantId, consumer.Id,
+                bootstrap.Id, profile.ProviderEnvironment, profile.CapabilityProfile,
+                profile.GovernanceAllowedCapabilities)
+            : null;
+
+        async Task<BaseCommandResponse<Guid>> Mutate(CancellationToken token)
         {
+            if (prepared is not null)
+            {
+                await prepared.AcquireAsync(request, token);
+                var currentConsumer = await consumerRepository.GetByIdForOwnerOperationAsync(
+                    request.ConsumerId, forUpdate: false, token);
+                RequireConsumer(prepared.Consumer, currentConsumer);
+                consumer = currentConsumer!;
+                RequireBootstrap(originalBootstrap, await bootstrapStateRepository.GetCurrentForUpdate(token));
+                RequireProfile(profile);
+
+                if (!ownership.Succeeded)
+                {
+                    var audit = await WriteRejectedAuditAsync(request, consumer, existing,
+                        expectedApplicationUid, externalApplicationId, ownership.FailureCategory!,
+                        profile.CapabilityProfile.ResolutionVersion, token, prepared.PrincipalId);
+                    RegisterFinalAdmission(originalBinding, audit.RetentionUntil);
+                    return Failure(existing?.Id ?? consumer.Id, ownership.FailureCategory!,
+                        "The provider application does not prove typed ownership by this consumer.");
+                }
+            }
+
             WebhookConsumerProviderBinding binding;
             if (expectedBindingId is { } bindingId)
             {
@@ -159,6 +220,8 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                         "Webhook provider binding changed before repair could be committed.");
                 }
 
+                if (prepared is not null && BindingFact(tracked) != originalBinding)
+                    throw new UnauthorizedAccessException("The acquired repair binding changed.");
                 binding = tracked;
             }
             else
@@ -177,7 +240,7 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                         "Webhook provider binding changed before repair could be committed.");
                 }
 
-                binding = WebhookConsumerProviderBinding.CreatePending(
+                binding = pending ?? WebhookConsumerProviderBinding.CreatePending(
                     consumer.TenantId,
                     consumer.Id,
                     bootstrap.Id,
@@ -197,6 +260,7 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                 profile.GovernanceAllowedCapabilities,
                 occurredAt);
 
+            var repairedBinding = BindingFact(binding);
             if (expectedBindingId is null)
             {
                 await bindingRepository.CreateAsync(binding, token);
@@ -206,7 +270,7 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                 await bindingRepository.SaveChangesAsync(token);
             }
 
-            await auditWriter.AppendAsync(
+            var succeededAudit = await auditWriter.AppendAsync(
                 new WebhookAuditWriteRequest(
                     binding.TenantId,
                     WebhookAuditAction.ProviderBindingRepairSucceeded,
@@ -232,14 +296,48 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                     }),
                     ConfigurationVersion: $"binding-v{binding.ConcurrencyVersion}:fence-{binding.VerificationFence}",
                     EffectiveScopeKind: consumer.Ownership.AuditScopeKind,
-                    EffectiveScopeId: consumer.OwnerId),
+                    EffectiveScopeId: consumer.OwnerId,
+                    PrincipalKind: prepared is null ? null : WebhookAuditPrincipalKind.User,
+                    PrincipalReference: prepared is null ? null : $"user:{prepared.PrincipalId:D}"),
                 token);
 
+            if (prepared is not null)
+                RegisterFinalAdmission(repairedBinding, succeededAudit.RetentionUntil);
             return Success(binding.Id, "Webhook provider binding verified.");
-        }, cancellationToken);
+        }
+
+        void RegisterFinalAdmission(HumanWebhookBindingFact? expected, DateTime retentionUntil)
+        {
+            finalizer.Register(async token =>
+            {
+                // W already excludes competing writers. These tracker-free reads also reject
+                // own writes to bootstrap or proof fields that closed transition admission
+                // deliberately does not classify as provider-ownership evidence.
+                RequireBootstrap(originalBootstrap, await bootstrapStateRepository.GetCurrent(token));
+                var current = await bindingRepository.GetByConsumerAsync(consumer.TenantId, consumer.Id,
+                    profile.ProviderKind, profile.ProviderEnvironment, token);
+                if ((current is null ? null : BindingFact(current)) != expected)
+                    throw new UnauthorizedAccessException("The retained provider ownership proof lineage changed.");
+            }, now =>
+            {
+                RequireProfile(profile);
+                if (now < occurredAt || now.UtcDateTime >= retentionUntil)
+                    throw new UnauthorizedAccessException("Repair evidence is outside its retained time bounds.");
+            });
+        }
+
+        if (prepared is null)
+            return await unitOfWork.ExecuteInTransactionAsync(Mutate, cancellationToken);
+
+        var invocation = new object();
+        var settled = await settlementBoundary.ExecuteAsync(invocation, async token =>
+            OriginalOwnerDecision<BaseCommandResponse<Guid>>.Commit(await Mutate(token)), cancellationToken);
+        // A trusted remote refusal is evidence, not a rollback witness. Its audit is admitted
+        // and committed in its own actual owner, with the same original requester and sources.
+        return settlementBoundary.Consume(invocation, settled, OriginalOwnerDisposition.Committed);
     }
 
-    private async Task WriteRejectedAuditAsync(
+    private async Task<WebhookAuditEvent> WriteRejectedAuditAsync(
         RepairWebhookProviderBindingCommand request,
         WebhookConsumer consumer,
         WebhookConsumerProviderBinding? binding,
@@ -247,10 +345,11 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
         string externalApplicationId,
         string failureCategory,
         string capabilityResolutionVersion,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? principalId = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await auditWriter.AppendAsync(
+        return await auditWriter.AppendAsync(
             new WebhookAuditWriteRequest(
                 consumer.TenantId,
                 WebhookAuditAction.ProviderBindingRepairRejected,
@@ -270,24 +369,49 @@ public sealed class RepairWebhookProviderBindingCommandHandler(
                 }),
                 ConfigurationVersion: capabilityResolutionVersion,
                 EffectiveScopeKind: consumer.Ownership.AuditScopeKind,
-                EffectiveScopeId: consumer.OwnerId),
+                EffectiveScopeId: consumer.OwnerId,
+                PrincipalKind: principalId.HasValue ? WebhookAuditPrincipalKind.User : null,
+                PrincipalReference: principalId.HasValue ? $"user:{principalId.Value:D}" : null),
             cancellationToken);
     }
 
-    private bool HasAuthenticatedActor()
+    private void RequireProfile(WebhookProviderBindingProfile expected)
     {
-        if (currentUserService.UserId is not null)
-        {
-            return true;
-        }
-
-        if (machinePrincipalAccessor.Current is not null)
-        {
-            return true;
-        }
-
-        return false;
+        var current = authorityService.ResolveCurrentProfile().Profile;
+        if (current is null || current.ProviderKind != expected.ProviderKind
+            || current.ProviderEnvironment != expected.ProviderEnvironment
+            || current.GovernanceAllowedCapabilities != expected.GovernanceAllowedCapabilities
+            || current.CapabilityProfile.ProviderKind != expected.CapabilityProfile.ProviderKind
+            || current.CapabilityProfile.ProviderVersion != expected.CapabilityProfile.ProviderVersion
+            || current.CapabilityProfile.Capabilities != expected.CapabilityProfile.Capabilities
+            || current.CapabilityProfile.ResolutionVersion != expected.CapabilityProfile.ResolutionVersion)
+            throw new UnauthorizedAccessException("The original repair provider profile changed.");
     }
+
+    private static void RequireBootstrap(HumanWebhookInstanceFact expected, InstanceBootstrapState? current)
+    {
+        if (current is null || current.Id != expected.Id || (int)current.Status != expected.Status
+            || current.Generation != expected.Generation || current.CreatedAt != expected.CreatedAt)
+            throw new UnauthorizedAccessException("The original repair instance identity changed.");
+    }
+
+    private static void RequireConsumer(HumanWebhookConsumerFact expected, WebhookConsumer? current)
+    {
+        if (current is null || expected != new HumanWebhookConsumerFact(current.Id, current.TenantId,
+            current.InstanceId, current.OrganizationId, current.GroupId, current.OwnerUserId,
+            current.ConfigurationScopeId, current.ConsumerKindId, current.StatusId,
+            current.ProviderModeId, current.ConfigurationVersion))
+            throw new UnauthorizedAccessException("The original repair consumer changed.");
+    }
+
+    private static HumanWebhookBindingFact BindingFact(WebhookConsumerProviderBinding binding) => new(
+        binding.Id, binding.TenantId, binding.WebhookConsumerId, binding.InstanceId, binding.ConfigurationScopeId,
+        binding.ProviderKindId, binding.ProviderVersion, binding.ProviderEnvironment, binding.NormalizedEnvironment,
+        binding.ApplicationUid, binding.NormalizedApplicationUid, binding.ExternalApplicationId,
+        binding.NormalizedExternalApplicationId, binding.VerificationStateId, binding.VerifiedTenantId,
+        binding.VerifiedWebhookConsumerId, binding.VerifiedAtUtc, (long)binding.Capabilities,
+        (long)binding.GovernanceAllowedCapabilities, binding.CapabilityResolutionVersion,
+        binding.CapabilitiesResolvedAtUtc, binding.IsEnabled, binding.ConcurrencyVersion, binding.VerificationFence);
 
     private static string? HashIdentity(string? value)
     {

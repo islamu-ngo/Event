@@ -18,7 +18,8 @@ public sealed class WebhookOwnershipScopeResolver(
     IWebhookConsumerRepository webhookConsumerRepository,
     IWebhookEndpointRepository webhookEndpointRepository,
     IWebhookMessageRepository webhookMessageRepository,
-    IWebhookDeliveryAttemptRepository webhookDeliveryAttemptRepository) : IWebhookOwnershipScopeResolver
+    IWebhookDeliveryAttemptRepository webhookDeliveryAttemptRepository,
+    IWebhookProviderPublicationRepository webhookProviderPublicationRepository) : IWebhookOwnershipScopeResolver
 {
     public async Task<WebhookOwnershipScopeResolution> ResolveAsync(
         int ownerKindId,
@@ -94,6 +95,19 @@ public sealed class WebhookOwnershipScopeResolver(
                     resourceId,
                     cancellationToken);
                 consumer = attempt?.Endpoint?.Consumer;
+                break;
+            case WebhookOwnedResourceKind.ProviderPublication:
+                var publication = await webhookProviderPublicationRepository.GetByTenantAndIdAsync(
+                    tenantContext.TenantId, resourceId, cancellationToken);
+                var plan = publication?.WebhookDeliveryPlanSnapshot;
+                if (publication is null || plan is null || publication.TenantId != tenantContext.TenantId ||
+                    plan.TenantId != publication.TenantId || plan.Id != publication.WebhookDeliveryPlanSnapshotId ||
+                    plan.WebhookMessageId != publication.WebhookMessageId)
+                    return Failed("webhook_resource_not_found", "Webhook resource was not found.");
+                consumer = await webhookConsumerRepository.GetByIdForOwnerOperationAsync(
+                    plan.WebhookConsumerId, forUpdate: false, cancellationToken);
+                if (consumer?.TenantId != publication.TenantId)
+                    return Failed("webhook_resource_not_found", "Webhook resource was not found.");
                 break;
             default:
                 return Failed("webhook_resource_kind_invalid", "Webhook resource kind is invalid.");

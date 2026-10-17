@@ -642,6 +642,16 @@ resolution falls back to disabled analytics, and feature-flag failures remain
 false or null; analytics diagnostics must not become a second export of the
 event or identity being measured.
 
+### RabbitMQ dispatch diagnostic privacy
+
+Broker dispatch health reports its enabled state and health decision without
+returning configured connection or queue names. Consumer, replay and publisher
+logs retain safe outcome categories and numeric broker facts, not tenant or
+message identities, private broker reply text or raw exceptions. Disabled
+dispatch remains healthy; an enabled but unconfigured connection is unhealthy.
+Investigate through the fixed outcome and your private broker configuration
+rather than adding credentials or pointer payloads to shared support logs.
+
 ### Recipe 1: Keycloak "Invalid Parameter: redirect_uri" or Infinite Login Loop
 
 #### Why this happens

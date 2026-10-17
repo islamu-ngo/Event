@@ -180,6 +180,21 @@ In-app notifications are implemented through notification controller/client/repo
 
 Keep the future notifications doc focused on in-app notification behavior when that doc is created, and link back here only for SMTP delivery boundaries.
 
+## RabbitMQ diagnostic boundary
+
+Email dispatch consumers, replay, pointer publication and broker transport keep
+operational outcomes without exporting tenant, outbox or publish identifiers,
+configured queue/connection/client names, consumer tags or exception objects.
+Broker return diagnostics retain the numeric reply code, not remote reply text
+or routing keys. Prefetch counts, numeric delivery/publish sequence values and
+closed settlement/failure categories remain available.
+
+Transport health data exposes only the enabled flag alongside the existing
+healthy/unhealthy decision and fixed description. A missing selected connection
+still fails health; disabled dispatch remains independently healthy. Sanitizing
+these exports does not change publish confirmation, nack/requeue decisions,
+native replay guards or unexpected worker failure propagation.
+
 ## Troubleshooting
 
 | Symptom | First Checks |

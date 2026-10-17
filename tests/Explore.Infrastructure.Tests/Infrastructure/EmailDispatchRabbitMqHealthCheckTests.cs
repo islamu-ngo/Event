@@ -97,7 +97,7 @@ public sealed class EmailDispatchRabbitMqHealthCheckTests
         await Assert.That(health.Enabled).IsFalse();
         await Assert.That(health.Healthy).IsTrue();
         await Assert.That(health.Description).Contains("Basic Dispatch Mode remains independent");
-        await Assert.That(health.Data["connectionStringName"]).IsEqualTo("missing-broker");
+        await Assert.That(health.Data.ContainsKey("connectionStringName")).IsFalse();
     }
 
     [Test]

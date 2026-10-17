@@ -54,6 +54,8 @@ public sealed class ConfigurationManifestOperationConfiguration
             .HasMaxLength(ConfigurationManifestOperation.DigestLength)
             .IsFixedLength();
         builder.Property(operation => operation.BootstrapGeneration);
+        builder.Property(operation => operation.EffectOutboxId)
+            .Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Throw);
         builder.Property(operation => operation.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(operation => operation.ReasonCode)
             .HasMaxLength(ConfigurationManifestOperation.MaxReasonCodeLength);

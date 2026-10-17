@@ -520,7 +520,6 @@ namespace Explore.Persistence.Migrations
             modelBuilder.Entity("Explore.Domain.ActorModerationRecord", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -2647,6 +2646,7 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("completed_at");
 
                     b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid")
                         .HasColumnName("concurrency_stamp");
 
@@ -2665,7 +2665,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("failure_message");
 
                     b.Property<string>("ImageSourceDigest")
-                        .HasColumnType("text")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("image_source_digest");
 
                     b.Property<Guid?>("ImageSourceMessageId")
@@ -2677,7 +2678,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("image_storage_object_id");
 
                     b.Property<string>("ImageUploadOperationKey")
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("image_upload_operation_key");
 
                     b.Property<Guid?>("ImageUploadSessionId")
@@ -2686,7 +2688,8 @@ namespace Explore.Persistence.Migrations
 
                     b.Property<string>("PayloadDigest")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("payload_digest");
 
                     b.Property<DateTime?>("PrimaryEffectLinkedAt")
@@ -2731,10 +2734,15 @@ namespace Explore.Persistence.Migrations
                         .HasName("pk_ai_tool_executions");
 
                     b.HasIndex("ProposedActionId")
+                        .IsUnique()
                         .HasDatabaseName("ix_ai_tool_executions_proposed_action_id");
 
-                    b.HasIndex("TenantId", "ProposedActionId", "StartedAt")
-                        .HasDatabaseName("ix_ai_tool_executions_tenant_id_proposed_action_id_started_at");
+                    b.HasIndex("ReservedEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_tool_executions_reserved_event_id");
+
+                    b.HasIndex("TenantId", "PrimaryEventId")
+                        .HasDatabaseName("ix_ai_tool_executions_tenant_id_primary_event_id");
 
                     b.HasIndex("TenantId", "ToolName", "StartedAt")
                         .HasDatabaseName("ix_ai_tool_executions_tenant_id_tool_name_started_at");
@@ -3137,7 +3145,6 @@ namespace Explore.Persistence.Migrations
             modelBuilder.Entity("Explore.Domain.AtprotoIdentityModerationRecord", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -4071,8 +4078,10 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("effect_outbox_id");
 
                     b.Property<string>("EffectPayloadDigest")
-                        .HasColumnType("text")
-                        .HasColumnName("effect_payload_digest");
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("effect_payload_digest")
+                        .IsFixedLength();
 
                     b.Property<string>("FailureCode")
                         .HasMaxLength(200)
@@ -4177,7 +4186,8 @@ namespace Explore.Persistence.Migrations
 
                     b.HasIndex("SessionId")
                         .IsUnique()
-                        .HasDatabaseName("ix_configuration_import_operations_session_id");
+                        .HasDatabaseName("ix_configuration_import_operations_session_id")
+                        .HasFilter("status <> 3");
 
                     b.HasIndex("SnapshotArtifactHandleId")
                         .IsUnique()
@@ -8559,6 +8569,9 @@ namespace Explore.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_event_location_disclosure_audits");
 
+                    b.HasIndex("CorrectionMessageId")
+                        .HasDatabaseName("ix_event_location_disclosure_audits_correction_message_id");
+
                     b.HasIndex("NewAudienceId")
                         .HasDatabaseName("ix_event_location_disclosure_audits_new_audience_id");
 
@@ -9392,7 +9405,8 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("provider_sync_outbox_id");
 
                     b.Property<string>("ProviderSyncPayloadDigest")
-                        .HasColumnType("text")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("provider_sync_payload_digest");
 
                     b.Property<DateTime?>("ProviderSyncSubmittedAtUtc")
@@ -9477,6 +9491,11 @@ namespace Explore.Persistence.Migrations
 
                     b.HasAlternateKey("TenantId", "EventId", "Id")
                         .HasName("ak_event_reports_tenant_id_event_id_id");
+
+                    b.HasIndex("ProviderSyncOutboxId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_reports_provider_sync_outbox_id")
+                        .HasFilter("provider_sync_outbox_id IS NOT NULL");
 
                     b.HasIndex("ReporterActorId")
                         .HasDatabaseName("ix_event_reports_reporter_actor_id");
@@ -10486,6 +10505,8 @@ namespace Explore.Persistence.Migrations
                             t.HasCheckConstraint("ck_event_resources_identity", "sort_order >= 0 AND is_deleted IN (0, 1) AND TRIM(title) <> '' AND session_scope_id <> '00000000-0000-0000-0000-000000000000'");
 
                             t.HasCheckConstraint("ck_event_resources_payload", "(is_deleted = 1 AND (storage_object_id IS NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL)) OR (is_deleted = 0 AND ((publication_state_id IN (1, 4) AND ((storage_object_id IS NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 1 AND storage_object_id IS NOT NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 2 AND storage_object_id IS NULL AND external_destination_ciphertext IS NOT NULL AND TRIM(external_destination_ciphertext) <> '' AND external_destination_protection_version IS NOT NULL AND external_destination_protection_version > 0 AND external_destination_safe_origin IS NOT NULL AND TRIM(external_destination_safe_origin) <> ''))) OR (publication_state_id IN (2, 3) AND ((event_resource_delivery_type_id = 1 AND storage_object_id IS NOT NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 2 AND storage_object_id IS NULL AND external_destination_ciphertext IS NOT NULL AND TRIM(external_destination_ciphertext) <> '' AND external_destination_protection_version IS NOT NULL AND external_destination_protection_version > 0 AND external_destination_safe_origin IS NOT NULL AND TRIM(external_destination_safe_origin) <> '')))))");
+
+                            t.HasCheckConstraint("ck_event_resources_relative_availability_order", "availability_start_anchor_id IS NULL OR availability_end_anchor_id IS NULL OR availability_start_anchor_id <> availability_end_anchor_id OR availability_end_offset_ticks > availability_start_offset_ticks");
 
                             t.HasCheckConstraint("ck_event_resources_session_scope", "(event_session_id IS NULL AND session_scope_id = event_id) OR (event_session_id IS NOT NULL AND session_scope_id = event_session_id)");
 
@@ -14435,9 +14456,9 @@ namespace Explore.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_fair_return_effect_attempts", "attempt_count >= 0 AND maximum_attempts BETWEEN 1 AND 100");
 
-                            t.HasCheckConstraint("ck_fair_return_effect_state", "(status_id = 1 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 2 AND lease_expires_at IS NOT NULL AND lease_owner IS NOT NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 3 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NOT NULL AND dead_lettered_at IS NULL) OR (status_id = 4 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NOT NULL)");
+                            t.HasCheckConstraint("ck_fair_return_effect_state", "(status_id IN (1, 5) AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 2 AND lease_expires_at IS NOT NULL AND lease_owner IS NOT NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 3 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NOT NULL AND dead_lettered_at IS NULL) OR (status_id = 4 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_fair_return_effect_status", "status_id BETWEEN 1 AND 4");
+                            t.HasCheckConstraint("ck_fair_return_effect_status", "status_id BETWEEN 1 AND 5");
                         });
                 });
 
@@ -15067,8 +15088,11 @@ namespace Explore.Persistence.Migrations
                     b.Property<string>("Collection")
                         .IsRequired()
                         .HasMaxLength(255)
+                        .IsUnicode(false)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("collection");
+                        .HasColumnName("collection")
+                        .UseCollation("C")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -15090,8 +15114,11 @@ namespace Explore.Persistence.Migrations
                     b.Property<string>("Did")
                         .IsRequired()
                         .HasMaxLength(255)
+                        .IsUnicode(false)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("did");
+                        .HasColumnName("did")
+                        .UseCollation("C")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<string>("ExpectedCid")
                         .HasMaxLength(255)
@@ -15164,8 +15191,11 @@ namespace Explore.Persistence.Migrations
                     b.Property<string>("RecordKey")
                         .IsRequired()
                         .HasMaxLength(255)
+                        .IsUnicode(false)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("record_key");
+                        .HasColumnName("record_key")
+                        .UseCollation("C")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<int>("RetryCount")
                         .HasColumnType("integer")
@@ -15244,9 +15274,9 @@ namespace Explore.Persistence.Migrations
                     b.HasIndex("Status", "NextRetryAt", "LeaseExpiresAt", "CreatedAt")
                         .HasDatabaseName("ix_pds_sync_outbox_status_next_retry_at_lease_expi_4329b0dd85fa");
 
-                    b.HasIndex("TenantId", "SourceEntityType", "SourceEntityId", "SourceVersion", "Operation", "PayloadHash")
+                    b.HasIndex("TenantId", "SourceEntityType", "SourceEntityId", "UserId", "Did", "Collection", "RecordKey", "SourceVersion", "Operation", "PayloadHash")
                         .IsUnique()
-                        .HasDatabaseName("ix_pds_sync_outbox_tenant_id_source_entity_type_so_a24f031756f2")
+                        .HasDatabaseName("ix_pds_sync_outbox_tenant_id_source_entity_type_so_cc9a43ff9a50")
                         .HasFilter("status IN (1, 2) AND superseded_at IS NULL");
 
                     b.ToTable("pds_sync_outbox", "islamu_event", t =>
@@ -17344,6 +17374,107 @@ namespace Explore.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.LocalStorageQuarantine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AdmissionReason")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("admission_reason");
+
+                    b.Property<long>("AdmittedAtUtc")
+                        .HasColumnType("bigint")
+                        .HasColumnName("admitted_at_utc_ticks");
+
+                    b.Property<string>("CanonicalPhysicalPath")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("canonical_physical_path");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long?>("LeaseExpiresAtUtc")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lease_expires_at_utc_ticks");
+
+                    b.Property<long>("ModifiedBeforeUtc")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_before_utc_ticks");
+
+                    b.Property<long?>("NextAttemptAtUtc")
+                        .HasColumnType("bigint")
+                        .HasColumnName("next_attempt_at_utc_ticks");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("object_key");
+
+                    b.Property<long>("ObservedLastModifiedUtc")
+                        .HasColumnType("bigint")
+                        .HasColumnName("observed_last_modified_utc_ticks");
+
+                    b.Property<long>("ObservedSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("observed_size");
+
+                    b.Property<short?>("Outcome")
+                        .HasColumnType("smallint")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("PhysicalPathHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("physical_path_hash");
+
+                    b.Property<Guid>("ProviderBindingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provider_binding_id");
+
+                    b.Property<long?>("SettledAtUtc")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settled_at_utc_ticks");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_local_storage_quarantine");
+
+                    b.HasIndex("PhysicalPathHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_local_storage_quarantine_physical_path_hash");
+
+                    b.HasIndex("ProviderBindingId")
+                        .HasDatabaseName("ix_local_storage_quarantine_provider_binding_id");
+
+                    b.HasIndex("State", "LeaseExpiresAtUtc", "Id")
+                        .HasDatabaseName("ix_local_storage_quarantine_state_lease_expires_at_utc_ticks_id");
+
+                    b.HasIndex("State", "NextAttemptAtUtc", "Id")
+                        .HasDatabaseName("ix_local_storage_quarantine_state_next_attempt_at_utc_ticks_id");
+
+                    b.ToTable("local_storage_quarantine", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_local_quarantine_evidence", "observed_size >= 0 AND observed_last_modified_utc_ticks > 0 AND observed_last_modified_utc_ticks <= modified_before_utc_ticks AND modified_before_utc_ticks <= admitted_at_utc_ticks AND object_key <> '' AND canonical_physical_path <> '' AND admission_reason <> ''");
+
+                            t.HasCheckConstraint("ck_local_quarantine_identity", "id <> '00000000-0000-0000-0000-000000000000' AND provider_binding_id <> '00000000-0000-0000-0000-000000000000' AND concurrency_stamp <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_local_quarantine_state", "(state = 1 AND next_attempt_at_utc_ticks IS NOT NULL AND lease_expires_at_utc_ticks IS NULL AND settled_at_utc_ticks IS NULL AND outcome IS NULL) OR (state = 2 AND next_attempt_at_utc_ticks IS NULL AND lease_expires_at_utc_ticks IS NOT NULL AND settled_at_utc_ticks IS NULL AND outcome IS NULL) OR (state = 3 AND next_attempt_at_utc_ticks IS NULL AND lease_expires_at_utc_ticks IS NULL AND settled_at_utc_ticks IS NOT NULL AND outcome IN (1, 2, 3)) OR (state = 4 AND next_attempt_at_utc_ticks IS NULL AND lease_expires_at_utc_ticks IS NULL AND settled_at_utc_ticks IS NOT NULL AND outcome = 4)");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.Location", b =>
                 {
                     b.Property<Guid>("Id")
@@ -17683,6 +17814,69 @@ namespace Explore.Persistence.Migrations
                             t.HasCheckConstraint("ck_location_pii_address_substring_key_version", "address_substring_key_version = 2 AND address_substring_key <> ''");
 
                             t.HasCheckConstraint("ck_location_pii_coordinate_shape", "(latitude IS NULL AND longitude IS NULL)\nOR (latitude IS NOT NULL AND longitude IS NOT NULL\n    AND latitude BETWEEN -90 AND 90\n    AND longitude BETWEEN -180 AND 180)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.LocationPrivacyCorrectionReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("AuthoritySequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authority_sequence");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("DisclosureAuditId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("disclosure_audit_id");
+
+                    b.Property<Guid?>("ErasureIntentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("erasure_intent_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventLocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_location_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("event_type");
+
+                    b.Property<Guid?>("LocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("location_id");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("policy_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_location_privacy_correction_receipts");
+
+                    b.HasIndex("TenantId", "EventLocationId", "PolicyVersion", "EventType")
+                        .IsUnique()
+                        .HasDatabaseName("ix_location_privacy_correction_receipts_tenant_id__a45c5000ce17");
+
+                    b.ToTable("location_privacy_correction_receipts", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_location_correction_policy", "policy_version > 0");
+
+                            t.HasCheckConstraint("ck_location_correction_source", "(event_type = 'location.privacy.corrected' AND disclosure_audit_id IS NOT NULL AND erasure_intent_id IS NULL AND authority_sequence IS NULL AND location_id IS NULL) OR (event_type = 'LocationPrivacyCorrectionRequested' AND disclosure_audit_id IS NULL AND erasure_intent_id IS NOT NULL AND authority_sequence IS NOT NULL AND authority_sequence > 0 AND location_id IS NOT NULL)");
                         });
                 });
 
@@ -20933,7 +21127,7 @@ namespace Explore.Persistence.Migrations
                         .HasColumnName("next_retry_at");
 
                     b.Property<string>("Payload")
-                        .HasColumnType("jsonb")
+                        .HasColumnType("text")
                         .HasColumnName("payload");
 
                     b.Property<DateTime?>("ProcessedAt")
@@ -24079,12 +24273,14 @@ namespace Explore.Persistence.Migrations
 
                     b.Property<string>("NativeInputDigest")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("native_input_digest");
 
                     b.Property<string>("NativeOperationKey")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
                         .HasColumnName("native_operation_key");
 
                     b.Property<DateTime?>("NoProviderHandoffProvenAt")
@@ -24192,6 +24388,10 @@ namespace Explore.Persistence.Migrations
                     b.HasAlternateKey("TenantId", "Id")
                         .HasName("ak_refund_attempts_tenant_id_id");
 
+                    b.HasIndex("TenantId", "NativeOperationKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refund_attempts_tenant_id_native_operation_key");
+
                     b.HasIndex("TenantId", "PaidOrderAcceptanceSnapshotId")
                         .HasDatabaseName("ix_refund_attempts_tenant_id_paid_order_acceptance_snapshot_id");
 
@@ -24221,9 +24421,15 @@ namespace Explore.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_refund_attempts_buyer_success_capacity", "buyer_refund_succeeded_at IS NULL OR status NOT IN (7, 8)");
 
+                            t.HasCheckConstraint("ck_refund_attempts_dispatch_fence", "dispatch_phase NOT IN (1, 3) OR (dispatch_token IS NOT NULL AND dispatch_committed_at IS NOT NULL AND provider_mutation_expires_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_refund_attempts_dispatch_phase", "dispatch_phase BETWEEN 0 AND 4");
+
                             t.HasCheckConstraint("ck_refund_attempts_fee_refund", "application_fee_refunded_amount_minor >= 0");
 
                             t.HasCheckConstraint("ck_refund_attempts_policy_version", "refund_policy_version > 0");
+
+                            t.HasCheckConstraint("ck_refund_attempts_requested_amount", "requested_amount_minor IS NULL OR requested_amount_minor > 0");
 
                             t.HasCheckConstraint("ck_refund_attempts_status", "status BETWEEN 1 AND 8");
                         });
@@ -27149,6 +27355,48 @@ namespace Explore.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_registration_order_add_on_lines_quantity", "quantity > 0");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.RegistrationOrderCreationReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("InputDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_digest");
+
+                    b.Property<string>("OperationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("operation_fingerprint");
+
+                    b.Property<Guid>("RegistrationOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("registration_order_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registration_order_creation_receipt");
+
+                    b.HasIndex("TenantId", "OperationFingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_registration_order_creation_receipt_tenant_id_o_26b7ffb982a1");
+
+                    b.ToTable("registration_order_creation_receipt", "islamu_event");
                 });
 
             modelBuilder.Entity("Explore.Domain.RegistrationOrderLine", b =>
@@ -39502,6 +39750,13 @@ namespace Explore.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_ai_tool_executions_ai_proposed_actions_proposed_action_id");
 
+                    b.HasOne("Explore.Domain.Event", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PrimaryEventId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_tool_executions_events_tenant_id_primary_event_id");
+
                     b.Navigation("ProposedAction");
                 });
 
@@ -43058,6 +43313,16 @@ namespace Explore.Persistence.Migrations
                         .HasConstraintName("fk_legal_document_versions_legal_documents_legal_document_id");
 
                     b.Navigation("LegalDocument");
+                });
+
+            modelBuilder.Entity("Explore.Domain.LocalStorageQuarantine", b =>
+                {
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("ProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_storage_quarantine_storage_provider_bindi_3d25e56028d2");
                 });
 
             modelBuilder.Entity("Explore.Domain.Location", b =>

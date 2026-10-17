@@ -15,11 +15,14 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(e => e.AggregateType).HasMaxLength(200).IsRequired();
         builder.Property(e => e.EventType).HasMaxLength(200).IsRequired();
 
-        // Payload stored as JSONB for PostgreSQL efficiency
-        builder.Property(e => e.Payload).HasColumnType("jsonb");
+        // Receipt digests and claim replacement compare the original serialized bytes.
+        builder.Property(e => e.Payload).HasColumnType("text");
 
         // Status (stored as integer)
         builder.Property(e => e.Status).IsRequired();
+        builder.Property(e => e.NextRetryAt).HasConversion(
+            value => value,
+            value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : (DateTime?)null);
 
         // Error tracking
         builder.Property(e => e.LastError).HasMaxLength(2000);

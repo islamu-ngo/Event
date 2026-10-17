@@ -109,6 +109,21 @@ public static class PrimaryDatabaseProviderComposition
         ArgumentNullException.ThrowIfNull(options);
 
         var database = PrimaryDatabaseConfiguration.BuildConnectionString(options);
+        ConfigureProvider(optionsBuilder, options, target, database.ConnectionString);
+        return database;
+    }
+
+    internal static void ConfigureApplicationModel(
+        DbContextOptionsBuilder optionsBuilder,
+        PrimaryDatabaseConnectionOptions options) =>
+        ConfigureProvider(optionsBuilder, options, PrimaryDatabaseMigrationTarget.Application, null);
+
+    private static void ConfigureProvider(
+        DbContextOptionsBuilder optionsBuilder,
+        PrimaryDatabaseConnectionOptions options,
+        PrimaryDatabaseMigrationTarget target,
+        string? connectionString)
+    {
         var migrationsAssembly = GetMigrationsAssemblyName(options.Provider, target);
         var migrationsHistory = GetMigrationsHistoryTable(options.Provider, target, options.Schema);
         var modelSchema = options.Role == PrimaryDatabaseRole.Migrator
@@ -120,7 +135,7 @@ public static class PrimaryDatabaseProviderComposition
         switch (options.Provider)
         {
             case PrimaryDatabaseProvider.PostgreSql:
-                optionsBuilder.UseNpgsql(database.ConnectionString, providerOptions =>
+                optionsBuilder.UseNpgsql(connectionString, providerOptions =>
                 {
                     providerOptions.MigrationsAssembly(migrationsAssembly);
                     providerOptions.MigrationsHistoryTable(migrationsHistory.Table, migrationsHistory.Schema);
@@ -142,7 +157,7 @@ public static class PrimaryDatabaseProviderComposition
 
             case PrimaryDatabaseProvider.Sqlite:
                 optionsBuilder.UseSqlite(
-                    database.ConnectionString,
+                    connectionString,
                     providerOptions =>
                     {
                         providerOptions.MigrationsAssembly(migrationsAssembly);
@@ -153,7 +168,7 @@ public static class PrimaryDatabaseProviderComposition
 
             case PrimaryDatabaseProvider.SqlServer:
                 optionsBuilder.UseSqlServer(
-                    database.ConnectionString,
+                    connectionString,
                     providerOptions =>
                     {
                         providerOptions.MigrationsAssembly(migrationsAssembly);
@@ -164,7 +179,7 @@ public static class PrimaryDatabaseProviderComposition
 
             case PrimaryDatabaseProvider.MariaDb:
                 optionsBuilder.UseMySql(
-                    database.ConnectionString,
+                    connectionString,
                     new MariaDbServerVersion(options.ServerVersion!),
                     providerOptions =>
                     {
@@ -176,7 +191,7 @@ public static class PrimaryDatabaseProviderComposition
 
             case PrimaryDatabaseProvider.MySql:
                 optionsBuilder.UseMySql(
-                    database.ConnectionString,
+                    connectionString,
                     new MySqlServerVersion(options.ServerVersion!),
                     providerOptions =>
                     {
@@ -191,7 +206,6 @@ public static class PrimaryDatabaseProviderComposition
         }
 
         optionsBuilder.UseSnakeCaseNamingConvention();
-        return database;
     }
 
     internal static (string Table, string? Schema) GetMigrationsHistoryTable(

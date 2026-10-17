@@ -9,6 +9,7 @@ using Explore.Persistence.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using MySqlConnector;
 using TUnit.Core;
 
@@ -33,8 +34,7 @@ public sealed class PrimaryPersistencePortabilityTests
             expectedTenantId,
             "domains.tenant_custom_domain",
             SettingValueSerializer.Serialize("Events.Example.COM."));
-        var repository = new TenantSettingRepository(context,
-            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        var repository = new ManagedTenantDomainRepository(new DomainContextFactory(context));
 
         TenantSetting? match = await repository.GetByDomainHostAsync("  events.example.com.  ");
 
@@ -54,8 +54,7 @@ public sealed class PrimaryPersistencePortabilityTests
             Guid.CreateVersion7(),
             "domains.tenant_custom_domain",
             "events.example.com");
-        var repository = new TenantSettingRepository(context,
-            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        var repository = new ManagedTenantDomainRepository(new DomainContextFactory(context));
 
         TenantSetting? match = await repository.GetByDomainHostAsync("events.example.com");
 
@@ -196,6 +195,16 @@ public sealed class PrimaryPersistencePortabilityTests
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(SqliteProjectionLockTransactionInterceptor.Instance)
             .Options);
+
+    private sealed class DomainContextFactory(ExploreDbContext context) : IGlobalExploreDbContextFactory
+    {
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new ExploreDbContext(
+                (DbContextOptions<ExploreDbContext>)context.GetService<IDbContextOptions>()));
+        }
+    }
 
     private static Task CreateTenantSettingTableAsync(ExploreDbContext context) =>
         context.Database.ExecuteSqlRawAsync(

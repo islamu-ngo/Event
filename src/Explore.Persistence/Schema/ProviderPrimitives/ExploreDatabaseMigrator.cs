@@ -1,5 +1,6 @@
 using Explore.Application.Configuration;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
@@ -33,14 +34,13 @@ public static class ExploreDatabaseMigrator
                 configuration["WEBHOOKS_PROVIDER"]);
 
     public static async Task MigrateAndSeedAsync(
-        ExploreDbContext runtimeDatabase,
         IHostEnvironment environment,
         IConfiguration configuration,
         PrimaryDatabaseConnectionOptions migrationDatabaseOptions,
         ILogger logger,
+        bool seedDevelopmentData = true,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(runtimeDatabase);
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(migrationDatabaseOptions);
@@ -48,9 +48,7 @@ public static class ExploreDatabaseMigrator
 
         bool agentBrowser = EnsureAgentBrowserAdmission(configuration, environment);
         if (agentBrowser && (migrationDatabaseOptions.Provider != PrimaryDatabaseProvider.PostgreSql
-            || migrationDatabaseOptions.Database != "islamu_event_agent"
-            || !runtimeDatabase.Database.IsNpgsql()
-            || runtimeDatabase.Database.GetDbConnection().Database != "islamu_event_agent"))
+            || migrationDatabaseOptions.Database != "islamu_event_agent"))
             throw new InvalidOperationException("agent_browser_database_binding_mismatch");
 
         PrivacyErasureAuthorityTopology topology =
@@ -69,22 +67,21 @@ public static class ExploreDatabaseMigrator
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             migrationOptions,
             migrationDatabaseOptions);
-        await using (var migrationDatabase = new ExploreDbContext(migrationOptions.Options))
-        {
-            if (agentBrowser)
-                await migrationDatabase.Database.ExecuteSqlRawAsync(
-                    "CREATE EXTENSION IF NOT EXISTS postgis",
-                    cancellationToken);
+        await using var migrationDatabase = new ExploreDbContext(migrationOptions.Options);
+        if (agentBrowser)
+            await migrationDatabase.Database.ExecuteSqlRawAsync(
+                "CREATE EXTENSION IF NOT EXISTS postgis",
+                cancellationToken);
 
-            await MigrateAsync(migrationDatabase, configuration, cancellationToken);
-        }
+        await MigrateAsync(migrationDatabase, configuration, cancellationToken);
         logger.LogInformation("Database migration operation {Operation} completed.", "Application");
 
-        await SqliteDatabaseInitializer.InitializeAsync(runtimeDatabase, cancellationToken);
-        if (runtimeDatabase.Database.IsNpgsql())
+        await using var executionDatabase = CreateNamespaceExecutionContext(migrationDatabase);
+        await SqliteDatabaseInitializer.InitializeAsync(executionDatabase, cancellationToken);
+        if (executionDatabase.Database.IsNpgsql())
         {
-            await PostgresModelConstraintApplier.ApplyAsync(runtimeDatabase, cancellationToken);
-            await PostgresTenantRowLevelSecurityModel.ApplyAsync(runtimeDatabase, cancellationToken);
+            await PostgresModelConstraintApplier.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresTenantRowLevelSecurityModel.ApplyAsync(executionDatabase, cancellationToken);
         }
         logger.LogInformation("Database migration operation {Operation} completed.", "ProviderAdjustments");
 
@@ -106,11 +103,12 @@ public static class ExploreDatabaseMigrator
             cancellationToken);
 
         if (agentBrowser)
-            await LookupTableSeeder.SeedAsync(runtimeDatabase, cancellationToken);
+            await LookupTableSeeder.SeedAsync(executionDatabase, cancellationToken);
         else
             await DatabaseSeeder.SeedAsync(
-                runtimeDatabase,
+                executionDatabase,
                 environment,
+                seedDevelopmentData,
                 configuration: configuration,
                 cancellationToken: cancellationToken);
         logger.LogInformation("Database migration operation {Operation} completed.", "Seed");
@@ -126,58 +124,156 @@ public static class ExploreDatabaseMigrator
         ArgumentNullException.ThrowIfNull(configuration);
 
         await db.Database.MigrateAsync(cancellationToken);
-        await PostgresDiscoverySnapshotMaintenanceContract.ApplyAsync(db, cancellationToken);
-        await PostgresQueueDrainHealthContract.ApplyAsync(db, cancellationToken);
-        await EventDiscoveryRankBackfill.ApplyAsync(db, cancellationToken);
-        if (db.Database.IsNpgsql())
+        var mapping = db.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>();
+        await using var mappedDatabase = mapping is not null && mapping.ModelSchema != mapping.TargetSchema
+            ? CreateNamespaceExecutionContext(db)
+            : null;
+        var executionDatabase = mappedDatabase ?? db;
+        PostgresNativeQueueEnrollment? queueEnrollment = executionDatabase.Database.IsNpgsql()
+            ? PostgresNativeQueueEnrollment.Bind(configuration)
+            : null;
+        await PostgresDiscoverySnapshotMaintenanceContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresTenantLookupContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresDiscoveryDisclosureContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
         {
-            await using var executionDatabase = CreateNamespaceExecutionContext(db);
-            await PostgresTenantRowLevelSecurityModel.ApplyAsync(executionDatabase, cancellationToken);
-            await PostgresRefundReconciliationHealthContract.ApplyAsync(
-                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
-            await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(
-                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
-            await PostgresEmailRetentionDiscoveryContract.ApplyAsync(
-                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
-            await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(
-                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
-            await PostgresEventResourceAuditRetentionContract.ApplyAsync(
-                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
+            await PostgresDiscoveryTraversalContract.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPublicEventDiscoveryContract.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPublicEventDetailContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPrivateEventManagementContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresRegistrationPrivateReadContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPublicEventResponseClockContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresGlobalLookupCatalogueContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresIdempotencyReceiptContract.ApplyAsync(
-                executionDatabase, PostgresNativeQueueEnrollment.Bind(configuration), cancellationToken);
-            var localizationEnrollment = PostgresNativeQueueEnrollment.Bind(configuration);
-            await PostgresHumanAdministratorCommitAuthorityContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresPolicySourceSetContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresHumanPrincipalSourceContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresHumanSupportAccessSourceContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresProviderConfigurationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresLocalizationSecretStatusContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresGlobalLookupCatalogueContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresExternalLoginAuthenticationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresUserTenantMembershipContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresTenantPreferenceContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresUserTenantNavigationContract.ApplyAsync(executionDatabase, localizationEnrollment, cancellationToken);
-            await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
-            await PostgresTenantLookupContract.ApplyAsync(executionDatabase, cancellationToken);
-            foreach (string role in new[]
-            {
-                PostgresExternalLoginAuthenticationContract.GlobalRole,
-                PostgresExternalApiKeyAuthenticationContract.GlobalRole,
-                PostgresAdmissionScannerAuthenticationContract.GlobalRole,
-                PostgresUserTenantMembershipContract.GlobalRole,
-                PostgresTenantPreferenceContract.GlobalRole,
-                PostgresAdministrativeAuthorityContract.GlobalRole,
-                PostgresTenantLookupContract.GlobalRole
-            })
-                await executionDatabase.Database.ExecuteSqlRawAsync(
-                    $"""
-                    GRANT "{role}" TO "{localizationEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
-                    WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
-                    """, cancellationToken);
+                executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresAiActorContextReadContract.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresEventCreationPublisherReadContract.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresAiConversationOwnerFenceContract.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
         }
+        await PostgresSubjectPrivacyErasureContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresPdsSettlementContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresPdsQueueAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresAtprotoModerationCompensationContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresIntegrationSyncDiscoveryContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresEmailDispatchAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresAtprotoMaterializationContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresAtprotoGovernanceContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        await PostgresInstanceApiKeyManagementContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresInstanceApiKeyIssuanceContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresPlatformApiKeyUsageReportContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresMachineMutationAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresMachineRoomMutationAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresUserTenantMembershipContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresExternalLoginAuthenticationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        await PostgresAdministrativeAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresActorConsolidationContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresManagedTenantDomainContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresNotificationFanoutAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresNotificationOutboxAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresGenericOutboxAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+        {
+            await PostgresOutboxExecutionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPublicationFanoutExecutionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        }
+        await PostgresWebPushDispatchAdmissionContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresQueueDrainHealthContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresLocationPrivacyReviewContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresLocationPrivacyGovernanceContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresManifestReplayContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+        {
+            await PostgresConfigurationManifestBootstrapContract.ApplyAsync(
+                executionDatabase, queueEnrollment.GlobalLogin, cancellationToken);
+            await executionDatabase.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresConfigurationManifestBootstrapContract.GlobalRole}"
+                TO "{queueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """, cancellationToken);
+        }
+        await PostgresConfigurationImportSnapshotContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportStateContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportLegalSourceContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportLegalMutationContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportPublicationPolicyContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportScalarSettingContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportReceiptContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportPaidPolicyContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportTenantIdentityContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportBrandingContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportEventResourceContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresConfigurationImportTenantSettingContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresIncomingWebhookQueueContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        await PostgresEventReportOperationsContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+        {
+            await PostgresEventResourceAuditRetentionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresWebhookLocalDeliveryAdmissionContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresWebhookClaimEndpointStateContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresWebhookLocalDeliveryHealthContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresHumanAdministratorCommitAuthorityContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPolicySourceSetContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresHumanPrincipalSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresHumanAuthorizationRouteContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresHumanEventAssignmentSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresHumanSupportAccessSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            if (IdentityDatabaseConfiguration.GetTopology(configuration) == IdentityDatabaseTopology.Colocated)
+            {
+                await PostgresLocalAdministrationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+                await PostgresSupportAdministrationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+                await PostgresManagedProviderProvisioningContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            }
+            await PostgresHumanEmailSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPlatformApiKeySourceContract.ApplyAsync(
+                executionDatabase, PlatformApiKeySourceEnrollment.Bind(configuration), cancellationToken);
+            await PostgresHumanWebhookResourceSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresHumanEventProviderSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresRegistrationFinalizationQueueContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresRegistrationProviderWriteQueueContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresRegistrationProviderSubscriptionClaimContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresPaymentReconciliationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresCheckoutDispatchContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresRefundReconciliationHealthContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresTicketingRecoveryHealthContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresEmailRetentionDiscoveryContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        }
+        await PostgresVisitorPolicyAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+        {
+            await PostgresEmailDeliveryPolicyContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresOperatorIdentityEditorContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresResolverConfigurationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresStorageProbeSourceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresStorageConfigurationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresProviderConfigurationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresMixedSettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresOrdinarySettingsContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresLocalizationSecretStatusContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresTenantPreferenceContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresUserTenantNavigationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresEventResourceProviderContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        }
+        await PostgresPaidPolicyCeilingContract.ApplyAsync(executionDatabase, cancellationToken);
+        await PostgresInstanceStorageAdministrationContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresStorageReconciliationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        await PostgresLocalStorageQuarantineContract.ApplyAsync(executionDatabase, cancellationToken);
+        await EventDiscoveryRankBackfill.ApplyAsync(executionDatabase, cancellationToken);
     }
 
     private static ExploreDbContext CreateNamespaceExecutionContext(ExploreDbContext migrationDatabase)

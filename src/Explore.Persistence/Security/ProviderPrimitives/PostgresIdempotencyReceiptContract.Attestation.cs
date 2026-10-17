@@ -11,7 +11,8 @@ public static partial class PostgresIdempotencyReceiptContract
     private static PostgresPrivilegeGuard.Contract Privileges(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         enrollment.Validate();
-        if (new[] { enrollment.MigratorLogin, enrollment.GlobalLogin, enrollment.RuntimeLogin }.Any(Roles.Contains))
+        if (new[] { enrollment.MigratorLogin, enrollment.GlobalLogin, enrollment.RuntimeLogin,
+            enrollment.EmailInstanceMutationLogin, enrollment.EmailTenantMutationLogin }.Any(Roles.Contains))
             throw new InvalidOperationException("idempotency_receipt_enrollment_collision");
         var sql = new IdempotencyReceiptSql(context);
         string table = context.Model.FindEntityType(typeof(IdempotencyRecord))!.GetTableName()!;

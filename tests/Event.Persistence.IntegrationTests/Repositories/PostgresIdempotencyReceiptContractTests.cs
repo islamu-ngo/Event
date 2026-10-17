@@ -32,7 +32,7 @@ public sealed class PostgresIdempotencyReceiptContractTests(PostgreSqlContainerF
         await Assert.That(claim.IsOwner).IsTrue();
         await Assert.That(claim.Lookup.Record!.Id).IsEqualTo(proposal.Id);
         await Assert.That(claim.Lookup.Record.CreatedAt).IsEqualTo(proposal.CreatedAt);
-        var sql = new IdempotencyReceiptSql(caller);
+        var sql = new HumanPrincipalSourceSql(caller);
         foreach (string query in new[]
         {
             $"SELECT * FROM {sql.Table(typeof(IdempotencyRecord))}",
@@ -272,7 +272,7 @@ public sealed class PostgresIdempotencyReceiptContractTests(PostgreSqlContainerF
         await using var migration = fixture.CreateDbContext();
         await migration.Database.OpenConnectionAsync();
         await using var held = await migration.Database.BeginTransactionAsync();
-        var sql = new IdempotencyReceiptSql(migration);
+        var sql = new HumanPrincipalSourceSql(migration);
         await migration.Database.ExecuteSqlRawAsync(
             $"SELECT 1 FROM {sql.Table(typeof(IdempotencyRecord))} WHERE tenant_id = {{0}} AND id = {{1}} FOR UPDATE",
             tenant, first.Id);
@@ -330,7 +330,7 @@ public sealed class PostgresIdempotencyReceiptContractTests(PostgreSqlContainerF
         await Assert.ThrowsAsync<PostgresException>(() => PostgresIdempotencyReceiptContract.ScrubExpiredAsync(
             global, fixture.NativeQueueEnrollment, tenant, DateTime.UtcNow, 1, CancellationToken.None));
         await Assert.ThrowsAsync<PostgresException>(async () =>
-            await global.Database.ExecuteSqlRawAsync($"SELECT * FROM {new IdempotencyReceiptSql(global).Table(typeof(IdempotencyRecord))}"));
+            await global.Database.ExecuteSqlRawAsync($"SELECT * FROM {new HumanPrincipalSourceSql(global).Table(typeof(IdempotencyRecord))}"));
     }
 
     [Test]
@@ -463,7 +463,7 @@ public sealed class PostgresIdempotencyReceiptContractTests(PostgreSqlContainerF
         await InstallAsync();
         await using var migration = fixture.CreateDbContext();
         await migration.Database.OpenConnectionAsync();
-        var sql = new IdempotencyReceiptSql(migration);
+        var sql = new HumanPrincipalSourceSql(migration);
         string routine = PostgresIdempotencyReceiptContract.FunctionSql(migration, "read");
         string signature = routine + "(uuid,jsonb,timestamp with time zone)";
         string table = sql.Table(typeof(IdempotencyRecord));
@@ -517,7 +517,7 @@ public sealed class PostgresIdempotencyReceiptContractTests(PostgreSqlContainerF
     {
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, fixture.GetNativeQueueOptions(role));
-        if (role == PrimaryDatabaseRole.Runtime) builder.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+        if (role == PrimaryDatabaseRole.Runtime) builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
         var context = new ExploreDbContext(builder.Options)
         {
             TenantContext = tenant.HasValue ? new SelectedTenant(tenant.Value) : null

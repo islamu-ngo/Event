@@ -8,15 +8,19 @@ using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Persistence.Repositories;
 
 public sealed class IdempotencyRepository(
     ExploreDbContext dbContext, TimeProvider? clock = null,
-    PostgresNativeQueueEnrollment? enrollment = null) : IIdempotencyRepository
+    PostgresNativeQueueEnrollment? enrollment = null,
+    IServiceProvider? services = null) : IIdempotencyRepository
 {
+    private readonly ExploreDbContextExecutionLease? _executionLease =
+        services?.GetService<ExploreDbContextExecutionLease>();
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
-    private ExploreDbContext Context => dbContext;
+    private ExploreDbContext Context => _executionLease?.Context ?? dbContext;
 
     public async Task<IdempotencyLookup> LookupAsync(
         IdempotencyRequestDescriptor request, DateTime utcNow, CancellationToken cancellationToken = default)
@@ -319,6 +323,7 @@ public sealed class IdempotencyRepository(
             if (_disposed || Spent || _connectionClosed || Context.ContextId != _contextId
                 || RequireTenant(Context) != Request.TenantId
                 || Context.TenantFilterTenantId != _selectedTenant || Context.Model.GetDefaultSchema() != _schema
+                || (Repository._executionLease?.Context is { } selected && !ReferenceEquals(selected, Context))
                 || (_connection is not null && (!_connection.Matches(Context)
                     || _connection.State != ConnectionState.Open
                     || !ReferenceEquals(Context.Database.CurrentTransaction?.GetDbTransaction(), _transaction)

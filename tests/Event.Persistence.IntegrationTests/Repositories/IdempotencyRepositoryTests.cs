@@ -39,7 +39,7 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
             fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
-        builder.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+        builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
         await using var context = new ExploreDbContext(builder.Options)
         {
             TenantContext = new ReceiptTenant(tenant)
@@ -56,7 +56,7 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
         await Assert.That(contender.Record.Id).IsEqualTo(original.Id);
         await Assert.That(contender.Record.RequestBodyHash).IsEqualTo(original.RequestBodyHash);
         await Assert.That(contender.Record.PrincipalFingerprint).IsEqualTo(original.PrincipalFingerprint);
-        string table = new IdempotencyReceiptSql(context).Table(typeof(IdempotencyRecord));
+        string table = new HumanPrincipalSourceSql(context).Table(typeof(IdempotencyRecord));
         var denied = await Assert.ThrowsAsync<Npgsql.PostgresException>(() =>
             context.Database.ExecuteSqlRawAsync($"SELECT * FROM {table} LIMIT 1"));
         await Assert.That(denied!.SqlState).IsEqualTo("42501");
@@ -153,7 +153,7 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
             fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
-        builder.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+        builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
         var context = new ExploreDbContext(builder.Options) { TenantContext = new ReceiptTenant(tenant) };
         context.BindTenantLease();
         return context;

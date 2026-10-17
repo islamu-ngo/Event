@@ -29,13 +29,11 @@ public sealed class ApiTenantResolutionMiddleware
     /// </summary>
     public async Task InvokeAsync(
         HttpContext context,
-        IResolverConfigService resolverConfigService,
-        ITenantSlugCache tenantSlugCache,
         ITenantContextAccessor tenantContextAccessor,
         IProblemDetailsService problemDetailsService,
         IDeploymentModeProvider deploymentModeProvider,
         IOptions<McpAdapterSettings> mcpAdapterOptions,
-        ITenantLifecycleAccessService lifecycle)
+        IServiceScopeFactory scopeFactory)
     {
         var isMcpPath = IsEnabledMcpPath(context, mcpAdapterOptions.Value);
         if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) && !isMcpPath)
@@ -68,25 +66,30 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
-        var configuration = await resolverConfigService.GetConfigurationAsync(context.RequestAborted);
-
         bool privateSessionRead = TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint());
         string? requestedSlug = context.Request.Headers[TenantHeaderNames.TenantSlug].FirstOrDefault();
         bool explicitlySelectedSessionTenant = privateSessionRead && !string.IsNullOrWhiteSpace(requestedSlug);
-        var resolvedTenantId = await ResolveFromSlugHeaderAsync(context, tenantSlugCache);
-        if (!explicitlySelectedSessionTenant)
-        {
-            resolvedTenantId ??= await ResolveFromHostAsync(context, configuration, tenantSlugCache);
-        }
-
         var hasApiKeyHeader = ApiKeyHeaderReader.HasNonEmptyApiKey(context.Request);
-        // The public routing cache intentionally excludes unpublished tenants. Bind only an
-        // explicitly named bootstrap directory for these session endpoints; this grants no authority.
-        if (resolvedTenantId is null && !hasApiKeyHeader && !string.IsNullOrWhiteSpace(requestedSlug)
-            && (TenantLifecycleAccessMiddleware.IsUserSynchronization(context.GetEndpoint())
-                || TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint())))
+        Guid? resolvedTenantId;
+        await using (var routingScope = scopeFactory.CreateAsyncScope())
         {
-            resolvedTenantId = await lifecycle.ResolveConfiguredAdministratorTenantAsync(requestedSlug, context.RequestAborted);
+            var tenantSlugCache = routingScope.ServiceProvider.GetRequiredService<ITenantSlugCache>();
+            resolvedTenantId = await ResolveFromSlugHeaderAsync(context, tenantSlugCache);
+            if (!explicitlySelectedSessionTenant && resolvedTenantId is null)
+            {
+                var configuration = await routingScope.ServiceProvider
+                    .GetRequiredService<IResolverConfigService>().GetConfigurationAsync(context.RequestAborted);
+                resolvedTenantId = await ResolveFromHostAsync(context, configuration, tenantSlugCache);
+            }
+
+            // Preliminary routing owns a disposable scope, never the ordinary request lease.
+            if (resolvedTenantId is null && !hasApiKeyHeader && !string.IsNullOrWhiteSpace(requestedSlug)
+                && (TenantLifecycleAccessMiddleware.IsUserSynchronization(context.GetEndpoint())
+                    || TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint())))
+            {
+                var lifecycle = routingScope.ServiceProvider.GetRequiredService<ITenantLifecycleAccessService>();
+                resolvedTenantId = await lifecycle.ResolveConfiguredAdministratorTenantAsync(requestedSlug, context.RequestAborted);
+            }
         }
 
         bool unresolvedExplicitSessionTenant = explicitlySelectedSessionTenant && resolvedTenantId is null;

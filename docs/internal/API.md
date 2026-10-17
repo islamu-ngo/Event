@@ -3,6 +3,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## Preliminary Tenant Routing Leases
+
+ApiTenantResolutionMiddleware resolves slug, host configuration and bootstrap
+directory dependencies in an independent asynchronous service scope. That scope
+is disposed before binding the request tenant or invoking authentication.
+Already-resolved and exempt requests do not instantiate those routing services.
+This prevents preliminary reads from freezing the ordinary request database
+lease before its tenant is selected; it does not confer resource authorization.
+
 ## Human Commit Identity and Source Contracts
 
 Localization governance binds the original UpdateLocalizationGovernanceCommand

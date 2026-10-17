@@ -6,6 +6,11 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Tenant routing performs preliminary directory/configuration reads on a separate
+scope before selecting the request tenant. A `tenant_lease_identity_changed`
+failure indicates an attempt to retarget an already-bound database lease;
+do not bypass that guard or expand table privileges to repair routing.
+
 ## Human mutation admission contracts
 
 Localization governance updates require a currently valid authenticated session

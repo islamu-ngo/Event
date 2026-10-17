@@ -8,7 +8,7 @@ using Explore.Domain.Constants;
 public sealed class AtprotoJetstreamTenantPresentationResolver(
     ITenantRepository tenantRepository,
     ISystemSettingRepository systemSettingRepository,
-    ITenantSettingRepository tenantSettingRepository)
+    IAtprotoGovernanceSettingRepository tenantSettingRepository)
 {
     public async Task<IReadOnlyList<Guid>> ResolveEnabledTenantIdsAsync(CancellationToken cancellationToken)
     {
@@ -18,7 +18,7 @@ public sealed class AtprotoJetstreamTenantPresentationResolver(
         SystemSetting? deploymentMode = await systemSettingRepository.GetByKey(
             GovernanceSettingKeys.Deployment.Mode,
             cancellationToken);
-        List<TenantSetting> tenantSettings = await tenantSettingRepository.GetByKeyAcrossTenants(
+        List<TenantSetting> tenantSettings = await tenantSettingRepository.GetOverridesAsync(
             GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
             cancellationToken);
         IReadOnlyList<Tenant> tenants = await tenantRepository.GetActiveAsNoTrackingAsync(cancellationToken);

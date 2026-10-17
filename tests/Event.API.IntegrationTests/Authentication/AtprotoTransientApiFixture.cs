@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.PrivacyErasure;
@@ -12,10 +13,7 @@ using Explore.Domain.Secrets;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
-using Explore.Persistence.Database;
-using Explore.Persistence.Seed;
 using Explore.Domain;
-using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +27,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
-using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 using BffAuth = bff::Explore.Blazor.Services.Auth;
 using BffHttpClients = bff::Explore.Blazor.Extensions.HttpClientExtensions;
@@ -46,7 +43,7 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
     public const string Purpose = "oauth_state";
     private readonly ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private readonly ECDsa retiringKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-    private readonly PostgreSqlContainer container;
+    internal PostgreSqlContainerFixture Database { get; } = new();
     private readonly TestPrivacyIdentityFenceKeyProvider identityFenceKeys = new();
     internal string AuthorityPath => identityFenceKeys.AuthorityPath;
     public ISecretResolver Secrets { get; } = Substitute.For<ISecretResolver, IRetainedSecretResolver>();
@@ -74,30 +71,17 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
                 call.ArgAt<string>(0) == SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks
                     ? ring : Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
                 SecretSourceType.Infisical, SecretScope.Instance, null, Clock.GetUtcNow())));
-        // The test secret authority, not an inline credential, owns container authentication.
-        string password = Secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Postgresql.Password, null, default)
-            .GetAwaiter().GetResult().Secret!.Value;
-        container = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("atproto_transient_api").WithUsername("postgres").WithPassword(password).Build();
     }
 
     public async Task InitializeAsync()
     {
-        await container.StartAsync();
-        var configuration = new Dictionary<string, string?>();
-        TestDatabaseConfiguration.AddPostgreSql(configuration, container.GetConnectionString());
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
-            PrimaryDatabaseConfiguration.BindRuntime(new ConfigurationBuilder().AddInMemoryCollection(configuration).Build()));
-        await using (var db = new ExploreDbContext(options.Options))
-        {
-            await db.Database.MigrateAsync();
-            await LookupTableSeeder.SeedAsync(db);
-        }
-        Factory = new PostgreSqlApiWebApplicationFactory(container.GetConnectionString(), new()
+        await Database.InitializeAsync();
+        Factory = new PostgreSqlApiWebApplicationFactory(Database, new()
         {
             ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
             ["RateLimiting:DisableInTesting"] = "true",
+            ["PublicBaseUrl"] = "https://localhost",
+            ["EffectiveHostAuthority:CanonicalOrigin"] = "https://localhost",
             ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
             ["PrivacyErasureAuthorityEmbedded:Path"] = AuthorityPath,
             ["Deployment:Mode"] = "MultiTenant"
@@ -215,8 +199,7 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
 
     public async Task<Guid> SeedTenantAsync(bool enabled = true, Guid? tenantId = null)
     {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var db = Database.CreateDbContext();
         var status = await db.TenantStatuses.SingleAsync(status => status.Id == (int)(enabled ? TenantStatusEnum.Active : TenantStatusEnum.Suspended));
         Guid id = tenantId ?? Guid.CreateVersion7();
         db.Tenants.Add(new Explore.Domain.Tenant
@@ -236,7 +219,7 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
     {
         Client?.Dispose();
         if (Factory is not null) await Factory.DisposeAsync();
-        await container.DisposeAsync();
+        await Database.DisposeAsync();
         identityFenceKeys.Dispose();
         key.Dispose();
         retiringKey.Dispose();

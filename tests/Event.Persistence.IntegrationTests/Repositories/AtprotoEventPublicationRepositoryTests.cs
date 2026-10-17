@@ -77,7 +77,7 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
             new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()));
         var publicAddress = new ConfigurationBuilder().AddInMemoryCollection(
             new Dictionary<string, string?> { ["PUBLIC_BASE_URL"] = "https://publication.example.test" }).Build();
-        var settings = new SystemSettingRepository(context, Substitute.For<ISettingMutationLock>());
+        var settings = SystemSettingRepository.CreateReadOnly(context, Substitute.For<ISettingMutationLock>());
         var payload = await new AtprotoPublicationPayloadBuilder(snapshotFactory, publicAddress, settings)
             .BuildEventAsync(graph, DateTimeOffset.UtcNow, CancellationToken.None);
         await Assert.That(payload.IsValid).IsTrue().Because(payload.FailureCode ?? "Publication payload was invalid");
@@ -97,7 +97,7 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
         tenant.TenantId.Returns(tenantId);
         await using var tenantContext = fixture.CreateTenantFilteredDbContext(tenant);
         var calendar = await new GetEventCalendarExportRequestHandler(
-            new EventRepository(tenantContext), new EventSessionRepository(tenantContext), disclosure, lifecycle)
+            new EventRepository(tenantContext), new EventSessionRepository(tenantContext, new Microsoft.AspNetCore.Http.HttpContextAccessor()), disclosure, lifecycle)
             .QueryAsync(new GetEventCalendarExportRequest(eventId), CancellationToken.None);
         await Assert.That(calendar).IsNotNull();
         string calendarJson = JsonSerializer.Serialize(calendar);

@@ -507,7 +507,7 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         await Assert.That(fixture.Storage.Objects).IsEmpty();
     }
 
-    private static Guid TenantId() => Guid.Parse("018e4e5c-7f00-7000-8000-000000000001");
+    private Guid TenantId() => _environment.Database.TenantId;
 
     private static AtprotoThumbnailBlobCandidate Candidate(string cid, string mimeType, long size) =>
         new(Did, cid, mimeType, size);

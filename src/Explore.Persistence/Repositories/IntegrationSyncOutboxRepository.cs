@@ -1,6 +1,5 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
-using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -21,7 +20,6 @@ public sealed class IntegrationSyncOutboxRepository(ExploreDbContext dbContext) 
         CancellationToken cancellationToken)
     {
         return await dbContext.IntegrationSyncOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.IntegrationSyncWorkerCrossTenantQueue)
             .AsNoTracking()
             .Where(o =>
                 ((o.Status == IntegrationSyncStatus.Pending || o.Status == IntegrationSyncStatus.RetryScheduled) &&
@@ -29,16 +27,29 @@ public sealed class IntegrationSyncOutboxRepository(ExploreDbContext dbContext) 
                 (o.Status == IntegrationSyncStatus.Processing &&
                  (o.ProcessingStartedAt == null || o.ProcessingStartedAt <= staleProcessingStartedBefore)))
             .OrderBy(o => o.CreatedAt)
+            .ThenBy(o => o.Id)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<IntegrationSyncOutbox?> GetPendingAsync(
+        Guid outboxId,
+        DateTime now,
+        DateTime staleProcessingStartedBefore,
+        CancellationToken cancellationToken) =>
+        dbContext.IntegrationSyncOutbox.AsNoTracking().FirstOrDefaultAsync(outbox =>
+            outbox.Id == outboxId &&
+            (((outbox.Status == IntegrationSyncStatus.Pending || outbox.Status == IntegrationSyncStatus.RetryScheduled) &&
+              (outbox.NextAttemptAt == null || outbox.NextAttemptAt <= now)) ||
+             (outbox.Status == IntegrationSyncStatus.Processing &&
+              (outbox.ProcessingStartedAt == null || outbox.ProcessingStartedAt <= staleProcessingStartedBefore))),
+            cancellationToken);
 
     public async Task<bool> TryClaimAsync(
         IntegrationSyncClaimRequest request,
         CancellationToken cancellationToken)
     {
         var updated = await dbContext.IntegrationSyncOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.IntegrationSyncWorkerCrossTenantQueue)
             .Where(o => o.TenantId == request.TenantId && o.Id == request.OutboxId &&
                 (((o.Status == IntegrationSyncStatus.Pending || o.Status == IntegrationSyncStatus.RetryScheduled) &&
                   (o.NextAttemptAt == null || o.NextAttemptAt <= request.StartedAt)) ||
@@ -62,7 +73,6 @@ public sealed class IntegrationSyncOutboxRepository(ExploreDbContext dbContext) 
         CancellationToken cancellationToken)
     {
         return dbContext.IntegrationSyncOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.IntegrationSyncWorkerCrossTenantQueue)
             .AsNoTracking()
             .FirstOrDefaultAsync(outbox =>
                 outbox.TenantId == claim.TenantId &&
@@ -153,7 +163,6 @@ public sealed class IntegrationSyncOutboxRepository(ExploreDbContext dbContext) 
         CancellationToken cancellationToken)
     {
         int updated = await dbContext.IntegrationSyncOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.IntegrationSyncWorkerCrossTenantQueue)
             .Where(outbox => outbox.TenantId == tenantId &&
                 outbox.Id == outboxId &&
                 outbox.Status == IntegrationSyncStatus.Processing &&
@@ -187,7 +196,6 @@ public sealed class IntegrationSyncOutboxRepository(ExploreDbContext dbContext) 
                 ? IntegrationSyncStatus.RetryScheduled
                 : IntegrationSyncStatus.DeadLettered;
         int updated = await dbContext.IntegrationSyncOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .Where(outbox => outbox.TenantId == request.TenantId &&
                 outbox.Id == request.OutboxId &&
                 outbox.Status == IntegrationSyncStatus.DeadLettered &&
@@ -210,14 +218,12 @@ public sealed class IntegrationSyncOutboxRepository(ExploreDbContext dbContext) 
         }
 
         return await dbContext.IntegrationSyncOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .AsNoTracking()
             .SingleAsync(outbox => outbox.TenantId == request.TenantId && outbox.Id == request.OutboxId, cancellationToken);
     }
 
     private IQueryable<IntegrationSyncOutbox> ActiveClaim(IntegrationSyncClaimIdentity claim) =>
         dbContext.IntegrationSyncOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.IntegrationSyncWorkerCrossTenantQueue)
             .Where(o => o.TenantId == claim.TenantId &&
                 o.Id == claim.OutboxId &&
                 o.Status == IntegrationSyncStatus.Processing &&

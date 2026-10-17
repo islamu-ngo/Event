@@ -12,7 +12,7 @@ namespace Explore.Application.Services.Federation;
 public sealed class AtprotoPdsRecoveryPolicyResolver(
     ITenantRepository tenantRepository,
     ISystemSettingRepository systemSettingRepository,
-    ITenantSettingRepository tenantSettingRepository)
+    IAtprotoGovernanceSettingRepository tenantSettingRepository)
 {
     public async Task<AtprotoPdsRecoveryPolicy> ResolveAsync(CancellationToken cancellationToken)
     {
@@ -25,10 +25,10 @@ public sealed class AtprotoPdsRecoveryPolicyResolver(
         SystemSetting? modeSetting = await systemSettingRepository.GetByKey(
             GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode,
             cancellationToken);
-        List<TenantSetting> enabledOverrides = await tenantSettingRepository.GetByKeyAcrossTenants(
+        List<TenantSetting> enabledOverrides = await tenantSettingRepository.GetOverridesAsync(
             GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled,
             cancellationToken);
-        List<TenantSetting> modeOverrides = await tenantSettingRepository.GetByKeyAcrossTenants(
+        List<TenantSetting> modeOverrides = await tenantSettingRepository.GetOverridesAsync(
             GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode,
             cancellationToken);
         IReadOnlyList<Tenant> tenants = await tenantRepository.GetActiveAsNoTrackingAsync(cancellationToken);

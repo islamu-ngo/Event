@@ -668,6 +668,7 @@ public sealed class ActorFederationMapperTests
     private sealed class ActorStore(List<Actor> items) : Store<Actor, Guid>, IActorRepository
     {
         public List<Actor> Items { get; } = items;
+        public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public override Task<Actor> Create(Actor entity)
         {
             entity.Id = ActorId;

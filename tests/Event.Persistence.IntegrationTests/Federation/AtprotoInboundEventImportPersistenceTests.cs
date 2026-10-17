@@ -131,7 +131,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-pin");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(1, observedAt, "Pinned event", "https://events.example/pinned");
@@ -181,7 +181,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task22-pin");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Pinned replay", "https://events.example/pin-replay");
@@ -233,7 +233,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task22-json");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         const string name = "Faith & Future 2026";
@@ -292,7 +292,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task22-thumbnail");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(1, observedAt, "Thumbnail event", "https://events.example/thumbnail");
@@ -348,7 +348,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync($"atproto-import-task24-safe-{expectedExtension[1..]}");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(
@@ -411,7 +411,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task24-reject-staged");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(
@@ -482,7 +482,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task24-cleanup");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(
@@ -565,7 +565,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-thumbnail-retirement");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Retirement event", "https://events.example/retirement");
@@ -717,7 +717,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         ImportScope firstScope = await SeedScopeAsync("atproto-multi-retirement-a");
         ImportScope secondScope = await SeedScopeAsync("atproto-multi-retirement-b", includeAtprotoIdentity: false);
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Multiple owners", "https://events.example/multiple");
@@ -770,7 +770,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await using (var replacementContext = new ExploreDbContext(options))
         {
             replacementContext.EnableTenantFilterBypass("Federation source-before-storage fence test.");
-            var replacementRepository = new AtprotoJetstreamRepository(replacementContext);
+            var replacementRepository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(replacementContext));
             result = snapshot
                 ? await replacementRepository.TryReconcileWithResultAsync(
                     new AtprotoPdsSnapshotApplyRequest(claim, [Did],
@@ -821,7 +821,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         StorageObject source;
         await using (ExploreDbContext context = fixture.CreateDbContext())
         {
-            var repository = new AtprotoJetstreamRepository(context);
+            var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
             claim = await ClaimAsync(repository, observedAt);
             AtprotoRecord first = Record(1, observedAt, "Fence event", "https://events.example/fence");
             await repository.TryApplyAndAdvanceAsync(WithStagedThumbnail(
@@ -839,7 +839,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await using (var context = new ExploreDbContext(options))
         {
             context.EnableTenantFilterBypass("Federation retirement commit-fence rollback test.");
-            var repository = new AtprotoJetstreamRepository(context);
+            var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
             DateTime updatedAt = observedAt.AddSeconds(1);
             AtprotoRecord next = Record(2, updatedAt, "Fence updated", "https://events.example/fence");
             AtprotoJetstreamApplyRequest request = ApplyRequest(claim, 1, 2, next, scope.TenantId,
@@ -885,7 +885,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-orphan-retirement");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Orphan owner", "https://events.example/orphan");
@@ -962,7 +962,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task22-replacement");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(2, observedAt, "Replacement event", "https://events.example/replacement");
@@ -1064,7 +1064,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync($"atproto-import-task22-soft-media-{size}");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(1, observedAt, "Optional media", "https://events.example/optional-media");
@@ -1107,7 +1107,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-create");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         DateTimeOffset sourceCreatedAt = UtcOffset(10);
         DateTimeOffset startsAt = UtcOffset(13);
@@ -1193,7 +1193,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync($"atproto-import-status-{status ?? "absent"}");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(1, observedAt, "Status event", "https://events.example/status");
@@ -1238,7 +1238,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-unicode-description");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(1, observedAt, "Unicode event", "https://events.example/unicode");
@@ -1286,7 +1286,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-replay");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Replay event", "https://events.example/replay");
@@ -1335,7 +1335,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-equal-repair");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Healthy event", "https://events.example/healthy");
@@ -1423,7 +1423,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-update");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Original title", "https://events.example/original");
@@ -1489,7 +1489,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-cancelled-reschedule");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord cancelledRecord = Record(1, observedAt, "Cancelled title", "https://events.example/reschedule");
@@ -1598,7 +1598,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-stale");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord current = Record(2, observedAt, "Current title", "https://events.example/current");
@@ -1652,7 +1652,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         AtprotoJetstreamClaim claim;
         await using (ExploreDbContext claimContext = fixture.CreateDbContext())
         {
-            claim = await ClaimAsync(new AtprotoJetstreamRepository(claimContext), observedAt);
+            claim = await ClaimAsync(new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(claimContext)), observedAt);
         }
 
         await using ExploreDbContext firstContext = fixture.CreateDbContext();
@@ -1660,7 +1660,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         AtprotoRecord first = Record(1, observedAt, "Concurrent event", "https://events.example/concurrent");
         AtprotoRecord second = Record(1, observedAt, "Concurrent event", "https://events.example/concurrent");
         bool[] results = await Task.WhenAll(
-            new AtprotoJetstreamRepository(firstContext).TryApplyAndAdvanceAsync(ApplyRequest(
+            new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(firstContext)).TryApplyAndAdvanceAsync(ApplyRequest(
                 claim,
                 0,
                 1,
@@ -1669,7 +1669,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 "Concurrent event",
                 "https://events.example/concurrent",
                 observedAt)),
-            new AtprotoJetstreamRepository(secondContext).TryApplyAndAdvanceAsync(ApplyRequest(
+            new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(secondContext)).TryApplyAndAdvanceAsync(ApplyRequest(
                 claim,
                 0,
                 1,
@@ -1701,7 +1701,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-schedule");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
 
@@ -1802,7 +1802,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-tombstone");
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord first = Record(1, observedAt, "Deleted remotely", "https://events.example/deleted");
@@ -1907,7 +1907,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         AtprotoJetstreamClaim claim;
         await using (ExploreDbContext claimContext = fixture.CreateDbContext())
         {
-            claim = await ClaimAsync(new AtprotoJetstreamRepository(claimContext), observedAt);
+            claim = await ClaimAsync(new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(claimContext)), observedAt);
         }
 
         var interceptor = new CancelAfterSaveInterceptor();
@@ -1923,7 +1923,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             bool cancelled = false;
             try
             {
-                await new AtprotoJetstreamRepository(failingContext).TryApplyAndAdvanceAsync(
+                await new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(failingContext)).TryApplyAndAdvanceAsync(
                     WithStagedThumbnail(
                         ApplyRequest(
                             claim,
@@ -1968,7 +1968,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         AtprotoJetstreamClaim claim;
         await using (ExploreDbContext claimContext = fixture.CreateDbContext())
         {
-            claim = await ClaimAsync(new AtprotoJetstreamRepository(claimContext), expiredObservedAt);
+            claim = await ClaimAsync(new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(claimContext)), expiredObservedAt);
         }
 
         await using (ExploreDbContext applyContext = fixture.CreateDbContext())
@@ -1978,7 +1978,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 expiredObservedAt,
                 "Expired fence event",
                 "https://events.example/expired-fence");
-            bool applied = await new AtprotoJetstreamRepository(applyContext).TryApplyAndAdvanceAsync(ApplyRequest(
+            bool applied = await new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(applyContext)).TryApplyAndAdvanceAsync(ApplyRequest(
                 claim,
                 0,
                 1,
@@ -2028,7 +2028,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 maximumBytes: RealPipelineImageBytes.Length,
                 requestTimeout: TimeSpan.FromSeconds(5));
 
-            var repository = new AtprotoJetstreamRepository(context);
+            var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
             DateTime observedAt = CurrentUtc();
             AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
             AtprotoRecord record = Record(
@@ -2149,7 +2149,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                     production.Policy,
                     maximumBytes: bytes.Length,
                     requestTimeout: TimeSpan.FromSeconds(5));
-                var repository = new AtprotoJetstreamRepository(context);
+                var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
                 DateTime observedAt = CurrentUtc();
                 AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
                 AtprotoRecord record = Record(
@@ -2242,7 +2242,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                     production.Policy,
                     maximumBytes: bytes.Length,
                     requestTimeout: TimeSpan.FromSeconds(5));
-                var repository = new AtprotoJetstreamRepository(context);
+                var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
                 DateTime observedAt = CurrentUtc();
                 AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
                 AtprotoRecord record = Record(
@@ -2338,7 +2338,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 maximumBytes: bytes.Length,
                 requestTimeout: TimeSpan.FromSeconds(5));
 
-            var repository = new AtprotoJetstreamRepository(context);
+            var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
             DateTime observedAt = CurrentUtc();
             AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
             AtprotoRecord record = Record(
@@ -2421,7 +2421,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         try
         {
             await using ExploreDbContext context = fixture.CreateDbContext();
-            var repository = new AtprotoJetstreamRepository(context);
+            var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
             DateTime observedAt = CurrentUtc();
             DateTimeOffset sourceCreatedAt = UtcOffset(10);
             const string source = "https://events.example/snapshot";
@@ -2678,7 +2678,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         ImportScope importedScope = await SeedScopeAsync("atproto-import-absence");
         ImportScope localScope = await SeedScopeAsync("atproto-import-absence-local", includeAtprotoIdentity: false);
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime observedAt = CurrentUtc();
         AtprotoJetstreamClaim claim = await ClaimAsync(repository, observedAt);
         AtprotoRecord record = Record(0, observedAt, "Absent event", "https://events.example/absence");
@@ -3274,9 +3274,21 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                         _fenced.Add((type, id));
             }
 
+            string tenantFence = Explore.Persistence.Security.PostgresDiscoveryDisclosureContract
+                .FunctionSql(context, "fence_tenants");
+            if (command.CommandText.Contains(tenantFence, StringComparison.Ordinal))
+            {
+                foreach (DbParameter parameter in command.Parameters)
+                    if (parameter.Value is Guid[] ids)
+                        foreach (Guid id in ids)
+                            _fenced.Add((typeof(Tenant), id));
+            }
+            string storageFence = Explore.Persistence.Security.PostgresAtprotoMaterializationContract
+                .FunctionSql(context, "fence_storage");
             if (!command.CommandText.StartsWith($"UPDATE {Table(typeof(StorageObject))}", StringComparison.Ordinal)
                 && !command.CommandText.StartsWith($"UPDATE {Table(typeof(StorageProducerOperation))}",
-                    StringComparison.Ordinal))
+                    StringComparison.Ordinal)
+                && !command.CommandText.Contains(storageFence, StringComparison.Ordinal))
                 return;
             SawStorageFence = true;
             if (!_fenced.Contains((typeof(Actor), actorId))

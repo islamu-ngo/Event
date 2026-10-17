@@ -11,8 +11,8 @@ public sealed class PdsSyncDrainServiceTests
     [Test]
     public async Task ProcessBatchAsync_ClaimsOneConfiguredBoundedBatch()
     {
-        var repository = Substitute.For<IPdsSyncOutboxRepository>();
-        repository.ClaimDueAsync(
+        var admission = Substitute.For<IPdsSyncQueueAdmission>();
+        admission.ClaimDueAsync(
                 20,
                 Arg.Any<string>(),
                 Arg.Any<DateTime>(),
@@ -20,7 +20,7 @@ public sealed class PdsSyncDrainServiceTests
                 Arg.Any<CancellationToken>())
             .Returns([]);
         var services = new ServiceCollection();
-        services.AddSingleton(repository);
+        services.AddSingleton(admission);
         await using ServiceProvider provider = services.BuildServiceProvider();
         var service = new PdsSyncDrainService(
             provider.GetRequiredService<IServiceScopeFactory>(),
@@ -30,7 +30,7 @@ public sealed class PdsSyncDrainServiceTests
         PdsSyncDrainResult result = await service.ProcessBatchAsync(CancellationToken.None);
 
         await Assert.That(result.ClaimedCount).IsEqualTo(0);
-        await repository.Received(1).ClaimDueAsync(
+        await admission.Received(1).ClaimDueAsync(
             20,
             Arg.Is<string>(owner => owner.StartsWith("pds-", StringComparison.Ordinal) && owner.Length <= 200),
             Arg.Any<DateTime>(),

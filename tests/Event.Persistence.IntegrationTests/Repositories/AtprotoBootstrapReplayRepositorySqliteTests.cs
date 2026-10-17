@@ -1,5 +1,6 @@
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
@@ -18,7 +19,7 @@ public sealed class AtprotoBootstrapReplayRepositorySqliteTests
             await CreateDatabaseAsync(databasePath);
             Guid tenantId = Guid.CreateVersion7();
             const string jti = "sqlite-bootstrap-contention";
-            ExploreDbContext[] contexts = Enumerable.Range(0, 4).Select(_ => CreateContext(databasePath)).ToArray();
+            ExploreDbContext[] contexts = Enumerable.Range(0, 4).Select(_ => CreateContext(databasePath, tenantId)).ToArray();
 
             DateTimeOffset expiresAt;
             try
@@ -52,10 +53,11 @@ public sealed class AtprotoBootstrapReplayRepositorySqliteTests
                 }
             }
 
-            await using (ExploreDbContext tenantContext = CreateContext(databasePath))
+            Guid otherTenant = Guid.CreateVersion7();
+            await using (ExploreDbContext tenantContext = CreateContext(databasePath, otherTenant))
             {
                 bool isolatedTenantResult = await new AtprotoBootstrapReplayRepository(tenantContext)
-                    .TryConsumeAsync(jti, Guid.CreateVersion7(), expiresAt);
+                    .TryConsumeAsync(jti, otherTenant, expiresAt);
 
                 await Assert.That(isolatedTenantResult).IsTrue();
                 await Assert.That(await tenantContext.IdempotencyRecords
@@ -104,7 +106,7 @@ public sealed class AtprotoBootstrapReplayRepositorySqliteTests
         await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
     }
 
-    private static ExploreDbContext CreateContext(string databasePath)
+    private static ExploreDbContext CreateContext(string databasePath, Guid? tenantId = null)
     {
         string connectionString = new SqliteConnectionStringBuilder
         {
@@ -112,9 +114,17 @@ public sealed class AtprotoBootstrapReplayRepositorySqliteTests
             DefaultTimeout = 30,
             Pooling = false,
         }.ToString();
-        return new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options);
+        if (tenantId is { } selected)
+        {
+            context.TenantContext = new SelectedTenant(selected);
+            context.BindTenantLease();
+        }
+        return context;
     }
+
+    private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
 }

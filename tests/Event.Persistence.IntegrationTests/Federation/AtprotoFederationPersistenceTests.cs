@@ -10,11 +10,29 @@ using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Event.Persistence.IntegrationTests.Federation;
+
+internal sealed class AtprotoMaterializationTestFactory(ExploreDbContext source)
+    : IAtprotoMaterializationDbContextFactory
+{
+    private readonly DbContextOptions<ExploreDbContext> _options =
+        (DbContextOptions<ExploreDbContext>)source.GetService<IDbContextOptions>();
+
+    public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var context = new ExploreDbContext(_options);
+        context.EnableTenantFilterBypass("ATProto persistence companion owns its complete fixture graph.");
+        context.BindTenantLease();
+        return Task.FromResult(context);
+    }
+}
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 [NotInParallel("PersistenceDb")]
@@ -92,7 +110,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await fixture.ResetAsync();
         var scope = await SeedScopeAsync("jetstream-replay");
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         var now = CurrentUtc();
         var claim = await repository.TryClaimAsync(
             "wss://jetstream.example/subscribe",
@@ -170,7 +188,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         var now = CurrentUtc();
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -333,7 +351,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await fixture.ResetAsync();
         var scope = await SeedScopeAsync("jetstream-tombstone");
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         var now = CurrentUtc();
         var claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -413,7 +431,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         local.Provenance = AtprotoRecordProvenance.LocalLifecycle;
         context.AtprotoRecords.Add(local);
         await context.SaveChangesAsync();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
             "worker-a",
@@ -439,7 +457,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await fixture.ResetAsync();
         FederationScope scope = await SeedScopeAsync("snapshot-all-dids");
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -495,7 +513,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await fixture.ResetAsync();
         FederationScope scope = await SeedScopeAsync("snapshot-reconcile");
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -688,7 +706,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -725,7 +743,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         AtprotoJetstreamClaim claim;
         await using (var claimContext = fixture.CreateDbContext())
         {
-            claim = await new AtprotoJetstreamRepository(claimContext).TryClaimAsync(
+            claim = await new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(claimContext)).TryClaimAsync(
                 "https://jetstream.example",
                 "snapshot-worker",
                 now,
@@ -755,7 +773,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
             "Event A",
             now);
 
-        bool reconciled = await new AtprotoJetstreamRepository(context).TryReconcileAsync(
+        bool reconciled = await new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context)).TryReconcileAsync(
             new(claim, [did], [snapshot], [], 100, now),
             CancellationToken.None);
 
@@ -783,7 +801,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         PdsSyncClaim staleClaim;
         await using (var claimContext = fixture.CreateDbContext())
         {
-            staleClaim = (await new PdsSyncOutboxRepository(claimContext).ClaimDueAsync(
+            staleClaim = (await OutboxRepository(claimContext).ClaimDueAsync(
                 1,
                 "worker-a",
                 now,
@@ -793,7 +811,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         var interceptor = new ReclaimOnSaveInterceptor(async () =>
         {
             await using var reclaimContext = fixture.CreateDbContext();
-            var reclaimed = await new PdsSyncOutboxRepository(reclaimContext).ClaimDueAsync(
+            var reclaimed = await OutboxRepository(reclaimContext).ClaimDueAsync(
                 1,
                 "worker-b",
                 now.AddMinutes(2),
@@ -810,7 +828,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         staleContext.EnableTenantFilterBypass("ATProto fenced settlement race test.");
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
-            new PdsSyncOutboxRepository(staleContext).TrySettleAsync(
+            OutboxRepository(staleContext).TrySettleAsync(
                 staleClaim,
                 $"at://{outbox.Did}/{outbox.Collection}/{outbox.RecordKey}",
                 "bafyreifenced",
@@ -842,15 +860,12 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await using var context = fixture.CreateDbContext();
         context.PdsSyncOutbox.Add(stale);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         PdsSyncClaim claim = (await repository.ClaimDueAsync(1, "worker-a", now, TimeSpan.FromSeconds(90))).Single();
         context.PdsSyncOutbox.Add(successor);
         await context.SaveChangesAsync();
         await repository.SupersedePriorAsync(
-            scope.TenantId,
-            stale.SourceEntityType,
-            stale.SourceEntityId,
-            successor.Id,
+            successor,
             now.AddSeconds(2));
         await context.SaveChangesAsync();
 
@@ -891,7 +906,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        IReadOnlyList<PdsSyncOutbox> rows = await new PdsSyncOutboxRepository(context)
+        IReadOnlyList<PdsSyncOutbox> rows = await OutboxRepository(context)
             .GetCurrentEventDeliveryStatesAsync(scope.TenantId, [eventId]);
 
         await Assert.That(rows).HasSingleItem();
@@ -917,13 +932,10 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await using var context = fixture.CreateDbContext();
         context.PdsSyncOutbox.AddRange(correction, successor);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
 
         int superseded = await repository.SupersedePriorAsync(
-            scope.TenantId,
-            correction.SourceEntityType,
-            correction.SourceEntityId,
-            successor.Id,
+            successor,
             Utc(11));
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
@@ -967,7 +979,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         SetForeignKeyIfPresent(context, actor, "TenantId", scope.TenantId);
         context.AddRange(eventEntity, outbox);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         PdsSyncClaim claim = (await repository.ClaimDueAsync(
             1,
             "worker-link",
@@ -1016,7 +1028,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         SetForeignKeyIfPresent(context, actor, "TenantId", scope.TenantId);
         context.AddRange(eventEntity, outbox);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository outboxRepository = new(context);
+        PdsSyncOutboxRepository outboxRepository = OutboxRepository(context);
         PdsSyncClaim claim = (await outboxRepository.ClaimDueAsync(
             1,
             "worker-global-moderation",
@@ -1027,6 +1039,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
             $"at://{outbox.Did}/{outbox.Collection}/{outbox.RecordKey}",
             "bafy-global-moderation",
             now.AddSeconds(3));
+        eventEntity = await context.Events.SingleAsync(value => value.Id == eventEntity.Id);
         eventEntity.IsDeleted = true;
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
@@ -1068,7 +1081,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         reorderedEcho.RecordHash = new string('f', 64);
         context.AtprotoRecords.Add(reorderedEcho);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         PdsSyncClaim claim = (await repository.ClaimDueAsync(1, "worker-a", now, TimeSpan.FromSeconds(90))).Single();
 
         bool settled = await repository.TrySettleAsync(claim, uri, cid, now.AddSeconds(2));
@@ -1093,7 +1106,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         alteredEcho.RecordJson = "{\"name\":\"Unrelated event\"}";
         context.AtprotoRecords.Add(alteredEcho);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         PdsSyncClaim claim = (await repository.ClaimDueAsync(1, "worker-a", now, TimeSpan.FromSeconds(90))).Single();
 
         bool settled = await repository.TrySettleAsync(claim, uri, cid, now.AddSeconds(2));
@@ -1116,7 +1129,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         context.PdsSyncOutbox.AddRange(predecessor, successor);
         context.AtprotoRecords.Add(Echo(predecessor, uri, oldCid, now));
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         PdsSyncClaim claim = (await repository.ClaimDueAsync(1, "worker-a", now.AddSeconds(2), TimeSpan.FromSeconds(90))).Single();
 
         bool settled = await repository.TrySettleAsync(
@@ -1145,7 +1158,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         reorderedPredecessorEcho.RecordJson = "{\"createdAt\":\"2026-07-18T10:00:00Z\",\"name\":\"Fenced event\"}";
         context.AtprotoRecords.Add(reorderedPredecessorEcho);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         PdsSyncClaim claim = (await repository.ClaimDueAsync(1, "worker-a", now.AddSeconds(2), TimeSpan.FromSeconds(90))).Single();
 
         bool retrySettled = await repository.TrySettleAsync(
@@ -1167,7 +1180,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         unrelatedEcho.RecordJson = "{\"name\":\"Unrelated third update\",\"createdAt\":\"2026-07-18T10:00:00Z\"}";
         unrelatedContext.AtprotoRecords.Add(unrelatedEcho);
         await unrelatedContext.SaveChangesAsync();
-        PdsSyncOutboxRepository unrelatedRepository = new(unrelatedContext);
+        PdsSyncOutboxRepository unrelatedRepository = OutboxRepository(unrelatedContext);
         claim = (await unrelatedRepository.ClaimDueAsync(1, "worker-a", now.AddSeconds(2), TimeSpan.FromSeconds(90))).Single();
 
         bool unrelatedSettled = await unrelatedRepository.TrySettleAsync(
@@ -1217,7 +1230,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         context.PdsSyncOutbox.AddRange(predecessors);
         context.PdsSyncOutbox.Add(successor);
         await context.SaveChangesAsync();
-        var repository = new PdsSyncOutboxRepository(context);
+        var repository = OutboxRepository(context);
         PdsSyncCompensationEvidence evidence = await repository.GetCompensationEvidenceAsync(successor);
         await Assert.That(evidence.IsComplete).IsFalse();
 
@@ -1267,7 +1280,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         context.PdsSyncOutbox.Add(outbox);
         context.AtprotoRecords.Add(Echo(outbox, uri, returnedCid, now.AddSeconds(1)));
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         PdsSyncClaim claim = (await repository.ClaimDueAsync(1, "worker-a", now, TimeSpan.FromSeconds(90))).Single();
 
         bool settled = await repository.TrySettleAsync(claim, uri, returnedCid, now.AddSeconds(2));
@@ -1314,7 +1327,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         context.PdsSyncOutbox.AddRange(echoedDelete, absentPredecessor, absentDelete);
         context.AtprotoRecords.Add(tombstone);
         await context.SaveChangesAsync();
-        PdsSyncOutboxRepository repository = new(context);
+        PdsSyncOutboxRepository repository = OutboxRepository(context);
         IReadOnlyList<PdsSyncClaim> claims = await repository.ClaimDueAsync(2, "worker-a", now.AddSeconds(2), TimeSpan.FromSeconds(90));
 
         bool echoedSettled = await repository.TrySettleAsync(
@@ -1333,6 +1346,33 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await Assert.That(await context.AtprotoRecords.CountAsync()).IsEqualTo(1);
         await Assert.That((await context.AtprotoRecords.SingleAsync()).TombstonedAt).IsNotNull();
     }
+
+    private static PdsSyncOutboxRepository OutboxRepository(ExploreDbContext context) =>
+        new(context, new SharedSettlementFactory((DbContextOptions<ExploreDbContext>)context.GetService<IDbContextOptions>()));
+
+    private sealed class SharedSettlementFactory(DbContextOptions<ExploreDbContext> options)
+        : IPdsSettlementDbContextFactory
+    {
+        public async Task<ExploreDbContext> CreateDbContextAsync(
+            Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            var context = new ExploreDbContext(options) { TenantContext = new SettlementTenant(tenantId) };
+            try
+            {
+                if (tenantId == Guid.Empty ||
+                    !await context.Tenants.AnyAsync(row => row.Id == tenantId, cancellationToken))
+                    throw new InvalidOperationException("Settlement tenant is not persisted.");
+                return context;
+            }
+            catch
+            {
+                await context.DisposeAsync();
+                throw;
+            }
+        }
+    }
+
+    private sealed record SettlementTenant(Guid TenantId) : ITenantContext;
 
     private async Task<FederationScope> SeedScopeAsync(string slug)
     {
@@ -1508,7 +1548,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await fixture.ResetAsync();
         var scope = await SeedScopeAsync("jetstream-account-purge");
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         var now = CurrentUtc();
         var claim = await repository.TryClaimAsync(
             "wss://jetstream.example/subscribe",
@@ -1560,7 +1600,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await fixture.ResetAsync();
         await SeedScopeAsync("jetstream-account-purge-outbound");
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         var now = CurrentUtc();
         var claim = await repository.TryClaimAsync(
             "wss://jetstream.example/subscribe",
@@ -1602,7 +1642,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
         await fixture.ResetAsync();
         var scope = await SeedScopeAsync("jetstream-effect-guard");
         await using var context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         var now = CurrentUtc();
         var claim = await repository.TryClaimAsync(
             "wss://jetstream.example/subscribe",

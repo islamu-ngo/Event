@@ -6,8 +6,10 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Event.Persistence.IntegrationTests.Federation;
 
@@ -239,7 +241,8 @@ public sealed class AtprotoEventProjectionVisibilityInMemoryTests
             CreateUnsettledOutbox(tenantId, sourceEvent.Id, ownership.UserId, did, PdsSyncStatus.Pending),
             CreateUnsettledOutbox(tenantId, sourceEvent.Id, ownership.UserId, "did:plc:other", PdsSyncStatus.Processing));
         await context.SaveChangesAsync();
-        var repository = new PdsSyncOutboxRepository(context);
+        var repository = new PdsSyncOutboxRepository(context,
+            new SharedSettlementFactory((DbContextOptions<ExploreDbContext>)context.GetService<IDbContextOptions>()));
 
         IReadOnlyList<PdsSyncOutbox> byActor = await repository.GetUnsettledEventMutationsForActorAsync(
             sourceEvent.ActorId,
@@ -291,6 +294,28 @@ public sealed class AtprotoEventProjectionVisibilityInMemoryTests
     {
         TenantContext = new TestTenantContext(tenantId)
     };
+
+    private sealed class SharedSettlementFactory(DbContextOptions<ExploreDbContext> options)
+        : IPdsSettlementDbContextFactory
+    {
+        public async Task<ExploreDbContext> CreateDbContextAsync(
+            Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            var context = new ExploreDbContext(options) { TenantContext = new TestTenantContext(tenantId) };
+            try
+            {
+                if (tenantId == Guid.Empty ||
+                    !await context.Tenants.AnyAsync(row => row.Id == tenantId, cancellationToken))
+                    throw new InvalidOperationException("Settlement tenant is not persisted.");
+                return context;
+            }
+            catch
+            {
+                await context.DisposeAsync();
+                throw;
+            }
+        }
+    }
 
     private static Guid AddProjection(
         ExploreDbContext context,

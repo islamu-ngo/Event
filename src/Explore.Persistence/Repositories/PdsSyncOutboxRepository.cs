@@ -4,8 +4,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Federation;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Explore.Persistence.Repositories;
 
@@ -13,10 +16,13 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
 {
     private const int MaximumCompensationLineageDepth = 32;
     private readonly ExploreDbContext _dbContext;
+    private readonly IPdsSettlementDbContextFactory _settlementFactory;
 
-    public PdsSyncOutboxRepository(ExploreDbContext dbContext)
+    public PdsSyncOutboxRepository(
+        ExploreDbContext dbContext, IPdsSettlementDbContextFactory settlementFactory)
     {
         _dbContext = dbContext;
+        _settlementFactory = settlementFactory;
     }
 
     public async Task AddAsync(PdsSyncOutbox outbox, CancellationToken cancellationToken = default)
@@ -86,6 +92,10 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
         {
             throw new ArgumentOutOfRangeException(nameof(leaseOwner));
         }
+
+        if (PdsSyncNativeClaim.ClaimAsync(
+                _dbContext, batchSize, normalizedOwner, claimedAt, leaseDuration, cancellationToken) is { } nativeClaim)
+            return await nativeClaim;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -222,7 +232,8 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
                 && value.Did == successor.Did
                 && value.Collection == successor.Collection
                 && value.RecordKey == successor.RecordKey
-                && value.SourceEntityType == successor.SourceEntityType)
+                && value.SourceEntityType == successor.SourceEntityType
+                && value.SourceEntityId == successor.SourceEntityId)
             .OrderByDescending(value => value.CreatedAt)
             .Take(MaximumCompensationLineageDepth + 1)
             .Select(value => new CompensationLineageNode(
@@ -304,11 +315,46 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
         CancellationToken cancellationToken = default,
         string? observedBaseCid = null)
     {
-        if (settledAt.Kind != DateTimeKind.Utc)
+        if (settledAt.Kind != DateTimeKind.Utc || claim.TenantId == Guid.Empty
+            || claim.OutboxId == Guid.Empty || claim.UserId == Guid.Empty
+            || claim.LeaseToken == Guid.Empty || claim.LeaseFence <= 0)
         {
             return false;
         }
 
+        if (_dbContext.Database.CurrentTransaction is not null)
+            throw new InvalidOperationException("PDS settlement must acquire Global authority before its transaction.");
+
+        await using var settlement = await _settlementFactory.CreateDbContextAsync(claim.TenantId, cancellationToken);
+        if (settlement.TenantFilterTenantId != claim.TenantId || settlement.Database.CurrentTransaction is not null)
+            throw new InvalidOperationException("pds_settlement_lease_mismatch");
+        try
+        {
+            return await new PdsSyncOutboxRepository(settlement, _settlementFactory)
+                .TrySettleCoreAsync(claim, uri, cid, settledAt, observedBaseCid, cancellationToken);
+        }
+        catch (Exception exception) when (exception is
+            PostgresException { SqlState: PostgresErrorCodes.SerializationFailure }
+            or DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.SerializationFailure } }
+            or InvalidOperationException
+            {
+                InnerException: DbUpdateException
+                {
+                    InnerException: PostgresException { SqlState: PostgresErrorCodes.SerializationFailure }
+                }
+            })
+        {
+            // Serializable engines can reject the stale write before EF observes
+            // its zero-row concurrency result. The owned transaction has rolled back.
+            throw new DbUpdateConcurrencyException(
+                "PDS settlement changed during its transaction.", exception);
+        }
+    }
+
+    private async Task<bool> TrySettleCoreAsync(
+        PdsSyncClaim claim, string? uri, string? cid, DateTime settledAt,
+        string? observedBaseCid, CancellationToken cancellationToken)
+    {
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         bool firstAttempt = true;
         return await strategy.ExecuteAsync(async () =>
@@ -603,26 +649,27 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
     }
 
     public async Task<int> SupersedePriorAsync(
-        Guid tenantId,
-        string sourceEntityType,
-        Guid sourceEntityId,
-        Guid supersedingOutboxId,
+        PdsSyncOutbox successor,
         DateTime supersededAt,
         CancellationToken cancellationToken = default)
     {
         var rows = await CrossTenantOutbox()
             .Where(value =>
-                value.TenantId == tenantId &&
-                value.SourceEntityType == sourceEntityType &&
-                value.SourceEntityId == sourceEntityId &&
-                value.Id != supersedingOutboxId &&
+                value.TenantId == successor.TenantId &&
+                value.SourceEntityType == successor.SourceEntityType &&
+                value.SourceEntityId == successor.SourceEntityId &&
+                value.UserId == successor.UserId &&
+                value.Did == successor.Did &&
+                value.Collection == successor.Collection &&
+                value.RecordKey == successor.RecordKey &&
+                value.Id != successor.Id &&
                 value.Status != PdsSyncStatus.Completed &&
                 value.Status != PdsSyncStatus.Superseded)
             .ToListAsync(cancellationToken);
         foreach (var row in rows)
         {
             row.Status = PdsSyncStatus.Superseded;
-            row.SupersededById = supersedingOutboxId;
+            row.SupersededById = successor.Id;
             row.SupersededAt = supersededAt;
             ClearLease(row);
         }

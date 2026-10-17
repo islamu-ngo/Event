@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -14,9 +15,6 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [NotInParallel("IntegrationSyncOutboxRepository")]
 public sealed class IntegrationSyncOutboxRepositoryTests
 {
-    private sealed class QueueHealthGlobalFactory(DbContextOptions<ExploreDbContext> options)
-        : PooledDbContextFactory<ExploreDbContext>(options, poolSize: 1), IGlobalExploreDbContextFactory;
-
     [Test]
     public async Task StaleClaimIsReclaimedAndOnlyTheExactNewOwnerCanSettle()
     {
@@ -196,6 +194,12 @@ public sealed class IntegrationSyncOutboxRepositoryTests
         };
         context.AddRange(tenant, outbox);
         await context.SaveChangesAsync();
+        context.TenantContext = new FixedTenant(tenant.Id);
         return outbox;
     }
+
+    private sealed record FixedTenant(Guid TenantId) : ITenantContext;
+
+    private sealed class QueueHealthGlobalFactory(DbContextOptions<ExploreDbContext> options)
+        : PooledDbContextFactory<ExploreDbContext>(options, poolSize: 1), IGlobalExploreDbContextFactory;
 }

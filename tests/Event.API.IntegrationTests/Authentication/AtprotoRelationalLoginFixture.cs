@@ -58,11 +58,8 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
     {
         await database.InitializeAsync();
         TenantId = await database.SeedTenantAsync();
-        string connection;
-        await using (var scope = database.Factory.Services.CreateAsyncScope())
+        await using (var db = database.Database.CreateDbContext())
         {
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            connection = db.Database.GetConnectionString()!;
             if (!ConfiguredOnboarding)
             {
                 Guid administratorId = Guid.CreateVersion7();
@@ -120,6 +117,8 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
         {
             ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
             ["RateLimiting:DisableInTesting"] = DisableRateLimiting.ToString(),
+            ["PublicBaseUrl"] = "https://api.test",
+            ["EffectiveHostAuthority:CanonicalOrigin"] = "https://api.test",
             ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
             ["PrivacyErasureAuthorityEmbedded:Path"] = database.AuthorityPath,
             ["Deployment:Mode"] = "SingleTenant",
@@ -154,7 +153,7 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
             apiConfiguration["Instance:OperatorIdentity:TermsUrl"] = PublicOrigin + "/terms";
             apiConfiguration["Instance:OperatorIdentity:PrivacyUrl"] = PublicOrigin + "/privacy";
         }
-        Api = new PostgreSqlApiWebApplicationFactory(connection, apiConfiguration, services =>
+        Api = new PostgreSqlApiWebApplicationFactory(database.Database, apiConfiguration, services =>
         {
             database.ConfigureServices(services);
             services.RemoveAll<TimeProvider>();

@@ -16,7 +16,7 @@ public sealed class AtprotoJetstreamTenantPresentationResolverTests
         Guid disabledOverrideTenantId = Guid.CreateVersion7();
         ITenantRepository tenants = Substitute.For<ITenantRepository>();
         ISystemSettingRepository systemSettings = Substitute.For<ISystemSettingRepository>();
-        ITenantSettingRepository tenantSettings = Substitute.For<ITenantSettingRepository>();
+        IAtprotoGovernanceSettingRepository tenantSettings = Substitute.For<IAtprotoGovernanceSettingRepository>();
         tenants.GetActiveAsNoTrackingAsync(Arg.Any<CancellationToken>()).Returns([
             Tenant(enabledOverrideTenantId),
             Tenant(disabledOverrideTenantId)
@@ -25,7 +25,7 @@ public sealed class AtprotoJetstreamTenantPresentationResolverTests
             .Returns(SystemSetting(GovernanceSettingKeys.Deployment.Mode, "\"MultiTenant\"", locked: false));
         systemSettings.GetByKey(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Arg.Any<CancellationToken>())
             .Returns(SystemSetting(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "false", locked: false));
-        tenantSettings.GetByKeyAcrossTenants(
+        tenantSettings.GetOverridesAsync(
                 GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
                 Arg.Any<CancellationToken>())
             .Returns([

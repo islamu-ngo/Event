@@ -10,7 +10,7 @@ public sealed record AtprotoEventGovernance(
     string ValidationProfile,
     bool PublishMyEvents);
 
-public sealed class AtprotoEventGovernanceResolver(IHierarchicalSettingsResolver settingsResolver)
+public sealed class AtprotoEventGovernanceResolver(IHierarchicalSettingsReader settingsResolver)
 {
     private static readonly string[] TenantKeys =
     [
@@ -34,10 +34,6 @@ public sealed class AtprotoEventGovernanceResolver(IHierarchicalSettingsResolver
             cancellationToken);
 
         var values = tenantSettings.ToDictionary(setting => setting.Key, StringComparer.Ordinal);
-        var group = new AtprotoFederationSettingGroup();
-        group.Populate(values);
-
-        var publishMyEvents = false;
         if (userId.HasValue)
         {
             IReadOnlyList<ResolvedSetting> consentSettings = await settingsResolver.ResolveBatchAsync(
@@ -46,12 +42,20 @@ public sealed class AtprotoEventGovernanceResolver(IHierarchicalSettingsResolver
                 cancellationToken);
             ResolvedSetting? consent = consentSettings.FirstOrDefault(
                 setting => setting.Key == GovernanceSettingKeys.Federation.AtprotoPublishMyEvents);
-            publishMyEvents = SettingValueSerializer.DeserializeBool(consent?.Value, false);
+            if (consent is not null)
+                values[consent.Key] = consent;
         }
 
+        return Evaluate(values);
+    }
+
+    public static AtprotoEventGovernance Evaluate(IReadOnlyDictionary<string, ResolvedSetting> resolved)
+    {
+        var group = new AtprotoFederationSettingGroup();
+        group.Populate(resolved);
         return new AtprotoEventGovernance(
             group.EventsEnabled,
             group.EventValidationProfile,
-            publishMyEvents);
+            group.PublishMyEvents);
     }
 }

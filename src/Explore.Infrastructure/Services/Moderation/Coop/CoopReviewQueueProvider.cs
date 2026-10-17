@@ -106,13 +106,13 @@ public sealed class CoopReviewQueueProvider(
                 isTransient: true,
                 "Coop review queue mirror timed out.");
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            logger.LogWarning(ex, "Coop review queue mirror request failed with {FailureType}", ex.GetType().Name);
+            logger.LogWarning("coop_review_queue_transport_failed");
             return ReviewCaseSyncResult.Failure(
                 "coop_unreachable",
                 isTransient: true,
-                ex.GetType().Name);
+                "Coop review queue transport is unavailable.");
         }
         catch (JsonException)
         {

@@ -43,6 +43,16 @@ Osprey acts strictly as an **advisory, signal-only evaluation coordinator**:
 
 ---
 
+### Operational diagnostics
+
+Coop and Osprey failures retain their stable retry categories, and gRPC failures
+retain their typed status. Logs and failure results do not reproduce private
+transport exceptions, provider-supplied exception detail or report/case payloads.
+If intake settings cannot be resolved, intake stays disabled without exposing
+the tenant identifier in diagnostics. Use the fixed category and provider
+health when investigating; provider secrets and payloads are not diagnostic
+attachments.
+
 ## 3. Configuration & Startup Flags
 
 Configured via environment variables (see [Environment Variables Reference](../configuration-and-operations/environment-variables.md#external-moderation-coop--osprey)):

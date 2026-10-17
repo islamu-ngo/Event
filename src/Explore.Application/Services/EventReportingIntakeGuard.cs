@@ -44,7 +44,7 @@ public sealed class EventReportingIntakeGuard(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogError(exception, "Event reporting intake resolution failed for tenant {TenantId}.", tenantId);
+            logger.LogError("event_reporting_intake_resolution_failed");
             return new EventReportingIntakeDecision(
                 TenantResolved: true,
                 IntakeEnabled: false,

@@ -67,7 +67,7 @@ public sealed class RuntimeModerationProviderResolver :
 
         return await ExecuteProviderAsync(
             () => _compositeProvider.SyncReportAsync(routedEnvelope, cancellationToken),
-            ex => EventReportProviderSyncResult.Failure("provider_sync_failed", isTransient: true, ex.GetType().Name));
+            () => EventReportProviderSyncResult.Failure("provider_sync_failed", isTransient: true, "Report provider synchronization failed."));
     }
 
     public Task<EventSafetySignalProviderResult> EvaluateAsync(
@@ -84,7 +84,7 @@ public sealed class RuntimeModerationProviderResolver :
 
         return ExecuteProviderAsync(
             () => _ospreySignalProvider.EvaluateAsync(ApplyEvidenceMode(envelope, options), cancellationToken),
-            ex => EventSafetySignalProviderResult.Failure("signal_provider_failed", isTransient: true, ex.GetType().Name));
+            () => EventSafetySignalProviderResult.Failure("signal_provider_failed", isTransient: true, "Signal provider evaluation failed."));
     }
 
     public Task<ReviewCaseSyncResult> MirrorCaseAsync(
@@ -101,7 +101,7 @@ public sealed class RuntimeModerationProviderResolver :
 
         return ExecuteProviderAsync(
             () => _coopReviewQueueProvider.MirrorCaseAsync(ApplyEvidenceMode(envelope, options), cancellationToken),
-            ex => ReviewCaseSyncResult.Failure("review_queue_provider_failed", isTransient: true, ex.GetType().Name));
+            () => ReviewCaseSyncResult.Failure("review_queue_provider_failed", isTransient: true, "Review queue provider failed."));
     }
 
     public Task<ReportDecisionExecutionResult> ExecuteAsync(
@@ -124,16 +124,16 @@ public sealed class RuntimeModerationProviderResolver :
 
     private async Task<TResult> ExecuteProviderAsync<TResult>(
         Func<Task<TResult>> operation,
-        Func<Exception, TResult> failureFactory)
+        Func<TResult> failureFactory)
     {
         try
         {
             return await operation();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Moderation provider operation failed with {FailureType}", ex.GetType().Name);
-            return failureFactory(ex);
+            _logger.LogWarning("moderation_provider_operation_failed");
+            return failureFactory();
         }
     }
 

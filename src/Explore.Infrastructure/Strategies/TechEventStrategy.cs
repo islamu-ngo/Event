@@ -46,11 +46,7 @@ public class TechEventStrategy : IEventStrategy
     {
         if (@event.TechAspect != null)
         {
-            _logger.LogInformation(
-                "Tech event {EventId} created. Skill Level: {SkillLevel}, Requires Laptop: {RequiresLaptop}",
-                @event.Id,
-                @event.TechAspect.SkillLevel,
-                @event.TechAspect.RequiresLaptop);
+            _logger.LogInformation("Tech event aspect created");
 
             // Future enhancement: Could trigger:
             // 1. GitHub webhook setup for repo updates
@@ -65,7 +61,7 @@ public class TechEventStrategy : IEventStrategy
         // Log updates for tech events
         if (@event.TechAspect != null)
         {
-            _logger.LogInformation("Tech event {EventId} updated", @event.Id);
+            _logger.LogInformation("Tech event aspect updated");
         }
 
         return Task.CompletedTask;

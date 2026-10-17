@@ -42,15 +42,9 @@ public class IslamicEventStrategy : IEventStrategy
 
     public Task PostCreateAsync(Event @event, CancellationToken cancellationToken = default)
     {
-        // Log Islamic event creation with aspect details
         if (@event.IslamicAspect != null)
         {
-            _logger.LogInformation(
-                "Islamic event {EventId} created with Madhab {MadhabId}, Prayer: {Prayer}, Gender Mode: {GenderMode}",
-                @event.Id,
-                @event.IslamicAspect.MadhabId,
-                @event.IslamicAspect.ReferencePrayer,
-                @event.IslamicAspect.GenderMode);
+            _logger.LogInformation("Islamic event aspect lifecycle processed");
 
             // Future enhancement: Could trigger a background job to:
             // 1. Lookup prayer times for the event location

@@ -3,6 +3,16 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 # API Architecture
 
+## API-Key Authentication Read Enrollment
+
+PostgresExternalApiKeyAuthenticationContract requires explicit deployment
+enrollment and the configured Global session for both exact key lookup and the
+fixed usage-metadata update. Native entry and reinstall attest exact role flags,
+membership options and effective privileges; Runtime cannot borrow executor
+authority directly or through the Global login. Existing drift is rejected before
+installer role or grant changes. Key selection and the two-column usage effect
+remain unchanged, and Runtime gains no direct credential-table privilege.
+
 ## Original User Tenant Navigation
 
 ResolveUserTenantRedirectionRequestHandler requires an authenticated request whose

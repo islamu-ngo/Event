@@ -92,14 +92,48 @@ public sealed class ApiKeyAuthenticationReadPortTests(PostgreSqlContainerFixture
             await Assert.That(rejected.InnerException is PostgresException
                 { SqlState: "55000", MessageText: "native_routine_acl_drift" }).IsTrue();
             var reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migrator));
+                await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migrator, fixture.NativeQueueEnrollment));
             await Assert.That(reinstall.SqlState).IsEqualTo("55000");
         }
         finally
         {
             await migrator.Database.ExecuteSqlRawAsync($"REVOKE EXECUTE ON FUNCTION {signature} FROM \"{runtime}\"");
         }
-        await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migrator);
+        await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+    }
+
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task RuntimeCannotInheritLookupOrUsageAuthority(bool usage, bool throughGlobalLogin)
+    {
+        await using var context = Open(PrimaryDatabaseRole.Migrator);
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var enrollment = fixture.NativeQueueEnrollment;
+        string borrowed = throughGlobalLogin ? enrollment.GlobalLogin : PostgresExternalApiKeyAuthenticationContract.GlobalRole;
+        string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        await context.Database.ExecuteSqlRawAsync(
+            $"GRANT {Quote(borrowed)} TO {Quote(enrollment.RuntimeLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE");
+        await transaction.CreateSavepointAsync("before_entry");
+        await context.Database.ExecuteSqlRawAsync($"SET LOCAL SESSION AUTHORIZATION {Quote(enrollment.RuntimeLogin)}");
+        await using (var command = context.Database.GetDbConnection().CreateCommand())
+        {
+            command.Transaction = transaction.GetDbTransaction();
+            command.CommandText = usage
+                ? $"SELECT {PostgresExternalApiKeyAuthenticationContract.UsageFunctionSql(context)}(@subject,CURRENT_TIMESTAMP,NULL::text,CURRENT_TIMESTAMP)"
+                : $"SELECT * FROM {PostgresExternalApiKeyAuthenticationContract.FunctionSql(context)}(@selector)";
+            command.Parameters.Add(usage
+                ? new NpgsqlParameter("subject", Guid.CreateVersion7())
+                : new NpgsqlParameter("selector", $"absent-{Guid.NewGuid():N}"));
+            var rejected = await Assert.ThrowsAsync<PostgresException>(async () => { await command.ExecuteNonQueryAsync(); });
+            await Assert.That(rejected.SqlState).IsEqualTo("55000");
+        }
+        await transaction.RollbackToSavepointAsync("before_entry");
+        var reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(context, enrollment));
+        await Assert.That(reinstall.SqlState).IsEqualTo("55000");
     }
 
     private ExploreDbContext Open(PrimaryDatabaseRole role)

@@ -17,16 +17,18 @@ public static class PostgresExternalApiKeyAuthenticationContract
     public static string FunctionSql(ExploreDbContext context) => Function(context, "_for_authentication");
     public static string UsageFunctionSql(ExploreDbContext context) => Function(context, "_touch_usage");
 
-    public static async Task ApplyAsync(ExploreDbContext context, CancellationToken cancellationToken = default)
+    public static async Task ApplyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
+        CancellationToken cancellationToken = default)
     {
         if (!context.Database.IsNpgsql())
             return;
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(BuildSql(context), cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        await using var transaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(cancellationToken) : null;
+        await context.Database.ExecuteSqlRawAsync(BuildSql(context, enrollment), cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
     }
 
-    public static string BuildSql(ExploreDbContext context)
+    public static string BuildSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var entity = context.Model.FindEntityType(typeof(ExternalApiKey))!;
         var mapping = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
@@ -47,8 +49,22 @@ public static class PostgresExternalApiKeyAuthenticationContract
             signatures, OwnerRole, GlobalRole, requireComplete: false);
         string currentAcl = PostgresPrivilegeGuard.BuildRoutineAclAssertSql(
             signatures, OwnerRole, GlobalRole, requireComplete: true);
+        string enrollmentGuard = EnrollmentGuard(context, enrollment);
+        string caller = $"""
+            {enrollmentGuard}
+            {PostgresPrivilegeGuard.RestrictedCallerSql}
+            IF session_user <> '{Literal(enrollment.GlobalLogin)}' OR current_user <> '{OwnerRole}' THEN
+                RAISE EXCEPTION 'native_api_key_authentication_wrong_executor' USING ERRCODE = '42501';
+            END IF;
+            """;
         return $"""
             DO $prior_acl$ BEGIN {priorAcl} END; $prior_acl$;
+            DO $prior_enrollment$ BEGIN
+                IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+                    WHERE rolname IN ('{OwnerRole}', '{MigratorRole}', '{GlobalRole}')) THEN
+                    {enrollmentGuard}
+                END IF;
+            END $prior_enrollment$;
             DO $contract$
             DECLARE v_role text;
             BEGIN
@@ -77,8 +93,9 @@ public static class PostgresExternalApiKeyAuthenticationContract
                     RAISE EXCEPTION 'API key authentication execution and migration logins must remain separate';
                 END IF;
             END $contract$;
-            GRANT {OwnerRole} TO {MigratorRole};
-            GRANT {MigratorRole} TO CURRENT_USER;
+            GRANT {OwnerRole} TO {MigratorRole} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+            GRANT {MigratorRole} TO {Quote(enrollment.MigratorLogin)} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+            GRANT {GlobalRole} TO {Quote(enrollment.GlobalLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE;
             GRANT USAGE, CREATE ON SCHEMA {schema} TO {OwnerRole};
             GRANT USAGE ON SCHEMA {schema} TO {GlobalRole};
             REVOKE ALL ON TABLE {table} FROM {OwnerRole}, {GlobalRole};
@@ -99,6 +116,7 @@ public static class PostgresExternalApiKeyAuthenticationContract
                 AS $function$
                 BEGIN
                     {currentAcl}
+                    {caller}
                     RETURN QUERY SELECT credential.* FROM {table} AS credential WHERE credential.{keyId} = p_key_id;
                 END;
                 $function$ $ddl$;
@@ -111,6 +129,7 @@ public static class PostgresExternalApiKeyAuthenticationContract
                 DECLARE v_touched boolean;
                 BEGIN
                     {currentAcl}
+                    {caller}
                     WITH touched AS (
                         UPDATE {table} SET {lastUsedAt} = p_used_at, {lastUsedIp} = p_last_ip
                         WHERE {id} = p_id AND ({lastUsedAt} IS NULL OR {lastUsedAt} < p_threshold)
@@ -129,8 +148,71 @@ public static class PostgresExternalApiKeyAuthenticationContract
             END $bootstrap$;
             REVOKE CREATE ON SCHEMA {schema} FROM {OwnerRole};
             DO $current_acl$ BEGIN {currentAcl} END; $current_acl$;
+            DO $current_enrollment$ BEGIN {enrollmentGuard} END; $current_enrollment$;
             """;
     }
+
+    private static string EnrollmentGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        enrollment.Validate();
+        string[] roles = [OwnerRole, MigratorRole, GlobalRole];
+        if (new[] { enrollment.MigratorLogin, enrollment.RuntimeLogin, enrollment.GlobalLogin,
+                enrollment.EmailInstanceMutationLogin, enrollment.EmailTenantMutationLogin }.Any(roles.Contains))
+            throw new InvalidOperationException("api_key_authentication_enrollment_collision");
+        var entity = context.Model.FindEntityType(typeof(ExternalApiKey))!;
+        var mapping = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        string schema = Schema(context, entity);
+        var columns = entity.GetProperties().Select(property => new PostgresPrivilegeGuard.Column(
+            property.GetColumnName(mapping)!,
+            property.Name is nameof(ExternalApiKey.LastUsedAt) or nameof(ExternalApiKey.LastUsedIp)
+                ? ["SELECT", "UPDATE"] : ["SELECT"])).ToArray();
+        var contract = new PostgresPrivilegeGuard.Contract(schema, roles,
+            [
+                new(mapping.Name + "_for_authentication", "text", OwnerRole, [GlobalRole]),
+                new(mapping.Name + "_touch_usage", "uuid, timestamp with time zone, text, timestamp with time zone", OwnerRole, [GlobalRole])
+            ],
+            [new(mapping.Name, OwnerRole, [], columns)],
+            [
+                new(OwnerRole, MigratorRole, false, true, false),
+                new(MigratorRole, enrollment.MigratorLogin, false, true, false),
+                new(GlobalRole, enrollment.GlobalLogin, true, false, false)
+            ]);
+        string table = context.GetService<ISqlGenerationHelper>().DelimitIdentifier(mapping.Name, schema);
+        return PostgresPrivilegeGuard.BuildAssertSql(contract) + $"""
+            IF pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{OwnerRole}','MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{MigratorRole}','MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{GlobalRole}','MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}','{OwnerRole}','MEMBER')
+                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}','{MigratorRole}','MEMBER')
+                OR EXISTS (
+                    WITH RECURSIVE inherited_roles(roleid) AS (
+                        SELECT edge.roleid FROM pg_catalog.pg_auth_members edge
+                        WHERE edge.member = (SELECT oid FROM pg_catalog.pg_roles
+                            WHERE rolname = '{Literal(enrollment.MigratorLogin)}')
+                        UNION
+                        SELECT edge.roleid FROM pg_catalog.pg_auth_members edge
+                        JOIN inherited_roles inherited ON edge.member = inherited.roleid)
+                    SELECT 1 FROM inherited_roles WHERE roleid =
+                        (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{GlobalRole}'))
+                OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+                    WHERE rolname IN ('{Literal(enrollment.RuntimeLogin)}','{Literal(enrollment.GlobalLogin)}')
+                    AND (NOT rolcanlogin OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication))
+                OR pg_catalog.has_schema_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(schema)}','CREATE')
+                OR pg_catalog.has_schema_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(schema)}','CREATE')
+                OR pg_catalog.has_table_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                OR pg_catalog.has_any_column_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,REFERENCES')
+                OR pg_catalog.has_table_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                OR pg_catalog.has_any_column_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,REFERENCES')
+                OR pg_catalog.has_function_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(FunctionSql(context))}(text)','EXECUTE')
+                OR pg_catalog.has_function_privilege('{Literal(enrollment.RuntimeLogin)}',
+                    '{Literal(UsageFunctionSql(context))}(uuid,timestamp with time zone,text,timestamp with time zone)','EXECUTE') THEN
+                RAISE EXCEPTION 'native_api_key_authentication_enrollment_drift' USING ERRCODE = '55000';
+            END IF;
+            """;
+    }
+
+    private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+    private static string Literal(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 
     private static string Function(ExploreDbContext context, string suffix)
     {

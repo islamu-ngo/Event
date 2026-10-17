@@ -94,7 +94,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresGlobalLookupCatalogueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAdministrativeAuthorityContract.ApplyAsync(migratorContext);
             await PostgresExternalLoginAuthenticationContract.ApplyAsync(migratorContext);
-            await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migratorContext);
+            await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migratorContext);
             await PostgresUserTenantMembershipContract.ApplyAsync(migratorContext);
             await PostgresTenantPreferenceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);

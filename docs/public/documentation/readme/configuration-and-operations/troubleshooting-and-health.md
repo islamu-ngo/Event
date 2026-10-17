@@ -6,6 +6,12 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Native API-key authentication requires the enrolled Global database login.
+Runtime must not inherit its executor role or the Global login, including through
+intermediate roles. Reconcile unauthorized grants through the approved database
+process before reinstalling; do not broaden Runtime credential-table privileges.
+Reinstallation rejects unexpected authority instead of silently repairing it.
+
 Tenant navigation reads the authenticated user's saved preference without loading
 their personal profile. A saved target is used only while it remains in that
 user's active tenant memberships. If it no longer qualifies, navigation chooses

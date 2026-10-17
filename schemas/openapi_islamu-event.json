@@ -6168,6 +6168,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmAiProposedActionRequestDto"
+              }
+            },
+            "text/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmAiProposedActionRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmAiProposedActionRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -7409,6 +7429,14 @@
             }
           },
           {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "api-version",
             "in": "query",
             "schema": {
@@ -7562,7 +7590,8 @@
           }
         ],
         "x-endpoint-class": "Authenticated",
-        "x-rate-limit-policy": "Write"
+        "x-rate-limit-policy": "Write",
+        "x-idempotency-key-required": true
       },
       "get": {
         "tags": [
@@ -122200,6 +122229,9 @@
                   ],
                   "format": "uuid"
                 },
+                "version": {
+                  "type": "string"
+                },
                 "kind": {
                   "type": "string"
                 },
@@ -122971,7 +123003,7 @@
             "format": "uuid"
           },
           "consumer": {
-            "type": "integer"
+            "$ref": "#/components/schemas/CredentialConsumer"
           },
           "generation": {
             "type": "string",
@@ -123354,6 +123386,9 @@
               "null",
               "string"
             ]
+          },
+          "inspectOnly": {
+            "type": "boolean"
           }
         }
       },
@@ -123368,12 +123403,6 @@
           },
           "cerbosAdminEndpoint": {
             "type": "string"
-          },
-          "cerbosAdminUsernameConfigured": {
-            "type": "boolean"
-          },
-          "cerbosAdminPasswordConfigured": {
-            "type": "boolean"
           },
           "cerbosDetectedFromEnvironment": {
             "type": "boolean"
@@ -123400,9 +123429,6 @@
             ]
           },
           "cerbosEndpointOwnership": {
-            "$ref": "#/components/schemas/SecretOwnershipDto"
-          },
-          "cerbosAdminCredentialsOwnership": {
             "$ref": "#/components/schemas/SecretOwnershipDto"
           }
         }
@@ -125481,6 +125507,17 @@
                 "$ref": "#/components/schemas/GuestRecoveryPolicyEnum"
               }
             ]
+          }
+        }
+      },
+      "ConfirmAiProposedActionRequestDto": {
+        "required": [
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "string"
           }
         }
       },
@@ -128709,7 +128746,11 @@
         }
       },
       "CredentialConsumer": {
-        "type": "integer"
+        "enum": [
+          "GoogleOidc",
+          "KeycloakOidc"
+        ],
+        "type": "string"
       },
       "CurrentSupportAccessSessionDto": {
         "type": "object",
@@ -145332,6 +145373,9 @@
                     "string"
                   ],
                   "format": "uuid"
+                },
+                "version": {
+                  "type": "string"
                 },
                 "kind": {
                   "type": "string"

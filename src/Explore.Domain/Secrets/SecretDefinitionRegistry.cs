@@ -17,9 +17,10 @@ namespace Explore.Domain.Secrets;
 /// <list type="bullet">
 ///   <item><c>/api</c> — SETUP_SECRET</item>
 ///   <item><c>/storage</c> — STORAGE_S3_*</item>
-///   <item><c>/keycloak</c> — KEYCLOAK_*</item>
+///   <item><c>/runtime/api/authentication/keycloak</c> — API Keycloak metadata</item>
+///   <item><c>/runtime/bff/oidc</c> — separately admitted Keycloak and Google folders</item>
 ///   <item><c>/atproto</c> — ATPROTO_*</item>
-///   <item><c>/cerbos</c> — CERBOS_GRPC_ENDPOINT</item>
+///   <item><c>/runtime/api/authorization/cerbos</c> — CERBOS_GRPC_ENDPOINT</item>
 ///   <item><c>/postgresql</c> — POSTGRESQL_*</item>
 ///   <item><c>/smtp</c> — MAIL_SMTP_*</item>
 ///   <item><c>/analytics</c> — ANALYTICS_POSTHOG_*</item>
@@ -49,6 +50,13 @@ public static class SecretDefinitionRegistry
     public static SecretRotationProfile GetRotationProfile(string settingKey)
     {
         _ = GetRequired(settingKey);
+        if (settingKey.StartsWith("data_protection.", StringComparison.Ordinal))
+            return new("data_protection", SecretRotationMode.CoordinatedRestart,
+                CandidateValidationRequired: true, EveryReplicaAcknowledgementRequired: true,
+                StaleReplicaAction: "drain-and-stop",
+                RollbackAction: "preserve-current-admission-pin-and-generation-floor",
+                RevocationGate: "operator-approved-invalidation-and-all-replica-drain",
+                BreakGlassAction: "forward-only-admission-and-coordinated-restart");
         var mode = settingKey switch
         {
             Keys.SetupSecret or Keys.Authentication.LocalBootstrapPassword
@@ -107,6 +115,8 @@ public static class SecretDefinitionRegistry
         public const string PrivacyIdentityFenceKey = "privacy.identity_fence_key";
         public const string SetupSecretBindingCommitmentHmacKey =
             "setup.secret_binding_commitment_hmac_key";
+        public const string SetupSigning = "setup.signing";
+        public const string SetupEncryption = "setup.encryption";
 
         public static class Storage
         {
@@ -123,8 +133,8 @@ public static class SecretDefinitionRegistry
             public const string Realm = "keycloak.realm";
             public const string ClientId = "keycloak.client_id";
             public const string BlazorClientSecret = "keycloak.blazor_client_secret";
+            public const string LifecycleClientSecret = "keycloak.lifecycle_client_secret";
             public const string Endpoint = "keycloak.endpoint";
-            public const string DbPassword = "keycloak.db_password";
         }
 
         public static class Authentication
@@ -296,6 +306,28 @@ public static class SecretDefinitionRegistry
                 IsBootstrapSecret = false,
                 Description = "Server-only HMAC key for Setup secret-write commitments.",
             },
+            new()
+            {
+                Key = Keys.SetupSigning,
+                AllowedScopes = instanceOnly,
+                AllowedSources = [SecretSourceType.Infisical],
+                DefaultInfisicalPath = "/setup",
+                DefaultInfisicalKey = "SETUP_SIGNING",
+                DefaultEnvironmentVariableName = "ISLAMU_SETUP_SIGNING",
+                IsBootstrapSecret = false,
+                Description = "Dedicated signing target for the enrolled setup secret-write protocol.",
+            },
+            new()
+            {
+                Key = Keys.SetupEncryption,
+                AllowedScopes = instanceOnly,
+                AllowedSources = [SecretSourceType.Infisical],
+                DefaultInfisicalPath = "/setup",
+                DefaultInfisicalKey = "SETUP_ENCRYPTION",
+                DefaultEnvironmentVariableName = "ISLAMU_SETUP_ENCRYPTION",
+                IsBootstrapSecret = false,
+                Description = "Dedicated encryption target for the enrolled setup secret-write protocol.",
+            },
 
             new()
             {
@@ -411,13 +443,13 @@ public static class SecretDefinitionRegistry
                 Description = "S3 region (e.g. us-east-1).",
             },
 
-            // --- keycloak/KEYCLOAK_* ---
+            // --- Consumer-owned Keycloak runtime configuration ---
             new()
             {
                 Key = Keys.Keycloak.Realm,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/api/authentication/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_REALM",
                 DefaultEnvironmentVariableName = "KEYCLOAK_REALM",
                 IsBootstrapSecret = false,
@@ -428,7 +460,7 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Keycloak.ClientId,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/api/authentication/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_CLIENT_ID",
                 DefaultEnvironmentVariableName = "KEYCLOAK_CLIENT_ID",
                 IsBootstrapSecret = false,
@@ -447,6 +479,17 @@ public static class SecretDefinitionRegistry
             },
             new()
             {
+                Key = Keys.Keycloak.LifecycleClientSecret,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/runtime/api/keycloak/lifecycle",
+                DefaultInfisicalKey = "KEYCLOAK_LIFECYCLE_CLIENT_SECRET",
+                DefaultEnvironmentVariableName = "KEYCLOAK_LIFECYCLE_CLIENT_SECRET",
+                IsBootstrapSecret = false,
+                Description = "Deployment-owned dedicated Keycloak lifecycle service client credential.",
+            },
+            new()
+            {
                 Key = Keys.Authentication.GoogleClientSecret,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
@@ -461,22 +504,11 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Keycloak.Endpoint,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/api/authentication/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_ENDPOINT",
                 DefaultEnvironmentVariableName = "KEYCLOAK_ENDPOINT",
                 IsBootstrapSecret = false,
                 Description = "Keycloak base URL (e.g. https://auth.example.com).",
-            },
-            new()
-            {
-                Key = Keys.Keycloak.DbPassword,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
-                DefaultInfisicalKey = "KEYCLOAK_DB_PASSWORD",
-                DefaultEnvironmentVariableName = "KEYCLOAK_DB_PASSWORD",
-                IsBootstrapSecret = false,
-                Description = "Keycloak backing database password (read by Keycloak itself).",
             },
             new()
             {
@@ -642,35 +674,12 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Cerbos.GrpcEndpoint,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/cerbos",
+                DefaultInfisicalPath = "/runtime/api/authorization/cerbos",
                 DefaultInfisicalKey = "CERBOS_GRPC_ENDPOINT",
                 DefaultEnvironmentVariableName = "CERBOS_GRPC_ENDPOINT",
                 IsBootstrapSecret = false,
                 Description = "Cerbos PDP gRPC endpoint (e.g. cerbosgrpc.example.com:443).",
             },
-            new()
-            {
-                Key = Keys.Cerbos.CustomAdminUsername,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/cerbos",
-                DefaultInfisicalKey = "CERBOS_ADMIN_USERNAME",
-                DefaultEnvironmentVariableName = "CERBOS_ADMIN_USERNAME",
-                IsBootstrapSecret = false,
-                Description = "Cerbos Admin API username used by server-side policy package sync.",
-            },
-            new()
-            {
-                Key = Keys.Cerbos.CustomAdminPassword,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/cerbos",
-                DefaultInfisicalKey = "CERBOS_ADMIN_PASSWORD",
-                DefaultEnvironmentVariableName = "CERBOS_ADMIN_PASSWORD",
-                IsBootstrapSecret = false,
-                Description = "Cerbos Admin API password used by server-side policy package sync.",
-            },
-
             new()
             {
                 Key = Keys.Webhooks.SvixAuthToken,
@@ -983,6 +992,32 @@ public static class SecretDefinitionRegistry
             },
         };
 
+        foreach (string partition in new[] { "api", "bff", "combined" })
+        {
+            string prefix = $"EVENT_DP_{partition.ToUpperInvariant()}";
+            defs.Add(new SecretDefinition
+            {
+                Key = $"data_protection.{partition}.ring",
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = $"/runtime/{partition}/data-protection",
+                DefaultInfisicalKey = prefix + "_RING",
+                DefaultEnvironmentVariableName = prefix + "_RING",
+                IsBootstrapSecret = true,
+                Description = "Read-only external Data Protection ring; operator-only provisioning and restart.",
+            });
+            defs.Add(new SecretDefinition
+            {
+                Key = $"data_protection.{partition}.admission",
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = $"/admission/{partition}/data-protection",
+                DefaultInfisicalKey = prefix + "_ADMISSION",
+                DefaultEnvironmentVariableName = prefix + "_ADMISSION",
+                IsBootstrapSecret = true,
+                Description = "Independent complete retention/revocation admission; separately protected deployment pin required.",
+            });
+        }
         return defs.ToFrozenDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
     }
 }

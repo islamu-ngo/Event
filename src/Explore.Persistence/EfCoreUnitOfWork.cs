@@ -185,7 +185,9 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
                     throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                         "The storage reference transaction has failed.");
                 await _dbContext.FlushDisclosureAsync(ct);
+                await _dbContext.ValidateTrustedSetupSettingsSourcesAsync(ct);
                 await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
+                _dbContext.ValidateTrustedSetupSettingsTimes();
                 commitAttempted = true;
                 await transaction.CommitAsync(ct);
                 return result;
@@ -242,6 +244,7 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
             finally
             {
                 _dbContext.ResetHumanCommitAdmissions();
+                _dbContext.ResetTrustedSetupSettingsAdmissions();
             }
         });
     }

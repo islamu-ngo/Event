@@ -40,7 +40,8 @@ public sealed class UserMembershipReadPortTests(PostgreSqlContainerFixture fixtu
         if (foreignTenant) request.TenantContext = new FixedTenant(inactive);
         request.BindTenantLease();
         var global = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
-        var repository = new UserTenantMembershipRepository(global);
+        var repository = new UserTenantMembershipRepository(global,
+            new TenantExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime)));
 
         var result = await repository.GetActiveTenantsForUserAsync(userId);
 

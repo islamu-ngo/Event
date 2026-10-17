@@ -1,11 +1,16 @@
 // Shared per assembly for lightweight contract validation (serialization, headers, ProblemDetails).
 
 using TUnit.Core.Interfaces;
+using Explore.API.Configuration;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Event.Api.IntegrationTests.Fixtures;
 
 /// <summary>
-/// Contract test fixture: fast, InMemory-backed, focused on API surface validation.
+/// Contract test fixture for API surface validation on enrolled PostgreSQL context owners.
+/// TestAuthHandler supplies protocol-test tickets; Local admission fixtures exercise native authentication.
 /// Uses <see cref="AuthenticatedWebApplicationFactory"/> with <see cref="StubAuthorizationProvider"/>.
 /// </summary>
 public class ContractApiFixture : IAsyncInitializer, IAsyncDisposable
@@ -20,7 +25,9 @@ public class ContractApiFixture : IAsyncInitializer, IAsyncDisposable
             AuthorizationProviderOverride = new StubAuthorizationProvider(),
             SeedActiveDefaultTenant = true
         };
-        Client = Factory.CreateClient();
+        var origin = Factory.Services.GetRequiredService<IOptions<EffectiveHostAuthorityOptions>>()
+            .Value.GetCanonicalOrigin();
+        Client = Factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = origin });
         return Task.CompletedTask;
     }
 
@@ -81,4 +88,5 @@ public class ContractApiFixture : IAsyncInitializer, IAsyncDisposable
 
         GC.SuppressFinalize(this);
     }
+
 }

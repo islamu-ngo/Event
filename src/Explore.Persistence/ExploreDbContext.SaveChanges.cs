@@ -37,6 +37,20 @@ public partial class ExploreDbContext
             acceptChanges => SavePrivacyErasureGraphAsync(acceptChanges, cancellationToken),
             acceptAllChangesOnSuccess: true, cancellationToken);
 
+    /// <summary>
+    /// Persists already prepared shared ATProto entries without regenerating stamps,
+    /// while retaining storage and disclosure processing in the owned transaction.
+    /// </summary>
+    internal Task<int> SavePreparedAtprotoChangesAsync(CancellationToken cancellationToken)
+    {
+        if (Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Prepared ATProto changes require an owned transaction.");
+
+        return SaveWithStorageReferencesAsync(
+            acceptChanges => base.SaveChangesAsync(acceptChanges, cancellationToken),
+            acceptAllChangesOnSuccess: true, cancellationToken);
+    }
+
     private async Task<int> SavePrivacyErasureGraphAsync(
         bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
     {
@@ -67,7 +81,7 @@ public partial class ExploreDbContext
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    private void PrepareTrackedEntities()
+    internal void PrepareTrackedEntities()
     {
         ValidateEventLocationCarrierConsistency();
         ValidateRegistrationProviderConnectionSecrets();
@@ -128,6 +142,7 @@ public partial class ExploreDbContext
             }
 
             if (entry.Entity is Explore.Domain.EventLocationDisclosureAudit
+                    or Explore.Domain.LocationPrivacyCorrectionReceipt
                     or Explore.Domain.EventLocationExactReadAudit
                     or Explore.Domain.PrivacyErasureReplayCheckpoint
                 && entry.State is EntityState.Modified or EntityState.Deleted)

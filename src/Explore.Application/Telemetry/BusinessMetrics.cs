@@ -13,7 +13,7 @@ namespace Explore.Application.Telemetry;
 
 /// <summary>
 /// Custom business metrics exposed via OpenTelemetry.
-/// Metrics use metric-specific bounded tags; not every metric includes tenant_id.
+/// Metrics use metric-specific tags and omit tenant and user identifiers.
 /// Meter name: "Explore.Business"
 /// </summary>
 public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
@@ -599,8 +599,7 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
 
     public void RecordEventPublished(string? tenantId = null)
     {
-        _eventsPublished.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"));
+        _eventsPublished.Add(1);
     }
 
     public void RecordEventPublicActionEngagement(EventPublicActionKindEnum actionKind, string? surface)
@@ -689,7 +688,6 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         bool? irreversible = null)
     {
         _eventModerationActions.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
             new KeyValuePair<string, object?>("action_kind", NormalizeModerationActionKind(actionKind)),
             new KeyValuePair<string, object?>("outcome", NormalizeModerationOutcome(outcome)),
             new KeyValuePair<string, object?>("failure_category", NormalizeModerationFailureCategory(failureCategory)),
@@ -702,7 +700,6 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         string? failureCategory = null)
     {
         _eventReportSubmissions.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
             new KeyValuePair<string, object?>("outcome", NormalizeEventReportSubmissionOutcome(outcome)),
             new KeyValuePair<string, object?>("failure_category", NormalizeEventReportSubmissionFailureCategory(failureCategory)));
     }
@@ -714,7 +711,6 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         string? failureCategory = null)
     {
         _eventReportWorkflowActions.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
             new KeyValuePair<string, object?>("action", NormalizeEventReportWorkflowAction(action)),
             new KeyValuePair<string, object?>("outcome", NormalizeEventReportOutcome(outcome)),
             new KeyValuePair<string, object?>("failure_category", NormalizeEventReportFailureCategory(failureCategory)));
@@ -727,7 +723,6 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         string? failureCategory = null)
     {
         _eventReportProviderSyncs.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
             new KeyValuePair<string, object?>("provider", NormalizeEventReportProvider(provider)),
             new KeyValuePair<string, object?>("outcome", NormalizeEventReportOutcome(outcome)),
             new KeyValuePair<string, object?>("failure_category", NormalizeEventReportFailureCategory(failureCategory)));
@@ -746,15 +741,15 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
 
     public void RecordRegistrationCreated(string? tenantId = null)
     {
-        _registrationsCreated.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"));
+        _registrationsCreated.Add(1);
     }
 
     public void RecordRegistrationProviderManagementAction(string action, string outcome)
     {
         _registrationProviderManagementActions.Add(1,
-            new KeyValuePair<string, object?>("action", NormalizeTag(action)),
-            new KeyValuePair<string, object?>("outcome", NormalizeTag(outcome)));
+            new KeyValuePair<string, object?>("action", action is "poll_reconciliation" or "manual_import" ? action : "unknown"),
+            new KeyValuePair<string, object?>("outcome", outcome is "validation_failed" or "not_found"
+                or "unsupported" or "unknown_capability" or "accepted" ? outcome : "unknown"));
     }
 
     public void RecordRegistrationProviderSubscriptionOperation(string? operation, string? outcome)
@@ -786,8 +781,7 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
 
     public void RecordOrganizationCreated(string? tenantId = null)
     {
-        _organizationsCreated.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"));
+        _organizationsCreated.Add(1);
     }
 
     /// <summary>
@@ -877,54 +871,71 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
     public void RecordEventRoleAssignmentChanged(string operation, string outcome, string? roleCode = null)
     {
         _eventRoleAssignmentChanged.Add(1,
-            new KeyValuePair<string, object?>("operation", operation),
-            new KeyValuePair<string, object?>("outcome", outcome),
-            new KeyValuePair<string, object?>("role", roleCode ?? "unknown"));
+            new KeyValuePair<string, object?>("operation", operation is "assign" or "revoke" or "transfer-ownership"
+                or "update-window" ? operation : "unknown"),
+            new KeyValuePair<string, object?>("outcome", outcome is "allowed" or "denied" ? outcome : "unknown"),
+            new KeyValuePair<string, object?>("role", Enum.TryParse<RoleEnum>(roleCode, out var role)
+                && Enum.IsDefined(role) ? role.ToString() : "unknown"));
     }
 
     public void RecordExternalApiKeyCreated(string? tenantId = null, string? ownerType = null)
     {
         _externalApiKeysCreated.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
-            new KeyValuePair<string, object?>("owner_type", ownerType ?? "unknown"));
+            new KeyValuePair<string, object?>("owner_type", NormalizeApiKeyOwnerType(ownerType)));
     }
 
     public void RecordExternalApiKeyRevoked(string? tenantId = null, string? ownerType = null)
     {
         _externalApiKeysRevoked.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
-            new KeyValuePair<string, object?>("owner_type", ownerType ?? "unknown"));
+            new KeyValuePair<string, object?>("owner_type", NormalizeApiKeyOwnerType(ownerType)));
     }
 
     public void RecordExternalApiKeyAuthentication(string outcome, string? tenantId = null, string? ownerType = null)
     {
         _externalApiKeyAuthenticationAttempts.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
-            new KeyValuePair<string, object?>("owner_type", ownerType ?? "unknown"),
-            new KeyValuePair<string, object?>("outcome", outcome));
+            new KeyValuePair<string, object?>("owner_type", NormalizeApiKeyOwnerType(ownerType)),
+            new KeyValuePair<string, object?>("outcome", outcome switch
+            {
+                "invalid" or "expired" or "inactive" or "success" or "tenant_mismatch" or "tenant_required" => outcome,
+                _ => "unknown"
+            }));
     }
 
     public void RecordExternalApiKeyThrottle(string policy, string? tenantId = null, string? ownerType = null)
     {
         _externalApiKeyThrottleEvents.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
-            new KeyValuePair<string, object?>("owner_type", ownerType ?? "unknown"),
-            new KeyValuePair<string, object?>("policy", policy));
+            new KeyValuePair<string, object?>("owner_type", NormalizeApiKeyOwnerType(ownerType)),
+            new KeyValuePair<string, object?>("policy", policy switch
+            {
+                "global" or "authenticated" or "write" or "controlplane" or "eventopengraphimage"
+                    or "setupsecret" or "atprototransient" or "configurationimportupload"
+                    or "setupenrollmentwrite" or "setupsecretbindingwrite" or "admission_ticket_recovery"
+                    or "admission_check_in" or "admission_scanner_capability" or "admission_scanner_check_in"
+                    or "public_transactional" or "anonymous_registration" or "analyticsrelay"
+                    or "publicingestion" or "aiassistant" => policy,
+                _ => "unknown"
+            }));
     }
 
     public void RecordExternalApiKeyPolicyUpdated(string? tenantId = null, string? ownerType = null)
     {
         _externalApiKeyPolicyUpdated.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
-            new KeyValuePair<string, object?>("owner_type", ownerType ?? "unknown"));
+            new KeyValuePair<string, object?>("owner_type", NormalizeApiKeyOwnerType(ownerType)));
     }
 
     public void RecordExternalApiKeyRotated(string? tenantId = null, string? ownerType = null)
     {
         _externalApiKeyRotated.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
-            new KeyValuePair<string, object?>("owner_type", ownerType ?? "unknown"));
+            new KeyValuePair<string, object?>("owner_type", NormalizeApiKeyOwnerType(ownerType)));
     }
+
+    private static string NormalizeApiKeyOwnerType(string? ownerType) => ownerType switch
+    {
+        nameof(ExternalApiKeyOwnerType.User) or nameof(ExternalApiKeyOwnerType.Organization)
+            or nameof(ExternalApiKeyOwnerType.Group) or nameof(ExternalApiKeyOwnerType.Tenant)
+            or nameof(ExternalApiKeyOwnerType.InstanceAdmin) => ownerType,
+        _ => "unknown"
+    };
 
     public void RecordEmailDispatchAttempt(EmailDispatchDrainOutcome outcome)
     {
@@ -1241,10 +1252,12 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
     public void RecordCustomPropertyPurgeDecision(string? tenantId, string scope, string outcome, string blockerCategory)
     {
         _customPropertyPurgeDecisions.Add(1,
-            new KeyValuePair<string, object?>("tenant_id", tenantId ?? "default"),
-            new KeyValuePair<string, object?>("scope", NormalizeTag(scope)),
-            new KeyValuePair<string, object?>("outcome", NormalizeTag(outcome)),
-            new KeyValuePair<string, object?>("blocker_category", NormalizeTag(blockerCategory)));
+            new KeyValuePair<string, object?>("scope", scope is "custom_property_definition"
+                or "event_custom_property_definition" or "event_session_custom_property_definition" ? scope : "unknown"),
+            new KeyValuePair<string, object?>("outcome", outcome is "blocked" or "blocked_after_recheck"
+                or "purged" or "failed" ? outcome : "unknown"),
+            new KeyValuePair<string, object?>("blocker_category", blockerCategory is "value" or "projection"
+                or "audit_log" or "sync_provenance" or "none" ? blockerCategory : "unknown"));
     }
 
     public void RecordIdempotencyCleanupRun(string mode, string outcome)
@@ -1272,8 +1285,9 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
     public void RecordAiRetentionCleanupRun(string mode, string outcome)
     {
         _aiRetentionCleanupRuns.Add(1,
-            new KeyValuePair<string, object?>("mode", NormalizeTag(mode)),
-            new KeyValuePair<string, object?>("outcome", NormalizeTag(outcome)));
+            new KeyValuePair<string, object?>("mode", mode is "dry_run" or "redact" ? mode : "unknown"),
+            new KeyValuePair<string, object?>("outcome", outcome is "succeeded" or "partial_failure"
+                or "failed" ? outcome : "unknown"));
     }
 
     public void RecordAiRetentionCleanupRows(long rowCount, string mode, string category)
@@ -1284,7 +1298,7 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         }
 
         _aiRetentionCleanupRows.Add(rowCount,
-            new KeyValuePair<string, object?>("mode", NormalizeTag(mode)),
+            new KeyValuePair<string, object?>("mode", mode is "dry_run" or "redact" ? mode : "unknown"),
             new KeyValuePair<string, object?>("category", NormalizeAiRetentionCleanupCategory(category)));
     }
 
@@ -1292,8 +1306,9 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
     {
         _aiProviderHealthChecks.Add(1,
             new KeyValuePair<string, object?>("provider", NormalizeAiProvider(provider)),
-            new KeyValuePair<string, object?>("status", NormalizeTag(status)),
-            new KeyValuePair<string, object?>("reason", NormalizeTag(reason)));
+            new KeyValuePair<string, object?>("status", status is "healthy" or "unhealthy" ? status : "unknown"),
+            new KeyValuePair<string, object?>("reason", reason is "invalid_settings" or "disabled"
+                or "provider_not_configured" or "configured_no_probe" or "healthy_fake" ? reason : "unknown"));
     }
 
     public void RecordAiProviderRequest(string? provider, string? outcome, string? failureCategory = null)

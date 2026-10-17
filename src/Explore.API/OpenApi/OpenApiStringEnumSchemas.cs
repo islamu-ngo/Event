@@ -1,11 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Explore.Application.DTOs.Ai;
+using Explore.Application.Features.AiAssistant;
+using Explore.Domain.Ai;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Features.AiAssistant;
-using Explore.Domain.Ai;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
@@ -43,6 +44,7 @@ internal static class OpenApiStringEnumSchemaCatalog
     [
         typeof(AiModelDiscoveryScope),
         typeof(AiCredentialScope),
+        typeof(Explore.Domain.Secrets.AuthenticationCredentialCutover.CredentialConsumer),
         typeof(EventResourceKindEnum),
         typeof(EventResourceDeliveryTypeEnum),
         typeof(EventResourceDisclosureModeEnum),
@@ -80,6 +82,7 @@ internal static class OpenApiStringEnumSchemaCatalog
     [
         typeof(AiModelDiscoveryScope),
         typeof(AiCredentialScope),
+        typeof(Explore.Domain.Secrets.AuthenticationCredentialCutover.CredentialConsumer),
         typeof(ExternalApiKeyDisclosureStatus),
         typeof(EventResourceKindEnum),
         typeof(EventResourceDeliveryTypeEnum),

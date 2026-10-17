@@ -10,10 +10,19 @@ internal sealed class MutationScopeCommandHandler<TCommand, TResult>(
     public async Task<TResult> ExecuteAsync(TCommand command, CancellationToken cancellationToken)
     {
         var selection = await PolicyMutationCommandScope.SelectAsync(command, provider, cancellationToken);
+        if (selection is null && ModerationMutationCommandScope.Handles(typeof(TCommand)))
+            selection = PolicyMutationScope.Instance;
         if (selection is null)
         {
             await PrepareHumanOwnerAsync(provider, cancellationToken);
             return await ExecuteCoreAsync(provider, command, cancellationToken);
+        }
+        if (FooterOperationScope.Handles(typeof(TCommand)))
+        {
+            await using var footer = await provider.GetRequiredService<IFooterExecutionScopeFactory>()
+                .CreateAsync(selection, cancellationToken);
+            return await footer.Services.GetRequiredService<IFooterOperationExecution>()
+                .ExecuteAsync(command, token => ExecuteCoreAsync(footer.Services, command, token), cancellationToken);
         }
         await using var scope = await provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
             .CreateAsync(selection, cancellationToken);

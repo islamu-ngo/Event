@@ -3,7 +3,6 @@ namespace Explore.API.Extensions;
 using Explore.Application.Configuration;
 using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
-using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
 
@@ -14,19 +13,20 @@ public static class ConfigurationExtensions
     /// </summary>
     public static IConfiguration AddSecretAuthorityConfiguration(
         this IConfigurationBuilder configBuilder,
-        string environmentName)
+        string environmentName,
+        SecretConsumer consumer = SecretConsumer.Api)
     {
         var bootstrapConfig = configBuilder.Build();
         _ = PrivacyErasureDurabilityOptions.FromConfiguration(bootstrapConfig);
         IConfiguration authority = SecretAuthorityConfiguration.Build(
             bootstrapConfig,
             environmentName,
-            "/keycloak", "/database", "/database/erasure", "/database/identity", "/api",
-            "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/integrations/listmonk");
+            consumer,
+            SecretAcquisitionPolicy.Roots(consumer).ToArray());
         _ = PrivacyErasureDurabilityOptions.FromConfiguration(authority);
         var isolatedAuthority = new ConfigurationBuilder().AddConfiguration(authority);
         PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(isolatedAuthority);
-        ApplyMapping(configBuilder, isolatedAuthority.Build());
+        ApplyMapping(configBuilder, isolatedAuthority.Build(), bootstrapConfig);
 
         // Runtime provider binding must use the authority and bootstrap source that loaded
         // startup secrets, not lower-priority settings or a vault-supplied provider selector.
@@ -50,15 +50,16 @@ public static class ConfigurationExtensions
     /// Authoritative Infisical keys:
     ///   /database: DATABASE_PROVIDER, DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_SCHEMA, etc.
     ///   /api:      DEPLOYMENT_MODE (single_tenant or multi_tenant)
-    ///   /keycloak: KEYCLOAK_ENDPOINT, KEYCLOAK_REALM
-    ///   /cerbos:   CERBOS_GRPC_ENDPOINT, CERBOS_HTTP_ENDPOINT, CERBOS_USE_POLICY_SCOPE
+    ///   /runtime/api/authentication/keycloak: KEYCLOAK_ENDPOINT, KEYCLOAK_REALM
+    ///   /runtime/api/authorization/cerbos: CERBOS_GRPC_ENDPOINT, CERBOS_HTTP_ENDPOINT, CERBOS_USE_POLICY_SCOPE
     ///   /api|/mcp: MCP_ENABLED, MCP_ENDPOINT_PATH, MCP_STATELESS, MCP_ENABLE_LEGACY_SSE
-    ///   /ai:       AI_ENDPOINT, AI_MODEL_ID, AI_CREDENTIAL_SCOPE, AI_PROVIDER
+    ///   /ai:       AI_ENDPOINT, AI_MODEL_ID, AI_API_KEY, AI_PROVIDER
     ///   /storage:  STORAGE_S3_ENDPOINT, STORAGE_S3_BUCKET_NAME, STORAGE_S3_ACCESS_KEY_ID, etc.
     ///   /smtp:     MAIL_SMTP_HOST, MAIL_SMTP_PORT, MAIL_SMTP_USERNAME, MAIL_SMTP_PASSWORD, etc.
     ///   /api:      VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
     /// </remarks>
-    private static void ApplyMapping(IConfigurationBuilder configBuilder, IConfiguration config)
+    private static void ApplyMapping(IConfigurationBuilder configBuilder, IConfiguration config,
+        IConfiguration runtimeConfiguration)
     {
         var rawRealm = config["KEYCLOAK_REALM"] ?? config["Keycloak:Realm"];
         var baseUrl = config["KEYCLOAK_ENDPOINT"];
@@ -68,11 +69,6 @@ public static class ConfigurationExtensions
             "Keycloak:ClientId",
             "KEYCLOAK_CLIENT_ID",
             "KEYCLOAK_BLAZOR_CLIENT_ID");
-        var rawKeycloakClientSecret = ReadFirst(
-            config,
-            "Keycloak:ClientSecret",
-            "Keycloak:BlazorClientSecret",
-            "KEYCLOAK_BLAZOR_CLIENT_SECRET");
 
         string? keycloakAuthority = null;
         if (!string.IsNullOrEmpty(explicitAuthority))
@@ -225,6 +221,26 @@ public static class ConfigurationExtensions
             ["Database:Schema"] = null,
             ["Database:Runtime:Username"] = null,
             ["Database:Runtime:Password"] = null,
+            ["DATABASE_GLOBAL_USERNAME"] = null,
+            ["DATABASE_GLOBAL_PASSWORD"] = null,
+            ["Database:Global:Username"] = null,
+            ["Database:Global:Password"] = null,
+            ["DATABASE_INSTANCE_KEY_READ_USERNAME"] = null,
+            ["DATABASE_INSTANCE_KEY_READ_PASSWORD"] = null,
+            ["Database:InstanceKeyRead:Username"] = null,
+            ["Database:InstanceKeyRead:Password"] = null,
+            ["DATABASE_INSTANCE_KEY_WRITE_USERNAME"] = null,
+            ["DATABASE_INSTANCE_KEY_WRITE_PASSWORD"] = null,
+            ["Database:InstanceKeyWrite:Username"] = null,
+            ["Database:InstanceKeyWrite:Password"] = null,
+            ["DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME"] = null,
+            ["DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD"] = null,
+            ["Database:InstanceKeyIssuance:Username"] = null,
+            ["Database:InstanceKeyIssuance:Password"] = null,
+            ["DATABASE_PLATFORM_KEY_REPORT_USERNAME"] = null,
+            ["DATABASE_PLATFORM_KEY_REPORT_PASSWORD"] = null,
+            ["Database:PlatformKeyReport:Username"] = null,
+            ["Database:PlatformKeyReport:Password"] = null,
             ["Database:Migrator:Username"] = null,
             ["Database:Migrator:Password"] = null,
             ["Database:TlsMode"] = null,
@@ -303,8 +319,16 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Keycloak:Authority", keycloakAuthority);
         TrySet(mappedConfig, config, "Keycloak:MetadataAddress", metadataAddress);
         TrySet(mappedConfig, config, "Keycloak:ClientId", keycloakClientId);
-        TrySet(mappedConfig, config, "Keycloak:ClientSecret", rawKeycloakClientSecret);
-        TrySet(mappedConfig, config, "Keycloak:Audience", "islamu-event-api");
+        TrySet(mappedConfig, config, "Keycloak:Audience",
+            runtimeConfiguration["Keycloak:Audience"] ?? "islamu-event-api");
+        var permittedClients = config.GetSection("Keycloak:PermittedClients").GetChildren().ToArray();
+        if (permittedClients.Length != 0)
+        {
+            foreach (var previous in runtimeConfiguration.GetSection("Keycloak:PermittedClients").GetChildren())
+                mappedConfig[previous.Path] = null;
+            foreach (var client in permittedClients)
+                mappedConfig[client.Path] = client.Value;
+        }
         TrySet(mappedConfig, config, "Keycloak:RequireHttpsMetadata", "true");
 
         TrySet(mappedConfig, config, "Smtp:Host", smtpHost);
@@ -336,6 +360,16 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Database:Schema", ReadFirst(config, "DATABASE_SCHEMA", "Database:Schema"));
         TrySet(mappedConfig, config, "Database:Runtime:Username", ReadFirst(config, "DATABASE_RUNTIME_USERNAME", "Database:Runtime:Username", "DATABASE_USERNAME", "Database:Username"));
         TrySet(mappedConfig, config, "Database:Runtime:Password", ReadFirst(config, "DATABASE_RUNTIME_PASSWORD", "Database:Runtime:Password", "DATABASE_PASSWORD", "Database:Password"));
+        TrySet(mappedConfig, config, "Database:Global:Username", ReadFirst(config, "DATABASE_GLOBAL_USERNAME", "Database:Global:Username"));
+        TrySet(mappedConfig, config, "Database:Global:Password", ReadFirst(config, "DATABASE_GLOBAL_PASSWORD", "Database:Global:Password"));
+        TrySet(mappedConfig, config, "Database:InstanceKeyRead:Username", config["DATABASE_INSTANCE_KEY_READ_USERNAME"] ?? config["Database:InstanceKeyRead:Username"]);
+        TrySet(mappedConfig, config, "Database:InstanceKeyRead:Password", config["DATABASE_INSTANCE_KEY_READ_PASSWORD"] ?? config["Database:InstanceKeyRead:Password"]);
+        TrySet(mappedConfig, config, "Database:InstanceKeyWrite:Username", config["DATABASE_INSTANCE_KEY_WRITE_USERNAME"] ?? config["Database:InstanceKeyWrite:Username"]);
+        TrySet(mappedConfig, config, "Database:InstanceKeyWrite:Password", config["DATABASE_INSTANCE_KEY_WRITE_PASSWORD"] ?? config["Database:InstanceKeyWrite:Password"]);
+        TrySet(mappedConfig, config, "Database:InstanceKeyIssuance:Username", config["DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME"] ?? config["Database:InstanceKeyIssuance:Username"]);
+        TrySet(mappedConfig, config, "Database:InstanceKeyIssuance:Password", config["DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD"] ?? config["Database:InstanceKeyIssuance:Password"]);
+        TrySet(mappedConfig, config, "Database:PlatformKeyReport:Username", config["DATABASE_PLATFORM_KEY_REPORT_USERNAME"] ?? config["Database:PlatformKeyReport:Username"]);
+        TrySet(mappedConfig, config, "Database:PlatformKeyReport:Password", config["DATABASE_PLATFORM_KEY_REPORT_PASSWORD"] ?? config["Database:PlatformKeyReport:Password"]);
         TrySet(mappedConfig, config, "Database:Migrator:Username", ReadFirst(config, "DATABASE_MIGRATOR_USERNAME", "Database:Migrator:Username"));
         TrySet(mappedConfig, config, "Database:Migrator:Password", ReadFirst(config, "DATABASE_MIGRATOR_PASSWORD", "Database:Migrator:Password"));
         TrySet(mappedConfig, config, "Database:TlsMode", ReadFirst(config, "DATABASE_TLS_MODE", "Database:TlsMode"));

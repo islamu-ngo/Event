@@ -141,9 +141,8 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         if ((long)(await history.ExecuteScalarAsync(Token))! == 0)
             throw new InvalidOperationException("agent_browser_fixture_migration_history_missing");
 
-        await using var database = CreateDatabase();
-        await ExploreDatabaseMigrator.MigrateAndSeedAsync(database, new HostingEnvironment { EnvironmentName = "Development" },
-            _configuration, PrimaryDatabaseConfiguration.BindRuntime(_configuration) with { Role = PrimaryDatabaseRole.Migrator }, NullLogger.Instance, Token);
+        await ExploreDatabaseMigrator.MigrateAndSeedAsync(new HostingEnvironment { EnvironmentName = "Development" },
+            _configuration, PrimaryDatabaseConfiguration.BindMigrator(_configuration), NullLogger.Instance, cancellationToken: Token);
     }
 
     internal void InterruptAt(string boundary) => _fault.Boundary = boundary;
@@ -170,8 +169,8 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         await using var database = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
             .UseNpgsql(Container.GetConnectionString()).UseSnakeCaseNamingConvention().Options);
-        await ExploreDatabaseMigrator.MigrateAndSeedAsync(database, new HostingEnvironment { EnvironmentName = "Development" },
-            configuration, PrimaryDatabaseConfiguration.BindRuntime(configuration) with { Role = PrimaryDatabaseRole.Migrator }, NullLogger.Instance, Token);
+        await ExploreDatabaseMigrator.MigrateAndSeedAsync(new HostingEnvironment { EnvironmentName = "Development" },
+            configuration, PrimaryDatabaseConfiguration.BindMigrator(configuration), NullLogger.Instance, cancellationToken: Token);
         await Assert.That(await database.Users.AnyAsync(Token)).IsFalse();
         await Assert.That(await database.Tenants.AnyAsync(Token)).IsFalse();
         await Assert.That(await database.PlatformUserRoles.AnyAsync(Token)).IsFalse();

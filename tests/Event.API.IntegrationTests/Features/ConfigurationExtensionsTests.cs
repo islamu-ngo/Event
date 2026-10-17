@@ -25,6 +25,53 @@ public sealed class ConfigurationExtensionsTests
     }
 
     [Test]
+    public async Task AddSecretAuthorityConfiguration_MapsIndependentGlobalCredentials()
+    {
+        string username = Guid.NewGuid().ToString("N");
+        string password = " " + Guid.NewGuid().ToString("N") + " ";
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["DATABASE_PROVIDER"] = "PostgreSql",
+            ["DATABASE_HOST"] = "database.example.test",
+            ["DATABASE_NAME"] = "global_mapping",
+            ["DATABASE_GLOBAL_USERNAME"] = username,
+            ["DATABASE_GLOBAL_PASSWORD"] = password,
+            ["DATABASE_RUNTIME_USERNAME"] = Guid.NewGuid().ToString("N"),
+            ["DATABASE_RUNTIME_PASSWORD"] = Guid.NewGuid().ToString("N"),
+            ["DATABASE_MIGRATOR_USERNAME"] = Guid.NewGuid().ToString("N"),
+            ["DATABASE_MIGRATOR_PASSWORD"] = Guid.NewGuid().ToString("N"),
+        });
+
+        await Assert.That(configuration["Database:Global:Username"]).IsEqualTo(username);
+        await Assert.That(configuration["Database:Global:Password"]).IsEqualTo(password);
+        var global = PrimaryDatabaseConfiguration.BindGlobal(configuration);
+        await Assert.That(global.Username).IsEqualTo(username);
+        await Assert.That(global.Password).IsEqualTo(password);
+    }
+
+    [Test]
+    public async Task AddSecretAuthorityConfiguration_MissingGlobalCredentialsCannotUseOtherRoles()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["DATABASE_PROVIDER"] = "PostgreSql",
+            ["DATABASE_HOST"] = "database.example.test",
+            ["DATABASE_NAME"] = "global_mapping",
+            ["DATABASE_RUNTIME_USERNAME"] = Guid.NewGuid().ToString("N"),
+            ["DATABASE_RUNTIME_PASSWORD"] = Guid.NewGuid().ToString("N"),
+            ["DATABASE_MIGRATOR_USERNAME"] = Guid.NewGuid().ToString("N"),
+            ["DATABASE_MIGRATOR_PASSWORD"] = Guid.NewGuid().ToString("N"),
+            ["Database:Username"] = Guid.NewGuid().ToString("N"),
+            ["Database:Password"] = Guid.NewGuid().ToString("N"),
+        });
+
+        await Assert.That(configuration["Database:Global:Username"]).IsNull();
+        await Assert.That(configuration["Database:Global:Password"]).IsNull();
+        Action bind = () => PrimaryDatabaseConfiguration.BindGlobal(configuration);
+        await Assert.That(bind).Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task AddSecretAuthorityConfiguration_MapsCerbosUsePolicyScopeFromAuthoritativeKey()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
@@ -36,8 +83,21 @@ public sealed class ConfigurationExtensionsTests
     }
 
     [Test]
+    public async Task AddSecretAuthorityConfiguration_PreservesResourceAudienceAndSeparatePermittedClient()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Keycloak:Audience"] = "event-resource",
+            ["Keycloak:PermittedClients:0"] = "event-browser"
+        });
+        await Assert.That(configuration["Keycloak:Audience"]).IsEqualTo("event-resource");
+        await Assert.That(configuration["Keycloak:PermittedClients:0"]).IsEqualTo("event-browser");
+    }
+
+    [Test]
     public async Task AddSecretAuthorityConfiguration_MapsKeycloakClientIdsForApiProviderManagement()
     {
+        string bffCanary = Guid.CreateVersion7().ToString("N");
         var configured = BuildConfiguration(new Dictionary<string, string?>
         {
             ["KEYCLOAK_CLIENT_ID"] = "configured-blazor"
@@ -45,12 +105,12 @@ public sealed class ConfigurationExtensionsTests
         var composeAlias = BuildConfiguration(new Dictionary<string, string?>
         {
             ["KEYCLOAK_BLAZOR_CLIENT_ID"] = "event-blazor",
-            ["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = "server-only-secret"
+            ["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = bffCanary
         });
 
         await Assert.That(configured["Keycloak:ClientId"]).IsEqualTo("configured-blazor");
         await Assert.That(composeAlias["Keycloak:ClientId"]).IsEqualTo("event-blazor");
-        await Assert.That(composeAlias["Keycloak:ClientSecret"]).IsEqualTo("server-only-secret");
+        await Assert.That(composeAlias["Keycloak:ClientSecret"]).IsNull();
     }
 
     [Test]
@@ -194,7 +254,7 @@ public sealed class ConfigurationExtensionsTests
             "ApplyMapping",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        method!.Invoke(null, [builder, new ConfigurationBuilder().Build()]);
+        method!.Invoke(null, [builder, new ConfigurationBuilder().Build(), builder.Build()]);
         IConfiguration configuration = builder.Build();
         Action bind = () => PrimaryDatabaseConfiguration.BindRuntime(configuration);
 

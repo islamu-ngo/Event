@@ -21,6 +21,8 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
 
     /// <summary>Client ID with directAccessGrantsEnabled for ROPC token acquisition.</summary>
     public const string TestClientId = "islamu-event-blazor";
+    public const string NoAudienceClientId = "token-context-no-audience";
+    public const string ServiceClientId = "token-context-service";
 
     /// <summary>Ephemeral client credential owned by this disposable container.</summary>
     public string ClientSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -31,6 +33,7 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
 
     private IContainer _container = null!;
     private readonly Dictionary<string, string> _userPasswords = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _clientSecrets = new(StringComparer.Ordinal);
 
     /// <summary>
     /// The OIDC authority URL (e.g., <c>http://localhost:{port}/realms/ISLAMU</c>).
@@ -65,6 +68,15 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
         JsonNode client = realm["clients"]!.AsArray()
             .Single(candidate => candidate!["clientId"]!.GetValue<string>() == TestClientId)!;
         client["secret"] = ClientSecret;
+        _clientSecrets.Add(TestClientId, ClientSecret);
+        foreach (string clientId in new[] { NoAudienceClientId, ServiceClientId })
+        {
+            JsonNode additional = realm["clients"]!.AsArray()
+                .Single(candidate => candidate!["clientId"]!.GetValue<string>() == clientId)!;
+            string secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            _clientSecrets.Add(clientId, secret);
+            additional["secret"] = secret;
+        }
         foreach (JsonNode? user in realm["users"]!.AsArray())
         {
             string username = user!["username"]!.GetValue<string>();
@@ -115,6 +127,13 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
         realm: RealmName,
         clientId: TestClientId,
         clientSecret: clientSecret,
+        userPasswords: _userPasswords);
+
+    public KeycloakTokenClient CreateContextTokenClient(string clientId) => new(
+        keycloakBaseUrl: BaseUrl,
+        realm: RealmName,
+        clientId: clientId,
+        clientSecret: _clientSecrets[clientId],
         userPasswords: _userPasswords);
 
     public async ValueTask DisposeAsync()

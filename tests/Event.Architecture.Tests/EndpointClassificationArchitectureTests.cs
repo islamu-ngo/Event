@@ -2,8 +2,11 @@ namespace Event.Architecture.Tests;
 
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Explore.API.Attributes;
 using Explore.API.Filters;
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetArchTest.Rules;
@@ -134,7 +137,7 @@ public class EndpointClassificationArchitectureTests
                 var allowsAnonymous = HasAttribute<AllowAnonymousAttribute>(controller)
                     || HasAttribute<AllowAnonymousAttribute>(action);
 
-                if (!isSetupSecretGated && (!hasAuthorize || allowsAnonymous))
+                if (!isSetupSecretGated && !HasProtectedInstanceQuery(action) && (!hasAuthorize || allowsAnonymous))
                 {
                     violations.Add($"{controller.Name}.{action.Name}");
                 }
@@ -142,7 +145,7 @@ public class EndpointClassificationArchitectureTests
         }
 
         await Assert.That(violations).IsEmpty()
-            .Because("Admin-classified endpoints must not be anonymously reachable unless explicitly protected by SetupSecretRequired.");
+            .Because("Admin endpoints require effective HTTP authorization, setup-secret gating, or a GET invoking its annotated instance-setting native query.");
     }
 
     [Test]
@@ -244,6 +247,52 @@ public class EndpointClassificationArchitectureTests
 
         return false;
     }
+
+    [Test]
+    [Arguments(nameof(QueryGuardProbe.ProtectedRead), true)]
+    [Arguments(nameof(QueryGuardProbe.PublicRead), false)]
+    [Arguments(nameof(QueryGuardProbe.Mutation), false)]
+    public async Task NativeQueryProtectionRequiresTheActualAnnotatedGetCall(string action, bool expected)
+    {
+        await Assert.That(HasProtectedInstanceQuery(typeof(QueryGuardProbe).GetMethod(action)!)).IsEqualTo(expected);
+    }
+
+    private static bool HasProtectedInstanceQuery(MethodInfo action)
+    {
+        if (!HasAttribute<HttpGetAttribute>(action) || IsMutatingHttpAction(action))
+            return false;
+        var body = action.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType
+            .GetMethod("MoveNext", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) ?? action;
+        Type[] requests = ConfiguredAdministratorBootstrapArchitectureTests.ReadCalledMethods(body)
+            .Where(method => method.Name == "QueryAsync"
+                && method.DeclaringType is { IsConstructedGenericType: true } type
+                && type.GetGenericTypeDefinition() == typeof(IQueryHandler<,>))
+            .Select(method => method.DeclaringType!.GetGenericArguments()[0]).Distinct().ToArray();
+        return requests is [var request] && typeof(ISecureRequest).IsAssignableFrom(request)
+            && request.GetCustomAttribute<AuthorizeResourceAttribute>() is
+            { Resource: ResourceKinds.InstanceSetting, Action: AuthorizationActions.InstanceSettings.View };
+    }
+
+    private sealed class QueryGuardProbe(
+        IQueryHandler<ProtectedProbeQuery, string> protectedQuery,
+        IQueryHandler<PublicProbeQuery, string> publicQuery)
+    {
+        [HttpGet]
+        public Task<string> ProtectedRead() => protectedQuery.QueryAsync(new(), default);
+        [HttpGet]
+        public Task<string> PublicRead() => publicQuery.QueryAsync(new(), default);
+        [HttpPost]
+        public Task<string> Mutation() => protectedQuery.QueryAsync(new(), default);
+    }
+
+    [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
+    private sealed record ProtectedProbeQuery : IQuery<string>, ISecureRequest
+    {
+        public string ResourceId => "probe";
+        public IAuthorizationFacts AuthorizationFacts => InstanceScopedAuthorizationFacts.Instance;
+    }
+
+    private sealed record PublicProbeQuery : IQuery<string>;
 
     private static EndpointClassificationAttribute? ResolveEndpointClassification(
         Type controller,

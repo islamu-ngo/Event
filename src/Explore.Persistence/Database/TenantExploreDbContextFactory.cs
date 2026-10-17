@@ -20,7 +20,7 @@ public sealed class TenantExploreDbContextFactory : ITenantExploreDbContextFacto
         var builder = new DbContextOptionsBuilder<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         if (options.Provider == PrimaryDatabaseProvider.PostgreSql)
-            builder.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+            builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
         _pool = new PooledDbContextFactory<ExploreDbContext>(builder.Options, poolSize);
     }
 

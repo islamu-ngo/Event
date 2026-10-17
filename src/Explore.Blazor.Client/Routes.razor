@@ -58,7 +58,12 @@
 
     protected override void OnInitialized()
     {
-        _routes = new List<RouteConfig>
+        _routes = CreateRouteCatalog();
+        RouteConfigurationPathBase.Apply(_routes, NavigationManager.BaseUri);
+    }
+
+    public static List<RouteConfig> CreateRouteCatalog() =>
+        new List<RouteConfig>
         {
             // Public routes - accessible to everyone (no guards)
             // NOTE: literal/specific routes MUST come before parameterized routes at the same depth
@@ -178,6 +183,4 @@
              new RouteConfig { Path = "/settings/group/:GroupId", Component = typeof(GroupAdminSettings), Transition = RouteTransition.Fade, Guards = RequireGroupAdmin() },
     };
 
-        RouteConfigurationPathBase.Apply(_routes, NavigationManager.BaseUri);
-    }
 }

@@ -23,7 +23,9 @@ public static class QueryFilterExtensions
 
     /// <summary>
     /// Ignores the tenant filter, querying across all tenants.
-    /// WARNING: Use only for admin/system operations with an explicit tenant predicate or privileged scope.
+    /// The reason is documentation, not authority. The caller must own the exact persisted
+    /// subject/object/action predicates and any required native transaction. An administrative
+    /// claim or a posted tenant id does not authorize widening a request lease.
     /// Soft delete filter is still enforced.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
@@ -39,7 +41,8 @@ public static class QueryFilterExtensions
 
     /// <summary>
     /// Ignores all query filters (tenant and soft delete).
-    /// WARNING: Use only for maintenance operations requiring full data access.
+    /// The caller must prove why both tenant and deleted-row access are required in its
+    /// purpose-bound native operation. A nonempty reason does not grant access.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <param name="query">The queryable to modify.</param>

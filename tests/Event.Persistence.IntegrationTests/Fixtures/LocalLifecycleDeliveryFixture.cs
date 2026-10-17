@@ -13,9 +13,9 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,9 +33,10 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
     internal CancellationToken CancellationToken => Native.CancellationToken;
     private LocalLifecycleDeliveryFixture(LocalCredentialFirstUseTests.Fixture native) => Native = native;
 
-    internal static async Task<LocalLifecycleDeliveryFixture> CreateAsync(IdentityDatabaseTopology topology, bool verified = true)
+    internal static async Task<LocalLifecycleDeliveryFixture> CreateAsync(IdentityDatabaseTopology topology, bool verified = true,
+        IInterceptor? interceptor = null)
     {
-        var native = await LocalCredentialFirstUseTests.Fixture.CreateAsync(topology);
+        var native = await LocalCredentialFirstUseTests.Fixture.CreateAsync(topology, interceptor);
         try
         {
             await native.IssueReadySessionAsync(verified);
@@ -77,12 +78,9 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             Lifecycle = new(Identity, Application, _scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Native.Clock, states);
             Deliveries = new(Identity, Application, states, fixture.Native.Clock);
             MutationLock = new(Application, new EfCoreUnitOfWork(Application), beforeLock);
-            var writer = EmailDispatchSqliteFixture.CreateEmailSettingsWriter(Application, MutationLock);
-            var settings = new HierarchicalSettingsResolver(new SystemSettingRepository(Application, MutationLock),
-                new TenantSettingRepository(Application, MutationLock), new OrganizationSettingRepository(Application),
-                new GroupSettingRepository(Application), new GroupTenantRepository(Application), new UserPreferenceRepository(Application),
-                this, MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, writer,
-                new EventResourceSettingsWriter(Application, MutationLock, new EfCoreUnitOfWork(Application)));
+            var settings = new HierarchicalSettingsReader(SystemSettingRepository.CreateReadOnly(Application, MutationLock),
+                TenantSettingRepository.CreateReadOnly(Application, MutationLock), new OrganizationSettingRepository(Application),
+                new GroupSettingRepository(Application), UserPreferenceRepository.CreateReadOnly(Application), _cache);
             var secrets = Substitute.For<ISecretResolver>();
             secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(call =>
             {
@@ -96,7 +94,7 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             Processor = new(Lifecycle, Deliveries, MutationLock, settings, capabilities, transport,
                 new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(
                     new Dictionary<string, string?> { ["PublicBaseUrl"] = "https://instance.test" }).Build(),
-                new SystemSettingRepository(Application, MutationLock),
+                SystemSettingRepository.CreateReadOnly(Application, MutationLock),
                 Options.Create(new EmailDispatchProcessorSettings()));
             Router = new(new UserExternalLoginRepository(Application), [new LocalIdentityLifecycleEmailService(Lifecycle, Deliveries)]);
         }

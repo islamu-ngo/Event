@@ -663,6 +663,81 @@ public sealed class ExploreDbContextModelProviderTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
+    public async Task PostgreSqlTextToJsonMigrationUsesExplicitCastWithoutMutatingOperations(bool nullable)
+    {
+        using var providerContext = CreateContext("PostgreSql");
+        var options = new DbContextOptionsBuilder<ExploreDbContext>(
+            (DbContextOptions<ExploreDbContext>)providerContext.GetService<IDbContextOptions>());
+        options.ReplaceService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsSqlGenerator,
+            ConfigurableNpgsqlMigrationsSqlGenerator>();
+        using var context = new ExploreDbContext(options.Options);
+        var generator = context.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsSqlGenerator>();
+        var operation = new Microsoft.EntityFrameworkCore.Migrations.Operations.AlterColumnOperation
+        {
+            Table = "ie_outbox_messages",
+            Name = "payload",
+            ClrType = typeof(string),
+            ColumnType = "jsonb",
+            IsNullable = nullable,
+            OldColumn = new Microsoft.EntityFrameworkCore.Migrations.Operations.AddColumnOperation
+            {
+                ClrType = typeof(string),
+                ColumnType = "text",
+                IsNullable = true
+            }
+        };
+        string first = string.Join("\n", generator.Generate([operation]).Select(command => command.CommandText));
+        string replay = string.Join("\n", generator.Generate([operation]).Select(command => command.CommandText));
+
+        await Assert.That(first).Contains("TYPE jsonb USING payload::jsonb;");
+        await Assert.That(first.Contains("SET NOT NULL", StringComparison.Ordinal)).IsEqualTo(!nullable);
+        await Assert.That(replay).IsEqualTo(first);
+        await Assert.That(operation.OldColumn.ColumnType).IsEqualTo("text");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task SameNameActionIndexReplacementPreservesForeignKeyCoverage(bool rollback)
+    {
+        using var providerContext = CreateContext("MySql");
+        var options = new DbContextOptionsBuilder<ExploreDbContext>(
+            (DbContextOptions<ExploreDbContext>)providerContext.GetService<IDbContextOptions>());
+        options.ReplaceService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsSqlGenerator,
+            ConfigurableMySqlMigrationsSqlGenerator>();
+        using var context = new ExploreDbContext(options.Options);
+        var generator = context.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsSqlGenerator>();
+        var commands = generator.Generate(
+        [
+            new Microsoft.EntityFrameworkCore.Migrations.Operations.DropIndexOperation
+            {
+                Table = "ie_ai_tool_executions",
+                Name = "ix_ai_tool_executions_proposed_action_id"
+            },
+            new Microsoft.EntityFrameworkCore.Migrations.Operations.CreateIndexOperation
+            {
+                Table = "ie_ai_tool_executions",
+                Name = "ix_ai_tool_executions_proposed_action_id",
+                Columns = ["proposed_action_id"],
+                IsUnique = !rollback
+            }
+        ]);
+
+        string sql = string.Join("\n", commands.Select(command => command.CommandText));
+        int bridgeCreate = sql.IndexOf("CREATE INDEX `ix_ai_tool_executions_proposed_action_bridge`", StringComparison.Ordinal);
+        int originalDrop = sql.IndexOf("DROP INDEX `ix_ai_tool_executions_proposed_action_id`", StringComparison.Ordinal);
+        int replacementCreate = sql.IndexOf(
+            rollback ? "CREATE INDEX `ix_ai_tool_executions_proposed_action_id`"
+                : "CREATE UNIQUE INDEX `ix_ai_tool_executions_proposed_action_id`",
+            StringComparison.Ordinal);
+        int bridgeDrop = sql.IndexOf("DROP INDEX `ix_ai_tool_executions_proposed_action_bridge`", StringComparison.Ordinal);
+        await Assert.That(bridgeCreate >= 0 && originalDrop > bridgeCreate
+            && replacementCreate > originalDrop && bridgeDrop > replacementCreate).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     public async Task StorageHashRenameRecomputesTheChangedIdentityBeforeFurtherMigrationOperations(bool rollback)
     {
         using var providerContext = CreateContext("MySql");

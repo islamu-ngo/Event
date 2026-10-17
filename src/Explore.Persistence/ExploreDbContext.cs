@@ -12,6 +12,7 @@ public partial class ExploreDbContext : DbContext
     private bool _tenantLeaseBound;
     private Guid? _tenantLeaseId;
     private ITenantContext? _tenantLeaseIdentity;
+    internal bool IsPostgresRuntimeReady { get; set; }
     internal bool IsConfigurationInstanceImportOwner { get; private set; }
 
     internal void BindConfigurationInstanceImportOwner()
@@ -95,6 +96,9 @@ public partial class ExploreDbContext : DbContext
         _nativePaymentReconciliationOwner = null;
         _nativeHumanTenantOwner = null;
         ResetHumanCommitAdmissions();
+        _outboxExecutionClaim = null;
+        ResetTrustedSetupSettingsAdmissions();
+        IsPostgresRuntimeReady = false;
         IsConfigurationInstanceImportOwner = false;
         _tenantLeaseBound = false;
         _tenantLeaseId = null;

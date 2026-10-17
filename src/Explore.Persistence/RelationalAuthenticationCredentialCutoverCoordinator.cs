@@ -155,10 +155,16 @@ public sealed class RelationalAuthenticationCredentialCutoverCoordinator(
                     || row.SettingKey == SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret))
             .Select(row => new SecretBinding
             {
-                Id = row.Id, SettingKey = row.SettingKey, SettingScopeId = row.SettingScopeId,
-                ScopeId = row.ScopeId, Qualifier = row.Qualifier, SecretSourceTypeId = row.SecretSourceTypeId,
-                InfisicalEnvironment = row.InfisicalEnvironment, InfisicalPath = row.InfisicalPath,
-                InfisicalKey = row.InfisicalKey, EnvironmentVariableName = row.EnvironmentVariableName
+                Id = row.Id,
+                SettingKey = row.SettingKey,
+                SettingScopeId = row.SettingScopeId,
+                ScopeId = row.ScopeId,
+                Qualifier = row.Qualifier,
+                SecretSourceTypeId = row.SecretSourceTypeId,
+                InfisicalEnvironment = row.InfisicalEnvironment,
+                InfisicalPath = row.InfisicalPath,
+                InfisicalKey = row.InfisicalKey,
+                EnvironmentVariableName = row.EnvironmentVariableName
             }).ToListAsync(cancellationToken);
         return new(operation.Id, operation.DeploymentRevision, head.ConcurrencyStamp, operation.ConcurrencyStamp,
             settings.Where(row => row.SettingKey is InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret

@@ -10,10 +10,25 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
     public const string CurrentTenantSettingName = "app.current_tenant_id";
 
     public static readonly PostgresTenantSessionInterceptor Instance = new();
+    internal static readonly PostgresTenantSessionInterceptor RuntimeInstance = new(true);
+    private readonly bool _verifyRuntimeAuthority;
+
+    public PostgresTenantSessionInterceptor() { }
+
+    private PostgresTenantSessionInterceptor(bool verifyRuntimeAuthority) =>
+        _verifyRuntimeAuthority = verifyRuntimeAuthority;
 
     public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
     {
+        if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext context)
+        {
+            context.IsPostgresRuntimeReady = false;
+            using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context);
+            PostgresTenantRuntimeReadiness.RequireReady(readiness.ExecuteScalar());
+        }
         ApplyTenantSessionState(connection, eventData.Context);
+        if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext ready)
+            ready.IsPostgresRuntimeReady = true;
     }
 
     public override async Task ConnectionOpenedAsync(
@@ -21,7 +36,15 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
         ConnectionEndEventData eventData,
         CancellationToken cancellationToken = default)
     {
+        if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext context)
+        {
+            context.IsPostgresRuntimeReady = false;
+            await using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context);
+            PostgresTenantRuntimeReadiness.RequireReady(await readiness.ExecuteScalarAsync(cancellationToken));
+        }
         await ApplyTenantSessionStateAsync(connection, eventData.Context, cancellationToken);
+        if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext ready)
+            ready.IsPostgresRuntimeReady = true;
     }
 
     private static void ApplyTenantSessionState(DbConnection connection, DbContext? dbContext)
@@ -121,6 +144,8 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
     {
         if (context is ExploreDbContext exploreDbContext)
         {
+            if (_verifyRuntimeAuthority && !exploreDbContext.IsPostgresRuntimeReady)
+                throw new InvalidOperationException("postgres_tenant_runtime_authority_not_ready");
             exploreDbContext.ValidateTenantLease();
         }
     }

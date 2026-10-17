@@ -65,7 +65,7 @@ internal sealed class PrimaryDatabaseProviderBehaviorFixture
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, _databaseOptions);
         if (Provider == PrimaryDatabaseProvider.PostgreSql)
-            builder.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+            builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
         var context = new ExploreDbContext(builder.Options) { TenantContext = new TestTenantContext(tenantId) };
         context.BindTenantLease();
         return context;

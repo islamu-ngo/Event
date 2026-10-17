@@ -50,9 +50,12 @@ public sealed class KeycloakRealmOwnershipTests
             .EnumerateArray()
             .Select(client => client.GetProperty("clientId").GetString() ?? string.Empty)
             .ToArray();
-        await Assert.That(clientIds.Length).IsEqualTo(ExpectedClientIds.Length);
-        await Assert.That(clientIds).IsEquivalentTo(ExpectedClientIds)
-            .Because($"{relativePath} must contain exactly the two public Event clients.");
+        string[] expectedClientIds = relativePath == "docker/keycloak/ISLAMU-realm.test.json"
+            ? [.. ExpectedClientIds, "token-context-no-audience", "token-context-service"]
+            : ExpectedClientIds;
+        await Assert.That(clientIds.Length).IsEqualTo(expectedClientIds.Length);
+        await Assert.That(clientIds).IsEquivalentTo(expectedClientIds)
+            .Because($"{relativePath} must contain the exact Event clients and only its designated negative token-context fixtures.");
 
         var violations = CollectReservedIdentifierViolations(root);
         await Assert.That(violations).IsEmpty()

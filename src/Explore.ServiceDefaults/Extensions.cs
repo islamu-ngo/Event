@@ -28,6 +28,7 @@ public static class Extensions
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.TryAddSingleton<HostProcessSignalSubscriptions>();
+        builder.Services.AddEarlyRequestAdmission(builder.Configuration, builder.Environment);
         builder.ConfigureRedaction();
 
         builder.ConfigureOpenTelemetry();
@@ -190,13 +191,17 @@ public static class Extensions
         };
 
         // Only readiness checks must pass for app to be considered ready to accept traffic.
-        app.MapHealthChecks(HealthEndpointPath, healthCheckOptions);
+        app.MapHealthChecks(HealthEndpointPath, healthCheckOptions).RequirePrivateOperationalListener();
 
         // Only health checks tagged with the "live" tag must pass for app to be considered alive
         app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
         {
             Predicate = r => r.Tags.Contains("live"),
-            ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+            ResponseWriter = (context, _) =>
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                return Task.CompletedTask;
+            },
             ResultStatusCodes =
             {
                 [HealthStatus.Healthy] = StatusCodes.Status200OK,
@@ -205,7 +210,7 @@ public static class Extensions
             }
         });
 
-        app.MapPrometheusScrapingEndpoint("/metrics");
+        app.MapPrometheusScrapingEndpoint("/metrics").RequirePrivateOperationalListener();
 
         return app;
     }

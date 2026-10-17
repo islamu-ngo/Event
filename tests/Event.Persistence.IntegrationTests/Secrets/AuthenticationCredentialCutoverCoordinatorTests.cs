@@ -511,7 +511,9 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
         {
             context.Add(new Explore.Domain.SettingValueTypeLookup
             {
-                Id = 0, MasterCode = "string", FullName = "String"
+                Id = 0,
+                MasterCode = "string",
+                FullName = "String"
             });
             await context.SaveChangesAsync();
         }
@@ -542,13 +544,13 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
         await using var context = database.CreateDbContext();
         if (await context.Set<Explore.Domain.SettingScopeLookup>().FindAsync(1) is null)
             context.Add(new Explore.Domain.SettingScopeLookup
-                { Id = 1, MasterCode = "instance", FullName = "Instance" });
+            { Id = 1, MasterCode = "instance", FullName = "Instance" });
         if (await context.Set<Explore.Domain.SecretSourceTypeLookup>().FindAsync(0) is null)
             context.Add(new Explore.Domain.SecretSourceTypeLookup
-                { Id = 0, MasterCode = "infisical", FullName = "Infisical" });
+            { Id = 0, MasterCode = "infisical", FullName = "Infisical" });
         if (await context.Set<Explore.Domain.SecretValidationStatus>().FindAsync(0) is null)
             context.Add(new Explore.Domain.SecretValidationStatus
-                { Id = 0, MasterCode = "unknown", FullName = "Unknown" });
+            { Id = 0, MasterCode = "unknown", FullName = "Unknown" });
         await context.SaveChangesAsync();
         var definition = SecretDefinitionRegistry.GetRequired(settingKey);
         var binding = SecretBinding.CreateInfisical(settingKey, SecretScope.Instance, null,
@@ -689,7 +691,7 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
         Guid qualified = await database.SeedHistoricalBindingAsync(
             SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret, "/keycloak", qualifier: "retained-other-purpose");
         Guid infrastructure = await database.SeedHistoricalBindingAsync(
-            SecretDefinitionRegistry.Keys.Keycloak.DbPassword, "/keycloak");
+            "keycloak.db_password", "/keycloak");
         var inventory = await database.Coordinator.InspectCleanupAsync(ready.InstanceId, ready.Id, Now.AddSeconds(3));
         await Assert.That(inventory.Bindings.Select(row => row.Id)).IsEquivalentTo(new[] { legacy });
         var cleaned = await database.Coordinator.CleanupAsync(ready.InstanceId, ready.Id, ready.DeploymentRevision,
@@ -794,7 +796,7 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
 
     private sealed class TestDatabase(string connectionString, DbContextOptions<ExploreDbContext> options,
         bool sharedConnection)
-        : IDbContextFactory<ExploreDbContext>, IAsyncDisposable
+        : IDbContextFactory<ExploreDbContext>, IGlobalExploreDbContextFactory, IAsyncDisposable
     {
         private readonly SqliteConnection _anchor = new(connectionString);
         private readonly ExploreDbContext _identityContext = new(options);
@@ -805,11 +807,9 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
         public DeploymentProfileReader Profile { get; } = new();
         public DbCommandInterceptor? CommandProbe { get; set; }
         public RelationalAuthenticationCredentialCutoverCoordinator Coordinator => new(this,
-            new AdminContext(HttpContext,
-                new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(_identityContext)),
+            new AdminContext(HttpContext, new AdministrativeAuthorityRepository(this),
                 new OrganizationMemberRepository(_identityContext),
-                new GroupMemberRepository(_identityContext),
-                new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(_identityContext)),
+                new GroupMemberRepository(_identityContext), new ExternalLoginAuthenticationRepository(this),
                 NullLogger<AdminContext>.Instance), HttpContext, Profile);
 
         public AuthenticationCredentialCutover CreateOperation(Guid? instanceId = null,
@@ -843,7 +843,7 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
             if (await context.Set<Explore.Domain.SettingValueTypeLookup>().FindAsync(0) is null)
             {
                 context.Add(new Explore.Domain.SettingValueTypeLookup
-                    { Id = 0, MasterCode = "string", FullName = "String" });
+                { Id = 0, MasterCode = "string", FullName = "String" });
                 await context.SaveChangesAsync();
             }
             Guid id = Guid.CreateVersion7();
@@ -866,15 +866,16 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
                 if (await context.Set<Explore.Domain.SettingScopeLookup>().FindAsync(scope) is null)
                     context.Add(new Explore.Domain.SettingScopeLookup
                     {
-                        Id = scope, MasterCode = scope == 1 ? "instance" : "tenant",
+                        Id = scope,
+                        MasterCode = scope == 1 ? "instance" : "tenant",
                         FullName = scope == 1 ? "Instance" : "Tenant"
                     });
             if (await context.Set<Explore.Domain.SecretSourceTypeLookup>().FindAsync(0) is null)
                 context.Add(new Explore.Domain.SecretSourceTypeLookup
-                    { Id = 0, MasterCode = "infisical", FullName = "Infisical" });
+                { Id = 0, MasterCode = "infisical", FullName = "Infisical" });
             if (await context.Set<Explore.Domain.SecretValidationStatus>().FindAsync(0) is null)
                 context.Add(new Explore.Domain.SecretValidationStatus
-                    { Id = 0, MasterCode = "unknown", FullName = "Unknown" });
+                { Id = 0, MasterCode = "unknown", FullName = "Unknown" });
             await context.SaveChangesAsync();
             Guid id = Guid.CreateVersion7();
             var definition = SecretDefinitionRegistry.GetRequired(settingKey);
@@ -932,7 +933,9 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
                     {
                         scope = new RoleScope
                         {
-                            Id = (int)RoleScopeEnum.Tenant, MasterCode = "tenant", FullName = "Tenant"
+                            Id = (int)RoleScopeEnum.Tenant,
+                            MasterCode = "tenant",
+                            FullName = "Tenant"
                         };
                         context.RoleScopes.Add(scope);
                     }
@@ -976,6 +979,12 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
         public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(CreateDbContext());
 
+        Task<ExploreDbContext> IGlobalExploreDbContextFactory.CreateDbContextAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new ExploreDbContext(options));
+        }
+
         public static async Task<TestDatabase> CreateAsync(bool authenticated = true, bool sharedConnection = false)
         {
             string connectionString = $"Data Source=file:cutover_coordinator_{Guid.CreateVersion7():N}?mode=memory&cache=shared";
@@ -993,7 +1002,9 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
                 {
                     scope = new RoleScope
                     {
-                        Id = (int)RoleScopeEnum.Platform, MasterCode = "platform", FullName = "Platform"
+                        Id = (int)RoleScopeEnum.Platform,
+                        MasterCode = "platform",
+                        FullName = "Platform"
                     };
                     context.RoleScopes.Add(scope);
                 }
@@ -1002,24 +1013,33 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
                 {
                     role = new Role
                     {
-                        Id = (int)RoleEnum.Admin, MasterCode = "platform.admin",
-                        FullName = "Platform administrator", RoleScope = scope, RoleScopeId = scope.Id
+                        Id = (int)RoleEnum.Admin,
+                        MasterCode = "platform.admin",
+                        FullName = "Platform administrator",
+                        RoleScope = scope,
+                        RoleScopeId = scope.Id
                     };
                     context.Roles.Add(role);
                 }
                 var user = new User
                 {
-                    Id = database.ActorId, CreatedAt = Now.UtcDateTime,
+                    Id = database.ActorId,
+                    CreatedAt = Now.UtcDateTime,
                     Pii = new UserPii
                     {
                         Email = $"cutover-{database.ActorId:N}@example.test",
-                        FirstName = "Cutover", LastName = "Operator"
+                        FirstName = "Cutover",
+                        LastName = "Operator"
                     }
                 };
                 context.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), User = user, UserId = user.Id,
-                    Role = role, RoleId = role.Id, GrantedAt = Now.UtcDateTime
+                    Id = Guid.CreateVersion7(),
+                    User = user,
+                    UserId = user.Id,
+                    Role = role,
+                    RoleId = role.Id,
+                    GrantedAt = Now.UtcDateTime
                 });
                 var bootstrap = InstanceBootstrapState.CreateInteractivePending(
                     database.InstanceId, DeploymentMode.MultiTenant, Now.UtcDateTime);

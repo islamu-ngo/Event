@@ -20,7 +20,12 @@ internal static class TestDbContextServiceCollectionExtensions
             options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
         });
 
-        services.AddSingleton<InMemoryContextOwners>();
+        return services.AddTestContextOwners();
+    }
+
+    public static IServiceCollection AddTestContextOwners(this IServiceCollection services)
+    {
+        services.AddSingleton<TestContextOwners>();
         foreach (Type factory in new[]
         {
             typeof(IGlobalExploreDbContextFactory), typeof(ITenantExploreDbContextFactory),
@@ -32,7 +37,7 @@ internal static class TestDbContextServiceCollectionExtensions
             typeof(IMixedSettingsDbContextFactory)
         })
             services.Replace(ServiceDescriptor.Singleton(factory,
-                sp => sp.GetRequiredService<InMemoryContextOwners>()));
+                sp => sp.GetRequiredService<TestContextOwners>()));
         services.AddPolicyMutationExecutionScopes();
         services.AddCheckoutDispatchPersistence();
         services.AddScoped(sp =>
@@ -85,7 +90,7 @@ internal static class TestDbContextServiceCollectionExtensions
         return services;
     }
 
-    private sealed class InMemoryContextOwners(IDbContextFactory<ExploreDbContext> factory)
+    private sealed class TestContextOwners(IDbContextFactory<ExploreDbContext> factory)
         : IGlobalExploreDbContextFactory, ITenantExploreDbContextFactory, IMixedSettingsDbContextFactory,
             IPdsSettlementDbContextFactory, IPdsSyncQueueAdmissionDbContextFactory,
             IEmailDispatchAdmissionDbContextFactory, IAtprotoMaterializationDbContextFactory,

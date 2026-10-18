@@ -7,7 +7,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Persistence;
+using Explore.Persistence.Database;
 using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 
@@ -158,25 +158,13 @@ public class SetupSecretAuthorizationMatrixTests
         ExternalApiPhase0WebApplicationFactory factory)
     {
         using var scope = factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var dbContext = await scope.ServiceProvider
+            .GetRequiredService<IGlobalExploreDbContextFactory>().CreateDbContextAsync();
         Guid userId = dbContext.InstanceBootstrapStates
             .Single()
             .CompletedByUserId
             ?? throw new InvalidOperationException(
                 "The API fixture must seed one completed bootstrap administrator.");
-        dbContext.Users.Add(new User
-        {
-            Id = userId,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId,
-            Pii = new UserPii
-            {
-                UserId = userId,
-                Email = $"{userId:N}@integration.test",
-                FirstName = "Instance",
-                LastName = "Admin"
-            }
-        });
         dbContext.UserExternalLogins.Add(new UserExternalLogin
         {
             Id = Guid.CreateVersion7(),

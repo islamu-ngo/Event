@@ -6,6 +6,7 @@ using System.Threading.Channels;
 using System.Threading.RateLimiting;
 using Event.Testing.DataProtection;
 using Explore.API.Authentication;
+using Explore.API.Configuration;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
@@ -15,6 +16,9 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Seed;
+using Explore.Secrets.Database;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -40,7 +44,8 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
 
     private readonly byte[] _jwtSigningKey = RandomNumberGenerator.GetBytes(64);
     private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
-    private readonly string _databaseName = $"InMemoryDbForExternalApiPhase0_{Guid.NewGuid():N}";
+    private readonly string _databasePath = Path.Combine(
+        Path.GetTempPath(), $"external-api-phase0-{Guid.CreateVersion7():N}.db");
 
     public DeploymentMode DeploymentMode { get; init; } = DeploymentMode.MultiTenant;
 
@@ -96,10 +101,10 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
         {
             var inMemoryConfig = new Dictionary<string, string?>
             {
-                ["Database:Provider"] = "PostgreSql",
+                ["Database:Provider"] = "Sqlite",
                 ["Database:Host"] = "localhost",
                 ["Database:Port"] = "5432",
-                ["Database:Database"] = "explore_db_test",
+                ["Database:Database"] = _databasePath,
                 ["Database:Runtime:TlsMode"] = "Prefer",
                 ["Database:Runtime:TrustServerCertificate"] = "false",
                 ["Keycloak:Authority"] = TestIssuer,
@@ -164,15 +169,19 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
         {
             services.RemoveExploreDbContextRegistrations();
 
-            services.AddInMemoryExploreDbContext(_databaseName);
+            services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+            services.AddTestContextOwners();
 
             // Override Redis with in-memory distributed cache for tests
             services.RemoveAll<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
             services.AddDistributedMemoryCache();
 
             using var scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ExploreDbContext>>();
+            using var dbContext = factory.CreateDbContext();
             dbContext.Database.EnsureCreated();
+            SqliteDatabaseInitializer.InitializeAsync(dbContext, CancellationToken.None).GetAwaiter().GetResult();
+            LookupTableSeeder.SeedAsync(dbContext).GetAwaiter().GetResult();
             var tenantIds = TenantSlugMappings.Values.Concat(TenantDomainMappings.Values)
                 .Concat(ApiKeyClients.Select(client => client.TenantId))
                 .Concat(PersistedApiKeys.Where(key => key.TenantId.HasValue).Select(key => key.TenantId!.Value));
@@ -182,11 +191,14 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
                 dbContext.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder().WithId(tenantId).Build());
 
             var completedAt = DateTime.UtcNow;
+            var administratorId = Guid.CreateVersion7();
+            dbContext.Users.Add(new Event.Api.IntegrationTests.Builders.UserBuilder()
+                .WithId(administratorId).Build());
             var bootstrap = InstanceBootstrapState.CreateInteractivePending(
                 Guid.CreateVersion7(),
                 DeploymentMode,
                 completedAt);
-            bootstrap.CompleteInteractive(Guid.CreateVersion7(), completedAt);
+            bootstrap.CompleteInteractive(administratorId, completedAt);
             dbContext.InstanceBootstrapStates.Add(bootstrap);
             dbContext.SaveChanges();
 
@@ -196,6 +208,23 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
                 CreateSystemSetting(GovernanceSettingKeys.TenantDelegation.LockMcp, McpRuntimeLockTenantMcp),
                 CreateSystemSetting(GovernanceSettingKeys.TenantDelegation.LockMcpLegacySse, McpRuntimeLockTenantLegacySse));
             dbContext.SaveChanges();
+
+            foreach (var (domain, tenantId) in TenantDomainMappings)
+            {
+                using var tenantContext = scope.ServiceProvider
+                    .GetRequiredService<ITenantExploreDbContextFactory>()
+                    .CreateDbContextAsync(tenantId).GetAwaiter().GetResult();
+                tenantContext.TenantSettingOverrides.Add(new TenantSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    SettingKey = GovernanceSettingKeys.Domains.TenantCustomDomain,
+                    Value = System.Text.Json.JsonSerializer.Serialize(domain),
+                    CreatedAt = DateTime.UtcNow
+                });
+                tenantContext.SaveChanges();
+            }
 
             if (PersistedApiKeys.Count > 0)
             {
@@ -223,6 +252,18 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
 
         builder.ConfigureTestServices(services =>
         {
+            services.Configure<EffectiveHostAuthorityOptions>(options =>
+            {
+                var verifiedAt = DateTimeOffset.UtcNow;
+                options.TenantDomains = TenantDomainMappings.Select(pair => new TenantDomainOwnershipAttestation
+                {
+                    Host = pair.Key,
+                    TenantId = pair.Value,
+                    VerifiedAt = verifiedAt,
+                    ExpiresAt = verifiedAt.AddHours(1),
+                    EvidenceReference = "api-fixture-operator-ownership"
+                }).ToArray();
+            });
             services.RemoveAll<IExternalDataProtectionSource>();
             services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             TestHostServicePruner.RemoveNoisyHostedServices(services);
@@ -403,6 +444,36 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
             // Some providers (like OpenFeature) may already be disposed or in the process of disposing.
             Console.WriteLine($"Ignoring WebApplicationFactory teardown ObjectDisposedException: {ex.Message}");
         }
+        finally
+        {
+            DeleteDatabase();
+        }
+    }
+
+    private void ConfigureDatabase(DbContextOptionsBuilder options)
+    {
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _databasePath
+        });
+        options.UseSnakeCaseNamingConvention();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+            DeleteDatabase();
+    }
+
+    private void DeleteDatabase()
+    {
+        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        ConfigureDatabase(options);
+        using var database = new ExploreDbContext(options.Options);
+        database.Database.EnsureDeleted();
     }
 
     private static SystemSetting CreateSystemSetting(string key, bool value, bool isLocked = false)

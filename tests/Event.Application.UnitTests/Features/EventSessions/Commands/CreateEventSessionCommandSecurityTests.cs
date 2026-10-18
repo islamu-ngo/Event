@@ -43,7 +43,7 @@ public class CreateEventSessionCommandSecurityTests
         var tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(tenantId);
         var events = Substitute.For<IEventRepository>();
-        events.GetEventWithDetails(eventId, Arg.Any<CancellationToken>())
+        events.GetAuthorizationTargetByIdAsync(eventId, Arg.Any<CancellationToken>())
             .Returns(new Explore.Domain.Event
             {
                 Id = eventId,

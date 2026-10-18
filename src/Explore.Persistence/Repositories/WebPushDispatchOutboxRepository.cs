@@ -35,8 +35,14 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
             return (await PostgresPublicationFanoutExecutionContract.ExecuteAsync(_dbContext, _nativeEnrollment,
                 "enqueue_push", new
                 {
-                    entity.Id, entity.TenantId, entity.UserId, entity.NotificationId, entity.SubscriptionId,
-                    entity.CategoryId, entity.Status, entity.PayloadJson
+                    entity.Id,
+                    entity.TenantId,
+                    entity.UserId,
+                    entity.NotificationId,
+                    entity.SubscriptionId,
+                    entity.CategoryId,
+                    entity.Status,
+                    entity.PayloadJson
                 }, cancellationToken)).GetBoolean();
         var exists = await _dbContext.WebPushDispatchOutbox
             .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushTenantOperation)

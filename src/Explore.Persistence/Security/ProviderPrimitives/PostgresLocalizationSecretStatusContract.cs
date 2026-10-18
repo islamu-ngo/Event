@@ -61,7 +61,7 @@ public static class PostgresLocalizationSecretStatusContract
             await using var command = Command(context);
             command.CommandText = $"SELECT {FunctionSql(context)}(@tenant)";
             command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid)
-                { Value = (object?)lease.SelectedTenantId ?? DBNull.Value });
+            { Value = (object?)lease.SelectedTenantId ?? DBNull.Value });
             bool result = (bool)(await command.ExecuteScalarAsync(token)
                 ?? throw new UnauthorizedAccessException("Localization status is absent."));
             RequireOriginal();

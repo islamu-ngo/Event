@@ -82,27 +82,47 @@ public static partial class PostgresEventCreationPublisherReadContract
             if (reader.GetBoolean(0))
                 organizations.Add(new OrganizationMember
                 {
-                    Id = member, TenantId = tenantId, Tenant = null!, UserId = principalId, User = null!,
-                    RoleId = role, Role = null!, OrganizationTenantId = placement,
+                    Id = member,
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    UserId = principalId,
+                    User = null!,
+                    RoleId = role,
+                    Role = null!,
+                    OrganizationTenantId = placement,
                     OrganizationTenant = new OrganizationTenant
                     {
-                        Id = placement, TenantId = tenantId, Tenant = null!, ApprovalStatus = null!,
+                        Id = placement,
+                        TenantId = tenantId,
+                        Tenant = null!,
+                        ApprovalStatus = null!,
                         OrganizationId = publisher,
                         Organization = new Organization
                         {
-                            Id = publisher, Pii = new OrganizationPii { OrganizationId = publisher, FullName = name }
+                            Id = publisher,
+                            Pii = new OrganizationPii { OrganizationId = publisher, FullName = name }
                         }
                     }
                 });
             else
                 groups.Add(new GroupMember
                 {
-                    Id = member, TenantId = tenantId, Tenant = null!, UserId = principalId, User = null!,
-                    RoleId = role, Role = null!, GroupTenantId = placement,
+                    Id = member,
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    UserId = principalId,
+                    User = null!,
+                    RoleId = role,
+                    Role = null!,
+                    GroupTenantId = placement,
                     GroupTenant = new GroupTenant
                     {
-                        Id = placement, TenantId = tenantId, Tenant = null!, ApprovalStatus = null!,
-                        GroupId = publisher, Group = new Group { Id = publisher, FullName = name }
+                        Id = placement,
+                        TenantId = tenantId,
+                        Tenant = null!,
+                        ApprovalStatus = null!,
+                        GroupId = publisher,
+                        Group = new Group { Id = publisher, FullName = name }
                     }
                 });
             if (!reader.IsDBNull(6))
@@ -110,11 +130,18 @@ public static partial class PostgresEventCreationPublisherReadContract
                 int permission = reader.GetInt32(6);
                 permissions.TryAdd((role, permission), new RolePermission
                 {
-                    RoleId = role, Role = null!, PermissionId = permission,
+                    RoleId = role,
+                    Role = null!,
+                    PermissionId = permission,
                     Permission = new Permission
                     {
-                        Id = permission, MasterCode = PermissionCodes.EventCreate, IsActive = true,
-                        ResourceKind = null!, Action = null!, FullName = null!, GroupName = null!
+                        Id = permission,
+                        MasterCode = PermissionCodes.EventCreate,
+                        IsActive = true,
+                        ResourceKind = null!,
+                        Action = null!,
+                        FullName = null!,
+                        GroupName = null!
                     }
                 });
             }

@@ -110,14 +110,20 @@ public sealed class LocalizationSecretStatusReaderTests(PostgreSqlContainerFixtu
 
     private static Tenant Tenant(Guid id) => new()
     {
-        Id = id, FullName = "Localization status", Slug = $"status-{id:N}",
-        TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+        Id = id,
+        FullName = "Localization status",
+        Slug = $"status-{id:N}",
+        TenantStatusId = (int)TenantStatusEnum.Active,
+        TenantStatus = null!
     };
 
     private static SecretBinding Binding(SecretScope scope, Guid? tenant, string qualifier = "") => new()
     {
-        Id = Guid.CreateVersion7(), SettingKey = SecretDefinitionRegistry.Keys.Localization.TmsApiKey,
-        Scope = scope, ScopeId = tenant, Qualifier = qualifier,
+        Id = Guid.CreateVersion7(),
+        SettingKey = SecretDefinitionRegistry.Keys.Localization.TmsApiKey,
+        Scope = scope,
+        ScopeId = tenant,
+        Qualifier = qualifier,
         SourceType = SecretSourceType.EnvironmentVariable,
         EnvironmentVariableName = "LOCALIZATION_TMS_API_KEY",
         LastValidationResult = SecretValidationResult.NotValidated

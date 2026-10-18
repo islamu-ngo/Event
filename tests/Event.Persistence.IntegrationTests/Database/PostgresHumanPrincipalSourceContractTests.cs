@@ -509,7 +509,9 @@ public sealed class PostgresHumanPrincipalSourceContractTests(PostgreSqlContaine
             var endpoint = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
             var options = fixture.GetNativeQueueOptions(role) with
             {
-                Host = endpoint.Host, Port = endpoint.Port, Database = endpoint.Database
+                Host = endpoint.Host,
+                Port = endpoint.Port,
+                Database = endpoint.Database
             };
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);

@@ -171,18 +171,26 @@ public sealed class UserMembershipReadPortTests(PostgreSqlContainerFixture fixtu
 
     private static User User(Guid id) => new()
     {
-        Id = id, Pii = new UserPii { Email = $"{id:N}@example.test", FirstName = "Member", LastName = "Owner" }
+        Id = id,
+        Pii = new UserPii { Email = $"{id:N}@example.test", FirstName = "Member", LastName = "Owner" }
     };
 
     private static Tenant Tenant(Guid id, TenantStatusEnum status) => new()
     {
-        Id = id, FullName = "Membership tenant", Slug = $"membership-{id:N}",
-        TenantStatusId = (int)status, TenantStatus = null!
+        Id = id,
+        FullName = "Membership tenant",
+        Slug = $"membership-{id:N}",
+        TenantStatusId = (int)status,
+        TenantStatus = null!
     };
 
     private static TenantUser Member(Guid tenant, Guid user) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, UserId = user, User = null!,
+        Id = Guid.CreateVersion7(),
+        TenantId = tenant,
+        Tenant = null!,
+        UserId = user,
+        User = null!,
         StatusId = (int)TenantUserStatusEnum.Active,
         JoinedAt = new DateTime(2028, 4, 5, 12, 0, 0, DateTimeKind.Utc)
     };

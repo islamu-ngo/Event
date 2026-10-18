@@ -174,13 +174,13 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
         {
             await setup.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
             {
-            await using var transaction = await setup.Database.BeginTransactionAsync();
-            await setup.Database.ExecuteSqlRawAsync(fault);
-            var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await setup.Database.ExecuteSqlRawAsync(
-                    PostgresInventoryHoldExpiryDiscoveryContract.BuildSql(setup, fixture.NativeQueueEnrollment)));
-            await Assert.That(denied?.SqlState).IsEqualTo(PostgresErrorCodes.ObjectNotInPrerequisiteState);
-            await transaction.RollbackAsync();
+                await using var transaction = await setup.Database.BeginTransactionAsync();
+                await setup.Database.ExecuteSqlRawAsync(fault);
+                var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
+                    await setup.Database.ExecuteSqlRawAsync(
+                        PostgresInventoryHoldExpiryDiscoveryContract.BuildSql(setup, fixture.NativeQueueEnrollment)));
+                await Assert.That(denied?.SqlState).IsEqualTo(PostgresErrorCodes.ObjectNotInPrerequisiteState);
+                await transaction.RollbackAsync();
             });
         }
         await InstallAsync(setup);
@@ -224,11 +224,11 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
         await context.Database.OpenConnectionAsync();
         await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-        await using var transaction = await context.Database.BeginTransactionAsync();
-        await context.Database.ExecuteSqlRawAsync("SET LOCAL session_replication_role = replica");
-        context.AddRange(rows);
-        await context.SaveChangesAsync();
-        await transaction.CommitAsync();
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            await context.Database.ExecuteSqlRawAsync("SET LOCAL session_replication_role = replica");
+            context.AddRange(rows);
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
         });
     }
 

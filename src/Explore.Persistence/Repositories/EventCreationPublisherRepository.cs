@@ -69,11 +69,20 @@ internal sealed class EventCreationPublisherRepository(ExploreDbContext context,
             .OrderBy(member => member.Id)
             .Select(member => new OrganizationMember
             {
-                Id = member.Id, TenantId = tenant, Tenant = null!, UserId = principal, User = null!,
-                RoleId = member.RoleId, Role = null!, OrganizationTenantId = member.OrganizationTenantId,
+                Id = member.Id,
+                TenantId = tenant,
+                Tenant = null!,
+                UserId = principal,
+                User = null!,
+                RoleId = member.RoleId,
+                Role = null!,
+                OrganizationTenantId = member.OrganizationTenantId,
                 OrganizationTenant = new OrganizationTenant
                 {
-                    Id = member.OrganizationTenantId, TenantId = tenant, Tenant = null!, ApprovalStatus = null!,
+                    Id = member.OrganizationTenantId,
+                    TenantId = tenant,
+                    Tenant = null!,
+                    ApprovalStatus = null!,
                     OrganizationId = member.OrganizationTenant.OrganizationId,
                     Organization = new Organization
                     {
@@ -92,11 +101,20 @@ internal sealed class EventCreationPublisherRepository(ExploreDbContext context,
             .OrderBy(member => member.Id)
             .Select(member => new GroupMember
             {
-                Id = member.Id, TenantId = tenant, Tenant = null!, UserId = principal, User = null!,
-                RoleId = member.RoleId, Role = null!, GroupTenantId = member.GroupTenantId,
+                Id = member.Id,
+                TenantId = tenant,
+                Tenant = null!,
+                UserId = principal,
+                User = null!,
+                RoleId = member.RoleId,
+                Role = null!,
+                GroupTenantId = member.GroupTenantId,
                 GroupTenant = new GroupTenant
                 {
-                    Id = member.GroupTenantId, TenantId = tenant, Tenant = null!, ApprovalStatus = null!,
+                    Id = member.GroupTenantId,
+                    TenantId = tenant,
+                    Tenant = null!,
+                    ApprovalStatus = null!,
                     GroupId = member.GroupTenant.GroupId,
                     Group = new Group { Id = member.GroupTenant.GroupId, FullName = member.GroupTenant.Group.FullName }
                 }
@@ -107,11 +125,18 @@ internal sealed class EventCreationPublisherRepository(ExploreDbContext context,
                 && mapping.Permission.MasterCode == PermissionCodes.EventCreate)
             .Select(mapping => new RolePermission
             {
-                RoleId = mapping.RoleId, Role = null!, PermissionId = mapping.PermissionId,
+                RoleId = mapping.RoleId,
+                Role = null!,
+                PermissionId = mapping.PermissionId,
                 Permission = new Permission
                 {
-                    Id = mapping.PermissionId, MasterCode = mapping.Permission.MasterCode, IsActive = mapping.Permission.IsActive,
-                    ResourceKind = null!, Action = null!, FullName = null!, GroupName = null!
+                    Id = mapping.PermissionId,
+                    MasterCode = mapping.Permission.MasterCode,
+                    IsActive = mapping.Permission.IsActive,
+                    ResourceKind = null!,
+                    Action = null!,
+                    FullName = null!,
+                    GroupName = null!
                 }
             }).ToListAsync(token);
         return (organizations.AsReadOnly(), groups.AsReadOnly(), permissions.AsReadOnly());

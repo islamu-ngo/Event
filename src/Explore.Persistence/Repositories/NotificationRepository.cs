@@ -53,9 +53,19 @@ public class NotificationRepository : GenericRepository<Notification, Guid>, INo
             await PostgresPublicationFanoutExecutionContract.ExecuteAsync(_dbContext, _nativeEnrollment,
                 "create_notification", new
                 {
-                    entity.Id, entity.TenantId, entity.UserId, entity.Title, entity.Body, entity.DeduplicationKey,
-                    entity.NotificationTypeId, entity.NotificationEntityTypeId, entity.EntityId,
-                    entity.NotificationScopeId, entity.SourceActorId, entity.RecipientContextActorId, entity.NotificationReasonId
+                    entity.Id,
+                    entity.TenantId,
+                    entity.UserId,
+                    entity.Title,
+                    entity.Body,
+                    entity.DeduplicationKey,
+                    entity.NotificationTypeId,
+                    entity.NotificationEntityTypeId,
+                    entity.EntityId,
+                    entity.NotificationScopeId,
+                    entity.SourceActorId,
+                    entity.RecipientContextActorId,
+                    entity.NotificationReasonId
                 }, CancellationToken.None);
             return entity;
         }

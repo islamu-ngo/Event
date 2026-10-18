@@ -144,30 +144,30 @@ public sealed class RefundReconciliationHealthNativeTests(PostgreSqlContainerFix
         await using var migration = fixture.CreateDbContext();
         await migration.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-        await using var transaction = await migration.Database.BeginTransactionAsync();
-        string[] roles = allRolesAbsent
-            ? [PostgresRefundReconciliationHealthContract.OwnerRole,
+            await using var transaction = await migration.Database.BeginTransactionAsync();
+            string[] roles = allRolesAbsent
+                ? [PostgresRefundReconciliationHealthContract.OwnerRole,
                 PostgresRefundReconciliationHealthContract.MigratorRole,
                 PostgresRefundReconciliationHealthContract.ExecutorRole]
-            : [PostgresRefundReconciliationHealthContract.OwnerRole];
-        foreach (string role in roles)
-            await migration.Database.ExecuteSqlRawAsync($"ALTER ROLE {role} RENAME TO \"refund_health_drift_{Guid.CreateVersion7():N}\"");
-        await transaction.CreateSavepointAsync("drift");
-        try
-        {
-            var rejected = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await migration.Database.ExecuteSqlRawAsync(
-                    PostgresRefundReconciliationHealthContract.BuildSql(migration, fixture.NativeQueueEnrollment)));
-            await Assert.That(rejected?.SqlState).IsEqualTo("55000");
-            await transaction.RollbackToSavepointAsync("drift");
+                : [PostgresRefundReconciliationHealthContract.OwnerRole];
             foreach (string role in roles)
-                await Assert.That(await migration.Database.SqlQuery<bool>(
-                    $"SELECT to_regrole({role}) IS NULL AS \"Value\"").SingleAsync()).IsTrue();
-        }
-        finally
-        {
-            await transaction.RollbackAsync();
-        }
+                await migration.Database.ExecuteSqlRawAsync($"ALTER ROLE {role} RENAME TO \"refund_health_drift_{Guid.CreateVersion7():N}\"");
+            await transaction.CreateSavepointAsync("drift");
+            try
+            {
+                var rejected = await Assert.ThrowsAsync<PostgresException>(async () =>
+                    await migration.Database.ExecuteSqlRawAsync(
+                        PostgresRefundReconciliationHealthContract.BuildSql(migration, fixture.NativeQueueEnrollment)));
+                await Assert.That(rejected?.SqlState).IsEqualTo("55000");
+                await transaction.RollbackToSavepointAsync("drift");
+                foreach (string role in roles)
+                    await Assert.That(await migration.Database.SqlQuery<bool>(
+                        $"SELECT to_regrole({role}) IS NULL AS \"Value\"").SingleAsync()).IsTrue();
+            }
+            finally
+            {
+                await transaction.RollbackAsync();
+            }
         });
     }
 
@@ -312,13 +312,13 @@ public sealed class RefundReconciliationHealthNativeTests(PostgreSqlContainerFix
         await context.Database.OpenConnectionAsync();
         await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-        await using var transaction = await context.Database.BeginTransactionAsync();
-        await context.Database.ExecuteSqlRawAsync("SET LOCAL session_replication_role = replica");
-        SeedRows(context, tenantA, tenantB);
-        await context.SaveChangesAsync();
-        // Commit is the observation barrier; no observer starts before rows
-        // become visible and no timing delay stands in for that event.
-        await transaction.CommitAsync();
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            await context.Database.ExecuteSqlRawAsync("SET LOCAL session_replication_role = replica");
+            SeedRows(context, tenantA, tenantB);
+            await context.SaveChangesAsync();
+            // Commit is the observation barrier; no observer starts before rows
+            // become visible and no timing delay stands in for that event.
+            await transaction.CommitAsync();
         });
     }
 

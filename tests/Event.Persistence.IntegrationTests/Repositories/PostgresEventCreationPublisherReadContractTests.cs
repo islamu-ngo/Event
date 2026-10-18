@@ -220,30 +220,51 @@ public sealed class PostgresEventCreationPublisherReadContractTests(PostgreSqlCo
         await PostgresEventCreationPublisherReadContract.ApplyAsync(setup, fixture.NativeQueueEnrollment);
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Native publisher test", Slug = Guid.CreateVersion7().ToString("N"),
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Native publisher test",
+            Slug = Guid.CreateVersion7().ToString("N"),
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var user = new User { Id = Guid.CreateVersion7(), Pii = null! };
         var role = new Role
         {
             Id = await setup.Set<Role>().MaxAsync(row => row.Id) + 1,
-            MasterCode = $"publisher-{Guid.CreateVersion7():N}", FullName = "No publishing permission",
+            MasterCode = $"publisher-{Guid.CreateVersion7():N}",
+            FullName = "No publishing permission",
             RoleScopeId = (int)RoleScopeEnum.Group
         };
         var group = new Group { Id = Guid.CreateVersion7(), FullName = "Unavailable native group" };
         var placement = new GroupTenant
         {
-            Id = Guid.CreateVersion7(), Group = group, GroupId = group.Id, Tenant = tenant, TenantId = tenant.Id,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!, IsSuspended = true
+            Id = Guid.CreateVersion7(),
+            Group = group,
+            GroupId = group.Id,
+            Tenant = tenant,
+            TenantId = tenant.Id,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+            ApprovalStatus = null!,
+            IsSuspended = true
         };
         var member = new GroupMember
         {
-            Id = Guid.CreateVersion7(), GroupTenantId = placement.Id, GroupTenant = placement,
-            Tenant = tenant, TenantId = tenant.Id, User = user, UserId = user.Id, Role = role, RoleId = role.Id
+            Id = Guid.CreateVersion7(),
+            GroupTenantId = placement.Id,
+            GroupTenant = placement,
+            Tenant = tenant,
+            TenantId = tenant.Id,
+            User = user,
+            UserId = user.Id,
+            Role = role,
+            RoleId = role.Id
         };
         setup.AddRange(member, new TenantUser
         {
-            Id = Guid.CreateVersion7(), Tenant = tenant, TenantId = tenant.Id, User = user, UserId = user.Id,
+            Id = Guid.CreateVersion7(),
+            Tenant = tenant,
+            TenantId = tenant.Id,
+            User = user,
+            UserId = user.Id,
             StatusId = (int)TenantUserStatusEnum.Active
         });
         await setup.SaveChangesAsync();

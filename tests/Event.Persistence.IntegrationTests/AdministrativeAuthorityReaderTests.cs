@@ -29,7 +29,11 @@ public sealed class AdministrativeAuthorityReaderTests(PostgreSqlContainerFixtur
         await Assert.That(await reader.IsInstanceAdminAsync(user.Id)).IsFalse();
         var grant = new PlatformUserRole
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = role.Id, Role = role
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            RoleId = role.Id,
+            Role = role
         };
         migration.PlatformUserRoles.Add(grant);
         await migration.SaveChangesAsync();

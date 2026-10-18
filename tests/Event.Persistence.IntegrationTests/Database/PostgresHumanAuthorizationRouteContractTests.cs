@@ -427,7 +427,9 @@ public sealed class PostgresHumanAuthorizationRouteContractTests(PostgreSqlConta
             var endpoint = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
             var original = fixture.GetNativeQueueOptions(role) with
             {
-                Host = endpoint.Host, Port = endpoint.Port, Database = endpoint.Database
+                Host = endpoint.Host,
+                Port = endpoint.Port,
+                Database = endpoint.Database
             };
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(builder, original);

@@ -390,7 +390,9 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
                     ["Keys"] = new JsonArray(JsonValue.Create(EmailKey)),
                     ["Rows"] = new JsonArray(new JsonObject
                     {
-                        ["Type"] = type, ["Before"] = before?.DeepClone(), ["After"] = after?.DeepClone()
+                        ["Type"] = type,
+                        ["Before"] = before?.DeepClone(),
+                        ["After"] = after?.DeepClone()
                     }),
                     ["Complete"] = complete
                 }.ToJsonString(), CancellationToken.None);
@@ -437,7 +439,8 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
                     new JsonObject
                     {
                         ["Keys"] = new JsonArray(JsonValue.Create(EmailKey)),
-                        ["Rows"] = new JsonArray(), ["Complete"] = true
+                        ["Rows"] = new JsonArray(),
+                        ["Complete"] = true
                     }.ToJsonString(), CancellationToken.None);
                 settings[settings.IndexOf(settingBefore)] = settingAfter;
                 attack = PostgresMixedSettingsContract.CompleteAsync(caller, fixture.NativeQueueEnrollment, null,
@@ -480,9 +483,15 @@ public sealed partial class MixedSettingsNativeContractTests(PostgreSqlContainer
             new Dictionary<string, string> { [EmailKey] = "false" }, CancellationToken.None);
         var row = JsonSerializer.SerializeToNode(new TenantSetting
         {
-            Id = Guid.CreateVersion7(), TenantId = seeded.Tenant, Tenant = null!,
-            SettingKey = EmailKey, Value = "false", CreatedAt = now, CreatedBy = seeded.Actor,
-            UpdatedAt = now, UpdatedBy = seeded.Actor
+            Id = Guid.CreateVersion7(),
+            TenantId = seeded.Tenant,
+            Tenant = null!,
+            SettingKey = EmailKey,
+            Value = "false",
+            CreatedAt = now,
+            CreatedBy = seeded.Actor,
+            UpdatedAt = now,
+            UpdatedBy = seeded.Actor
         })!.AsObject();
         row.Remove(nameof(TenantSetting.Tenant));
         var rejected = await Assert.ThrowsAsync<PostgresException>(() => PostgresMixedSettingsContract.WriteAsync(

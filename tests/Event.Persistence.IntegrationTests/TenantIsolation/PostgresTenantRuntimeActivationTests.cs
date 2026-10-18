@@ -131,21 +131,21 @@ public sealed class PostgresTenantRuntimeActivationTests(PostgreSqlContainerFixt
                     await Assert.That(reader.GetBoolean(2)).IsFalse();
             }
             var values = new Dictionary<string, string?>
-                {
-                    ["Database:Provider"] = "PostgreSql",
-                    ["Database:Host"] = selected.Host,
-                    ["Database:Port"] = selected.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    ["Database:Database"] = selected.Database,
-                    ["Database:Schema"] = schema,
-                    ["Database:Runtime:Username"] = selected.Username,
-                    ["Database:Runtime:Password"] = selected.Password,
-                    ["Database:Migrator:Username"] = fixture.NativeQueueEnrollment.MigratorLogin,
-                    ["Database:Global:Username"] = globalRole,
-                    ["Database:Global:Password"] = globalPassword,
-                    ["Database:TlsMode"] = "Disabled",
-                    ["PrivacyErasure:Authority:Topology"] = "CoLocated"
-                    // Deliberately no optional Persistence:EnableRlsTenantSession opt-in.
-                };
+            {
+                ["Database:Provider"] = "PostgreSql",
+                ["Database:Host"] = selected.Host,
+                ["Database:Port"] = selected.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Database:Database"] = selected.Database,
+                ["Database:Schema"] = schema,
+                ["Database:Runtime:Username"] = selected.Username,
+                ["Database:Runtime:Password"] = selected.Password,
+                ["Database:Migrator:Username"] = fixture.NativeQueueEnrollment.MigratorLogin,
+                ["Database:Global:Username"] = globalRole,
+                ["Database:Global:Password"] = globalPassword,
+                ["Database:TlsMode"] = "Disabled",
+                ["PrivacyErasure:Authority:Topology"] = "CoLocated"
+                // Deliberately no optional Persistence:EnableRlsTenantSession opt-in.
+            };
             foreach (var purpose in new[]
             {
                 PrimaryDatabaseRole.EmailPolicyInstanceMutation,

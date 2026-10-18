@@ -38,8 +38,14 @@ public class NotificationFanoutRunRepository : GenericRepository<NotificationFan
         if (PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
             return await PostgresPublicationFanoutExecutionContract.ReadAsync<NotificationFanoutRun>(
                 _dbContext, _nativeEnrollment, "read_run",
-                new { TenantId = tenantId, FanoutKind = fanoutKind, NotificationEntityTypeId = notificationEntityTypeId,
-                    EntityId = entityId, SourceActorId = sourceActorId }, cancellationToken);
+                new
+                {
+                    TenantId = tenantId,
+                    FanoutKind = fanoutKind,
+                    NotificationEntityTypeId = notificationEntityTypeId,
+                    EntityId = entityId,
+                    SourceActorId = sourceActorId
+                }, cancellationToken);
 
         var query = _dbContext.NotificationFanoutRuns
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
@@ -88,9 +94,17 @@ public class NotificationFanoutRunRepository : GenericRepository<NotificationFan
 
     private static object PublicationRun(NotificationFanoutRun entity) => new
     {
-        entity.Id, entity.TenantId, entity.FanoutKind, entity.NotificationEntityTypeId,
-        entity.EntityId, entity.SourceActorId, entity.Status, entity.ConcurrencyStamp,
-        entity.CursorSubscriberTenantUserId, entity.ProcessedCount, entity.CreatedNotificationCount
+        entity.Id,
+        entity.TenantId,
+        entity.FanoutKind,
+        entity.NotificationEntityTypeId,
+        entity.EntityId,
+        entity.SourceActorId,
+        entity.Status,
+        entity.ConcurrencyStamp,
+        entity.CursorSubscriberTenantUserId,
+        entity.ProcessedCount,
+        entity.CreatedNotificationCount
     };
 
     public async Task<List<NotificationFanoutRun>> GetPendingBatchAsync(

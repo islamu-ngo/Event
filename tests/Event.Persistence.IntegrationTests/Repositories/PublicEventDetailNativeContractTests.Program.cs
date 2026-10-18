@@ -151,8 +151,13 @@ public sealed partial class PublicEventDetailNativeContractTests
         var calculator = new EventScheduleProjectionCalculator();
         var hiddenDay = new EventDay
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            EventId = eventId, Event = parent, LocalDate = new DateOnly(2028, 6, 15), IsPublished = false
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            EventId = eventId,
+            Event = parent,
+            LocalDate = new DateOnly(2028, 6, 15),
+            IsPublished = false
         };
         writer.Add(hiddenDay);
         var visible = AddSession(EventSessionStatusEnum.Published);
@@ -174,9 +179,16 @@ public sealed partial class PublicEventDetailNativeContractTests
         foreach (var assigned in new[] { group, hiddenGroup })
             writer.Add(new EventSessionGroupSession
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                EventId = eventId, Event = parent, EventSessionId = visible.Id, EventSession = visible,
-                EventSessionGroupId = assigned.Id, EventSessionGroup = assigned, IsPrimary = assigned == group
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                EventId = eventId,
+                Event = parent,
+                EventSessionId = visible.Id,
+                EventSession = visible,
+                EventSessionGroupId = assigned.Id,
+                EventSessionGroup = assigned,
+                IsPrimary = assigned == group
             });
         var agenda = AddAgenda();
         AddAgenda().EventDayId = hiddenDay.Id;
@@ -188,9 +200,15 @@ public sealed partial class PublicEventDetailNativeContractTests
         {
             var entity = new EventSession(status)
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                EventId = eventId, Event = parent, Title = "Public program session",
-                StartTime = now, EndTime = now.AddHours(1), EndTimeType = SessionEndTimeType.Fixed
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                EventId = eventId,
+                Event = parent,
+                Title = "Public program session",
+                StartTime = now,
+                EndTime = now.AddHours(1),
+                EndTimeType = SessionEndTimeType.Fixed
             };
             entity.ReprojectLocalTimes("UTC", calculator);
             writer.Add(entity);
@@ -200,8 +218,13 @@ public sealed partial class PublicEventDetailNativeContractTests
         {
             var entity = new EventSessionGroup
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                EventId = eventId, Event = parent, Name = "Public track", IsPublished = published
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                EventId = eventId,
+                Event = parent,
+                Name = "Public track",
+                IsPublished = published
             };
             writer.Add(entity);
             return entity;
@@ -210,9 +233,14 @@ public sealed partial class PublicEventDetailNativeContractTests
         {
             var entity = new EventAgendaItem
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                EventId = eventId, Event = parent, Title = "Public agenda",
-                StartTime = now, EndTime = now.AddMinutes(5)
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                EventId = eventId,
+                Event = parent,
+                Title = "Public agenda",
+                StartTime = now,
+                EndTime = now.AddMinutes(5)
             };
             entity.ReprojectLocalTimes("UTC", calculator);
             writer.Add(entity);

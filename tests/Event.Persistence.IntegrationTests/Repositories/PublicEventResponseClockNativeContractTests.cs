@@ -85,8 +85,11 @@ public sealed partial class PublicEventResponseClockNativeContractTests(PostgreS
         {
             var location = new Location
             {
-                Id = Guid.CreateVersion7(), TenantId = seeded.Tenant,
-                FullName = "Public venue", City = "Brussels", Country = "BE"
+                Id = Guid.CreateVersion7(),
+                TenantId = seeded.Tenant,
+                FullName = "Public venue",
+                City = "Brussels",
+                Country = "BE"
             };
             location.SetManualAddress("Public venue address", "1000");
             writer.Add(location);
@@ -136,8 +139,14 @@ public sealed partial class PublicEventResponseClockNativeContractTests(PostgreS
             session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
             writer.Add(new EventDay
             {
-                Id = dayId, TenantId = seeded.Tenant, Tenant = null!, EventId = seeded.Event, Event = null!,
-                LocalDate = DateOnly.FromDateTime(Now.UtcDateTime), IsPublished = true, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = dayId,
+                TenantId = seeded.Tenant,
+                Tenant = null!,
+                EventId = seeded.Event,
+                Event = null!,
+                LocalDate = DateOnly.FromDateTime(Now.UtcDateTime),
+                IsPublished = true,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
             session.EventDayId = dayId;
             await writer.SaveChangesAsync();
@@ -212,20 +221,31 @@ public sealed partial class PublicEventResponseClockNativeContractTests(PostgreS
         await PostgresPublicEventResponseClockContract.ApplyAsync(writer, fixture.NativeQueueEnrollment);
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Public clock", Slug = Guid.CreateVersion7().ToString("N"),
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Public clock",
+            Slug = Guid.CreateVersion7().ToString("N"),
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var user = new User { Id = Guid.CreateVersion7(), Pii = null! };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Public organizer" }
         };
         writer.AddRange(tenant, user, actor, new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
+            ActorId = actor.Id,
+            Actor = actor,
             StatusId = (int)TenantUserStatusEnum.Active
         });
         var visible = Add(VisibilityTypeEnum.Public, Now.AddMinutes(-1), Now.AddSeconds(20));
@@ -237,18 +257,31 @@ public sealed partial class PublicEventResponseClockNativeContractTests(PostgreS
         {
             var entity = new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                ActorId = actor.Id, Actor = actor, Title = "Public clock",
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                ActorId = actor.Id,
+                Actor = actor,
+                Title = "Public clock",
                 PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
-                VisibilityTypeId = (int)visibility, VisibilityType = null!, EventStatus = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
+                VisibilityTypeId = (int)visibility,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                Timezone = "UTC", CreatedAt = Now.UtcDateTime
+                Timezone = "UTC",
+                CreatedAt = Now.UtcDateTime
             };
             var session = new EventSession(EventSessionStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                EventId = entity.Id, Event = entity, StartTime = start, EndTime = end,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                EventId = entity.Id,
+                Event = entity,
+                StartTime = start,
+                EndTime = end,
                 EndTimeType = SessionEndTimeType.Fixed
             };
             session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());

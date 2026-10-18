@@ -90,7 +90,7 @@ public sealed class ApiKeyAuthenticationReadPortTests(PostgreSqlContainerFixture
                     await repository.GetByKeyIdForAuthentication("absent-key");
             });
             await Assert.That(rejected.InnerException is PostgresException
-                { SqlState: "55000", MessageText: "native_routine_acl_drift" }).IsTrue();
+            { SqlState: "55000", MessageText: "native_routine_acl_drift" }).IsTrue();
             var reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
                 await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migrator, fixture.NativeQueueEnrollment));
             await Assert.That(reinstall.SqlState).IsEqualTo("55000");
@@ -187,19 +187,27 @@ public sealed class ApiKeyAuthenticationReadPortTests(PostgreSqlContainerFixture
 
     private static Tenant Tenant(Guid id) => new()
     {
-        Id = id, FullName = $"Authentication {id:N}", Slug = $"auth-{id:N}",
-        TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+        Id = id,
+        FullName = $"Authentication {id:N}",
+        Slug = $"auth-{id:N}",
+        TenantStatusId = (int)TenantStatusEnum.Active,
+        TenantStatus = null!
     };
 
     private static ExternalApiKey Key(Guid? tenantId) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = tenantId, Name = "Authentication key",
-        KeyId = ApiKeyHashing.CreateKeyId(), SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+        Id = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        Name = "Authentication key",
+        KeyId = ApiKeyHashing.CreateKeyId(),
+        SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
         Scopes = "events:read",
         OwnerType = tenantId.HasValue ? ExternalApiKeyOwnerType.Tenant : ExternalApiKeyOwnerType.InstanceAdmin,
         OwnerId = tenantId ?? Guid.CreateVersion7(),
-        ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.PendingRotation, ExternalApiKeyStatus = null!,
-        ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+        ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.PendingRotation,
+        ExternalApiKeyStatus = null!,
+        ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+        ExternalApiKeyCreditPeriod = null!
     };
 
     private sealed record FixedTenant(Guid TenantId) : ITenantContext;

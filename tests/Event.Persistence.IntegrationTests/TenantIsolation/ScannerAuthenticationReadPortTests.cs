@@ -25,8 +25,10 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
         Guid userId = Guid.CreateVersion7();
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = userId,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Scanner owner" }
         };
         migrator.Users.Add(new User
@@ -67,16 +69,26 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
         {
             migrator.Tenants.Add(new Tenant
             {
-                Id = tenantId, FullName = "Scanner tenant", Slug = $"scanner-{tenantId:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = tenantId,
+                FullName = "Scanner tenant",
+                Slug = $"scanner-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             var source = new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, Title = "Scanner admission",
-                EventStatus = null!, EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Digital, EventFormat = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                Title = "Scanner admission",
+                EventStatus = null!,
+                EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Digital,
+                EventFormat = null!,
                 ConcurrencyStamp = Guid.CreateVersion7()
             };
             migrator.Events.Add(source);

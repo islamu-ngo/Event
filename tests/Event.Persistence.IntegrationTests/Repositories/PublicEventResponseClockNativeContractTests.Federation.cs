@@ -29,47 +29,75 @@ public sealed partial class PublicEventResponseClockNativeContractTests
             string did = $"did:web:{seeded.Tenant:N}.example.org";
             writer.Add(new AtprotoIdentity(AtprotoDid.Parse(did))
             {
-                Id = Guid.CreateVersion7(), ActorId = local.ActorId, IsActive = true,
-                PdsHost = "https://pds.example.org", LastResolvedAt = Now.UtcDateTime
+                Id = Guid.CreateVersion7(),
+                ActorId = local.ActorId,
+                IsActive = true,
+                PdsHost = "https://pds.example.org",
+                LastResolvedAt = Now.UtcDateTime
             });
             writer.Add(new AtprotoRecord
             {
-                Id = recordId, Did = did, Collection = "community.lexicon.calendar.event",
+                Id = recordId,
+                Did = did,
+                Collection = "community.lexicon.calendar.event",
                 RecordKey = recordId.ToString("N"),
                 Direction = echo ? AtprotoRecordDirection.Outbound : AtprotoRecordDirection.Inbound,
                 Provenance = echo ? AtprotoRecordProvenance.LocalLifecycle : AtprotoRecordProvenance.Jetstream,
-                SourceVersion = 1, UpdatedAt = Now.UtcDateTime, RecordJson = "{}"
+                SourceVersion = 1,
+                UpdatedAt = Now.UtcDateTime,
+                RecordJson = "{}"
             });
             writer.Add(new AtprotoEventProjection
             {
-                AtprotoRecordId = recordId, Name = "Clock projection", CreatedAt = Now,
-                StartsAt = null, EndsAt = Now.AddSeconds(5),
-                SourceUrl = "https://events.example.org/event", SourceVersion = 1, MaterializedAt = Now.UtcDateTime
+                AtprotoRecordId = recordId,
+                Name = "Clock projection",
+                CreatedAt = Now,
+                StartsAt = null,
+                EndsAt = Now.AddSeconds(5),
+                SourceUrl = "https://events.example.org/event",
+                SourceVersion = 1,
+                MaterializedAt = Now.UtcDateTime
             });
             writer.Add(new AtprotoRecordTenantPresentation
             {
-                TenantId = seeded.Tenant, AtprotoRecordId = recordId, IsVisible = true,
-                SourceVersion = 1, EvaluatedAt = Now.UtcDateTime
+                TenantId = seeded.Tenant,
+                AtprotoRecordId = recordId,
+                IsVisible = true,
+                SourceVersion = 1,
+                EvaluatedAt = Now.UtcDateTime
             });
             if (echo)
             {
                 local.AtprotoRecordId = recordId;
                 writer.Add(new AtprotoOutboundRecordOwnership
                 {
-                    TenantId = seeded.Tenant, AtprotoRecordId = recordId, UserId = seeded.User,
-                    SourceEntityType = nameof(Explore.Domain.Event), SourceEntityId = local.Id,
-                    SourceVersion = Guid.CreateVersion7(), CreatedAt = Now.UtcDateTime, UpdatedAt = Now.UtcDateTime
+                    TenantId = seeded.Tenant,
+                    AtprotoRecordId = recordId,
+                    UserId = seeded.User,
+                    SourceEntityType = nameof(Explore.Domain.Event),
+                    SourceEntityId = local.Id,
+                    SourceVersion = Guid.CreateVersion7(),
+                    CreatedAt = Now.UtcDateTime,
+                    UpdatedAt = Now.UtcDateTime
                 });
             }
             else
             {
                 writer.Add(new Explore.Domain.Event(EventStatusEnum.Draft)
                 {
-                    Id = Guid.CreateVersion7(), TenantId = seeded.Tenant, Tenant = null!,
-                    ActorId = local.ActorId, Actor = null!, Title = "Imported clock",
-                    PublicCode = recordId.ToString("N")[^12..], AtprotoRecordId = recordId,
-                    EventStatus = null!, VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                    EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = seeded.Tenant,
+                    Tenant = null!,
+                    ActorId = local.ActorId,
+                    Actor = null!,
+                    Title = "Imported clock",
+                    PublicCode = recordId.ToString("N")[^12..],
+                    AtprotoRecordId = recordId,
+                    EventStatus = null!,
+                    VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                    VisibilityType = null!,
+                    EventFormatId = (int)EventFormatEnum.Local,
+                    EventFormat = null!,
                     EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated
                 });
             }

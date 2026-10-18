@@ -527,6 +527,12 @@ ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the 
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.
 
+The Data Protection operator is outside the solution but retains its own
+dependency lockfile. The fast lane explicitly restores its project in locked
+mode before the license audit, so its exact package versions have local NuGet
+metadata even on a clean runner. This does not exempt operator dependencies
+from the audit or permit missing metadata.
+
 The retained exporter is part of `Explore.slnx`, so its lock and dependency
 closure participate in solution restore/audits. Missing metadata remains a
 blocking error. Removal of unused probes does not weaken package licensing

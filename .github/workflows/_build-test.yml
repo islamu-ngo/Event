@@ -94,6 +94,10 @@ jobs:
         if: ${{ inputs.run-fast-tests }}
         run: dotnet restore --locked-mode
 
+      - name: Restore Data Protection Operator
+        if: ${{ inputs.run-fast-tests }}
+        run: dotnet restore eng/security/Event.DataProtection.Operator/Event.DataProtection.Operator.csproj --locked-mode
+
       - name: Restore .NET Tools
         if: ${{ inputs.run-fast-tests }}
         run: dotnet tool restore

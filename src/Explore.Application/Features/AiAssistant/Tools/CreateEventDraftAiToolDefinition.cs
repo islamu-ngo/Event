@@ -38,7 +38,7 @@ public static class CreateEventDraftAiToolDefinition
                 AiToolApprovalMode.HumanConfirmationRequired,
                 "Available only when AI tool proposals are enabled and the current API/HAL context allows event creation.",
                 AiToolFollowUpPolicy.AskClarifyingQuestionBeforeProposal,
-                "Create a draft proposal only. Put poster-derived date, time, location, gender mode, and primary-session speaker actor references in structured fields instead of prose; keep description as a short summary. The initial event draft may include at most one primary session because event creation creates the first draft session by convention. Use the dedicated event-session draft workflow only after an event exists and the source clearly contains additional sessions. Do not publish, invite attendees, assign roles, or claim the event exists before the user confirms the proposal.",
+                "Create a draft proposal only. Put poster-derived date, time, location, gender mode, and primary-session speaker actor references in structured fields instead of prose; keep description as a short summary. This AI proposal may include at most one primary session. If its schedule is undecided, retain its title and omit both times instead of inventing dates. Use the dedicated event-session draft workflow only after an event exists and the source clearly contains additional sessions. Do not publish, invite attendees, assign roles, or claim the event exists before the user confirms the proposal.",
                 new AiToolResultPresentationMetadata(
                     "event-draft-proposal-card",
                     "Review event draft proposal",
@@ -168,10 +168,9 @@ public static class CreateEventDraftAiToolDefinition
             "session": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["startTime", "endTime"],
               "properties": {
-                "startTime": { "type": "string", "format": "date-time" },
-                "endTime": { "type": "string", "format": "date-time" },
+                "startTime": { "type": ["string", "null"], "format": "date-time" },
+                "endTime": { "type": ["string", "null"], "format": "date-time" },
                 "title": { "type": "string", "maxLength": 500 },
                 "eventSessionKindId": { "type": "integer" },
                 "description": { "type": "string", "maxLength": 5000 },

@@ -77,6 +77,19 @@ for operator-attested custom domains, fresh reservation checks, canonical links,
 and private socket-only diagnostic access. A private network/firewall and an
 independently bound scraper listener remain deployment prerequisites.
 
+Offline preparation is moving to the external
+[Configurator repository](https://github.com/ISLAMU/Configurator), with
+Event-owned data definitions and the deployed-origin route
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf`. This handoff is not live
+administration or an Event runtime launch button. Event retains bootstrap,
+tenant, secret, identity and legal semantic authority and its manifest-schema
+generator after the cutover. Install Configurator separately and supply the local
+Event definition; bundled offline projects are removed and old commands are not
+aliases. Bounded reference
+round-trips do not establish generic renderer equivalence for specialized flows.
+See [the definition handoff contract](SETUP_ASSISTANT_ARCHITECTURE.md#external-definition-handoff)
+and [public preparation guidance](../public/self-hosting/setup-assistant.md#external-configurator-handoff).
+
 Interactive setup establishes the effective BFF request address internally during
 authorized save/completion, without a URL field or confirmation. `PUBLIC_BASE_URL`
 is the explicit canonical host authority for external exposure and sensitive

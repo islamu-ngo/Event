@@ -9,6 +9,40 @@ namespace Event.Application.UnitTests.Features.AiAssistant.Tools;
 public sealed class CreateEventDraftAiToolDefinitionTests
 {
     [Test]
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    [Arguments(true, true)]
+    public async Task Registry_PreservesTitleOnlyDraftAcrossNullableInputAndProviderNormalization(
+        bool explicitNulls, bool normalizeAlias)
+    {
+        var titleField = normalizeAlias ? "eventTitle" : "title";
+        var times = explicitNulls ? ""","startTime":null,"endTime":null""" : string.Empty;
+        var payload =
+            $$"""
+            {
+              "{{titleField}}": "Community gathering",
+              "session": { "title": "Prepared discussion"{{times}} },
+              "participationConfiguration": {
+                "participationHandlingModeId": 1,
+                "advanceRegistrationObligationId": 1
+              }
+            }
+            """;
+        var admitted = AiToolContractRegistry.CreateDefault().ValidatePayload(
+            AiProposedActionKind.CreateEventDraft, payload, allowProviderNormalization: normalizeAlias);
+
+        await Assert.That(admitted.Succeeded).IsTrue();
+        var mapped = new CreateEventDraftAiActionMapper().Map(admitted.NormalizedPayloadJson ?? payload);
+        await Assert.That(mapped.Succeeded).IsTrue();
+        await Assert.That(mapped.Draft!.Sessions.Count).IsEqualTo(1);
+        var session = mapped.Draft.Sessions.Single();
+        await Assert.That(session.Title).IsEqualTo("Prepared discussion");
+        await Assert.That(session.StartTime).IsNull();
+        await Assert.That(session.EndTime).IsNull();
+    }
+
+    [Test]
     public async Task Create_ReturnsRequiredGovernanceMetadata()
     {
         var definition = CreateEventDraftAiToolDefinition.Create();

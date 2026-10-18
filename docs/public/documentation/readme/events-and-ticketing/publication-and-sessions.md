@@ -4,7 +4,52 @@ description: One program with relevant sessions, public regional discovery, and 
 
 # Publication & Sessions
 
-Create an event for a real program, then add sessions for its dates and locations. A session can be a meeting, a stop on a tour, or another scheduled part of that program. Adding a date or city does not require another event listing.
+Create an event for a real program and prepare its sessions before saving, or
+add them later through the saved event's available actions. A session can be a
+meeting, a stop on a tour, or another scheduled part of that program. Adding a
+date or city does not require another event listing.
+
+## Preparing a program during event creation
+
+Add program items in the event's program section. Edit, duplicate, move and
+remove affect only your local preparation; they do not save an event or leave
+the creation page. **Save program item** retains that item locally, and
+**Save and add another** opens an empty item. **Cancel** discards the open
+item's changes without changing the prepared row.
+
+A title is enough to prepare an unscheduled draft item. Leave all date and
+time fields empty when its schedule is undecided. You can save a draft with
+no items, or with a mixture of scheduled and unscheduled items. The page does
+not invent a date. Source and template-associated item details remain attached
+when you edit or duplicate an item.
+
+For a fixed interval, select both start and end dates and times. Use the next
+date for an overnight end; the page never assumes that an earlier clock time
+means tomorrow. An open-ended item has a start but no end. Dates use the event
+timezone, and changing that timezone checks the same entered wall times again
+when you save. Choose another time if a daylight-saving clock change makes a
+new time nonexistent or repeated.
+
+Finish or cancel the open item, then choose **Save draft** or **Publish**.
+Both send the complete prepared program together with the event. Publishing
+requires each prepared item to have a valid schedule; it does not discard
+unscheduled items to publish the rest. Both a saved draft and a successfully
+published event open that event's [Studio Overview](studio-workspace.md).
+Details and appearance, the managed schedule and available next actions stay
+within that workspace.
+
+If the server rejects the request, your fields and prepared items remain so
+you can correct them. Session errors identify the submitted row and field.
+If the response is lost or cancellation occurs after sending, the outcome is
+unknown rather than a confirmed rollback. The page keeps your input and
+disables another create. Use **Check managed events in another tab** and
+reconcile the authoritative result before starting another creation; there is
+no automatic retry.
+
+If saving succeeds but navigation fails, the event is already saved. Use the
+provided saved-event link instead of creating it again. These local preparation
+controls do not give editing rights to a saved event; follow the actions the
+server offers for that event.
 
 ## What attendees see
 
@@ -96,6 +141,30 @@ review or reversal. The fixture does not assign reviewers, restore revoked
 ownership, or change unrelated listings.
 
 ## API consumers
+
+### Preparing draft programs without dates
+
+Event-creation API requests can include title-only sessions in a Draft program.
+Omit both `startTime` and `endTime` when a date has not been decided; their
+metadata and valid venue, room and explicit day associations are retained.
+No public occurrence or inferred day is created. A draft can mix scheduled
+and unscheduled sessions, and managed program reads retain both.
+
+A Fixed scheduled session needs a start and a later end, including an explicit
+next-day end for an overnight interval. An OpenEnded session needs a start and
+no end. Existing prayer-relative schedules keep their own scheduling rules.
+Partial/invalid schedules are rejected with session/field context. Publishing
+requires every submitted session to be scheduled: one valid child does not
+cause another unscheduled child to be discarded.
+
+Use the regenerated client contracts. This change needs no database migration,
+but older code that assumes all drafts have start times is unsafe after these
+drafts are saved. Preserve the program and use compatible code or a forward
+correction rather than deleting drafts to downgrade.
+
+If a creation response is lost, the save outcome is unknown. Keep the prepared
+input and inspect your managed events before creating again; do not
+automatically replay the create request or treat response loss as rollback.
 
 Public event browsing uses forward continuation. Start with the desired filters
 and `pageSize` (1 through 100), then follow the returned HAL `next` link with those

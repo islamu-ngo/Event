@@ -20,6 +20,8 @@ public sealed class EditSessionTests : IDisposable
     public EditSessionTests()
     {
         _ctx = new BlazorTestContext();
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.enableNavigationPrompt", _ => true).SetVoidResult();
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.disableNavigationPrompt", _ => true).SetVoidResult();
         _eventService = Substitute.For<IEventService>();
         _eventSessionService = Substitute.For<Explore.Blazor.Client.Contracts.Services.IEventSessionService>();
         _eventSessionLanguageService = Substitute.For<IEventSessionLanguageService>();
@@ -59,7 +61,7 @@ public sealed class EditSessionTests : IDisposable
         var eventId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
         var navigation = _ctx.Services.GetRequiredService<NavigationManager>();
-        navigation.NavigateTo($"/events/{eventId}/sessions/{sessionId}/edit");
+        navigation.NavigateTo($"/studio/events/{eventId}/sessions/{sessionId}/edit");
 
         _eventService.GetEventByIdAsync(eventId).Returns(CreateDraftEvent(eventId));
         _eventSessionService.GetManagedSessionByIdAsync(eventId, sessionId).Returns(CreateSession(eventId, sessionId, canEdit: true));
@@ -73,6 +75,38 @@ public sealed class EditSessionTests : IDisposable
         await _locationService.DidNotReceive().GetAllLocationsAsync();
         await _locationRoomService.DidNotReceive().GetRoomsByLocationAsync(Arg.Any<Guid>());
         await Assert.That(cut.Markup).DoesNotContain("The program item could not be loaded.");
+    }
+
+    [Test]
+    [Arguments(9, 9, false)]
+    [Arguments(11, 11, false)]
+    [Arguments(9, 10, true)]
+    [Arguments(11, 12, true)]
+    public async Task MovingStartDate_PreservesSameDayOrOvernightEnd(int startDay, int endDay, bool overnight)
+    {
+        var eventId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        _eventService.GetEventByIdAsync(eventId).Returns(CreateDraftEvent(eventId));
+        _eventSessionService.GetManagedSessionByIdAsync(eventId, sessionId).Returns(CreateSession(eventId, sessionId, canEdit: true));
+        var submitted = new TaskCompletionSource<UpdateEventSessionDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _eventSessionService.UpdateSessionAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<UpdateEventSessionDto>()).Returns(call =>
+        {
+            submitted.TrySetResult(call.ArgAt<UpdateEventSessionDto>(2));
+            return new BaseCommandResponseOfGuid { Success = true, Id = sessionId };
+        });
+        var cut = _ctx.Render<EditSession>(p => p.Add(c => c.EventId, eventId).Add(c => c.SessionId, sessionId));
+        var form = cut.FindComponent<EventSessionForm>();
+        await cut.InvokeAsync(() => form.Instance.SessionDateChanged.InvokeAsync(new DateTime(2026, 6, 10)));
+        await cut.InvokeAsync(() => form.Instance.EndDateChanged.InvokeAsync(new DateTime(2026, 6, overnight ? 11 : 10)));
+        await cut.InvokeAsync(() => form.Instance.StartTimeChanged.InvokeAsync(TimeSpan.FromHours(overnight ? 23 : 9)));
+        await cut.InvokeAsync(() => form.Instance.EndTimeChanged.InvokeAsync(TimeSpan.FromHours(overnight ? 1 : 10)));
+        await cut.InvokeAsync(() => form.Instance.SessionDateChanged.InvokeAsync(new DateTime(2026, 6, startDay)));
+        await Assert.That(cut.FindComponent<EventSessionForm>().Instance.EndDate).IsEqualTo(new DateTime(2026, 6, endDay));
+
+        await cut.Find("form").SubmitAsync();
+        var request = await submitted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.That(request.Schedule!.StartTime!.Value).IsEqualTo(new DateTimeOffset(2026, 6, startDay, overnight ? 23 : 9, 0, 0, TimeSpan.FromHours(2)));
+        await Assert.That(request.Schedule.EndTime!.Value).IsEqualTo(new DateTimeOffset(2026, 6, endDay, overnight ? 1 : 10, 0, 0, TimeSpan.FromHours(2)));
     }
 
     [Test]
@@ -158,7 +192,7 @@ public sealed class EditSessionTests : IDisposable
                 && dto.Schedule.EndTime!.Value == new DateTimeOffset(2026, 7, 3, 13, 30, 0, TimeSpan.Zero)
                 && dto.Schedule.StartTime.Value.Value.Offset == TimeSpan.Zero
                 && dto.Schedule.EndTime.Value.Value.Offset == TimeSpan.Zero));
-        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/events/{eventId}/edit?programUpdated=1", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/studio/events/{eventId}/schedule?programUpdated=1", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
@@ -194,7 +228,7 @@ public sealed class EditSessionTests : IDisposable
         await cut.InvokeAsync(() => InvokePrivateAsync(cut.Instance, "SaveSessionAsync"));
 
         await _eventSessionService.Received(1).AssignSessionToGroupAsync(eventId, groupId, sessionId, true, 0);
-        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/events/{eventId}/edit?programUpdated=1", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/studio/events/{eventId}/schedule?programUpdated=1", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
@@ -231,7 +265,7 @@ public sealed class EditSessionTests : IDisposable
 
         await _eventSessionService.Received(1).UnassignSessionFromGroupAsync(eventId, groupId, sessionId);
         await _eventSessionService.DidNotReceive().AssignSessionToGroupAsync(eventId, groupId, sessionId, true, 0);
-        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/events/{eventId}/edit?programUpdated=1", StringComparison.Ordinal)).IsTrue();
+        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri.EndsWith($"/studio/events/{eventId}/schedule?programUpdated=1", StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]

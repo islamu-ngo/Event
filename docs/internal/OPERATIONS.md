@@ -3450,21 +3450,18 @@ The convention-first launch path is Setup Secret → Admin Auth → Site Profile
 
 ### Terminal Setup Target
 
-`Event.SetupAssistant.Terminal` is the only human terminal interface. It uses
-the audited `ISLAMU.Terminal.Gui` `2.4.17-islamu.1` package and the shared
-CommunityToolkit presentation workspace; `Event.SetupAssistant.Cli` remains
-noninteractive and has no `tui` command or console fallback. Launch the target
-from an interactive terminal with no arguments. Redirected input, output, or
-error fails with `interactive-terminal-required` before secret state is created.
-Below 40 columns by 17 rows the target hides every input/action and shows only
-a resize instruction; it never leaves clipped controls active.
+Offline terminal preparation belongs to the separately installed
+[ISLAMU Configurator terminal](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/terminal.md).
+Its package and protected-save host evidence are owned by Configurator, not
+Event's backend bootstrap. Supply the Event definition; the headless CLI is
+`islamu-configurator`, not an interactive command alias.
 
-The target creates a new `.env.setup` by default and never overwrites an
-existing file. Secret entry is masked, clipboard paste is refused, and the
-buffer is cleared on completion, cancellation, signal, disposal, or failure.
-Protected output currently requires Linux, macOS, or FreeBSD owner-only `0600`
-file semantics; other operating systems fail closed with
-`protected-output-unavailable`. There is no alternate renderer.
+Event still owns setup-secret lifecycle, onboarding and semantic acceptance.
+Prepared files are restricted, create-only native artifacts; unsupported output
+hosts fail closed. Do not introduce plaintext stdout, overwrite fallbacks,
+implicit secret custody or a claim that local success certifies Event readiness.
+The bundled source roots are removed; the literal disposition record is
+`docs/internal/configurator-source-cutover-inventory.md`.
 
 ## External API Key Operations
 

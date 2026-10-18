@@ -45,7 +45,7 @@ jobs:
 
           is_build_test_ignored() {
             case "$1" in
-              .env.example|docker-compose.yml|docs/CONFIGURATION.md|eng/setup-assistant/generated/environment-catalogue.json) return 1 ;;
+              .env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*) return 1 ;;
               schemas/configuration-manifest-v1alpha2.schema.json|schemas/tenant-configuration-package-v1alpha2.schema.json) return 1 ;;
               .agents/*|.claude/*|.codex/*|.copilot/*|.gemini/*|.opencode/*|.repomix/*|.sisyphus/*|.taskmaster/*) return 0 ;;
               _bmad/*|_bmad-output/*) return 0 ;;
@@ -185,7 +185,7 @@ jobs:
                   run_blazor="true"
                   run_arch="true"
                   ;;
-                NuGet.Config|.env.example|docker-compose.yml|docs/CONFIGURATION.md|src/Event.Setup.Core/*|src/Event.Setup.Artifacts/*|src/Event.SetupAssistant/*|src/Event.SetupAssistant.Browser/*|src/Event.SetupAssistant.Desktop/*|src/Event.SetupAssistant.Terminal/*|src/Event.SetupAssistant.Cli/*|tests/Event.Setup*.Tests/*|eng/setup-assistant/generated/browser-release-capabilities.json|eng/setup-assistant/generated/setup-live-release-capabilities.json|eng/setup-assistant/generated/frozen-contract-baseline.json|eng/setup-assistant/generated/environment-catalogue.json|eng/setup-assistant/*|eng/release/dependencies/terminal-gui/*)
+                NuGet.Config|.env.example|docker-compose.yml|docs/internal/CONFIGURATION.md|configurator/definitions/*|tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/*)
                   run_arch="true"
                   run_setup="true"
                   ;;
@@ -217,6 +217,10 @@ jobs:
                   ;;
               esac
               case "$file" in
+                src/Explore.Blazor.Client/Services/SetupLive/*|tests/Explore.Blazor.Client.Tests/SetupLive/*)
+                  run_arch="true"
+                  run_setup="true"
+                  ;;
                 src/Event.Wire.Contracts/SetupLive/*|src/Explore.Domain/SetupLive/*|src/Explore.Application/ApplicationServicesRegistration.cs|src/Explore.Application/Contracts/SetupLive/*|src/Explore.Application/Contracts/Persistence/ISetupLiveRepository.cs|src/Explore.Application/Contracts/Infrastructure/ISetupSecretBindingReadinessReader.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingCommitBarrier.cs|src/Explore.Application/Features/SetupLive/*|src/Explore.Application/Telemetry/SetupLiveTelemetry.cs|src/Explore.Persistence/PersistenceServicesRegistration.cs|src/Explore.Persistence/ExploreDbContext.DbSets.cs|src/Explore.Persistence/ExploreDbContext.QueryFilters.cs|src/Explore.Persistence/Configurations/Entities/SetupLiveConfigurations.cs|src/Explore.Persistence/Repositories/SetupLiveRepository.cs|src/Explore.Persistence/RelationalSetupSecretBindingOperationCoordinator.cs|src/Explore.Persistence/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.MySql/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.SqlServer/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.Sqlite/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Secrets/Services/SetupSecretBindingAuthority.cs|src/Explore.Secrets/Extensions/SecretResolutionServiceCollectionExtensions.cs|src/Explore.Infrastructure/InfrastructureServicesRegistration.cs|src/Explore.Infrastructure/Services/SetupSecretProvider.cs|src/Explore.API/Controllers/SetupTargetEnrollmentsController.cs|src/Explore.API/OpenApi/SetupLiveRequestBodyTransformer.cs|src/Explore.Blazor.Client/Clients/EventApiClients.cs|src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs|tests/Event.Wire.Contracts.UnitTests/SetupLive/*|tests/Event.Domain.UnitTests/SetupLive/*|tests/Event.Application.UnitTests/Features/SetupLive/*|tests/Event.Persistence.IntegrationTests/SetupLive/*|tests/Explore.Secrets.UnitTests/SetupLive/*|tests/Event.API.IntegrationTests/Features/SetupLive*|tests/Explore.GeneratedContracts.Tests/SetupLive*)
                   run_arch="true"
                   run_setup="true"

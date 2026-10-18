@@ -1,275 +1,176 @@
 ---
-description: "Prepare local configuration with the offline Setup Assistant and keep restricted artifacts on protected native hosts."
+description: "Prepare Event configuration with separately installed ISLAMU Configurator and Event-owned local definitions."
 ---
 
-# Setup Assistant
+# External Configurator for Event
 
-The Setup Assistant CLI is a non-interactive tool for inspecting the public
-configuration catalogue, validating or rendering dotenv input, checking legal
-drafts, and producing deterministic machine-readable diagnostics. Use the
-Terminal UI for interactive human workflows.
+Install [ISLAMU Configurator](https://github.com/ISLAMU/Configurator) separately.
+Event no longer bundles the offline CLI, terminal, desktop, browser or shared
+preparation engine. The extraction changes tooling, not Event's environment,
+database schema, authentication, bootstrap or backend configuration authority.
 
-The CLI does not store credentials, connect to a live instance, or replace the
-instance administration surface.
+## External Configurator handoff
 
-Run `event-setup` or `event-setup --help` to list the available commands; neither
-starts the interactive Terminal UI.
+Supply `configurator/definitions/islamu-event/definition.json` from the matching
+Event release. Check its family, revision and digest against `release.json`.
+The stable Event family is `a4bcfaa6-9979-43e5-b1f5-00d552618cdf`; native and
+browser definitions have the same identity. Reference answers are fictional
+interoperability vectors, not production credentials or approved legal templates.
 
-## Choose a release target
+Event maintains one handwritten public `configurator.yaml`, reviewed against its
+catalogue, secret policy and host contracts. Maintainers use Configurator's portable
+`configurator-integrate` skill and standalone CLI to check, revise and build
+canonical JSON; clients consume the selected compiled `definition.json`.
+The YAML is not automatically generated or kept fresh. `release.json` records
+the selected release metadata; retained receipts do not prove edited source was
+compiled. Digests enable comparison, not publisher authentication, legal approval
+or release promotion. Revision 6 replaces
+traversal field numbers with semantic paths; synthetic answer keys changed, and
+real answer workspaces are not migrated implicitly. The delivery directory contains
+only this YAML source, `definition.json` and `release.json`. Synthetic inputs,
+answers and expected artifacts live under
+`tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`;
+they are test data, not deployment defaults. Event still accepts JSON/dotenv
+artifacts; YAML is only the authoring format.
 
-| Host | Runtime identifier | Release executable | File export |
-|---|---|---|---|
-| Linux x64 | `linux-x64` | `event-setup` | Protected local filesystem required |
-| Linux ARM64 | `linux-arm64` | `event-setup` | Requires Linux host verification |
-| macOS Apple Silicon | `osx-arm64` | `event-setup` | Disabled pending native protection evidence |
-| Windows x64 | `win-x64` | `event-setup.exe` | Disabled pending native protection evidence |
+Configurator's [packaging guide](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/packaging.md)
+owns install/build instructions and host support. Copy the complete package
+directory, including license and third-party notices. CLI, terminal, desktop
+and static browser are separately packaged surfaces. A packaged RID is not
+proof of protected-save support: native restricted output currently requires
+Linux and a filesystem where owner-only, create-only protection can be proved.
+Windows/macOS output fails closed; desktop packaging supports Linux x64 only.
 
-Each target is self-contained and published as one executable. The host does
-not need a separately installed .NET runtime.
-
-Windows and macOS packages can inspect public catalogue data and validate
-local input, but cannot save files. The Terminal's protected Save is
-unavailable on those hosts. Neither package currently promises protected
-dotenv or identity export. The browser provides a smaller public-only
-workspace. The separate desktop release currently supports Linux x64 only.
-
-## Publish from source
-
-Run the release project from the repository root. Keep build temporary files
-on a filesystem with enough space:
-
-```bash
-export TMPDIR="$HOME/.cache/agent-tmp"
-dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
-  -target:PublishSetupAssistant \
-  -property:SetupAssistantRid=linux-x64 \
-  -property:SetupAssistantOutputRoot="$PWD/artifacts/setup-assistant"
-```
-
-Replace `linux-x64` with one of the runtime identifiers in the table. The
-executable is written under `artifacts/setup-assistant/<runtime-identifier>/`.
-
-On Linux or macOS, install it into a directory on `PATH`:
+The [CLI guide](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/cli.md)
+owns executable grammar and the `islamu-configurator-command/v1` result envelope.
+For native interactive preparation:
 
 ```bash
-chmod 0755 artifacts/setup-assistant/linux-x64/event-setup
-install -m 0755 artifacts/setup-assistant/linux-x64/event-setup "$HOME/.local/bin/event-setup"
-event-setup doctor --machine
+islamu-configurator-terminal --definition configurator/definitions/islamu-event/definition.json
+islamu-configurator-desktop --definition configurator/definitions/islamu-event/definition.json
 ```
 
-## Interactive terminal
+On the origin where you deploy Configurator, open
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf`. This selects installed metadata
+without contacting Event. Optional `appVersion`, `entry`, `locale` and `digest`
+selectors must match the installed definition. No public origin is prescribed.
+The browser transfers only declared public enum/boolean choices. Never upload
+secrets, environment files, manifests, tenant packages or personal identity data.
 
-Publish the Terminal.Gui application separately:
+## Command migration
+
+Old `event-setup` families are not aliases. Replace bundled tooling commands with
+the generic CLI, an explicit local definition and a declared artifact ID.
+
+| Previous workflow | External preparation |
+|---|---|
+| Catalogue inspection | `catalogue list/show/describe` with `--definition` |
+| Dotenv preparation | `env validate/render` with `--artifact environment` |
+| Configuration manifest | `artifact` operations with `--artifact configuration-manifest` |
+| Tenant package | `artifact` operations with `--artifact tenant-package` |
+| Operator identity portability | `operator-identity` artifact; Event still owns integrity and target import acceptance |
+| Legal draft preparation | `legal-drafts` artifact; host review/publication remains separate |
+| Bundled release targets | Separately packaged Configurator surfaces |
 
 ```bash
-dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
-  -target:PublishSetupAssistant \
-  -property:SetupAssistantSurface=terminal \
-  -property:SetupAssistantRid=linux-x64 \
-  -property:SetupAssistantOutputRoot="$PWD/artifacts/setup-assistant"
-artifacts/setup-assistant/terminal/linux-x64/event-setup-terminal
+islamu-configurator doctor --machine
+islamu-configurator catalogue list --definition configurator/definitions/islamu-event/definition.json --machine --dry-run
+islamu-configurator env render --definition configurator/definitions/islamu-event/definition.json --artifact environment --input environment-answers.json --output deployment.env --machine
+islamu-configurator artifact validate --definition configurator/definitions/islamu-event/definition.json --artifact configuration-manifest --input manifest-answers.json --machine
 ```
 
-Run it in a real terminal at least 80 columns by 17 rows. Redirected input
-or output is rejected. Navigation separates environment editing, the
-catalogue, configuration manifests, tenant packages, legal previews and
-operator-identity drafts. Changing a form invalidates its prepared output;
-changing workspace clears private inputs and previews and cancels a pending
-environment write before publication. Identity input is masked; clipboard,
-context-menu and undo/redo history commands are disabled. Native exports use
-the protected, create-only file rules above. Exported drafts do not attest
-identity or apply anything to an instance.
+`--input` is a JSON answer workspace keyed by declared field IDs, not an arbitrary
+existing host artifact. Existing projected artifacts require their answer proof
+via `--answers`; lost/transformed answers cannot be inferred. Choose an artifact's
+declared format, rather than adding an unsupported YAML conversion switch.
+`--dry-run` publishes nothing. All answer-derived bytes are restricted, including
+public-field answers; they never go to stdout. Output is create-only, and an
+existing file is left unchanged.
 
-## Native desktop workspace
+Machine success means `host-validation-required`, not permission to apply to
+Event. `doctor` checks local writer/schema availability, not target readiness.
+Keep artifacts separate from runtime secret authority and use Event's existing
+authorized import workflow for promotion.
 
-Publish the independent Avalonia application for its verified host:
+## Event shapes, identity and legal drafts
+
+The checked definition declares five generation-only artifacts and a bounded
+reference shape. Tenant row edits within its declared list change answers, not
+the definition revision. Changed document vocabulary, bounds, nullability or
+output policy requires a reviewed source edit and a new canonical revision.
+Trusted issuer fields are finite declarations, not wildcard authority.
+See [Event definition ownership](../../internal/CONFIGURATOR_DEFINITION_EXPORT.md).
+
+Maintainers install the standalone CLI and copy the complete
+`skills/configurator-integrate/` directory from its package or
+[repository](https://github.com/ISLAMU/Configurator/blob/HEAD/skills/configurator-integrate/SKILL.md)
+into their agent's supported skill location. The agent reads Event's public
+configuration code/contracts and authors the supported compact source; it does
+not inspect private answers or launch Event. Confirm the installed v1 command
+and authoring contracts, then use native commands:
 
 ```bash
-dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
-  -target:PublishSetupAssistant \
-  -property:SetupAssistantSurface=desktop \
-  -property:SetupAssistantRid=linux-x64 \
-  -property:SetupAssistantOutputRoot="$PWD/artifacts/setup-assistant"
+islamu-configurator --help
+islamu-configurator definition --help
+islamu-configurator definition check --source configurator/definitions/islamu-event/configurator.yaml --machine
 ```
 
-Run `artifacts/setup-assistant/desktop/linux-x64/event-setup-desktop` from a
-private, owner-controlled working directory in an X11 or XWayland graphical
-session. Files are created in that launch directory and are never overwritten.
-The desktop release target refuses other RIDs until their native runtime and
-protected-output behavior have been verified.
+For a new integration, `definition init` allocates identity once and requires an
+exact application version. For an existing release, retain its canonical JSON
+and run `definition revise --source PATH --against PRIOR_CANONICAL_JSON` after
+semantic source edits, then `definition build --source PATH`. Build creates an
+immutable revision under `dist/configurator/revisions/` relative to the source.
+Review actual results/digests and exercise complete and incomplete synthetic
+workspaces through the documented artifact commands before distributing a release.
+Fixtures remain test-owned; no current compilation is implied by these recipes.
 
-The three tabs prepare a standalone SQLite environment template, a local
-configuration manifest, or an operator-identity draft. Environment placeholders
-still require the operator's selected secret authority; preparation is not
-deployment readiness. Identity input is bounded to the shared 64 KiB UTF-8
-contract and is not copied into shared observable state.
+Export an integrity-protected operator identity through Event's authenticated
+manifest API, not an offline hashing helper.
+The checked generation-only definition is not an identity import request.
+`artifact import` requires a separately admitted import-semantic definition
+that explicitly projects the required target revision field. Do not invent a
+request wrapper or substitute the source revision for the target's current one.
+See [identity portability](operator-identity-portability.md).
 
-Prepare or validate before Save. Editing inputs invalidates prepared output;
-every save attempt consumes the preparation, including permission failures.
-Use **Clear private input** to clear an identity draft. Status text exposes
-codes and digests, not private content. The right-to-left layout toggle changes
-layout direction; it does not claim complete Arabic translation or
-assistive-technology certification.
-
-The desktop does not discover, authenticate to, or apply anything to an Event
-instance. Exported identities are local drafts, not verified identity assertions.
-
-## Public browser workspace
-
-Publish the independent static Blazor application:
-
-```bash
-dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
-  -target:PublishSetupAssistantBrowser \
-  -property:SetupAssistantOutputRoot="$PWD/artifacts/setup-assistant"
-```
-
-Serve `artifacts/setup-assistant/browser/wwwroot/` from one static origin.
-Serve WebAssembly files with `application/wasm`, preserve the `_framework/`
-directory, and route application paths such as `/manifest` to `index.html`.
-The initial load requires the static host. There is no service worker and
-no promise of relaunching without network access.
-
-The catalogue contains public Core definitions only. The manifest page
-accepts the bounded `event-setup-public-manifest/v1` template format:
-`schema`, `kind`, `name`, `topology`, `capabilities` and `providers`.
-It is not the native configuration-portability or identity format.
-Unknown fields and kinds, identity fields, malformed input and files above
-64 KiB are rejected without a preview or download. A new selection clears
-the previous result; a failed or superseded read cannot restore it.
-
-Processing stays in browser memory after static boot. There is no application
-API, login, instance address, secret input, persistent storage or telemetry.
-Use a native target for restricted files. Browser validation never applies
-configuration or establishes platform authorization.
-
-## Use the implemented command grammar
-
-Command families are bare first arguments. Do not prefix them with `setup`.
-For example, `event-setup catalogue ...` is valid; `setup catalogue ...` is
-not an executable command.
-
-Human help and command results use Spectre.Console. Request help for a
-family or operation without supplying input files, output paths or revisions:
-`event-setup catalogue --help` or `event-setup manifest validate --help`.
-Machine mode remains a separate JSON contract rather than formatted text.
-
-Commands that produce an artifact require an explicit output destination.
-Use `--output -` to write public catalogue data to standard output. To try the
-three common commands from a terminal:
-
-```bash
-event-setup catalogue list --output -
-event-setup catalogue show --key API_HTTP_PORT --output -
-event-setup manifest create --output instance-manifest.json
-```
-
-The manifest command creates a new file and rejects an existing destination.
-Use `--dry-run` to preview a write without producing the file.
-
-Only public catalogue output may use `--output -`. Environment files,
-configuration manifests, tenant packages and operator identity outputs
-require a protected native file, even when a particular template contains
-no secret. Redirecting restricted output to stdout fails with exit `74`
-without emitting artifact bytes.
-
-On Linux, choose a local directory owned by your account or root, with no
-group/other write access and no symlink components. The writer creates
-owner-only (`0600`) files atomically and never overwrites an existing file.
-Choose a fresh destination for each export; move or retire the previous
-file yourself after review. Cancellation discards private staging without
-leaving temporary files. Anonymous-file and hard-link support and mounted
-procfs are required; unsupported filesystems fail rather than fall back to
-an unprotected write. This protects against other ordinary local accounts,
-not root, elevated administrators, or processes running as your own account.
-
-Use machine mode for scripts and CI:
-
-```bash
-event-setup catalogue list --machine --dry-run
-event-setup env validate --input deployment.env --machine
-event-setup env render --topology standalone --provider sqlite --output deployment.env --machine
-event-setup manifest validate --input instance-manifest.json --machine
-event-setup tenant-package validate --input tenant-package.json --machine
-event-setup legal validate --input legal-draft.json --machine
-event-setup doctor --machine
-```
-
-Machine mode emits one newline-terminated `event-setup-command/v1` JSON object.
-Treat `exitCode` as authoritative and retain only value-safe diagnostics,
-coverage, readiness, and artifact metadata.
-
-### Operator identity portability
-
-Export an operator-identity document as a digest-bound JSON or YAML artifact:
-
-```bash
-event-setup portability export-operator-identity \
-  --input operator-identity.json \
-  --output operator-identity.yaml \
-  --format yaml \
-  --machine
-```
-
-Prepare an import request against the exact current target revision:
-
-```bash
-event-setup portability import-operator-identity \
-  --input operator-identity.yaml \
-  --output operator-identity-import.json \
-  --expected-revision "$EXPECTED_REVISION_SHA256" \
-  --machine
-```
-
-Use `--expected-revision absent` only when the target has no current identity
-document. Export and import outputs are sensitive. A successful command proves
-offline format and digest integrity only; it does not prove server readiness,
-authorization, or apply permission.
+Legal output remains a draft for host review. Local validation does not publish
+documents, establish accountable identity or certify legal validity.
 
 ## Configuration import sessions on a live instance
 
-Live configuration import is an established server-controlled workflow,
-separate from the offline CLI:
+Live configuration import remains a server-controlled workflow, separate from
+offline Configurator:
 
-1. An authorized administrator uploads one bounded configuration artifact.
-   The server protects the artifact and creates a short-lived import session.
-2. The administrator requests a preview. The preview is bound to the exact
-   artifact digest, target revision, selected sections, mappings, apply mode,
-   required approvals, and expiry.
-3. The client displays the preview and follows only the actions present in the
-   server-authored HAL links.
-4. Apply consumes the matching preview once. A stale revision, changed
-   selection, expired or cancelled session, wrong target, invalid session
-   token, or replay fails closed.
+1. An authorized administrator uploads a bounded artifact. The server protects
+   it and creates a short-lived import session.
+2. Preview binds its digest, target revision, selected sections, mappings,
+   apply mode, approvals and expiry.
+3. The client enables only actions advertised by server-authored HAL links.
+4. Apply consumes the matching preview once. Changed revisions/selections,
+   expiry, cancellation, wrong targets, invalid tokens and replay fail closed.
 
-The authenticated Setup Live API exposes this flow at:
+The authenticated SetupLive API remains:
 
 - `POST /api/tenants/{tenantId}/setup/enrollments/{enrollmentId}/configuration-import/sessions`
-  to create a protected session;
-- `POST .../sessions/{sessionId}/preview` to generate the bound preview;
-- `POST .../sessions/{sessionId}/apply` to consume an apply-ready preview.
+- `POST .../sessions/{sessionId}/preview`
+- `POST .../sessions/{sessionId}/apply`
 
-Use the enrollment capability returned by the server. Preview and apply also
-require the session access token. Follow the preview link from the created
-resource and the apply link only when the preview response advertises it; do
-not construct or enable the apply action locally. An enrollment-bound session
-cannot be applied through the ordinary tenant import route, even by a tenant
-administrator who has its session token.
+Use the server-issued enrollment capability throughout; preview/apply also need
+the session access token. An enrolled session cannot be applied through ordinary
+tenant import routes, even by a tenant administrator holding its token.
+Configurator has no live sign-in, target apply or administration operation.
 
-## Security rules
+## Security and recovery
 
-- Never place passwords, tokens, credentials, private keys, API keys, or
-  connection strings in command arguments, file names, environment names,
-  logs, or retained command output.
-- Review generated files before deployment. `--dry-run` reports planned work
-  but does not write the output artifact.
-- Keep configuration artifacts separate from runtime secret authorities.
-- Protect operator-identity artifacts because they contain public legal and
-  contact identity data even though they contain no credentials.
-- Gate live preview and apply actions by server-issued HAL links, not local
-  roles or claims.
-- Back up affected stores and test imports in staging before applying reviewed
-  configuration to a production instance.
+Never put credentials or personal artifact values in arguments, file names,
+environment names, logs or retained command output. Review output before use.
+Protect identity artifacts despite their public legal/contact content. Back up
+affected stores and test imports in staging before applying to production.
+
+For tooling rollback, use a previously recorded Configurator package and its
+matching definition revision; keep licenses/notices with it. Do not bypass
+Event validation or change database state to compensate for a tooling rollback.
+For a stale backend preview/import, read current target state and prepare a new
+request rather than replaying an old one.
 
 ## Related documentation
 

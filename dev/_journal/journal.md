@@ -1,5 +1,9 @@
 ## Key Decisions
 
+- [2026-10-14 Europe/Brussels] **Native Configurator adoption supersedes the exporter model** — The Steward rejected `eng/configurator/` as contrary to the intended maintainer UX and requested its removal. Contributors use the portable `configurator-integrate` Agentic Skill with an AI agent that researches Event's public configuration declarations, schemas, validators and synthetic examples, then authors the integration file. The standalone Configurator CLI checks, revises, builds and exercises that file; Event retains target validation and apply authority. No bespoke exporter, downloader, compiler wrapper or target runtime dependency is required. The earlier generated-source decision below is historical and superseded. See `docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md` and Configurator's `docs/public/integrate-your-tool.md`.
+
+- **Configurator source and fixture ownership:** Event generates one `configurator.yaml` from its contracts and reviewed host shapes; canonical `definition.json` and its public `release.json` remain the delivery boundary. Synthetic inputs, answers, expected artifacts and catalogue/template snapshots live under `tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`. The baseline manifest is the two-tenant vector, so only one- and three-tenant variations need separate files. YAML round-trip validation and semantic revision guards preserve scalar meaning and canonical identity while raw source SHA-256 tracks serialization changes. `--write-local` retains compiled bytes and cannot establish compiler freshness; explicit pinned compilation remains a separate gate.
+
 - [2026-09-06 Europe/Brussels] **3-Ring Progressive Verification and Yak-Shaving Quarantine Standards** — Resolved the engineering bottleneck where test diagnosis and failure triage consumed ~50% of developer and agent effort. Codified the 3-Ring Progressive Verification Model: Ring 1 in-memory sliced tests (< 2s) for active coding loops, Ring 2 single-provider integration tests (< 15s) for phase exit gates, and Ring 3 full multi-provider matrix and architecture tests reserved strictly for workstream exit milestones and CI. Codified the Yak-Shaving Quarantine Rule: agents encountering pre-existing, out-of-scope test failures are strictly forbidden from opportunistically fixing them; failures are quarantined in the task context, execution filters are narrowed via `--treenode-filter`, and planned scope is preserved. Hardened persistence integration tests with dynamic schema-per-run PostgreSQL isolation (`SET search_path = test_<run_id>`) and isolated SQLite memory URIs to eliminate container deadlocks and table collision flakes. Re-balanced algorithmic Unicode normalization/casing invariants into sub-millisecond in-memory domain tests. Key files: `AGENTS.md`, `docs/internal/QUICK_REFERENCE.md`, `docs/internal/adr/ADR-028-progressive-testing-and-quarantine.md`, `.agents/CONTEXT_ENGINEERING.md`, `docs/internal/AGENTIC_CONTEXT_ENGINEERING.md`, `tests/Event.Persistence.IntegrationTests/Fixtures/PostgreSqlContainerFixture.cs`, `tests/Event.Persistence.IntegrationTests/Fixtures/SqliteTestDatabaseFactory.cs`, `tests/Event.Domain.UnitTests/UnicodeNormalizationInvariantTests.cs`.
 
 - [2026-09-06 Europe/Brussels] **Self-Contained Agent Interaction & Zero Plan-Opening UX Standard** — Codified Critical Rule #14 and repository-wide interaction policies prohibiting agents from prompting for approval, reporting milestone status, or asking questions using cryptic bare codes (e.g. "P04/P06 with P03 gates open") that force developers to open active plan files in `dev/active/<task>/`. Established the Decision Brief standard: all agent prompts must provide inline context, descriptive feature names, trade-offs, structured options with recommendations, and immediate next actions. The implementation plan serves strictly as internal working memory; the chat response is the developer console. Key files: `AGENTS.md`, `docs/internal/QUICK_REFERENCE.md`, `.agents/CONTEXT_ENGINEERING.md`, `.agents/skills/implement-tasks/SKILL.md`, `.agents/skills/implementation-plan/resources/quality-gates.md`, `.agents/skills/grill-me/SKILL.md`.
@@ -2986,5 +2990,56 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 
 **Promotion Consideration**:
 - [x] Stays in journal only; the existing shared-writer regression owns this composition boundary.
+
+---
+
+[2026-10-12 Europe/Brussels] — Standalone client builds do not export fresh API schema
+
+**Context**: While reviewing the Studio event workspace implementation plan, its phase gates claimed that a standalone Blazor client build would also produce the current backend OpenAPI input. The review changed documentation only.
+
+**Symptom / Observation**: `Explore.Blazor.Client.csproj` regenerates and captures the client from the selected checked-in schema, but its `BuildApiContractForClient` target invokes API export only when `BuildingSolutionFile` is `true`. A successful standalone client build can therefore consume a schema that predates a DTO change.
+
+**Root Cause**: Solution-build ordering and standalone schema-driven generation are deliberately separate contracts. Input hashing proves which schema the client consumed; it does not prove that schema was generated from the latest backend source.
+
+**Resolution**: The reviewed plan now requires native API `GetOpenApiContractInput`, then the API inventory producer, then `GenerateApiClient`, followed by the affected client gate. These commands are planned, not executed or claimed passing in this documentation review. The actual generated client owner is `Clients/EventApiTagClients.g.cs`; older API documentation still contains a retired filename example.
+
+**Why This Matters for Future Work**: Every API contract change needs producer-to-consumer provenance. Standalone client compilation or a matching capture hash alone cannot establish that the backend and browser agree on new nullability or wire shape.
+
+**References**:
+- `src/Explore.Blazor.Client/Explore.Blazor.Client.csproj:134`
+- `src/Explore.API/Explore.API.csproj:109`
+- `eng/tools/Explore.ApiContractInventory/Program.cs:50`
+- `docs/internal/API.md#openapi-export-and-client-generation`
+- Repository evidence: `072f2b6dbd8e4b87e16b795bc02a9ea23f902046`
+
+**Promotion Consideration**:
+- [x] Candidate for updating the API generation guidance when its owning contract work is implemented; no generation tooling change is implied.
+
+---
+
+[2026-10-13 Europe/Brussels] — Projection bootstrap failures depend on shared fixture context
+
+**Context**: Final Studio workspace assurance executed disjoint persistence classes and compared failures against untouched base `c65788c36`. Projection tests unexpectedly failed before reaching their projection assertions.
+
+**Symptom / Observation**: Full-class runs reported `DbUpdateConcurrencyException: Discovery tenant enrollment changed after the empty snapshot.` All three failing methods passed in isolated baseline slices. Full updater-class baseline runs reproduced the exact failing methods; the coordination baseline instead failed Upsert while the current class failed MarkDrained. Both coordination failures stopped in `SeedTenantAsync`, not the dirty-scope behavior being asserted.
+
+**Root Cause**: Projection tests share a PostgreSQL fixture with `SharedType.PerAssembly`. Tenant creation enters the discovery enrollment fence during `SaveChangesAsync`. When its transaction sees an empty tenant catalog, `RequireEmptyCurrentCatalogAsync` checks another ReadCommitted connection and rejects a snapshot that predates an already committed tenant. The reported guard and seed-helper frames are unchanged on base. Concurrent first-tenant bootstrap in a shared fixture can therefore fail a different seeding method depending on execution context; an isolated method does not exercise that contention.
+
+**Resolution**: Preserve the original class failures, isolated passes and different losing coordination methods. Quarantine the existing fixture problem rather than retry until green, serialize the feature's original receipt, change business expectations or modify the enrollment guard. Verification used `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/EventCustomPropertyProjectionUpdaterTests*/*" --minimum-expected-tests 8 --maximum-parallel-tests 2` and the corresponding six-case session-updater and five-case coordination filters on untouched base. Exact-method filters under the same class selected one case each and passed. These are deliberately mixed receipts, not a passing full suite. Future fixture work should establish first-tenant enrollment deterministically before concurrent unrelated projection assertions while retaining separate tests for the real enrollment conflict.
+
+**Why This Matters for Future Work**: A same-class failure count or generic enrollment exception is not proof that the same test failed on base. Compare case identity and seed/guard frames, retain class-versus-isolated differences, and distinguish fixture initialization failure from coverage of later business assertions.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Projections/CustomPropertyProjectionCoordinationTests.cs:16`
+- `tests/Event.Persistence.IntegrationTests/Projections/CustomPropertyProjectionCoordinationTests.cs:291`
+- `tests/Event.Persistence.IntegrationTests/Projections/EventCustomPropertyProjectionUpdaterTests.cs:393`
+- `tests/Event.Persistence.IntegrationTests/Projections/EventSessionCustomPropertyProjectionUpdaterTests.cs:299`
+- `tests/Event.Persistence.IntegrationTests/Fixtures/ProjectionTestContainerFixture.cs:35`
+- `src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoverySourceProviderOperations.cs:69`
+- `.agents/skills/finding/SKILL.md`
+- Baseline source: `c65788c36`; full-class comparison monitors `mon_559EDJS7B070SM4B` and `mon_BJT4JE70KD30FXY5`; isolated comparison `mon_X9QY8EMF9B0DWN2A`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; preserve the fixture-context evidence without creating a new product invariant or repairing unrelated tests.
 
 ---

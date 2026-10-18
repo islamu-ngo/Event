@@ -466,70 +466,41 @@ Package input changes must commit the matching lock-file changes in the same PR.
 
 Dockerfiles must copy the root restore inputs (`global.json`, `Directory.Build.props`, `Directory.Packages.props`), project files, and relevant `packages.lock.json` files before running `dotnet restore --locked-mode` inside the build stage. This preserves Docker layer caching while keeping NuGet resolution deterministic.
 
-### Setup Assistant Foundation CI Boundary
+### Event Configurator and retained SetupLive CI boundary
 
-The `Build & Test` change detector treats the Setup source trees (including
-`Event.Setup.Artifacts` and the nested `Event.SetupAssistant.SetupLive` project), all focused test
-trees, the exact cross-layer SetupLive owners, `eng/setup-assistant/**`, the
-audited Terminal.Gui package inputs, every
-nested Setup `packages.lock.json`, and all three generated ratchet JSON files as
-Setup-relevant. Those paths route both `Event.Architecture.Tests` and the
-reusable workflow's `Setup Project Gates`; root dependency, solution, CI-script,
-or workflow changes continue to route every lane. The top-level check remains
-always present and reports an intentional no-op for unrelated documentation or
-dedicated-workflow changes.
+Offline runtime packaging and portable engine tests belong to the independent
+Configurator repository. Event retains definition authoring, host acceptance,
+bootstrap and live API authority. The change detector routes
+`configurator/definitions/*`, the Configurator test fixtures, `.env.example`, Compose and
+`docs/internal/CONFIGURATION.md` to architecture and setup checks. Exact
+cross-layer SetupLive routing remains in its second case statement.
 
-`Event.Setup.Core` points inward to `Event.Wire.Contracts` and uses the approved
-YamlDotNet graph. The shared Assistant points inward through Core and uses the
-approved CommunityToolkit graph. The public Browser points directly to Core;
-native targets use the protected Artifacts adapter. The separate SetupLive outer
-adapter points to Core and the generated Blazor client while keeping network and
-ephemeral capability custody outside the shared presentation assembly. The Setup
-lane restores in locked mode, builds the focused test projects in Release,
-then executes every project with a nonzero TUnit test-count safeguard. It also
-executes the isolated 35-test `SetupLiveAuthoritySecurityTests` Tier 1 class and
-retains its TRX report. The main Assistant suite currently executes 52 tests.
-The Terminal suite independently guards authoritative Core output, localization,
-and the secret boundary. SetupLive release capabilities remain disabled.
-The public Browser is enabled independently, with secret entry disabled.
+Maintainers author the integration with the portable `configurator-integrate`
+skill and validate/build it with the standalone Configurator CLI. Event has no
+bespoke exporter, compiler downloader or compiler wrapper. Its tests assert
+Event-owned wire and authority invariants; Configurator owns authoring/compiler
+behavior. Relocated client transport and tests live under
+`Explore.Blazor.Client/Services/SetupLive/` and
+`Explore.Blazor.Client.Tests/SetupLive/`, routed by the Blazor lane and explicit
+retained SetupLive security routing.
 
-The read-only `Publish public Setup Assistant browser` step runs only when
-both `run-fast-tests` and `run-setup-tests` are true. It invokes the static
-release target, checks `index.html` and `_framework/` in the temporary bundle,
-and verifies generator-owned capabilities with `--check`. This is local
-artifact validation, not deployment or external publication.
+`Event SetupLive authority security gate` is a separate retained step with ID
+`test_setup`, not part of the soon-to-be-removed seven-project test loop.
+It runs `SetupLiveAuthoritySecurityTests` with
+`--minimum-expected-tests 35 --maximum-parallel-tests 1`, retains
+`SetupLiveAuthoritySecurityTests.trx`, and appends the existing optional
+Cobertura arguments. Coverage validation observes that step's `started` output.
+There is no legacy tool-test loop or coverage owner.
 
-All Setup lock files are tracked and discovered automatically by the
-recursive NuGet license-policy scan. Official `Terminal.Gui`, `TextMateSharp`,
-Sharprompt, and unapproved replacement GUI/TUI packages remain
-blocked. `ISLAMU.Terminal.Gui` `2.4.17-islamu.1` is the separately approved,
-MIT-preserving package built from the pinned official revision. CI verifies its
-recorded patch, package identity, final closure, SBOM, notices, and absence of
-the grammar/editor graph. The exact
-YamlDotNet and CommunityToolkit graphs are pinned by architecture and lock-file
-ratchets. Every additional target requires its own dependency, behavior,
-publish and supported-host evidence.
-
-The audited Avalonia graph is admitted only in the desktop project and its
-focused tests. Headless test dependencies must remain absent from native
-published dependency manifests. The release-contract suite publishes each
-native target independently and checks project/package separation; desktop
-publication is restricted to the verified Linux x64 host. See
-[the dependency record](legal/dependencies/setup-assistant-ui.md) for the
-version-specific ANGLE file-license classification.
-
-`eng/setup-assistant/GenerateSetupAssistantRatchets.cs` owns the tracked browser
-capability, SetupLive capability, and frozen-contract JSON ratchets. CI runs only its non-mutating
-`--check` mode immediately after locked restore and fails on missing or stale
-bytes; CI must never run `--write`. Source project files, C# source, tests,
-locks, generator source, generated ratchets, and future browser source
-`wwwroot` remain tracked. Only generated `bin/`, `obj/`, build-output
-`wwwroot`, publish output, package staging, `releases/`, and `artifacts/` remain
-ignored.
-
-This lane inherits top-level `permissions: contents: read`, disables checkout
-credential persistence, receives no PR secrets, and has no write, OIDC, signing,
-external publication, deployment, or release authority.
+These read-only checks retain nonpersistent checkout credentials and no signing,
+publication or deployment authority. Bundled CI jobs, fourteen product/test
+solution registrations, two generator registrations, eight exclusive package
+pins, the terminal feed and unused probes are removed after destination readiness.
+Shared DI/YamlDotNet remain because Event has retained callers. The old restricted
+host jobs, browser publication and audited package rebuild are Configurator-owned.
+No backend coverage or schema authority is removed. Root dependency, solution,
+CI-script and workflow changes still route all lanes; unrelated documentation
+changes retain the intentional no-op required check.
 
 ### NuGet Vulnerability Audit Policy
 
@@ -547,40 +518,19 @@ require locked restore; there is no commercial-edition restore bypass. See
 
 ### Dependency License Policy
 
-The audited Terminal.Gui rebuild gate retains its rebuilt package, assembly
-hashes and `dotnet --info` under `artifacts/dependencies/terminal-gui` when byte
-comparison fails. The normal CI evidence upload collects these diagnostics
-before scratch cleanup; upstream source, PDBs and build logs are not retained
-there. A mismatch still fails with the original comparison status. Investigate
-the changed build input before regenerating any approved package or hash.
-
-Build & Test installs the SDK selected by `global.json` into an isolated runner
-temporary directory through setup-dotnet's `DOTNET_INSTALL_DIR`, with a matching
-`DOTNET_ROOT`. This prevents newer preinstalled runtime patches from changing
-compiler/PDB identity during the audited rebuild. The audit logs `dotnet --info`
-and still compares exact package bytes; deployed application runtime selection
-is unchanged.
-
-Setup-dotnet also installs the newest LTS runtime. Before compilation, the job
-retains the Core runtime requested by the installed SDK's `dotnet.runtimeconfig.json`
-and moves extra Core runtime directories into a separate runner-temporary holding
-directory. It validates that the root is the job-owned `audited-dotnet` directory;
-system .NET and host/fxr are untouched. `dotnet --list-runtimes` records the
-available framework rather than confusing the native host version with the
-compiler runtime. This follows the documented [runtime installation layout](https://learn.microsoft.com/en-us/dotnet/core/install/remove-runtime-sdk-versions#scripted-or-manual).
+The terminal rebuild/feed and its compiler-runtime isolation steps no longer
+belong to Event CI. Historical dependency approval, patch, package hash and SBOM
+records remain provenance, not restore or build inputs. Configurator owns the
+audited UI package closure and package/native-host gates.
 
 ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the ISLAMU project steward broad inbound rights for contributor work. That inbound CLA does not override third-party dependency licenses, so CI must keep runtime, build, and test dependency license risk explicit before alternative-license, commercial, nonprofit, public-sector, procurement-restricted, hosted-service, or special social-impact distribution is offered.
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.
 
-Restore coverage also includes the standalone dependency probes under
-`eng/setup-assistant/probes/` and the approved Terminal.Gui closure probe under
-`eng/release/dependencies/terminal-gui/probe/`. These lockfiles are audited but
-their projects are not part of solution restore. The reusable workflow restores
-them explicitly in locked mode before auditing; it must not depend on an older
-package version already being present in a warm cache. Missing metadata remains
-a blocking error, and restoring an approved graph does not authorize changing
-its frozen dependency approval.
+The retained exporter is part of `Explore.slnx`, so its lock and dependency
+closure participate in solution restore/audits. Missing metadata remains a
+blocking error. Removal of unused probes does not weaken package licensing
+policy or authorize changing a frozen approval.
 
 Reviewed license identifiers currently allowed by policy are `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`, `ISC`, `MIT`, `MPL-2.0`, `PostgreSQL`, `Unicode-DFS-2016`, `Unlicense`, and `Zlib`. Strong reciprocal, copyleft, source-available, and business-source families such as AGPL, GPL, LGPL, BUSL, Commons Clause, RPL, and SSPL are denied unless an explicit temporary exception is recorded in `.ci/scripts/validate-dependency-license-policy.cs`.
 

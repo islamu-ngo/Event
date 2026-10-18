@@ -66,8 +66,8 @@ public sealed class EventDetailTests : IDisposable
         await obsoleteLoad.WaitAsync(TimeSpan.FromSeconds(10));
         await cut.InvokeAsync(() => { });
 
-        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsNotEmpty();
-        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{original.Id}/details']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{related.Id}/details']")).IsEmpty();
         await Assert.That(cut.FindAll("section[data-public-detail-status]")).IsEmpty();
     }
 
@@ -141,7 +141,7 @@ public sealed class EventDetailTests : IDisposable
         await obsoleteLoad.WaitAsync(TimeSpan.FromSeconds(10));
         await cut.InvokeAsync(() => { });
 
-        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{original.Id}/details']")).IsNotEmpty();
         await Assert.That(cut.Instance.PersistedState!.EventId).IsEqualTo(original.Id!.Value);
         await Assert.That(cut.Instance.PersistedState.EventSessions).IsEmpty();
         await Assert.That(cut.Instance.PersistedState.EventDays).IsEmpty();
@@ -236,7 +236,7 @@ public sealed class EventDetailTests : IDisposable
 
         await Assert.That(GetField<EventDto>(cut.Instance, "_eventDetails").Id).IsEqualTo(related.Id);
         await Assert.That(cut.FindAll("h1").Any(node => node.TextContent == related.Title)).IsTrue();
-        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{related.Id}/details']")).IsNotEmpty();
         await Assert.That(typeof(EventDetail).GetField("_islamicAspect",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(cut.Instance)).IsNull();
         await Assert.That(typeof(EventDetail).GetField("_techAspect",
@@ -313,7 +313,7 @@ public sealed class EventDetailTests : IDisposable
         await Assert.That(mutations.Count).IsEqualTo(holdConfirmation ? 0 : 1);
         await Assert.That(GetField<EventDto>(cut.Instance, "_eventDetails").Id).IsEqualTo(related.Id);
         await Assert.That(cut.FindAll("h1").Any(node => node.TextContent == related.Title)).IsTrue();
-        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{related.Id}/details']")).IsNotEmpty();
     }
 
     [Test]
@@ -435,12 +435,12 @@ public sealed class EventDetailTests : IDisposable
         };
         router.SetCurrentRoute(Match("original-CODE1"), "/events/original-CODE1");
         var cut = _ctx.RenderMudComponent<EventDetail>();
-        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{original.Id}/details']")).IsNotEmpty();
 
         await cut.InvokeAsync(() => router.SetCurrentRoute(Match("related-CODE2"), "/events/related-CODE2"));
 
-        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
-        await Assert.That(cut.FindAll($"a[href='/events/{original.Id}/edit']")).IsEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{related.Id}/details']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{original.Id}/details']")).IsEmpty();
         await Assert.That(cut.FindAll("h1").Any(node => node.TextContent == related.Title)).IsTrue();
 
         await cut.InvokeAsync(() => router.SetCurrentRoute(new RouteMatch
@@ -449,7 +449,7 @@ public sealed class EventDetailTests : IDisposable
             MatchedPath = "/",
             Params = new Dictionary<string, string>()
         }, "/"));
-        await Assert.That(cut.FindAll($"a[href='/events/{related.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{related.Id}/details']")).IsNotEmpty();
     }
 
     [Test]
@@ -484,7 +484,7 @@ public sealed class EventDetailTests : IDisposable
         await recovery.QuerySelector("button")!.ClickAsync(new());
 
         await Assert.That(cut.FindAll("section[data-public-detail-status]")).IsEmpty();
-        await Assert.That(cut.FindAll($"a[href='/events/{current.Id}/edit']")).IsNotEmpty();
+        await Assert.That(cut.FindAll($"a[href='/studio/events/{current.Id}/details']")).IsNotEmpty();
     }
 
     [Test]

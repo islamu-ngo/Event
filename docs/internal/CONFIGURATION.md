@@ -12,8 +12,8 @@ This document owns configuration architecture, source anchors and invariants.
 
 Startup source composition fixes the secret consumer before acquisition.
 `SecretAcquisitionPolicy` owns exact runtime roots; `RuntimeSecretEnvironment`
-owns the final AppHost child projection. AppHost consumes the Setup Core
-catalogue's public startup metadata to preserve declared runtime controls without
+owns the final AppHost child projection. AppHost consumes the Event-owned
+environment catalogue's public startup metadata to preserve declared runtime controls without
 forwarding arbitrary parent secrets. Compose assigns independent machine
 credentials per service rather than including a common credential pair in an
 environment anchor. See [the custody contract](SECRETS.md#consumer-isolated-acquisition-and-orchestration).
@@ -26,6 +26,32 @@ restriction; an empty item is invalid. Compose uses an unresolved-value
 passthrough for index zero so omission does not inject an empty list member.
 The API mapping preserves public process configuration even when secrets come
 from Infisical. Retired accepted-audience arrays are not projected by AppHost.
+
+## External configuration preparation
+
+[Configurator](https://github.com/ISLAMU/Configurator) receives declarative
+Event-owned data-only definitions compiled by its standalone CLI, not Event
+configuration handlers or semantic apply authority. The stable family GUID is
+`a4bcfaa6-9979-43e5-b1f5-00d552618cdf`; a deployed Configurator origin can serve
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` for public choices only.
+This contract introduces no Event URL key or runtime launch feature.
+
+Maintainers install Configurator's portable `configurator-integrate` skill,
+review Event's public environment metadata and portable schema, and author one
+compact `configurator.yaml`. It is author-maintained, not automatically generated.
+Native `definition init/check/revise/build` commands own identity allocation,
+admission and immutable canonical JSON releases without an Event runtime dependency.
+Synthetic fixtures are test-owned and independently compared against Event's
+parsers. Event still owns issuer
+normalization, setting scope, identity integrity and concurrency, legal lifecycle
+and backend validation. New offline preparation uses separately installed
+Configurator with the local Event definition and a declared artifact ID. The
+bundled offline source owners are removed; generic rendering is not equivalent
+to every specialized Event workflow. A retained receipt does not prove current
+YAML compilation; record actual native CLI and host-test results separately.
+See [native definition authoring](CONFIGURATOR_DEFINITION_EXPORT.md).
+See [the architectural boundary](SETUP_ASSISTANT_ARCHITECTURE.md#external-definition-handoff)
+and [operator guidance](../public/self-hosting/setup-assistant.md#external-configurator-handoff).
 
 ## Discovery traversal governance
 
@@ -406,10 +432,10 @@ coordinates, which never enter Setup contracts, logs, metrics, or responses.
 Recovery is to revoke the enrollment and clear the adapter's in-memory state;
 there is no credential-persistence recovery path.
 
-`eng/setup-assistant/generated/setup-live-release-capabilities.json` is the
-governed release gate. D2 closes with `targetEnabled` and every live-control
-capability set to `false`; the backend and outer adapter therefore do not imply
-an activated CLI, browser, desktop, or shared-presentation workflow.
+Configurator's own release-capability metadata governs its offline surfaces.
+The old bundled capability generator is removed. Retained Event backend
+authority and the relocated client adapter do not activate live control in
+Configurator; a future integration requires its separately scoped contract.
 
 ## Aspire Hosting Topology
 

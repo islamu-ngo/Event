@@ -7,7 +7,6 @@
 @page "/studio/events/{EventId:guid}/integrations"
 @page "/studio/events/{EventId:guid}/forms"
 @page "/studio/events/{EventId:guid}/analytics"
-@page "/studio/events/{EventId:guid}/publication"
 @page "/studio/events/{EventId:guid}/resources"
 @using Blazouter.Services
 @using Microsoft.AspNetCore.Authorization
@@ -16,6 +15,8 @@
 @inject RouterStateService RouterState
 @inject NavigationManager Navigation
 @inject StudioEventContextState EventContext
+@inject IEventResourceService Resources
+@implements IDisposable
 
 <PageTitle>@(Resource?.Title ?? "Studio Event")</PageTitle>
 
@@ -50,7 +51,11 @@
         <section class="studio-event-shell__section" aria-labelledby="studio-event-section-title">
             <MudText Id="studio-event-section-title" Typo="Typo.h5" HtmlTag="h2">@SectionTitle</MudText>
             <MudText Typo="Typo.body1" Color="Color.Secondary">@SectionDescription</MudText>
-            @if (Section == "tickets")
+            @if (Section is "overview" or "schedule")
+            {
+                <StudioEventOverview @key="EventContext.Generation" EventId="EventId" ScheduleOnly="@(Section == "schedule")" />
+            }
+            else if (Section == "tickets")
             {
                 @if (!CanManageTickets)
                 {
@@ -90,7 +95,20 @@
             }
             else if (Section == "resources")
             {
-                <StudioEventResources EventId="EventId" />
+                @if (_resourceManagementLoading)
+                {
+                    <p role="status">Loading resource permissions…</p>
+                }
+                else if (_canManageResources)
+                {
+                    <StudioEventResources @key="EventContext.Generation" EventId="EventId" />
+                }
+                else
+                {
+                    <div role="alert" data-testid="resources-route-unavailable">
+                        Resources are not available for this event.
+                    </div>
+                }
             }
             else if (Section == "orders")
             {
@@ -132,7 +150,7 @@
                 }
                 else
                 {
-                    <StudioRegistrationAnalytics EventId="EventId" AnalyticsLink="AnalyticsLink" />
+                    <StudioRegistrationAnalytics @key="EventContext.Generation" EventId="EventId" AnalyticsLink="AnalyticsLink" />
                 }
             }
             else if (Section == "integrations")
@@ -147,19 +165,6 @@
                 {
                     <StudioEventIntegrations Event="Resource" />
                 }
-            }
-            else
-            {
-                <div class="studio-event-shell__actions">
-                    @if (Section == "schedule" && CanAddSession)
-                    {
-                        <AppButton Href="@($"/events/{EventId}/sessions/create")" StartIcon="@Icons.Material.Filled.Add">Add session</AppButton>
-                    }
-                    @if (Resource.HasHalLink("edit"))
-                    {
-                        <AppButton Href="@($"/events/{EventId}/edit")" Variant="Variant.Outlined">Open event editor</AppButton>
-                    }
-                </div>
             }
         </section>
     }
@@ -180,13 +185,12 @@
         "resources" => "Resources",
         "integrations" => "Integrations",
         "forms" => "Forms",
-        "analytics" => "Analytics",
-        "publication" => "Publication",
-        _ => "Details"
+        "analytics" => "Answer analytics",
+        _ => "Overview"
     };
     private string SectionDescription => Section switch
     {
-        "schedule" => "Manage this event's sessions in the existing event editor.",
+        "schedule" => "Review the current managed program and open each permitted session editor.",
         "registration" => "Define how people participate, whether advance registration applies, and which identity options are available.",
         "tickets" => "Define ticket types, shared capacity pools, prices, limits, and admission entitlements.",
         "promotions" => "Create and manage event promotion codes when the server advertises the required affordances.",
@@ -195,11 +199,8 @@
         "integrations" => "Connect registration providers, monitor health, and reconcile provider submissions.",
         "forms" => "Author versioned registration questions, conditional rules, and publication readiness.",
         "analytics" => "Review privacy-bounded aggregates for governed registration answers.",
-        "publication" => "Review and edit publication details in the existing event editor.",
-        _ => "Edit this event using the existing event editor."
+        _ => "Review current event status, program and publication readiness."
     };
-    private bool CanAddSession => Resource?.HasHalLink("add-session") == true
-        || Resource?.HasHalLink("create-session-draft") == true;
     private bool CanConfigureParticipation => Resource?.HasHalLink("configure-participation") == true;
     private bool CanManageTicketTypes => Resource?.HasHalLink("manage-ticket-types") == true;
     private bool CanManageCapacityPools => Resource?.HasHalLink("manage-capacity-pools") == true;
@@ -213,10 +214,30 @@
         ? null
         : Explore.Blazor.Client.Pages.Studio.RegistrationForms.RegistrationFormHal.Link(Resource.AdditionalProperties, "view-registration-analytics");
 
+    private bool _disposed;
+    private bool _canManageResources;
+    private bool _resourceManagementLoading;
+    private long _resourceGeneration = -1;
+    private readonly CancellationTokenSource _resourceLifetime = new();
+
+    protected override void OnInitialized() => EventContext.Changed += OnContextChanged;
+
+    private void OnContextChanged()
+    {
+        if (_disposed) return;
+        if (Resource is null || _resourceGeneration != EventContext.Generation) _canManageResources = false;
+        _ = InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            StateHasChanged();
+            await LoadResourceAuthorityAsync();
+            if (!_disposed) StateHasChanged();
+        });
+    }
+
     protected override async Task OnParametersSetAsync()
     {
-        if (EventId == Guid.Empty
-            && Guid.TryParse(RouterState.GetParam("eventId"), out var routeEventId))
+        if (Guid.TryParse(RouterState.GetParam("eventId"), out var routeEventId))
         {
             EventId = routeEventId;
         }
@@ -224,8 +245,40 @@
         if (EventId != Guid.Empty)
         {
             await EventContext.LoadAsync(EventId);
+            await LoadResourceAuthorityAsync();
         }
     }
+
+    private async Task LoadResourceAuthorityAsync()
+    {
+        if (_disposed || Section != "resources" || Resource is null || _resourceGeneration == EventContext.Generation) return;
+        var generation = _resourceGeneration = EventContext.Generation;
+        var eventId = EventId;
+        _canManageResources = false;
+        _resourceManagementLoading = true;
+        try
+        {
+            var page = await Resources.AudienceAsync(eventId, null, _resourceLifetime.Token);
+            if (IsCurrentResourceScope(eventId, generation))
+                _canManageResources = page?._links?.ContainsKey("manage-resources") == true;
+        }
+        catch (OperationCanceledException) when (_resourceLifetime.IsCancellationRequested)
+        {
+            // Disposal cancels the authority read; no permission result belongs to the departed shell.
+        }
+        catch (ApiException)
+        {
+            // Denied or unavailable collection authority keeps the resources route closed.
+        }
+        finally
+        {
+            if (IsCurrentResourceScope(eventId, generation)) _resourceManagementLoading = false;
+        }
+    }
+
+    private bool IsCurrentResourceScope(Guid eventId, long generation) =>
+        !_disposed && EventId == eventId && EventContext.EventId == eventId
+        && EventContext.Generation == generation && Resource is not null;
 
     private string ResolveSection()
     {
@@ -239,8 +292,7 @@
             : path.EndsWith("/forms", StringComparison.OrdinalIgnoreCase) ? "forms"
             : path.EndsWith("/analytics", StringComparison.OrdinalIgnoreCase) ? "analytics"
             : path.EndsWith("/resources", StringComparison.OrdinalIgnoreCase) ? "resources"
-            : path.EndsWith("/publication", StringComparison.OrdinalIgnoreCase) ? "publication"
-            : "details";
+            : "overview";
     }
 
     private async Task ReloadEventAsync()
@@ -248,4 +300,12 @@
         await EventContext.ReloadAsync(EventId);
     }
 
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        EventContext.Changed -= OnContextChanged;
+        _resourceLifetime.Cancel();
+        _resourceLifetime.Dispose();
+    }
 }

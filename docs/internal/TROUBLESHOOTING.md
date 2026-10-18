@@ -421,18 +421,21 @@ Checks:
 
 ### Terminal Assistant Does Not Start Or Write
 
-- `interactive-terminal-required`: run `Event.SetupAssistant.Terminal` directly
-  in a TTY. Pipes, redirects, captured standard streams, and secret arguments are
-  rejected deliberately.
-- `protected-output-unavailable`: use Linux, macOS, or FreeBSD and a writable
-  current directory. The target requires owner-only `0600` create-new semantics
-  and has no plaintext fallback.
-- Existing output file: choose a new safe filename or remove the old file only
-  after preserving it deliberately; the assistant never overwrites.
-- Resize-only screen: enlarge the terminal to at least 40 columns by 17 rows.
+For new installs, use separately packaged
+[Configurator](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/terminal.md)
+with the local Event definition. Its release evidence owns supported output
+hosts; protected output currently requires Linux and a supported filesystem.
+`islamu-configurator` has no bundled `event-setup` aliases. An offline result
+cannot establish Event bootstrap, secret binding or backend readiness.
+- Launch `islamu-configurator-terminal --definition PATH` in an interactive TTY,
+  with an admitted local Event definition. Never pass private answers as arguments.
+- Protected-save refusal: use a supported Linux host/filesystem. The writer has
+  no plaintext fallback and does not infer native protection from a packaged RID.
+- Existing output file: choose a new safe filename; publication never overwrites.
+- Resize-only screen: use at least 80 columns by 26 rows.
 - Arabic text displays but shaping/order is poor: select a terminal/font with
   Unicode and RTL support. Terminal.Gui screen-reader, braille, RTL shaping, and
-  scrollback erasure remain unverified and are stated in the UI.
+  scrollback erasure remain unverified guarantees in the external UI.
 
 ## Secret Provider Unavailable
 

@@ -10,16 +10,8 @@
     <Project Path="src/Explore.API/Explore.API.csproj" />
   </Folder>
   <Folder Name="/Core/">
-    <Project Path="src/Event.Setup.Core/Event.Setup.Core.csproj" />
     <Project Path="src/Explore.Application/Explore.Application.csproj" />
     <Project Path="src/Explore.Domain/Explore.Domain.csproj" />
-  </Folder>
-  <Folder Name="/Product/Setup Assistant/">
-    <Project Path="src/Event.Setup.Artifacts/Event.Setup.Artifacts.csproj" />
-    <Project Path="src/Event.SetupAssistant/Event.SetupAssistant.csproj" />
-    <Project Path="src/Event.SetupAssistant/SetupLive/Event.SetupAssistant.SetupLive.csproj" />
-    <Project Path="src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj" />
-    <Project Path="src/Event.SetupAssistant.Terminal/Event.SetupAssistant.Terminal.csproj" />
   </Folder>
   <Folder Name="/Infrastructure/">
     <Project Path="src/Explore.Atproto.Transport/Explore.Atproto.Transport.csproj" />
@@ -54,21 +46,8 @@
     <Project Path="eng/dependency-submission/src/ISLAMU.DependencySubmission/ISLAMU.DependencySubmission.csproj" />
     <Project Path="eng/dependency-submission/tests/ISLAMU.DependencySubmission.Tests/ISLAMU.DependencySubmission.Tests.csproj" />
   </Folder>
-  <Folder Name="/Tooling/Setup Assistant/">
-    <Project Path="eng/setup-assistant/EnvironmentCatalogueGenerator/EnvironmentCatalogueGenerator.csproj" />
-    <Project Path="eng/setup-assistant/SetupCliCommandSchemaGenerator/SetupCliCommandSchemaGenerator.csproj" />
-  </Folder>
   <Folder Name="/Tooling/OpenAPI/">
     <Project Path="eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj" />
-  </Folder>
-  <Folder Name="/Test/Setup Assistant/">
-    <Project Path="tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj" />
-    <Project Path="tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj" />
-    <Project Path="tests/Event.SetupAssistant.Tests/Event.SetupAssistant.Tests.csproj" />
-    <Project Path="tests/Event.SetupAssistant.Browser.Tests/Event.SetupAssistant.Browser.Tests.csproj" />
-    <Project Path="tests/Event.SetupAssistant.Desktop.Tests/Event.SetupAssistant.Desktop.Tests.csproj" />
-    <Project Path="tests/Event.SetupAssistant.Cli.Tests/Event.SetupAssistant.Cli.Tests.csproj" />
-    <Project Path="tests/Event.SetupAssistant.Terminal.Tests/Event.SetupAssistant.Terminal.Tests.csproj" />
   </Folder>
   <Folder Name="/Tooling/Assurance/">
     <Project Path="eng/tools/Explore.AssuranceAudit/Explore.AssuranceAudit.csproj" />
@@ -86,10 +65,6 @@
     <Project Path="tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj" />
     <Project Path="tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj" />
     <Project Path="tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj" />
-  </Folder>
-  <Folder Name="/UI/Setup Assistant/">
-    <Project Path="src/Event.SetupAssistant.Browser/Event.SetupAssistant.Browser.csproj" />
-    <Project Path="src/Event.SetupAssistant.Desktop/Event.SetupAssistant.Desktop.csproj" />
   </Folder>
   <Folder Name="/UI/">
     <Project Path="src/Explore.Blazor.Client/Explore.Blazor.Client.csproj" />

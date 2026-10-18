@@ -1189,6 +1189,36 @@ the former unqualified `event:detail:{eventId}` key leaves stale details behind.
 
 ### Event Program Summary Queries
 
+#### Native creation retains unscheduled draft programs
+
+`CreateEventGraphSessionDto.StartTime` is nullable. A Draft request may omit both
+start and end for a prepared session; its metadata and validated graph
+references persist without invented dates or inferred day rows. A Fixed
+scheduled session requires both instants and `EndTime > StartTime`. OpenEnded
+preserves start-only schedules; existing prayer-relative inputs keep their
+scheduling/aspect rules. An end without a start, a partial Fixed schedule, or
+publication containing an unscheduled session fails validation before rollups
+and persistence. A scheduled child cannot make an invalid sibling disappear.
+
+Native validation errors retain property/index paths, including
+`Sessions[1].StartTime`, through the shared command-failure ProblemDetails
+mapping. Location, room, image and temp-key references remain tenant-qualified;
+a valid explicit day association on an unscheduled draft is retained, not
+silently dropped. Applicable owner assignment and publication outbox remain in
+the existing serializable graph transaction. Personal community reports retain
+their existing submitted-by provenance without an invented owner grant;
+organizer-created events retain their owner lifecycle. Managed reads retain draft programs;
+anonymous/public program reads do not expose them.
+
+Regenerate consumers through API `GetOpenApiContractInput`, the inventory
+producer and client `GenerateApiClient` in that order. Standalone client
+compilation alone does not export current backend inputs. No migration is
+needed for this wire change. After nullable drafts exist, an older executable
+that dereferences starts is not a safe downgrade; use a compatible full-outcome
+rollback or forward correction without deleting retained programs. A lost
+create response is an unknown outcome, not proven rollback or permission for
+automatic browser replay.
+
 `EventManagementReadController.GetProgramSummary` and `GetManagedProgramSummary`
 inject separate closed `IQueryHandler<..., EventProgramSummaryDto?>` ports. Both
 ports are implemented by `GetEventProgramSummaryRequestHandler` and discovered

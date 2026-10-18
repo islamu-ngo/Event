@@ -5,6 +5,13 @@
 > **Reviewed:** 2026-09-30
 > **Evidence:** Central package versions, generated target lockfiles and NuGet package metadata
 
+This is the historical September dependency review, retained for provenance and
+rights attribution. The bundled Event UI/CLI projects, exclusive package pins
+and audited restore feed are removed. Current runtime/package/native-host gates
+belong to [ISLAMU Configurator](https://github.com/ISLAMU/Configurator).
+This record is not an instruction to restore or build removed Event targets,
+nor approval to bypass either repository's dependency policy.
+
 ## Reviewed Components
 
 | Component | Version | Role | Terms |

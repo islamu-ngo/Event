@@ -253,7 +253,10 @@ public sealed class CreateEventDraftAiActionMapper
         bool hasPrimaryLocation,
         bool hasPrimaryRoom)
     {
-        if (session is null || session.StartTime == default || session.EndTime == default || session.EndTime <= session.StartTime)
+        if (session is null
+            || session.StartTime.HasValue != session.EndTime.HasValue
+            || (session.StartTime.HasValue && session.EndTime <= session.StartTime)
+            || (!session.StartTime.HasValue && string.IsNullOrWhiteSpace(session.Title)))
         {
             return [];
         }

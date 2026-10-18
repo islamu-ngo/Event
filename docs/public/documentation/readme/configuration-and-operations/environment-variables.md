@@ -15,6 +15,21 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ## Guided Setup Adds No Environment Inputs
 
+Offline preparation uses separately installed
+[ISLAMU Configurator](https://github.com/ISLAMU/Configurator) and Event's local
+definition, not new environment switches. Follow
+[the external handoff](../../../self-hosting/setup-assistant.md#external-configurator-handoff).
+Event owns its environment catalogue and validates runtime binding; Configurator
+does not become a secret authority. Keep credentials and generated dotenv files
+on a protected native host. The public browser accepts only declared public
+choices. This repository/tooling extraction needs no database migration.
+
+Legal identity seeds are optional during installation. Configure disclosure and
+paid-event identity later through authenticated administration; authoritative
+kind/country choices come from the server rather than another environment list.
+The [getting-started groups](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+do not change provider responsibility, secret authority or SQLite processing bounds.
+
 ### Consumer identity and API token policy
 
 Compose/Aspire use `INFISICAL_API_CLIENT_ID/CLIENT_SECRET`,
@@ -32,12 +47,6 @@ more clients; Compose needs an explicit service entry for each additional index.
 Omit unused entries completely: a blank member is invalid, and permitted clients
 never expand accepted audiences. See [the identity cutover](infisical.md#consumer-isolation-cutover)
 for ACLs, provider-resource injection and cold-restart requirements.
-
-Legal identity seeds are optional during installation. Configure disclosure and
-paid-event identity later through authenticated administration; authoritative
-kind/country choices come from the server rather than another environment list.
-The [getting-started groups](../administration-and-branding/admin-guide.md#getting-started-after-setup)
-do not change provider responsibility, secret authority or SQLite processing bounds.
 
 ## Removed edition inputs
 

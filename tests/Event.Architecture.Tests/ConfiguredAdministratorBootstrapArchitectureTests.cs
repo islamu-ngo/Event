@@ -98,34 +98,6 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
     }
 
     [Test]
-    public async Task SetupCoreAndAssistantRemainOfflineAndDisconnectedFromRuntimeLayers()
-    {
-        string coreProject = ContextSystemHelpers.RepoPath(
-            "src", "Event.Setup.Core", "Event.Setup.Core.csproj");
-        string assistantProject = ContextSystemHelpers.RepoPath(
-            "src", "Event.SetupAssistant", "Event.SetupAssistant.csproj");
-
-        await Assert.That(ProjectReferences(coreProject))
-            .IsEquivalentTo(["Event.Wire.Contracts"]);
-        await Assert.That(ProjectReferences(assistantProject))
-            .IsEquivalentTo(["Event.Setup.Core"]);
-
-        string[] forbidden = ProjectClosure(coreProject, assistantProject)
-            .Where(name => name is
-                "Explore.API" or
-                "Explore.Application" or
-                "Explore.Domain" or
-                "Explore.Infrastructure" or
-                "Explore.Persistence" or
-                "Explore.Blazor" or
-                "Explore.Blazor.Client")
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        await Assert.That(forbidden).IsEmpty();
-    }
-
-    [Test]
     public async Task ConfigurationManifestMachineContractExcludesBootstrapIdentityAuthority()
     {
         string[] forbiddenContractProperties = ReachableContractTypes(
@@ -516,15 +488,6 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
 
         return type;
     }
-
-    private static string[] ProjectReferences(string projectPath) =>
-        XDocument.Load(projectPath).Descendants()
-            .Where(element => element.Name.LocalName == "ProjectReference")
-            .Select(element => element.Attribute("Include")?.Value)
-            .OfType<string>()
-            .Select(path => Path.GetFileNameWithoutExtension(path.Replace('\\', '/')))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
 
     private static IEnumerable<string> ProjectClosure(params string[] projectPaths)
     {

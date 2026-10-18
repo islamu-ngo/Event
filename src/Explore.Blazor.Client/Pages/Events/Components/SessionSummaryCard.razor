@@ -37,7 +37,18 @@
                 <div class="d-flex align-center gap-1">
                     <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Color="Color.Secondary" />
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        @Session.StartTime.ToString("ddd d MMM, HH:mm")–@Session.EndTime.ToString("HH:mm")
+                        @if (Session.StartTime is { } start)
+                        {
+                            @start.ToString("ddd d MMM, HH:mm")
+                            @if (Session.EndTime is { } end)
+                            {
+                                <span>–@end.ToString(end.Date == start.Date ? "HH:mm" : "ddd d MMM, HH:mm")</span>
+                            }
+                        }
+                        else
+                        {
+                            <span>Not scheduled</span>
+                        }
                     </MudText>
                 </div>
                 @if (LocationName is not null)

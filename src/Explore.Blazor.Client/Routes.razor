@@ -118,7 +118,12 @@
             // Studio workspace routes
             new RouteConfig { Path = "/studio", Component = typeof(StudioHome), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/events", Component = typeof(StudioEvents), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
-            new RouteConfig { Path = "/studio/events/:eventId/schedule", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/studio/events/:eventId/details", Component = typeof(EventEdit), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/studio/events/:eventId/sessions/create", Component = typeof(CreateSession), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/studio/events/:eventId/sessions/:sessionId/edit", Component = typeof(EditSession), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/studio/events/:eventId/resources", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/studio/events/:eventId/analytics", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/studio/events/:eventId/schedule", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/events/:eventId/registration", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/events/:eventId/tickets", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/events/:eventId/promotions", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
@@ -127,10 +132,9 @@
             new RouteConfig { Path = "/studio/events/:eventId/forms", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/events/:eventId/check-in", Component = typeof(StudioAdmissionCheckIn), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/events/:eventId/attendees", Component = typeof(StudioEventAttendees), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
-            new RouteConfig { Path = "/studio/events/:eventId/publication", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/orders", Component = typeof(StudioOrders), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/studio/attendees", Component = typeof(StudioAttendees), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
-            new RouteConfig { Path = "/studio/events/:eventId", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
+            new RouteConfig { Path = "/studio/events/:eventId", Component = typeof(StudioEventShell), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
 
             // AI workspace routes
             new RouteConfig { Path = "/ai", Component = typeof(AiWorkspace), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
@@ -151,12 +155,8 @@
 
             // Event management routes — specific literals before parameterized at same depth
             new RouteConfig { Path = "/events/create", Component = typeof(CreateEvent), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
-            new RouteConfig { Path = "/events/:eventId/edit", Component = typeof(EventEdit), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/events/:EventId/moderation/reports", Component = typeof(ModerationReportQueuePage), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
-            new RouteConfig { Path = "/events/:eventId/sessions/create", Component = typeof(CreateSession), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
-            new RouteConfig { Path = "/events/:eventId/sessions/:sessionId/edit", Component = typeof(EditSession), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/events/:eventId/sessions/:sessionId", Component = typeof(EventSessionDetail), Transition = RouteTransition.Fade },
-            new RouteConfig { Path = "/event-created/:eventId", Component = typeof(EventCreated), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/organizations/:organizationId/events/create", Component = typeof(CreateEvent), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },
             // Parameterized event route last — catches /events/{slug}-{publicCode}
             new RouteConfig { Path = "/events/:slugCode", Component = typeof(EventDetail), Transition = RouteTransition.Fade },

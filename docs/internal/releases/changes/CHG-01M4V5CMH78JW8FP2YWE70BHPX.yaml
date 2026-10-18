@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4V5CMH78JW8FP2YWE70BHPX
+Title: "Allow repeated Studio cleanup after navigation"
+Type: fix
+Scope: events
+Summary: "Studio Overview and its shell can be disposed repeatedly without canceling an already disposed token source, while in-flight authority reads remain canceled."
+Group: studio-event-workspace
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

@@ -193,6 +193,50 @@ public sealed class AtprotoFederationSettingPolicyTests
     }
 
     [Test]
+    [Arguments(DateTimeKind.Local)]
+    [Arguments(DateTimeKind.Unspecified)]
+    public async Task DedicatedRowsRejectNonUtcCreationAuditTime(DateTimeKind kind)
+    {
+        DateTime invalidTime = DateTime.SpecifyKind(CreatedAt, kind);
+
+        await Assert.That(() => AtprotoFederationInstanceSetting.Create(
+                EventsEnabled, "false", true, invalidTime, Guid.CreateVersion7()))
+            .Throws<ArgumentException>();
+        await Assert.That(() => AtprotoFederationTenantSetting.Create(
+                Guid.CreateVersion7(), BackfillMode, "\"full\"", false, invalidTime, Guid.CreateVersion7()))
+            .Throws<ArgumentException>();
+    }
+
+    [Test]
+    [Arguments(DateTimeKind.Local)]
+    [Arguments(DateTimeKind.Unspecified)]
+    public async Task RejectedNonUtcMutationPreservesBothCompletePersistedImages(DateTimeKind kind)
+    {
+        Guid creator = Guid.CreateVersion7(), previousUpdater = Guid.CreateVersion7();
+        var instance = AtprotoFederationInstanceSetting.Create(EventsEnabled, "false", true, CreatedAt, creator);
+        var tenant = AtprotoFederationTenantSetting.Create(
+            Guid.CreateVersion7(), BackfillMode, "\"full\"", false, CreatedAt, creator);
+        instance.SetValue("false", UpdatedAt, previousUpdater);
+        tenant.SetValue("\"full\"", UpdatedAt, previousUpdater);
+        var instanceBefore = (instance.Id, instance.SettingKey, instance.Value, instance.IsLocked,
+            instance.CreatedAt, instance.CreatedBy, instance.UpdatedAt, instance.UpdatedBy);
+        var tenantBefore = (tenant.Id, tenant.TenantId, tenant.SettingKey, tenant.Value, tenant.IsLocked,
+            tenant.CreatedAt, tenant.CreatedBy, tenant.UpdatedAt, tenant.UpdatedBy);
+        DateTime invalidTime = DateTime.SpecifyKind(UpdatedAt.AddMinutes(1), kind);
+        Guid rejectedUpdater = Guid.CreateVersion7();
+
+        await Assert.That(() => instance.SetValue("true", invalidTime, rejectedUpdater)).Throws<ArgumentException>();
+        await Assert.That(() => tenant.SetValue("\"downtime_only\"", invalidTime, rejectedUpdater)).Throws<ArgumentException>();
+        await Assert.That(() => instance.SetLock(false, invalidTime, rejectedUpdater)).Throws<ArgumentException>();
+        await Assert.That(() => tenant.SetLock(true, invalidTime, rejectedUpdater)).Throws<ArgumentException>();
+
+        await Assert.That((instance.Id, instance.SettingKey, instance.Value, instance.IsLocked,
+            instance.CreatedAt, instance.CreatedBy, instance.UpdatedAt, instance.UpdatedBy)).IsEqualTo(instanceBefore);
+        await Assert.That((tenant.Id, tenant.TenantId, tenant.SettingKey, tenant.Value, tenant.IsLocked,
+            tenant.CreatedAt, tenant.CreatedBy, tenant.UpdatedAt, tenant.UpdatedBy)).IsEqualTo(tenantBefore);
+    }
+
+    [Test]
     public async Task TenantOverrideRequiresANonemptyTenantIdentity()
     {
         await Assert.That(() => AtprotoFederationTenantSetting.Create(Guid.Empty, EventsEnabled, "true", false, CreatedAt, null))

@@ -98,6 +98,8 @@ public static partial class PostgresConfigurationImportPaidPolicyContract
 
     private static string BuildSql(ExploreDbContext context)
     {
+        var installation = new PostgresConfigurationImportInstallationSql(
+            OwnerRole, MigratorRole, GlobalRole, FingerprintPrefix, MigratorPlaceholder);
         string roles = $"'{OwnerRole}', '{MigratorRole}', '{GlobalRole}'";
         const string elevated = "rolcanlogin OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication OR rolinherit";
         var helper = context.GetService<ISqlGenerationHelper>();
@@ -136,37 +138,8 @@ public static partial class PostgresConfigurationImportPaidPolicyContract
                         AND (member.rolsuper OR member.rolbypassrls OR member.rolcreatedb
                             OR member.rolcreaterole OR member.rolreplication))
             """;
-        string membershipMissing = $"""
-            NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members edge
-                JOIN pg_catalog.pg_roles member ON member.oid = edge.member
-                JOIN pg_catalog.pg_roles parent ON parent.oid = edge.roleid
-                WHERE member.rolname = '{MigratorRole}' AND parent.rolname = '{OwnerRole}'
-                    AND edge.set_option AND NOT edge.inherit_option AND NOT edge.admin_option)
-            OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members edge
-                JOIN pg_catalog.pg_roles member ON member.oid = edge.member
-                JOIN pg_catalog.pg_roles parent ON parent.oid = edge.roleid
-                WHERE member.rolname = {MigratorPlaceholder} AND parent.rolname = '{MigratorRole}'
-                    AND edge.set_option AND NOT edge.inherit_option AND NOT edge.admin_option)
-            """;
-        // Use actual membership edges: a fixture DBA's implicit superuser
-        // pg_has_role(..., MEMBER) result is not Global enrollment.
-        string migrationInGlobal = $"""
-            EXISTS (WITH RECURSIVE memberships(roleid) AS (
-                SELECT roleid FROM pg_catalog.pg_auth_members
-                    WHERE member = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = CURRENT_USER)
-                UNION SELECT edge.roleid FROM pg_catalog.pg_auth_members edge
-                    JOIN memberships parent ON parent.roleid = edge.member)
-                SELECT 1 FROM memberships JOIN pg_catalog.pg_roles role ON role.oid = memberships.roleid
-                    WHERE role.rolname = '{GlobalRole}')
-            """;
-        string ownershipInvalid = $"""
-            EXISTS (SELECT 1 FROM pg_catalog.pg_shdepend dependency
-                WHERE dependency.refclassid = 'pg_catalog.pg_authid'::regclass
-                    AND dependency.refobjid IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
-                    AND dependency.deptype = 'o' AND (dependency.classid <> 'pg_catalog.pg_proc'::regclass
-                        OR dependency.dbid <> (SELECT oid FROM pg_catalog.pg_database
-                            WHERE datname = pg_catalog.current_database())))
-            """;
+        string membershipMissing = installation.MissingMemberships();
+        string ownershipInvalid = installation.NonRoutineOwnership();
         string privilegeInvalid = $"""
             EXISTS (SELECT 1 FROM pg_catalog.pg_class relation
                 JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
@@ -177,38 +150,11 @@ public static partial class PostgresConfigurationImportPaidPolicyContract
                             'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                         OR role.oid <> (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}')
                             AND pg_catalog.has_any_column_privilege(role.oid, relation.oid, 'SELECT,INSERT,UPDATE,REFERENCES')))
-            OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute attribute
-                JOIN pg_catalog.pg_class relation ON relation.oid = attribute.attrelid
-                JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
-                CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) access(privilege)
-                WHERE attribute.attnum > 0 AND NOT attribute.attisdropped
-                    AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')
-                    AND namespace.nspname NOT LIKE 'pg_toast%'
-                    AND pg_catalog.has_column_privilege('{OwnerRole}', relation.oid, attribute.attnum, access.privilege)
-                    AND NOT EXISTS (SELECT 1 FROM (VALUES {expectedColumns}) expected(relation_id, column_name, privilege)
-                        WHERE expected.relation_id = relation.oid AND expected.column_name = attribute.attname
-                            AND expected.privilege = access.privilege))
-            OR EXISTS (SELECT 1 FROM (VALUES {expectedColumns}) expected(relation_id, column_name, privilege)
-                WHERE NOT pg_catalog.has_column_privilege('{OwnerRole}', expected.relation_id,
-                    expected.column_name, expected.privilege))
+            OR {installation.ColumnPrivilegeDrift(expectedColumns)}
             OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace namespace
                 CROSS JOIN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles})) role
                 WHERE pg_catalog.has_schema_privilege(role.oid, namespace.oid, 'CREATE'))
-            OR EXISTS (SELECT 1 FROM pg_catalog.pg_class sequence
-                CROSS JOIN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles})) role
-                WHERE sequence.relkind = 'S'
-                    AND pg_catalog.has_sequence_privilege(role.oid, sequence.oid, 'USAGE,SELECT,UPDATE'))
-            OR EXISTS (SELECT 1 FROM pg_catalog.pg_database database
-                CROSS JOIN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles})) role
-                WHERE pg_catalog.has_database_privilege(role.oid, database.oid, 'CREATE'))
-            OR EXISTS (SELECT 1 FROM pg_catalog.pg_class relation
-                CROSS JOIN LATERAL pg_catalog.aclexplode(relation.relacl) permission
-                WHERE permission.grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
-                    AND permission.is_grantable)
-            OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute attribute
-                CROSS JOIN LATERAL pg_catalog.aclexplode(attribute.attacl) permission
-                WHERE permission.grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
-                    AND permission.is_grantable)
+            OR {installation.ExtraneousGrants()}
             OR NOT pg_catalog.has_schema_privilege('{GlobalRole}', {Text(Schema(context, typeof(PaidEventPolicyVersion)))}, 'USAGE')
             OR {string.Join(" OR ", relations.Select(relation => Schema(context, relation.Type)).Distinct(StringComparer.Ordinal)
                 .Select(name => $"NOT pg_catalog.has_schema_privilege('{OwnerRole}', {Text(name)}, 'USAGE')"))}
@@ -380,52 +326,14 @@ public static partial class PostgresConfigurationImportPaidPolicyContract
                     FROM pg_catalog.pg_proc function WHERE function.oid = {Text(contract.Signature)}::regprocedure);
             END; $stamp_function$;
             """));
-        return $"""
-            DO $roles$
-            DECLARE role_name text;
-            BEGIN
-                IF CURRENT_USER <> SESSION_USER OR CURRENT_USER IN ({roles}) OR {migrationInGlobal} THEN
-                    RAISE EXCEPTION 'configuration_import_paid_policy_migration_scope' USING ERRCODE = '42501';
-                END IF;
-                FOREACH role_name IN ARRAY ARRAY[{roles}] LOOP
-                    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = role_name) THEN
-                        EXECUTE pg_catalog.format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS', role_name);
-                        EXECUTE pg_catalog.format('COMMENT ON ROLE %I IS %L', role_name, '{FingerprintPrefix}role:' || role_name);
-                    END IF;
-                    IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = role_name
-                        AND (({elevated}) OR pg_catalog.shobj_description(oid, 'pg_authid') IS DISTINCT FROM
-                            '{FingerprintPrefix}role:' || role_name)) THEN
-                        RAISE EXCEPTION 'configuration_import_paid_policy_role_invalid' USING ERRCODE = '42501';
-                    END IF;
-                END LOOP;
-                IF {membershipInvalid.Replace(MigratorPlaceholder, "CURRENT_USER", StringComparison.Ordinal)}
-                    OR {ownershipInvalid} OR {existingFunctionInvalid} OR {tenantRlsInvalid} THEN
-                    RAISE EXCEPTION 'configuration_import_paid_policy_migration_authority_invalid' USING ERRCODE = '42501';
-                END IF;
-            END; $roles$;
-            GRANT {OwnerRole} TO {MigratorRole} WITH INHERIT FALSE, SET TRUE;
-            GRANT {MigratorRole} TO CURRENT_USER WITH INHERIT FALSE, SET TRUE;
-            GRANT USAGE ON SCHEMA {schemas} TO {OwnerRole};
-            GRANT USAGE, CREATE ON SCHEMA {schema} TO {OwnerRole};
-            GRANT USAGE ON SCHEMA {schema} TO {GlobalRole};
-            {grants}
-            {policyDdl}
-            DO $install$
-            DECLARE previous_role text := pg_catalog.current_setting('role');
-                migrator_login text := CURRENT_USER;
-            BEGIN
-                PERFORM pg_catalog.set_config('role', '{OwnerRole}', true);
-                EXECUTE pg_catalog.replace($ddl${ddl}$ddl$, '{MigratorPlaceholder}', pg_catalog.quote_literal(migrator_login));
-                EXECUTE $acl${acl}$acl$;
-                PERFORM pg_catalog.set_config('role', previous_role, true);
-            END; $install$;
-            REVOKE CREATE ON SCHEMA {schema} FROM {OwnerRole};
-            DO $closed$
-            BEGIN
-                IF {structureInvalid.Replace(MigratorPlaceholder, "CURRENT_USER", StringComparison.Ordinal)} THEN
-                    RAISE EXCEPTION 'configuration_import_paid_policy_authority_not_ready' USING ERRCODE = '42501';
-                END IF;
-            END; $closed$;
-            """;
+        return installation.Build(schema,
+            schemaGrants: $"GRANT USAGE ON SCHEMA {schemas} TO {OwnerRole};",
+            grants, policies: policyDdl, ddl, acl,
+            installationInvalid: $"""
+                {membershipInvalid.Replace(MigratorPlaceholder, "CURRENT_USER", StringComparison.Ordinal)}
+                    OR {ownershipInvalid} OR {existingFunctionInvalid} OR {tenantRlsInvalid}
+                """,
+            closedInvalid: structureInvalid.Replace(MigratorPlaceholder, "CURRENT_USER", StringComparison.Ordinal),
+            diagnosticPrefix: "configuration_import_paid_policy");
     }
 }

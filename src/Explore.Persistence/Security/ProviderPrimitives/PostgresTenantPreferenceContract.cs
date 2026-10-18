@@ -166,7 +166,7 @@ public static class PostgresTenantPreferenceContract
         string[] signatures = [$"{write}(uuid, uuid, timestamp with time zone)", $"{image}(uuid, uuid, timestamp with time zone)"];
         string acl = PostgresPrivilegeGuard.BuildRoutineAclAssertSql(signatures, OwnerRole, GlobalRole, requireComplete: true)
             + Guard(context, enrollment) + PostgresPrivilegeGuard.RestrictedCallerSql + $"""
-            IF session_user <> '{Literal(enrollment.GlobalLogin)}' OR current_user <> '{OwnerRole}' THEN
+            IF session_user <> {Text(enrollment.GlobalLogin)} OR current_user <> '{OwnerRole}' THEN
                 RAISE EXCEPTION 'native_tenant_preference_wrong_executor' USING ERRCODE = '55000';
             END IF;
             """;
@@ -224,7 +224,8 @@ public static class PostgresTenantPreferenceContract
         context.GetService<ISqlGenerationHelper>().DelimitIdentifier("human_tenant_preference_" + operation, Schema(context));
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
-    private static string Literal(string value) => value.Replace("'", "''", StringComparison.Ordinal);
+    private static string Text(string value) => "E'" + value.Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("'", "''", StringComparison.Ordinal).Replace("$", "\\044", StringComparison.Ordinal) + "'";
 
     private static string Guard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
@@ -259,24 +260,24 @@ public static class PostgresTenantPreferenceContract
         string table = context.GetService<ISqlGenerationHelper>()
             .DelimitIdentifier(context.Model.FindEntityType(typeof(User))!.GetTableName()!, Schema(context));
         return PostgresPrivilegeGuard.BuildAssertSql(contract) + $"""
-            IF pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{OwnerRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{MigratorRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{GlobalRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}','{OwnerRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}','{MigratorRole}','MEMBER')
-                OR pg_catalog.has_schema_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(Schema(context))}','CREATE')
-                OR pg_catalog.has_schema_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(Schema(context))}','CREATE')
+            IF pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},'{OwnerRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},'{MigratorRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},'{GlobalRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},'{OwnerRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},'{MigratorRole}','MEMBER')
+                OR pg_catalog.has_schema_privilege({Text(enrollment.RuntimeLogin)},{Text(Schema(context))},'CREATE')
+                OR pg_catalog.has_schema_privilege({Text(enrollment.GlobalLogin)},{Text(Schema(context))},'CREATE')
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles
-                WHERE rolname IN ('{Literal(enrollment.RuntimeLogin)}','{Literal(enrollment.GlobalLogin)}')
+                WHERE rolname IN ({Text(enrollment.RuntimeLogin)},{Text(enrollment.GlobalLogin)})
                   AND (NOT rolcanlogin OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication))
-                OR pg_catalog.has_table_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(table)}','INSERT,DELETE,TRUNCATE,TRIGGER')
-                OR pg_catalog.has_any_column_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(table)}','UPDATE,INSERT,REFERENCES')
-                OR pg_catalog.has_table_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(table)}','DELETE,TRUNCATE,TRIGGER')
-                OR pg_catalog.has_any_column_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(table)}','SELECT,UPDATE,INSERT,REFERENCES')
-                OR pg_catalog.has_function_privilege('{Literal(enrollment.RuntimeLogin)}',
-                    '{Literal(Function(context, "write"))}(uuid,uuid,timestamp with time zone)','EXECUTE')
-                OR pg_catalog.has_function_privilege('{Literal(enrollment.RuntimeLogin)}',
-                    '{Literal(Function(context, "image"))}(uuid,uuid,timestamp with time zone)','EXECUTE') THEN
+                OR pg_catalog.has_table_privilege({Text(enrollment.RuntimeLogin)},{Text(table)},'INSERT,DELETE,TRUNCATE,TRIGGER')
+                OR pg_catalog.has_any_column_privilege({Text(enrollment.RuntimeLogin)},{Text(table)},'UPDATE,INSERT,REFERENCES')
+                OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(table)},'DELETE,TRUNCATE,TRIGGER')
+                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(table)},'SELECT,UPDATE,INSERT,REFERENCES')
+                OR pg_catalog.has_function_privilege({Text(enrollment.RuntimeLogin)},
+                    {Text(Function(context, "write") + "(uuid,uuid,timestamp with time zone)")},'EXECUTE')
+                OR pg_catalog.has_function_privilege({Text(enrollment.RuntimeLogin)},
+                    {Text(Function(context, "image") + "(uuid,uuid,timestamp with time zone)")},'EXECUTE') THEN
                 RAISE EXCEPTION 'native_tenant_preference_effective_privilege_drift' USING ERRCODE = '55000';
             END IF;
             """;

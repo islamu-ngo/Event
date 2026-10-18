@@ -30,7 +30,7 @@ public static class PostgresUserTenantNavigationContract
                     WHERE rolname IN ('{OwnerRole}','{GlobalRole}','{MigratorRole}'))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc p
                         JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-                        WHERE n.nspname = '{Literal(model.SchemaName)}' AND p.proname = '{FunctionName}')
+                        WHERE n.nspname = {Text(model.SchemaName)} AND p.proname = '{FunctionName}')
                 """;
             if (await existing.ExecuteScalarAsync(token) is true)
             {
@@ -138,31 +138,31 @@ public static class PostgresUserTenantNavigationContract
         string guard = PostgresPrivilegeGuard.BuildAssertSql(contract)
             + PostgresPrivilegeGuard.BuildRoutineAclAssertSql([signature], OwnerRole, GlobalRole, requireComplete: true)
             + $"""
-            IF pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{OwnerRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{MigratorRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.RuntimeLogin)}','{GlobalRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}','{OwnerRole}','MEMBER')
-                OR pg_catalog.pg_has_role('{Literal(enrollment.GlobalLogin)}','{MigratorRole}','MEMBER')
+            IF pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},'{OwnerRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},'{MigratorRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.RuntimeLogin)},'{GlobalRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},'{OwnerRole}','MEMBER')
+                OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},'{MigratorRole}','MEMBER')
                 OR EXISTS (
                     WITH RECURSIVE inherited_roles(roleid) AS (
                         SELECT edge.roleid FROM pg_catalog.pg_auth_members edge
                         WHERE edge.member = (SELECT oid FROM pg_catalog.pg_roles
-                            WHERE rolname = '{Literal(enrollment.MigratorLogin)}')
+                            WHERE rolname = {Text(enrollment.MigratorLogin)})
                         UNION
                         SELECT edge.roleid FROM pg_catalog.pg_auth_members edge
                         JOIN inherited_roles inherited ON edge.member = inherited.roleid)
                     SELECT 1 FROM inherited_roles
                     WHERE roleid = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{GlobalRole}'))
-                OR pg_catalog.has_schema_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(schema)}','CREATE')
-                OR pg_catalog.has_schema_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(schema)}','CREATE')
+                OR pg_catalog.has_schema_privilege({Text(enrollment.RuntimeLogin)},{Text(schema)},'CREATE')
+                OR pg_catalog.has_schema_privilege({Text(enrollment.GlobalLogin)},{Text(schema)},'CREATE')
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles
-                    WHERE rolname IN ('{Literal(enrollment.RuntimeLogin)}','{Literal(enrollment.GlobalLogin)}')
+                    WHERE rolname IN ({Text(enrollment.RuntimeLogin)},{Text(enrollment.GlobalLogin)})
                         AND (NOT rolcanlogin OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication))
-                OR pg_catalog.has_table_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
-                OR pg_catalog.has_any_column_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,REFERENCES')
-                OR pg_catalog.has_table_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
-                OR pg_catalog.has_any_column_privilege('{Literal(enrollment.GlobalLogin)}','{Literal(table)}','SELECT,INSERT,UPDATE,REFERENCES')
-                OR pg_catalog.has_function_privilege('{Literal(enrollment.RuntimeLogin)}','{Literal(signature)}','EXECUTE') THEN
+                OR pg_catalog.has_table_privilege({Text(enrollment.RuntimeLogin)},{Text(table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                OR pg_catalog.has_any_column_privilege({Text(enrollment.RuntimeLogin)},{Text(table)},'SELECT,INSERT,UPDATE,REFERENCES')
+                OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(table)},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(table)},'SELECT,INSERT,UPDATE,REFERENCES')
+                OR pg_catalog.has_function_privilege({Text(enrollment.RuntimeLogin)},{Text(signature)},'EXECUTE') THEN
                 RAISE EXCEPTION 'native_user_navigation_effective_privilege_drift' USING ERRCODE = '55000';
             END IF;
             """;
@@ -170,7 +170,7 @@ public static class PostgresUserTenantNavigationContract
             BEGIN
                 {guard}
                 {PostgresPrivilegeGuard.RestrictedCallerSql}
-                IF session_user <> '{Literal(enrollment.GlobalLogin)}' OR current_user <> '{OwnerRole}' THEN
+                IF session_user <> {Text(enrollment.GlobalLogin)} OR current_user <> '{OwnerRole}' THEN
                     RAISE EXCEPTION 'native_user_navigation_wrong_executor' USING ERRCODE = '42501';
                 END IF;
                 RETURN QUERY SELECT u.{id}, u.{preference} FROM {table} u
@@ -188,5 +188,6 @@ public static class PostgresUserTenantNavigationContract
         ?? context.Model.FindEntityType(typeof(User))!.GetSchema() ?? "public";
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
-    private static string Literal(string value) => value.Replace("'", "''", StringComparison.Ordinal);
+    private static string Text(string value) => "E'" + value.Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("'", "''", StringComparison.Ordinal).Replace("$", "\\044", StringComparison.Ordinal) + "'";
 }

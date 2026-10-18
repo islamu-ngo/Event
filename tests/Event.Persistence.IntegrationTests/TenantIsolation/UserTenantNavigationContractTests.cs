@@ -19,6 +19,24 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public sealed class UserTenantNavigationContractTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
+    public async Task ReadinessParsesDollarQuotedLoginBeforeRejectingChangedEnrollment()
+    {
+        await using var context = fixture.CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        string login = "rt$guard$$install$$body$$ddl$'\\" + Guid.CreateVersion7().ToString("N")[..12];
+        var enrollment = fixture.NativeQueueEnrollment with { RuntimeLogin = login };
+        await context.Database.ExecuteSqlRawAsync(
+            $"ALTER ROLE {Quote(fixture.NativeQueueEnrollment.RuntimeLogin)} RENAME TO {Quote(login)}");
+
+        // The renamed login is valid SQL, but the installed body still belongs to
+        // the original enrollment. Parsing must succeed before exact-body rejection.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            PostgresUserTenantNavigationContract.RequireReadyAsync(context, enrollment, CancellationToken.None));
+
+        await transaction.RollbackAsync();
+    }
+
+    [Test]
     public async Task EnrolledReadReturnsOnlySelectedLiveUserAndPreference()
     {
         await using var context = Open();

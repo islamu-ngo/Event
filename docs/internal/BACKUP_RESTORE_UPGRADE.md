@@ -11,6 +11,20 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## Native PostgreSQL login identity
+
+Navigation and tenant-preference native contracts serialize declared login names
+as complete PostgreSQL escape-string literals, including backslash, apostrophe
+and dollar escaping. This preserves the exact enrolled identity when a name
+contains a dollar-quote delimiter used by a generated routine or readiness
+block. Identifier quoting remains separate from literal serialization; command
+parameters cannot replace literals inside a `DO` body.
+
+Install updated native definitions through the controlled migrator before
+accepting application traffic. Expected bodies and fingerprints remain exact:
+Runtime must reject an old or drifted installation, not normalize it, switch
+authority or repair it on demand.
+
 ## Instance Onboarding State Across Restore
 
 The database is the authority for completed onboarding. Restore a completed

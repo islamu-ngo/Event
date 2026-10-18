@@ -18,6 +18,26 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public sealed class TenantPreferenceContractTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
+    public async Task ReadinessParsesDollarQuotedLoginBeforeRejectingChangedEnrollment()
+    {
+        await using var context = fixture.CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        string login = "rt$guard$$install$$body$$ddl$'\\" + Guid.CreateVersion7().ToString("N")[..12];
+        var enrollment = fixture.NativeQueueEnrollment with { RuntimeLogin = login };
+        using var identifiers = new NpgsqlCommandBuilder();
+        string original = identifiers.QuoteIdentifier(fixture.NativeQueueEnrollment.RuntimeLogin);
+        string renamed = identifiers.QuoteIdentifier(login);
+        await context.Database.ExecuteSqlRawAsync($"ALTER ROLE {original} RENAME TO {renamed}");
+
+        // Login text must survive the outer dollar-quoted guard. The original
+        // installed body must still reject the changed enrollment identity.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            PostgresTenantPreferenceContract.RequireReadyAsync(context, enrollment, CancellationToken.None));
+
+        await transaction.RollbackAsync();
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task SameBodyWithReversedUuidArgumentNamesCannotPassReadiness(bool image)

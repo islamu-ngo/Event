@@ -13,6 +13,17 @@ successful file copy alone is not evidence of crash safety or recovery.
 
 ---
 
+## PostgreSQL login identities during upgrade
+
+Preserve the exact declared Migrator, Global and Runtime login names when
+restoring or installing native database contracts. Supported punctuation in a
+login name remains identity data. Do not strip punctuation or rename these
+logins to accommodate SQL generation.
+
+Deploy matching native definitions with the application through the controlled
+migrator before reopening traffic. Runtime rejects stale or changed definitions
+rather than repairing them or selecting another database authority.
+
 ## 1. What Must Be Backed Up
 
 Inventory the stores your selected topology actually uses:

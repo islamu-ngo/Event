@@ -94,6 +94,11 @@ isolation mechanism. For Infisical-backed local databases, separately inject
 bootstrap role credentials and stable `DATABASE_PORT` / `ERASURE_DATABASE_PORT`
 values, then provision matching runtime and migrator coordinates in the vault.
 AppHost will not substitute generated local credentials for a failed vault read.
+This also applies to Global database credentials in both Split and Standalone
+local-data profiles: keep them in the selected consumer's vault authority, not
+in AppHost's `Database:Global` configuration. AppHost must not need those local
+values to construct its resource graph, and supplying them does not authorize
+forwarding them to an Infisical-backed child.
 Recovery is forward correction and restart; never restore broad folder fallback.
 
 > [!TIP]

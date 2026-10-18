@@ -34,6 +34,12 @@ roots. AppHost performs no shared vault acquisition and never switches the
 selected secret provider for a local profile. Provider containers use
 resource-specific operator injection. The [secret authority contract](SECRETS.md#consumer-isolated-acquisition-and-orchestration)
 defines the trusted-orchestrator limitation and local database prerequisites.
+In local-data profiles, both API and Standalone route Global credential
+projection through the same selected-provider guard used for external data.
+With Infisical selected, AppHost neither binds `Database:Global` from its own
+configuration nor projects those credentials; the child acquires its own
+authority. Environment and Development/Testing User Secrets retain their
+explicit Global credential projection.
 External provider setup and signed Cerbos publication precede runtime readiness;
 no retired bootstrap script or runtime publisher is restored by this topology.
 

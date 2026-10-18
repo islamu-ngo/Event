@@ -436,8 +436,7 @@ if (hostingTopology == HostingTopology.Split)
     {
         exploreAPI = WithLocalPrimaryDatabase(builder, exploreAPI, database, PrimaryDatabaseRole.Runtime)
             .WaitFor(database);
-        exploreAPI = WithSelectedPrimaryDatabaseCredentials(
-            builder, exploreAPI, PrimaryDatabaseConfiguration.BindGlobal(builder.Configuration));
+        exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Global);
     }
     else
     {
@@ -643,8 +642,7 @@ else
                 database,
                 PrimaryDatabaseRole.Runtime)
             .WaitFor(database);
-        eventStandalone = WithSelectedPrimaryDatabaseCredentials(
-            builder, eventStandalone, PrimaryDatabaseConfiguration.BindGlobal(builder.Configuration));
+        eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Global);
     }
     else
     {

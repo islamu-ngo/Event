@@ -17,6 +17,15 @@ context, and their membership checks still apply. A missing tenant selection
 is denied rather than treated as instance-wide creation; an existing event ID
 cannot substitute for the new-event creation identity.
 
+### Setup credentials and bearer tokens
+
+On setup-protected routes, an invalid bearer token returns `401` even when the
+setup secret is valid. Send an access token with the correct purpose, or omit
+the Authorization header for an explicitly supported setup-only operation
+while setup is active. A valid bearer token does not override an invalid setup
+secret supplied in the same request. Rejected credentials never authorize a
+credential-provider call through the other channel.
+
 ---
 
 ## 1. Administrative Consoles & Routes

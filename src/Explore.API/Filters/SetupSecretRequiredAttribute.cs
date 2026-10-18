@@ -1,6 +1,10 @@
 using Explore.API.ExceptionHandling;
+using Explore.API.Extensions;
+using Explore.Application.Constants;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Onboarding;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -31,6 +35,21 @@ public class SetupSecretRequiredAttribute : TypeFilterAttribute
 
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
+            if (context.HttpContext.Request.Headers.Authorization.Any(value => !string.IsNullOrWhiteSpace(value)))
+            {
+                string bearerScheme = AuthenticationExtensions.IsAtprotoSessionBearer(context.HttpContext.Request)
+                    ? ApiAuthenticationSchemeNames.AtprotoSession
+                    : AuthenticationExtensions.IsLocalIdentityBearer(context.HttpContext.Request)
+                        ? ApiAuthenticationSchemeNames.LocalIdentity
+                        : JwtBearerDefaults.AuthenticationScheme;
+                if (!(await context.HttpContext.AuthenticateAsync(bearerScheme)).Succeeded)
+                {
+                    context.Result = ApiProblemFactory.ToProblemResult(
+                        ApiProblemFactory.CreateAuthenticationRequiredProblem(context.HttpContext));
+                    return;
+                }
+            }
+
             var secret = context.HttpContext.Request.Headers["X-Setup-Secret"].FirstOrDefault();
             SetupSecretValidationOutcome validation = await _setupSecretProvider.ValidateSecretAsync(
                 secret,

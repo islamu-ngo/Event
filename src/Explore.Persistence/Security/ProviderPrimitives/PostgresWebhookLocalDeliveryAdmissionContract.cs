@@ -68,7 +68,12 @@ public static partial class PostgresWebhookLocalDeliveryAdmissionContract
             request.LeaseDuration <= TimeSpan.Zero)
             return [];
         return await context.Database.SqlQueryRaw<WebhookLocalDeliveryClaim>(
-            $"SELECT * FROM {ClaimFunctionSql(context)}(@now, @duration, @batch, @candidates, @global, @tenants, @tenant_caps, @endpoint_caps, @cycles, @target)",
+            $"""
+            SELECT "TenantId" AS tenant_id, "TargetId" AS target_id, "LeaseToken" AS lease_token,
+                "DeliveryFence" AS delivery_fence, "ClaimedAtUtc" AS claimed_at_utc,
+                "LeaseExpiresAtUtc" AS lease_expires_at_utc, "NextActionAtUtc" AS next_action_at_utc
+            FROM {ClaimFunctionSql(context)}(@now, @duration, @batch, @candidates, @global, @tenants, @tenant_caps, @endpoint_caps, @cycles, @target)
+            """,
             new NpgsqlParameter("now", request.ClaimedAtUtc),
             new NpgsqlParameter("duration", request.LeaseDuration),
             new NpgsqlParameter("batch", request.BatchSize),

@@ -48,7 +48,11 @@ public static class PostgresWebhookClaimEndpointStateContract
         if (operation != 0 && context.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Webhook endpoint health requires the settlement transaction.");
         return await context.Database.SqlQueryRaw<WebhookEndpointFailureState>(
-                $"SELECT * FROM {FunctionSql(context)}(@tenant, @target, @lease, @fence, @endpoint, @observed, @operation, @category, @threshold)",
+                $"""
+                SELECT "ConsecutiveFailureCount" AS consecutive_failure_count,
+                    "IsAutoPaused" AS is_auto_paused, "TransitionedToAutoPaused" AS transitioned_to_auto_paused
+                FROM {FunctionSql(context)}(@tenant, @target, @lease, @fence, @endpoint, @observed, @operation, @category, @threshold)
+                """,
                 new NpgsqlParameter("tenant", tenantId), new NpgsqlParameter("target", targetId),
                 new NpgsqlParameter("lease", leaseToken), new NpgsqlParameter("fence", fence),
                 new NpgsqlParameter("endpoint", NpgsqlDbType.Uuid) { Value = (object?)endpointId ?? DBNull.Value },

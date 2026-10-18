@@ -98,6 +98,7 @@ public partial class ExploreDbContext : DbContext
         ResetHumanCommitAdmissions();
         _outboxExecutionClaim = null;
         ResetTrustedSetupSettingsAdmissions();
+        ResetNativeWebhookClaims();
         IsPostgresRuntimeReady = false;
         IsConfigurationInstanceImportOwner = false;
         _tenantLeaseBound = false;

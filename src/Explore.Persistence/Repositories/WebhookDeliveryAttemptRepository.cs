@@ -17,21 +17,32 @@ public sealed class WebhookDeliveryAttemptRepository(ExploreDbContext dbContext)
             attempt.Id = Guid.CreateVersion7();
         }
 
-        await dbContext.WebhookDeliveryAttempts.AddAsync(attempt, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return attempt;
+        try
+        {
+            dbContext.BindNativeWebhookClaimEvidence([attempt]);
+            await dbContext.WebhookDeliveryAttempts.AddAsync(attempt, cancellationToken);
+            int savedEntries = await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.ConsumeNativeWebhookClaimEvidence([attempt], savedEntries);
+            return attempt;
+        }
+        catch
+        {
+            dbContext.PoisonNativeWebhookClaimEvidence([attempt]);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<WebhookDeliveryAttempt>> CreateManyAsync(
         IReadOnlyCollection<WebhookDeliveryAttempt> attempts,
         CancellationToken cancellationToken)
     {
-        if (attempts.Count == 0)
+        var admittedAttempts = attempts.ToArray();
+        if (admittedAttempts.Length == 0)
         {
             return [];
         }
 
-        foreach (var attempt in attempts)
+        foreach (var attempt in admittedAttempts)
         {
             if (attempt.Id == Guid.Empty)
             {
@@ -39,9 +50,19 @@ public sealed class WebhookDeliveryAttemptRepository(ExploreDbContext dbContext)
             }
         }
 
-        await dbContext.WebhookDeliveryAttempts.AddRangeAsync(attempts, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return attempts.ToList();
+        try
+        {
+            dbContext.BindNativeWebhookClaimEvidence(admittedAttempts);
+            await dbContext.WebhookDeliveryAttempts.AddRangeAsync(admittedAttempts, cancellationToken);
+            int savedEntries = await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.ConsumeNativeWebhookClaimEvidence(admittedAttempts, savedEntries);
+            return admittedAttempts;
+        }
+        catch
+        {
+            dbContext.PoisonNativeWebhookClaimEvidence(admittedAttempts);
+            throw;
+        }
     }
 
     public Task<WebhookDeliveryAttempt?> GetByIdForOwnerOperationAsync(

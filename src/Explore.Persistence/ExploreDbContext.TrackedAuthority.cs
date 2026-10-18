@@ -133,6 +133,7 @@ public partial class ExploreDbContext
     private async Task ValidateTrackedTenantAuthorityAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        await ValidateNativeWebhookClaimEvidenceAsync(cancellationToken);
         ValidateTenantLease();
         if (TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty)
             return;
@@ -176,6 +177,8 @@ public partial class ExploreDbContext
                                 ?? NativeAiForeignKeyVisible(entry, foreignKey.PrincipalEntityType,
                                     foreignKey.PrincipalKey.Properties, values)
                                 ?? NativeCheckoutDispatchForeignKeyVisible(entry, foreignKey.PrincipalEntityType,
+                                    foreignKey.PrincipalKey.Properties, values)
+                                ?? NativeWebhookClaimForeignKeyVisible(entry, foreignKey.PrincipalEntityType,
                                     foreignKey.PrincipalKey.Properties, values)
                                 ?? NativePaymentReconciliationForeignKeyVisible(entry, foreignKey.PrincipalEntityType,
                                     foreignKey.PrincipalKey.Properties, values)

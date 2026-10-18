@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5804NKRQA499NBG52WZHY9R
+Title: "Retain import ownership for portable settings snapshots"
+Type: fix
+Scope: database
+Summary: "Route Portable configuration comparison reads through the existing sealed import owner and scoped repositories without retargeting Runtime or weakening ordinary settings admission."
+Group: import-settings-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Portable reads retain the sealed import owner and original transaction. The ordinary settings scope guard, catalogue validation, instance locks and secret omission remain enforced; no new grants or caller authority are introduced.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Portable comparison snapshots use their authorized import target without retargeting the administrator's Runtime context. The correction requires no additional environment variables or database permissions.

@@ -182,6 +182,14 @@ metadata through a bounded native read on that same owner. Deploy its updated
 snapshot function through the migration process; do not repair missing
 capability installation by granting the application direct access to bootstrap
 history. Runtime assurance for this repair remains pending.
+
+Portable comparison snapshots resolve effective settings through the import's
+own read scope, just as Overrides reads its selected values there. The
+administrator's currently selected tenant is unchanged, and does not substitute
+for the authorized import target. Instance locks and secret omission still
+apply; no extra database grants or configuration variables are needed for this
+settings-read correction.
+
 Tenant lock targets are also selected through a bounded native read. A matching
 inactive tenant remains visible to the import's eligibility checks; this does
 not authorize applying changes to an inactive tenant. The application does not

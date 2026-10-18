@@ -2498,6 +2498,23 @@ field-ownership tracking, drift/conflict policy, deletion semantics, and
 takeover rules remain deferred; there is no dormant `Reconcile` runtime mode or
 placeholder UI.
 
+### Import Snapshot Settings Authority
+
+`ConfigurationInstanceImportExecutor.ReadSnapshotAsync` creates an independent,
+sealed Global import owner and reads within that owner's Serializable transaction.
+Both Overrides and Portable comparison snapshots retain that owner; they never
+retarget the request's Runtime tenant context.
+
+Portable resolution reaches `InstanceTenantSettingsReader`. For a sealed import
+owner, it reuses the scoped `SystemSettingRepository.GetAllSettings` EF read and
+`TenantSettingRepository.GetByTenantAndKeys` for the explicit tenant and requested
+catalogue keys. The latter retains PostgreSQL's existing import snapshot contract
+and its original connection/transaction checks. It does not fall back to
+`GetAllForTenant` or send the Global import context through an ordinary-settings
+capability. The ordinary reader's scope guard remains unchanged. Catalogue key
+validation, instance-lock precedence and non-secret manifest projection still
+apply; this dispatch grants no new database or request authority.
+
 ## Related
 
 - [API.md](API.md)

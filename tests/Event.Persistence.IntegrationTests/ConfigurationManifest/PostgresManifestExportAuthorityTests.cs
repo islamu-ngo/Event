@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Event.Persistence.IntegrationTests.TenantIsolation;
+using Explore.API.Extensions;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -26,16 +27,19 @@ using Explore.Domain.Settings.Documents;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Entities;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
@@ -49,6 +53,62 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
     private const string ExcludedKey = "manifest.export.non_catalog";
     private const string TenantASlug = "z-export-tenant-a";
     private const string TenantBSlug = "a-export-tenant-b";
+
+    [Test]
+    [Arguments("resource")]
+    [Arguments("tenant-setting")]
+    [Arguments("branding")]
+    [Arguments("tenant-identity")]
+    [Arguments("paid-policy")]
+    [Arguments("legal-mutation")]
+    [Arguments("publication")]
+    [Arguments("receipt")]
+    public async Task ImportInstallersRejectUndeclaredColumnPrivilegesInOriginalTransaction(string family)
+    {
+        (string Owner, Func<ExploreDbContext, CancellationToken, Task> Install) contract = family switch
+        {
+            "resource" => (PostgresConfigurationImportEventResourceContract.OwnerRole,
+                PostgresConfigurationImportEventResourceContract.ApplyAsync),
+            "tenant-setting" => (PostgresConfigurationImportTenantSettingContract.OwnerRole,
+                PostgresConfigurationImportTenantSettingContract.ApplyAsync),
+            "branding" => (PostgresConfigurationImportBrandingContract.OwnerRole,
+                PostgresConfigurationImportBrandingContract.ApplyAsync),
+            "tenant-identity" => (PostgresConfigurationImportTenantIdentityContract.OwnerRole,
+                PostgresConfigurationImportTenantIdentityContract.ApplyAsync),
+            "paid-policy" => (PostgresConfigurationImportPaidPolicyContract.OwnerRole,
+                PostgresConfigurationImportPaidPolicyContract.ApplyAsync),
+            "legal-mutation" => (PostgresConfigurationImportLegalMutationContract.OwnerRole,
+                PostgresConfigurationImportLegalMutationContract.ApplyAsync),
+            "publication" => (PostgresConfigurationImportPublicationPolicyContract.OwnerRole,
+                PostgresConfigurationImportPublicationPolicyContract.ApplyAsync),
+            "receipt" => (PostgresConfigurationImportReceiptContract.OwnerRole,
+                PostgresConfigurationImportReceiptContract.ApplyAsync),
+            _ => throw new ArgumentOutOfRangeException(nameof(family), family, null)
+        };
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(
+            builder, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var migration = new ExploreDbContext(builder.Options);
+        await using var transaction = await migration.Database.BeginTransactionAsync();
+        await contract.Install(migration, CancellationToken.None);
+
+        var names = new HumanPrincipalSourceSql(migration);
+        using var identifiers = new NpgsqlCommandBuilder();
+        // GRANT accepts identifiers, not value parameters. Every identifier is quoted.
+        string grant =
+            $"GRANT REFERENCES ({names.Column(typeof(SystemSetting), nameof(SystemSetting.SettingKey))}) " +
+            $"ON TABLE {names.Table(typeof(SystemSetting))} TO {identifiers.QuoteIdentifier(contract.Owner)}";
+        await migration.Database.ExecuteSqlRawAsync(grant);
+        var denied = await Assert.ThrowsAsync<PostgresException>(() => contract.Install(migration, CancellationToken.None));
+        await Assert.That(denied!.SqlState).IsEqualTo("42501");
+        await transaction.RollbackAsync();
+
+        // The failed install must neither commit the injected grant nor replace
+        // the caller's transaction with a separately committed installation.
+        await using var cleanTransaction = await migration.Database.BeginTransactionAsync();
+        await contract.Install(migration, CancellationToken.None);
+        await cleanTransaction.RollbackAsync();
+    }
 
     [Test]
     public async Task OrdinaryRuntimeTenantACannotReadTenantBOverridesEvenWithoutQueryFilters()
@@ -970,26 +1030,39 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
         await seed.SaveChangesAsync();
     }
 
-    private static ServiceProvider CreateServices(
+    private ServiceProvider CreateServices(
         PrimaryDatabaseConnectionOptions runtime, NpgsqlConnectionStringBuilder global, Guid? actor = null,
         Action<Guid>? failAfterEffect = null)
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        var settings = new Dictionary<string, string?>
         {
             ["Database:Provider"] = "PostgreSql",
             ["Database:Host"] = runtime.Host,
             ["Database:Port"] = runtime.Port?.ToString(CultureInfo.InvariantCulture),
             ["Database:Database"] = runtime.Database,
             ["Database:Schema"] = runtime.Schema,
-            ["Database:Username"] = runtime.Username,
-            ["Database:Password"] = runtime.Password,
+            ["Database:Runtime:Username"] = runtime.Username,
+            ["Database:Runtime:Password"] = runtime.Password,
             ["Database:Global:Username"] = global.Username,
             ["Database:Global:Password"] = global.Password,
             ["Database:TlsMode"] = "Disabled",
             ["Authentication:Provider"] = "Local",
             ["Authorization:Provider"] = "local",
             ["SecretProvider:Provider"] = "Environment"
-        }).Build();
+        };
+        foreach (var role in new[]
+        {
+            PrimaryDatabaseRole.Migrator,
+            PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
+            PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
+            PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport
+        })
+        {
+            var options = fixture.GetNativeQueueOptions(role, runtime.Schema);
+            settings[$"Database:{role}:Username"] = options.Username;
+            settings[$"Database:{role}:Password"] = options.Password;
+        }
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             DisableDefaults = true,
@@ -1001,6 +1074,9 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
         services.AddMetrics();
         services.AddSingleton<ProjectionMetrics>();
         services.AddSingleton<BusinessMetrics>();
+        var environment = new ManifestWebEnvironment();
+        services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddApiAuthentication(configuration, environment, skipAuthorityWarmup: true);
         services.ConfigureApplicationServices(configuration);
         services.ConfigureInfrastructureServices(configuration);
         services.AddSecretProvider(configuration);
@@ -1028,6 +1104,16 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
 
     private static Task<string> CurrentLoginAsync(ExploreDbContext context) =>
         context.Database.SqlQueryRaw<string>("SELECT current_user::text AS \"Value\"").SingleAsync();
+
+    private sealed class ManifestWebEnvironment : IWebHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Production;
+        public string ApplicationName { get; set; } = typeof(Program).Assembly.GetName().Name!;
+        public string ContentRootPath { get; set; } = Directory.GetCurrentDirectory();
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        public string WebRootPath { get; set; } = Directory.GetCurrentDirectory();
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+    }
 
     private sealed class FailAfterPersistedEffectOutbox(
         IConfigurationImportEffectOutboxRepository inner,

@@ -13,6 +13,14 @@ public sealed class InstanceTenantSettingsReader(
     public async Task<(IReadOnlyList<SystemSetting> System, IReadOnlyList<TenantSetting> Tenant)> ReadAsync(
         Guid? tenantId, IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
     {
+        if (context.IsConfigurationInstanceImportOwner)
+        {
+            context.ValidateTenantLease();
+            return (await systemSettings.GetAllSettings(cancellationToken: cancellationToken),
+                tenantId is { } importTenant
+                    ? await tenantSettings.GetByTenantAndKeys(importTenant, keys, cancellationToken) : []);
+        }
+
         var native = await PostgresOrdinarySettingsContract.TryReadHierarchyAsync(context,
             () => services.GetRequiredService<PostgresNativeQueueEnrollment>(),
             tenantId ?? context.TenantFilterTenantId, keys, cancellationToken);

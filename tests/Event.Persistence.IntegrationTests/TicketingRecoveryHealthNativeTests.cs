@@ -30,15 +30,17 @@ public sealed class TicketingRecoveryHealthNativeTests(PostgreSqlContainerFixtur
         await using var setup = fixture.CreateDbContext();
         await PostgresTicketingRecoveryHealthContract.ApplyAsync(setup, fixture.NativeQueueEnrollment);
         Guid tenantA = Guid.CreateVersion7(), tenantB = Guid.CreateVersion7();
-        await using (var transaction = await setup.Database.BeginTransactionAsync())
+        await setup.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
+            setup.ChangeTracker.Clear();
+            await using var transaction = await setup.Database.BeginTransactionAsync();
             await setup.Database.ExecuteSqlRawAsync("SET LOCAL session_replication_role = replica");
             // Unknown cases deliberately retain the real status/state CHECKs.
             // Generated schema must admit the domain's Unknown state with cleared
             // lease and terminal markers; this suite never weakens those checks.
             await TicketingRecoveryHealthTestData.SeedAsync(setup, tenantA, tenantB, unknown);
             await transaction.CommitAsync();
-        }
+        });
         // Commit is the visibility event. No observer starts before it completes.
         var factory = GlobalFactory();
         await using var request = RuntimeContext(boundRequest ? tenantA : null);
@@ -249,23 +251,26 @@ public sealed class TicketingRecoveryHealthNativeTests(PostgreSqlContainerFixtur
     {
         await using var setup = fixture.CreateDbContext();
         await PostgresTicketingRecoveryHealthContract.ApplyAsync(setup, fixture.NativeQueueEnrollment);
-        await using var transaction = await setup.Database.BeginTransactionAsync();
-        string[] roles = allAbsent
-            ? [PostgresTicketingRecoveryHealthContract.OwnerRole,
-                PostgresTicketingRecoveryHealthContract.MigratorRole, PostgresTicketingRecoveryHealthContract.ExecutorRole]
-            : [PostgresTicketingRecoveryHealthContract.OwnerRole];
-        foreach (string role in roles)
-            await setup.Database.ExecuteSqlRawAsync($"ALTER ROLE {role} RENAME TO \"recovery_health_drift_{Guid.CreateVersion7():N}\"");
-        await transaction.CreateSavepointAsync("drift");
-        var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await setup.Database.ExecuteSqlRawAsync(
-                PostgresTicketingRecoveryHealthContract.BuildSql(setup, fixture.NativeQueueEnrollment)));
-        await Assert.That(denied?.SqlState).IsEqualTo("55000");
-        await transaction.RollbackToSavepointAsync("drift");
-        foreach (string role in roles)
-            await Assert.That(await setup.Database.SqlQuery<bool>(
-                $"SELECT to_regrole({role}) IS NULL AS \"Value\"").SingleAsync()).IsTrue();
-        await transaction.RollbackAsync();
+        await setup.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await setup.Database.BeginTransactionAsync();
+            string[] roles = allAbsent
+                ? [PostgresTicketingRecoveryHealthContract.OwnerRole,
+                    PostgresTicketingRecoveryHealthContract.MigratorRole, PostgresTicketingRecoveryHealthContract.ExecutorRole]
+                : [PostgresTicketingRecoveryHealthContract.OwnerRole];
+            foreach (string role in roles)
+                await setup.Database.ExecuteSqlRawAsync($"ALTER ROLE {role} RENAME TO \"recovery_health_drift_{Guid.CreateVersion7():N}\"");
+            await transaction.CreateSavepointAsync("drift");
+            var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
+                await setup.Database.ExecuteSqlRawAsync(
+                    PostgresTicketingRecoveryHealthContract.BuildSql(setup, fixture.NativeQueueEnrollment)));
+            await Assert.That(denied?.SqlState).IsEqualTo("55000");
+            await transaction.RollbackToSavepointAsync("drift");
+            foreach (string role in roles)
+                await Assert.That(await setup.Database.SqlQuery<bool>(
+                    $"SELECT to_regrole({role}) IS NULL AS \"Value\"").SingleAsync()).IsTrue();
+            await transaction.RollbackAsync();
+        });
     }
 
     private GlobalExploreDbContextFactory GlobalFactory() =>

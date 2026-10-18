@@ -1,3 +1,5 @@
+using System.Data;
+using System.Data.Common;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Infrastructure.Recovery;
@@ -73,6 +75,15 @@ internal static class TicketingRecoveryHealthTestData
         string table = Table<FairReturnOrchestrationEffect>(context);
         DateTime? completed = status == FairReturnOrchestrationEffectStatus.Completed ? ObservedAt : null;
         DateTime? deadLettered = status == FairReturnOrchestrationEffectStatus.DeadLettered ? ObservedAt : null;
+        using var parameterFactory = context.Database.GetDbConnection().CreateCommand();
+        DbParameter NullableParameter(string name, DbType type, object? value)
+        {
+            var parameter = parameterFactory.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.DbType = type;
+            parameter.Value = value ?? DBNull.Value;
+            return parameter;
+        }
         return context.Database.ExecuteSqlRawAsync($$"""
             INSERT INTO {{table}}
                 (id, tenant_id, waitlist_payment_intent_id, stable_operation_id, stable_cursor,
@@ -82,8 +93,9 @@ internal static class TicketingRecoveryHealthTestData
                     {7}, {8}, {9}, {10}, {11})
             """,
             [Guid.CreateVersion7(), tenant, Guid.CreateVersion7(), Guid.CreateVersion7(), due.Ticks,
-                (int)status, due, (object?)failure ?? DBNull.Value, (object?)completed ?? DBNull.Value,
-                (object?)deadLettered ?? DBNull.Value, Guid.CreateVersion7(), due]);
+                (int)status, due, NullableParameter("failure", DbType.String, failure),
+                NullableParameter("completed", DbType.DateTime, completed),
+                NullableParameter("deadLettered", DbType.DateTime, deadLettered), Guid.CreateVersion7(), due]);
     }
 
     internal static string Table<T>(ExploreDbContext context) where T : class

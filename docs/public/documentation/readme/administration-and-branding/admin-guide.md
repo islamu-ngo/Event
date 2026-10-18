@@ -352,6 +352,28 @@ Quotas validate the instance ceiling rather than creating quota rows. The plan's
 remain unrun; deployments must use the current migration-installed contract,
 not silently repair stale database authority.
 
+### Updating Administrative API Clients
+
+Deploy regenerated clients with the matching API version. Provider credentials
+belong in the selected deployment secret authority, not administrative JSON:
+AI model creation and instance AI patches no longer accept `apiKey`, and
+authentication-provider patches no longer accept `googleClientSecret`.
+Tenant onboarding settings and completion no longer carry `aiAssistantApiKey`.
+Settings and onboarding reads no longer disclose the removed plaintext
+authentication secrets or the former AI/Cerbos credential-status properties;
+update automation that consumed those fields.
+
+The internal authentication-provider onboarding GET
+`/api/instanceonboarding/auth-provider-configuration/internal` is removed.
+Use the supported settings and onboarding operations exposed by the current
+client contract. Do not recover credentials by restoring an internal route.
+
+AI proposed-action confirmation now requires its request body. Registration
+order creation requires `Idempotency-Key`; retain the same key when retrying
+the same intent after an uncertain response. A rollback must preserve secret
+isolation and operation-key continuity, not restore plaintext fields or create
+a second order by generating a new key.
+
 ### Static Localization Bundles
 
 Instance administrators can import a static translation bundle with

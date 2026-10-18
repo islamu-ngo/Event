@@ -1,8 +1,7 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Secrets;
-using Explore.Persistence.Security;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Persistence.Services;
 
@@ -15,9 +14,9 @@ public sealed class LocalizationSecretStatusReader(
         context.ValidateTenantLease();
         if (context.IsTenantFilterBypassed || context.IsConfigurationInstanceImportOwner)
             throw new UnauthorizedAccessException("Localization status requires the ordinary selected scope.");
-        if (context.Database.IsNpgsql())
-            return await PostgresLocalizationSecretStatusContract.ReadAsync(context,
-                services.GetRequiredService<PostgresNativeQueueEnrollment>(), cancellationToken);
+        var nativeRead = LocalizationSecretStatusNativeQuery.ReadAsync(context, services, cancellationToken);
+        if (nativeRead is not null)
+            return await nativeRead;
 
         var contextId = context.ContextId;
         var tenant = context.TenantFilterTenantId;

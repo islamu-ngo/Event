@@ -27,7 +27,13 @@ public static class PostgresTicketingRecoveryHealthContract
     internal static Task<TicketingRecoveryAggregateHealth> ObserveAsync(
         ExploreDbContext context, CancellationToken cancellationToken) =>
         context.Database.SqlQueryRaw<TicketingRecoveryAggregateHealth>(
-            $"SELECT * FROM {FunctionSql(context)}()").SingleAsync(cancellationToken);
+            $"""
+            SELECT "RecoveryOnly" AS recovery_only, "Failed" AS failed,
+                "PendingReissues" AS pending_reissues, "AmbiguousEffects" AS ambiguous_effects,
+                "DeadLetteredEffects" AS dead_lettered_effects, "PoisonEffects" AS poison_effects,
+                "OldestDueAt" AS oldest_due_at
+            FROM {FunctionSql(context)}()
+            """).SingleAsync(cancellationToken);
 
     /// <summary>Install under migration authority after model-derived forced RLS.</summary>
     public static async Task ApplyAsync(

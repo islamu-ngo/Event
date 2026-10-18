@@ -27,7 +27,11 @@ public static class PostgresWebhookLocalDeliveryHealthContract
     internal static Task<WebhookLocalDeliveryHealth> ObserveAsync(
         ExploreDbContext context, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) =>
         context.Database.SqlQueryRaw<WebhookLocalDeliveryHealth>(
-            $"SELECT * FROM {FunctionSql(context)}({{0}})", observedAtUtc).SingleAsync(cancellationToken);
+            $$"""
+            SELECT "DueLocalTargets" AS due_local_targets,
+                "StaleDeliveringTargets" AS stale_delivering_targets
+            FROM {{FunctionSql(context)}}({0})
+            """, observedAtUtc).SingleAsync(cancellationToken);
 
     /// <summary>Install under migration authority after model-derived forced RLS.</summary>
     public static async Task ApplyAsync(

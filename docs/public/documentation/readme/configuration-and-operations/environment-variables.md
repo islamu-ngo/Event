@@ -365,15 +365,21 @@ provider ID/key/display name and creation/update audit columns. No Runtime
 read, write permission, table-wide SELECT or grant option is added. Every service
 sharing the Global credential can read these columns; the application restricts
 each lookup to the exact provider and account. Keep that credential restricted
-to trusted backend services.
+to trusted backend services. Grant these column reads directly to Global, not
+through another role. Admission rejects binding privileges on any other role in
+Global's transitive membership graph, including ADMIN-only memberships that
+could delegate access later.
 
-This development cutover requires a fresh isolated database installation. If an
-old external-login routine or any `event_external_login_authentication_*` role
-remains, startup migration fails with
-`external_login_requires_fresh_development_database`. Roles are cluster-wide, so
-use an isolated development PostgreSQL cluster when an existing cluster still
-contains them. The application does not delete data or clean up old database
-objects. Preserve any data you need before explicitly provisioning a replacement;
+This development cutover requires a fresh isolated PostgreSQL instance/cluster
+without the obsolete `event_external_login_authentication_owner`,
+`event_external_login_authentication_migrator` and
+`event_external_login_authentication_global` roles. Provision the database and
+declared accounts there. Creating only a new database in the old cluster is
+insufficient because roles are cluster-wide. If the old external-login routine
+or any of those roles remains, startup migration fails with
+`external_login_requires_fresh_development_database`. The application does not
+delete data or clean up old database objects. Preserve any data you need before
+explicitly provisioning a replacement;
 do not grant the removed execution role or broaden Runtime permissions to bypass
 the failure. No new environment variables or secret authority are required.
 

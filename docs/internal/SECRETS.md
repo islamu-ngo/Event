@@ -755,16 +755,23 @@ UpdatedAt and UpdatedBy. It grants no table-wide SELECT, writes or grant options
 Runtime remains denied. The required repository enrollment comes from the
 existing selected deployment configuration; PostgreSQL rejects missing enrollment
 or another session even if it has copied column permissions. The reader and
-installer reject excess privileges, including system columns and SET-reachable
-roles. Transactional identity synchronization retains its same-context reader.
+installer reject excess privileges, including system columns and the full
+transitive role-membership graph. Only the Global login itself may hold binding
+read privileges within that graph; another member role's binding privileges are
+rejected even when INHERIT and SET are disabled. This also closes ADMIN OPTION
+delegation through direct or nested membership. Transactional identity
+synchronization retains its same-context reader.
 
 All consumers sharing the Global credential can query those nine binding
 columns; factory aliases do not isolate them at the database level. No new secret
 authority or connection credential is introduced. The installer accepts only the
 declared Migrator session. It rejects the obsolete external-login function or any
 of its three legacy roles with `external_login_requires_fresh_development_database`.
-Use a fresh isolated development database/cluster with the declared accounts;
-there is no automatic object cleanup, data deletion or in-place compatibility path.
+Use a fresh isolated development PostgreSQL instance/cluster containing none of
+those obsolete capability roles, then provision its database and declared
+accounts. Roles are cluster-wide: creating only a new database in the old cluster
+does not remove them and cannot satisfy admission while they remain. There is
+no automatic object cleanup, data deletion or in-place compatibility path.
 Claims enrichment resolves authority directly through
 `IAdministrativeAuthorityRepository`, without constructing the ordinary
 `IAdminContext` before post-authentication tenant binding.

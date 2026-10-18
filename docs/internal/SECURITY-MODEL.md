@@ -397,8 +397,10 @@ identity result. No Runtime login-table privilege is required.
 `ExternalLoginAuthenticationRepository` uses one untracked EF query for all
 providers, matching both AuthenticationProviderId and ProviderKey without a User
 or UserPii join. PostgreSQL admission requires the declared Global session and
-its fixed column-only read privileges, including checks against privileges
-reachable through SET ROLE and system-column grants. The factory lease keeps
+its fixed column-only read privileges, including system-column grants and the
+full transitive role-membership graph. Binding privileges on member roles other
+than Global itself are rejected, including ADMIN-only delegation paths even
+when INHERIT and SET are disabled. The factory lease keeps
 the connection open across admission and the read; retries repeat both steps.
 The configured Global login can directly read all granted binding columns;
 the account predicate is enforced by C#, not a stored function. Other services
@@ -1907,7 +1909,9 @@ predicates, transactions and fences. Granting an execution group does not
 grant arbitrary private-table reads or owner membership. External provider-account
 binding lookup instead uses EF and fixed read-only Global column grants; it has
 no stored routine. Existing deployments containing its obsolete routine or roles
-are rejected and require explicit fresh isolated development database provisioning.
+are rejected and require an explicitly provisioned fresh isolated development
+PostgreSQL instance/cluster without the obsolete capability roles. A new database
+inside a cluster retaining those roles is insufficient because roles are cluster-wide.
 The application never automatically removes those objects or deletes data.
 
 Operators provision the selected Runtime, Migrator and Global logins and only

@@ -6,6 +6,15 @@
 > **Status:** Approved prospective policy; no release automation is active
 > **Owner:** Platform/Ops and Project Steward
 
+## Complete release-impact metadata
+
+Review complete changed-file metadata, including previous names for renames.
+A large PR must not bypass impact classification or lower its declared file count.
+See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
+A workflow correction on a PR branch does not replace the trusted-base version
+used by `pull_request_target`; arrange an independently reviewed base update
+before relying on its rerun.
+
 ## Scope and precedence
 
 This policy governs the future release engine. It does not replace the current manual

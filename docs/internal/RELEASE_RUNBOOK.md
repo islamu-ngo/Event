@@ -6,6 +6,15 @@
 > **Status:** Current manual procedure active; governed flow is prospective
 > **Owner:** Platform/Ops and release operators
 
+## Complete release-impact metadata
+
+Review complete changed-file metadata, including previous names for renames.
+A large PR must not bypass impact classification or lower its declared file count.
+See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
+A workflow correction on a PR branch does not replace the trusted-base version
+used by `pull_request_target`; arrange an independently reviewed base update
+before relying on its rerun.
+
 ## Current procedure
 
 Until a trusted release bundle, release-engine verification, signer policy, provider

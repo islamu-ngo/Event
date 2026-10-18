@@ -3,6 +3,16 @@
 
 # Operations
 
+## Complete release-impact metadata
+
+The release-impact validator reads runner-local file metadata, not an inline
+environment JSON payload. Investigate missing or truncated metadata rather than
+reducing the expected changed-file count.
+See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
+A workflow correction on a PR branch does not replace the trusted-base version
+used by `pull_request_target`; arrange an independently reviewed base update
+before relying on its rerun.
+
 ## Human administrator commit fences
 
 Tenant API-key revoke/details now acquire original S/P/H and repeat their existing

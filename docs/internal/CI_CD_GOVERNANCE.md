@@ -17,6 +17,22 @@ Do not symlink `.github` to `.ci`. GitHub discovers workflows from `.github/work
 
 Workflow YAML defines what runs; repository settings define which checks are required, which environments require approval, and which organization security features are enabled.
 
+## Complete PR file metadata
+
+The release-impact job checks out only its trusted base and fetches the immutable
+PR-head object without checking it out. Its NUL-delimited, rename-aware Git diff
+is serialized into a runner-local JSON file. This avoids both GitHub's
+3,000-file listing cap and process-environment payload limits while retaining
+previous filenames for impact classification. The validator accepts at most
+16 MiB of file metadata and still requires the exact event file count and unique
+paths; missing, truncated or invalid metadata fails closed.
+
+`RELEASE_IMPACT_FILE_METADATA_PATH` selects this runner-local metadata file.
+The former inline JSON environment payload is no longer used. No PR-head code,
+checkout, custom diff driver or text-conversion driver is executed. Because
+`pull_request_target` executes trusted-base code, this workflow repair must be
+reviewed and installed on the base before it can validate an affected large PR.
+
 ## Reproducible WebAssembly Restore
 
 `global.json` pins the SDK. `Directory.Build.props` additionally pins

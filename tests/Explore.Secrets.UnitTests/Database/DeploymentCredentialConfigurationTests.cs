@@ -97,7 +97,8 @@ public sealed class DeploymentCredentialConfigurationTests
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "docker-compose.yml")))
             directory = directory.Parent;
         if (directory is null) throw new InvalidOperationException("compose_source_not_found");
-        var start = new ProcessStartInfo("docker")
+        // This Linux compose renderer must not select its executable from ambient PATH.
+        var start = new ProcessStartInfo("/usr/bin/docker")
         {
             WorkingDirectory = directory.FullName,
             UseShellExecute = false,

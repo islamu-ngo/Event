@@ -67,10 +67,8 @@ public static class PostgresQueueDrainHealthContract
         ];
         string tableGrants = string.Join("\n", grants.Select(grant => $"""
             REVOKE ALL ON TABLE {Table(grant.Type)} FROM {OwnerRole}, {GlobalRole};
-            GRANT SELECT ({string.Join(", ", grant.Columns.Select(column => Column(grant.Type, column)))})
-                ON {Table(grant.Type)} TO {OwnerRole};
-            DROP POLICY IF EXISTS "{PolicyName}" ON {Table(grant.Type)};
-            CREATE POLICY "{PolicyName}" ON {Table(grant.Type)} FOR SELECT TO {OwnerRole} USING (true);
+            {FleetHealthInstallationSql.ReadPolicy(Table(grant.Type),
+                grant.Columns.Select(column => Column(grant.Type, column)), OwnerRole, PolicyName)}
             """));
         string schema = sql.DelimitIdentifier(Schema(context, Entity(typeof(IntegrationSyncOutbox))));
         string function = FunctionSql(context);

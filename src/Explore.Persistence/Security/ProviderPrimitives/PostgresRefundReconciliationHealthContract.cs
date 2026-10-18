@@ -127,16 +127,11 @@ public static class PostgresRefundReconciliationHealthContract
                 RAISE EXCEPTION 'refund_health_observation_not_ready' USING ERRCODE = '55000';
             END IF;
             """;
-        string grants = string.Join("\n", relations.Select(relation =>
-        {
-            string table = sql.DelimitIdentifier(relation.Name, schemaName);
-            return $"""
-                GRANT SELECT ({string.Join(", ", relation.Columns.Select(column => sql.DelimitIdentifier(column.Name)))})
-                    ON {table} TO {OwnerRole};
-                DROP POLICY IF EXISTS "{PolicyName}" ON {table};
-                CREATE POLICY "{PolicyName}" ON {table} FOR SELECT TO {OwnerRole} USING (true);
-                """;
-        }));
+        var installation = new FleetHealthInstallationSql(
+            contract, enrollment, OwnerRole, MigratorRole, ExecutorRole, PolicyName, "refund_health");
+        string grants = string.Join("\n", relations.Select(relation => FleetHealthInstallationSql.ReadPolicy(
+            sql.DelimitIdentifier(relation.Name, schemaName),
+            relation.Columns.Select(column => sql.DelimitIdentifier(column.Name)), OwnerRole, PolicyName)));
         string attempts = Table(context, typeof(RefundAttempt));
         string campaigns = Table(context, typeof(RefundCampaign));
         string disputes = Table(context, typeof(PaymentDispute));
@@ -161,42 +156,7 @@ public static class PostgresRefundReconciliationHealthContract
                             AND NOT rolcreaterole AND NOT rolreplication) THEN
                     RAISE EXCEPTION 'refund_health_enrollment_invalid' USING ERRCODE = '55000';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles
-                    WHERE rolname IN ('{OwnerRole}', '{MigratorRole}', '{ExecutorRole}')) THEN
-                    IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc routine
-                        JOIN pg_catalog.pg_namespace namespace ON namespace.oid = routine.pronamespace
-                        WHERE namespace.nspname = {Text(schemaName)}
-                            AND routine.proname = {Text(contract.Routines[0].Name)})
-                        OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy policy
-                            JOIN pg_catalog.pg_class relation ON relation.oid = policy.polrelid
-                            JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
-                            WHERE namespace.nspname = {Text(schemaName)} AND policy.polname = '{PolicyName}') THEN
-                        RAISE EXCEPTION 'refund_health_partial_bootstrap' USING ERRCODE = '55000';
-                    END IF;
-                    FOREACH v_role IN ARRAY ARRAY['{OwnerRole}', '{MigratorRole}', '{ExecutorRole}'] LOOP
-                        EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS', v_role);
-                    END LOOP;
-                    GRANT {OwnerRole} TO {MigratorRole} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
-                    EXECUTE format('GRANT {ExecutorRole} TO %I WITH INHERIT TRUE, SET FALSE, ADMIN FALSE', {Text(enrollment.GlobalLogin)});
-                    EXECUTE format('GRANT {MigratorRole} TO %I WITH INHERIT FALSE, SET TRUE, ADMIN FALSE', {Text(enrollment.MigratorLogin)});
-                    -- Creator ADMIN authority is needed for the grants above.
-                    -- Only fresh owner/executor shortcuts are removed; the
-                    -- declared migrator edge is retained with its exact options.
-                    FOREACH v_role IN ARRAY ARRAY['{OwnerRole}', '{ExecutorRole}'] LOOP
-                        IF EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members membership
-                            JOIN pg_catalog.pg_roles parent ON parent.oid = membership.roleid
-                            JOIN pg_catalog.pg_roles member ON member.oid = membership.member
-                            WHERE parent.rolname = v_role AND member.rolname = {Text(enrollment.MigratorLogin)}) THEN
-                            EXECUTE format('REVOKE %I FROM %I', v_role, {Text(enrollment.MigratorLogin)});
-                        END IF;
-                    END LOOP;
-                    IF ({PostgresPrivilegeGuard.BuildRoleGraphSql(contract)}) IS NOT TRUE THEN
-                        RAISE EXCEPTION 'native_privilege_guard_not_ready' USING ERRCODE = '55000';
-                    END IF;
-                ELSE
-                    {guard}
-                    {observationGuard}
-                END IF;
+                {installation.Enroll(guard, observationGuard)}
             END $enrollment$;
             GRANT USAGE, CREATE ON SCHEMA {schema} TO {OwnerRole};
             GRANT USAGE ON SCHEMA {schema} TO {ExecutorRole};

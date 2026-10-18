@@ -85,61 +85,13 @@ public static class PostgresWebhookLocalDeliveryHealthContract
             ]);
         string guard = PostgresPrivilegeGuard.BuildAssertSql(contract);
         string tables = string.Join(", ", sources.Select(source => Text(Table(context, source.Type)) + "::regclass"));
-        // This pre-bootstrap check cannot depend on the not-yet-created routine or roles.
-        string sourceGuard = $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles role
-                WHERE role.rolname = {Text(enrollment.GlobalLogin)} AND role.rolcanlogin
-                    AND NOT role.rolsuper AND NOT role.rolbypassrls AND NOT role.rolcreatedb
-                    AND NOT role.rolcreaterole AND NOT role.rolreplication)
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles role
-                    WHERE (pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)}, role.oid, 'USAGE')
-                        OR pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)}, role.oid, 'SET'))
-                        AND (role.rolsuper OR role.rolbypassrls OR role.rolcreatedb
-                            OR role.rolcreaterole OR role.rolreplication))
-                OR pg_catalog.has_schema_privilege({Text(enrollment.GlobalLogin)}, {Text(schemaName)}, 'CREATE')
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_class relation
-                    WHERE relation.oid IN ({tables}) AND (
-                        NOT relation.relrowsecurity OR NOT relation.relforcerowsecurity
-                        OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
-                            'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
-                        OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)}, relation.oid,
-                            'SELECT,INSERT,UPDATE,REFERENCES'))) THEN
-                RAISE EXCEPTION 'webhook_local_health_sources_not_ready' USING ERRCODE = '55000';
-            END IF;
-            """;
-        // Restrictive or undeclared applicable policies must not hide an unhealthy fleet.
-        string observationGuard = $"""
-            {sourceGuard}
-            IF EXISTS (SELECT 1 FROM pg_catalog.pg_class relation
-                LEFT JOIN pg_catalog.pg_policy policy
-                    ON policy.polrelid = relation.oid AND policy.polname = '{PolicyName}'
-                WHERE relation.oid IN ({tables}) AND (
-                    policy.oid IS NULL OR policy.polcmd <> 'r' OR NOT policy.polpermissive
-                    OR policy.polroles IS DISTINCT FROM ARRAY[pg_catalog.to_regrole('{OwnerRole}')::oid]
-                    OR pg_catalog.pg_get_expr(policy.polqual, policy.polrelid) IS DISTINCT FROM 'true'
-                    OR policy.polwithcheck IS NOT NULL
-                    OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy other
-                        WHERE other.polrelid = relation.oid AND other.polname <> '{PolicyName}'
-                            AND other.polcmd IN ('r', '*')
-                            AND EXISTS (SELECT 1 FROM unnest(other.polroles) role_id
-                                WHERE role_id = 0 OR pg_catalog.pg_has_role('{OwnerRole}', role_id, 'USAGE'))
-                            AND (NOT other.polpermissive OR other.polname <> 'tenant_isolation'))))
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc routine
-                    WHERE routine.oid = pg_catalog.to_regprocedure({Text(signature)})
-                        AND routine.provolatile = 's') THEN
-                RAISE EXCEPTION 'webhook_local_health_observation_not_ready' USING ERRCODE = '55000';
-            END IF;
-            """;
-        string grants = string.Join("\n", relations.Select(relation =>
-        {
-            string table = sql.DelimitIdentifier(relation.Name, schemaName);
-            return $"""
-                GRANT SELECT ({string.Join(", ", relation.Columns.Select(column => sql.DelimitIdentifier(column.Name)))})
-                    ON {table} TO {OwnerRole};
-                DROP POLICY IF EXISTS "{PolicyName}" ON {table};
-                CREATE POLICY "{PolicyName}" ON {table} FOR SELECT TO {OwnerRole} USING (true);
-                """;
-        }));
+        var installation = new FleetHealthInstallationSql(
+            contract, enrollment, OwnerRole, MigratorRole, ExecutorRole, PolicyName, "webhook_local_health");
+        string sourceGuard = installation.SourceGuard(tables);
+        string observationGuard = installation.ObservationGuard(sourceGuard, tables, signature);
+        string grants = string.Join("\n", relations.Select(relation => FleetHealthInstallationSql.ReadPolicy(
+            sql.DelimitIdentifier(relation.Name, schemaName),
+            relation.Columns.Select(column => sql.DelimitIdentifier(column.Name)), OwnerRole, PolicyName)));
         string targets = Table(context, typeof(WebhookLocalTargetSnapshot));
         string endpoints = Table(context, typeof(WebhookEndpoint));
         string C<T>(string property) => sql.DelimitIdentifier(ColumnName(context, typeof(T), property));
@@ -160,40 +112,7 @@ public static class PostgresWebhookLocalDeliveryHealthContract
                     RAISE EXCEPTION 'webhook_local_health_enrollment_invalid' USING ERRCODE = '55000';
                 END IF;
                 {sourceGuard}
-                IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles
-                    WHERE rolname IN ('{OwnerRole}', '{MigratorRole}', '{ExecutorRole}')) THEN
-                    IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc routine
-                        JOIN pg_catalog.pg_namespace namespace ON namespace.oid = routine.pronamespace
-                        WHERE namespace.nspname = {Text(schemaName)}
-                            AND routine.proname = {Text(contract.Routines[0].Name)})
-                        OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy policy
-                            JOIN pg_catalog.pg_class relation ON relation.oid = policy.polrelid
-                            JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
-                            WHERE namespace.nspname = {Text(schemaName)} AND policy.polname = '{PolicyName}') THEN
-                        RAISE EXCEPTION 'webhook_local_health_partial_bootstrap' USING ERRCODE = '55000';
-                    END IF;
-                    FOREACH v_role IN ARRAY ARRAY['{OwnerRole}', '{MigratorRole}', '{ExecutorRole}'] LOOP
-                        EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS', v_role);
-                    END LOOP;
-                    GRANT {OwnerRole} TO {MigratorRole} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
-                    EXECUTE format('GRANT {ExecutorRole} TO %I WITH INHERIT TRUE, SET FALSE, ADMIN FALSE', {Text(enrollment.GlobalLogin)});
-                    EXECUTE format('GRANT {MigratorRole} TO %I WITH INHERIT FALSE, SET TRUE, ADMIN FALSE', {Text(enrollment.MigratorLogin)});
-                    FOREACH v_role IN ARRAY ARRAY['{OwnerRole}', '{ExecutorRole}'] LOOP
-                        IF EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members membership
-                            JOIN pg_catalog.pg_roles parent ON parent.oid = membership.roleid
-                            JOIN pg_catalog.pg_roles member ON member.oid = membership.member
-                            WHERE parent.rolname = v_role AND member.rolname = {Text(enrollment.MigratorLogin)}) THEN
-                            EXECUTE format('REVOKE %I FROM %I', v_role, {Text(enrollment.MigratorLogin)});
-                        END IF;
-                    END LOOP;
-                    IF ({PostgresPrivilegeGuard.BuildRoleGraphSql(contract)}) IS NOT TRUE THEN
-                        RAISE EXCEPTION 'native_privilege_guard_not_ready' USING ERRCODE = '55000';
-                    END IF;
-                ELSE
-                    -- Reject existing drift before grants; do not adopt or normalize it.
-                    {guard}
-                    {observationGuard}
-                END IF;
+                {installation.Enroll(guard, observationGuard)}
             END $enrollment$;
             GRANT USAGE, CREATE ON SCHEMA {schema} TO {OwnerRole};
             GRANT USAGE ON SCHEMA {schema} TO {ExecutorRole};

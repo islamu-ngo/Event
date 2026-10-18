@@ -3043,3 +3043,25 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; preserve the fixture-context evidence without creating a new product invariant or repairing unrelated tests.
 
 ---
+
+[2026-10-18 Europe/Brussels] — Close flock descriptors before starting .NET builds
+
+**Context**: Persistence verification in shared PR #75 serializes expensive builds with an advisory lock in the approved temporary directory.
+
+**Symptom / Observation**: A Release build completed successfully, but the next build waited on the same lock. `lslocks` showed the previous VBCSCompiler process holding `FLOCK WRITE` and the new flock process waiting with `WRITE*`.
+
+**Root Cause**: Without `flock --close`, the launched command inherits the lock descriptor. A compiler server started by that command can outlive the build and retain the descriptor, so command completion does not necessarily release the lock.
+
+**Resolution**: Graceful `dotnet build-server shutdown --vbcscompiler` released the observed inherited lock. Subsequent verification uses `flock --close -w 900 "$TMPDIR/event-security-build.lock" dotnet build ...`; the flock parent retains serialization while compiler children do not inherit the descriptor. The next affected-project Release build completed with exit 0. Do not delete the lock file or kill unrelated builds to bypass contention.
+
+**Why This Matters for Future Work**: A blocked verification process may indicate descriptor inheritance rather than a slow active build. Inspect the actual lock owner before retrying or starting another build, and use close-on-child execution for long-lived compiler processes.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj`
+- `.agents/skills/implement-tasks/SKILL.md`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reusable operational diagnosis, no product behavior change.
+
+---

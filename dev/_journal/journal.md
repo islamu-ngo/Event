@@ -3065,3 +3065,27 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; reusable operational diagnosis, no product behavior change.
 
 ---
+
+[2026-10-19 Europe/Brussels] — Failed EF saves do not undo earlier native writes
+
+**Context**: PR #75 Persistence verification exercises webhook health changes and evidence insertion on one original PostgreSQL transaction.
+
+**Symptom / Observation**: A real duplicate-key evidence INSERT raised `DbUpdateException` with PostgreSQL state23505. The callback caught it and cleared EF tracking; the unit of work then committed the earlier native health change instead of rejecting completion.
+
+**Root Cause**: EF rolls a failed SaveChanges back to its own savepoint, not to the beginning of the existing transaction. Earlier native writes remain pending, while ChangeTracker.Clear removes tracked evidence that could otherwise reveal incomplete work. Tracking state alone therefore cannot represent the authority to commit the original operation.
+
+**Resolution**: Retain failure state in the original claim binding outside EF tracking and poison only its retained original transaction. Catch failures across binding, insertion and consumption, rethrow the provider error, and require the outer unit of work to reject completion even when the callback catches that error. The existing21 claim cases passed with `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter '/*/*/WebhookLocalDeliveryNativeAuthorityTests/ClaimAuthority*' --minimum-expected-tests 21 --progress off --maximum-parallel-tests 1` (zero failures/skips,exit0). An additional mutable-batch-input counterexample remains under verification; this receipt does not certify that later case or complete PR readiness.
+
+**Why This Matters for Future Work**: A database error and EF savepoint rollback do not prove business-operation rollback. Commit authority must survive tracker clearing, and batch inputs used to find retained bindings must be snapshotted before awaits so caller mutation cannot hide a failed attempt.
+
+**References**:
+- `src/Explore.Persistence/ExploreDbContext.WebhookClaimAuthority.cs:125`
+- `src/Explore.Persistence/Repositories/WebhookDeliveryAttemptRepository.cs:19`
+- `tests/Event.Persistence.IntegrationTests/Repositories/WebhookLocalDeliveryNativeAuthorityTests.ClaimAuthority.cs:395`
+- Official EF transaction behavior, retrieved as prose through Context7: https://learn.microsoft.com/en-us/ef/core/saving/transactions
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reusable failure-atomicity lesson with a real provider regression.
+
+---

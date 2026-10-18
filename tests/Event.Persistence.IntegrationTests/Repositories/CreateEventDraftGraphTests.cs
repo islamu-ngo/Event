@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -15,6 +15,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
@@ -45,13 +46,13 @@ public sealed class CreateEventDraftGraphTests
         bool mixed, bool explicitReferences)
     {
         var providerFixture = PrimaryDatabaseProviderBehaviorFixture.Create();
-        await providerFixture.PrepareAsync();
+        await NativeDraftGraphAuthentication.PrepareDatabaseAsync();
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
-        await using var services = BuildServices(providerFixture, tenant, userId);
+        await using var services = BuildServices(tenant);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var publisher = await SeedOwnerAsync(db, tenant.TenantId, userId);
+        var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
         await AssertProviderAsync(providerFixture, db);
         var request = DraftRequest(publisher.LocationId, mixed, explicitReferences)
             with
@@ -65,8 +66,8 @@ public sealed class CreateEventDraftGraphTests
             .Because($"{response.FailureCode}: {string.Join(", ", response.Errors ?? [])}");
 
         // A fresh provider context proves committed storage, not the handler's tracker.
-        await using var fresh = providerFixture.CreateTenantContext(tenant.TenantId);
-        var sessions = await new EventSessionRepository(fresh).GetSessionsByEvent(response.Id);
+        await using var fresh = NativeDraftGraphAuthentication.CreateRuntimeContext(tenant);
+        var sessions = await new EventSessionRepository(fresh, new HttpContextAccessor()).GetSessionsByEvent(response.Id);
         await Assert.That(sessions.Count).IsEqualTo(2);
         var prepared = sessions.Single(session => session.Title == "Prepared native session");
         await Assert.That(prepared.StartTime).IsNull();
@@ -117,25 +118,31 @@ public sealed class CreateEventDraftGraphTests
         await Assert.That(await fresh.EventRoleAssignments.CountAsync(grant => grant.EventId == response.Id
             && grant.UserId == userId && grant.RoleId == (int)RoleEnum.EventOwner)).IsEqualTo(1);
         await Assert.That(await fresh.OutboxMessages.CountAsync(message => message.AggregateId == response.Id)).IsEqualTo(0);
-        await Assert.That(await new EventSessionRepository(fresh).GetPublicSessionsByEventAsync(response.Id, default)).IsEmpty();
-        await Assert.That(await new EventRepository(fresh).IsPubliclyEligibleAsync(tenant.TenantId, response.Id, default)).IsFalse();
-        await using var foreign = providerFixture.CreateTenantContext(Guid.CreateVersion7());
+        // Public native reads require the context and binding selected together
+        // by production DI, not a manually reconstructed repository.
+        await using var publicRead = services.CreateAsyncScope();
+        await Assert.That(await publicRead.ServiceProvider.GetRequiredService<IEventSessionRepository>()
+            .GetPublicSessionsByEventAsync(response.Id, default)).IsEmpty();
+        await Assert.That(await publicRead.ServiceProvider.GetRequiredService<IEventRepository>()
+            .IsPubliclyEligibleAsync(tenant.TenantId, response.Id, default)).IsFalse();
+        await using var foreign = NativeDraftGraphAuthentication.CreateRuntimeContext(new GraphTenant(Guid.CreateVersion7()));
         await Assert.That(await new EventRepository(foreign).GetById(response.Id)).IsNull();
-        await Assert.That(await new EventSessionRepository(foreign).GetSessionsByEvent(response.Id)).IsEmpty();
+        await Assert.That(await new EventSessionRepository(foreign, new HttpContextAccessor())
+            .GetSessionsByEvent(response.Id)).IsEmpty();
     }
 
     [Test]
     public async Task NativeDraftCreation_PublicationWithUnscheduledChildRejectsWithoutGraphResidue()
     {
         var providerFixture = PrimaryDatabaseProviderBehaviorFixture.Create();
-        await providerFixture.PrepareAsync();
+        await NativeDraftGraphAuthentication.PrepareDatabaseAsync();
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
         var writes = new GraphWriteWitness();
-        await using var services = BuildServices(providerFixture, tenant, userId, writes);
+        await using var services = BuildServices(tenant, writes);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var publisher = await SeedOwnerAsync(db, tenant.TenantId, userId);
+        var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
         await AssertProviderAsync(providerFixture, db);
         var request = DraftRequest(publisher.LocationId, mixed: true, explicitReferences: false) with
         {
@@ -149,7 +156,7 @@ public sealed class CreateEventDraftGraphTests
         await Assert.That(response.Errors!.Any(error =>
             error.Contains("Sessions[0].StartTime", StringComparison.OrdinalIgnoreCase))).IsTrue();
         await Assert.That(writes.GraphWriteAttempted).IsFalse();
-        await using var fresh = providerFixture.CreateTenantContext(tenant.TenantId);
+        await using var fresh = NativeDraftGraphAuthentication.CreateRuntimeContext(tenant);
         await AssertEmptyGraphAsync(fresh);
     }
 
@@ -157,14 +164,14 @@ public sealed class CreateEventDraftGraphTests
     public async Task NativeDraftCreation_PreCommitPublicationFailureRollsBackWrittenGraphAndOutbox()
     {
         var providerFixture = PrimaryDatabaseProviderBehaviorFixture.Create();
-        await providerFixture.PrepareAsync();
+        await NativeDraftGraphAuthentication.PrepareDatabaseAsync();
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
         var failure = new PublicationWriteFailure(tenant.TenantId);
-        await using var services = BuildServices(providerFixture, tenant, userId, failure);
+        await using var services = BuildServices(tenant, failure);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var publisher = await SeedOwnerAsync(db, tenant.TenantId, userId);
+        var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
         await AssertProviderAsync(providerFixture, db);
         var draft = DraftRequest(publisher.LocationId, mixed: true, explicitReferences: false)
             with
@@ -189,7 +196,7 @@ public sealed class CreateEventDraftGraphTests
         await Assert.That(failure.OwnerWritten).IsTrue();
         await Assert.That(failure.OutboxWritten).IsTrue();
         await Assert.That(failure.Injected).IsTrue();
-        await using var fresh = providerFixture.CreateTenantContext(tenant.TenantId);
+        await using var fresh = NativeDraftGraphAuthentication.CreateRuntimeContext(tenant);
         await AssertEmptyGraphAsync(fresh);
         await Assert.That(await fresh.OutboxMessages.CountAsync(message => message.AggregateId == failure.RootId)).IsEqualTo(0);
         await Assert.That(await fresh.PdsSyncOutbox.CountAsync(message => message.SourceEntityId == failure.RootId)).IsEqualTo(0);
@@ -199,14 +206,14 @@ public sealed class CreateEventDraftGraphTests
     public async Task NativeDraftCreation_RealChildSaveFailureRollsBackRootChildrenOwnerAndOutbox()
     {
         var providerFixture = PrimaryDatabaseProviderBehaviorFixture.Create();
-        await providerFixture.PrepareAsync();
+        await NativeDraftGraphAuthentication.PrepareDatabaseAsync();
         var tenant = new GraphTenant(Guid.CreateVersion7());
         var userId = Guid.CreateVersion7();
         var failure = new ChildWriteFailure();
-        await using var services = BuildServices(providerFixture, tenant, userId, failure);
+        await using var services = BuildServices(tenant, failure);
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var publisher = await SeedOwnerAsync(db, tenant.TenantId, userId);
+        var publisher = await SeedAuthenticatedOwnerAsync(scope.ServiceProvider, tenant, userId);
         await AssertProviderAsync(providerFixture, db);
         var request = DraftRequest(publisher.LocationId, mixed: false, explicitReferences: true)
             with
@@ -218,7 +225,7 @@ public sealed class CreateEventDraftGraphTests
         await Assert.That(failure.RootWritten).IsTrue();
         await Assert.That(failure.OwnerWritten).IsTrue();
         await Assert.That(failure.ChildWritten).IsTrue();
-        await using var fresh = providerFixture.CreateTenantContext(tenant.TenantId);
+        await using var fresh = NativeDraftGraphAuthentication.CreateRuntimeContext(tenant);
         await AssertEmptyGraphAsync(fresh);
         await Assert.That(await fresh.LocationRooms.CountAsync()).IsEqualTo(0);
         await Assert.That(await fresh.OutboxMessages.CountAsync(message => message.AggregateId == failure.RootId)).IsEqualTo(0);
@@ -296,14 +303,10 @@ public sealed class CreateEventDraftGraphTests
     }
 
     private static ServiceProvider BuildServices(
-        PrimaryDatabaseProviderBehaviorFixture fixture, GraphTenant tenant, Guid userId, IInterceptor? interceptor = null)
+        GraphTenant tenant, IInterceptor? interceptor = null,
+        PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime)
     {
-        var configuration = new ConfigurationBuilder().AddEnvironmentVariables().AddInMemoryCollection(
-            new Dictionary<string, string?>
-            {
-                ["Authentication:Provider"] = "Local",
-                ["SecretProvider:Provider"] = "Environment"
-            }).Build();
+        var configuration = NativeDraftGraphAuthentication.CreateConfiguration();
         var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             DisableDefaults = true,
@@ -336,29 +339,35 @@ public sealed class CreateEventDraftGraphTests
         services.AddSecretResolution();
         services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
         services.AddSingleton<ITenantContext>(tenant);
-        services.AddSingleton<IHttpContextAccessor>(new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "fixture"))
-            }
-        });
+        NativeDraftGraphAuthentication.AddAuthentication(services, configuration);
         services.AddScoped(provider =>
         {
-            var context = interceptor is null
-                ? fixture.CreateTenantContext(tenant.TenantId)
-                : fixture.CreateTenantContext(tenant.TenantId, interceptor);
+            if (provider.GetRequiredService<ExploreDbContextExecutionLease>().Context is { } selected)
+                return selected;
+            var context = NativeDraftGraphAuthentication.CreateContext(configuration, tenant, role, interceptor);
             context.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
             return context;
         });
         return services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
     }
 
-    private static async Task<(Guid LocationId, Guid OrganizationId)> SeedOwnerAsync(
-        ExploreDbContext db, Guid tenantId, Guid userId)
+    private static async Task<(Guid LocationId, Guid OrganizationId)> SeedAuthenticatedOwnerAsync(
+        IServiceProvider requestServices, GraphTenant tenant, Guid userId)
     {
-        var actorId = Guid.CreateVersion7();
+        await using var setupServices = BuildServices(tenant, role: PrimaryDatabaseRole.Migrator);
+        await using var setup = setupServices.CreateAsyncScope();
+        var receipt = await NativeDraftGraphAuthentication.CreatePendingAsync(setup.ServiceProvider, userId);
+        var publisher = await SeedOwnerAsync(setup.ServiceProvider.GetRequiredService<ExploreDbContext>(),
+            tenant.TenantId, userId, receipt);
+        string token = await NativeDraftGraphAuthentication.ActivateAndLoginAsync(setup.ServiceProvider, receipt);
+        await NativeDraftGraphAuthentication.AuthenticateRequestAsync(requestServices, token, userId);
+        return publisher;
+    }
+
+    private static async Task<(Guid LocationId, Guid OrganizationId)> SeedOwnerAsync(
+        ExploreDbContext db, Guid tenantId, Guid userId, LocalCredentialOperationReceipt receipt)
+    {
+        var actorId = receipt.PersonalActorId;
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,
@@ -370,7 +379,17 @@ public sealed class CreateEventDraftGraphTests
         db.Users.Add(new User
         {
             Id = userId,
-            Pii = new UserPii { Email = string.Empty, FirstName = "Native", LastName = "Organizer" }
+            Pii = new UserPii { Email = NativeDraftGraphAuthentication.Email(userId), FirstName = "Native", LastName = "Organizer" },
+            EmailVerified = true
+        });
+        db.UserExternalLogins.Add(new UserExternalLogin
+        {
+            Id = receipt.ExternalLoginId,
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+            AuthenticationProvider = null!,
+            ProviderKey = userId.ToString("D")
         });
         db.Actors.Add(new Actor
         {

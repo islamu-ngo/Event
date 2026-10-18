@@ -183,8 +183,11 @@ public sealed class HumanEventCreationPublisherReaderNativeTests(PostgreSqlConta
         await using var setup = postgres.CreateDbContext();
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Creation publisher reader", Slug = Guid.CreateVersion7().ToString("N"),
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Creation publisher reader",
+            Slug = Guid.CreateVersion7().ToString("N"),
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         setup.Tenants.Add(tenant);
         await setup.SaveChangesAsync();
@@ -202,7 +205,9 @@ public sealed class HumanEventCreationPublisherReaderNativeTests(PostgreSqlConta
             bool allowed = i % 2 == 0;
             var role = new Role
             {
-                Id = nextRole + i, MasterCode = $"publisher-{Guid.CreateVersion7():N}", FullName = "Publisher role",
+                Id = nextRole + i,
+                MasterCode = $"publisher-{Guid.CreateVersion7():N}",
+                FullName = "Publisher role",
                 RoleScopeId = (int)(organization ? RoleScopeEnum.Organization : RoleScopeEnum.Group)
             };
             setup.Add(role);
@@ -221,14 +226,26 @@ public sealed class HumanEventCreationPublisherReaderNativeTests(PostgreSqlConta
                 };
                 var placement = new OrganizationTenant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!,
-                    OrganizationId = owner.Id, Organization = owner,
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!, IsSuspended = true
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    OrganizationId = owner.Id,
+                    Organization = owner,
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                    ApprovalStatus = null!,
+                    IsSuspended = true
                 };
                 setup.Add(new OrganizationMember
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, UserId = user, User = null!,
-                    RoleId = role.Id, Role = role, OrganizationTenantId = placement.Id, OrganizationTenant = placement
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    UserId = user,
+                    User = null!,
+                    RoleId = role.Id,
+                    Role = role,
+                    OrganizationTenantId = placement.Id,
+                    OrganizationTenant = placement
                 });
             }
             else
@@ -236,13 +253,26 @@ public sealed class HumanEventCreationPublisherReaderNativeTests(PostgreSqlConta
                 var owner = new Group { Id = Guid.CreateVersion7(), FullName = allowed ? "Allowed group" : "Unavailable group" };
                 var placement = new GroupTenant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, GroupId = owner.Id, Group = owner,
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!, IsSuspended = true
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    GroupId = owner.Id,
+                    Group = owner,
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                    ApprovalStatus = null!,
+                    IsSuspended = true
                 };
                 setup.Add(new GroupMember
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, UserId = user, User = null!,
-                    RoleId = role.Id, Role = role, GroupTenantId = placement.Id, GroupTenant = placement
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    UserId = user,
+                    User = null!,
+                    RoleId = role.Id,
+                    Role = role,
+                    GroupTenantId = placement.Id,
+                    GroupTenant = placement
                 });
             }
         }

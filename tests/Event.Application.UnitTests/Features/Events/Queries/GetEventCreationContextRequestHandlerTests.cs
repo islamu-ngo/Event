@@ -212,11 +212,18 @@ public class GetEventCreationContextRequestHandlerTests
 
     private static RolePermission CreatePermission(int roleId, bool active) => new()
     {
-        RoleId = roleId, Role = null!, PermissionId = 1,
+        RoleId = roleId,
+        Role = null!,
+        PermissionId = 1,
         Permission = new Permission
         {
-            Id = 1, MasterCode = PermissionCodes.EventCreate, IsActive = active,
-            ResourceKind = "event", Action = "create", FullName = "Create event", GroupName = "Events"
+            Id = 1,
+            MasterCode = PermissionCodes.EventCreate,
+            IsActive = active,
+            ResourceKind = "event",
+            Action = "create",
+            FullName = "Create event",
+            GroupName = "Events"
         }
     };
 

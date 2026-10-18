@@ -72,7 +72,9 @@ internal sealed class LocalizationNativeJwtAuthority : IDisposable
         // Match the independent RS256 signing pattern in KeycloakTokenContextFixture.
         string header = Base64UrlEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(new
         {
-            alg = "RS256", kid = KeyId, typ = "JWT"
+            alg = "RS256",
+            kid = KeyId,
+            typ = "JWT"
         }));
         string input = $"{header}.{Base64UrlEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(payload))}";
         byte[] signature = authority.SignData(

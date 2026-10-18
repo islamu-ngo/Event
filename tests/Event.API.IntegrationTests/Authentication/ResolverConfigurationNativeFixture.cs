@@ -202,19 +202,36 @@ internal sealed class ResolverConfigurationNativeFixture : IAsyncDisposable
         {
             var member = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, UserId = Actor, User = user,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = now
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant,
+                Tenant = null!,
+                UserId = Actor,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = now
             };
             database.AddRange(member, new TenantUserRoleGrant
             {
-                Id = Grant, TenantId = tenant, Tenant = null!, TenantUserId = member.Id, TenantUser = member,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = now
+                Id = Grant,
+                TenantId = tenant,
+                Tenant = null!,
+                TenantUserId = member.Id,
+                TenantUser = member,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = now
             });
         }
         else
             database.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Grant, UserId = Actor, User = user, RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = now
+                Id = Grant,
+                UserId = Actor,
+                User = user,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = now
             });
         await database.SaveChangesAsync();
         var pending = (await credentials.ReadProvisioningAsync(receipt.OperationId, default))!;

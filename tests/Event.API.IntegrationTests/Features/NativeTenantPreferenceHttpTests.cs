@@ -49,13 +49,19 @@ public sealed class NativeTenantPreferenceHttpTests
             migrator.UserExternalLogins.Add(jwt.Binding(user));
             migrator.Tenants.Add(new Tenant
             {
-                Id = target, FullName = "Preference target", Slug = $"preference-{target:N}",
-                TenantStatusId = (int)(suspendedTenant ? TenantStatusEnum.Suspended : TenantStatusEnum.Active), TenantStatus = null!
+                Id = target,
+                FullName = "Preference target",
+                Slug = $"preference-{target:N}",
+                TenantStatusId = (int)(suspendedTenant ? TenantStatusEnum.Suspended : TenantStatusEnum.Active),
+                TenantStatus = null!
             });
             migrator.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = target, Tenant = null!,
-                UserId = foreignTarget ? otherUser : subject, User = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = target,
+                Tenant = null!,
+                UserId = foreignTarget ? otherUser : subject,
+                User = null!,
                 StatusId = (int)(revoked ? TenantUserStatusEnum.Suspended : TenantUserStatusEnum.Active)
             });
             await migrator.SaveChangesAsync();
@@ -123,12 +129,19 @@ public sealed class NativeTenantPreferenceHttpTests
             migrator.UserExternalLogins.Add(jwt.Binding(user));
             migrator.Tenants.Add(new Tenant
             {
-                Id = tenant, FullName = "Terminal preference target", Slug = $"terminal-{tenant:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = tenant,
+                FullName = "Terminal preference target",
+                Slug = $"terminal-{tenant:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             migrator.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, UserId = subject, User = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant,
+                Tenant = null!,
+                UserId = subject,
+                User = null!,
                 StatusId = (int)TenantUserStatusEnum.Active
             });
             await migrator.SaveChangesAsync();
@@ -172,6 +185,7 @@ public sealed class NativeTenantPreferenceHttpTests
 
     private static User User(Guid id) => new()
     {
-        Id = id, Pii = new UserPii { Email = $"{id:N}@example.test", FirstName = "Preference", LastName = "Owner" }
+        Id = id,
+        Pii = new UserPii { Email = $"{id:N}@example.test", FirstName = "Preference", LastName = "Owner" }
     };
 }

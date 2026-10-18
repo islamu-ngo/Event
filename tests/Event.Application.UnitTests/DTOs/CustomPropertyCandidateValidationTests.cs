@@ -25,15 +25,25 @@ public sealed class CustomPropertyCandidateValidationTests
             if (session)
                 return CustomPropertyRuntimeValueValidator.ValidateSingle(new EventSessionCustomPropertyDefinition
                 {
-                    Namespace = "tenant.community", Key = "pattern", DisplayName = "Pattern",
-                    IsActive = true, PropertyType = PropertyType.Text, RegexPattern = pattern,
-                    MinLength = 2, MaxLength = 3
+                    Namespace = "tenant.community",
+                    Key = "pattern",
+                    DisplayName = "Pattern",
+                    IsActive = true,
+                    PropertyType = PropertyType.Text,
+                    RegexPattern = pattern,
+                    MinLength = 2,
+                    MaxLength = 3
                 }, new SetEventSessionCustomPropertyValueDto { TextValue = value });
             return CustomPropertyRuntimeValueValidator.ValidateSingle(new EventCustomPropertyDefinition
             {
-                Namespace = "tenant.community", Key = "pattern", DisplayName = "Pattern",
-                IsActive = true, PropertyType = PropertyType.Text, RegexPattern = pattern,
-                MinLength = 2, MaxLength = 3
+                Namespace = "tenant.community",
+                Key = "pattern",
+                DisplayName = "Pattern",
+                IsActive = true,
+                PropertyType = PropertyType.Text,
+                RegexPattern = pattern,
+                MinLength = 2,
+                MaxLength = 3
             }, new SetEventCustomPropertyValueDto { TextValue = value });
         }
 

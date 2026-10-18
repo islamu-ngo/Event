@@ -72,7 +72,8 @@ public sealed class RabbitMqEmailDispatchDeadLetterReplayLiveTests(RabbitMqConta
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
         await using var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
-            ValidateOnBuild = true, ValidateScopes = true
+            ValidateOnBuild = true,
+            ValidateScopes = true
         });
         var settingsMonitor = CreateOptionsMonitor(settings);
         await using var transport = CreateTransport(settingsMonitor);

@@ -55,12 +55,17 @@ public sealed class TenantNavigationOwnershipTests
         DateTime joined = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var rows = Enumerable.Range(0, count).Select(index => new TenantUser
         {
-            Id = Guid.CreateVersion7(), UserId = subject, User = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = subject,
+            User = null!,
             TenantId = index == 0 && rememberedMember ? remembered : Guid.CreateVersion7(),
             JoinedAt = joined.AddDays(index),
             Tenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = "Tenant", Slug = $"tenant-{index}", TenantStatus = null!
+                Id = Guid.CreateVersion7(),
+                FullName = "Tenant",
+                Slug = $"tenant-{index}",
+                TenantStatus = null!
             }
         }).ToList();
         var memberships = Substitute.For<IUserTenantMembershipRepository>();

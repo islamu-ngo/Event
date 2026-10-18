@@ -75,12 +75,17 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
             {
                 Tags = presentation.Tags.Select(tag => new Explore.Application.DTOs.Tag.TagListDto
                 {
-                    Id = tag.Id, MasterCode = tag.MasterCode, FullName = tag.FullName
+                    Id = tag.Id,
+                    MasterCode = tag.MasterCode,
+                    FullName = tag.FullName
                 }).ToList(),
                 Categories = presentation.Categories.Select(category => new Explore.Application.DTOs.Category.CategoryListDto
                 {
-                    Id = category.Id, ConcurrencyStamp = category.ConcurrencyStamp,
-                    MasterCode = category.MasterCode, FullName = category.FullName, ParentId = category.ParentId
+                    Id = category.Id,
+                    ConcurrencyStamp = category.ConcurrencyStamp,
+                    MasterCode = category.MasterCode,
+                    FullName = category.FullName,
+                    ParentId = category.ParentId
                 }).ToList()
             };
         }

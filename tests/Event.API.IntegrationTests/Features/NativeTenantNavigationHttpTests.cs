@@ -47,8 +47,11 @@ public sealed class NativeTenantNavigationHttpTests
             {
                 migrator.Tenants.Add(new Tenant
                 {
-                    Id = tenants[index], FullName = "Navigation tenant", Slug = $"navigation-{tenants[index]:N}",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = tenants[index],
+                    FullName = "Navigation tenant",
+                    Slug = $"navigation-{tenants[index]:N}",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
             }
             await migrator.SaveChangesAsync();
@@ -76,12 +79,18 @@ public sealed class NativeTenantNavigationHttpTests
 
     private static User User(Guid id) => new()
     {
-        Id = id, Pii = new UserPii { Email = $"{id:N}@example.test", FirstName = "Navigation", LastName = "Owner" }
+        Id = id,
+        Pii = new UserPii { Email = $"{id:N}@example.test", FirstName = "Navigation", LastName = "Owner" }
     };
 
     private static TenantUser Membership(Guid user, Guid tenant, DateTime joined) => new()
     {
-        Id = Guid.CreateVersion7(), UserId = user, User = null!, TenantId = tenant, Tenant = null!,
-        StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = joined
+        Id = Guid.CreateVersion7(),
+        UserId = user,
+        User = null!,
+        TenantId = tenant,
+        Tenant = null!,
+        StatusId = (int)TenantUserStatusEnum.Active,
+        JoinedAt = joined
     };
 }

@@ -95,7 +95,10 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
                 if (!await setup.RolePermissions.AnyAsync(row => row.RoleId == (int)RoleEnum.EventManager && row.PermissionId == permission))
                     setup.RolePermissions.Add(new RolePermission
                     {
-                        RoleId = (int)RoleEnum.EventManager, Role = null!, PermissionId = permission, Permission = null!
+                        RoleId = (int)RoleEnum.EventManager,
+                        Role = null!,
+                        PermissionId = permission,
+                        Permission = null!
                     });
             await setup.Permissions.Where(row => permissions.Contains(row.Id))
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.IsFiltered, false).SetProperty(row => row.IsActive, true));
@@ -270,7 +273,8 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
             var previous = accessor.HttpContext;
             accessor.HttpContext = new DefaultHttpContext
             {
-                RequestServices = services, User = new ClaimsPrincipal(new ClaimsIdentity())
+                RequestServices = services,
+                User = new ClaimsPrincipal(new ClaimsIdentity())
             };
             try
             {
@@ -428,32 +432,57 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
                 var owner = new Group { Id = Guid.CreateVersion7(), FullName = "Membership group" };
                 var placement = new GroupTenant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, GroupId = owner.Id, Group = owner,
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    GroupId = owner.Id,
+                    Group = owner,
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                    ApprovalStatus = null!
                 };
                 actor.GroupId = owner.Id;
                 setup.AddRange(owner, placement, new GroupMember
                 {
-                    Id = membership, TenantId = tenant, Tenant = null!, GroupTenantId = placement.Id, GroupTenant = placement,
-                    UserId = request.Subject.PrincipalId, User = null!, RoleId = role.Id, Role = role
+                    Id = membership,
+                    TenantId = tenant,
+                    Tenant = null!,
+                    GroupTenantId = placement.Id,
+                    GroupTenant = placement,
+                    UserId = request.Subject.PrincipalId,
+                    User = null!,
+                    RoleId = role.Id,
+                    Role = role
                 });
             }
             else
             {
                 var owner = new Organization
                 {
-                    Id = Guid.CreateVersion7(), Pii = new OrganizationPii { FullName = "Membership organization" }
+                    Id = Guid.CreateVersion7(),
+                    Pii = new OrganizationPii { FullName = "Membership organization" }
                 };
                 var placement = new OrganizationTenant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, OrganizationId = owner.Id, Organization = owner,
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    OrganizationId = owner.Id,
+                    Organization = owner,
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                    ApprovalStatus = null!
                 };
                 actor.OrganizationId = owner.Id;
                 setup.AddRange(owner, placement, new OrganizationMember
                 {
-                    Id = membership, TenantId = tenant, Tenant = null!, OrganizationTenantId = placement.Id, OrganizationTenant = placement,
-                    UserId = request.Subject.PrincipalId, User = null!, RoleId = role.Id, Role = role
+                    Id = membership,
+                    TenantId = tenant,
+                    Tenant = null!,
+                    OrganizationTenantId = placement.Id,
+                    OrganizationTenant = placement,
+                    UserId = request.Subject.PrincipalId,
+                    User = null!,
+                    RoleId = role.Id,
+                    Role = role
                 });
             }
             setup.AddRange(role, actor);
@@ -464,13 +493,23 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
             delivery = Guid.CreateVersion7();
             setup.PdsSyncOutbox.Add(new PdsSyncOutbox
             {
-                Id = delivery, TenantId = tenant, UserId = request.Subject.PrincipalId,
-                Did = "did:plc:private-management", Collection = "community.lexicon.calendar.event",
-                RecordKey = memberEvent.ToString("N"), Operation = PdsSyncOperation.Create,
-                Payload = "{\"title\":\"Private draft\"}", PayloadHash = new string('a', 64),
-                IdempotencyKey = delivery.ToString("N"), PdsHost = "https://pds.example.test",
-                SourceEntityType = "Event", SourceEntityId = memberEvent, SourceVersion = target.ConcurrencyStamp,
-                Status = PdsSyncStatus.Failed, LastError = "delivery_denied", MaxRetries = 3,
+                Id = delivery,
+                TenantId = tenant,
+                UserId = request.Subject.PrincipalId,
+                Did = "did:plc:private-management",
+                Collection = "community.lexicon.calendar.event",
+                RecordKey = memberEvent.ToString("N"),
+                Operation = PdsSyncOperation.Create,
+                Payload = "{\"title\":\"Private draft\"}",
+                PayloadHash = new string('a', 64),
+                IdempotencyKey = delivery.ToString("N"),
+                PdsHost = "https://pds.example.test",
+                SourceEntityType = "Event",
+                SourceEntityId = memberEvent,
+                SourceVersion = target.ConcurrencyStamp,
+                Status = PdsSyncStatus.Failed,
+                LastError = "delivery_denied",
+                MaxRetries = 3,
                 CreatedAt = DateTime.UtcNow
             });
             await setup.SaveChangesAsync();
@@ -534,20 +573,33 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
         {
             var action = new EventPublicAction
             {
-                Id = actionId, TenantId = tenant, EventId = eventId,
+                Id = actionId,
+                TenantId = tenant,
+                EventId = eventId,
                 EventPublicActionKindId = (int)EventPublicActionKindEnum.OriginalSource,
                 HealthStateId = (int)EventPublicActionHealthStateEnum.Disabled
             };
             action.SetDestination(ExternalActionUrl.Create("https://event.example.test/private"));
             var group = new EventSessionGroup
             {
-                Id = groupId, EventId = eventId, Event = null!, TenantId = tenant, Tenant = null!,
-                Name = "Unpublished track", IsPublished = false
+                Id = groupId,
+                EventId = eventId,
+                Event = null!,
+                TenantId = tenant,
+                Tenant = null!,
+                Name = "Unpublished track",
+                IsPublished = false
             };
             var session = new EventSession
             {
-                Id = Guid.CreateVersion7(), EventId = eventId, Event = null!, TenantId = tenant, Tenant = null!,
-                Title = "Private session", EventSessionKindId = (int)EventSessionKindEnum.Talk, RegistrationModeId = 1
+                Id = Guid.CreateVersion7(),
+                EventId = eventId,
+                Event = null!,
+                TenantId = tenant,
+                Tenant = null!,
+                Title = "Private session",
+                EventSessionKindId = (int)EventSessionKindEnum.Talk,
+                RegistrationModeId = 1
             };
             var start = new DateTimeOffset(2035, 1, 10, 10, 0, 0, TimeSpan.Zero);
             session.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "UTC", new EventScheduleProjectionCalculator());
@@ -677,8 +729,11 @@ public sealed class PrivateEventManagementNativeReadTests(PostgreSqlContainerFix
         await using var setup = postgres.CreateDbContext();
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Private management native reads",
-            Slug = Guid.CreateVersion7().ToString("N"), TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Private management native reads",
+            Slug = Guid.CreateVersion7().ToString("N"),
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         setup.Tenants.Add(tenant);
         await setup.SaveChangesAsync();

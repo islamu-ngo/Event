@@ -279,30 +279,55 @@ public sealed class AdmissionCompositeDispatchTests
         Guid eventId = Guid.CreateVersion7();
         var user = new User
         {
-            Id = Guid.CreateVersion7(), CreatedAt = now,
+            Id = Guid.CreateVersion7(),
+            CreatedAt = now,
             Pii = new UserPii { Email = string.Empty, FirstName = "Admission", LastName = "Owner" }
         };
         var tenant = new Tenant
         {
-            Id = tenantId, FullName = "Admission dispatch", Slug = $"admission-{tenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = now
+            Id = tenantId,
+            FullName = "Admission dispatch",
+            Slug = $"admission-{tenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = now
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = user.Id, User = user, Pii = new ActorPii { DisplayName = "Admission owner" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = user.Id,
+            User = user,
+            Pii = new ActorPii { DisplayName = "Admission owner" }
         };
         context.AddRange(user, tenant, actor, new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = tenant,
-            UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
-            StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = now, JoinedAt = now
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
+            ActorId = actor.Id,
+            Actor = actor,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = now,
+            JoinedAt = now
         }, new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = eventId, TenantId = tenantId, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-            Title = "Admission dispatch", VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
+            Id = eventId,
+            TenantId = tenantId,
+            Tenant = tenant,
+            ActorId = actor.Id,
+            Actor = actor,
+            Title = "Admission dispatch",
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, CreatedAt = now
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            CreatedAt = now
         });
         await context.SaveChangesAsync();
         var catalog = EventTicketCatalogVersion.Create(tenantId, eventId, "EUR", 1);

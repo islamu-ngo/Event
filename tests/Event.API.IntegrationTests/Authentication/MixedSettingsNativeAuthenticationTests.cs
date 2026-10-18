@@ -38,11 +38,14 @@ public sealed class MixedSettingsNativeAuthenticationTests(PostgreSqlContainerFi
                 {
                     row = new SystemSetting
                     {
-                        Id = Guid.CreateVersion7(), SettingKey = settingKey, Value = value,
+                        Id = Guid.CreateVersion7(),
+                        SettingKey = settingKey,
+                        Value = value,
                         ValueType = settingKey == GovernanceSettingKeys.Email.SmtpPort
                             ? SettingValueType.Integer : SettingValueType.Boolean,
                         Category = settingKey == GovernanceSettingKeys.Email.SmtpPort ? "Email" : "TenantDelegation",
-                        CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime, CreatedBy = fixture.Actor
+                        CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime,
+                        CreatedBy = fixture.Actor
                     };
                     seed.SystemSettings.Add(row);
                 }
@@ -52,8 +55,12 @@ public sealed class MixedSettingsNativeAuthenticationTests(PostgreSqlContainerFi
             if (tenant)
                 seed.TenantSettingOverrides.Add(new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = fixture.Tenant, Tenant = null!,
-                    SettingKey = key, Value = "2525", CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = fixture.Tenant,
+                    Tenant = null!,
+                    SettingKey = key,
+                    Value = "2525",
+                    CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime,
                     CreatedBy = fixture.Actor
                 });
             await seed.SaveChangesAsync();

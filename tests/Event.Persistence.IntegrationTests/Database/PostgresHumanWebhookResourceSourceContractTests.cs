@@ -331,6 +331,8 @@ public sealed class PostgresHumanWebhookResourceSourceContractTests(PostgreSqlCo
 
     [Test]
     [Arguments("source", "human_webhook_source_drift")]
+    [Arguments("private-column", "human_webhook_source_drift")]
+    [Arguments("anchor", "human_webhook_authority_drift")]
     [Arguments("trigger", "human_webhook_writer_drift")]
     [Arguments("acl", "native_privilege_guard_not_ready")]
     [Arguments("role", "native_privilege_guard_not_ready")]
@@ -350,6 +352,8 @@ public sealed class PostgresHumanWebhookResourceSourceContractTests(PostgreSqlCo
         string ddl = drift switch
         {
             "source" => $"ALTER TABLE {table} ALTER COLUMN {database.Sql.Column(typeof(WebhookEndpoint), "ConfigurationVersion")} DROP NOT NULL",
+            "private-column" => $"ALTER TABLE {database.Sql.Table(typeof(WebhookMessage))} ALTER COLUMN {database.Sql.Column(typeof(WebhookMessage), "_payloadBytes")} TYPE text USING NULL::text",
+            "anchor" => $"ALTER TABLE {database.Sql.Name("human_webhook_resource_source_epoch")} ALTER COLUMN revision DROP NOT NULL",
             "trigger" => $"ALTER TABLE {table} DISABLE TRIGGER zz_human_webhook_resource_source_write",
             "acl" => $"GRANT EXECUTE ON FUNCTION {observe}{Signature} TO PUBLIC",
             "role" => $"ALTER ROLE {PostgresHumanWebhookResourceSourceContract.RuntimeRole} BYPASSRLS",
@@ -697,7 +701,9 @@ public sealed class PostgresHumanWebhookResourceSourceContractTests(PostgreSqlCo
             var endpoint = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
             var original = fixture.GetNativeQueueOptions(role) with
             {
-                Host = endpoint.Host, Port = endpoint.Port, Database = endpoint.Database
+                Host = endpoint.Host,
+                Port = endpoint.Port,
+                Database = endpoint.Database
             };
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(builder, original);

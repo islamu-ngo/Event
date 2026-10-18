@@ -4,43 +4,9 @@ namespace Explore.Persistence.Security;
 
 public static partial class PostgresHumanSupportAccessSourceContract
 {
-    private static string SourceGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
-    {
-        var sql = Names(context);
-        string sources = string.Join("\n", HumanSupportAccessSourceSql.Sources.Select(source =>
-        {
-            var entity = context.Model.FindEntityType(source.Type)!;
-            string table = Text(sql.Table(source.Type));
-            string columns = string.Join(" OR ", source.Columns.Select(column =>
-            {
-                var property = entity.FindProperty(column)!;
-                return $"""
-                    NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
-                        WHERE a.attrelid = pg_catalog.to_regclass({table}) AND a.attname = {Text(sql.ColumnName(source.Type, column))}
-                            AND a.attnum > 0 AND NOT a.attisdropped
-                            AND a.atttypid = pg_catalog.to_regtype({Text(property.GetRelationalTypeMapping().StoreType)})
-                            AND pg_catalog.format_type(a.atttypid,a.atttypmod) = {Text(property.GetRelationalTypeMapping().StoreType)}
-                            AND a.attnotnull = {(property.IsNullable ? "false" : "true")}
-                            AND (a.attcollation = 0 OR a.attcollation = 'pg_catalog."default"'::regcollation))
-                    """;
-            }));
-            return $"""
-                IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
-                    AND t.relkind = 'r' AND t.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)
-                    OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class = pg_catalog.to_regclass({table}))
-                    OR EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i
-                        WHERE i.inhrelid = pg_catalog.to_regclass({table}) OR i.inhparent = pg_catalog.to_regclass({table}))
-                    OR {columns}
-                THEN RAISE EXCEPTION 'human_support_source_drift' USING ERRCODE = '55000'; END IF;
-                """;
-        }));
-        return $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(sql.Schema)}
-                AND n.nspowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)
-            THEN RAISE EXCEPTION 'human_support_schema_drift' USING ERRCODE = '55000'; END IF;
-            {sources}
-            """;
-    }
+    private static string SourceGuard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        PostgresHumanSourceInstallationSql.SourceGuard(context, enrollment.MigratorLogin,
+            HumanSupportAccessSourceSql.Sources, "human_support");
 
     private static string Guard(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
@@ -54,17 +20,8 @@ public static partial class PostgresHumanSupportAccessSourceContract
             + string.Join(",", routines.Select(routine =>
                 $"({Text(sql.Name(routine.Name) + "(" + routine.Signature + ")")})"))
             + ") expected(signature)";
-        string routineChecks = string.Join("\n", routines.Select(routine => $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
-                WHERE f.oid = pg_catalog.to_regprocedure({Text(sql.Name(routine.Name) + "(" + routine.Signature + ")")})
-                    AND f.provolatile = 'v' AND f.proparallel = 'u' AND NOT f.proleakproof
-                    AND NOT f.proisstrict AND NOT f.proretset AND f.proargdefaults IS NULL
-                    AND f.prorettype = 'pg_catalog.{routine.Result}'::regtype
-                    AND f.prolang = (SELECT oid FROM pg_catalog.pg_language WHERE lanname = 'plpgsql')
-                    AND pg_catalog.obj_description(f.oid,'pg_proc') =
-                        '{Stamp}' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(f.prosrc,'UTF8')),'hex'))
-            THEN RAISE EXCEPTION 'human_support_routine_drift' USING ERRCODE = '55000'; END IF;
-            """));
+        string routineChecks = PostgresHumanSourceInstallationSql.RoutineGuard(
+            sql, routines, Stamp, "human_support_routine_drift");
         var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
         string policies = string.Join("\n", HumanSupportAccessSourceSql.Sources.Select(source =>
         {
@@ -108,30 +65,12 @@ public static partial class PostgresHumanSupportAccessSourceContract
                 THEN RAISE EXCEPTION 'human_support_writer_drift' USING ERRCODE = '55000'; END IF;
                 """;
         }));
-        string anchor = Text(sql.Name(Anchor));
         return $"""
             {PostgresPrivilegeGuard.BuildAssertSql(Privileges(context, enrollment))}
             {SourceGuard(context, enrollment)}
             {routineChecks}
             {policies}
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({anchor})
-                AND t.relkind = 'r' AND t.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid
-                AND NOT t.relrowsecurity AND NOT t.relforcerowsecurity)
-                OR (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({anchor})
-                    AND a.attnum > 0 AND NOT a.attisdropped) <> 2
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({anchor})
-                    AND a.attname = 'id' AND a.atttypid = 'smallint'::regtype AND a.attnotnull)
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({anchor})
-                    AND a.attname = 'revision' AND a.atttypid = 'boolean'::regtype AND a.attnotnull)
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid = pg_catalog.to_regclass({anchor})
-                    AND c.contype = 'p' AND c.convalidated AND NOT c.condeferrable
-                    AND pg_catalog.pg_get_constraintdef(c.oid) = 'PRIMARY KEY (id)')
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid = pg_catalog.to_regclass({anchor})
-                    AND c.contype = 'c' AND c.convalidated AND pg_catalog.pg_get_expr(c.conbin,c.conrelid) = '(id = 1)')
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE t.tgrelid = pg_catalog.to_regclass({anchor}) AND NOT t.tgisinternal)
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class = pg_catalog.to_regclass({anchor}))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i
-                    WHERE i.inhrelid = pg_catalog.to_regclass({anchor}) OR i.inhparent = pg_catalog.to_regclass({anchor}))
+            IF {PostgresHumanSourceInstallationSql.AnchorDriftPredicate(sql, Anchor, enrollment.MigratorLogin)}
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname IN ({roles})
                     AND pg_catalog.shobj_description(r.oid,'pg_authid') IS DISTINCT FROM '{Stamp}role:' || r.rolname)
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n CROSS JOIN pg_catalog.pg_roles r
@@ -190,12 +129,8 @@ public static partial class PostgresHumanSupportAccessSourceContract
             {(function.Result == "jsonb" ? $"GRANT EXECUTE ON FUNCTION {sql.Name(function.Name)}({function.Signature}) TO {RuntimeRole},{GlobalRole};" : "")}
             COMMENT ON FUNCTION {sql.Name(function.Name)}({function.Signature}) IS {Text(Stamp + Hash(function.Body))};
             """));
-        string triggers = string.Join("\n", HumanSupportAccessSourceSql.Sources.Select(source => $"""
-            DROP TRIGGER IF EXISTS {WriterTrigger} ON {sql.Table(source.Type)};
-            CREATE TRIGGER {WriterTrigger} BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON {sql.Table(source.Type)}
-                FOR EACH STATEMENT EXECUTE FUNCTION {sql.Name(Write)}();
-            ALTER TABLE {sql.Table(source.Type)} ENABLE ALWAYS TRIGGER {WriterTrigger};
-            """));
+        string triggers = PostgresHumanSourceInstallationSql.WriterTriggers(
+            sql, HumanSupportAccessSourceSql.Sources, WriterTrigger, Write);
         return $"""
             DO $bootstrap$
             DECLARE role_name text; v_count integer;

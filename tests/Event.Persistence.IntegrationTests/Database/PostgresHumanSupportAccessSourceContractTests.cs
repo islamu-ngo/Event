@@ -286,6 +286,7 @@ public sealed class PostgresHumanSupportAccessSourceContractTests(PostgreSqlCont
 
     [Test]
     [Arguments("column", "human_support_source_drift")]
+    [Arguments("anchor", "human_support_authority_drift")]
     [Arguments("trigger", "human_support_writer_drift")]
     [Arguments("acl", "native_privilege_guard_not_ready")]
     [Arguments("routine", "human_support_routine_drift")]
@@ -304,6 +305,7 @@ public sealed class PostgresHumanSupportAccessSourceContractTests(PostgreSqlCont
         string ddl = drift switch
         {
             "column" => $"ALTER TABLE {database.Sql.Table(typeof(SystemSetting))} ALTER COLUMN {database.Sql.Column(typeof(SystemSetting), "IsLocked")} DROP NOT NULL",
+            "anchor" => $"ALTER TABLE {database.Sql.Name("human_support_access_source_epoch")} ALTER COLUMN revision DROP NOT NULL",
             "trigger" => $"ALTER TABLE {table} DISABLE TRIGGER zz_human_support_access_source_write",
             "acl" => $"GRANT EXECUTE ON FUNCTION {observe}{signature} TO PUBLIC",
             "routine" => $"ALTER FUNCTION {observe}{signature} STABLE",
@@ -581,7 +583,9 @@ public sealed class PostgresHumanSupportAccessSourceContractTests(PostgreSqlCont
             var endpoint = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
             var original = fixture.GetNativeQueueOptions(role) with
             {
-                Host = endpoint.Host, Port = endpoint.Port, Database = endpoint.Database
+                Host = endpoint.Host,
+                Port = endpoint.Port,
+                Database = endpoint.Database
             };
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(builder, original);

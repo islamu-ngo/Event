@@ -139,10 +139,10 @@ public sealed class PostgresHumanEventAssignmentSourceContractTests(PostgreSqlCo
         await using var command = AssignmentDatabase.Command(caller,
             $"SELECT {PostgresHumanEventAssignmentSourceContract.ObserveFunctionSql(database.Migration)}(@actor,@purpose,@tenant,{events})");
         command.Parameters.Add(new NpgsqlParameter("actor", NpgsqlDbType.Uuid)
-            { Value = scenario == "actor" ? Guid.Empty : database.User });
+        { Value = scenario == "actor" ? Guid.Empty : database.User });
         command.Parameters.Add(new NpgsqlParameter("purpose", global ? 2 : 1));
         command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid)
-            { Value = scenario == "tenant" ? DBNull.Value : database.Tenant });
+        { Value = scenario == "tenant" ? DBNull.Value : database.Tenant });
         command.Parameters.Add(new NpgsqlParameter("event", database.Event));
 
         var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteScalarAsync());
@@ -251,6 +251,8 @@ public sealed class PostgresHumanEventAssignmentSourceContractTests(PostgreSqlCo
     [Arguments("trigger")]
     [Arguments("public")]
     [Arguments("column")]
+    [Arguments("anchor")]
+    [Arguments("routine")]
     [Arguments("assignment-restamp")]
     [Arguments("ai-restamp")]
     public async Task AdmissionAndActualInstallerRejectDriftWithoutRepair(string drift)
@@ -265,6 +267,8 @@ public sealed class PostgresHumanEventAssignmentSourceContractTests(PostgreSqlCo
             "trigger" => $"ALTER TABLE {database.Sql.Table(typeof(EventRoleAssignment))} DISABLE TRIGGER zz_human_event_assignment_source_write",
             "public" => $"GRANT EXECUTE ON FUNCTION {function}{signature} TO PUBLIC",
             "column" => $"ALTER TABLE {database.Sql.Table(typeof(Actor))} ALTER COLUMN {database.Sql.Column(typeof(Actor), "IsDeleted")} DROP NOT NULL",
+            "anchor" => $"ALTER TABLE {database.Epoch} ALTER COLUMN revision DROP NOT NULL",
+            "routine" => $"ALTER FUNCTION {function}{signature} STABLE",
             "assignment-restamp" or "ai-restamp" => $"""
                 CREATE OR REPLACE FUNCTION {function}({(ai ? "p_actor uuid,p_selected uuid,p_event uuid" : "p_actor uuid,p_purpose integer,p_tenant uuid,p_events uuid[]")})
                     RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog
@@ -727,7 +731,9 @@ public sealed class PostgresHumanEventAssignmentSourceContractTests(PostgreSqlCo
             var endpoint = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
             var options = fixture.GetNativeQueueOptions(role) with
             {
-                Host = endpoint.Host, Port = endpoint.Port, Database = endpoint.Database
+                Host = endpoint.Host,
+                Port = endpoint.Port,
+                Database = endpoint.Database
             };
             var builder = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);

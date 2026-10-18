@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -35,6 +36,46 @@ public sealed class ResponseCaptureBoundaryTests
     private const int ETagLimit = 256 * 1024;
     private const int ReceiptLimit = 1024 * 1024;
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(30);
+
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task SmallResponsesKeepCaptureCapacitySmallAndRemainUsable(bool receipts, bool synchronous)
+    {
+        int capacity = -1;
+        await using var host = await NativeHost.CreateAsync(async context =>
+        {
+            context.Response.ContentType = "application/json";
+            if (synchronous)
+                context.Response.Body.Write("{}"u8);
+            else
+                await context.Response.Body.WriteAsync("{}"u8.ToArray());
+
+            // Inspect the captured memory without widening the internal stream's visibility.
+            var captured = (ReadOnlyMemory<byte>)context.Response.Body.GetType()
+                .GetProperty("CapturedBody")!.GetValue(context.Response.Body)!;
+            await Assert.That(MemoryMarshal.TryGetArray(captured, out ArraySegment<byte> buffer)).IsTrue();
+            capacity = buffer.Array!.Length;
+            await Assert.That(captured.Length).IsEqualTo(2);
+        }, receipts: receipts);
+
+        using HttpResponseMessage response = await (receipts
+            ? host.SendWriteAsync("small-body-key") : host.Client.GetAsync("/capture")).WaitAsync(Deadline);
+        await Assert.That(await response.Content.ReadAsStringAsync()).IsEqualTo("{}");
+        await Assert.That(capacity >= 2 && capacity <= 4096).IsTrue();
+        if (receipts)
+        {
+            using HttpResponseMessage replay = await host.SendWriteAsync("small-body-key").WaitAsync(Deadline);
+            await Assert.That(replay.Headers.GetValues("X-Idempotency-Replay").Single()).IsEqualTo("true");
+            await Assert.That(await replay.Content.ReadAsStringAsync()).IsEqualTo("{}");
+        }
+        else
+        {
+            await Assert.That(response.Headers.ETag).IsNotNull();
+        }
+    }
 
     [Test]
     [Arguments(ETagLimit - 1, false)]
@@ -551,7 +592,7 @@ public sealed class ResponseCaptureBoundaryTests
             var host = new NativeHost();
             if (receipts)
             {
-                await using ExploreDbContext context = host.CreateContext();
+                await using ExploreDbContext context = host.CreateContext(setup: true);
                 await context.Database.EnsureCreatedAsync();
                 await SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);
                 await context.Database.ExecuteSqlRawAsync("CREATE TABLE response_capture_effects (id TEXT PRIMARY KEY)");
@@ -569,7 +610,12 @@ public sealed class ResponseCaptureBoundaryTests
             services.AddSingleton(new RecyclableMemoryStreamManager());
             services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
             services.AddSingleton<ITenantContext>(new TenantContext(host.TenantId));
-            services.AddScoped(_ => host.CreateContext());
+            services.AddScoped(provider =>
+            {
+                var context = host.CreateContext();
+                context.TenantContext = provider.GetRequiredService<ITenantContext>();
+                return context;
+            });
             services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
             services.AddResponseCompression(options => options.Providers.Add<GzipCompressionProvider>());
             WebApplication app = builder.Build();
@@ -605,7 +651,7 @@ public sealed class ResponseCaptureBoundaryTests
             return host;
         }
 
-        public ExploreDbContext CreateContext()
+        public ExploreDbContext CreateContext(bool setup = false)
         {
             string connectionString = new SqliteConnectionStringBuilder
             {
@@ -614,10 +660,12 @@ public sealed class ResponseCaptureBoundaryTests
                 Pooling = false
             }.ToString();
             var options = new DbContextOptionsBuilder<ExploreDbContext>()
-                .EnableServiceProviderCaching(false)
                 .UseSqlite(connectionString).UseSnakeCaseNamingConvention().Options;
             var context = new ExploreDbContext(options);
-            context.EnableTenantFilterBypass("Native bounded HTTP receipt contract.");
+            if (setup)
+                context.EnableTenantFilterBypass("Create the bounded HTTP receipt fixture database.");
+            else
+                context.TenantContext = new TenantContext(TenantId);
             return context;
         }
 

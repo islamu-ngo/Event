@@ -39,7 +39,7 @@ internal sealed class BoundedResponseCaptureStream(
         {
             if (!buffer.IsEmpty)
             {
-                (_buffer ??= new MemoryStream(limit)).Write(buffer);
+                (_buffer ??= new MemoryStream()).Write(buffer);
             }
             return;
         }
@@ -61,7 +61,7 @@ internal sealed class BoundedResponseCaptureStream(
         {
             if (!buffer.IsEmpty)
             {
-                (_buffer ??= new MemoryStream(limit)).Write(buffer.Span);
+                (_buffer ??= new MemoryStream()).Write(buffer.Span);
             }
             return;
         }

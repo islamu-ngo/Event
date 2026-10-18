@@ -136,7 +136,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p artifacts/security-tests
-          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=Security]" --minimum-expected-tests 1 --no-progress --report-trx --report-trx-filename security-integration-tests.trx 2>&1 | tee artifacts/security-tests/security-integration-tests.log
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=Security]" --minimum-expected-tests 1 --maximum-parallel-tests 1 --no-progress --report-trx --report-trx-filename security-integration-tests.trx 2>&1 | tee artifacts/security-tests/security-integration-tests.log
 
       - name: Cerbos Policy Contract Tests
         if: ${{ steps.changes.outputs.run-tests == 'true' }}

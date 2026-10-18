@@ -17,6 +17,17 @@ Do not symlink `.github` to `.ci`. GitHub discovers workflows from `.github/work
 
 Workflow YAML defines what runs; repository settings define which checks are required, which environments require approval, and which organization security features are enabled.
 
+## Security integration fixture execution
+
+The security workflow runs the complete `Category=Security` selection with
+`--maximum-parallel-tests 1`. Each case may still exercise concurrent HTTP
+requests and independent database connections inside its own fixture; this
+setting serializes separate cases, not the business races they assert.
+Keep provider identities, external Data Protection authority, scoped database
+owners and host teardown real and bounded. A killed process or missing test
+summary is not a passing receipt. Diagnose partial-initialization leaks and
+provider lifecycle wiring rather than reducing coverage or extending a hang.
+
 ## Complete PR file metadata
 
 The release-impact job checks out only its trusted base and fetches the immutable

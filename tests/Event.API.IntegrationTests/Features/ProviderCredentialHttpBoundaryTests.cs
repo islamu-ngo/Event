@@ -425,19 +425,6 @@ public sealed class ProviderCredentialHttpBoundaryTests
             using var scope = host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             Guid userId = db.InstanceBootstrapStates.Single().CompletedByUserId!.Value;
-            db.Users.Add(new User
-            {
-                Id = userId,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = userId,
-                Pii = new UserPii
-                {
-                    UserId = userId,
-                    Email = $"{userId:N}@integration.test",
-                    FirstName = "Boundary",
-                    LastName = "Admin"
-                }
-            });
             db.UserExternalLogins.Add(new UserExternalLogin
             {
                 Id = Guid.CreateVersion7(),

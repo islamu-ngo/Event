@@ -656,7 +656,7 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
         await HumanCommitSubject.ResolveAsync(
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, id.ToString())], "fixture")),
             new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)))),
+                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), fixture.NativeQueueEnrollment)),
             CancellationToken.None) ?? throw new InvalidOperationException("A resolved subject is required.");
 
     private ExploreDbContext Open(Guid tenant)

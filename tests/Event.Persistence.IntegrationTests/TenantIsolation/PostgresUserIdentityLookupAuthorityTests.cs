@@ -16,7 +16,7 @@ public sealed class PostgresUserIdentityLookupAuthorityTests(PostgreSqlContainer
     {
         await using var rows = await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.CreateAsync(fixture);
         await using var global = await PostgresAuthenticationLookupAuthorityTests.AuthenticationGlobalAuthority.CreateAsync(fixture);
-        var repository = new ExternalLoginAuthenticationRepository(global.Factory);
+        var repository = new ExternalLoginAuthenticationRepository(global.Factory, fixture.NativeQueueEnrollment);
 
         UserExternalLogin? binding = await repository.GetByProviderAndKey(rows.Account);
 

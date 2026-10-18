@@ -171,7 +171,7 @@ public sealed partial class HumanAdministratorNativeCommitFenceTests(PostgreSqlC
             [new Claim(ClaimTypes.NameIdentifier, user.ToString())], "fixture"));
         var resolver = new ResolveCurrentUserIdByIdentityRequestHandler(
             new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global))));
+                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), fixture.NativeQueueEnrollment));
         var subject = await HumanCommitSubject.ResolveAsync(principal, resolver, CancellationToken.None);
         return new(context, subject!, purpose, fixture.NativeQueueEnrollment);
     }

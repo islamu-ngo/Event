@@ -258,7 +258,7 @@ public sealed class HumanAiModerationProposalTargetNativeTests(PostgreSqlContain
     private async Task<HumanCommitSubject> SubjectAsync(Guid user) => await HumanCommitSubject.ResolveAsync(
         new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.ToString())], "fixture")),
         new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)))), default)
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), fixture.NativeQueueEnrollment)), default)
         ?? throw new InvalidOperationException("The original resolved human is required.");
 
     private ExploreDbContext Open(Guid tenant)

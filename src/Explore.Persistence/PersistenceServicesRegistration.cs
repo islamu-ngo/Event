@@ -480,7 +480,10 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IUserNotificationPreferenceRepository, UserNotificationPreferenceRepository>();
         services.AddScoped<IUserAuthenticationTokenRepository, UserAuthenticationTokenRepository>();
         services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
-        services.AddScoped<IExternalLoginAuthenticationRepository, ExternalLoginAuthenticationRepository>();
+        services.AddScoped<IExternalLoginAuthenticationRepository>(provider =>
+            new ExternalLoginAuthenticationRepository(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IUserIdentityEmailRepository, UserIdentityEmailRepository>();
         services.AddScoped<IExternalBindingRepository, ExternalBindingRepository>();
 

@@ -264,7 +264,7 @@ public sealed class HumanEventAssignmentNativeSourceFenceTests(PostgreSqlContain
         await HumanCommitSubject.ResolveAsync(
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, id.ToString())], "fixture")),
             new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)))), default)
+                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), fixture.NativeQueueEnrollment)), default)
         ?? throw new InvalidOperationException("A resolved human is required.");
 
     private ExploreDbContext Open(Guid tenant)

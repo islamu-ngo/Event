@@ -81,11 +81,8 @@ internal sealed class OperatorIdentityEditorNativeFixture : IAsyncDisposable
         await using (var migration = postgres.CreateDbContext())
         {
             await PostgresOperatorIdentityEditorContract.ApplyAsync(migration, postgres.NativeQueueEnrollment);
-            // The original lookup executor resolves the signed Local subject before Global
-            // editor selection. No direct identity-table access is granted to that login.
-            var names = new HumanPrincipalSourceSql(migration);
-            await migration.Database.ExecuteSqlRawAsync(
-                $"GRANT {PostgresExternalLoginAuthenticationContract.GlobalRole} TO {names.Quote(postgres.NativeQueueEnrollment.GlobalLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE");
+            await Explore.Persistence.Schema.PostgresExternalLoginReadPermissions.ApplyAsync(
+                migration, postgres.NativeQueueEnrollment);
             migration.Tenants.Add(new Tenant
             {
                 Id = tenant,

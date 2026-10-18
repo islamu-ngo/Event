@@ -394,6 +394,16 @@ or human mutation preparation. The exact provider account key and cancellation
 token cross the read port; absent bindings retain the existing fail-closed
 identity result. No Runtime login-table privilege is required.
 
+`ExternalLoginAuthenticationRepository` uses one untracked EF query for all
+providers, matching both AuthenticationProviderId and ProviderKey without a User
+or UserPii join. PostgreSQL admission requires the declared Global session and
+its fixed column-only read privileges, including checks against privileges
+reachable through SET ROLE and system-column grants. The factory lease keeps
+the connection open across admission and the read; retries repeat both steps.
+The configured Global login can directly read all granted binding columns;
+the account predicate is enforced by C#, not a stored function. Other services
+using that same Global credential share that database-level access.
+
 The public lifecycle check reads current Active identities through
 `ITenantLookupSource`, not full `Tenant` entities through the request Runtime
 repository. PostgreSQL uses the independent Global pool and the existing
@@ -1888,13 +1898,17 @@ binding the request tenant.
 
 Migration-owned `SECURITY DEFINER` functions use fixed search paths and
 separate NOLOGIN owners, migration installers and execution groups. PUBLIC
-execution is revoked. Authentication exposes exact credential/account
+execution is revoked. API-key/scanner authentication exposes exact credential
 lookups, membership exposes one user's complete tenant graph, and
 administrative authority exposes primitive scope IDs for an exact user.
 Queue admission/discovery, snapshot maintenance, disclosure fanout, PDS
 settlement and ATProto materialization each retain their own bounded
 predicates, transactions and fences. Granting an execution group does not
-grant arbitrary private-table reads or owner membership.
+grant arbitrary private-table reads or owner membership. External provider-account
+binding lookup instead uses EF and fixed read-only Global column grants; it has
+no stored routine. Existing deployments containing its obsolete routine or roles
+are rejected and require explicit fresh isolated development database provisioning.
+The application never automatically removes those objects or deletes data.
 
 Operators provision the selected Runtime, Migrator and Global logins and only
 the capability groups required by each consumer; see [SECRETS.md](SECRETS.md)

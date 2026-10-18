@@ -90,10 +90,8 @@ internal sealed class ResolverConfigurationNativeFixture : IAsyncDisposable
         await using (var migration = postgres.CreateDbContext())
         {
             await PostgresResolverConfigurationContract.ApplyAsync(migration, postgres.NativeQueueEnrollment);
-            // Canonical signed-subject lookup enrollment, not a resolver/editor grant.
-            var names = new HumanPrincipalSourceSql(migration);
-            await migration.Database.ExecuteSqlRawAsync(
-                $"GRANT {PostgresExternalLoginAuthenticationContract.GlobalRole} TO {names.Quote(postgres.NativeQueueEnrollment.GlobalLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE");
+            await Explore.Persistence.Schema.PostgresExternalLoginReadPermissions.ApplyAsync(
+                migration, postgres.NativeQueueEnrollment);
             migration.Tenants.Add(new()
             {
                 Id = tenant,

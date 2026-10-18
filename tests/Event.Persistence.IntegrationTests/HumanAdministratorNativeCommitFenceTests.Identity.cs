@@ -43,7 +43,7 @@ public sealed partial class HumanAdministratorNativeCommitFenceTests
         }
         var resolver = new ResolveCurrentUserIdByIdentityRequestHandler(
             new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global))));
+                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), fixture.NativeQueueEnrollment));
         var subject = await HumanCommitSubject.ResolveAsync(principal, resolver, CancellationToken.None);
         await Assert.That(subject!.PrincipalId).IsEqualTo(rows.User);
         await using var context = Open(PrimaryDatabaseRole.EmailPolicyInstanceMutation, null);

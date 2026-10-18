@@ -185,21 +185,17 @@ internal sealed class TenantBrandingNativeAuthenticationFixture : IAsyncDisposab
     private async Task EnrollBrandingAccessAsync()
     {
         await using var setup = postgres.CreateDbContext();
-        // Install the existing production lookup contract using the fixture's setup authority.
-        // Enroll only its declared Global executor; never give the Runtime owner identity-table access.
+        // Global reads only the binding columns; Runtime retains no identity-table access.
         await setup.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
-            await PostgresExternalLoginAuthenticationContract.ApplyAsync(setup, postgres.NativeQueueEnrollment));
+            await Explore.Persistence.Schema.PostgresExternalLoginReadPermissions.ApplyAsync(setup, postgres.NativeQueueEnrollment));
         var sql = setup.GetService<ISqlGenerationHelper>();
         string global = sql.DelimitIdentifier(postgres.NativeQueueEnrollment.GlobalLogin);
         string runtime = sql.DelimitIdentifier(postgres.NativeQueueEnrollment.RuntimeLogin);
-        string lookupRole = sql.DelimitIdentifier(PostgresExternalLoginAuthenticationContract.GlobalRole);
         string Table(Type type)
         {
             var entity = setup.Model.FindEntityType(type)!;
             return sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
         }
-        await setup.Database.ExecuteSqlRawAsync(
-            $"GRANT {lookupRole} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE");
         // Ordinary branding data access is distinct from execute-only human authority fences.
         // The tenant document remains under the existing FORCE RLS policy.
         if (!actorReadsOnly)

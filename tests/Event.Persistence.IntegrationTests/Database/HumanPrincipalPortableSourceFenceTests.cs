@@ -57,7 +57,7 @@ public sealed class HumanPrincipalPortableSourceFenceTests(AdmissionAuthorityPro
             new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, Guid.CreateVersion7().ToString())], "fixture")),
             new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.CreateOptions(provider, PrimaryDatabaseRole.Global)))),
+                new GlobalExploreDbContextFactory(fixture.CreateOptions(provider, PrimaryDatabaseRole.Global)), null)),
             CancellationToken.None) ?? throw new InvalidOperationException("A human subject is required.");
         await using var context = Open(provider);
         var source = new HumanPrincipalSourceFence(context, subject, PolicySourceSetPurpose.Global);

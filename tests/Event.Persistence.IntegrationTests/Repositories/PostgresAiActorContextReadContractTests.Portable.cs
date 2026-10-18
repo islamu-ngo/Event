@@ -46,7 +46,7 @@ public sealed partial class PostgresAiActorContextReadContractTests
             await setup.SaveChangesAsync();
         }
         var resolver = new ResolveCurrentUserIdByIdentityRequestHandler(
-            new ExternalLoginAuthenticationRepository(new PortableIdentityFactory(options.Options)));
+            new ExternalLoginAuthenticationRepository(new PortableIdentityFactory(options.Options), null));
         var subject = await HumanCommitSubject.ResolveAsync(Principal(seed.User), resolver, default)
             ?? throw new InvalidOperationException("Portable human must resolve through its persisted provider binding.");
         await Assert.That(subject.AccountKey!.Value).IsEqualTo(accountValue);

@@ -75,7 +75,7 @@ public sealed class HumanEmailNativeSourceProtocolTests(PostgreSqlContainerFixtu
             new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", row.User.ToString("D")),
                 new Claim("auth_provider", "local"), new Claim("iss", LocalIdentityOptions.Issuer)], "source-control")),
             new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)))), default)
+                new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), fixture.NativeQueueEnrollment)), default)
             ?? throw new InvalidOperationException("Persisted original Local subject required.");
         var local = new LocalSessionAuthority(row.User, row.Stamp, true);
         await using var context = Open(PrimaryDatabaseRole.EmailPolicyTenantMutation, row.Tenant);

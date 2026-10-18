@@ -131,11 +131,10 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             }
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresUserTenantMembershipContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresExternalLoginAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresExternalLoginReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAdministrativeAuthorityContract.ApplyAsync(migratorContext);
             foreach (string executor in new[]
             {
-                PostgresExternalLoginAuthenticationContract.GlobalRole,
                 PostgresAdministrativeAuthorityContract.GlobalRole,
                 PostgresUserTenantMembershipContract.GlobalRole
             })

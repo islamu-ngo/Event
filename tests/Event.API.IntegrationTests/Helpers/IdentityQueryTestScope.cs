@@ -27,7 +27,8 @@ internal sealed class IdentityQueryTestScope : IDisposable
         var options = new DbContextOptionsBuilder<ExploreDbContext>()
             .UseInMemoryDatabase(nameof(IdentityQueryTestScope), new InMemoryDatabaseRoot()).Options;
         services.AddSingleton<IGlobalExploreDbContextFactory>(new IdentityQueryInMemoryContextFactory(options));
-        services.AddScoped<IExternalLoginAuthenticationRepository, ExternalLoginAuthenticationRepository>();
+        services.AddScoped<IExternalLoginAuthenticationRepository>(provider => new ExternalLoginAuthenticationRepository(
+            provider.GetRequiredService<IGlobalExploreDbContextFactory>(), null));
         services.AddSingleton<IAuthorizationProvider, UnexpectedPolicy>();
         services.AddScoped<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>, ResolveCurrentUserIdByIdentityRequestHandler>();
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });

@@ -44,7 +44,8 @@ public sealed class TenantStorageSettingsControllerTests : IDisposable
         var options = new DbContextOptionsBuilder<ExploreDbContext>()
             .UseInMemoryDatabase(Guid.CreateVersion7().ToString()).Options;
         services.AddSingleton<IGlobalExploreDbContextFactory>(new IdentityQueryInMemoryContextFactory(options));
-        services.AddScoped<IExternalLoginAuthenticationRepository, ExternalLoginAuthenticationRepository>();
+        services.AddScoped<IExternalLoginAuthenticationRepository>(provider => new ExternalLoginAuthenticationRepository(
+            provider.GetRequiredService<IGlobalExploreDbContextFactory>(), null));
         services.AddSingleton(Substitute.For<IAuthorizationProvider>());
         services.AddNativeOperations([typeof(ResolveCurrentUserIdByIdentityRequest), typeof(ResolveCurrentUserIdByIdentityRequestHandler)]);
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });

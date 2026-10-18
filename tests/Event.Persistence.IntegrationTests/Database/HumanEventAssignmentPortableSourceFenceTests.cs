@@ -57,7 +57,7 @@ public sealed class HumanEventAssignmentPortableSourceFenceTests(AdmissionAuthor
         var subject = await HumanCommitSubject.ResolveAsync(
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.ToString())], "fixture")),
             new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-                new GlobalExploreDbContextFactory(fixture.CreateOptions(provider, PrimaryDatabaseRole.Global)))), default)
+                new GlobalExploreDbContextFactory(fixture.CreateOptions(provider, PrimaryDatabaseRole.Global)), null)), default)
             ?? throw new InvalidOperationException("A human subject is required.");
         await using var context = Open(provider, tenant);
         var source = new HumanEventAssignmentSourceFence(context, subject,

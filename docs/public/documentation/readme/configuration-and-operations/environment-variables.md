@@ -351,13 +351,31 @@ overrides take effect.
 
 For pre-tenant credential and membership discovery, grant
 `event_api_key_authentication_global`, `event_scanner_authentication_global`,
-`event_user_membership_global` and `event_external_login_authentication_global`
+`event_user_membership_global`
 to the configured Global login, with inheritance enabled and role switching
 disabled. Keep their owner/migrator groups and direct private-table access away
 from both application logins. These capabilities provide exact credential
-lookup, narrow usage metadata updates, one user's active tenant memberships,
-and exact provider-account binding lookup. They do not grant credential
+lookup, narrow usage metadata updates and one user's active tenant memberships.
+They do not grant credential
 management, check-in mutation or identity-write authority.
+
+External provider-account binding lookup uses EF with the existing Global
+credential. The Migrator installs SELECT only on the binding's ID, user ID,
+provider ID/key/display name and creation/update audit columns. No Runtime
+read, write permission, table-wide SELECT or grant option is added. Every service
+sharing the Global credential can read these columns; the application restricts
+each lookup to the exact provider and account. Keep that credential restricted
+to trusted backend services.
+
+This development cutover requires a fresh isolated database installation. If an
+old external-login routine or any `event_external_login_authentication_*` role
+remains, startup migration fails with
+`external_login_requires_fresh_development_database`. Roles are cluster-wide, so
+use an isolated development PostgreSQL cluster when an existing cluster still
+contains them. The application does not delete data or clean up old database
+objects. Preserve any data you need before explicitly provisioning a replacement;
+do not grant the removed execution role or broaden Runtime permissions to bypass
+the failure. No new environment variables or secret authority are required.
 
 Administrative scope discovery additionally requires
 `event_admin_authority_global` on the Global login, with inheritance enabled and

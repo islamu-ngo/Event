@@ -160,7 +160,6 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
     [Arguments("usage")]
     [Arguments("scanner")]
     [Arguments("membership")]
-    [Arguments("binding")]
     public async Task OrdinaryRuntimeCannotExecuteGlobalAuthenticationCapabilities(string purpose)
     {
         await using var rows = await AuthenticationRows.CreateAsync(fixture);
@@ -189,11 +188,6 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
             case "membership":
                 command.CommandText = $"SELECT * FROM {PostgresUserTenantMembershipContract.FunctionSql(request)}(@user)";
                 Add("user", rows.UserId);
-                break;
-            case "binding":
-                command.CommandText = $"SELECT * FROM {PostgresExternalLoginAuthenticationContract.FunctionSql(request)}(@provider, @key)";
-                Add("provider", (int)rows.Account.ProviderKind);
-                Add("key", rows.Account.Value);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(purpose));
@@ -442,7 +436,7 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
                     await Assert.That(reader.GetBoolean(2)).IsFalse();
                 }
                 foreach (Type type in new[] { typeof(ExternalApiKey), typeof(AdmissionScannerCapability),
-                    typeof(TenantUser), typeof(UserExternalLogin), typeof(UserPii) })
+                    typeof(TenantUser), typeof(UserPii) })
                 {
                     var entity = metadata.Model.FindEntityType(type)!;
                     string table = $"\"{entity.GetSchema()}\".\"{entity.GetTableName()}\"";

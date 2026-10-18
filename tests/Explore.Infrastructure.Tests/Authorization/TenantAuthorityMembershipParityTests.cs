@@ -325,7 +325,7 @@ public sealed class TenantAuthorityMembershipParityTests
             new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, UserId.ToString())], "test")) } },
             new AdministrativeAuthorityRepository(this),
             new OrganizationMemberRepository(Context), new GroupMemberRepository(Context),
-            new ExternalLoginAuthenticationRepository(this), NullLogger<AdminContext>.Instance);
+            new ExternalLoginAuthenticationRepository(this, null), NullLogger<AdminContext>.Instance);
 
         public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
         {

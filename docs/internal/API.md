@@ -78,8 +78,12 @@ retains the validated credential lifetime, committed subject and administrator
 sources through one Serializable attempt. Native ordinary settings writes share
 that owner; completeness and source/deadline checks precede commit. Settings
 notifications and translation-cache invalidation happen only after settlement.
-Signed provider identities resolve through the independent execute-only Global
-authentication projection, not Runtime identity-table reads.
+Signed provider identities resolve through the independent Global EF binding
+reader. PostgreSQL grants that configured login SELECT on the fixed nine
+UserExternalLogin scalar columns; the exact provider/account predicate belongs
+to C#. Runtime has no binding-table access. Every consumer sharing the Global
+login can read those columns; purpose-specific factory aliases do not create
+separate database identities.
 
 LookupDataCache owns an identity-free Runtime context from IDbContextFactory for
 initialization and refresh. It never resolves the tenant-selected scoped context;

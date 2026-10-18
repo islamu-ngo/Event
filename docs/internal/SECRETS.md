@@ -738,8 +738,7 @@ inside other mutation transactions do not route through this capability.
 
 Pre-tenant authentication readers also acquire independent sealed-null Global
 leases. Grant the selected Global login `event_api_key_authentication_global`,
-`event_scanner_authentication_global`, `event_user_membership_global` and
-`event_external_login_authentication_global`, with inheritance enabled and role
+`event_scanner_authentication_global` and `event_user_membership_global`, with inheritance enabled and role
 switching disabled. Their owner/migrator groups and direct private-table grants
 remain unavailable to Runtime and Global.
 Exact key lookup preserves inactive/expired rows for the authentication handler's
@@ -748,8 +747,24 @@ and IP. Scanner lookup pairs each digest with its version and returns up to two
 matches so ambiguity is rejected. Membership discovery returns the complete
 active membership/Tenant/TenantStatus graph for one server-resolved user; checking
 a chosen target tenant uses an independent exact Runtime lease instead.
-Standalone external-login lookup uses the exact provider/account pair, while
-transactional identity synchronization keeps its existing same-context reader.
+Standalone external-login lookup uses the exact provider/account pair through
+EF. `PostgresExternalLoginReadPermissions` grants the declared Global login
+SELECT on the mapped UserExternalLogin properties Id, UserId,
+AuthenticationProviderId, ProviderKey, ProviderDisplayName, CreatedAt, CreatedBy,
+UpdatedAt and UpdatedBy. It grants no table-wide SELECT, writes or grant options.
+Runtime remains denied. The required repository enrollment comes from the
+existing selected deployment configuration; PostgreSQL rejects missing enrollment
+or another session even if it has copied column permissions. The reader and
+installer reject excess privileges, including system columns and SET-reachable
+roles. Transactional identity synchronization retains its same-context reader.
+
+All consumers sharing the Global credential can query those nine binding
+columns; factory aliases do not isolate them at the database level. No new secret
+authority or connection credential is introduced. The installer accepts only the
+declared Migrator session. It rejects the obsolete external-login function or any
+of its three legacy roles with `external_login_requires_fresh_development_database`.
+Use a fresh isolated development database/cluster with the declared accounts;
+there is no automatic object cleanup, data deletion or in-place compatibility path.
 Claims enrichment resolves authority directly through
 `IAdministrativeAuthorityRepository`, without constructing the ordinary
 `IAdminContext` before post-authentication tenant binding.

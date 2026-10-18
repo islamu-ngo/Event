@@ -116,7 +116,7 @@ public sealed partial class PostgresAiActorContextReadContractTests
             await migration.SaveChangesAsync();
         }
         var resolver = new ResolveCurrentUserIdByIdentityRequestHandler(new ExternalLoginAuthenticationRepository(
-            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global))));
+            new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)), fixture.NativeQueueEnrollment));
         var subject = await HumanCommitSubject.ResolveAsync(principal, resolver, default)
             ?? throw new InvalidOperationException("The persisted provider account must resolve the seeded human.");
         await Assert.That(subject.PrincipalId).IsEqualTo(seed.User);

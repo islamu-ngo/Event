@@ -809,7 +809,7 @@ public sealed class AuthenticationCredentialCutoverCoordinatorTests
         public RelationalAuthenticationCredentialCutoverCoordinator Coordinator => new(this,
             new AdminContext(HttpContext, new AdministrativeAuthorityRepository(this),
                 new OrganizationMemberRepository(_identityContext),
-                new GroupMemberRepository(_identityContext), new ExternalLoginAuthenticationRepository(this),
+                new GroupMemberRepository(_identityContext), new ExternalLoginAuthenticationRepository(this, null),
                 NullLogger<AdminContext>.Instance), HttpContext, Profile);
 
         public AuthenticationCredentialCutover CreateOperation(Guid? instanceId = null,

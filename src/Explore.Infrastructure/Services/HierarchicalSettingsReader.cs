@@ -224,7 +224,7 @@ public class HierarchicalSettingsReader : IHierarchicalSettingsReader
         return await _cache.GetOrCreateAsync(SystemCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = _cacheExpiration;
-            return await _systemSettingRepository.GetAllSettings();
+            return await _systemSettingRepository.GetAllSettings(cancellationToken: ct);
         }) ?? [];
     }
 
@@ -234,7 +234,7 @@ public class HierarchicalSettingsReader : IHierarchicalSettingsReader
         return await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = _cacheExpiration;
-            return await _tenantSettingRepository.GetAllForTenant(tenantId);
+            return await _tenantSettingRepository.GetAllForTenant(tenantId, ct);
         }) ?? [];
     }
 

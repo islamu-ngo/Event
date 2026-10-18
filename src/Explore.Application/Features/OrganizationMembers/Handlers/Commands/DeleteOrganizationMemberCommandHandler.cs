@@ -43,7 +43,7 @@ public class DeleteOrganizationMemberCommandHandler : ICommandHandler<DeleteOrga
 
     private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken)
     {
-        var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId);
+        var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId, cancellationToken);
 
         if (memberToDelete == null)
         {

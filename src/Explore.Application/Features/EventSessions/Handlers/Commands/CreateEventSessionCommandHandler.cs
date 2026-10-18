@@ -200,7 +200,7 @@ public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessi
                 }
                 if (input.SessionTemplateId is { } templateId)
                 {
-                    var template = await _eventSessionTemplateRepository.GetSessionTemplateWithDetails(templateId);
+                    var template = await _eventSessionTemplateRepository.GetSessionTemplateWithDetails(templateId, token);
                     if (template is { IsPublished: true, IsActive: true })
                     {
                         eventSession.SourceTemplateId = template.Id;

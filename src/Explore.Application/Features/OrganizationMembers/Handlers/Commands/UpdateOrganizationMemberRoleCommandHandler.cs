@@ -45,7 +45,7 @@ public class UpdateOrganizationMemberRoleCommandHandler : ICommandHandler<Update
     {
         var dto = request.UpdateOrganizationMemberRoleDto;
 
-        var memberToUpdate = await _organizationMemberRepository.GetOrganizationMemberWithDetails(dto.Id);
+        var memberToUpdate = await _organizationMemberRepository.GetOrganizationMemberWithDetails(dto.Id, cancellationToken);
         if (memberToUpdate == null)
         {
             return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");

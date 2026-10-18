@@ -51,7 +51,7 @@ public class GetEventProgramSummaryRequestHandler :
         CancellationToken cancellationToken)
     {
         var eventEntity = includeManaged
-            ? await _eventRepository.GetEventWithDetails(eventId)
+            ? await _eventRepository.GetEventWithDetails(eventId, cancellationToken)
             : await _eventRepository.GetPublicEventWithDetailsByIdAsync(eventId, cancellationToken);
         if (eventEntity is null)
             return null;

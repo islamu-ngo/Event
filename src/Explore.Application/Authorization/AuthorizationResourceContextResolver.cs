@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.EventTemplates.Requests.Commands;
 using Explore.Application.Features.EventSessionTemplates.Requests.Commands;
 using Explore.Application.Features.Notifications.Requests.Commands;
@@ -84,6 +85,17 @@ public sealed class AuthorizationResourceContextResolver(
                 throw new AuthorizationException(resourceKind, action);
             return new AuthorizationContext(template.TenantId.ToString("D"), new TenantScopedAuthorizationFacts(template.TenantId));
         }
+        if (request is CreateEventCommand eventCreation
+            && resourceKind == ResourceKinds.Event && action == AuthorizationActions.Create)
+        {
+            if (tenantContext is null || tenantContext.TenantId == Guid.Empty
+                || resourceId != CreateEventCommand.PreCreateResourceId)
+                throw new AuthorizationException(resourceKind, action);
+            declaredFacts = new PreCreateAuthorizationFacts(tenantContext.TenantId,
+                OrganizationId: eventCreation.EventDto.OrganizationId,
+                GroupId: eventCreation.EventDto.GroupId);
+        }
+
         if (declaredFacts is PreCreateAuthorizationFacts creation)
         {
             if (action != AuthorizationActions.Create

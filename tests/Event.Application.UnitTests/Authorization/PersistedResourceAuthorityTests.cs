@@ -1,11 +1,77 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.DTOs.Event;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.Events.Requests.Commands;
 
 namespace Event.Application.UnitTests.Authorization;
 
 public sealed class PersistedResourceAuthorityTests
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task EventCreationDerivesTenantAndOwnerFactsFromOriginalServerContext(bool forgedFacts)
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        Guid organizationId = Guid.CreateVersion7();
+        Guid groupId = Guid.CreateVersion7();
+        var command = new CreateEventCommand
+        {
+            EventDto = new CreateEventDto
+            {
+                Title = "Selected tenant event",
+                OrganizationId = organizationId,
+                GroupId = groupId,
+                ParticipationConfiguration = new()
+            }
+        };
+        var resolver = new AuthorizationResourceContextResolver(tenantContext: new Tenant(tenantId));
+        IAuthorizationFacts? declared = forgedFacts
+            ? new PreCreateAuthorizationFacts(Guid.CreateVersion7(), Guid.CreateVersion7(),
+                Guid.CreateVersion7(), Guid.CreateVersion7())
+            : ((ISecureRequest)command).AuthorizationFacts;
+
+        var result = await resolver.ResolveAsync(command, ResourceKinds.Event,
+            AuthorizationActions.Create, CreateEventCommand.PreCreateResourceId, declared, CancellationToken.None);
+
+        await Assert.That(result.ResourceId).IsEqualTo(CreateEventCommand.PreCreateResourceId);
+        await Assert.That(result.Facts).IsEqualTo(new PreCreateAuthorizationFacts(
+            tenantId, OrganizationId: organizationId, GroupId: groupId));
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task EventCreationWithoutSelectedTenantFailsClosed(bool emptyTenant)
+    {
+        var command = new CreateEventCommand
+        {
+            EventDto = new CreateEventDto { Title = "No selected tenant", ParticipationConfiguration = new() }
+        };
+        var resolver = new AuthorizationResourceContextResolver(
+            tenantContext: emptyTenant ? new Tenant(Guid.Empty) : null);
+
+        await Assert.ThrowsAsync<AuthorizationException>(() => resolver.ResolveAsync(
+            command, ResourceKinds.Event, AuthorizationActions.Create, CreateEventCommand.PreCreateResourceId,
+            ((ISecureRequest)command).AuthorizationFacts, CancellationToken.None));
+    }
+
+    [Test]
+    public async Task EventCreationCannotUseAnExistingResourceIdentity()
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        var command = new CreateEventCommand
+        {
+            EventDto = new CreateEventDto { Title = "Invalid target", ParticipationConfiguration = new() }
+        };
+        var resolver = new AuthorizationResourceContextResolver(tenantContext: new Tenant(tenantId));
+
+        await Assert.ThrowsAsync<AuthorizationException>(() => resolver.ResolveAsync(
+            command, ResourceKinds.Event, AuthorizationActions.Create, Guid.CreateVersion7().ToString("D"),
+            new PreCreateAuthorizationFacts(tenantId), CancellationToken.None));
+    }
+
     [Test]
     [Arguments(ResourceKinds.Event)]
     [Arguments(ResourceKinds.EventSession)]

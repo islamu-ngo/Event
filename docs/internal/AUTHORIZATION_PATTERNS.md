@@ -19,6 +19,14 @@
 2. `[AuthorizeResource]` + `ISecureRequest`: optional resource ID and typed `AuthorizationFacts` supplied by the request.
 3. Optional `IAuthorizationContextEnricher<TRequest>`: resolves typed context before `AuthorizationResourceContextResolver` replaces it with persisted facts wherever supported. Caller or enricher facts do not override persisted authority.
 
+For `CreateEventCommand`, no event row or client-supplied tenant is authoritative.
+The resolver derives pre-create tenant facts from the selected `ITenantContext`
+and organization/group identifiers from the original command DTO. It requires
+the exact `create` resource identity and a nonempty selected tenant before the
+provider evaluates the fixed event-create capability. Supplied or enriched facts
+cannot retarget this creation scope; the handler still checks the requested
+organization/group membership before persistence.
+
 There is no `IAuthorizedRequest` or caller-authored policy dictionary. Unannotated requests retain their exact reviewed public, capability-token, worker or handler-owned enforcement from [AUTHORIZATION.md](AUTHORIZATION.md#reviewed-handler-and-worker-authorities); do not add blanket bypass flags or arbitrary exception inventories.
 
 ## How To Choose

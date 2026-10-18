@@ -8,6 +8,15 @@ description: Walkthrough of administrative consoles and management workflows for
 
 This guide walks administrators through the web consoles in the Blazor management interface, covering instance-level controls, tenant provisioning, monetization, branding, and organization governance.
 
+### Event creation scope
+
+Select the intended tenant before creating an event. Event creation derives its
+authorization scope from that server-selected tenant, not a tenant identifier
+in the event body. The requested organization and group identify the owning
+context, and their membership checks still apply. A missing tenant selection
+is denied rather than treated as instance-wide creation; an existing event ID
+cannot substitute for the new-event creation identity.
+
 ---
 
 ## 1. Administrative Consoles & Routes

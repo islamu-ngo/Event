@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Xml.Linq;
+using Event.DataProtection.Operator;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption;
@@ -149,11 +150,14 @@ catch
     return 1;
 }
 
-internal sealed record OperatorBundle(string Ring, string Admission);
-
-internal sealed class OperatorRepository : IXmlRepository
+namespace Event.DataProtection.Operator
 {
-    private readonly List<XElement> documents = [];
-    public IReadOnlyCollection<XElement> GetAllElements() => documents.Select(element => new XElement(element)).ToArray();
-    public void StoreElement(XElement element, string friendlyName) => documents.Add(new XElement(element));
+    internal sealed record OperatorBundle(string Ring, string Admission);
+
+    internal sealed class OperatorRepository : IXmlRepository
+    {
+        private readonly List<XElement> documents = [];
+        public IReadOnlyCollection<XElement> GetAllElements() => documents.Select(element => new XElement(element)).ToArray();
+        public void StoreElement(XElement element, string friendlyName) => documents.Add(new XElement(element));
+    }
 }

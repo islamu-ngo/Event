@@ -81,12 +81,7 @@ public static partial class PostgresLocalAdministrationContract
                         WHERE m.roleid = pg_catalog.to_regrole(role_name)::oid AND m.member = pg_catalog.to_regrole(session_user)::oid)
                     THEN EXECUTE pg_catalog.format('REVOKE %I FROM %I',role_name,session_user); END IF;
                 END LOOP;
-                CREATE TABLE {sql.Name(SourceTable)} (id smallint PRIMARY KEY CHECK (id = 1), revision bigint NOT NULL CHECK (revision >= 0));
-                INSERT INTO {sql.Name(SourceTable)} (id,revision) VALUES (1,0);
-                CREATE TABLE {sql.Name(AttemptTable)} (
-                    attempt bigint NOT NULL,backend integer NOT NULL,request jsonb NOT NULL,preimage jsonb NOT NULL,
-                    plan jsonb,postimage jsonb,result text,applied boolean NOT NULL,completed boolean NOT NULL,
-                    PRIMARY KEY (attempt,backend));
+                {AttemptSql(context).CreateTables}
                 {policies}
                 GRANT USAGE ON SCHEMA {sql.Quote(sql.Schema)} TO {string.Join(",", Roles)};
                 GRANT CREATE ON SCHEMA {sql.Quote(sql.Schema)} TO {OwnerRole};
@@ -96,9 +91,7 @@ public static partial class PostgresLocalAdministrationContract
                 PERFORM pg_catalog.set_config('role','none',true);
                 REVOKE CREATE ON SCHEMA {sql.Quote(sql.Schema)} FROM {OwnerRole};
                 {triggers}
-                CREATE CONSTRAINT TRIGGER {Prefix}settlement AFTER INSERT ON {sql.Name(AttemptTable)}
-                    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION {FunctionSql(context, "settlement")}();
-                ALTER TABLE {sql.Name(AttemptTable)} ENABLE ALWAYS TRIGGER {Prefix}settlement;
+                {AttemptSql(context).InstallSettlement}
                 PERFORM pg_catalog.set_config('role','{OwnerRole}',true);
                 REVOKE EXECUTE ON FUNCTION {FunctionSql(context, "changed")}() FROM {migrator};
                 REVOKE EXECUTE ON FUNCTION {FunctionSql(context, "settlement")}() FROM {migrator};

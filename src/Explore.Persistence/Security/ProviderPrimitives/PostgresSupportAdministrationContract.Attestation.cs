@@ -233,36 +233,6 @@ public static partial class PostgresSupportAdministrationContract
                     'SELECT,INSERT,UPDATE,REFERENCES')
             THEN RAISE EXCEPTION 'support_administration_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
             """));
-        var fields = new[]
-        {
-            (SourceTable, "id", "int2", true), (SourceTable, "revision", "int8", true),
-            (AttemptTable, "attempt", "int8", true), (AttemptTable, "backend", "int4", true),
-            (AttemptTable, "request", "jsonb", true), (AttemptTable, "preimage", "jsonb", true),
-            (AttemptTable, "plan", "jsonb", false), (AttemptTable, "postimage", "jsonb", false),
-            (AttemptTable, "result", "text", false), (AttemptTable, "applied", "bool", true),
-            (AttemptTable, "completed", "bool", true)
-        };
-        string internals = string.Join("\n", new[] { SourceTable, AttemptTable }.Select(name => $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({Text(sql.Name(name))})
-                AND t.relkind = 'r' AND t.relpersistence = 'p' AND NOT t.relrowsecurity AND NOT t.relforcerowsecurity
-                AND t.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class = pg_catalog.to_regclass({Text(sql.Name(name))}))
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i WHERE i.inhrelid = pg_catalog.to_regclass({Text(sql.Name(name))})
-                    OR i.inhparent = pg_catalog.to_regclass({Text(sql.Name(name))}))
-                OR (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({Text(sql.Name(name))})
-                    AND a.attnum > 0 AND NOT a.attisdropped) <> {fields.Count(field => field.Item1 == name)}
-                OR EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE t.tgrelid = pg_catalog.to_regclass({Text(sql.Name(name))})
-                    AND NOT t.tgisinternal AND NOT ({(name == AttemptTable ? $"t.tgname = '{Prefix}settlement'" : "false")}))
-            THEN RAISE EXCEPTION 'support_administration_private_catalog_drift' USING ERRCODE = '55000'; END IF;
-            """));
-        string fieldChecks = string.Join("\n", fields.Select(field => $"""
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({Text(sql.Name(field.Item1))})
-                AND a.attname = {Text(field.Item2)} AND a.attnum > 0 AND NOT a.attisdropped
-                AND a.atttypid = 'pg_catalog.{field.Item3}'::regtype AND a.atttypmod = -1
-                AND a.attnotnull = {field.Item4.ToString().ToLowerInvariant()} AND a.attgenerated = '' AND a.attidentity = ''
-                AND NOT a.atthasdef AND a.attcollation = {(field.Item3 == "text" ? "'pg_catalog.\"default\"'::regcollation" : "0")})
-            THEN RAISE EXCEPTION 'support_administration_private_column_drift' USING ERRCODE = '55000'; END IF;
-            """));
         return $"""
             {SourceGuard(context, enrollment)}
             {OriginalSources(context, enrollment)}
@@ -272,29 +242,7 @@ public static partial class PostgresSupportAdministrationContract
             {policies}
             {triggers}
             {callerDenial}
-            {internals}
-            {fieldChecks}
-            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid = {Text(sql.Name(SourceTable))}::regclass
-                AND c.contype = 'p' AND NOT c.condeferrable AND c.convalidated AND pg_catalog.pg_get_constraintdef(c.oid) = 'PRIMARY KEY (id)'
-                AND EXISTS (SELECT 1 FROM pg_catalog.pg_index i WHERE i.indexrelid = c.conindid
-                    AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate))
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid = {Text(sql.Name(AttemptTable))}::regclass
-                    AND c.contype = 'p' AND NOT c.condeferrable AND c.convalidated
-                    AND pg_catalog.pg_get_constraintdef(c.oid) = 'PRIMARY KEY (attempt, backend)'
-                    AND EXISTS (SELECT 1 FROM pg_catalog.pg_index i WHERE i.indexrelid = c.conindid
-                        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate))
-                OR (SELECT count(*) FROM pg_catalog.pg_constraint c WHERE c.conrelid = {Text(sql.Name(SourceTable))}::regclass AND c.contype <> 'n') <> 3
-                OR (SELECT count(*) FROM pg_catalog.pg_constraint c WHERE c.conrelid = {Text(sql.Name(AttemptTable))}::regclass AND c.contype <> 'n') <> 2
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid = {Text(sql.Name(SourceTable))}::regclass
-                    AND c.contype = 'c' AND c.convalidated AND NOT c.connoinherit AND pg_catalog.pg_get_expr(c.conbin,c.conrelid) = '(id = 1)')
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid = {Text(sql.Name(SourceTable))}::regclass
-                    AND c.contype = 'c' AND c.convalidated AND NOT c.connoinherit AND pg_catalog.pg_get_expr(c.conbin,c.conrelid) = '(revision >= 0)')
-                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE t.tgrelid = {Text(sql.Name(AttemptTable))}::regclass
-                    AND t.tgname = '{Prefix}settlement' AND t.tgfoid = pg_catalog.to_regprocedure({Text(FunctionSql(context, "settlement") + "()")})
-                    AND t.tgtype = 5 AND t.tgenabled = 'A' AND NOT t.tgisinternal AND t.tgqual IS NULL
-                    AND t.tgnargs = 0 AND t.tgargs = ''::bytea AND t.tgattr = ''::int2vector
-                    AND t.tgconstraint <> 0 AND t.tgdeferrable AND t.tginitdeferred AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL)
-            THEN RAISE EXCEPTION 'support_administration_private_seal_drift' USING ERRCODE = '55000'; END IF;
+            {AttemptSql(context).PrivateCatalog(enrollment.MigratorLogin)}
             IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace n WHERE n.nspname = {Text(sql.Schema)}
                     AND n.nspowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid)
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname IN ({roles})

@@ -7,6 +7,9 @@ namespace Explore.Persistence.Security;
 
 public static partial class PostgresSupportAdministrationContract
 {
+    private static PostgresAdministrationAttemptSql AttemptSql(ExploreDbContext context) =>
+        new(new HumanPrincipalSourceSql(context), SourceTable, AttemptTable, Prefix, OwnerRole);
+
     private static readonly (string Name, string Signature, string Arguments, string Result)[] Routines =
     [
         ("read", "jsonb", "p_request jsonb", "jsonb"),
@@ -160,34 +163,10 @@ public static partial class PostgresSupportAdministrationContract
             """;
     }
 
-    private static string AcquireBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
-    {
-        var sql = new HumanPrincipalSourceSql(context);
-        return $"""
-            DECLARE observed jsonb;
-            BEGIN
-                {Guard(context, enrollment)}
-                {RequestGuard}
-                {Caller(enrollment)}
-                UPDATE {sql.Name(SourceTable)} SET revision = revision WHERE id = 1;
-                IF NOT FOUND THEN RAISE EXCEPTION 'support_administration_epoch_missing' USING ERRCODE = '55000'; END IF;
-                observed := {FunctionSql(context, "read")}(p_request);
-                IF p_before IS DISTINCT FROM observed
-                THEN RAISE EXCEPTION 'support_administration_preimage_changed' USING ERRCODE = '40001'; END IF;
-                INSERT INTO {sql.Name(AttemptTable)}
-                    (attempt,backend,request,preimage,plan,postimage,result,applied,completed)
-                    VALUES (pg_catalog.txid_current(),pg_catalog.pg_backend_pid(),p_request,observed,NULL,NULL,NULL,false,false);
-                RETURN observed;
-            END;
-            """;
-    }
+    private static string AcquireBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        AttemptSql(context).AcquireBody(Guard(context, enrollment), RequestGuard, Caller(enrollment));
 
-    private static string LoadAttempt(ExploreDbContext context) => $"""
-        SELECT * INTO admitted FROM {new HumanPrincipalSourceSql(context).Name(AttemptTable)}
-            WHERE attempt = pg_catalog.txid_current() AND backend = pg_catalog.pg_backend_pid() FOR UPDATE;
-        IF NOT FOUND OR admitted.request IS DISTINCT FROM p_request OR admitted.completed
-        THEN RAISE EXCEPTION 'support_administration_original_attempt_required' USING ERRCODE = '42501'; END IF;
-        """;
+    private static string LoadAttempt(ExploreDbContext context) => AttemptSql(context).LoadAttempt;
 
     private static string ApplyBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
@@ -248,64 +227,17 @@ public static partial class PostgresSupportAdministrationContract
             """;
     }
 
-    private static string CompleteBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
-    {
-        var sql = new HumanPrincipalSourceSql(context);
-        return $"""
-            DECLARE admitted {sql.Name(AttemptTable)}%ROWTYPE; observed jsonb;
-            BEGIN
-                {Guard(context, enrollment)}
-                {RequestGuard}
-                {Caller(enrollment)}
-                {LoadAttempt(context)}
-                IF NOT admitted.applied OR admitted.plan IS NULL
-                THEN RAISE EXCEPTION 'support_administration_incomplete_group' USING ERRCODE = '42501'; END IF;
-                observed := {FunctionSql(context, "read")}(p_request);
-                IF observed IS DISTINCT FROM p_disclosed OR observed->'Data' IS DISTINCT FROM admitted.postimage
-                    OR (observed->>'Revision')::bigint IS DISTINCT FROM
-                        (admitted.preimage->>'Revision')::bigint + pg_catalog.jsonb_array_length(admitted.plan)
-                THEN RAISE EXCEPTION 'support_administration_completion_changed' USING ERRCODE = '40001'; END IF;
-                UPDATE {sql.Name(AttemptTable)} SET completed = true,request = pg_catalog.jsonb_build_object(),
-                    preimage = pg_catalog.jsonb_build_object(),plan = '[]'::jsonb,postimage = pg_catalog.jsonb_build_object(),result = NULL
-                    WHERE attempt = admitted.attempt AND backend = admitted.backend;
-                RETURN observed;
-            END;
-            """;
-    }
+    private static string CompleteBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        AttemptSql(context).CompleteBody(Guard(context, enrollment), RequestGuard, Caller(enrollment));
 
     private static string ChangedBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        return $"""
-            BEGIN
-                {Guard(context, enrollment)}
-                IF current_user <> '{OwnerRole}' OR TG_WHEN <> 'BEFORE' OR TG_LEVEL <> 'STATEMENT'
-                    OR TG_OP NOT IN ('INSERT','UPDATE','DELETE','TRUNCATE')
-                    OR TG_RELID NOT IN ({string.Join(",", Inventory.Select(source => Text(sql.Table(source.Type)) + "::regclass"))})
-                THEN RAISE EXCEPTION 'support_administration_writer_target' USING ERRCODE = '55000'; END IF;
-                IF EXISTS (SELECT 1 FROM {sql.Name(AttemptTable)}
-                    WHERE attempt = pg_catalog.txid_current() AND backend = pg_catalog.pg_backend_pid() AND completed)
-                THEN RAISE EXCEPTION 'support_administration_write_after_completion' USING ERRCODE = '42501'; END IF;
-                UPDATE {sql.Name(SourceTable)} SET revision = revision + 1 WHERE id = 1;
-                IF NOT FOUND THEN RAISE EXCEPTION 'support_administration_epoch_missing' USING ERRCODE = '55000'; END IF;
-                RETURN NULL;
-            END;
-            """;
+        return AttemptSql(context).ChangedBody(Guard(context, enrollment),
+            string.Join(",", Inventory.Select(source => Text(sql.Table(source.Type)) + "::regclass")));
     }
 
-    private static string SettlementBody(ExploreDbContext context) => $"""
-        BEGIN
-            IF current_user <> '{OwnerRole}' OR TG_RELID <> {Text(new HumanPrincipalSourceSql(context).Name(AttemptTable))}::regclass
-                OR TG_WHEN <> 'AFTER' OR TG_LEVEL <> 'ROW' OR TG_OP <> 'INSERT'
-                OR NEW.attempt <> pg_catalog.txid_current() OR NEW.backend <> pg_catalog.pg_backend_pid()
-                OR NOT EXISTS (SELECT 1 FROM {new HumanPrincipalSourceSql(context).Name(AttemptTable)} a
-                    WHERE a.attempt = NEW.attempt AND a.backend = NEW.backend AND a.completed AND a.applied
-                        AND a.request = pg_catalog.jsonb_build_object() AND a.preimage = pg_catalog.jsonb_build_object()
-                        AND a.plan = '[]'::jsonb AND a.postimage = pg_catalog.jsonb_build_object() AND a.result IS NULL)
-            THEN RAISE EXCEPTION 'support_administration_private_settlement_missing' USING ERRCODE = '42501'; END IF;
-            RETURN NULL;
-        END;
-        """;
+    private static string SettlementBody(ExploreDbContext context) => AttemptSql(context).SettlementBody;
 
     private static IEnumerable<(string Name, string Signature, string Arguments, string Result, string Body)> Functions(
         ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>

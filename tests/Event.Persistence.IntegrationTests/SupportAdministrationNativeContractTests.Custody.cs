@@ -1,5 +1,6 @@
 using System.Data;
 using System.Text.Json.Nodes;
+using Explore.Application.Contracts.Identity;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -8,12 +9,53 @@ using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using LocalNative = Explore.Persistence.Security.PostgresLocalAdministrationContract;
 using Native = Explore.Persistence.Security.PostgresSupportAdministrationContract;
 
 namespace Event.Persistence.IntegrationTests;
 
 public sealed partial class SupportAdministrationNativeContractTests
 {
+    [Test]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    [Arguments(true, true)]
+    public async Task EachAdministrationOwnerRequiresItsOwnPhysicalCompletionSeal(bool completeLocal, bool completeSupport)
+    {
+        var source = await SeedAsync();
+        var localRequest = new LocalNative.Request("Status", LocalAdministrationStage.Disclose,
+            source.Actor, source.Tenant, Guid.CreateVersion7());
+        var supportRequest = new Native.Request("List", source.Actor, source.Tenant, TargetTenantId: source.Tenant);
+        await using var caller = Open(PrimaryDatabaseRole.Runtime, source.Tenant);
+        await caller.Database.OpenConnectionAsync();
+        await using var owner = await caller.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        string localBefore = await LocalNative.ReadAsync(caller, fixture.NativeQueueEnrollment, localRequest, default);
+        string supportBefore = await Native.ReadAsync(caller, fixture.NativeQueueEnrollment, supportRequest, default);
+        await LocalNative.AcquireAsync(caller, fixture.NativeQueueEnrollment, localRequest, localBefore, default);
+        await Native.AcquireAsync(caller, fixture.NativeQueueEnrollment, supportRequest, supportBefore, default);
+        await LocalNative.CompileAsync(caller, fixture.NativeQueueEnrollment, localRequest, new(), default);
+        await Native.CompileAsync(caller, fixture.NativeQueueEnrollment, supportRequest, new(), default);
+        var localApplied = JsonNode.Parse(await LocalNative.ApplyPlanAsync(
+            caller, fixture.NativeQueueEnrollment, localRequest, default))!;
+        string supportApplied = await Native.ApplyPlanAsync(caller, fixture.NativeQueueEnrollment, supportRequest, default);
+        if (completeLocal)
+            await LocalNative.CompleteAsync(caller, fixture.NativeQueueEnrollment, localRequest,
+                localApplied["Image"]!.ToJsonString(), default);
+        if (completeSupport)
+            await Native.CompleteAsync(caller, fixture.NativeQueueEnrollment, supportRequest, supportApplied, default);
+
+        if (completeLocal && completeSupport)
+        {
+            await owner.CommitAsync();
+            return;
+        }
+        var error = await Assert.ThrowsAsync<PostgresException>(() => owner.CommitAsync());
+        await Assert.That(error!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        await Assert.That(error.MessageText).IsEqualTo(completeLocal
+            ? "support_administration_private_settlement_missing"
+            : "local_administration_private_settlement_missing");
+    }
+
     [Test]
     public async Task AdditionalPrivateAttemptConstraintFailsBeforeDataObservation()
     {

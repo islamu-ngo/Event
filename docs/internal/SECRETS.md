@@ -776,6 +776,37 @@ Claims enrichment resolves authority directly through
 `IAdministrativeAuthorityRepository`, without constructing the ordinary
 `IAdminContext` before post-authentication tenant binding.
 
+Reference catalogue initialization uses the existing Runtime credential, not
+Global. `PostgresLookupCatalogueReadPermissions` installs direct, non-grantable
+column SELECT for seventeen fixed EF entities. Every type exposes Id, MasterCode,
+FullName and Description; EventType additionally exposes TenantId, AudienceAge
+exposes MinAge/MaxAge, and Role exposes RoleScopeId/IsSystem. The remaining types
+are EventFormat, EventStatus, AudienceGender, Madhab, Language, VisibilityType,
+ApprovalStatus, RegistrationMode, OrganizationPosition, ActorType, DidCustodyType,
+FileType, TagType and OwnerType. Future mapped properties do not silently join
+this permission inventory: closed-model admission rejects shape drift.
+
+The catalogue reader requires an identity-free, tenantless Runtime context,
+original Serializable transaction and unchanged connection. It rechecks tenant
+policy readiness before EF materialization. Column permission checks reject
+table-wide access, writes, system columns, grant options and transitive membership
+paths, including dormant ADMIN delegation. Runtime membership with Global or either
+email account is forbidden in both directions. Global retains no catalogue-source
+privileges. Email policy independently owns the email accounts' Role.Id,
+RoleScopeId and MasterCode projections; catalogue admission does not attest those
+grants. Runtime cannot borrow either email mutation role, and email sessions cannot
+execute the Runtime catalogue reader. RolePermission and UserPii remain private.
+Existing actor/conversation guards recognize only the six
+declared direct Runtime Role columns; they do not relax private-source authority.
+
+The obsolete `global_lookup_catalogue` function, `event_global_lookup_owner`,
+`event_global_lookup_migrator`, `event_global_lookup_runtime` roles and dedicated
+EventType catalogue policies are not installed. Their presence fails with
+`global_lookup_requires_fresh_development_database`. As with external-login
+discovery, use a fresh isolated development PostgreSQL instance/cluster without
+those roles and provision the declared accounts there. No automatic cleanup,
+permission repair, compatibility path or new secret is introduced.
+
 Grant `event_admin_authority_global` to Global with inheritance enabled and role
 switching disabled. Its four fixed-search-path functions return only an exact
 user's platform-administrator Boolean and tenant/organization/group scope IDs.

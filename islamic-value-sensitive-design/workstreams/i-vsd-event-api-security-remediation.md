@@ -266,6 +266,86 @@ the four workstream mitigations. Five-provider behavior, broader current-user/
 erasure flows, later workflow transitions and operational/release assurance remain
 open. Release record: `CHG-01M57X9PSZWNQ67TDK6NZTBVGQ`.
 
+#### Lookup catalogue: shared Runtime reads and truthful cache failure — 2026-10-18
+
+The next bounded capability moves seventeen reference-entity reads from a stored
+selector routine to ordinary, detached EF queries. Every consumer of the enrolled
+Runtime login can now read the explicitly declared reference columns; a factory
+name does not isolate those consumers. This is a documented trust change, not a
+claim that the former execute-only database boundary survives. Role metadata is
+limited to six declared columns; private role assignments, RolePermission and
+UserPii remain outside this capability. Tenant-private EventType rows remain
+protected by the existing tenant filter and forced database RLS.
+
+This applies the existing IVSD-F002/M002 and IVSD-F024/M024 obligations to tenants,
+operators and maintainers: publish the actual shared-login reach, grant only fixed
+columns, reject inherited/grantable/system-column expansion, and retain distinct
+owners' authority. Global receives no catalogue-source permission. Email policy's
+independently governed Role projections remain its own responsibility; Runtime
+cannot borrow email mutation roles or cross membership with either email account.
+No private source inventory or capability is merged for code reuse.
+
+The cache change also implements Sidq (truthful reporting) and Amanah (responsible
+custody): a failed or cancelled load must fail visibly, not present an empty or
+partially refreshed catalogue as success. All seventeen maps are built privately;
+only a complete load whose context has been disposed is atomically published.
+Failure leaves the prior complete snapshot intact. This protects callers from a
+mixed catalogue without pretending the retained snapshot is newly refreshed.
+Queries retain their original Serializable owner and connection; this does not
+claim a transaction-wide snapshot across independent cache queries.
+
+Parent-executed native catalogue verification passed **36/36**, zero failures or
+skips, exit0,5m50.405s (`pr75-catalogue-owner-green.Cbifaf.log`), using
+`dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/GlobalLookupCatalogueNativeContractTests/*" --minimum-expected-tests 36 --progress off --maximum-parallel-tests 1`.
+SQLite `LookupDataCacheAtomicityTests` separately passed **4/4**, zero failures or
+skips, exit0,43.473s (`pr75-cache-atomicity-green2.SRdtXz.log`). These are targeted
+runtime receipts, not final provider-matrix or release assurance.
+
+The first refreshed eleven-case actor/fence coexistence run passed ten and failed
+one because a PUBLIC grant was rejected by the shared privilege guard earlier
+than the test expected. The corrected test retains that attack and independently
+asserts Publisher, actor and fence denial; its completed rerun passed **11/11**,
+zero failures/skips, exit0,4m52.974s (`pr75-actor-catalogue-corrected.aQkxd4.log`),
+using the exact filter `/*/*/PostgresAiActorContextReadContractTests/Catalogue*`,
+minimum11. No database guard was relaxed.
+
+The event-read correction intersects each owner's own registered reference sources
+with the fixed Runtime catalogue descriptor; it does not allow table-wide,
+inherited, grantable, system-column or private-source access. The combined working
+tree subsequently passed PublicDetail **39/39**, including twelve catalogue
+coexistence cases, and ResponseClock **21/21**, both with zero failures/skips and
+exit0 (`pr75-catalogue-projection-coexistence.QFPApB.log`). PublicDiscovery26 plus
+native moderation-compensation15 also passed **41/41**, zero failures/skips,
+exit0,27m22.059s (`pr75-public-discovery-compensation-native.mfMxLD.log`). These
+receipts supersede the earlier detail source-guard failure; they are not isolated
+catalogue-candidate evidence or proof of the separate federation-storage vertical.
+
+The combined working-tree private-management/registration API run passed **2/2**,
+zero failures/skips, exit0,4m35.016s
+(`pr75-private-reader-runtime-factory-green.m5JAgD.log`). Its fixture correction
+is separately committed at `56c51e8aeced59cecd7d05ba6d7f4f9915eca262`.
+The exact exported candidate tree `727cc4daa5db7880fbc79ba64866e874be8e5576`
+also compiled: Persistence integration build1422 warnings, zero errors,
+exit0,1m28.65s; API build751 warnings, zero errors, exit0,54s
+(`pr75-exact-catalogue-candidate-build.Jy28KR.log`). The same exported tree then
+passed native catalogue/actor/cache **27/27**, zero failures/skips, exit0,2m38.513s,
+and projection **15/15**, zero failures/skips, exit0,2m27.128s
+(`pr75-exact-catalogue-native-corrected.VUgqth.log`). These are isolated candidate
+receipts. Isolated API2 also passed **2/2**, zero failures/skips, exit0,4m35.682s
+in the same log: 44 targeted tests (27+15+2), distinct from combined API2 evidence.
+This closes isolated catalogue acceptance only. The coordinator owns broader
+validation. This I-VSD addition is documentation-only; the exported product/test
+tree is unchanged. Five-provider behavior and final scanner gates remain open.
+The latest recorded Sonar scan is at `0992e28c7`, before the fixture commit:
+15054/327453 = 4.597301% duplicated new lines, gate ERROR. It supersedes the older
+81d32756b scan, but does not analyze the pending catalogue changes. No current
+catalogue Sonar pass or completed multi-provider assurance is claimed.
+
+Release record: `CHG-01M57ZK3SQYGXXCMHQFQ56EWC2`. Operators must preserve needed
+development data and provision a fresh isolated PostgreSQL cluster when obsolete
+cluster-global roles remain; installation never silently drops them or repairs
+drift. No new credential, personal-data purpose or retention policy is introduced.
+
 ## Recommendations
 
 1. Preserve all stable finding and reference IDs in a candidate-bound, machine-consumed security evidence register. A green check with no executed tests is not closure evidence.

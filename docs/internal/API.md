@@ -97,13 +97,24 @@ scope identifiers for one exact internal user. Role claims cannot substitute
 for committed membership, and Runtime retains no direct membership-table access.
 These discovery reads do not supply transactional mutation authority.
 
-LookupDataCache loads the closed reference catalogue through the native
-GlobalLookupCatalogueProviderOperations projection. Here "Global" names
-tenant-independent data, not the database login: only enrolled Runtime executes
-the catalogue function. Global, migration and email accounts are rejected.
-The seventeen declared selectors expose only declared lookup fields; EventType
-includes only tenant-null rows. Role definitions are reference data, not user
-membership or administrator authority. Direct source-table reads remain denied.
+LookupDataCache loads seventeen closed reference entity types through ordinary
+untracked EF queries in GlobalLookupCatalogueProviderOperations on every provider.
+Here "Global" names tenant-independent data, not the database login. PostgreSQL
+requires the enrolled Runtime session and direct SELECT on exactly the declared
+reference columns; no catalogue business function remains. Global, migration and
+email sessions cannot borrow this reader. EventType contributes only tenant-null
+rows to this tenantless cache, with normal EF filters and forced tenant RLS intact.
+Role definitions are reference data, not RolePermission, membership or
+administrator authority. Sharing the Runtime credential shares these reference
+read permissions; a factory alias is not a separate database identity.
+
+Each read retains its original connection and Serializable transaction. These are
+per-read database observations, not a claim of one database snapshot across all
+seventeen types. The cache assembles all type maps privately, completes context
+and scope disposal, then atomically publishes one complete in-memory snapshot.
+Loads are serialized while readers remain lock-free. Initialization, admission,
+query and cancellation failures propagate; a failed refresh retains the last
+complete snapshot instead of clearing it or publishing partial success.
 
 Localization TMS binding status uses ILocalizationSecretStatusReader rather than
 generic SecretBindingRepository queries. Native reads return only whether an

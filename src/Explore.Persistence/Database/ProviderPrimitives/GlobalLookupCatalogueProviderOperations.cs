@@ -1,9 +1,8 @@
 using System.Data;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Npgsql;
-using NpgsqlTypes;
 
 namespace Explore.Persistence.Database.ProviderPrimitives;
 
@@ -11,12 +10,12 @@ namespace Explore.Persistence.Database.ProviderPrimitives;
 internal static class GlobalLookupCatalogueProviderOperations
 {
     internal static async Task<List<T>> ReadAsync<T>(ExploreDbContext context,
-        PostgresNativeQueueEnrollment enrollment, CancellationToken cancellationToken) where T : class
+        PostgresNativeQueueEnrollment? enrollment, CancellationToken cancellationToken) where T : class
     {
-        if (!context.Database.IsNpgsql() || System.Transactions.Transaction.Current is not null
+        if (System.Transactions.Transaction.Current is not null
             || context.BindTenantLease() is not null || context.IsTenantFilterBypassed)
             throw new UnauthorizedAccessException("global_lookup_original_global_owner_required");
-        var lookup = PostgresGlobalLookupCatalogueContract.Resolve(context, typeof(T));
+        PostgresLookupCatalogueReadPermissions.ValidateModel(context, typeof(T));
         var connection = context.Database.GetDbConnection();
         if (context.Database.CurrentTransaction is null)
         {
@@ -33,14 +32,9 @@ internal static class GlobalLookupCatalogueProviderOperations
 
         var transaction = context.Database.CurrentTransaction.GetDbTransaction();
         RequireOwner();
-        await PostgresGlobalLookupCatalogueContract.RequireReadyAsync(context, enrollment, cancellationToken);
+        await PostgresLookupCatalogueReadPermissions.RequireReadyAsync(context, enrollment, cancellationToken);
         RequireOwner();
-        // EF still owns entity materialization and every ordinary named query filter.
-        // This composable projection reads the function result, never the source table.
-        var items = await context.Set<T>().FromSqlRaw(
-            PostgresGlobalLookupCatalogueContract.EntitySql(context, lookup),
-            new NpgsqlParameter("lookup_type", NpgsqlDbType.Integer) { Value = lookup.Selector })
-            .AsNoTracking().ToListAsync(cancellationToken);
+        var items = await context.Set<T>().AsNoTracking().ToListAsync(cancellationToken);
         RequireOwner();
         return items;
 

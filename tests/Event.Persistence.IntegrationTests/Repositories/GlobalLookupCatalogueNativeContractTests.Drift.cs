@@ -1,6 +1,10 @@
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
+using Explore.Persistence;
 using Explore.Persistence.Caching;
+using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
@@ -13,105 +17,138 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 public sealed partial class GlobalLookupCatalogueNativeContractTests
 {
     [Test]
-    [Arguments("routine-acl")]
-    [Arguments("body")]
-    [Arguments("policy")]
-    [Arguments("tenant-policy")]
-    [Arguments("extra-policy")]
-    [Arguments("source-column")]
-    [Arguments("source-type")]
-    [Arguments("rls")]
-    [Arguments("role")]
-    [Arguments("owner-table-grant")]
-    [Arguments("owner-secret-grant")]
-    [Arguments("namespace-owner")]
-    public async Task AdmissionAndReinstallationRefuseCatalogueDriftWithoutRepair(string change)
+    public async Task ModelExpansionCannotSilentlyWidenTheReferenceProjection()
+    {
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+        await using var context = new ExpandedCatalogueContext(builder.Options);
+        var denied = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            GlobalLookupCatalogueProviderOperations.ReadAsync<Role>(context, fixture.NativeQueueEnrollment, default));
+        await Assert.That(denied!.Message).IsEqualTo("global_lookup_model_shape_drift");
+    }
+
+    [Test]
+    [Arguments("table-select")]
+    [Arguments("grant-option")]
+    [Arguments("column-write")]
+    [Arguments("extra-column")]
+    [Arguments("system-column")]
+    [Arguments("missing-column")]
+    [Arguments("private-source")]
+    [Arguments("private-system-column")]
+    [Arguments("permission-source")]
+    [Arguments("global-source")]
+    [Arguments("admin-membership")]
+    public async Task ReinstallationRefusesExpandedOrIncompletePermissionsWithoutRepair(string change)
     {
         await using var writer = Open(PrimaryDatabaseRole.Migrator);
         await using var transaction = await writer.Database.BeginTransactionAsync();
         var names = new HumanPrincipalSourceSql(writer);
-        string function = PostgresGlobalLookupCatalogueContract.FunctionSql(writer);
-        string roleTable = names.Table(typeof(Role));
-        string types = names.Table(typeof(EventType));
+        string table = names.Table(typeof(Role));
+        string login = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
+        string description = names.Column(typeof(Role), nameof(Role.Description));
+        string driftRole = names.Quote("catalogue_drift_" + Guid.CreateVersion7().ToString("N"));
         await writer.Database.ExecuteSqlRawAsync(change switch
         {
-            "routine-acl" => $"GRANT EXECUTE ON FUNCTION {function}(integer) TO PUBLIC",
-            "body" => ReplaceBody(function, names.Quote(names.Schema)),
-            "policy" => $"ALTER POLICY global_lookup_catalogue_read ON {types} USING (true)",
-            "tenant-policy" => $"ALTER POLICY tenant_isolation ON {types} USING (true)",
-            "extra-policy" => $"CREATE POLICY catalogue_test_extra ON {types} TO {PostgresGlobalLookupCatalogueContract.OwnerRole} USING (true)",
-            "source-column" => $"ALTER TABLE {roleTable} ADD COLUMN catalogue_test_extra integer",
-            "source-type" => $"ALTER TABLE {roleTable} ALTER COLUMN {names.Column(typeof(Role), nameof(Role.Description))} TYPE text",
-            "rls" => $"ALTER TABLE {types} NO FORCE ROW LEVEL SECURITY",
-            "role" => $"ALTER ROLE {PostgresGlobalLookupCatalogueContract.RuntimeRole} INHERIT",
-            "owner-table-grant" => $"GRANT SELECT ON {roleTable} TO {PostgresGlobalLookupCatalogueContract.OwnerRole}",
-            "owner-secret-grant" => $"GRANT SELECT ON {names.Table(typeof(RolePermission))} TO {PostgresGlobalLookupCatalogueContract.OwnerRole}",
-            "namespace-owner" => $"ALTER SCHEMA {names.Quote(names.Schema)} OWNER TO {PostgresGlobalLookupCatalogueContract.OwnerRole}",
+            "table-select" => $"GRANT SELECT ON {table} TO {login}",
+            "grant-option" => $"GRANT SELECT ({description}) ON {table} TO {login} WITH GRANT OPTION",
+            "column-write" => $"GRANT UPDATE ({description}) ON {table} TO {login}",
+            "extra-column" => $"ALTER TABLE {table} ADD COLUMN catalogue_extra text; GRANT SELECT (catalogue_extra) ON {table} TO {login}",
+            "system-column" => $"GRANT SELECT (xmin) ON {table} TO {login}",
+            "missing-column" => $"REVOKE SELECT ({description}) ON {table} FROM {login}",
+            "private-source" => $"GRANT SELECT ON {names.Table(typeof(UserPii))} TO {login}",
+            "private-system-column" => $"GRANT SELECT (xmin) ON {names.Table(typeof(UserPii))} TO {login}",
+            "permission-source" => $"GRANT SELECT ON {names.Table(typeof(RolePermission))} TO {login}",
+            "global-source" => $"GRANT SELECT ({description}) ON {table} TO {names.Quote(fixture.NativeQueueEnrollment.GlobalLogin)}",
+            "admin-membership" => $"CREATE ROLE {driftRole} NOLOGIN; GRANT SELECT ({description}) ON {table} TO {driftRole}; GRANT {driftRole} TO {login} WITH INHERIT FALSE, SET FALSE, ADMIN TRUE",
             _ => throw new ArgumentOutOfRangeException(nameof(change))
         });
-        await transaction.CreateSavepointAsync("before_admission");
         var denied = await Assert.ThrowsAsync<PostgresException>(() =>
-            PostgresGlobalLookupCatalogueContract.RequireReadyAsync(writer, fixture.NativeQueueEnrollment));
-        await Assert.That(denied!.SqlState).IsEqualTo("55000");
-        await transaction.RollbackToSavepointAsync("before_admission");
-        denied = await Assert.ThrowsAsync<PostgresException>(() =>
-            PostgresGlobalLookupCatalogueContract.ApplyAsync(writer, fixture.NativeQueueEnrollment));
+            PostgresLookupCatalogueReadPermissions.ApplyAsync(writer, fixture.NativeQueueEnrollment));
         await Assert.That(denied!.SqlState).IsEqualTo("55000");
         await transaction.RollbackAsync();
     }
 
     [Test]
-    [Arguments("body")]
-    [Arguments("schema")]
-    [Arguments("policy")]
-    public async Task ActualRuntimeRefusesCommittedDriftAndCacheDoesNotInventEmptySuccess(string change)
+    [Arguments(PrimaryDatabaseRole.Global, false)]
+    [Arguments(PrimaryDatabaseRole.Global, true)]
+    [Arguments(PrimaryDatabaseRole.EmailPolicyInstanceMutation, false)]
+    [Arguments(PrimaryDatabaseRole.EmailPolicyInstanceMutation, true)]
+    [Arguments(PrimaryDatabaseRole.EmailPolicyTenantMutation, false)]
+    [Arguments(PrimaryDatabaseRole.EmailPolicyTenantMutation, true)]
+    public async Task CataloguePermissionsRejectCrossPurposeAccountMembership(PrimaryDatabaseRole purpose, bool runtimeReceives)
+    {
+        await using var writer = Open(PrimaryDatabaseRole.Migrator);
+        await using var transaction = await writer.Database.BeginTransactionAsync();
+        var names = new HumanPrincipalSourceSql(writer);
+        string runtime = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
+        string other = names.Quote(purpose switch
+        {
+            PrimaryDatabaseRole.Global => fixture.NativeQueueEnrollment.GlobalLogin,
+            PrimaryDatabaseRole.EmailPolicyInstanceMutation => fixture.NativeQueueEnrollment.EmailInstanceMutationLogin,
+            PrimaryDatabaseRole.EmailPolicyTenantMutation => fixture.NativeQueueEnrollment.EmailTenantMutationLogin,
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose))
+        });
+        await writer.Database.ExecuteSqlRawAsync(
+            $"GRANT {(runtimeReceives ? other : runtime)} TO {(runtimeReceives ? runtime : other)} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE");
+        var denied = await Assert.ThrowsAsync<PostgresException>(() =>
+            PostgresLookupCatalogueReadPermissions.ApplyAsync(writer, fixture.NativeQueueEnrollment));
+        await Assert.That(denied!.SqlState).IsEqualTo("55000");
+        await Assert.That(denied.MessageText).IsEqualTo("global_lookup_read_permissions_drift");
+        await transaction.RollbackAsync();
+    }
+
+    [Test]
+    [Arguments(PostgresEmailDeliveryPolicyContract.InstanceMutationRole)]
+    [Arguments(PostgresEmailDeliveryPolicyContract.TenantMutationRole)]
+    public async Task CataloguePermissionsRejectRuntimeBorrowingIndependentEmailAuthority(string emailRole)
+    {
+        await using var writer = Open(PrimaryDatabaseRole.Migrator);
+        await using var transaction = await writer.Database.BeginTransactionAsync();
+        var names = new HumanPrincipalSourceSql(writer);
+        await writer.Database.ExecuteSqlRawAsync(
+            $"GRANT {names.Quote(emailRole)} TO {names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin)} WITH INHERIT FALSE, SET FALSE, ADMIN TRUE");
+        var denied = await Assert.ThrowsAsync<PostgresException>(() =>
+            PostgresLookupCatalogueReadPermissions.ApplyAsync(writer, fixture.NativeQueueEnrollment));
+        await Assert.That(denied!.SqlState).IsEqualTo("55000");
+        await Assert.That(denied.MessageText).IsEqualTo("global_lookup_read_permissions_drift");
+        await transaction.RollbackAsync();
+    }
+
+    [Test]
+    [Arguments("table-select")]
+    [Arguments("admin-membership")]
+    public async Task ActualRuntimeRefusesCommittedPrivilegeExpansionAndCacheDoesNotInventEmptySuccess(string change)
     {
         await using var writer = Open(PrimaryDatabaseRole.Migrator);
         var names = new HumanPrincipalSourceSql(writer);
-        string function = PostgresGlobalLookupCatalogueContract.FunctionSql(writer);
-        string types = names.Table(typeof(EventType));
-        string roleTable = names.Table(typeof(Role));
-        string originalBody = await writer.Database.SqlQueryRaw<string>(
-            "SELECT pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure({0})) AS \"Value\"",
-            function + "(integer)").SingleAsync();
-        string originalPolicy = await writer.Database.SqlQueryRaw<string>(
-            """
-            SELECT pg_catalog.pg_get_expr(p.polqual,p.polrelid) AS "Value" FROM pg_catalog.pg_policy p
-            WHERE p.polrelid = pg_catalog.to_regclass({0}) AND p.polname = 'global_lookup_catalogue_read'
-            """, types).SingleAsync();
-        string policyStamp = await writer.Database.SqlQueryRaw<string>(
-            """
-            SELECT pg_catalog.obj_description(p.oid,'pg_policy') AS "Value" FROM pg_catalog.pg_policy p
-            WHERE p.polrelid = pg_catalog.to_regclass({0}) AND p.polname = 'global_lookup_catalogue_read'
-            """, types).SingleAsync();
-        // Commit only the owned mutation so a genuinely separate Runtime connection
-        // observes it. Finally restores the exact original capability, even on failure.
+        string table = names.Table(typeof(Role));
+        string login = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
+        string driftRole = names.Quote("catalogue_drift_" + Guid.CreateVersion7().ToString("N"));
+        string referenceColumns = string.Join(",", EfFirstProperties(typeof(Role))
+            .Select(property => names.Column(typeof(Role), property)));
+        await using (var baseline = Open(PrimaryDatabaseRole.Runtime))
+        {
+            await Assert.That((await GlobalLookupCatalogueProviderOperations.ReadAsync<Role>(
+                baseline, fixture.NativeQueueEnrollment, default)).Count).IsGreaterThan(0);
+        }
         try
         {
-            await using (var mutation = await writer.Database.BeginTransactionAsync())
-            {
-                await writer.Database.ExecuteSqlRawAsync(change switch
-                {
-                    "body" => ReplaceBody(function, names.Quote(names.Schema)),
-                    "schema" => $"ALTER TABLE {roleTable} ADD COLUMN catalogue_test_extra integer",
-                    "policy" => $"ALTER POLICY global_lookup_catalogue_read ON {types} USING (true)",
-                    _ => throw new ArgumentOutOfRangeException(nameof(change))
-                });
-                await mutation.CommitAsync();
-            }
+            await writer.Database.ExecuteSqlRawAsync(change == "table-select"
+                ? $"GRANT SELECT ON {table} TO {login}"
+                : $"CREATE ROLE {driftRole} NOLOGIN; GRANT SELECT ON {table} TO {driftRole}; GRANT {driftRole} TO {login} WITH INHERIT FALSE, SET FALSE, ADMIN TRUE");
             await using var reader = Open(PrimaryDatabaseRole.Runtime);
-            var denied = await Assert.ThrowsAsync<PostgresException>(() =>
-                GlobalLookupCatalogueProviderOperations.ReadAsync<Role>(
-                    reader, fixture.NativeQueueEnrollment, default));
-            await Assert.That(denied!.SqlState).IsEqualTo("55000");
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                GlobalLookupCatalogueProviderOperations.ReadAsync<Role>(reader, fixture.NativeQueueEnrollment, default));
 
             var services = new ServiceCollection();
             services.AddSingleton(fixture.NativeQueueEnrollment);
-            services.AddScoped(_ => Open(PrimaryDatabaseRole.Runtime));
+            services.AddSingleton<IDbContextFactory<ExploreDbContext>>(
+                new EfFirstCatalogueContextFactory(() => Open(PrimaryDatabaseRole.Runtime)));
             await using var provider = services.BuildServiceProvider();
-            var cache = new LookupDataCache(provider.GetRequiredService<IServiceScopeFactory>(),
+            using var cache = new LookupDataCache(provider.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<LookupDataCache>.Instance);
-            await cache.InitializeAsync();
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => cache.InitializeAsync());
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
             {
                 _ = cache.Get<Role>();
@@ -121,28 +158,10 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests
         finally
         {
             await using var restoration = await writer.Database.BeginTransactionAsync();
-            if (change == "body")
-            {
-                await writer.Database.ExecuteSqlRawAsync(ReplaceDefinition(
-                    names.Quote(names.Schema), originalBody));
-            }
-            else if (change == "schema")
-                await writer.Database.ExecuteSqlRawAsync($"ALTER TABLE {roleTable} DROP COLUMN catalogue_test_extra");
-            else
-            {
-                await writer.Database.ExecuteSqlRawAsync(
-                    $"ALTER POLICY global_lookup_catalogue_read ON {types} USING ({originalPolicy})");
-                // The predicate is identical; stamp its freshly parsed expression using
-                // the original source fingerprint rather than assuming parser locations.
-                string prefix = policyStamp[..(policyStamp.LastIndexOf(':') + 1)];
-                string restoredStamp = await writer.Database.SqlQueryRaw<string>(
-                    """
-                    SELECT {0} || pg_catalog.md5(p.polqual::text) AS "Value" FROM pg_catalog.pg_policy p
-                    WHERE p.polrelid = pg_catalog.to_regclass({1}) AND p.polname = 'global_lookup_catalogue_read'
-                    """, prefix, types).SingleAsync();
-                await writer.Database.ExecuteSqlRawAsync(
-                    $"COMMENT ON POLICY global_lookup_catalogue_read ON {types} IS '{restoredStamp.Replace("'", "''", StringComparison.Ordinal)}'");
-            }
+            // PostgreSQL table REVOKE also removes column grants; restore only the declared baseline.
+            await writer.Database.ExecuteSqlRawAsync(change == "table-select"
+                ? $"REVOKE SELECT ON {table} FROM {login}; GRANT SELECT ({referenceColumns}) ON {table} TO {login}"
+                : $"REVOKE {driftRole} FROM {login}; REVOKE SELECT ON {table} FROM {driftRole}; DROP ROLE {driftRole}");
             await restoration.CommitAsync();
         }
         await using var restored = Open(PrimaryDatabaseRole.Runtime);
@@ -151,44 +170,38 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests
     }
 
     [Test]
-    public async Task UnexpectedRuntimeSourceGrantIsRefusedRatherThanUsed()
+    [Arguments("role")]
+    [Arguments("routine")]
+    public async Task ExistingCatalogueArtifactsRequireFreshDevelopmentDatabaseWithoutDestructiveCleanup(string artifact)
     {
         await using var writer = Open(PrimaryDatabaseRole.Migrator);
+        await using var transaction = await writer.Database.BeginTransactionAsync();
         var names = new HumanPrincipalSourceSql(writer);
-        string target = names.Table(typeof(Role));
-        string login = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
-        try
-        {
-            await writer.Database.ExecuteSqlRawAsync($"GRANT SELECT ON {target} TO {login}");
-            await using var reader = Open(PrimaryDatabaseRole.Runtime);
-            var denied = await Assert.ThrowsAsync<PostgresException>(() =>
-                GlobalLookupCatalogueProviderOperations.ReadAsync<Role>(
-                    reader, fixture.NativeQueueEnrollment, default));
-            await Assert.That(denied!.SqlState).IsEqualTo("42501");
-        }
-        finally
-        {
-            await writer.Database.ExecuteSqlRawAsync($"REVOKE SELECT ON {target} FROM {login}");
-        }
+        await writer.Database.ExecuteSqlRawAsync(artifact == "role"
+            ? "CREATE ROLE event_global_lookup_runtime NOLOGIN"
+            : $"CREATE FUNCTION {names.Name("global_lookup_catalogue")}(integer) RETURNS integer LANGUAGE sql RETURN 0");
+        await transaction.CreateSavepointAsync("before_installation");
+        var denied = await Assert.ThrowsAsync<PostgresException>(() =>
+            PostgresLookupCatalogueReadPermissions.ApplyAsync(writer, fixture.NativeQueueEnrollment));
+        await Assert.That(denied!.SqlState).IsEqualTo("55000");
+        await Assert.That(denied.MessageText).IsEqualTo("global_lookup_requires_fresh_development_database");
+        await transaction.RollbackToSavepointAsync("before_installation");
+        bool remains = artifact == "role"
+            ? await writer.Database.SqlQueryRaw<bool>(
+                "SELECT pg_catalog.to_regrole('event_global_lookup_runtime') IS NOT NULL AS \"Value\"").SingleAsync()
+            : await writer.Database.SqlQueryRaw<bool>(
+                "SELECT pg_catalog.to_regprocedure({0}) IS NOT NULL AS \"Value\"",
+                names.Name("global_lookup_catalogue") + "(integer)").SingleAsync();
+        await Assert.That(remains).IsTrue();
+        await transaction.RollbackAsync();
     }
 
-    private static string ReplaceBody(string function, string schema) => ReplaceDefinition(schema, $"""
-        CREATE OR REPLACE FUNCTION {function}(p_type integer)
-            RETURNS TABLE ("Id" integer,"MasterCode" text,"FullName" text,"Description" text,
-                "MinAge" integer,"MaxAge" integer,"RoleScopeId" integer,"IsSystem" boolean,"TenantId" uuid)
-            LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog
-            AS $changed$ BEGIN RETURN; END; $changed$;
-        """);
-
-    private static string ReplaceDefinition(string schema, string definition) => $"""
-        GRANT CREATE ON SCHEMA {schema} TO {PostgresGlobalLookupCatalogueContract.OwnerRole};
-        DO $replace$
-        DECLARE previous_role text := pg_catalog.current_setting('role');
-        BEGIN
-            PERFORM pg_catalog.set_config('role','{PostgresGlobalLookupCatalogueContract.OwnerRole}',true);
-            EXECUTE $definition${definition}$definition$;
-            PERFORM pg_catalog.set_config('role',previous_role,true);
-        END $replace$;
-        REVOKE CREATE ON SCHEMA {schema} FROM {PostgresGlobalLookupCatalogueContract.OwnerRole};
-        """;
+    private sealed class ExpandedCatalogueContext(DbContextOptions<ExploreDbContext> options) : ExploreDbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<Role>().Property<string>("CatalogueExtra");
+        }
+    }
 }

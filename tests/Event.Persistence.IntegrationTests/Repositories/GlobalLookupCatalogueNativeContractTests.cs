@@ -54,14 +54,19 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlC
         }).ToArray();
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Catalogue isolation",
+            Id = Guid.CreateVersion7(),
+            FullName = "Catalogue isolation",
             Slug = Guid.CreateVersion7().ToString("N"),
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var privateType = new EventType
         {
-            Id = checked(id + 1), MasterCode = "PRIVATE_" + id, FullName = "Tenant-only reference",
-            TenantId = tenant.Id, Tenant = tenant
+            Id = checked(id + 1),
+            MasterCode = "PRIVATE_" + id,
+            FullName = "Tenant-only reference",
+            TenantId = tenant.Id,
+            Tenant = tenant
         };
         writer.AddRange(inserted);
         writer.AddRange(tenant, privateType);
@@ -70,9 +75,10 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlC
         {
             var services = new ServiceCollection();
             services.AddSingleton(fixture.NativeQueueEnrollment);
-            services.AddScoped(_ => Open(PrimaryDatabaseRole.Runtime));
+            services.AddSingleton<IDbContextFactory<ExploreDbContext>>(
+                new EfFirstCatalogueContextFactory(() => Open(PrimaryDatabaseRole.Runtime)));
             await using var provider = services.BuildServiceProvider();
-            var cache = new LookupDataCache(provider.GetRequiredService<IServiceScopeFactory>(),
+            using var cache = new LookupDataCache(provider.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<LookupDataCache>.Instance);
             await cache.InitializeAsync();
             await CompareAsync<EventType>();
@@ -129,13 +135,13 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlC
     }
 
     [Test]
-    public async Task RuntimeHasNoSourceOrOwnerPromotionAuthority()
+    public async Task RuntimeHasNoProtectedSourceOrOtherLoginPromotionAuthority()
     {
         await using var reader = Open(PrimaryDatabaseRole.Runtime);
         await Assert.That((await GlobalLookupCatalogueProviderOperations.ReadAsync<Role>(
             reader, fixture.NativeQueueEnrollment, default)).Count).IsGreaterThan(0);
         var names = new HumanPrincipalSourceSql(reader);
-        foreach (Type type in LookupTypes.Concat([typeof(RolePermission), typeof(UserPii)]))
+        foreach (Type type in new[] { typeof(RolePermission), typeof(UserPii) })
         {
             var denied = await Assert.ThrowsAsync<PostgresException>(() =>
                 reader.Database.ExecuteSqlRawAsync($"SELECT * FROM {names.Table(type)} LIMIT 1"));
@@ -143,13 +149,13 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlC
         }
         foreach (string role in new[]
         {
-            PostgresGlobalLookupCatalogueContract.OwnerRole,
-            PostgresGlobalLookupCatalogueContract.MigratorRole,
-            PostgresGlobalLookupCatalogueContract.RuntimeRole
+            fixture.NativeQueueEnrollment.MigratorLogin,
+            fixture.NativeQueueEnrollment.GlobalLogin,
+            fixture.NativeQueueEnrollment.EmailTenantMutationLogin
         })
         {
             var denied = await Assert.ThrowsAsync<PostgresException>(() =>
-                reader.Database.ExecuteSqlRawAsync($"SET ROLE {role}"));
+                reader.Database.ExecuteSqlRawAsync($"SET ROLE {names.Quote(role)}"));
             await Assert.That(denied!.SqlState).IsEqualTo("42501");
         }
     }
@@ -164,21 +170,19 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlC
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             GlobalLookupCatalogueProviderOperations.ReadAsync<Tenant>(
                 reader, fixture.NativeQueueEnrollment, default));
-        await using var transaction = await reader.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var denied = await Assert.ThrowsAsync<PostgresException>(() =>
-            reader.Database.ExecuteSqlRawAsync(
-                $"SELECT * FROM {PostgresGlobalLookupCatalogueContract.FunctionSql(reader)}(2147483647)"));
-        await Assert.That(denied!.SqlState).IsEqualTo("22023");
-        await transaction.RollbackAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            GlobalLookupCatalogueProviderOperations.ReadAsync<UserPii>(
+                reader, fixture.NativeQueueEnrollment, default));
     }
 
     [Test]
     [Arguments(PrimaryDatabaseRole.Global)]
+    [Arguments(PrimaryDatabaseRole.EmailPolicyInstanceMutation)]
     [Arguments(PrimaryDatabaseRole.EmailPolicyTenantMutation)]
     public async Task OtherPhysicalLoginsCannotBorrowTheCatalogue(PrimaryDatabaseRole role)
     {
         await using var reader = Open(role);
-        await Assert.ThrowsAsync<PostgresException>(() =>
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             GlobalLookupCatalogueProviderOperations.ReadAsync<Role>(reader, fixture.NativeQueueEnrollment, default));
     }
 
@@ -209,9 +213,8 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests(PostgreSqlC
         await using var transaction = await reader.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         await reader.Database.ExecuteSqlRawAsync(
             "SELECT set_config('app.current_tenant_id',{0},true)", Guid.CreateVersion7().ToString());
-        var denied = await Assert.ThrowsAsync<PostgresException>(() =>
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             GlobalLookupCatalogueProviderOperations.ReadAsync<EventType>(reader, fixture.NativeQueueEnrollment, default));
-        await Assert.That(denied!.SqlState).IsEqualTo("42501");
         await transaction.RollbackAsync();
     }
 

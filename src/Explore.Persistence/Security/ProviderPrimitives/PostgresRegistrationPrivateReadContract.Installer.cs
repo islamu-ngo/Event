@@ -92,58 +92,15 @@ public static partial class PostgresRegistrationPrivateReadContract
         {
             var entity = context.Model.FindEntityType(type)!;
             var table = tables.SingleOrDefault(t => t.TableName == entity.GetTableName());
-            result.Add(type, table is null ? "true"
-                : table.ParentJoin is { } parent ? ParentPolicy(parent, sql.Names.Table(type), 0)
-                : Tenant(table.TenantIdColumn!, table.AllowsNullTenant));
+            result.Add(type, EventReadProjectionSql.TenantPredicate(
+                context, sql.Names, table, sql.Names.Table(type), "registration_parent_", sql.Column));
         }
         return result;
-
-        string Tenant(string column, bool nullable)
-        {
-            string value = sql.Names.Quote(column);
-            string match = value + " = NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid";
-            return nullable ? $"({value} IS NULL OR {match})" : match;
-        }
-        string ParentPolicy(TenantParentJoinMetadata parent, string child, int depth)
-        {
-            string alias = "registration_parent_" + depth;
-            var entity = context.Model.GetEntityTypes().Single(e => e.GetTableName() == parent.ParentTableName);
-            string Register(string column)
-            {
-                var property = entity.GetProperties().Single(p => sql.Names.ColumnName(entity.ClrType, p.Name) == column);
-                return sql.Column(entity.ClrType, alias, property.Name);
-            }
-            string key = Register(parent.ParentKeyColumn);
-            string tenantColumn = parent.ParentTenantIdColumn is { } column ? Register(column) : "";
-            string predicate = parent.ParentJoin is { } next ? ParentPolicy(next, alias, depth + 1)
-                : parent.ParentAllowsNullTenant
-                    ? $"({tenantColumn} IS NULL OR {tenantColumn} = NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid)"
-                    : tenantColumn + " = NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid";
-            return $"EXISTS (SELECT 1 FROM {sql.Names.Name(parent.ParentTableName)} {alias} WHERE {key} = {child}.{sql.Names.Quote(parent.ForeignKeyColumn)} AND {predicate})";
-        }
     }
 
     private static string PolicyGuard(GraphSql sql, IReadOnlyDictionary<Type, string> policies) =>
-        string.Join("\n", policies.SelectMany(pair => PolicyModes.Select(permissive =>
-        {
-            string name = permissive ? Policy + "_allow" : Policy;
-            return $"""
-                IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p
-                    WHERE p.polrelid = {Text(sql.Names.Table(pair.Key))}::regclass AND p.polname = {Text(name)}
-                        AND p.polcmd = 'r' AND p.polpermissive = {Boolean(permissive)}
-                        AND p.polroles = ARRAY[pg_catalog.to_regrole('{OwnerRole}')::oid]
-                        AND p.polqual IS NOT NULL AND p.polwithcheck IS NULL
-                        AND pg_catalog.obj_description(p.oid,'pg_policy') =
-                            {Text(Stamp + Hash(pair.Value) + ":")} || pg_catalog.md5(p.polqual::text))
-                THEN RAISE EXCEPTION 'registration_private_read_policy_drift' USING ERRCODE = '55000'; END IF;
-                IF EXISTS (SELECT 1 FROM pg_catalog.pg_policy p
-                    WHERE p.polrelid = {Text(sql.Names.Table(pair.Key))}::regclass
-                        AND p.polname NOT IN ('tenant_isolation','{Policy}','{Policy}_allow')
-                        AND EXISTS (SELECT 1 FROM unnest(p.polroles) role_id
-                            WHERE role_id = 0 OR pg_catalog.pg_has_role('{OwnerRole}',role_id,'USAGE')))
-                THEN RAISE EXCEPTION 'registration_private_read_unexpected_policy' USING ERRCODE = '55000'; END IF;
-                """;
-        })));
+        string.Join("\n", policies.Select(pair => EventReadProjectionSql.ReadPolicyGuard(
+            sql.Names.Table(pair.Key), Policy, OwnerRole, Stamp + Hash(pair.Value) + ":", "registration_private_read")));
 
     private static string CallerPrivileges(GraphSql sql, PostgresNativeQueueEnrollment enrollment)
     {

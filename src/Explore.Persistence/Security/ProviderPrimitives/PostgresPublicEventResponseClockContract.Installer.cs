@@ -166,34 +166,13 @@ public static partial class PostgresPublicEventResponseClockContract
             {
                 var entity = context.Model.FindEntityType(type)!;
                 var tenant = tenantTables.SingleOrDefault(table => table.TableName == entity.GetTableName());
-                string predicate = tenant is null ? "true"
-                    : tenant.ParentJoin is { } parent ? ParentPolicy(parent, Names.Table(type), 0)
-                    : tenant.AllowsNullTenant
-                        ? $"({Names.Quote(tenant.TenantIdColumn!)} IS NULL OR {Names.Quote(tenant.TenantIdColumn!)} = NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid)"
-                        : $"{Names.Quote(tenant.TenantIdColumn!)} = NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid";
+                string predicate = EventReadProjectionSql.TenantPredicate(
+                    context, Names, tenant, Names.Table(type), "clock_parent_", Column);
                 if (type == typeof(Event))
                     predicate += $" AND NOT {Names.Column(type, "IsDeleted")} AND {Names.Column(type, "VisibilityTypeId")} = {(int)VisibilityTypeEnum.Public}";
                 result.Add(type, predicate);
             }
             return result;
-        }
-
-        private string ParentPolicy(TenantParentJoinMetadata parent, string child, int depth)
-        {
-            string alias = "clock_parent_" + depth;
-            var entity = context.Model.GetEntityTypes().Single(entity => entity.GetTableName() == parent.ParentTableName);
-            string Register(string name)
-            {
-                var property = entity.GetProperties().Single(property => Names.ColumnName(entity.ClrType, property.Name) == name);
-                return Column(entity.ClrType, alias, property.Name);
-            }
-            string key = Register(parent.ParentKeyColumn);
-            string tenantColumn = parent.ParentTenantIdColumn is { } column ? Register(column) : "";
-            string tenant = parent.ParentJoin is { } next ? ParentPolicy(next, alias, depth + 1)
-                : parent.ParentAllowsNullTenant
-                    ? $"({tenantColumn} IS NULL OR {tenantColumn} = NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid)"
-                    : tenantColumn + " = NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid";
-            return $"EXISTS (SELECT 1 FROM {Names.Name(parent.ParentTableName)} {alias} WHERE {key} = {child}.{Names.Quote(parent.ForeignKeyColumn)} AND {tenant})";
         }
     }
 }

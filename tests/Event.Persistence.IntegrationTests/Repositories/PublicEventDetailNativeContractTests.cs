@@ -67,14 +67,20 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
             var entity = await writer.Events.SingleAsync(value => value.Id == seeded.Event);
             var tag = new Tag
             {
-                Id = tagId, TenantId = seeded.Tenant, Tenant = null!,
-                MasterCode = "PUBLIC_LABEL", FullName = "Public label"
+                Id = tagId,
+                TenantId = seeded.Tenant,
+                Tenant = null!,
+                MasterCode = "PUBLIC_LABEL",
+                FullName = "Public label"
             };
             var category = new Category
             {
-                Id = categoryId, ConcurrencyStamp = Guid.CreateVersion7(),
-                TenantId = seeded.Tenant, Tenant = null!,
-                MasterCode = "PUBLIC_CATEGORY", FullName = "Public category"
+                Id = categoryId,
+                ConcurrencyStamp = Guid.CreateVersion7(),
+                TenantId = seeded.Tenant,
+                Tenant = null!,
+                MasterCode = "PUBLIC_CATEGORY",
+                FullName = "Public category"
             };
             var moderated = EventModerationRecord.CreateLightModeration(
                 Guid.CreateVersion7(), seeded.Tenant, seeded.Event, null,
@@ -85,12 +91,22 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
                 "private_restoration_correlation", moderated.CreatedAt.AddMinutes(1));
             writer.AddRange(tag, category, moderated, restored, new EventTags
             {
-                Id = Guid.CreateVersion7(), EventId = entity.Id, Event = entity,
-                TagId = tag.Id, Tag = tag, TenantId = seeded.Tenant, Tenant = null!
+                Id = Guid.CreateVersion7(),
+                EventId = entity.Id,
+                Event = entity,
+                TagId = tag.Id,
+                Tag = tag,
+                TenantId = seeded.Tenant,
+                Tenant = null!
             }, new EventCategories
             {
-                Id = Guid.CreateVersion7(), EventId = entity.Id, Event = entity,
-                CategoryId = category.Id, Category = category, TenantId = seeded.Tenant, Tenant = null!
+                Id = Guid.CreateVersion7(),
+                EventId = entity.Id,
+                Event = entity,
+                CategoryId = category.Id,
+                Category = category,
+                TenantId = seeded.Tenant,
+                Tenant = null!
             });
             await writer.SaveChangesAsync();
         }
@@ -142,8 +158,11 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
             {
                 var action = new EventPublicAction
                 {
-                    Id = Guid.CreateVersion7(), TenantId = entity.TenantId, EventId = entity.Id,
-                    EventPublicActionKindId = (int)kind, HealthStateId = (int)EventPublicActionHealthStateEnum.Active
+                    Id = Guid.CreateVersion7(),
+                    TenantId = entity.TenantId,
+                    EventId = entity.Id,
+                    EventPublicActionKindId = (int)kind,
+                    HealthStateId = (int)EventPublicActionHealthStateEnum.Active
                 };
                 action.SetDestination(ExternalActionUrl.Create("https://example.test/event"));
                 writer.Add(action);
@@ -152,12 +171,21 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
             writer.Add(binding);
             var image = new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = seeded.Tenant, Tenant = null!,
-                FileTypeId = await writer.FileTypes.Select(value => value.Id).FirstAsync(), FileType = null!,
-                Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
-                ObjectKey = "public-detail/image.png", FullName = "Image", SafeDisplayName = "Image",
-                Extension = "png", ContentType = "image/png", Size = 10,
-                Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage,
+                Id = Guid.CreateVersion7(),
+                TenantId = seeded.Tenant,
+                Tenant = null!,
+                FileTypeId = await writer.FileTypes.Select(value => value.Id).FirstAsync(),
+                FileType = null!,
+                Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
+                ObjectKey = "public-detail/image.png",
+                FullName = "Image",
+                SafeDisplayName = "Image",
+                Extension = "png",
+                ContentType = "image/png",
+                Size = 10,
+                Visibility = StorageObjectVisibilities.PublicImage,
+                Purpose = StorageObjectPurposes.EventImage,
                 LifecycleState = StorageObjectLifecycleStates.Active
             };
             writer.Add(image);
@@ -242,6 +270,11 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
     [Arguments("acl")]
     [Arguments("body")]
     [Arguments("policy")]
+    [Arguments("allow-policy")]
+    [Arguments("extra-policy")]
+    [Arguments("tenant-policy")]
+    [Arguments("source-column")]
+    [Arguments("source-rls")]
     public async Task AdmissionRejectsDriftWithoutRepairingIt(string change)
     {
         await SeedAsync();
@@ -262,6 +295,11 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
                 REVOKE CREATE ON SCHEMA {sql.Quote(sql.Schema)} FROM {PostgresPublicEventDetailContract.OwnerRole};
                 """,
             "policy" => $"ALTER POLICY public_event_detail_read ON {sql.Table(typeof(Explore.Domain.Event))} USING (true)",
+            "allow-policy" => $"ALTER POLICY public_event_detail_read_allow ON {sql.Table(typeof(Explore.Domain.Event))} USING (true)",
+            "extra-policy" => $"CREATE POLICY public_detail_extra ON {sql.Table(typeof(Explore.Domain.Event))} FOR SELECT TO {PostgresPublicEventDetailContract.OwnerRole} USING (true)",
+            "tenant-policy" => $"ALTER POLICY tenant_isolation ON {sql.Table(typeof(Explore.Domain.Event))} USING (true)",
+            "source-column" => $"ALTER TABLE {sql.Table(typeof(Explore.Domain.Event))} ALTER COLUMN {sql.Column(typeof(Explore.Domain.Event), nameof(Explore.Domain.Event.IsDeleted))} DROP NOT NULL",
+            "source-rls" => $"ALTER TABLE {sql.Table(typeof(Explore.Domain.Event))} NO FORCE ROW LEVEL SECURITY",
             _ => throw new ArgumentOutOfRangeException(nameof(change))
         });
         var denied = await Assert.ThrowsAsync<PostgresException>(() =>
@@ -292,21 +330,31 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
         await PostgresPublicEventDetailContract.ApplyAsync(writer, fixture.NativeQueueEnrollment);
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Public detail reader",
+            Id = Guid.CreateVersion7(),
+            FullName = "Public detail reader",
             Slug = Guid.CreateVersion7().ToString("N"),
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var user = new User { Id = Guid.CreateVersion7(), Pii = null! };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), User = user, UserId = user.Id,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            User = user,
+            UserId = user.Id,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Public organizer" }
         };
         writer.AddRange(tenant, user, actor, new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            UserId = user.Id, User = user, ActorId = actor.Id, Actor = actor,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
+            ActorId = actor.Id,
+            Actor = actor,
             StatusId = (int)TenantUserStatusEnum.Active
         });
         var visible = Create(VisibilityTypeEnum.Public);
@@ -318,13 +366,22 @@ public sealed partial class PublicEventDetailNativeContractTests(PostgreSqlConta
         {
             var entity = new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                ActorId = actor.Id, Actor = actor, Title = "Public detail",
-                Content = "Published full description", PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
-                VisibilityTypeId = (int)visibility, VisibilityType = null!, EventStatus = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                ActorId = actor.Id,
+                Actor = actor,
+                Title = "Public detail",
+                Content = "Published full description",
+                PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
+                VisibilityTypeId = (int)visibility,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                Timezone = "UTC", CreatedAt = new DateTime(2028, 6, 15, 12, 0, 0, DateTimeKind.Utc)
+                Timezone = "UTC",
+                CreatedAt = new DateTime(2028, 6, 15, 12, 0, 0, DateTimeKind.Utc)
             };
             writer.Add(entity);
             return entity;

@@ -383,6 +383,28 @@ explicitly provisioning a replacement;
 do not grant the removed execution role or broaden Runtime permissions to bypass
 the failure. No new environment variables or secret authority are required.
 
+Reference-data cache loading also uses ordinary EF reads, with the existing
+Runtime credential. The schema installer grants read-only columns for seventeen
+declared reference types, such as event formats, languages and role definitions.
+These permissions do not expose role assignments, permissions or user-private
+data. No write, table-wide read or grant-delegation permission is added. All
+services sharing Runtime share the reference-column reads; tenant-specific event
+types remain subject to tenant isolation and are excluded from the tenantless cache.
+
+The old `global_lookup_catalogue` function and `event_global_lookup_owner`,
+`event_global_lookup_migrator`, `event_global_lookup_runtime` roles are no longer
+used. Their presence causes `global_lookup_requires_fresh_development_database`.
+Use a fresh isolated development PostgreSQL instance/cluster without those roles;
+creating another database in the same cluster does not remove them. Do not add
+the removed execution roles or broaden permissions to bypass admission. There is
+no automatic object cleanup or data deletion, and no new environment variable.
+Preserve needed development data before deliberately provisioning a replacement.
+
+Cache initialization now fails visibly if any reference read fails. A failed or
+cancelled refresh retains the previous complete cache and reports the failure;
+it does not replace good data with an empty or partial cache. Correct the reported
+database or permission problem before retrying rather than granting broad access.
+
 Administrative scope discovery additionally requires
 `event_admin_authority_global` on the Global login, with inheritance enabled and
 role switching disabled. Do not grant its owner/migrator groups or direct access

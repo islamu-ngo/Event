@@ -117,7 +117,7 @@ public static partial class PostgresPrivateEventManagementContract
                 new(MigratorRole, enrollment.MigratorLogin, false, true, false),
                 new(RuntimeRole, enrollment.RuntimeLogin, true, false, false)]);
         string guard = PostgresPrivilegeGuard.BuildAssertSql(privileges) + SourceGuard(context, sql, enrollment)
-            + PolicyGuard(sql, policies) + CallerPrivileges(sql, enrollment);
+            + PolicyGuard(sql, policies) + CallerPrivileges(context, sql, enrollment);
         string body = $"""
             BEGIN
                 {guard}

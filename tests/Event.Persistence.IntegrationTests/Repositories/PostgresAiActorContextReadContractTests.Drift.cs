@@ -56,6 +56,38 @@ public sealed partial class PostgresAiActorContextReadContractTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CatalogProofKeepsEachOwnersSourceInventory(bool conversationSource)
+    {
+        await using var migration = fixture.CreateDbContext();
+        await using var transaction = await migration.Database.BeginTransactionAsync();
+        var sql = new HumanPrincipalSourceSql(migration);
+        Type source = conversationSource ? typeof(PrivacyErasureSaga) : typeof(ActorPii);
+        await migration.Database.ExecuteSqlRawAsync(
+            $"ALTER TABLE {sql.Table(source)} ADD COLUMN family_unexpected integer");
+
+        await PostgresEventCreationPublisherReadContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+        PostgresException? error;
+        if (conversationSource)
+        {
+            await PostgresAiActorContextReadContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+            error = await Assert.ThrowsAsync<PostgresException>(() =>
+                PostgresAiConversationOwnerFenceContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
+        }
+        else
+        {
+            await PostgresAiConversationOwnerFenceContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+            error = await Assert.ThrowsAsync<PostgresException>(() =>
+                PostgresAiActorContextReadContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
+        }
+        await Assert.That(error!.SqlState).IsEqualTo(PostgresErrorCodes.ObjectNotInPrerequisiteState);
+        await Assert.That(error.MessageText).IsEqualTo(conversationSource
+            ? "ai_conversation_owner_source_catalog_drift" : "ai_actor_context_source_catalog_drift");
+        await transaction.RollbackAsync();
+    }
+
+    [Test]
     [Arguments(PrimaryDatabaseRole.Runtime)]
     [Arguments(PrimaryDatabaseRole.Global)]
     public async Task RawPrivateGrantIsRejectedBeforeReinstallationCanHideIt(PrimaryDatabaseRole role)
@@ -68,6 +100,8 @@ public sealed partial class PostgresAiActorContextReadContractTests
             ? fixture.NativeQueueEnrollment.RuntimeLogin : fixture.NativeQueueEnrollment.GlobalLogin;
         await migration.Database.ExecuteSqlRawAsync(
             $"GRANT SELECT ({sql.Column(typeof(ActorPii), "DisplayName")}) ON {sql.Table(typeof(ActorPii))} TO {sql.Quote(login)}");
+        await PostgresEventCreationPublisherReadContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+        await PostgresAiConversationOwnerFenceContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
         var error = await Assert.ThrowsAsync<PostgresException>(() =>
             PostgresAiActorContextReadContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
         await Assert.That(error!.MessageText).IsEqualTo("ai_actor_context_private_source_privilege");

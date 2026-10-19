@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5A5DP1X10J4CCR8JA6TWQ2Y
+Title: "Preserve earlier PostgreSQL locks when a later wait is cancelled"
+Type: fix
+Scope: database
+Summary: "Reconcile a cancelled session-lock acquisition on its original connection without discarding earlier caller-owned leases."
+Group: named-lock-cancellation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Cleanup checks the original context lease, connection, backend, database and exact advisory key. It never guesses a pre-existing recursive lock count or acts on a detected replacement session. Unconfirmed cleanup remains fail-closed; no permissions or privileged business routines are added.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/SELF_HOSTING.md
+    Disposition: not-applicable

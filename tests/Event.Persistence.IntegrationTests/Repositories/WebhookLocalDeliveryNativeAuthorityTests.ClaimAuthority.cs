@@ -606,19 +606,19 @@ public sealed partial class WebhookLocalDeliveryNativeAuthorityTests
 
     private static WebhookDeliveryAttempt ClaimAuthorityEvidence(
         WebhookLocalTargetSnapshot target, WebhookDeliveryAttemptOutcome outcome) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        TenantId = target.TenantId,
-        MessageId = target.WebhookMessageId,
-        EndpointId = target.WebhookEndpointId,
-        AttemptNumber = 1,
-        ProcessingFence = 1,
-        Outcome = outcome,
-        ScheduledAt = Now.UtcDateTime,
-        SentAt = Now.UtcDateTime,
-        CompletedAt = Now.UtcDateTime,
-        CreatedAt = Now.UtcDateTime
-    };
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = target.TenantId,
+            MessageId = target.WebhookMessageId,
+            EndpointId = target.WebhookEndpointId,
+            AttemptNumber = 1,
+            ProcessingFence = 1,
+            Outcome = outcome,
+            ScheduledAt = Now.UtcDateTime,
+            SentAt = Now.UtcDateTime,
+            CompletedAt = Now.UtcDateTime,
+            CreatedAt = Now.UtcDateTime
+        };
 
     private async Task AssertClaimAuthorityRolledBackAsync(
         TargetGraph graph, Guid lease, Guid? expectedEndpointId = null)

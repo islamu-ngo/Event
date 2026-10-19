@@ -207,19 +207,26 @@ public sealed partial class GlobalLookupCatalogueNativeContractTests
         await using var writer = Open(PrimaryDatabaseRole.Migrator);
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "EF catalogue isolation",
+            Id = Guid.CreateVersion7(),
+            FullName = "EF catalogue isolation",
             Slug = Guid.CreateVersion7().ToString("N"),
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         int id = await NextEfFirstLookupId(writer);
         var privateType = new EventType
         {
-            Id = id, MasterCode = "EF_PRIVATE_" + id, FullName = "Tenant-private EF reference",
-            TenantId = tenant.Id, Tenant = tenant
+            Id = id,
+            MasterCode = "EF_PRIVATE_" + id,
+            FullName = "Tenant-private EF reference",
+            TenantId = tenant.Id,
+            Tenant = tenant
         };
         var globalType = new EventType
         {
-            Id = checked(id + 1), MasterCode = "EF_GLOBAL_" + id, FullName = "Global EF reference"
+            Id = checked(id + 1),
+            MasterCode = "EF_GLOBAL_" + id,
+            FullName = "Global EF reference"
         };
         writer.AddRange(tenant, privateType, globalType);
         await writer.SaveChangesAsync();

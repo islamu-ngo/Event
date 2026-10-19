@@ -421,9 +421,16 @@ public sealed class GenericOutboxAdmissionTests(PostgreSqlContainerFixture fixtu
             "dispatch_failed", true, 1, DateTime.UtcNow)).IsEqualTo(OutboxFailureTransition.DeadLettered);
         var terminal = await executionRepository.GetClaimedGenericAsync(
             message.Id, claim.LeaseExpiresAt, OutboxMessageStatus.DeadLettered, DateTime.UtcNow);
+        var terminalReread = await executionRepository.GetByIdAsync(message.Id, CancellationToken.None);
+        await Assert.That(terminalReread).IsNotNull();
+        await Assert.That(terminalReread!.Id).IsEqualTo(terminal!.Id);
+        await Assert.That(terminalReread.Status).IsEqualTo(OutboxMessageStatus.DeadLettered);
+        await Assert.That(terminalReread.NextRetryAt).IsEqualTo(claim.LeaseExpiresAt);
+        await Assert.That(terminalReread.Payload).IsEqualTo(terminal.Payload);
         await authority.RequireDeadLetterAsync(terminal!, CancellationToken.None);
         await Assert.That(await executionRepository.MarkDeadLetterReconciled(message.Id, claim.LeaseExpiresAt)).IsTrue();
         await Assert.That(await executionRepository.MarkDeadLetterReconciled(message.Id, claim.LeaseExpiresAt)).IsFalse();
+        await Assert.That(await executionRepository.GetByIdAsync(message.Id, CancellationToken.None)).IsNull();
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             authority.RequireDeadLetterAsync(terminal!, CancellationToken.None));
     }
@@ -838,9 +845,13 @@ internal static class GenericOutboxConfigurationReceiptAssertions
                 ConfigurationManifestAuditMode.Bootstrap, "v1", "TenantBootstrap", "receipt",
                 new string('a', 64), ConfigurationManifestOperationStatus.Applied,
                 0, 0, 0, 0, null, null, now, now, new string('b', 64), 1);
-            message = ConfigurationManifestEffectOutbox.Create(Guid.CreateVersion7(), operation.Id, now);
-            if (variant != "manifest-unbound")
-                operation.BindEffectOutbox(message.Id);
+            operation.BindEffectOutbox(Guid.CreateVersion7());
+            message = ConfigurationManifestEffectOutbox.Create(operation, []);
+            if (variant == "manifest-unbound")
+                operation = ConfigurationManifestOperation.Create(operation.Id,
+                    ConfigurationManifestAuditMode.Bootstrap, "v1", "TenantBootstrap", "receipt",
+                    new string('a', 64), ConfigurationManifestOperationStatus.Applied,
+                    0, 0, 0, 0, null, null, now, now, new string('b', 64), 1);
             if (variant == "manifest-wrong-id")
                 message.Id = Guid.CreateVersion7();
             expectedIdentity = $"{operation.Id:D}:{message.Id:D}";

@@ -12,6 +12,7 @@
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\TestDbContextOptions.cs" Link="Fixtures\NativeTestDbContextOptions.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\PostgreSqlContainerFixture.cs" Link="Fixtures\NativePostgreSqlContainerFixture.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\ConfigurationManifest\ConfigurationManifestBootstrapTestHost.cs" Link="Fixtures\ConfigurationManifestBootstrapTestHost.cs" />
   </ItemGroup>
 
   <ItemGroup>

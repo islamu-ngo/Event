@@ -79,6 +79,19 @@ public sealed class ConfigurationManifestConcurrencyTests(
             operation.CreatedTenantCount == 1)).IsEqualTo(1);
         await Assert.That(operations.Count(operation =>
             operation.SkippedExistingTenantCount == 1)).IsEqualTo(1);
+        var effects = await verification.OutboxMessages.AsNoTracking().ToArrayAsync();
+        await Assert.That(effects.Length).IsEqualTo(1);
+        var creator = operations.Single(operation => operation.CreatedTenantCount == 1);
+        var skipped = operations.Single(operation => operation.SkippedExistingTenantCount == 1);
+        await Assert.That(skipped.EffectOutboxId).IsNull();
+        await Assert.That(effects[0].Status).IsEqualTo(OutboxMessageStatus.Pending);
+        await Assert.That(effects[0].AggregateType).IsEqualTo(ConfigurationManifestEffectOutbox.AggregateType);
+        await Assert.That(effects[0].EventType).IsEqualTo(ConfigurationManifestEffectOutbox.EventType);
+        var instructions = ConfigurationManifestEffectPayload.Read(effects[0].Payload, effects[0].CreatedAt);
+        await Assert.That(instructions.Version).IsEqualTo(ConfigurationManifestEffectPayload.CurrentVersion);
+        await Assert.That(instructions.Tenants.Length).IsEqualTo(1);
+        await Assert.That(effects[0].AggregateId).IsEqualTo(creator.Id);
+        await Assert.That(effects[0].Id).IsEqualTo(creator.EffectOutboxId);
         await Assert.That(tenantResults.Select(result => result.Status)).IsEquivalentTo(
         [
             ConfigurationManifestTenantResultStatus.Created,

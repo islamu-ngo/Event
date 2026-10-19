@@ -137,7 +137,8 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             "Results" => InsertOnly($"after_row->>'OperationId' = p_scope->>'Operation' AND {In("TenantId", "Tenants")}"),
             "Outbox" => InsertOnly($"after_row->>'Id' = p_scope->>'Effect' AND after_row->>'AggregateId' = p_scope->>'Operation' " +
                 $"AND after_row->>'AggregateType' = {Text(ConfigurationManifestEffectOutbox.AggregateType)} " +
-                $"AND after_row->>'EventType' = {Text(ConfigurationManifestEffectOutbox.EventType)} AND after_row->'Payload' = 'null'::jsonb " +
+                $"AND after_row->>'EventType' = {Text(ConfigurationManifestEffectOutbox.EventType)} " +
+                $"AND pg_catalog.jsonb_typeof(after_row->'Payload') = 'string' AND pg_catalog.octet_length(after_row->>'Payload') BETWEEN 1 AND {ConfigurationManifestEffectPayload.MaximumPayloadByteCount} " +
                 $"AND (after_row->>'Status')::integer = {(int)OutboxMessageStatus.Pending}"),
             _ => "true"
         };

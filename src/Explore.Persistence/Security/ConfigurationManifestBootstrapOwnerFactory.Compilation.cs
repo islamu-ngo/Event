@@ -174,15 +174,18 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory
         bool hasEffects = created > 0 || !plan.Instance.ChangedSettingKeyNames.IsEmpty || !plan.Instance.ChangedDocumentKeyNames.IsEmpty;
         if (hasEffects) operation.BindEffectOutbox(plan.EffectOutboxId);
         Add(data, after, changes, operation);
+        var results = new List<ConfigurationManifestTenantResult>(preflight.Tenants.Length);
         foreach (var target in preflight.Tenants)
         {
             bool createdTenant = target.Disposition == ConfigurationManifestTenantDisposition.Create;
-            Add(data, after, changes, ConfigurationManifestTenantResult.Create(plan.OperationId, target.TenantId,
+            var result = ConfigurationManifestTenantResult.Create(plan.OperationId, target.TenantId,
                 createdTenant ? ConfigurationManifestTenantResultStatus.Created : ConfigurationManifestTenantResultStatus.SkippedExisting,
                 createdTenant ? target.Plan.ChangedSettingKeyNames : [],
-                createdTenant ? target.Plan.ChangedDocumentKeyNames : [], completedAt));
+                createdTenant ? target.Plan.ChangedDocumentKeyNames : [], completedAt);
+            results.Add(result);
+            Add(data, after, changes, result);
         }
-        if (hasEffects) Add(data, after, changes, ConfigurationManifestEffectOutbox.Create(plan.EffectOutboxId, plan.OperationId, completedAt));
+        if (hasEffects) Add(data, after, changes, ConfigurationManifestEffectOutbox.Create(operation, results));
         data.Order(after);
         return new(operation, changes, after);
     }

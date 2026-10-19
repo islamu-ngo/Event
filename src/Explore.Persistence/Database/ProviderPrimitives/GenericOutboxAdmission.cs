@@ -313,7 +313,7 @@ public sealed class GenericOutboxAdmission(IGenericOutboxAdmissionDbContextFacto
                             Identity(aggregate, source.Id, campaignId, source.EventId)) : null;
                     }
                 case "ConfigurationManifestEffectsRequested":
-                    return message.AggregateType == nameof(ConfigurationManifestOperation) && message.Payload is null
+                    return message.AggregateType == nameof(ConfigurationManifestOperation) && message.Payload is not null
                         && await context.Set<ConfigurationManifestOperation>().AsNoTracking().AnyAsync(row =>
                             row.Id == aggregate && row.Status == ConfigurationManifestOperationStatus.Applied
                             && row.EffectOutboxId == message.Id, ct)

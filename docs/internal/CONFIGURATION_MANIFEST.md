@@ -518,6 +518,51 @@ regression proves both retained API mutex custody and that an independent
 EXCLUSIVE table lock succeeds, excluding the old table/row fences. Separate
 cooperating-owner tests verify create-once/skip-second behavior.
 
+Bootstrap stores its effect envelope in the same original transaction as the
+configuration, operation audit and tenant results. Production startup selects
+`DeferredConfigurationManifestEffectDelivery`: it does not enumerate, claim or
+settle effects on the bootstrap Global context. The ordinary Runtime outbox
+worker admits the persisted operation/effect pair, selects the original
+claim-bound Runtime scope, dispatches through `ConfigurationManifestEffectDispatcher`
+and settles only the retained claim. A lost claim cannot authorize completion.
+Consumer failure leaves durable retry/dead-letter work under the existing outbox
+protocol; it must not turn a committed bootstrap into fabricated rollback evidence.
+
+`ConfigurationManifestEffectPayload` is the versioned, key-only delivery contract.
+The original C# compiler derives it from the complete Applied receipt and Created
+tenant results, then stores it with those rows in the same physical transaction.
+Version1 contains only the notification UTC time, changed instance setting-key
+names, and Created tenant IDs with their changed setting-key names. It contains
+no setting values, document bodies, secrets, source manifest, names or audit text.
+Skipped tenants are excluded; a no-op replay does not create another effect.
+
+The dispatcher consumes the exact persisted payload bound to its original claim,
+not private operation/result reads or a substitute Global context. .NET10 strict
+JSON metadata rejects duplicate/unknown/missing properties; C# additionally checks
+the version, size, UTC time, canonical tenant identities/order and closed key
+catalogues before any cache invalidation or notification. Applied-operation and
+effect-ID admission, exact payload-byte digest, route and live lease checks remain.
+The worker no longer re-derives metadata from later audit-row edits: the immutable
+atomic payload is its delivery authority. Privileged database rewrites are not an
+API workflow and are not repaired or silently normalized.
+
+Manifest payload replacement is denied in both the repository's atomic portable
+predicate and the existing native queue primitive, using the persisted route.
+Other routes retain their required redaction/scrubbing capabilities. This adds no
+private audit grants, schema columns, migration or privileged business routine.
+Legacy null payloads and unsupported versions have no fallback. Keep the matching
+application and native definitions together; exact body attestation still rejects
+stale definitions rather than upgrading them implicitly. A rollback must restore
+a coherent application/database checkpoint, not rewrite pending effects by hand.
+
+`AddConfigurationManifestApplication` registers common services only. Startup
+registration exclusively selects delivery timing and retains dispatcher/import
+services and real human import admission for deferred delivery. Re-registering
+common services must not silently restore an immediate claimer. Native origin
+tests assert pending operation-linked envelopes, not completed worker delivery;
+the genuine PostgreSQL startup-to-worker cohort remains a separate acceptance
+requirement. See [Outbox pattern](OUTBOX_PATTERN.md) for worker lifecycle.
+
 The Persistence module registers a scoped concrete
 `ConfigurationManifestBootstrapOrigin`; its source-authority interface aliases
 that same instance, and the internal executor and owner require the concrete
@@ -582,7 +627,7 @@ The implemented control flow is:
     authoritative in-transaction mutation boundaries.
 11. Each absent tenant is created in deterministic slug order with its
     directory-operator identity, branding, settings, and optional paid policy.
-12. The operation audit, per-tenant results, and payload-free outbox effect are
+12. The operation audit, per-tenant results, and versioned key-only outbox effect are
     committed in the same transaction.
 13. Cache invalidation and setting notifications run after commit. In the split
     topology the one-shot owner leaves the effect in the durable general outbox
@@ -971,7 +1016,7 @@ The administration workspace follows one server-owned state machine:
    configuration values.
 
 An apply commits all selected authoritative mutations, the protected pre-apply
-snapshot, append-only operation evidence, and the payload-free effect outbox or
+snapshot, append-only operation evidence, and the typed effect outbox or
 commits none of them. Cache refresh and other effects may remain `Pending`; the
 configuration transaction is not replayed to repair an effect.
 
@@ -1398,7 +1443,7 @@ evidence.
 
 | Condition | Safe action |
 |---|---|
-| Bootstrap committed but startup reports post-commit effect failure | Preserve the committed operation. Restore runtime/outbox processing and let the payload-free effect retry. |
+| Bootstrap committed but its effect remains pending | Preserve the committed operation. Restore runtime/outbox processing and let the same versioned effect retry; do not reapply configuration or force completion. |
 | Failure audit could not be persisted | Treat startup as failed. Use correlation logs and database health evidence, restore database availability, and rerun. |
 | `configuration_manifest_export_too_large` / HTTP `413` | Use supported Day 2 APIs or a database backup for recovery. Export emits no partial bytes. |
 | Export returns `401` or `403` | Authenticate with instance authority; do not grant tenant admins cross-tenant export |
@@ -1483,7 +1528,7 @@ Bootstrap-lifecycle changes are Tier 1 security work. Preserve:
 - same-section rerun protection;
 - whole-tenant existing skips;
 - safe post-rollback failure recording;
-- payload-free post-commit effects.
+- versioned key-only bootstrap effects, without private audit reads by Runtime.
 
 Use real PostgreSQL collision tests for every shared authority. Tests must
 subscribe to explicit gates/events before triggering competitors; do not add

@@ -124,6 +124,19 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
         if (_dbContext.IsConfigurationInstanceImportOwner
             && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
             return await native.ReadEffectAsync(messageId, cancellationToken);
+        if (_dbContext.GenericOutboxExecutionClaim is { } claim
+            && PostgresOutboxExecutionContract.For(_dbContext) is not null)
+        {
+            // Re-reading an admitted effect must retain its original claim, not require raw table access.
+            if (claim.MessageId != messageId) return null;
+            DateTime observedAt = DateTime.UtcNow;
+            var current = await GetClaimedGenericAsync(messageId, claim.LeaseExpiresAt, claim.Status,
+                observedAt, cancellationToken);
+            // Failure may retain the same original claim while entering terminal reconciliation.
+            return current ?? (claim.Status == OutboxMessageStatus.Processing && GenericOutboxRoutes.SupportsDeadLetter(claim.EventType)
+                ? await GetClaimedGenericAsync(messageId, claim.LeaseExpiresAt, OutboxMessageStatus.DeadLettered,
+                    observedAt, cancellationToken) : null);
+        }
         return await _dbContext.OutboxMessages
             .AsNoTracking()
             .SingleOrDefaultAsync(message => message.Id == messageId, cancellationToken);
@@ -203,6 +216,8 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedPayload);
         ArgumentException.ThrowIfNullOrWhiteSpace(replacementPayload);
+        if (_dbContext.GenericOutboxExecutionClaim?.EventType == ConfigurationManifestEffectOutbox.EventType)
+            return false;
         if (PostgresOutboxExecutionContract.For(_dbContext) is { } native)
             return await native.SettleAsync(NativeEnrollment,
                 id, processingLeaseExpiresAt, OutboxMessageStatus.Processing, 4,
@@ -211,6 +226,7 @@ public class OutboxRepository : GenericRepository<OutboxMessage, Guid>,
             .Where(message => message.Id == id
                 && message.Status == OutboxMessageStatus.Processing
                 && message.NextRetryAt == processingLeaseExpiresAt
+                && message.EventType != ConfigurationManifestEffectOutbox.EventType
                 && message.Payload == expectedPayload)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(message => message.Payload, replacementPayload), ct);

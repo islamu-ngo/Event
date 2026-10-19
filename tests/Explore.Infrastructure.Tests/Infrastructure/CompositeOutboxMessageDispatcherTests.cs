@@ -594,11 +594,14 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Substitute.For<IEventPublishedNotificationFanoutService>(),
             Substitute.For<IEventModerationNotificationFanoutService>(),
             manifestEffectDispatcher: manifestDispatcher);
-        Guid operationId = Guid.CreateVersion7();
-        OutboxMessage message = ConfigurationManifestEffectOutbox.Create(
-            Guid.CreateVersion7(),
-            operationId,
-            DateTime.UtcNow);
+        DateTime now = DateTime.UtcNow;
+        var operation = ConfigurationManifestOperation.Create(ConfigurationManifestAuditMode.Bootstrap,
+            "configuration.islamu.org/v1alpha2", "ConfigurationManifest", "routing",
+            new string('a', 64), ConfigurationManifestOperationStatus.Applied,
+            0, 0, 0, 0, null, null, now, now,
+            instanceSectionDigest: new string('b', 64), bootstrapGeneration: 1);
+        operation.BindEffectOutbox(Guid.CreateVersion7());
+        OutboxMessage message = ConfigurationManifestEffectOutbox.Create(operation, []);
 
         await dispatcher.DispatchAsync(message);
 

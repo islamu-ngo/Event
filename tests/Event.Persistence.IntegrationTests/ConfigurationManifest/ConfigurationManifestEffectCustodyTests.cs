@@ -22,9 +22,8 @@ public sealed class ConfigurationManifestEffectCustodyTests
     [Arguments("lease")]
     [Arguments("timestamp")]
     [Arguments("status")]
-    [Arguments("unbound")]
     [Arguments("terminal")]
-    public async Task EffectsRequireTheCommittedOperationAndOriginalPersistedMessage(string change)
+    public async Task EffectsRequireTheExactOriginalPersistedInstructions(string change)
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         var observation = new Observation();
@@ -34,17 +33,19 @@ public sealed class ConfigurationManifestEffectCustodyTests
             new string('a', 64), ConfigurationManifestOperationStatus.Applied,
             0, 0, 0, 0, null, null, Now, Now,
             instanceSectionDigest: new string('b', 64), bootstrapGeneration: 1,
-            instanceChangedSettingKeyNames: ["instance.display_name"]);
-        OutboxMessage message = ConfigurationManifestEffectOutbox.Create(
-            Guid.CreateVersion7(), operation.Id, Now);
+            instanceChangedSettingKeyNames: ["branding.display_name"]);
+        operation.BindEffectOutbox(Guid.CreateVersion7());
+        OutboxMessage message = ConfigurationManifestEffectOutbox.Create(operation, []);
         message.Status = change == "terminal" ? OutboxMessageStatus.DeadLettered : OutboxMessageStatus.Processing;
         message.NextRetryAt = Now.AddMinutes(5);
-        if (change != "unbound")
-            operation.BindEffectOutbox(message.Id);
         fixture.Context.ConfigurationManifestOperations.Add(operation);
         fixture.Context.OutboxMessages.Add(message);
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();
+        var repository = new OutboxRepository(fixture.Context);
+        var retained = await repository.GetByIdAsync(message.Id, CancellationToken.None);
+        await Assert.That(retained!.CreatedAt.Kind).IsEqualTo(DateTimeKind.Utc);
+        await Assert.That(retained.CreatedAt).IsEqualTo(Now);
         var submitted = new OutboxMessage
         {
             Id = message.Id,
@@ -67,8 +68,7 @@ public sealed class ConfigurationManifestEffectCustodyTests
             case "status": submitted.Status = OutboxMessageStatus.Pending; break;
         }
         var dispatcher = new ConfigurationManifestEffectDispatcher(
-            new ConfigurationManifestOperationRepository(fixture.Context),
-            new OutboxRepository(fixture.Context),
+            repository,
             Substitute.For<IHierarchicalSettingsResolver>(),
             Substitute.For<ITypedSettingsDocumentResolver>(), [observation]);
         if (change is "none" or "terminal")

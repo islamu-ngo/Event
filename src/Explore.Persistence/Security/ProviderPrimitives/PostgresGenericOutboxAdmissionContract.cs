@@ -326,7 +326,7 @@ public static class PostgresGenericOutboxAdmissionContract
                             AND c.kind = {(int)RefundCampaignKind.EventCancellation};
                         v_identity := v_identity || ':' || v_order::text || ':' || v_other::text || ':' || v_event::text;
                     WHEN 'ConfigurationManifestEffectsRequested' THEN
-                        IF r.aggregate_type <> 'ConfigurationManifestOperation' OR r.payload IS NOT NULL
+                        IF r.aggregate_type <> 'ConfigurationManifestOperation' OR r.payload IS NULL
                             OR NOT EXISTS (SELECT 1 FROM {manifests}
                                 WHERE id = r.aggregate_id AND status = 'Applied' AND effect_outbox_id = r.id) THEN RETURN; END IF;
                         v_ownership := 3; v_identity := v_identity || ':' || r.id::text;

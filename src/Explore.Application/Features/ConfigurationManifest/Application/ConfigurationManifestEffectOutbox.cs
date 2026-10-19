@@ -16,19 +16,21 @@ public static class ConfigurationManifestEffectOutbox
     public const int MaxRetries = 5;
 
     public static OutboxMessage Create(
-        Guid messageId,
-        Guid operationId,
-        DateTime occurredAtUtc)
+        ConfigurationManifestOperation operation,
+        IReadOnlyCollection<ConfigurationManifestTenantResult> results)
     {
+        ArgumentNullException.ThrowIfNull(operation);
+        Guid messageId = operation.EffectOutboxId ?? Guid.Empty;
+        Guid operationId = operation.Id;
         if (messageId == Guid.Empty || messageId.Version != 7
             || operationId == Guid.Empty || operationId.Version != 7)
         {
             throw new ArgumentException("Manifest effect identities must be UUIDv7.");
         }
 
-        if (occurredAtUtc.Kind != DateTimeKind.Utc)
+        if (operation.CompletedAt.Kind != DateTimeKind.Utc)
         {
-            throw new ArgumentException("Manifest effect timestamp must use UTC kind.", nameof(occurredAtUtc));
+            throw new ArgumentException("Manifest effect timestamp must use UTC kind.", nameof(operation));
         }
 
         return new OutboxMessage
@@ -37,9 +39,9 @@ public static class ConfigurationManifestEffectOutbox
             AggregateType = AggregateType,
             AggregateId = operationId,
             EventType = EventType,
-            Payload = null,
+            Payload = ConfigurationManifestEffectPayload.Create(operation, results),
             Status = OutboxMessageStatus.Pending,
-            CreatedAt = occurredAtUtc,
+            CreatedAt = operation.CompletedAt,
             MaxRetries = MaxRetries
         };
     }
@@ -51,7 +53,6 @@ public interface IConfigurationManifestEffectDispatcher
 }
 
 public sealed class ConfigurationManifestEffectDispatcher(
-    IConfigurationManifestOperationRepository operationRepository,
     IConfigurationManifestEffectOutboxRepository outboxRepository,
     IHierarchicalSettingsReader settingsResolver,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
@@ -66,7 +67,6 @@ public sealed class ConfigurationManifestEffectDispatcher(
         if (message.Id == Guid.Empty || message.AggregateId == Guid.Empty
             || message.AggregateType != ConfigurationManifestEffectOutbox.AggregateType
             || message.EventType != ConfigurationManifestEffectOutbox.EventType
-            || message.Payload is not null
             || message.Status is not OutboxMessageStatus.Processing and not OutboxMessageStatus.DeadLettered
             || message.NextRetryAt is null)
             throw new InvalidOperationException("Manifest effect envelope is invalid.");
@@ -74,52 +74,35 @@ public sealed class ConfigurationManifestEffectDispatcher(
             ?? throw new InvalidOperationException("Manifest effect message was not found.");
         if (persisted.AggregateId != message.AggregateId
             || persisted.AggregateType != message.AggregateType
-            || persisted.EventType != message.EventType || persisted.Payload is not null
+            || persisted.EventType != message.EventType
+            || !string.Equals(persisted.Payload, message.Payload, StringComparison.Ordinal)
             || persisted.Status != message.Status || persisted.NextRetryAt != message.NextRetryAt
             || persisted.CreatedAt != message.CreatedAt)
             throw new InvalidOperationException("Manifest effect custody was lost.");
-        Guid operationId = persisted.AggregateId;
-        ConfigurationManifestOperation operation =
-            await operationRepository.GetByIdAsync(operationId, cancellationToken)
-            ?? throw new InvalidOperationException("Manifest effect operation was not found.");
-        if (operation.Status != ConfigurationManifestOperationStatus.Applied
-            || operation.EffectOutboxId != persisted.Id || operation.CompletedAt != persisted.CreatedAt)
-        {
-            throw new InvalidOperationException("Manifest effects require an applied operation.");
-        }
-
-        IReadOnlyList<ConfigurationManifestTenantResult> results =
-            await operationRepository.GetResultsByOperationIdAsync(
-                operationId,
-                cancellationToken);
-        ConfigurationManifestTenantResult[] created = results
-            .Where(result =>
-                result.Status == ConfigurationManifestTenantResultStatus.Created)
-            .OrderBy(result => result.TenantId)
-            .ToArray();
+        var payload = ConfigurationManifestEffectPayload.Read(persisted.Payload, persisted.CreatedAt);
         var failures = new List<Exception>();
-        if (operation.InstanceChangedSettingKeyNames.Count > 0)
+        if (!payload.InstanceSettingKeys.IsEmpty)
         {
             TryEffect(
                 () => settingsResolver.InvalidateCache(SettingScope.Instance),
                 failures);
         }
 
-        foreach (ConfigurationManifestTenantResult result in created)
+        foreach (var tenant in payload.Tenants)
         {
             TryEffect(
-                () => settingsResolver.InvalidateCache(SettingScope.Tenant, result.TenantId),
+                () => settingsResolver.InvalidateCache(SettingScope.Tenant, tenant.TenantId),
                 failures);
             TryEffect(
                 () => typedSettingsDocumentResolver.InvalidateTenantDocumentCache(
-                    result.TenantId,
+                    tenant.TenantId,
                     SettingsDocumentKeys.Tenant.Branding),
                 failures);
         }
 
         ImmutableArray<SettingChangedNotification> notifications =
         [
-            .. operation.InstanceChangedSettingKeyNames.Select(key =>
+            .. payload.InstanceSettingKeys.Select(key =>
                 new SettingChangedNotification(
                     key,
                     oldValue: null,
@@ -127,16 +110,16 @@ public sealed class ConfigurationManifestEffectDispatcher(
                     SettingSource.SystemDefault,
                     tenantId: null,
                     actorUserId: null,
-                    operation.StartedAt)),
-            .. created.SelectMany(result => result.ChangedSettingKeyNames.Select(key =>
+                    payload.NotificationTimeUtc)),
+            .. payload.Tenants.SelectMany(tenant => tenant.SettingKeys.Select(key =>
                 new SettingChangedNotification(
                     key,
                     oldValue: null,
                     newValue: null,
                     SettingSource.TenantOverride,
-                    result.TenantId,
+                    tenant.TenantId,
                     actorUserId: null,
-                    operation.StartedAt)))
+                    payload.NotificationTimeUtc)))
         ];
         foreach (SettingChangedNotification notification in notifications)
         {

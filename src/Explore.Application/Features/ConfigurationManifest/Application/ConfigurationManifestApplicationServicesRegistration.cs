@@ -21,25 +21,12 @@ public enum ConfigurationManifestEffectDeliveryMode
 public static class ConfigurationManifestApplicationServicesRegistration
 {
     public static IServiceCollection AddConfigurationManifestApplication(
-        this IServiceCollection services,
-        ConfigurationManifestEffectDeliveryMode effectDeliveryMode =
-            ConfigurationManifestEffectDeliveryMode.Immediate)
+        this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        if (!Enum.IsDefined(effectDeliveryMode))
-        {
-            throw new ArgumentOutOfRangeException(nameof(effectDeliveryMode));
-        }
 
         services.TryAddScoped<IConfigurationManifestApplier, ConfigurationManifestApplier>();
         services.TryAddSingleton<LegalDocumentRenderingService>();
-        if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
-        {
-            services.TryAddScoped<IConfigurationManifestEffectDeliveryStrategy,
-                DeferredConfigurationManifestEffectDelivery>();
-            return services;
-        }
-
         services.TryAddScoped<IPublicationPolicyMutationBoundary, PublicationPolicyMutationBoundary>();
         services.TryAddScoped<SettingUpsertService>();
         services.TryAddScoped<
@@ -74,10 +61,6 @@ public static class ConfigurationManifestApplicationServicesRegistration
         services.TryAddScoped<
             IConfigurationManifestEffectDispatcher,
             ConfigurationManifestEffectDispatcher>();
-        services.TryAddScoped<
-            IConfigurationManifestEffectDeliveryStrategy,
-            ConfigurationManifestEffectDelivery>();
-
         return services;
     }
 }

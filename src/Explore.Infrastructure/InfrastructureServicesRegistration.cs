@@ -140,7 +140,8 @@ public static class InfrastructureServicesRegistration
                 DisabledAddressSelectionProtector>();
         }
 
-        services.AddConfigurationManifestStartup(configuration);
+        services.AddConfigurationManifestStartup(configuration,
+            Explore.Application.Features.ConfigurationManifest.Application.ConfigurationManifestEffectDeliveryMode.DeferredToRuntime);
         services.AddScoped<ConfiguredAdministratorBootstrapProvider>();
         services.AddScoped<
             IConfiguredAdministratorBootstrapProvider>(provider =>

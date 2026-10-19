@@ -346,6 +346,47 @@ development data and provision a fresh isolated PostgreSQL cluster when obsolete
 cluster-global roles remain; installation never silently drops them or repairs
 drift. No new credential, personal-data purpose or retention policy is introduced.
 
+## Bootstrap delivery privacy and truthful completion — 2026-10-19
+
+The maintainer approved a versioned durable effect containing only changed
+setting-key names, Created tenant identifiers and original notification time.
+C# constructs it from the complete bound Applied receipt and result set in the
+same physical transaction. The Runtime worker no longer reads private bootstrap
+audit tables to reconstruct those instructions; no additional audit grants,
+setting values, secrets or document contents are carried into delivery. Tenant
+identifiers remain restricted operational metadata, not public or harmless data.
+
+This serves IVSD-F024/M024 least privilege and IVSD-F027/M027 truthful durable
+completion: startup commit is not a claim that notifications already succeeded.
+Production startup leaves the same effect to a genuine admitted Runtime worker.
+Strict bounded JSON validation and exact original claim/route/byte checks precede
+effects; manifest instruction replacement is denied in the native and portable
+paths without removing redaction capabilities from other routes. Cache failure
+retries the same effect and does not fabricate rollback of committed configuration.
+At-least-once effects may repeat after partial delivery; no exactly-once external
+notification guarantee is asserted. Diagnostics must retain categorical errors,
+not this payload or raw exception content; full zero-PII telemetry acceptance is
+still a broader workstream gate.
+
+Evidence is scoped: the genuine PostgreSQL startup-to-worker cohort passed9cases
+with zero failures/skips in6m53.550s, including actual private-table SELECT denial,
+stale claims, direct mutation denial, cache-fault retry, malformed-version refusal
+and same-claim substitutions. Three affected projects built with zero errors;
+startup composition passed3cases. Independent asymmetric source reviews found no
+concrete defect. Subsequent shared-tree receipt/admission/custody/atomicity and
+bootstrap regressions passed42cases with no failures/skips. A separate isolated
+22-image payload/startup candidate excludes all federation/migration changes;
+its four builds, payload34, startup3 and native custody9 passed. The first SQLite
+run passed seven assertions but exited9 because its minimum incorrectly used the
+later shared count11. Unchanged-binary continuation corrected the minimum:
+SQLite7/0/0 in1m55.166s and genuine native worker9/0/0 in7m35.366s, both exit0.
+Those isolated receipts do not establish full provider/
+migration or HTTP-host acceptance. The live
+digest is not an independent historical receipt digest and does not protect
+against privileged database rewrites before admission. Null legacy payloads are
+not silently repaired. Preserve matching application/native definitions and a
+coherent backup checkpoint; no deployment or host-ready signal is issued here.
+
 ## Recommendations
 
 1. Preserve all stable finding and reference IDs in a candidate-bound, machine-consumed security evidence register. A green check with no executed tests is not closure evidence.

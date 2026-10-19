@@ -188,6 +188,11 @@ public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContaine
         await Assert.That(effect.AggregateId).IsEqualTo(operation.Id);
         await Assert.That(effect.AggregateType).IsEqualTo(ConfigurationManifestEffectOutbox.AggregateType);
         await Assert.That(effect.EventType).IsEqualTo(ConfigurationManifestEffectOutbox.EventType);
+        var instructions = ConfigurationManifestEffectPayload.Read(effect.Payload, effect.CreatedAt);
+        await Assert.That(instructions.Version).IsEqualTo(ConfigurationManifestEffectPayload.CurrentVersion);
+        await Assert.That(instructions.Tenants.Select(tenant => tenant.TenantId))
+            .IsEquivalentTo([tenant.Id]);
+        await Assert.That(instructions.NotificationTimeUtc).IsEqualTo(operation.StartedAt);
     }
 
     [Test]

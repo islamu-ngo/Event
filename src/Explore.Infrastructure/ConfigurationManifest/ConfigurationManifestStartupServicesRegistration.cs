@@ -20,16 +20,21 @@ public static class ConfigurationManifestStartupServicesRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        if (!Enum.IsDefined(effectDeliveryMode))
+            throw new ArgumentOutOfRangeException(nameof(effectDeliveryMode));
 
         services.AddDataProtection();
         services.AddHttpContextAccessor();
         services.TryAddScoped<IEmailDeliveryDisableTokenService, EmailDeliveryDisableTokenService>();
-        services.AddConfigurationManifestApplication(effectDeliveryMode);
-        if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.Immediate)
-        {
-            services.RemoveAll<IHumanConfigurationImportAdmission>();
-            services.AddScoped<IHumanConfigurationImportAdmission, HumanConfigurationImportAdmission>();
-        }
+        services.AddConfigurationManifestApplication();
+        // Startup owns delivery timing; common Application registration never chooses a claimer.
+        services.RemoveAll<IConfigurationManifestEffectDeliveryStrategy>();
+        if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
+            services.AddScoped<IConfigurationManifestEffectDeliveryStrategy, DeferredConfigurationManifestEffectDelivery>();
+        else
+            services.AddScoped<IConfigurationManifestEffectDeliveryStrategy, ConfigurationManifestEffectDelivery>();
+        services.RemoveAll<IHumanConfigurationImportAdmission>();
+        services.AddScoped<IHumanConfigurationImportAdmission, HumanConfigurationImportAdmission>();
         services.AddOptions<ConfigurationManifestOptions>()
             .Configure(options =>
             {

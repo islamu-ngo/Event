@@ -142,6 +142,28 @@ every out-of-protocol edit. Conflicts can fail an attempt; it is not automatical
 replayed. Keep database credentials restricted and do not treat direct SQL edits
 as an equivalent administration workflow.
 
+Bootstrap commits its configuration and a durable effect record together. API
+startup then leaves that record for the normal outbox worker rather than trying
+to deliver it with the bootstrap database identity. Keep the outbox worker enabled
+and monitor pending/retry/dead-letter work: successful bootstrap does not mean
+every notification or cache effect has already completed. Worker downtime delays
+delivery without discarding the committed record. Do not manually claim, mark
+complete or delete an effect to force startup or recovery to look successful.
+
+Bootstrap effect records carry a versioned list of changed setting-key names,
+Created community IDs and the original notification time. They do not contain
+setting values, credentials or the source configuration. The API writes these
+instructions atomically with the committed configuration; the worker uses its
+claimed message without needing private bootstrap audit-table access.
+
+Use matching application and database capability definitions. Old null-payload,
+unknown-version or corrupt effects are not silently converted or delivered.
+Investigate an undelivered effect through the outbox recovery procedure; do not
+edit its payload, lease or receipt, force completion, or replay configuration to
+hide the delivery failure. Before upgrading, retain a coherent backup checkpoint
+for application/database rollback. Native definition drift remains a startup
+failure, not permission for automatic database repair.
+
 ---
 
 ## Standard Operating Procedure

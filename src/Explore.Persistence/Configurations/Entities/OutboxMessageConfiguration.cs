@@ -20,6 +20,10 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
 
         // Status (stored as integer)
         builder.Property(e => e.Status).IsRequired();
+        // Providers without timestamp-kind storage must preserve the envelope's UTC contract on read.
+        builder.Property(e => e.CreatedAt).HasConversion(
+            value => value,
+            value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
         builder.Property(e => e.NextRetryAt).HasConversion(
             value => value,
             value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : (DateTime?)null);

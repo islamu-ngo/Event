@@ -176,7 +176,8 @@ public static partial class PostgresOutboxExecutionContract
                         END IF;
                     WHEN 3 THEN UPDATE {table} SET next_retry_at = NULL WHERE id = message_id;
                     WHEN 4 THEN
-                        IF p_expected IS NULL OR p_replacement IS NULL OR r.payload IS DISTINCT FROM p_expected
+                        IF r.event_type = 'ConfigurationManifestEffectsRequested'
+                            OR p_expected IS NULL OR p_replacement IS NULL OR r.payload IS DISTINCT FROM p_expected
                             THEN RETURN NULL; END IF;
                         UPDATE {table} SET payload = p_replacement WHERE id = message_id;
                     WHEN 5 THEN

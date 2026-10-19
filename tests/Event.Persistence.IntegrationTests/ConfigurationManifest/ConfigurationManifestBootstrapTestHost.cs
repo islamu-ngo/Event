@@ -50,7 +50,8 @@ internal sealed class ConfigurationManifestBootstrapTestHost : IAsyncDisposable
         Func<ExploreDbContext> observer, string? migrationLogin = null,
         INotificationHandler<SettingChangedNotification>? consumer = null, IModel? model = null,
         IConfigurationManifestBootstrapSourceAuthority? counterfeitAuthority = null,
-        ConfigurationManifestMode mode = ConfigurationManifestMode.Bootstrap)
+        ConfigurationManifestMode mode = ConfigurationManifestMode.Bootstrap,
+        ConfigurationManifestEffectDeliveryMode effectDeliveryMode = ConfigurationManifestEffectDeliveryMode.Immediate)
     {
         if (target.Role != PrimaryDatabaseRole.Global)
             throw new ArgumentException("The fixture must explicitly select its real Global target.", nameof(target));
@@ -72,7 +73,7 @@ internal sealed class ConfigurationManifestBootstrapTestHost : IAsyncDisposable
             services.AddMemoryCache();
             services.AddSingleton<IGlobalExploreDbContextFactory>(new SelectedGlobal(target, model));
             services.AddScoped(_ => observer());
-            services.AddConfigurationManifestStartup(configuration);
+            services.AddConfigurationManifestStartup(configuration, effectDeliveryMode);
             services.AddConfigurationManifestPersistence();
             if (counterfeitAuthority is not null)
             {
@@ -100,10 +101,12 @@ internal sealed class ConfigurationManifestBootstrapTestHost : IAsyncDisposable
     }
 
     internal static ConfigurationManifestBootstrapTestHost ForPostgres(PostgreSqlContainerFixture fixture,
-        INotificationHandler<SettingChangedNotification>? consumer = null,
         ConfigurationManifestMode mode = ConfigurationManifestMode.Bootstrap) =>
         new(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), () => fixture.CreateDbContext(),
-            fixture.NativeQueueEnrollment.MigratorLogin, consumer, mode: mode);
+            fixture.NativeQueueEnrollment.MigratorLogin, mode: mode,
+            // This lane verifies original Global bootstrap and its durable effect envelope.
+            // Runtime claim-bound worker delivery is a separate contract, not simulated here.
+            effectDeliveryMode: ConfigurationManifestEffectDeliveryMode.DeferredToRuntime);
 
     internal static ConfigurationManifestBootstrapTestHost ForSqlite(Func<ExploreDbContext> observer,
         INotificationHandler<SettingChangedNotification>? consumer = null)

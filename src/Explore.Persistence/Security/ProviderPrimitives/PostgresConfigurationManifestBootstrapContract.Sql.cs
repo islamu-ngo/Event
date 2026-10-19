@@ -76,11 +76,8 @@ public static partial class PostgresConfigurationManifestBootstrapContract
         END IF;
         """;
 
-    private static string ReadBody(ConfigurationManifestBootstrapData data, string authority, bool retainSource)
+    private static string ReadBody(ConfigurationManifestBootstrapData data, string authority)
     {
-        string relationFence = retainSource
-            ? $"LOCK TABLE {string.Join(", ", data.Relations.Select(relation => relation.Table).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))} IN SHARE MODE;"
-            : "";
         var reads = data.Relations.Select(relation =>
         {
             string columns = string.Join(", ", relation.Columns.Select(column => "r." + column.Sql));
@@ -89,7 +86,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             return $"""
                 SELECT COALESCE(pg_catalog.jsonb_agg({Project(relation, "r")} ORDER BY {order}), '[]'::jsonb)
                     INTO rows FROM (SELECT {columns} FROM {relation.Table} r
-                        WHERE {Predicate(data, relation)} ORDER BY {order} {(retainSource ? "FOR UPDATE" : "")}) r;
+                        WHERE {Predicate(data, relation)} ORDER BY {order}) r;
                 image := image || pg_catalog.jsonb_build_object({Text(relation.Tag)}, rows);
                 """;
         });
@@ -98,8 +95,6 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             BEGIN
                 PERFORM {authority}();
                 {ScopeCheck()}
-                {(retainSource ? $"PERFORM pg_catalog.pg_advisory_xact_lock({RelationalSettingMutationLock.ComputeStableLockKey(ConfigurationManifestLockKeys.InstanceManifest).ToString(System.Globalization.CultureInfo.InvariantCulture)}::bigint);" : "")}
-                {relationFence}
                 {string.Join("\n", reads)}
                 RETURN image;
             END;

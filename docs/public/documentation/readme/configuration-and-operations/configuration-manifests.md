@@ -129,12 +129,18 @@ an applied receipt cannot be submitted as failed history. Keep matching backend
 and native capability definitions, and investigate drift rather than bypassing
 readiness or manually relabeling an operation.
 
-During PostgreSQL Bootstrap, source relation locks also protect missing rows
-until commit or rollback, so another writer cannot insert a captured missing
-setting mid-attempt. Concurrent writes can wait or fail as conflicts; an
-attempt is not replayed automatically. The dedicated no-login owner receives
-the read privilege needed for these locks; the application Global login does
-not receive that owner role or new direct table write access.
+Bootstrap coordinates configuration changes in the API. It acquires ordered
+coordination leases before starting its atomic database transaction and retains
+them through commit or rollback. A cooperating API writer waits, then reads the
+settled state; no privileged table/row-lock routine or broader table permissions
+are introduced. Global still does not receive the dedicated native-owner role.
+
+Use the API for configuration changes. Direct database edits bypass this
+coordination and can race, including inserting a setting Bootstrap observed as
+absent. Transaction isolation and conflict checks do not guarantee detection of
+every out-of-protocol edit. Conflicts can fail an attempt; it is not automatically
+replayed. Keep database credentials restricted and do not treat direct SQL edits
+as an equivalent administration workflow.
 
 ---
 

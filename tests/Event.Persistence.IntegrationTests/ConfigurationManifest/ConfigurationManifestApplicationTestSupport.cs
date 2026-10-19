@@ -18,8 +18,8 @@ internal static class ConfigurationManifestApplicationTestSupport
         ConfigurationManifestBootstrapTestHost.ForSqlite(factory.CreateDbContext, effectConsumer);
 
     public static ConfigurationManifestBootstrapTestHost CreateHandler(
-        PostgreSqlContainerFixture fixture, INotificationHandler<SettingChangedNotification>? effectConsumer = null) =>
-        ConfigurationManifestBootstrapTestHost.ForPostgres(fixture, effectConsumer);
+        PostgreSqlContainerFixture fixture) =>
+        ConfigurationManifestBootstrapTestHost.ForPostgres(fixture);
 
     public static ConfigurationManifestBootstrapTestHost CreateHandler(
         EventResourcePersistenceTests.TestDatabase database) =>

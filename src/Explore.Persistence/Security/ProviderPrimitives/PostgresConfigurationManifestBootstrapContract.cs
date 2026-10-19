@@ -44,7 +44,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
         {
             string columns = string.Join(", ", relation.Columns.Select(column => column.Sql));
             string update = string.Join(", ", UpdateNames(relation).Select(name => relation.Field(name)));
-            return $"GRANT SELECT ON {relation.Table} TO {OwnerRole};\n" +
+            return $"GRANT SELECT ({columns}) ON {relation.Table} TO {OwnerRole};\n" +
                 $"GRANT INSERT ({columns}) ON {relation.Table} TO {OwnerRole};" +
                 (update.Length == 0 ? "" : $"\nGRANT UPDATE ({update}) ON {relation.Table} TO {OwnerRole};");
         });
@@ -205,8 +205,8 @@ public static partial class PostgresConfigurationManifestBootstrapContract
         return
         [
             (assert, "", "", "void", AuthorityBody(context, data, migrationLogin, globalLogin)),
-            (read, "jsonb", "p_scope jsonb", "jsonb", ReadBody(data, assert, retainSource: true)),
-            (Function(context, "validate_source"), "jsonb", "p_scope jsonb", "jsonb", ReadBody(data, assert, retainSource: false)),
+            (read, "jsonb", "p_scope jsonb", "jsonb", ReadBody(data, assert)),
+            (Function(context, "validate_source"), "jsonb", "p_scope jsonb", "jsonb", ReadBody(data, assert)),
             (Function(context, "write"), "jsonb,jsonb,jsonb,jsonb", "p_scope jsonb, p_before jsonb, p_changes jsonb, p_after jsonb",
                 "jsonb", WriteBody(data, assert, read)),
             (Function(context, "write_failed"), "jsonb,jsonb,jsonb,jsonb", "p_scope jsonb, p_before jsonb, p_changes jsonb, p_after jsonb",

@@ -5,6 +5,7 @@ using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,7 @@ namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    public async Task OriginalAbsentSetting_RemainsFencedAgainstIndependentInsertUntilSettlement()
+    public async Task OriginalAbsentSetting_UsesApiCoordinationWithoutNativeTableOrRowFences()
     {
         await fixture.ResetAsync();
         await using (var setup = fixture.CreateDbContext())
@@ -28,20 +29,44 @@ public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContaine
                 .Where(setting => setting.SettingKey == AppearanceSettingDefinitions.DefaultThemeMode.Key)
                 .ExecuteDeleteAsync();
         await using var host = ConfigurationManifestBootstrapTestHost.ForPostgres(fixture);
-        host.AfterObservation = async (actual, _, _) =>
+        host.AfterObservation = async (actual, _, token) =>
         {
             var entity = actual.Model.FindEntityType(typeof(SystemSetting))!;
             string table = actual.GetService<ISqlGenerationHelper>()
                 .DelimitIdentifier(entity.GetTableName()!, entity.GetSchema() ?? "public");
             await using var independent = fixture.CreateDbContext();
             await using var transaction = await independent.Database.BeginTransactionAsync();
-            var rejected = await Assert.ThrowsAsync<PostgresException>(() =>
-                independent.Database.ExecuteSqlRawAsync($"LOCK TABLE {table} IN ROW EXCLUSIVE MODE NOWAIT"));
-            await Assert.That(rejected?.SqlState).IsEqualTo(PostgresErrorCodes.LockNotAvailable);
+            await using var probe = independent.Database.GetDbConnection().CreateCommand();
+            probe.Transaction = transaction.GetDbTransaction();
+            probe.CommandText = "SELECT pg_catalog.pg_try_advisory_xact_lock(@key)";
+            var key = probe.CreateParameter();
+            key.ParameterName = "key";
+            key.Value = RelationalNamedLock.ComputeStableKey(
+                "explore:setting-mutation:" + ConfigurationManifestLockKeys.InstanceManifest);
+            probe.Parameters.Add(key);
+            await Assert.That((bool)(await probe.ExecuteScalarAsync(token))!).IsFalse();
+
+            // EXCLUSIVE permits ordinary reads but conflicts with SHARE and FOR UPDATE's
+            // ROW SHARE lock. Non-participating database writers are intentionally unfenced.
+            probe.Parameters.Clear();
+            probe.CommandText = $"LOCK TABLE {table} IN EXCLUSIVE MODE NOWAIT";
+            await probe.ExecuteNonQueryAsync(token);
+            await transaction.RollbackAsync(token);
         };
-        var result = await host.ExecuteAsync(
-            new ApplyConfigurationManifestCommand(ConfigurationManifestApplicationTestSupport.Source("absence-fence")),
-            CancellationToken.None);
+        var source = ConfigurationManifestApplicationTestSupport.Source("api-coordination");
+        var settings = source.Manifest.Spec.Instance.Settings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        settings[AppearanceSettingDefinitions.DefaultThemeMode.Key] = System.Text.Json.JsonSerializer.SerializeToElement("dark");
+        source = source with
+        {
+            Manifest = source.Manifest with
+            {
+                Spec = source.Manifest.Spec with
+                {
+                    Instance = source.Manifest.Spec.Instance with { Settings = settings }
+                }
+            }
+        };
+        var result = await host.ExecuteAsync(new ApplyConfigurationManifestCommand(source), CancellationToken.None);
         await Assert.That(result.IsSuccess).IsTrue();
         await using var verification = fixture.CreateDbContext();
         var restored = await verification.SystemSettings.SingleAsync(
@@ -72,10 +97,15 @@ public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContaine
             await observed.Task.WaitAsync(TimeSpan.FromSeconds(30));
             await using var independent = fixture.CreateDbContext();
             await using var transaction = await independent.Database.BeginTransactionAsync();
-            bool acquired = await independent.Database.SqlQueryRaw<bool>(
-                    "SELECT pg_catalog.pg_try_advisory_xact_lock({0}) AS \"Value\"",
-                    RelationalSettingMutationLock.ComputeStableLockKey(ConfigurationManifestLockKeys.InstanceManifest))
-                .SingleAsync();
+            await using var probe = independent.Database.GetDbConnection().CreateCommand();
+            probe.Transaction = transaction.GetDbTransaction();
+            probe.CommandText = "SELECT pg_catalog.pg_try_advisory_xact_lock(@key)";
+            var key = probe.CreateParameter();
+            key.ParameterName = "key";
+            key.Value = RelationalNamedLock.ComputeStableKey(
+                "explore:setting-mutation:" + ConfigurationManifestLockKeys.InstanceManifest);
+            probe.Parameters.Add(key);
+            bool acquired = (bool)(await probe.ExecuteScalarAsync())!;
             await Assert.That(acquired).IsTrue();
             await transaction.RollbackAsync();
         }
@@ -153,6 +183,11 @@ public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContaine
         await Assert.That(operation.Digest).IsEqualTo(host.ArtifactDigest);
         await Assert.That(operation.Mode).IsEqualTo(ConfigurationManifestAuditMode.Bootstrap);
         await Assert.That(operation.Status).IsEqualTo(ConfigurationManifestOperationStatus.Applied);
+        var effect = await context.OutboxMessages.SingleAsync(row => row.Id == operation.EffectOutboxId);
+        await Assert.That(effect.Status).IsEqualTo(OutboxMessageStatus.Pending);
+        await Assert.That(effect.AggregateId).IsEqualTo(operation.Id);
+        await Assert.That(effect.AggregateType).IsEqualTo(ConfigurationManifestEffectOutbox.AggregateType);
+        await Assert.That(effect.EventType).IsEqualTo(ConfigurationManifestEffectOutbox.EventType);
     }
 
     [Test]

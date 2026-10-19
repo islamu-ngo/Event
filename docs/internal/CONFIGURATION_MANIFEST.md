@@ -497,18 +497,26 @@ receipt; a representation mismatch must not become an incidental SQL cast error
 or weaken that guard. Failure-injection tests derive their status column/literal
 from the same relational model and verify actual rollback evidence.
 
-The retained mutation source acquires ordered SHARE locks on every mapped
-source relation before its first row image. Present-row locks alone do not
-fence absence: Serializable could otherwise order bootstrap before a later
-insert while that insert becomes visible before bootstrap settlement.
-Relation SHARE locks conflict with an inserter's ROW EXCLUSIVE requirement and
-last through the original transaction. The no-login native owner therefore
-has table SELECT on these mapped relations for LOCK privilege; INSERT and
-UPDATE remain mapped-column constrained, and Global receives only function
-execution, not owner membership or new direct table permissions.
-The native NOWAIT regression removes a canonical setting, captures that
-absence through the real startup owner and requires an independent writer's
-ROW EXCLUSIVE lock to be rejected before the genuine owner recreates it.
+`ConfigurationManifestBootstrapOwnerFactory` coordinates mutation with its
+normalized ordered setting-key session leases in C#. Acquire them before opening
+the original Serializable transaction and hold them through commit or rollback.
+A cooperating successor waits before BEGIN, then observes the previous owner's
+settled image. Native source reads request no SHARE table locks, FOR UPDATE row
+locks or duplicate advisory mutex. The no-login native owner receives only the
+fixed mapped-column SELECT grants admitted by its existing authority contract;
+INSERT/UPDATE remain column-constrained. Global receives function execution, not
+owner membership or broader direct table permissions. Installed-body attestation,
+exact before/after effects and affected-row checks remain fail-closed.
+
+This is cooperative API coordination, not a fence against arbitrary database
+writers. Direct edits outside the protocol can race, including inserts of absent
+settings. Serializable supplies a consistent transaction image, not fresh reads
+of arbitrary later commits; exact-effect checks do not guarantee detection of
+every out-of-protocol edit. Conflicts abort rather than automatically replaying
+an attempt. Operators must use the API for configuration changes. The native
+regression proves both retained API mutex custody and that an independent
+EXCLUSIVE table lock succeeds, excluding the old table/row fences. Separate
+cooperating-owner tests verify create-once/skip-second behavior.
 
 The Persistence module registers a scoped concrete
 `ConfigurationManifestBootstrapOrigin`; its source-authority interface aliases

@@ -4655,7 +4655,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -7430,7 +7430,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -11464,7 +11464,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -12560,7 +12560,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -13100,7 +13100,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT")
                         .HasColumnName("regex_pattern");
 
@@ -36748,7 +36748,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("AttemptRetentionUntilUtc")
+                    b.Property<DateTime>("AttemptRetentionUntilUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasColumnName("attempt_retention_until_utc")
@@ -36768,7 +36768,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("created_by");
 
-                    b.Property<DateTimeOffset>("DeadLetterEvidenceRetentionUntilUtc")
+                    b.Property<DateTime>("DeadLetterEvidenceRetentionUntilUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasColumnName("dead_letter_evidence_retention_until_utc")
@@ -36780,17 +36780,17 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("event_contract_version");
 
-                    b.Property<DateTimeOffset>("MaterializedAtUtc")
+                    b.Property<DateTime>("MaterializedAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("materialized_at_utc");
 
-                    b.Property<DateTimeOffset>("OperationalLogRetentionUntilUtc")
+                    b.Property<DateTime>("OperationalLogRetentionUntilUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasColumnName("operational_log_retention_until_utc")
                         .HasDefaultValueSql("datetime('now', '+30 days')");
 
-                    b.Property<DateTimeOffset>("PayloadRetentionUntilUtc")
+                    b.Property<DateTime>("PayloadRetentionUntilUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("payload_retention_until_utc");
 
@@ -36798,7 +36798,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("provider_mode_id");
 
-                    b.Property<DateTimeOffset>("PublicationRetentionUntilUtc")
+                    b.Property<DateTime>("PublicationRetentionUntilUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasColumnName("publication_retention_until_utc")
@@ -37300,7 +37300,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("CapturedAtUtc")
+                    b.Property<DateTime>("CapturedAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("captured_at_utc");
 
@@ -37323,11 +37323,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("credential_reference");
 
-                    b.Property<DateTimeOffset>("CredentialValidFromUtc")
+                    b.Property<DateTime>("CredentialValidFromUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("credential_valid_from_utc");
 
-                    b.Property<DateTimeOffset?>("CredentialValidUntilUtc")
+                    b.Property<DateTime?>("CredentialValidUntilUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("credential_valid_until_utc");
 
@@ -37361,11 +37361,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("max_attempts");
 
-                    b.Property<DateTimeOffset>("NextActionAtUtc")
+                    b.Property<DateTime>("NextActionAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("next_action_at_utc");
 
-                    b.Property<DateTimeOffset?>("ProcessingLeaseExpiresAtUtc")
+                    b.Property<DateTime?>("ProcessingLeaseExpiresAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("processing_lease_expires_at_utc");
 

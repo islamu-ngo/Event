@@ -420,6 +420,39 @@ Before traffic resumes, restore the verified backup on any failed validation. Af
 resumes, pause writers and deploy a new additive forward migration. Do not use destructive
 rollback for evidence-bearing webhook rows and do not guess provider success during repair.
 
+### Custom-property provider-model reconciliation
+
+Separate generated SQL Server and MySQL migrations reconcile five nullable
+custom-property regex columns from 1000 to 2048 characters, matching the existing
+`CustomPropertyPatternPolicy.MaximumPatternLength`. PostgreSQL already carries
+the equivalent upstream reconciliation. SQLite's separate
+`ReconcileProviderModelMetadata` migration has empty Up/Down methods: its snapshot
+aligns the five length annotations and eleven existing webhook UTC-converter CLR
+metadata entries; SQLite TEXT storage and defaults do not change. It is not a
+data-conversion migration.
+
+SQL Server/MySQL Down returns the five limits to 1000. The MySQL/MariaDB migration
+SQL generator prefixes all supported finite, same-family VARCHAR reductions with
+typed CHECK validation before any original migration operation. It rejects
+oversized values, including trailing spaces and multibyte characters, rather than
+relying on SQL mode to prevent silent truncation. Source-changing dependencies
+and unsupported conversions are refused during generation, not guessed. MariaDB
+enables `SESSION check_constraint_checks` in each validation command; it remains
+enabled for that maintenance session. No GLOBAL setting or SQL-mode change is made.
+
+Stop API traffic and every background writer before applying either an EF-driven
+downgrade or its exported script, and keep writers stopped through settlement.
+MySQL requires dropping the temporary CHECK before MODIFY; this is validation
+under quiescence, not protection against a concurrent privileged database writer.
+MySQL/MariaDB DDL is not atomic across the migration. A failing CHECK stops before
+the original operations, but later errors can leave schema changes committed; a
+failed temporary-CHECK removal can also leave guard metadata. Inspect actual
+schema and migration history, resolve the reported data or metadata deliberately,
+and verify a fresh attempt before reopening writers. Do not truncate patterns,
+disable checks, edit history, or blindly remove a guard to force a downgrade.
+Prefer a forward repair or a verified matching application backup when a lossless
+downgrade cannot be established.
+
 ## Rollback Rules
 
 Rollback depends on whether migrations are reversible:

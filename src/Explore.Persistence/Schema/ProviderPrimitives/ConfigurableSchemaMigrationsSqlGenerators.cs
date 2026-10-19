@@ -179,6 +179,18 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
     IMySqlOptions options)
     : MySqlMigrationsSqlGenerator(dependencies, commandBatchPreparer, options)
 {
+    private readonly bool _isMariaDb = options.ServerVersion is MariaDbServerVersion;
+
+    protected override void Generate(
+        AddCheckConstraintOperation operation,
+        IModel? model,
+        MigrationCommandListBuilder builder)
+    {
+        if (_isMariaDb && MySqlVarcharNarrowingGuard.IsPreflight(operation))
+            builder.AppendLine("SET SESSION check_constraint_checks = ON;");
+        base.Generate(operation, model, builder);
+    }
+
     public override IReadOnlyList<MigrationCommand> Generate(
         IReadOnlyList<MigrationOperation> operations,
         Microsoft.EntityFrameworkCore.Metadata.IModel? model = null,
@@ -226,8 +238,10 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
                     """
             });
         }
+        IReadOnlyList<MigrationOperation> guardedOperations = MySqlVarcharNarrowingGuard.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper);
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
-            base.Generate(executableOperations, model, sqlOptions),
+            base.Generate(guardedOperations, model, sqlOptions),
             executableOperations,
             Dependencies);
     }

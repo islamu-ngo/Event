@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5AMGXGYZ11J2SBP19JSP03H
+Title: "Align provider model metadata and guard pattern downgrades"
+Type: fix
+Scope: database
+Summary: "Generate separate provider-model catch-up migrations for the existing C# pattern limit and SQLite webhook metadata, and reject unsafe MySQL/MariaDB VARCHAR narrowing before original migration operations."
+Group: custom-property-pattern-provider-alignment
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Generated SQL Server and MySQL migrations widen five nullable custom-property pattern columns from 1000 to 2048. PostgreSQL is already aligned. SQLite has an empty Up/Down metadata reconciliation for five length annotations and eleven existing webhook UTC-converter entries with unchanged TEXT storage and defaults. MySQL/MariaDB generated narrowing validates all supported finite same-family VARCHAR reductions before original operations and refuses unsafe source dependencies or conversions; generated artifacts are not hand-edited.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Quiesce API and worker writes through downgrade settlement for both EF and exported scripts. Oversized values are rejected without truncation; temporary checks are dropped before MODIFY, so direct concurrent database writes are outside the safety contract. MariaDB enables session constraint checking without changing global settings or SQL mode. DDL is not whole-migration atomic; inspect schema, history and any retained guard after failure before reopening traffic.

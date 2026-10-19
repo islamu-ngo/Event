@@ -4674,8 +4674,8 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -7456,8 +7456,8 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -11492,8 +11492,8 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -12591,8 +12591,8 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")
@@ -13131,8 +13131,8 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnName("property_type");
 
                     b.Property<string>("RegexPattern")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)")
                         .HasColumnName("regex_pattern");
 
                     b.Property<int>("SortOrder")

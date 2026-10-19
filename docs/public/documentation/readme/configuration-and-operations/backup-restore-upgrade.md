@@ -320,6 +320,32 @@ upgrade is not explicitly image-only reversible, use a tested recovery plan that
 retains newer erasure facts. Keep the prior software and verified artifacts until
 acceptance completes; a successful startup is not itself a restore rehearsal.
 
+### Custom-property limits and maintenance downgrades
+
+Separate SQL Server and MySQL migrations align five custom-property pattern
+columns with the API's existing 2048-character limit. PostgreSQL already has that
+alignment. SQLite's separate provider-model metadata migration changes no stored
+data: it aligns length annotations and existing webhook UTC-converter metadata.
+
+Reversing the SQL Server/MySQL alignment restores the 1000-character limit.
+MySQL/MariaDB first validate all affected columns and reject oversized values,
+including trailing spaces and multibyte text, before running the original
+migration operations. They do not silently shorten patterns or change SQL mode.
+MariaDB enables constraint checking for the maintenance session and leaves it on;
+no server-wide setting changes.
+
+Stop the API and all workers before running the downgrade, whether through EF or
+an exported script. Keep them stopped until migration and verification finish.
+Temporary validation checks must be removed before the columns can change, so
+direct database writes during maintenance can bypass this protection. The schema
+changes are not an all-or-nothing rollback: a later error may leave earlier
+changes applied, or a failed cleanup may leave a temporary validation constraint.
+On failure, keep traffic stopped, inspect actual schema and migration history,
+and resolve the reported problem before retrying. Do not disable checks, shorten
+patterns, alter history, or delete a validation constraint just to force success.
+If a lossless downgrade is unavailable, use a forward correction or restore a
+verified application backup with its matching software.
+
 ### Email-optional development migration consolidation
 
 The current application history uses the supported provider Init followed by one

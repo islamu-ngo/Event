@@ -17,10 +17,11 @@ namespace Explore.Persistence.Security;
 
 internal sealed partial class ConfigurationManifestBootstrapOwnerFactory
 {
-    private static ConfigurationManifestBootstrapSnapshot Snapshot(JsonObject image)
+    private static ConfigurationManifestBootstrapSnapshot Snapshot(ConfigurationManifestBootstrapData data, JsonObject image)
     {
         var operations = Rows(image, "Operations").Where(row =>
-                Number(row, "Status") == (int)ConfigurationManifestOperationStatus.Applied && row["BootstrapGeneration"] is not null)
+                JsonNode.DeepEquals(row["Status"], data.ProviderValue("Operations", nameof(ConfigurationManifestOperation.Status),
+                    ConfigurationManifestOperationStatus.Applied)) && row["BootstrapGeneration"] is not null)
             .OrderByDescending(row => Number(row, "BootstrapGeneration")).ThenByDescending(row => Long(row, "CompletedAt"))
             .ThenByDescending(row => Id(row, "Id"));
         var latest = operations.FirstOrDefault();

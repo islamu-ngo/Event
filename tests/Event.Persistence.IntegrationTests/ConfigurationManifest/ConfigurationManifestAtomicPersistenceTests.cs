@@ -10,6 +10,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
@@ -337,10 +338,16 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             await using (ExploreDbContext apply = factory.CreateDbContext())
             {
                 var entity = apply.Model.FindEntityType(typeof(ConfigurationManifestOperation))!;
-                string table = apply.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                var names = apply.GetService<ISqlGenerationHelper>();
+                var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+                var status = entity.FindProperty(nameof(ConfigurationManifestOperation.Status))!;
+                string table = names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                string statusColumn = names.DelimitIdentifier(status.GetColumnName(store)!);
+                string appliedStatus = status.GetRelationalTypeMapping()
+                    .GenerateSqlLiteral(ConfigurationManifestOperationStatus.Applied);
                 await apply.Database.ExecuteSqlRawAsync($"""
                     CREATE TRIGGER reject_manifest_applied BEFORE INSERT ON {table}
-                    WHEN NEW.status = {(int)ConfigurationManifestOperationStatus.Applied}
+                    WHEN NEW.{statusColumn} = {appliedStatus}
                     BEGIN SELECT RAISE(ABORT, 'actual manifest receipt persistence rejected'); END;
                     """);
                 await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);

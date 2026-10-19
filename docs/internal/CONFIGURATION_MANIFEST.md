@@ -489,6 +489,14 @@ does not issue a mutation capsule. The genuine-origin regression holds that
 validation read open at an exact observation event and requires an independent
 backend to acquire the manifest mutex immediately.
 
+Bootstrap audit mode and status comparisons use the EF model's provider values,
+not the numeric C# enum ordinals. The source predicate, retained snapshot,
+mutation shape and failed-history guard must agree with the mapped string
+representation. Failed-history writes admit only `Failed`, never an `Applied`
+receipt; a representation mismatch must not become an incidental SQL cast error
+or weaken that guard. Failure-injection tests derive their status column/literal
+from the same relational model and verify actual rollback evidence.
+
 The retained mutation source acquires ordered SHARE locks on every mapped
 source relation before its first row image. Present-row locks alone do not
 fence absence: Serializable could otherwise order bootstrap before a later

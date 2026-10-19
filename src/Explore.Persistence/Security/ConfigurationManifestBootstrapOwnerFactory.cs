@@ -50,7 +50,7 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
         var scope = Reserve(plan).Scope;
         var image = await new ConfigurationManifestBootstrapProviderOperations(context, data, configuration)
             .ReadValidationAsync(scope, token);
-        var result = ConfigurationManifestPreflight.EvaluateOriginal(plan, Snapshot(image) with { BootstrapState = null });
+        var result = ConfigurationManifestPreflight.EvaluateOriginal(plan, Snapshot(data, image) with { BootstrapState = null });
         if (AfterOriginalObservation is { } observe) await observe(context, plan, token);
         await transaction.RollbackAsync(token);
         return result;
@@ -109,7 +109,7 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
                 await owner.RequireImageAsync(scope, before, token);
                 if (AfterOriginalObservation is { } observe) await observe(context, plan, token);
                 // The first native row/absence image is complete before any business preflight.
-                var preflight = ConfigurationManifestPreflight.EvaluateOriginal(plan, Snapshot(before));
+                var preflight = ConfigurationManifestPreflight.EvaluateOriginal(plan, Snapshot(owner.Data, before));
                 plan = preflight.BoundPlan;
                 if (!preflight.IsValid)
                 {
@@ -342,7 +342,8 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
                 || changes[0]!["Tag"]!.GetValue<string>() != "Operations"
                 || changes[0]!["Before"] is not null
                 || changes[0]!["After"]!["Id"]!.GetValue<Guid>() != rejection.Plan.OperationId
-                || changes[0]!["After"]!["Status"]!.GetValue<int>() != (int)ConfigurationManifestOperationStatus.Failed)
+                || !JsonNode.DeepEquals(changes[0]!["After"]!["Status"],
+                    Data.ProviderValue("Operations", nameof(ConfigurationManifestOperation.Status), ConfigurationManifestOperationStatus.Failed)))
                 throw new UnauthorizedAccessException("Only original acknowledged rollback evidence may write failed history.");
             await RequireImageAsync(rejection.Scope, before, token);
             await provider.WriteEvidenceAsync(rejection.Scope, before, changes, after, token);

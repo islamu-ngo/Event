@@ -123,6 +123,12 @@ mutex or retaining source row locks. It rolls back its read transaction and
 does not grant permission to apply that preview later; Bootstrap must originate
 its own deployment-file attempt.
 
+Failed-bootstrap history records acknowledged rollback, not successful application.
+The backend uses the database model's audit-state representation consistently;
+an applied receipt cannot be submitted as failed history. Keep matching backend
+and native capability definitions, and investigate drift rather than bypassing
+readiness or manually relabeling an operation.
+
 During PostgreSQL Bootstrap, source relation locks also protect missing rows
 until commit or rollback, so another writer cannot insert a captured missing
 setting mid-attempt. Concurrent writes can wait or fail as conflicts; an

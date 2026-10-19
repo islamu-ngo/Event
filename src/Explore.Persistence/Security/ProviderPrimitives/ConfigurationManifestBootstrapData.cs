@@ -61,20 +61,29 @@ internal sealed class ConfigurationManifestBootstrapData(ExploreDbContext contex
         var entry = context.Entry(entity);
         var result = new JsonObject();
         foreach (var column in relation.Columns)
-        {
-            object? value = entry.Property(column.Name).CurrentValue;
-            var converter = column.Property.GetRelationalTypeMapping().Converter;
-            if (converter is not null) value = converter.ConvertToProvider(value);
-            result[column.Name] = value switch
-            {
-                null => null,
-                DateTime instant => JsonValue.Create(instant.Ticks),
-                DateTimeOffset instant => JsonValue.Create(instant.UtcTicks),
-                string text when column.Json => JsonNode.Parse(text),
-                _ => JsonSerializer.SerializeToNode(value)
-            };
-        }
+            result[column.Name] = ProviderValue(column, entry.Property(column.Name).CurrentValue);
         return result;
+    }
+
+    internal JsonNode? ProviderValue(string tag, string property, object? value) =>
+        ProviderValue(Relations.Single(relation => relation.Tag == tag).Columns.Single(column => column.Name == property), value);
+
+    private object? ProviderScalar(string tag, string property, object? value) =>
+        Relations.Single(relation => relation.Tag == tag).Columns.Single(column => column.Name == property)
+            .Property.GetRelationalTypeMapping().Converter?.ConvertToProvider(value) ?? value;
+
+    private static JsonNode? ProviderValue(Column column, object? value)
+    {
+        var converter = column.Property.GetRelationalTypeMapping().Converter;
+        if (converter is not null) value = converter.ConvertToProvider(value);
+        return value switch
+        {
+            null => null,
+            DateTime instant => JsonValue.Create(instant.Ticks),
+            DateTimeOffset instant => JsonValue.Create(instant.UtcTicks),
+            string text when column.Json => JsonNode.Parse(text),
+            _ => JsonSerializer.SerializeToNode(value)
+        };
     }
 
     internal IEnumerable<object> PolicyRows(PaidEventPolicyVersion policy)
@@ -201,7 +210,7 @@ internal sealed class ConfigurationManifestBootstrapData(ExploreDbContext contex
             "Policies" => $"{relation.Field("IsActive")} = 1 OR {In(relation.Field("Id"), Ids("Policies"))}",
             "Organizers" or "Currencies" or "Refunds" or "Limits" => $"{relation.Field("PaidEventPolicyVersionId")} IN ({policyRoots})",
             "Operations" => $"{In(relation.Field("Id"), Ids("Operations"))} OR {relation.Field("Id")} = " +
-                $"(SELECT {relation.Field("Id")} FROM {relation.Table} WHERE {relation.Field("Status")} = {(int)ConfigurationManifestOperationStatus.Applied} " +
+                $"(SELECT {relation.Field("Id")} FROM {relation.Table} WHERE {relation.Field("Status")} = {Param(ProviderScalar("Operations", nameof(ConfigurationManifestOperation.Status), ConfigurationManifestOperationStatus.Applied))} " +
                 $"AND {relation.Field("BootstrapGeneration")} IS NOT NULL ORDER BY {relation.Field("BootstrapGeneration")} DESC, " +
                 $"{relation.Field("CompletedAt")} DESC, {relation.Field("Id")} DESC LIMIT 1)",
             "Results" => $"{relation.Field("OperationId")} = {Param(scope["Operation"]!.GetValue<Guid>())}",

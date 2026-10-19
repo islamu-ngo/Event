@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
+using Explore.Domain;
 using Explore.Domain.Settings.Documents;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -216,7 +217,8 @@ public static partial class PostgresConfigurationManifestBootstrapContract
                             OR pg_catalog.jsonb_array_length(p_changes) <> 1 OR p_changes->0->>'Tag' <> 'Operations'
                             OR p_changes->0->'Before' <> 'null'::jsonb
                             OR p_changes->0->'After'->>'Id' <> p_scope->>'Operation'
-                            OR (p_changes->0->'After'->>'Status')::integer <> 3 THEN
+                            OR p_changes->0->'After'->'Status' IS DISTINCT FROM
+                                {Text(data.ProviderValue("Operations", nameof(ConfigurationManifestOperation.Status), ConfigurationManifestOperationStatus.Failed)!.ToJsonString())}::jsonb THEN
                             RAISE EXCEPTION 'manifest_bootstrap_failed_history_only' USING ERRCODE = '42501';
                         END IF;
                         RETURN {Function(context, "write")}(p_scope,p_before,p_changes,p_after);

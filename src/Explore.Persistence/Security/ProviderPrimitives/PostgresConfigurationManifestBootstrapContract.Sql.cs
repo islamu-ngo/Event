@@ -53,7 +53,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             "Policies" => $"{F("IsActive")} OR {F("Id")} IN ({Ids("Policies")})",
             "Organizers" or "Currencies" or "Refunds" or "Limits" => $"{F("PaidEventPolicyVersionId")} IN ({policies})",
             "Operations" => $"{F("Id")} IN ({Ids("Operations")}) OR {F("Id")} = (SELECT {relation.Field("Id")} FROM {relation.Table} " +
-                $"WHERE {relation.Field("Status")} = {(int)ConfigurationManifestOperationStatus.Applied} " +
+                $"WHERE {relation.Field("Status")} = {Text(data.ProviderValue("Operations", nameof(ConfigurationManifestOperation.Status), ConfigurationManifestOperationStatus.Applied)!.GetValue<string>())} " +
                 $"AND {relation.Field("BootstrapGeneration")} IS NOT NULL ORDER BY {relation.Field("BootstrapGeneration")} DESC, " +
                 $"{relation.Field("CompletedAt")} DESC, {relation.Field("Id")} DESC LIMIT 1)",
             "Results" => $"{F("OperationId")} = (p_scope->>'Operation')::uuid",
@@ -114,10 +114,12 @@ public static partial class PostgresConfigurationManifestBootstrapContract
         _ => []
     };
 
-    private static string Shape(ConfigurationManifestBootstrapData.Relation relation)
+    private static string Shape(ConfigurationManifestBootstrapData data, ConfigurationManifestBootstrapData.Relation relation)
     {
         string In(string field, string tag) => $"(after_row->>{Text(field)})::uuid IN ({Ids(tag)})";
         string InsertOnly(string condition) => $"before_row <> 'null'::jsonb OR NOT ({condition})";
+        string OperationValue(string property, object value) =>
+            Text(data.ProviderValue("Operations", property, value)!.ToJsonString()) + "::jsonb";
         return relation.Tag switch
         {
             "Systems" => $"NOT (after_row->>'SettingKey' = ANY ({Values(ConfigurationManifestCatalog.InstanceSettings.Keys)}))",
@@ -134,8 +136,9 @@ public static partial class PostgresConfigurationManifestBootstrapContract
                 "OR after_row->'IsActive' <> 'false'::jsonb OR after_row->'ActiveUniquenessSlot' <> before_row->'VersionNumber')",
             "Organizers" or "Currencies" or "Refunds" or "Limits" => InsertOnly(In("PaidEventPolicyVersionId", "Policies")),
             "Operations" => InsertOnly($"after_row->>'Id' = p_scope->>'Operation' " +
-                $"AND (after_row->>'Mode')::integer = {(int)ConfigurationManifestAuditMode.Bootstrap} " +
-                $"AND (after_row->>'Status')::integer IN ({(int)ConfigurationManifestOperationStatus.Applied},{(int)ConfigurationManifestOperationStatus.Failed})"),
+                $"AND after_row->'Mode' = {OperationValue(nameof(ConfigurationManifestOperation.Mode), ConfigurationManifestAuditMode.Bootstrap)} " +
+                $"AND after_row->'Status' IN ({OperationValue(nameof(ConfigurationManifestOperation.Status), ConfigurationManifestOperationStatus.Applied)}," +
+                $"{OperationValue(nameof(ConfigurationManifestOperation.Status), ConfigurationManifestOperationStatus.Failed)})"),
             "Results" => InsertOnly($"after_row->>'OperationId' = p_scope->>'Operation' AND {In("TenantId", "Tenants")}"),
             "Outbox" => InsertOnly($"after_row->>'Id' = p_scope->>'Effect' AND after_row->>'AggregateId' = p_scope->>'Operation' " +
                 $"AND after_row->>'AggregateType' = {Text(ConfigurationManifestEffectOutbox.AggregateType)} " +
@@ -170,7 +173,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
                     IF NOT (after_row ?& {fields}) OR (SELECT count(*) FROM pg_catalog.jsonb_object_keys(after_row)) <> {relation.Columns.Length}
                         OR before_row <> 'null'::jsonb AND (NOT (before_row ?& {fields})
                             OR (SELECT count(*) FROM pg_catalog.jsonb_object_keys(before_row)) <> {relation.Columns.Length})
-                        OR {Shape(relation)} {audit} THEN
+                        OR {Shape(data, relation)} {audit} THEN
                         RAISE EXCEPTION 'manifest_bootstrap_effect_invalid' USING ERRCODE = '42501';
                     END IF;
                     identity := pg_catalog.jsonb_build_array(change->>'Tag', {key});

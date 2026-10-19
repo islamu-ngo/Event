@@ -28,10 +28,13 @@ public sealed class ConfigurationManifestProviderValueNativeTests(PostgreSqlCont
         var scope = new JsonObject
         {
             ["Slugs"] = new JsonArray(JsonValue.Create("failed-history-provider-value")),
-            ["Tenants"] = new JsonArray(), ["CreatedTenants"] = new JsonArray(),
-            ["Documents"] = new JsonArray(), ["Policies"] = new JsonArray(),
+            ["Tenants"] = new JsonArray(),
+            ["CreatedTenants"] = new JsonArray(),
+            ["Documents"] = new JsonArray(),
+            ["Policies"] = new JsonArray(),
             ["Operations"] = new JsonArray(JsonValue.Create(operationId)),
-            ["Operation"] = JsonValue.Create(operationId), ["Effect"] = JsonValue.Create(Guid.CreateVersion7())
+            ["Operation"] = JsonValue.Create(operationId),
+            ["Effect"] = JsonValue.Create(Guid.CreateVersion7())
         };
         string migration = fixture.NativeQueueEnrollment.MigratorLogin;
         string global = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global).Username!;
@@ -54,7 +57,9 @@ public sealed class ConfigurationManifestProviderValueNativeTests(PostgreSqlCont
             data.Order(after);
             var changes = new JsonArray(new JsonObject
             {
-                ["Tag"] = "Operations", ["Before"] = null, ["After"] = row
+                ["Tag"] = "Operations",
+                ["Before"] = null,
+                ["After"] = row
             });
             rejection = await Assert.ThrowsAsync<PostgresException>(() => PostgresConfigurationManifestBootstrapContract.WriteEvidenceAsync(
                 original, data, scope, migration, global, before, changes, after, CancellationToken.None));

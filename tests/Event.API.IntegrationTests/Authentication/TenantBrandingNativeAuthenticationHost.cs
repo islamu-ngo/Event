@@ -126,8 +126,8 @@ internal sealed class TenantBrandingNativeAuthenticationHost(
             services.AddDbContextFactory<ExploreDbContext>(options =>
             {
                 PrimaryDatabaseProviderComposition.ConfigureApplication(options,
-                    postgres.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
-                options.AddInterceptors(new DatabaseFailureObserver(this));
+                    postgres.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+                options.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance, new DatabaseFailureObserver(this));
             });
             services.AddScoped(provider =>
             {
@@ -139,7 +139,7 @@ internal sealed class TenantBrandingNativeAuthenticationHost(
                 var context = runtimeRequestContexts
                     ? postgres.CreateEnrolledTenantDbContext(provider.GetRequiredService<ITenantContext>(),
                         [PostgresTenantSessionInterceptor.RuntimeInstance, new DatabaseFailureObserver(this), .. ownerInterceptors])
-                    : provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+                    : CreateCredentialIssuanceContext();
                 context.TenantContext = provider.GetRequiredService<ITenantContext>();
                 context.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
                 context.ClearTenantFilterBypass();
@@ -161,6 +161,15 @@ internal sealed class TenantBrandingNativeAuthenticationHost(
             services.AddSingleton<IPrivacyIdentityFenceKeyProvider>(PrivacyKeys);
             configureServices?.Invoke(services);
         });
+    }
+
+    private ExploreDbContext CreateCredentialIssuanceContext()
+    {
+        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            postgres.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        options.AddInterceptors(new DatabaseFailureObserver(this));
+        return new ExploreDbContext(options.Options);
     }
 
     private sealed class FailureObserver(TenantBrandingNativeAuthenticationHost host) : IExceptionHandler

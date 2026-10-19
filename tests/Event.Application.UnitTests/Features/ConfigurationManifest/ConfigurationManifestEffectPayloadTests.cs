@@ -128,9 +128,11 @@ public sealed class ConfigurationManifestEffectPayloadTests
         {
             case "missing-result": results.RemoveAt(0); break;
             case "duplicate-result": results[0] = results[1]; break;
-            case "foreign-operation": results[0] = ConfigurationManifestTenantResult.Create(Guid.CreateVersion7(), FirstTenant,
+            case "foreign-operation":
+                results[0] = ConfigurationManifestTenantResult.Create(Guid.CreateVersion7(), FirstTenant,
                 ConfigurationManifestTenantResultStatus.Created, [], [], Completed); break;
-            case "completion": results[0] = ConfigurationManifestTenantResult.Create(operation.Id, FirstTenant,
+            case "completion":
+                results[0] = ConfigurationManifestTenantResult.Create(operation.Id, FirstTenant,
                 ConfigurationManifestTenantResultStatus.Created, [], [], Completed.AddSeconds(1)); break;
         }
         await Assert.ThrowsAsync<InvalidOperationException>(() => Task.FromResult(ConfigurationManifestEffectPayload.Create(operation, results)));

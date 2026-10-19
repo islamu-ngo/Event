@@ -30,7 +30,10 @@ public sealed class UserTenantNavigationReadEnrollmentTests(PostgreSqlContainerF
             .Where(user => user.Id == subject && !user.IsDeleted)
             .Select(user => new User
             {
-                Id = user.Id, IsDeleted = user.IsDeleted, LastActiveTenantId = user.LastActiveTenantId, Pii = null!
+                Id = user.Id,
+                IsDeleted = user.IsDeleted,
+                LastActiveTenantId = user.LastActiveTenantId,
+                Pii = null!
             }).SingleOrDefaultAsync();
         await Assert.That(selected?.Id).IsEqualTo(subject);
         await Assert.That(selected!.LastActiveTenantId).IsEqualTo(preference);
@@ -129,8 +132,12 @@ public sealed class UserTenantNavigationReadEnrollmentTests(PostgreSqlContainerF
 
     private static User CreateUser(Guid id, Guid? preference, bool deleted = false) => new()
     {
-        Id = id, LastActiveTenantId = preference, IsDeleted = deleted,
-        ConcurrencyStamp = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow, Pii = null!
+        Id = id,
+        LastActiveTenantId = preference,
+        IsDeleted = deleted,
+        ConcurrencyStamp = Guid.CreateVersion7(),
+        CreatedAt = DateTime.UtcNow,
+        Pii = null!
     };
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";

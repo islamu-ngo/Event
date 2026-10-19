@@ -52,7 +52,10 @@ public sealed class UserTenantNavigationRepository(
                     .Where(user => user.Id == userId && !user.IsDeleted)
                     .Select(user => new User
                     {
-                        Id = user.Id, IsDeleted = user.IsDeleted, LastActiveTenantId = user.LastActiveTenantId, Pii = null!
+                        Id = user.Id,
+                        IsDeleted = user.IsDeleted,
+                        LastActiveTenantId = user.LastActiveTenantId,
+                        Pii = null!
                     }).SingleOrDefaultAsync(cancellationToken);
                 RequireOriginal();
                 return user;

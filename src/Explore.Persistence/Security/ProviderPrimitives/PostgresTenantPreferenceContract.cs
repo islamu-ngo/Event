@@ -273,7 +273,7 @@ public static class PostgresTenantPreferenceContract
                 OR pg_catalog.has_table_privilege({Text(enrollment.RuntimeLogin)},{Text(table)},'INSERT,DELETE,TRUNCATE,TRIGGER')
                 OR pg_catalog.has_any_column_privilege({Text(enrollment.RuntimeLogin)},{Text(table)},'UPDATE,INSERT,REFERENCES')
                 OR pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(table)},'DELETE,TRUNCATE,TRIGGER')
-                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(table)},'SELECT,UPDATE,INSERT,REFERENCES')
+                OR NOT ({Explore.Persistence.Schema.PostgresUserTenantNavigationReadPermissions.AllowedGlobalReadPredicate(context, enrollment.GlobalLogin)})
                 OR pg_catalog.has_function_privilege({Text(enrollment.RuntimeLogin)},
                     {Text(Function(context, "write") + "(uuid,uuid,timestamp with time zone)")},'EXECUTE')
                 OR pg_catalog.has_function_privilege({Text(enrollment.RuntimeLogin)},

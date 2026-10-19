@@ -45,12 +45,34 @@ current active-membership result. Otherwise navigation chooses the latest active
 membership, or returns no target when no active memberships remain.
 The navigation response grants no tenant access and never changes the preference.
 
-PostgresUserTenantNavigationContract installs a dedicated execute-only Global
-reader with a single UUID selector. Its owner can select only User.Id,
-User.IsDeleted and User.LastActiveTenantId; it has no mutation or PII privileges.
-Admission attests the enrolled login and role graph, effective privileges, exact
-routine body and invocation metadata. Reinstalling an existing contract rejects
-drift rather than repairing unexpected grants or replacing a changed definition.
+`UserTenantNavigationRepository` uses the same untracked EF Core projection for
+every provider: `User.Id`, `IsDeleted` and `LastActiveTenantId`, excluding deleted
+users and disabling PII auto-includes without disabling query filters. C# owns
+subject selection and membership decisions; no navigation business routine remains.
+Each read uses its factory-created, sealed tenantless Global context and retains
+the original connector/backend through permission admission and query completion.
+
+`PostgresUserTenantNavigationReadPermissions` installs and attests exactly those
+three direct nondelegable column reads for the configured Global login. Runtime
+receives no User-table access; profile/audit columns, table-wide rights and writes
+remain denied. Fixed catalogue/role/ACL checks are deployment primitives, not
+stored business logic. The preference writer recognizes only this same compiled
+read inventory, retaining its separate mutation authority. A stored preference
+still grants neither membership nor tenant access.
+
+Global is an API deployment database login purpose, not a human role. These fixed
+database permissions cannot enforce authenticated-current-user equality: a stolen
+Global credential can enumerate user/preferred-tenant associations. This accepted
+trust boundary depends on API authorization and credential protection, not a
+claim that row-level security authenticates the human. No profile access follows.
+
+The old `user_tenant_navigation_read` routine and cluster-wide
+`event_user_navigation_owner`, `event_user_navigation_global` and
+`event_user_navigation_migrator` roles must be absent. Installation/readiness reject
+obsolete objects or grant drift without dropping, revoking or silently repairing
+them. Use a fresh isolated development cluster or a reviewed dependency-checked
+operator decommissioning; a new database alone does not remove cluster roles.
+No entity/schema migration or compatibility routine accompanies this cutover.
 
 ## Original Human Tenant Preference Mutation
 
@@ -64,7 +86,8 @@ Selecting a tenant imposes no tenant-status condition and grants no resource acc
 
 HumanTenantPreferenceStore accepts only the registered preparation's current
 mutation. Its native function can update only the exact user's
-last_active_tenant_id, updated_at and updated_by. Global has execute-only access;
+last_active_tenant_id, updated_at and updated_by. Global has execute-only mutation access
+plus the separate three-column navigation read described above;
 Runtime receives no direct user-table privilege. A separate canonical image
 function and contract attestation run before final source/lifetime checks.
 Missing membership causes whole-attempt rollback and false; cache invalidation

@@ -361,7 +361,9 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
         services.AddScoped<ITenantUserRepository, TenantUserRepository>();
         services.AddScoped<IUserTenantMembershipRepository, UserTenantMembershipRepository>();
-        services.AddScoped<IUserTenantNavigationRepository, UserTenantNavigationRepository>();
+        services.AddScoped<IUserTenantNavigationRepository>(provider => new UserTenantNavigationRepository(
+            provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+            provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IAdministrativeAuthorityRepository, AdministrativeAuthorityRepository>();
         services.AddScoped<ITenantUserProfileRepository, TenantUserProfileRepository>();
         services.AddScoped<ITenantUserRoleGrantRepository, TenantUserRoleGrantRepository>();

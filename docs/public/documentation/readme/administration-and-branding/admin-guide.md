@@ -17,6 +17,33 @@ context, and their membership checks still apply. A missing tenant selection
 is denied rather than treated as instance-wide creation; an existing event ID
 cannot substitute for the new-event creation identity.
 
+### User tenant navigation and database authority
+
+The API resolves navigation for the authenticated user only. It uses a saved
+tenant preference only when that tenant is still in the user's active membership
+list; otherwise it selects the latest active membership or no destination. A
+navigation result is a convenience, not permission to enter a tenant, and does
+not change the saved preference.
+
+The configured Global database login can read exactly the user's identifier,
+deleted flag and preferred tenant identifier through EF Core. Global is an API
+database purpose, not an administrator's human role. Runtime gains no User-table
+access, and profile fields, audit fields and preference writes remain separately
+restricted. Protect Global credentials: someone holding that database login can
+enumerate those user/preference associations even though the API selects only
+the authenticated user. Database row-level security does not authenticate a human
+using stolen application credentials.
+
+This pre-release cutover removes the old navigation routine and its capability
+roles. Startup refuses leftover `user_tenant_navigation_read` routines or
+`event_user_navigation_owner`, `event_user_navigation_global` and
+`event_user_navigation_migrator` roles rather than automatically deleting them or
+repairing permissions. For disposable development, use a fresh isolated PostgreSQL
+cluster; a new database in the same cluster does not remove shared roles. If data
+or shared roles must survive, arrange a reviewed dependency-checked transition
+before deployment. No new environment key or entity migration is needed; do not
+delete retained user data or broaden grants to bypass readiness.
+
 ### Setup credentials and bearer tokens
 
 On setup-protected routes, an invalid bearer token returns `401` even when the

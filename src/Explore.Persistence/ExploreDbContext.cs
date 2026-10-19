@@ -77,6 +77,14 @@ public partial class ExploreDbContext : DbContext
             throw new InvalidOperationException("tenant_lease_identity_changed");
     }
 
+    /// <summary>Requires an existing immutable owner; read admission must never mint a missing lease.</summary>
+    internal void RequireBoundTenantLease()
+    {
+        ValidateTenantLease();
+        if (!_tenantLeaseBound)
+            throw new InvalidOperationException("tenant_lease_not_bound");
+    }
+
     public override void Dispose()
     {
         ClearTenantLease();

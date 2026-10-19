@@ -387,6 +387,41 @@ against privileged database rewrites before admission. Null legacy payloads are
 not silently repaired. Preserve matching application/native definitions and a
 coherent backup checkpoint; no deployment or host-ready signal is issued here.
 
+## Navigation minimum-data read and explicit credential trust — 2026-10-19
+
+The maintainer explicitly approved configured Global SELECT on exactly User.Id,
+IsDeleted and LastActiveTenantId so all providers can use one ordinary EF Core
+projection instead of a navigation business routine. Authenticated-current-user
+equality and separate active-membership selection remain Application authority;
+neither a saved preference nor a navigation response grants tenant access.
+Runtime receives no User-table permission. Profile/audit fields and writes remain
+outside this read inventory; unrelated preference mutation authority stays narrow.
+
+This supports IVSD-F024/M024 minimum necessary authority and avoids copying user
+PII merely to choose navigation. The remaining credential-compromise risk is
+explicit, not eliminated: someone holding Global credentials can enumerate
+user/preferred-tenant associations. Those identifiers are protected operational
+metadata, not anonymous or harmless data. API subject checks and credential
+custody carry that boundary; tenant RLS does not authenticate a human credential
+holder. No new public data purpose, telemetry field or retention policy is added.
+
+Permission admission rejects copied/substituted identities, table/extra-column/
+write/grant-option authority and recoverable Runtime ownership, including dormant
+membership with revoked ordinary rights. Exact deployment-name lookup preserves
+accepted casing and punctuation. Old routines/cluster roles and ACL drift are
+rejected without destructive cleanup. Fresh development provisioning or reviewed
+dependency-checked decommissioning must preserve retained data rather than hide
+failed readiness through broad grants or automatic deletion.
+
+Evidence remains scoped: unchanged Application ownership/membership9 passed;
+initial native controls passed4/failed3 for missing EF authority/retirement.
+Independent reviewers found two guard edge cases, corrected before GREEN. The
+first expanded run passed39/failed1 because schema denial preceded typed role
+rejection; a catalog-only identity precheck corrected the ordering without extra
+rights or relaxed tests. Isolated Release299warnings/0errors31.71s then native
+40/0/0 in1m10.996s and preference8/0/0 in2m26.199s, all exit0. Complete provider,
+connector-interruption, zero-PII telemetry and workstream acceptance remain open.
+
 ## Recommendations
 
 1. Preserve all stable finding and reference IDs in a candidate-bound, machine-consumed security evidence register. A green check with no executed tests is not closure evidence.

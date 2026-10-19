@@ -25,6 +25,24 @@ accepting application traffic. Expected bodies and fingerprints remain exact:
 Runtime must reject an old or drifted installation, not normalize it, switch
 authority or repair it on demand.
 
+## Uncertain PostgreSQL session-lock reacquisition
+
+`RelationalNamedLock` preserves the original connection when a sent acquisition
+fails for an already-held advisory key. PostgreSQL session locks are reentrant:
+the command may have added a count before its failure reached C#. An attempted
+unlock could consume an earlier lease; closing the connection could release all
+earlier keys before their workflows settle. Neither is safe cleanup.
+
+The helper instead throws `named_lock_acquisition_cleanup_unconfirmed` with the
+original cause and returns no new lease. Earlier owners retain exclusion and
+release their known counts normally. A possible extra count can continue blocking
+other work until the physical backend ends or its state is reset. Do not retry
+indefinitely on that same session or mistake logical pooled-connection closure
+for confirmed physical cleanup: Npgsql can defer reset until the next use.
+Unwind the original workflow and its leases before recycling the owning session.
+This repair adds no permissions, business routines or replacement-session cleanup;
+it does not recover an aborted caller-owned transaction.
+
 ## Instance Onboarding State Across Restore
 
 The database is the authority for completed onboarding. Restore a completed

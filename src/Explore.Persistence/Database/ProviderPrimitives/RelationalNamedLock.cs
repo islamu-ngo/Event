@@ -229,6 +229,12 @@ internal static class RelationalNamedLock
                         await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
                     throw;
                 }
+
+                // A sent reentrant command may have added a count before failing. Neither
+                // unlocking nor closing can preserve the earlier leases with certainty.
+                // Keep their original session intact; any surplus count lasts until that
+                // physical session ends or is reset, rather than silently losing exclusion.
+                throw new InvalidOperationException("named_lock_acquisition_cleanup_unconfirmed", acquisitionFailure);
             }
             if (ownsConnection)
             {

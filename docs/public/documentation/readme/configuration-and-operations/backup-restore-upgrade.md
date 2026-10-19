@@ -26,6 +26,22 @@ Deploy matching native definitions with the application through the controlled
 migrator before reopening traffic. Runtime rejects stale or changed definitions
 rather than repairing them or selecting another database authority.
 
+## Interrupted PostgreSQL lock reacquisition
+
+If logs report `named_lock_acquisition_cleanup_unconfirmed`, the API could not
+confirm a repeated lock acquisition on an already-held key. It deliberately keeps
+the original session and earlier locks intact so another writer cannot enter
+while the original operation is still settling. That acquisition failed; no new
+lock lease or successful configuration change is implied.
+
+A possibly retained extra lock count can block later work. Let the owning
+operation unwind and release its earlier leases, then recycle that database
+session through normal application lifecycle handling. Do not repeatedly retry
+on the same session or forcibly close a connection while its earlier operation is
+still running. A pooled connection being logically closed does not itself prove
+that the backend ended or its lock state was already reset. No new database
+permissions or deployment settings are required.
+
 ## 1. What Must Be Backed Up
 
 Inventory the stores your selected topology actually uses:

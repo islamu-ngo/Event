@@ -1,0 +1,29 @@
+Change-Id: CHG-01M59KCYB76TK0A2Y6MEJNXW8W
+Title: "Preserve punctuated PostgreSQL bootstrap deployment logins"
+Type: fix
+Scope: self-hosting
+Summary: "Encode bootstrap deployment login literals without changing enrollment, privileges or exact installed-body attestation."
+Group: deployment-login-literals
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Accepted login dollar tags cannot terminate generated bootstrap SQL blocks. Identifier quoting, original enrollment and installed-body checks remain unchanged.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Install matching native definitions through the controlled migrator. Preserve declared login punctuation; stale definitions and changed enrollment still fail closed.

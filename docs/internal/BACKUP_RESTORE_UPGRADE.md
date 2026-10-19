@@ -13,7 +13,7 @@ This runbook covers self-hosted deployments using the repository Docker Compose 
 
 ## Native PostgreSQL login identity
 
-Navigation and tenant-preference native contracts serialize declared login names
+Bootstrap, navigation and tenant-preference native contracts serialize declared login names
 as complete PostgreSQL escape-string literals, including backslash, apostrophe
 and dollar escaping. This preserves the exact enrolled identity when a name
 contains a dollar-quote delimiter used by a generated routine or readiness

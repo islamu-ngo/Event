@@ -8,7 +8,9 @@ namespace Explore.Persistence.Security;
 
 public static partial class PostgresConfigurationManifestBootstrapContract
 {
-    private static string Text(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+    /// <summary>Preserves literal text without terminating an enclosing dollar-quoted SQL body.</summary>
+    private static string Text(string value) => "E'" + value.Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("'", "''", StringComparison.Ordinal).Replace("$", "\\044", StringComparison.Ordinal) + "'";
     private static string Values(IEnumerable<string> values) => "ARRAY[" + string.Join(", ", values.Select(Text)) + "]::text[]";
     private static string Ids(string tag) => $"SELECT value::uuid FROM pg_catalog.jsonb_array_elements_text(p_scope->{Text(tag)}) value";
     private static string Ticks(string value) => $"((EXTRACT(EPOCH FROM {value}) * 10000000)::bigint + 621355968000000000)";

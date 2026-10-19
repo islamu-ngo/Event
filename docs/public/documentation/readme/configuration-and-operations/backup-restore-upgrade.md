@@ -18,7 +18,9 @@ successful file copy alone is not evidence of crash safety or recovery.
 Preserve the exact declared Migrator, Global and Runtime login names when
 restoring or installing native database contracts. Supported punctuation in a
 login name remains identity data. Do not strip punctuation or rename these
-logins to accommodate SQL generation.
+logins to accommodate SQL generation. This includes bootstrap installation as
+well as navigation and tenant-preference contracts; dollar tags, apostrophes and
+backslashes must preserve the original login identity.
 
 Deploy matching native definitions with the application through the controlled
 migrator before reopening traffic. Runtime rejects stale or changed definitions

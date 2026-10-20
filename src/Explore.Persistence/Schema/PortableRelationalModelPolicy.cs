@@ -701,7 +701,10 @@ internal static partial class PortableRelationalModelPolicy
 
     private static string NormalizeBooleanLiterals(string sql, string providerName) =>
         providerName == SqlServerProvider
-            ? TrueLiteral().Replace(FalseLiteral().Replace(sql, "0"), "1")
+            ? SqlServerBooleanTokens().Replace(sql, static match =>
+                match.Groups["boolean"].Success
+                    ? (match.Value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0")
+                    : match.Value)
             : sql;
 
     private static string NormalizeSqlServerBooleanPredicates(
@@ -742,11 +745,11 @@ internal static partial class PortableRelationalModelPolicy
     [GeneratedRegex(@"\bcursor\s*>=\s*0\b", RegexOptions.IgnoreCase)]
     private static partial Regex NonnegativeCursor();
 
-    [GeneratedRegex(@"\bfalse\b", RegexOptions.IgnoreCase)]
-    private static partial Regex FalseLiteral();
-
-    [GeneratedRegex(@"\btrue\b", RegexOptions.IgnoreCase)]
-    private static partial Regex TrueLiteral();
+    // Model predicates use SQL string literals and quoted identifiers. Match those
+    // complete tokens first so their contents never become SQL Server bit values.
+    [GeneratedRegex("""'(?:''|[^'])*'|"(?:""|[^"])*"|\[(?:\]\]|[^\]])*\]|(?<boolean>\b(?:false|true)\b)""",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SqlServerBooleanTokens();
 
     [GeneratedRegex(@"^\((?<left>.+)\)\s*=\s*\((?<right>.+)\)$", RegexOptions.Singleline)]
     private static partial Regex PredicateEquivalence();

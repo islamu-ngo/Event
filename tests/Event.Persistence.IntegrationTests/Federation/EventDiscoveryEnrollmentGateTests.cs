@@ -11,6 +11,7 @@ using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Federation;
 
@@ -488,6 +489,43 @@ public sealed class EventDiscoveryEnrollmentGateTests
             }
         }
         await Assert.That(EventDiscoveryEnrollmentGate.TryRequireCurrent(context)).IsFalse();
+    }
+
+    [Test]
+    public async Task CompletedLeaseCleanupFailureDoesNotReplaceTheComposedOutcomeDuringScopedDisposal()
+    {
+        await using var original = CreateContext();
+        await using var contender = CreateContext();
+        var services = new ServiceCollection();
+        services.AddScoped<IEventDiscoveryEnrollmentGate>(_ => new EventDiscoveryEnrollmentGate(original));
+        await using var provider = services.BuildIsolatedServiceProvider(validateScopes: true);
+        var scope = provider.CreateAsyncScope();
+        var gate = scope.ServiceProvider.GetRequiredService<IEventDiscoveryEnrollmentGate>();
+        var lease = await gate.AcquireAsync();
+        await original.Database.GetDbConnection().CloseAsync();
+
+        var cleanup = await Assert.ThrowsAsync<InvalidOperationException>(() => lease.DisposeAsync().AsTask());
+        await Assert.That(cleanup.Message).IsEqualTo("discovery_enrollment_cleanup_lost_custody");
+        await Assert.That(EventDiscoveryEnrollmentGate.TryRequireCurrent(original)).IsFalse();
+        await Assert.That(original.Database.CurrentTransaction).IsNull();
+        await using var nextGate = new EventDiscoveryEnrollmentGate(contender);
+        await using var next = await nextGate.AcquireAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        nextGate.RequireCurrent();
+
+        // The lease still owns its first cleanup failure; DI only owns the adapter.
+        var repeated = await Assert.ThrowsAsync<InvalidOperationException>(() => lease.DisposeAsync().AsTask());
+        await Assert.That(repeated).IsSameReferenceAs(cleanup);
+        var primary = new InvalidOperationException("Original operation failure retained by its caller.");
+        var combined = new AggregateException(primary, cleanup);
+        var observed = await Assert.ThrowsAsync<AggregateException>(async () =>
+        {
+            await using (scope)
+                throw combined;
+        });
+        await Assert.That(observed).IsSameReferenceAs(combined);
+        await Assert.That(observed.InnerExceptions[0]).IsSameReferenceAs(primary);
+        await Assert.That(observed.InnerExceptions[1]).IsSameReferenceAs(cleanup);
+        nextGate.RequireCurrent();
     }
 
     private static async Task RequireFixedResourceBlockedAsync(ExploreDbContext contender)

@@ -240,6 +240,15 @@ internal sealed class EventDiscoveryEnrollmentGateCustody : IAsyncDisposable
             return _cleanup ??= CleanupCoreAsync();
     }
 
+    internal bool HasCompletedCleanup
+    {
+        get
+        {
+            lock (_lifecycle)
+                return _cleanup?.IsCompleted == true;
+        }
+    }
+
     private async Task CleanupCoreAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);

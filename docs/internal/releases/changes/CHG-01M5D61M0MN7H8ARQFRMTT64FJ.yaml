@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5D61M0MN7H8ARQFRMTT64FJ
+Title: "Read localization configured status through EF Core"
+Type: fix
+Scope: localization
+Summary: "Keep localization scope selection in C# and read only binding-existence metadata through EF Core instead of a database business routine."
+Group: localization-ef-configured-status
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Runtime and Global receive fixed SELECT access to four non-secret binding metadata columns. C# selects the current tenant or instance; stolen database credentials can enumerate that metadata across scopes. Private binding fields, secret values and writes remain excluded.
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Matching installation tooling admits the fixed metadata profile and rejects the retired localization routine or execution roles without automatically dropping database objects.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Existing Runtime and Global credentials are used; no additional localization database credential is required.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Apply matching migration tooling, preserve the fixed four-column grants and do not restore the retired status routine or broaden table permissions.

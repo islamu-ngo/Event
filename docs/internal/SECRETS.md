@@ -1641,6 +1641,28 @@ Application databases store only non-secret binding/reference metadata. The
 second source after absence or failure. APIs and UI expose only value-free status;
 they do not prefill, persist, or read back deployment secret values.
 
+### Localization configured-status metadata
+
+`LocalizationSecretStatusReader` uses EF Core `AnyAsync` on the original selected
+context. C# applies the exact localization key, empty qualifier, instance scope
+and selected-tenant scope; the result is a Boolean, never a secret value or
+provider reference. PostgreSQL installs fixed SELECT access only to
+`SecretBinding.SettingKey`, `Qualifier`, `SettingScopeId` and `ScopeId` for the
+declared Runtime and Global accounts. There are no binding-write or table-wide
+read grants and no status stored routine.
+
+Installation requires the former localization routine and execution roles to be
+absent. It does not drop existing database objects or repair permission drift.
+
+`SecretBinding` retains its existing non-RLS state. Adding RLS just for this
+projection would break other fixed binding owners and their source attestations;
+it is not needed to move scope selection into the application. Consequently a
+stolen Runtime or Global database credential can enumerate those four metadata
+columns across binding rows, bypassing C# scope selection. It still cannot use
+this grant to read private binding/reference columns or obtain secret values
+from the selected external authority. This is an intentional application-owned
+authority boundary, not a claim of database-enforced metadata row isolation.
+
 Reporting provider secrets are server-side tenant settings. API keys and webhook secrets for Osprey and Coop must never be returned in browser DTOs, HAL links, health checks, logs, metrics, traces, screenshots, issue templates, or support bundles; browser/control-plane surfaces may expose only configured/source/editability metadata. Routing update actions are write-only for secret values: supplying a new Osprey/Coop API key or webhook secret rotates that tenant value, while omitting the field or sending it blank preserves the currently stored secret. There is no implicit clear-secret endpoint and no readback path; confirm rotation through configured flags, provider readiness checks, and secret-provider audit trails.
 
 Current migrated surface: Cerbos authorization settings expose endpoint and Admin API credential ownership metadata. `AUTHORIZATION_PROVIDER` is non-secret deployment intent, while `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` are server-side deployment secrets resolved from environment configuration or Infisical. The browser normally sees only configured flags and ownership metadata. During an explicit setup sync, an operator may instead submit a complete one-time pair; it exists only in the Blazor server circuit and request pipeline, overrides deployment credentials for that call, is cleared after the call, and is never written to `SystemSetting`, returned by an API, or logged. `CERBOS_ADMIN_PASSWORD_HASH` is the Cerbos server verifier and cannot authenticate an Admin API client; keep the matching plaintext password only in deployment secrets or enter it for one sync. Reporting provider secret keys are registered as sensitive hierarchical settings for the moderation routing foundation. Listmonk API username/key values are registered server-side secret bindings; admin updates are write-only and browser DTOs expose configured flags only. Stripe `payments.stripe.platform_secret_key` and `payments.stripe.webhook_secret` are instance/server-only definitions for self-hoster-owned platform credentials. Promotion lookup resolves the qualified instance-only `promotions.code_lookup_hmac_key` binding for every digest operation. SMTP, S3, OAuth, localization/TMS, and AI keys still have area-specific storage/UI paths and must not be documented as fully migrated until their resolvers use the shared ownership metadata consistently.

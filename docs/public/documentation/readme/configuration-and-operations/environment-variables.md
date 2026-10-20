@@ -370,6 +370,24 @@ through another role. Admission rejects binding privileges on any other role in
 Global's transitive membership graph, including ADMIN-only memberships that
 could delegate access later.
 
+Localization's configured-status check uses the existing Runtime or Global
+account; no additional credential is required. Matching migration tooling grants
+SELECT only on four secret-binding metadata fields: setting key, qualifier,
+scope type and scope ID. The API selects the instance or current tenant in C#
+and returns only whether the localization binding is configured. It does not
+read back a secret, expose a provider reference or grant binding writes.
+
+These metadata rows are not protected by PostgreSQL row-level security. Someone
+who steals either database credential can enumerate those four fields across
+scopes, even though normal API calls apply tenant selection. Private binding
+fields and externally stored secret values are not included in this grant.
+Keep both accounts confined to trusted backend processes; do not add broader
+table permissions or restore the retired localization-status routine.
+
+If startup rejects retained localization routines or roles, use a reviewed
+development database transition; installation does not remove them automatically.
+Do not delete retained data merely to pass readiness.
+
 This development cutover requires a fresh isolated PostgreSQL instance/cluster
 without the obsolete `event_external_login_authentication_owner`,
 `event_external_login_authentication_migrator` and

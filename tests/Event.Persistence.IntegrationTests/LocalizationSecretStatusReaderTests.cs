@@ -7,11 +7,16 @@ using Explore.Domain.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -51,13 +56,16 @@ public sealed class LocalizationSecretStatusReaderTests(PostgreSqlContainerFixtu
         migration.SecretBindings.Add(Binding(SecretScope.Instance, null));
         await migration.SaveChangesAsync();
 
-        await using var transaction = await caller.Database.BeginTransactionAsync();
-        var connection = caller.Database.GetDbConnection();
-        await Assert.That(await reader.IsConfiguredAsync()).IsTrue();
-        await Assert.That(ReferenceEquals(caller.Database.CurrentTransaction, transaction)).IsTrue();
-        await Assert.That(ReferenceEquals(caller.Database.GetDbConnection(), connection)).IsTrue();
-        await Assert.That(caller.ChangeTracker.Entries().Any()).IsFalse();
-        await transaction.CommitAsync();
+        await caller.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await caller.Database.BeginTransactionAsync();
+            var connection = caller.Database.GetDbConnection();
+            await Assert.That(await reader.IsConfiguredAsync()).IsTrue();
+            await Assert.That(ReferenceEquals(caller.Database.CurrentTransaction, transaction)).IsTrue();
+            await Assert.That(ReferenceEquals(caller.Database.GetDbConnection(), connection)).IsTrue();
+            await Assert.That(caller.ChangeTracker.Entries().Any()).IsFalse();
+            await transaction.CommitAsync();
+        });
         var denied = await Assert.ThrowsAsync<Npgsql.PostgresException>(() =>
             caller.SecretBindings.AsNoTracking().ToListAsync());
         await Assert.That(denied!.SqlState).IsEqualTo(Npgsql.PostgresErrorCodes.InsufficientPrivilege);
@@ -69,43 +77,77 @@ public sealed class LocalizationSecretStatusReaderTests(PostgreSqlContainerFixtu
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(role));
         if (role == PrimaryDatabaseRole.Runtime)
             options.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
-        return new(options.Options) { TenantContext = tenant.HasValue ? new SelectedTenant(tenant.Value) : null };
+        var context = new ExploreDbContext(options.Options)
+            { TenantContext = tenant.HasValue ? new SelectedTenant(tenant.Value) : null };
+        context.BindTenantLease();
+        return context;
     }
 
     [Test]
-    public async Task UndeclaredExecutorIsRejectedWithoutRepairingItsGrant()
+    public async Task PrivateColumnGrantIsRejectedWithoutRepairingItsGrant()
     {
         await using var migration = Open(PrimaryDatabaseRole.Migrator);
-        var executor = $"status_executor_{Guid.CreateVersion7():N}";
-        var function = PostgresLocalizationSecretStatusContract.FunctionSql(migration);
+        var entity = migration.Model.FindEntityType(typeof(SecretBinding))!;
+        var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        var names = migration.GetService<ISqlGenerationHelper>();
+        string table = names.DelimitIdentifier(store.Name, store.Schema);
+        string column = entity.FindProperty(nameof(SecretBinding.EnvironmentVariableName))!.GetColumnName(store)!;
+        string login = fixture.NativeQueueEnrollment.GlobalLogin;
         await migration.Database.ExecuteSqlRawAsync(
-            $"CREATE ROLE \"{executor}\" NOLOGIN; GRANT EXECUTE ON FUNCTION {function}(uuid) TO \"{executor}\"");
+            $"GRANT SELECT ({names.DelimitIdentifier(column)}) ON {table} TO {names.DelimitIdentifier(login)}");
         try
         {
             await using var caller = Open(PrimaryDatabaseRole.Global);
-            await Assert.ThrowsAsync<Npgsql.PostgresException>(() =>
-                PostgresLocalizationSecretStatusContract.ReadAsync(caller, fixture.NativeQueueEnrollment, default));
+            await caller.Database.OpenConnectionAsync();
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresLocalizationSecretStatusReadPermissions.RequireReadyAsync(caller, fixture.NativeQueueEnrollment));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(migration, fixture.NativeQueueEnrollment));
             await using var command = migration.Database.GetDbConnection().CreateCommand();
             await migration.Database.OpenConnectionAsync();
-            command.CommandText = $"SELECT pg_catalog.has_function_privilege('{executor}', '{function}(uuid)', 'EXECUTE')";
+            command.CommandText = "SELECT pg_catalog.has_column_privilege(@login,@table,@column,'SELECT')";
+            command.Parameters.Add(new NpgsqlParameter("login", login));
+            command.Parameters.Add(new NpgsqlParameter("table", table));
+            command.Parameters.Add(new NpgsqlParameter("column", column));
             await Assert.That((bool)(await command.ExecuteScalarAsync())!).IsTrue();
         }
         finally
         {
             await migration.Database.ExecuteSqlRawAsync(
-                $"REVOKE EXECUTE ON FUNCTION {function}(uuid) FROM \"{executor}\"; DROP ROLE \"{executor}\"");
+                $"REVOKE SELECT ({names.DelimitIdentifier(column)}) ON {table} FROM {names.DelimitIdentifier(login)}");
         }
     }
 
     [Test]
-    public async Task RuntimeSessionCannotChooseAnotherTenant()
+    public async Task RuntimeReaderCannotChooseAnotherTenant()
     {
-        await using var caller = Open(PrimaryDatabaseRole.Runtime, Guid.CreateVersion7());
+        await fixture.ResetAsync();
+        Guid selected = Guid.CreateVersion7(), foreign = Guid.CreateVersion7();
+        await using var migration = Open(PrimaryDatabaseRole.Migrator);
+        migration.SecretBindings.Add(Binding(SecretScope.Tenant, foreign));
+        await migration.SaveChangesAsync();
+        await using var caller = Open(PrimaryDatabaseRole.Runtime, selected);
         await caller.Database.OpenConnectionAsync();
-        await using var command = caller.Database.GetDbConnection().CreateCommand();
-        command.CommandText = $"SELECT {PostgresLocalizationSecretStatusContract.FunctionSql(caller)}(@tenant)";
-        command.Parameters.Add(new Npgsql.NpgsqlParameter("tenant", Guid.CreateVersion7()));
-        await Assert.ThrowsAsync<Npgsql.PostgresException>(() => command.ExecuteScalarAsync());
+        using var services = new ServiceCollection().AddSingleton(caller)
+            .AddSingleton(fixture.NativeQueueEnrollment).BuildServiceProvider();
+        var reader = ActivatorUtilities.CreateInstance<LocalizationSecretStatusReader>(services);
+        await Assert.That(await reader.IsConfiguredAsync()).IsFalse();
+        using var missingEnrollment = new ServiceCollection().BuildServiceProvider();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            new LocalizationSecretStatusReader(caller, missingEnrollment).IsConfiguredAsync());
+        await using var unselected = Open(PrimaryDatabaseRole.Runtime);
+        await unselected.Database.OpenConnectionAsync();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            PostgresLocalizationSecretStatusReadPermissions.RequireReadyAsync(unselected, fixture.NativeQueueEnrollment));
+        await migration.Database.OpenConnectionAsync();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            PostgresLocalizationSecretStatusReadPermissions.RequireReadyAsync(migration, fixture.NativeQueueEnrollment));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        {
+            caller.TenantContext = new SelectedTenant(foreign);
+            return reader.IsConfiguredAsync();
+        });
+        await Assert.That(caller.TenantFilterTenantId).IsEqualTo(selected);
     }
 
     private static Tenant Tenant(Guid id) => new()

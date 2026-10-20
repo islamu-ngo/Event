@@ -3,6 +3,14 @@ ABOUTME: Prioritizes runtime rules from TenantContext, query filters, and govern
 
 # Multi-Tenancy
 
+Tenant isolation supports application-owned authorization; it does not transfer
+business authority to the database. EF query filters and PostgreSQL RLS constrain
+the rows an ordinary selected tenant can access. Authorized instance-wide work
+uses an explicitly selected purpose with fixed storage rights and C# access checks,
+not Runtime promotion. Existing native capability descriptions below are current
+mechanisms to reassess during the EF-first cutover, not a mandate to keep business
+logic in stored routines. See [the accepted decision](adr/ADR-application-owned-persistence.md).
+
 A PostgreSQL database context seals tenant identity for its connection lease.
 Each reader, scalar and nonquery command validates that identity before execution;
 replacing the tenant context or mutating its tenant ID fails closed. Disposal
@@ -11,15 +19,15 @@ clears the sealed identity and request state before context-pool reuse.
 ## Global reference catalogue and visitor metadata reads
 
 `LookupDataCache` reads its 17 declared reference entity types through
-`PostgresGlobalLookupCatalogueContract` on PostgreSQL. The caller remains the
-original tenantless Runtime connection in a Serializable transaction. A dedicated
-NOLOGIN function owner has only the declared source-column privileges; Runtime
-receives execution, not source-table access or owner-role promotion. Installation
-and admission attest the function body, role edges, source shape and RLS policies.
+EF Core and `GlobalLookupCatalogueProviderOperations`. On PostgreSQL,
+`PostgresLookupCatalogueReadPermissions` installs/attests fixed Runtime column
+reads; the obsolete catalogue business routine is retired. The caller remains
+the original tenantless Runtime connection in a Serializable transaction, without
+owner-role promotion or private `RolePermission`/`UserPii` access.
 `EventType` is the one tenant-capable reference: only its global (`TenantId IS
-NULL`) rows enter this catalogue. Unknown selectors and tenant-selected sessions
-cannot use it. EF still materializes the mapped entities; cache refresh and load
-failure semantics are unchanged.
+NULL`) rows enter this catalogue. Tenant-selected sessions cannot use it. EF
+materializes the mapped entities; cache refresh publishes the complete image only
+after all reads succeed, retaining the previous complete image on failure.
 
 Visitor HAL metadata uses `IInstanceTenantSettingsReader` on the selected original
 context instead of raw system/tenant repository queries. One complete

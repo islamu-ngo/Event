@@ -4,7 +4,7 @@ ABOUTME: Captures key runtime patterns and boundaries that are not obvious from 
 # Technical Architecture
 
 > **Audience:** Contributors | Architects | Operators | Integrators | AI agents
-> **Status:** Implemented
+> **Status:** Mixed
 > **Owner:** Contributor Experience
 > **Last Verified:** 2026-09-03
 > **Source Anchors:** `src/Explore.API/Program.cs`, `src/Explore.Application/`, `src/Explore.Domain/`, `src/Explore.Persistence/`, `src/Explore.Infrastructure/`, `src/Explore.Blazor/`, `src/Explore.AppHost/`
@@ -183,6 +183,24 @@ DDL rather than an EF Core migration.
 
 ## Persistence Capability Ladder
 
+### Authority belongs to the application
+
+The accepted direction is **a C# application with a database storage engine, not
+two applications with competing business authority**. Domain owns business
+invariants and state transitions; Application owns authorization requirements,
+workflows, concurrency coordination and completion. Persistence implements their
+ports with EF Core. Controllers remain transport adapters. The execution flow is
+HTTP/API → Application workflows → Domain rules → EF Core persistence → database;
+this is a runtime flow, not a reversal of inward project dependencies.
+
+The database supplies atomic transactions, foreign keys, uniqueness, declarative
+constraints and useful tenant isolation. RLS (row-level security) limits which
+rows a selected database session can access; it is defence in depth, not a second
+RBAC, business-rule engine or workflow coordinator. The approved application
+purpose must have the fixed permissions necessary to perform its legitimate work.
+See [the accepted decision](adr/ADR-application-owned-persistence.md) for the
+credential-compromise boundary and the current implementation transition.
+
 Persistence code follows one ordered capability ladder:
 
 1. **EF Core LINQ and set-based APIs** are the default for reads and mutations.
@@ -194,6 +212,15 @@ Persistence code follows one ordered capability ladder:
    SQL, provider-name checks, lock commands, and migration-generator coupling
    live only under `Explore.Persistence/Database/ProviderPrimitives` or
    `Explore.Persistence/Schema/ProviderPrimitives`.
+
+Use tracked changes, LINQ, transactions and appropriate EF set-based APIs before
+handwritten business SQL. EF-generated SQL is normal: EF is the abstraction, not
+a promise that the database executes no SQL. C# retains expected-state/concurrency
+checks, affected-row validation, retry/idempotency decisions and atomic outbox
+completion. A provider limitation may justify a small locking or storage primitive,
+not moving the entire use case into a stored procedure or privileged routine.
+Retire existing business routines through a verified C# cutover; do not preserve
+them for compatibility or drop their controls without the replacement.
 
 `EFCore.NamingConventions` owns ordinary snake-case identifiers.
 `RelationalModelNamespace` applies the configured PostgreSQL/SQL Server schema
@@ -214,6 +241,10 @@ requires a demonstrated EF capability gap, a parameterized implementation,
 real-engine tests for every affected provider, an architecture allowlist, and
 operator documentation. Ordinary repository branching or raw SQL is not an
 exception path.
+
+That inventory describes existing implementation, not a blanket requirement to
+retain its SQL. Reassess each primitive against the application-owned decision;
+queue eligibility, business ordering and workflow completion still belong in C#.
 
 `GuestRegistrationCapabilityRepository` owns exact guest-order recovery reads,
 order fencing, and monotonic status-promise CAS, returning Domain entities to

@@ -3,6 +3,24 @@
 
 # Security
 
+## Application authority and database defence
+
+C# Domain/Application workflows own authorization, business rules, concurrency
+coordination and completion. EF Core is the default persistence abstraction;
+database transactions, integrity constraints and tenant RLS support that authority.
+RLS restricts a session's accessible rows; it does not replace application access
+checks or orchestrate business actions. An approved application purpose needs the
+fixed storage permissions necessary for its legitimate operations.
+
+The [accepted persistence decision](adr/ADR-application-owned-persistence.md)
+records the separate credential-only compromise risk and approval boundary.
+Do not use that accepted risk to repeatedly require permission approvals or push
+business logic into privileged SQL. Native routine descriptions below record
+existing mechanisms, not a requirement to preserve database business authority;
+replace them through verified C# workflows rather than silently bypassing controls.
+
+## Existing PostgreSQL capability support
+
 `PostgresPrivilegeGuard` generates read-only PostgreSQL assertions from a trusted,
 source-declared contract of dedicated roles, routines, relations and memberships.
 It checks effective table/column privileges, grant options, role attributes,

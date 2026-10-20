@@ -35,6 +35,8 @@ ISLAMU Event is a **self-hostable event discovery and management platform** for 
 
 The public ISLAMU instance is Islamic-focused, but the software itself is **purpose-agnostic, white-label, and designed to be rebranded for any event ecosystem**.
 
+- **Application-owned logic, EF-first persistence:** C# Domain/Application workflows own authorization, business rules and concurrency; EF Core handles ordinary storage. The database provides transactions, constraints and tenant-isolation safeguards—not a competing business application. See the [architecture guide](docs/public/documentation/readme/getting-started/architecture-and-request-flows.md#application-authority-and-database-storage) and [accepted engineering decision](docs/internal/adr/ADR-application-owned-persistence.md). The SQL-to-EF cutover is ongoing.
+
 ## ✨ Who It Serves
 
 ### Event Seekers

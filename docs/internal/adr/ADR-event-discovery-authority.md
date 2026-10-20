@@ -3,6 +3,14 @@
 Status: Implemented; adversarial native repairs verified, real-browser and attendee evaluation gates remain open.
 Scope: Public discovery membership, current disclosure, native transaction ordering.
 
+Persistence placement update (2026-10-20): the
+[application-owned persistence decision](ADR-application-owned-persistence.md)
+supersedes the assumption that database routines must own business authority.
+The native mechanisms below describe the existing implementation, not the target
+architecture. Preserve discovery membership, ordering, isolation and atomicity
+when replacing them with coordinated C#/EF workflows; do not treat this note as
+an already implemented cutover or permission to remove controls silently.
+
 ## Decision
 
 Freeze a finite ordered set of canonical source references, not card payloads.

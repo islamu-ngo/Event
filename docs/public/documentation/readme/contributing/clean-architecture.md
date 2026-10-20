@@ -7,10 +7,26 @@ description: Understand layer ownership, CQRS request flow, repository boundarie
 ISLAMU Event strictly enforces Clean Architecture. Business domain rules are completely isolated from web frameworks, persistence mechanisms, and third-party SDKs. Dependencies point inward:
 
 ```
-Domain ──> Application ──> Persistence / Infrastructure ──> API & BFF Composition
+API / Composition ──> Persistence / Infrastructure ──> Application ──> Domain
 ```
 
 *(Note: The arrows describe compile-time project dependencies, not runtime request execution flow).*
+
+## Application authority, EF-first storage
+
+The C# backend owns authorization, business rules, workflows, concurrency
+coordination and completion. "API-owned" does not mean putting those rules in
+controllers: Application coordinates the use case, Domain owns its rules, and
+Persistence implements storage with EF Core/LINQ and supported provider libraries.
+The database supplies transactions, foreign keys, uniqueness, constraints and
+useful tenant isolation—not a second business application built from stored
+procedures or privileged routines.
+
+Necessary fixed permissions for an approved workflow are normal. Narrow roles and
+row-level security remain supporting safeguards, not reasons to move business
+authority into SQL. Existing native business paths are being replaced; this is
+the accepted direction, not a claim that the SQL-to-EF cutover is complete. See
+[the architecture and storage boundary](../getting-started/architecture-and-request-flows.md#application-authority-and-database-storage).
 
 ---
 

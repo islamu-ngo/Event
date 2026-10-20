@@ -44,6 +44,7 @@ These rules are **non-negotiable**. Violations break architectural integrity.
 | 9 | UserId extraction fallback is `sub` -> `nameidentifier` -> `sid` | Provider compatibility; claim name variations |
 | 10 | Use file-scoped namespaces | C# 10+ convention; cleaner code |
 | 11 | Source code is self-documenting; legacy ABOUTME retired for code | Clean Architecture naming + XML doc summaries; see [policy below](#header--file-metadata-policy-natural-metadata--code-retirement) |
+| 12 | C# owns business authority; persistence is EF-first storage | Domain/Application own rules, authorization, workflows and concurrency; database safeguards support legitimate application work, not a competing SQL application. See [the accepted decision](adr/ADR-application-owned-persistence.md). |
 
 **For detailed examples**: See `QUICK_REFERENCE.md` and relevant skills.
 

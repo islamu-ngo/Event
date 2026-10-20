@@ -1,11 +1,17 @@
+using System.Data;
+using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -276,6 +282,158 @@ public sealed class UserTenantNavigationContractTests(PostgreSqlContainerFixture
             await context.Users.IgnoreAutoIncludes().AsNoTracking()
                 .Select(user => new { user.Id, user.IsDeleted, user.LastActiveTenantId }).Take(1).ToArrayAsync();
         });
+    }
+
+    [Test]
+    public async Task ConfiguredRetryCannotReanchorNavigationToAReplacementBackend()
+    {
+        CancellationToken token = TestContext.Current!.Execution.CancellationToken;
+        Guid subject = Guid.CreateVersion7(), preference = Guid.CreateVersion7();
+        await using (var strategyContext = Open())
+        {
+            strategyContext.BindTenantLease();
+            await strategyContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var seed = Open();
+                seed.BindTenantLease();
+                await using var humanGate = new HumanSecuritySourceGate(seed);
+                await using var human = await humanGate.AcquireAsync(token);
+                await using var discoveryGate = new EventDiscoveryEnrollmentGate(seed);
+                await using var discovery = await discoveryGate.AcquireAsync(token);
+                seed.Users.Add(new User
+                {
+                    Id = subject,
+                    LastActiveTenantId = preference,
+                    ConcurrencyStamp = Guid.CreateVersion7(),
+                    CreatedAt = DateTime.UtcNow,
+                    Pii = null!
+                });
+                await seed.SaveChangesAsync(token);
+            });
+        }
+
+        var factory = new GlobalExploreDbContextFactory(
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
+        await using (var configured = await factory.CreateDbContextAsync(token))
+            await Assert.That(configured.Database.CreateExecutionStrategy().RetriesOnFailure).IsTrue();
+        var repository = new UserTenantNavigationRepository(factory, fixture.NativeQueueEnrollment);
+        using var fault = new NavigationRetryFault();
+        var healthy = await repository.GetNavigationUserAsync(subject, token);
+        await Assert.That(healthy).IsNotNull();
+        await Assert.That(healthy!.Id).IsEqualTo(subject);
+        await Assert.That(healthy.LastActiveTenantId).IsEqualTo(preference);
+        await Assert.That(healthy.IsDeleted).IsFalse();
+        await Assert.That(healthy.Pii).IsNull();
+        await Assert.That(fault.WarmReads).IsGreaterThanOrEqualTo(1);
+
+        fault.Arm();
+        User? escaped = null;
+        Exception? failure = null;
+        try
+        {
+            escaped = await repository.GetNavigationUserAsync(subject, token);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+        string observation = $"failure_type={failure?.GetType().FullName ?? "<none>"}; fault_count={fault.Faults}; escaped_user={escaped is not null}; replacement_observed={fault.ReplacementBackendObserved}; same_owner={fault.SameOwnerOnSubsequentReads}";
+        await Assert.That(fault.Faults).IsEqualTo(1).Because(observation);
+        await Assert.That(fault.OriginalBackend).IsGreaterThan(0);
+        await Assert.That(fault.FaultWasTransient).IsTrue();
+        await Assert.That(fault.ClosedOriginal).IsTrue();
+        await Assert.That(fault.SameOwnerOnSubsequentReads).IsTrue().Because(observation);
+        if (escaped is not null)
+        {
+            await Assert.That(fault.ReplacementBackendObserved).IsTrue().Because(observation);
+            await Assert.That(escaped.Id).IsEqualTo(subject);
+            await Assert.That(escaped.LastActiveTenantId).IsEqualTo(preference);
+        }
+        await Assert.That(failure is UnauthorizedAccessException).IsTrue()
+            .Because("navigation must not renew its original backend witness during a configured retry; " + observation);
+        await Assert.That(escaped).IsNull();
+    }
+
+    private sealed class NavigationRetryFault : IObserver<DiagnosticListener>,
+        IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly IDisposable listeners;
+        private readonly System.Collections.Concurrent.ConcurrentBag<IDisposable> subscriptions = [];
+        private ExploreDbContext? originalContext;
+        private NpgsqlConnection? originalConnection;
+        private DbContextId originalLease;
+        private bool armed;
+        public int WarmReads { get; private set; }
+        public int Faults { get; private set; }
+        public int OriginalBackend { get; private set; }
+        public bool FaultWasTransient { get; private set; }
+        public bool ClosedOriginal { get; private set; }
+        public bool ReplacementBackendObserved { get; private set; }
+        public bool SameOwnerOnSubsequentReads { get; private set; } = true;
+
+        public NavigationRetryFault() => listeners = DiagnosticListener.AllListeners.Subscribe(this);
+
+        public void Arm()
+        {
+            if (originalContext is null || WarmReads == 0)
+                throw new InvalidOperationException("A genuine successful navigation read must precede the fault.");
+            armed = true;
+        }
+
+        public void OnNext(DiagnosticListener listener)
+        {
+            if (listener.Name == "Microsoft.EntityFrameworkCore")
+                subscriptions.Add(listener.Subscribe(this, name => name == RelationalEventId.CommandExecuted.Name));
+        }
+
+        public void OnNext(KeyValuePair<string, object?> diagnostic)
+        {
+            if (diagnostic.Value is not CommandExecutedEventData command
+                || command.ExecuteMethod != DbCommandMethod.ExecuteReader
+                || command.Context is not ExploreDbContext context
+                || command.Command.Connection is not NpgsqlConnection connection)
+                return;
+            if (!armed)
+            {
+                originalContext ??= context;
+                if (ReferenceEquals(context, originalContext)) WarmReads++;
+                return;
+            }
+            if (!ReferenceEquals(context, originalContext))
+                return;
+            context.RequireBoundTenantLease();
+            if (context.TenantFilterTenantId is not null || context.IsTenantFilterBypassed
+                || context.IsConfigurationInstanceImportOwner || connection.State != ConnectionState.Open
+                || !ReferenceEquals(context.Database.GetDbConnection(), connection)
+                || context.Database.CurrentTransaction is not null)
+                throw new InvalidOperationException("The fault must target the actual sealed-null Global navigation owner.");
+            if (Faults != 0)
+            {
+                SameOwnerOnSubsequentReads &= context.ContextId == originalLease
+                    && ReferenceEquals(connection, originalConnection);
+                ReplacementBackendObserved |= connection.ProcessID != OriginalBackend;
+                return;
+            }
+            originalLease = context.ContextId;
+            originalConnection = connection;
+            OriginalBackend = connection.ProcessID;
+            Faults++;
+            NpgsqlConnection.ClearPool(connection);
+            connection.Close();
+            ClosedOriginal = connection.State == ConnectionState.Closed;
+            var transient = new NpgsqlException("Controlled navigation connection interruption.",
+                new System.IO.IOException("The test closed the original connector after its actual navigation query."));
+            FaultWasTransient = transient.IsTransient;
+            throw transient;
+        }
+
+        public void OnCompleted() { }
+        public void OnError(Exception error) => throw error;
+        public void Dispose()
+        {
+            listeners.Dispose();
+            foreach (var subscription in subscriptions) subscription.Dispose();
+        }
     }
 
     private async Task AssertDriftPersistsAsync(ExploreDbContext context, IDbContextTransaction transaction)

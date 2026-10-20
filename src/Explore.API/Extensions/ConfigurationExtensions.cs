@@ -210,9 +210,12 @@ public static class ConfigurationExtensions
             ["Keycloak:ClientId"] = null,
             ["Keycloak:ClientSecret"] = null,
             ["Authentication:Local:JwtKey"] = null,
-            ["IdentityDatabase:ConnectionString"] = null,
             ["IdentityDatabase:Runtime:Password"] = null,
             ["IdentityDatabase:Migrator:Password"] = null,
+            ["IdentityDatabase:LocalIdentityWriter:Password"] = null,
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"] = null,
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = null,
+            ["IDENTITY_DATABASE_SERVER_VERSION"] = null,
             ["Database:Provider"] = null,
             ["Database:Host"] = null,
             ["Database:Port"] = null,
@@ -225,6 +228,10 @@ public static class ConfigurationExtensions
             ["DATABASE_GLOBAL_PASSWORD"] = null,
             ["Database:Global:Username"] = null,
             ["Database:Global:Password"] = null,
+            ["DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"] = null,
+            ["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = null,
+            ["Database:LocalIdentityWriter:Username"] = null,
+            ["Database:LocalIdentityWriter:Password"] = null,
             ["DATABASE_INSTANCE_KEY_READ_USERNAME"] = null,
             ["DATABASE_INSTANCE_KEY_READ_PASSWORD"] = null,
             ["Database:InstanceKeyRead:Username"] = null,
@@ -362,6 +369,8 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Database:Runtime:Password", ReadFirst(config, "DATABASE_RUNTIME_PASSWORD", "Database:Runtime:Password", "DATABASE_PASSWORD", "Database:Password"));
         TrySet(mappedConfig, config, "Database:Global:Username", ReadFirst(config, "DATABASE_GLOBAL_USERNAME", "Database:Global:Username"));
         TrySet(mappedConfig, config, "Database:Global:Password", ReadFirst(config, "DATABASE_GLOBAL_PASSWORD", "Database:Global:Password"));
+        mappedConfig["Database:LocalIdentityWriter:Username"] = config["Database:LocalIdentityWriter:Username"] ?? config["DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"];
+        mappedConfig["Database:LocalIdentityWriter:Password"] = config["Database:LocalIdentityWriter:Password"] ?? config["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"];
         TrySet(mappedConfig, config, "Database:InstanceKeyRead:Username", config["DATABASE_INSTANCE_KEY_READ_USERNAME"] ?? config["Database:InstanceKeyRead:Username"]);
         TrySet(mappedConfig, config, "Database:InstanceKeyRead:Password", config["DATABASE_INSTANCE_KEY_READ_PASSWORD"] ?? config["Database:InstanceKeyRead:Password"]);
         TrySet(mappedConfig, config, "Database:InstanceKeyWrite:Username", config["DATABASE_INSTANCE_KEY_WRITE_USERNAME"] ?? config["Database:InstanceKeyWrite:Username"]);
@@ -436,8 +445,6 @@ public static class ConfigurationExtensions
             ReadFirst(config, "IdentityDatabase:Topology", "IDENTITY_DATABASE_TOPOLOGY"));
         TrySet(mappedConfig, config, "IdentityDatabase:Provider",
             ReadFirst(config, "IdentityDatabase:Provider", "IDENTITY_DATABASE_PROVIDER"));
-        TrySet(mappedConfig, config, "IdentityDatabase:ConnectionString",
-            ReadFirst(config, "IdentityDatabase:ConnectionString", "IDENTITY_DATABASE_CONNECTION_STRING"));
         TrySet(mappedConfig, config, "IdentityDatabase:Host",
             ReadFirst(config, "IdentityDatabase:Host", "IDENTITY_DATABASE_HOST"));
         TrySet(mappedConfig, config, "IdentityDatabase:Port",
@@ -446,6 +453,8 @@ public static class ConfigurationExtensions
             ReadFirst(config, "IdentityDatabase:Name", "IDENTITY_DATABASE_NAME"));
         TrySet(mappedConfig, config, "IdentityDatabase:Schema",
             ReadFirst(config, "IdentityDatabase:Schema", "IDENTITY_DATABASE_SCHEMA"));
+        mappedConfig["IdentityDatabase:ServerVersion"] =
+            config["IdentityDatabase:ServerVersion"] ?? config["IDENTITY_DATABASE_SERVER_VERSION"];
         TrySet(mappedConfig, config, "IdentityDatabase:TlsMode",
             ReadFirst(config, "IdentityDatabase:TlsMode", "IDENTITY_DATABASE_TLS_MODE"));
         TrySet(mappedConfig, config, "IdentityDatabase:TrustServerCertificate",
@@ -453,14 +462,18 @@ public static class ConfigurationExtensions
                 config,
                 "IdentityDatabase:TrustServerCertificate",
                 "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE")));
-        TrySet(mappedConfig, config, "IdentityDatabase:Runtime:Username",
-            ReadFirst(config, "IdentityDatabase:Runtime:Username", "IDENTITY_DATABASE_RUNTIME_USERNAME"));
-        TrySet(mappedConfig, config, "IdentityDatabase:Runtime:Password",
-            ReadFirst(config, "IdentityDatabase:Runtime:Password", "IDENTITY_DATABASE_RUNTIME_PASSWORD"));
-        TrySet(mappedConfig, config, "IdentityDatabase:Migrator:Username",
-            ReadFirst(config, "IdentityDatabase:Migrator:Username", "IDENTITY_DATABASE_MIGRATOR_USERNAME"));
-        TrySet(mappedConfig, config, "IdentityDatabase:Migrator:Password",
-            ReadFirst(config, "IdentityDatabase:Migrator:Password", "IDENTITY_DATABASE_MIGRATOR_PASSWORD"));
+        mappedConfig["IdentityDatabase:Runtime:Username"] =
+            config["IdentityDatabase:Runtime:Username"] ?? config["IDENTITY_DATABASE_RUNTIME_USERNAME"];
+        mappedConfig["IdentityDatabase:Runtime:Password"] =
+            config["IdentityDatabase:Runtime:Password"] ?? config["IDENTITY_DATABASE_RUNTIME_PASSWORD"];
+        mappedConfig["IdentityDatabase:Migrator:Username"] =
+            config["IdentityDatabase:Migrator:Username"] ?? config["IDENTITY_DATABASE_MIGRATOR_USERNAME"];
+        mappedConfig["IdentityDatabase:Migrator:Password"] =
+            config["IdentityDatabase:Migrator:Password"] ?? config["IDENTITY_DATABASE_MIGRATOR_PASSWORD"];
+        mappedConfig["IdentityDatabase:LocalIdentityWriter:Username"] =
+            config["IdentityDatabase:LocalIdentityWriter:Username"] ?? config["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"];
+        mappedConfig["IdentityDatabase:LocalIdentityWriter:Password"] =
+            config["IdentityDatabase:LocalIdentityWriter:Password"] ?? config["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"];
 
         // Deployment
         TrySet(mappedConfig, config, "Deployment:Mode", deploymentMode);

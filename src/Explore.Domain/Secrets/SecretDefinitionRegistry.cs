@@ -150,11 +150,16 @@ public static class SecretDefinitionRegistry
             public const string AgentBrowserPassword = "redis.agent_browser_password";
         }
 
+        public static class Database
+        {
+            public const string LocalIdentityWriterPassword = "database.local_identity_writer.password";
+        }
+
         public static class IdentityDatabase
         {
-            public const string ConnectionString = "identity_database.connection_string";
             public const string RuntimePassword = "identity_database.runtime.password";
             public const string MigratorPassword = "identity_database.migrator.password";
+            public const string LocalIdentityWriterPassword = "identity_database.local_identity_writer.password";
         }
 
         public static class Stripe
@@ -523,14 +528,25 @@ public static class SecretDefinitionRegistry
             },
             new()
             {
-                Key = Keys.IdentityDatabase.ConnectionString,
+                Key = Keys.Database.LocalIdentityWriterPassword,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/database",
+                DefaultInfisicalKey = "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                DefaultEnvironmentVariableName = "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                IsBootstrapSecret = false,
+                Description = "Dedicated application-side Local Identity workflow credential.",
+            },
+            new()
+            {
+                Key = Keys.IdentityDatabase.LocalIdentityWriterPassword,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
                 DefaultInfisicalPath = "/database/identity",
-                DefaultInfisicalKey = "IDENTITY_DATABASE_CONNECTION_STRING",
-                DefaultEnvironmentVariableName = "IDENTITY_DATABASE_CONNECTION_STRING",
+                DefaultInfisicalKey = "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                DefaultEnvironmentVariableName = "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
                 IsBootstrapSecret = false,
-                Description = "Optional external Identity database connection string.",
+                Description = "Dedicated external Identity lifecycle writer credential.",
             },
             new()
             {

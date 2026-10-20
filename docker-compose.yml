@@ -20,7 +20,6 @@ x-local-identity-runtime-env: &local-identity-runtime-env
   Authentication__Local__PasswordHashIterations: ${AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS:-210000}
   IdentityDatabase__Topology: ${IDENTITY_DATABASE_TOPOLOGY:-colocated}
   IdentityDatabase__Provider: ${IDENTITY_DATABASE_PROVIDER:-}
-  IdentityDatabase__ConnectionString: ${IDENTITY_DATABASE_CONNECTION_STRING:-}
   IdentityDatabase__Host: ${IDENTITY_DATABASE_HOST:-}
   IdentityDatabase__Port: ${IDENTITY_DATABASE_PORT:-}
   IdentityDatabase__Name: ${IDENTITY_DATABASE_NAME:-}
@@ -29,11 +28,13 @@ x-local-identity-runtime-env: &local-identity-runtime-env
   IdentityDatabase__TrustServerCertificate: ${IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE:-false}
   IdentityDatabase__Runtime__Username: ${IDENTITY_DATABASE_RUNTIME_USERNAME:-}
   IdentityDatabase__Runtime__Password: ${IDENTITY_DATABASE_RUNTIME_PASSWORD:-}
+  IdentityDatabase__LocalIdentityWriter__Username: ${IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:-}
+  IdentityDatabase__LocalIdentityWriter__Password: ${IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD:-}
+  IdentityDatabase__ServerVersion: ${IDENTITY_DATABASE_SERVER_VERSION:-}
 
 x-local-identity-migrator-env: &local-identity-migrator-env
   IdentityDatabase__Topology: ${IDENTITY_DATABASE_TOPOLOGY:-colocated}
   IdentityDatabase__Provider: ${IDENTITY_DATABASE_PROVIDER:-}
-  IdentityDatabase__ConnectionString: ${IDENTITY_DATABASE_CONNECTION_STRING:-}
   IdentityDatabase__Host: ${IDENTITY_DATABASE_HOST:-}
   IdentityDatabase__Port: ${IDENTITY_DATABASE_PORT:-}
   IdentityDatabase__Name: ${IDENTITY_DATABASE_NAME:-}
@@ -42,6 +43,9 @@ x-local-identity-migrator-env: &local-identity-migrator-env
   IdentityDatabase__TrustServerCertificate: ${IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE:-false}
   IdentityDatabase__Migrator__Username: ${IDENTITY_DATABASE_MIGRATOR_USERNAME:-}
   IdentityDatabase__Migrator__Password: ${IDENTITY_DATABASE_MIGRATOR_PASSWORD:-}
+  IdentityDatabase__Runtime__Username: ${IDENTITY_DATABASE_RUNTIME_USERNAME:-}
+  IdentityDatabase__LocalIdentityWriter__Username: ${IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:-}
+  IdentityDatabase__ServerVersion: ${IDENTITY_DATABASE_SERVER_VERSION:-}
 
 # One explicit deployment-owned secret authority. Environment never contacts Infisical;
 # Infisical never falls back to the lower environment values below.
@@ -90,6 +94,8 @@ x-database-runtime-env: &database-runtime-env
   Database__Runtime__Password: ${DATABASE_RUNTIME_PASSWORD:-}
   Database__Global__Username: ${DATABASE_GLOBAL_USERNAME:-}
   Database__Global__Password: ${DATABASE_GLOBAL_PASSWORD:-}
+  Database__LocalIdentityWriter__Username: ${DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:-}
+  Database__LocalIdentityWriter__Password: ${DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD:-}
   Database__InstanceKeyRead__Username: ${DATABASE_INSTANCE_KEY_READ_USERNAME:-}
   Database__InstanceKeyRead__Password: ${DATABASE_INSTANCE_KEY_READ_PASSWORD:-}
   Database__InstanceKeyWrite__Username: ${DATABASE_INSTANCE_KEY_WRITE_USERNAME:-}
@@ -106,6 +112,11 @@ x-database-runtime-env: &database-runtime-env
 x-database-migrator-env: &database-migrator-env
   Database__Migrator__Username: ${DATABASE_MIGRATOR_USERNAME:-}
   Database__Migrator__Password: ${DATABASE_MIGRATOR_PASSWORD:-}
+  Database__Runtime__Username: ${DATABASE_RUNTIME_USERNAME:-}
+  Database__Global__Username: ${DATABASE_GLOBAL_USERNAME:-}
+  Database__LocalIdentityWriter__Username: ${DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:-}
+  Database__EmailPolicyInstanceMutation__Username: ${DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME:-}
+  Database__EmailPolicyTenantMutation__Username: ${DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME:-}
 
 x-privacy-erasure-authority-env: &privacy-erasure-authority-env
   PrivacyErasure__Authority__Topology: ${ERASURE_DATABASE_TOPOLOGY:-EmbeddedSqlite}

@@ -100,6 +100,186 @@ public sealed class RuntimeSecretEnvironmentTests
         await Assert.That(combined["KEYCLOAK_LIFECYCLE_CLIENT_SECRET"]).IsEqualTo(inputs["KEYCLOAK_LIFECYCLE_CLIENT_SECRET"]!);
     }
 
+    [Test]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Bff, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Migration, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Infisical)]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Infisical)]
+    [Arguments(SecretConsumer.Bff, SecretProviderType.Infisical)]
+    [Arguments(SecretConsumer.Migration, SecretProviderType.Infisical)]
+    public async Task LocalWriterPasswordsReachOnlyTheirSelectedBackendAuthority(
+        SecretConsumer consumer, SecretProviderType provider)
+    {
+        var inputs = Inputs();
+        string applicationWriter = SecretsTestValues.CreateSecret();
+        string identityWriter = SecretsTestValues.CreateSecret();
+        inputs["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = applicationWriter;
+        inputs["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = identityWriter;
+        var target = new Dictionary<string, object>
+        {
+            ["Database__LocalIdentityWriter__Password"] = applicationWriter,
+            ["IdentityDatabase__LocalIdentityWriter__Password"] = identityWriter
+        };
+
+        RuntimeSecretEnvironment.Apply(target, Configuration(inputs), inputs.Keys, consumer, provider);
+
+        bool delivers = provider == SecretProviderType.Environment
+            && consumer is SecretConsumer.Api or SecretConsumer.Combined;
+        await Assert.That(Equals(target["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"],
+            delivers ? applicationWriter : string.Empty)).IsTrue();
+        await Assert.That(Equals(target["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"],
+            delivers ? identityWriter : string.Empty)).IsTrue();
+        await Assert.That(Equals(target["Database__LocalIdentityWriter__Password"],
+            delivers ? applicationWriter : string.Empty)).IsTrue();
+        await Assert.That(Equals(target["IdentityDatabase__LocalIdentityWriter__Password"],
+            delivers ? identityWriter : string.Empty)).IsTrue();
+        if (!delivers)
+        {
+            await Assert.That(target.Values.Contains(applicationWriter)).IsFalse();
+            await Assert.That(target.Values.Contains(identityWriter)).IsFalse();
+        }
+    }
+
+    [Test]
+    [Arguments(SecretConsumer.Api)]
+    [Arguments(SecretConsumer.Combined)]
+    public async Task MissingLocalWriterPasswordNeverBorrowsRuntimeGlobalOrMigrator(SecretConsumer consumer)
+    {
+        var inputs = Inputs();
+        foreach (string name in new[]
+        {
+            "DATABASE_RUNTIME_PASSWORD", "DATABASE_GLOBAL_PASSWORD", "DATABASE_MIGRATOR_PASSWORD",
+            "IDENTITY_DATABASE_RUNTIME_PASSWORD", "IDENTITY_DATABASE_MIGRATOR_PASSWORD"
+        })
+            inputs[name] = SecretsTestValues.CreateSecret();
+        var inherited = inputs.Keys.Concat(new[]
+        {
+            "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+            "Database__LocalIdentityWriter__Password", "IdentityDatabase__LocalIdentityWriter__Password"
+        }).ToArray();
+        var target = new Dictionary<string, object>();
+
+        RuntimeSecretEnvironment.Apply(target, Configuration(inputs), inherited, consumer, SecretProviderType.Environment);
+
+        foreach (string name in inherited.Where(name => name.Contains("LOCAL_IDENTITY_WRITER", StringComparison.Ordinal)
+            || name.Contains("LocalIdentityWriter", StringComparison.Ordinal)))
+            await Assert.That(Equals(target[name], string.Empty)).IsTrue();
+    }
+
+    [Test]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Migration, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Bff, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Infisical)]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Infisical)]
+    [Arguments(SecretConsumer.Migration, SecretProviderType.Infisical)]
+    [Arguments(SecretConsumer.Bff, SecretProviderType.Infisical)]
+    public async Task LocalWriterEnrollmentProjectsDeclaredLoginNamesWithoutSiblingPasswords(
+        SecretConsumer consumer, SecretProviderType provider)
+    {
+        var inputs = Inputs();
+        string[] names =
+        [
+            "DATABASE_RUNTIME_USERNAME", "DATABASE_GLOBAL_USERNAME", "DATABASE_MIGRATOR_USERNAME",
+            "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME", "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME",
+            "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "IDENTITY_DATABASE_RUNTIME_USERNAME",
+            "IDENTITY_DATABASE_MIGRATOR_USERNAME", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"
+        ];
+        foreach (string name in names)
+            inputs[name] = "declared_" + Guid.CreateVersion7().ToString("N");
+        inputs["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = SecretsTestValues.CreateSecret();
+        inputs["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = SecretsTestValues.CreateSecret();
+        var target = new Dictionary<string, object>();
+
+        RuntimeSecretEnvironment.Apply(target, Configuration(inputs), inputs.Keys, consumer, provider);
+
+        bool projectsNames = provider == SecretProviderType.Environment && consumer != SecretConsumer.Bff;
+        foreach (string name in names)
+            await Assert.That(Equals(target[name], projectsNames ? inputs[name] : string.Empty)).IsTrue();
+        if (consumer is SecretConsumer.Migration or SecretConsumer.Bff)
+        {
+            await Assert.That(Equals(target["DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"], string.Empty)).IsTrue();
+            await Assert.That(Equals(target["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"], string.Empty)).IsTrue();
+        }
+    }
+
+    [Test]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Environment, "only")]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Environment, "only")]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Environment, "both")]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Environment, "both")]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Environment, "empty")]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Environment, "empty")]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Infisical, "only")]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Infisical, "only")]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Infisical, "both")]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Infisical, "both")]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Infisical, "empty")]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Infisical, "empty")]
+    public async Task StructuredLocalWriterAuthorityMasksFlatAliasesWithoutLeakingDiscardedValues(
+        SecretConsumer consumer, SecretProviderType provider, string form)
+    {
+        var inputs = Inputs();
+        (string Canonical, string Alias, string Value)[] coordinates =
+        [
+            ("Database:LocalIdentityWriter:Username", "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+                "writer_" + Guid.CreateVersion7().ToString("N")),
+            ("Database:LocalIdentityWriter:Password", "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                SecretsTestValues.CreateSecret()),
+            ("IdentityDatabase:LocalIdentityWriter:Username", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+                "writer_" + Guid.CreateVersion7().ToString("N")),
+            ("IdentityDatabase:LocalIdentityWriter:Password", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                SecretsTestValues.CreateSecret())
+        ];
+        var discarded = new List<string>();
+        foreach (var coordinate in coordinates)
+        {
+            inputs[coordinate.Canonical] = form == "empty" ? string.Empty : coordinate.Value;
+            if (form != "only")
+            {
+                string shadowed = SecretsTestValues.CreateSecret();
+                inputs[coordinate.Alias] = shadowed;
+                discarded.Add(shadowed);
+            }
+        }
+        string[] inherited = inputs.Keys.Select(name => name.Replace(":", "__", StringComparison.Ordinal)).ToArray();
+        var target = new Dictionary<string, object>();
+
+        RuntimeSecretEnvironment.Apply(target, Configuration(inputs), inherited, consumer, provider);
+
+        foreach (var coordinate in coordinates)
+        {
+            string projectedName = coordinate.Canonical.Replace(":", "__", StringComparison.Ordinal);
+            string expected = provider == SecretProviderType.Environment && form != "empty"
+                ? coordinate.Value : string.Empty;
+            await Assert.That(Equals(target[projectedName], expected)).IsTrue();
+        }
+        foreach (string shadowed in discarded)
+            await Assert.That(target.Values.Contains(shadowed)).IsFalse();
+    }
+
+    [Test]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Environment)]
+    [Arguments(SecretConsumer.Api, SecretProviderType.Infisical)]
+    [Arguments(SecretConsumer.Combined, SecretProviderType.Infisical)]
+    public async Task ExternalServerVersionReachesOnlyTheSelectedEnvironmentAuthority(
+        SecretConsumer consumer, SecretProviderType provider)
+    {
+        var inputs = Inputs();
+        const string explicitVersion = "10.11.8";
+        inputs["IDENTITY_DATABASE_SERVER_VERSION"] = explicitVersion;
+        var target = new Dictionary<string, object>();
+
+        RuntimeSecretEnvironment.Apply(target, Configuration(inputs), inputs.Keys, consumer, provider);
+
+        await Assert.That(Equals(target["IDENTITY_DATABASE_SERVER_VERSION"],
+            provider == SecretProviderType.Environment ? explicitVersion : string.Empty)).IsTrue();
+    }
+
     private static IConfiguration Configuration(Dictionary<string, string?> inputs) =>
         new ConfigurationBuilder().AddInMemoryCollection(inputs).Build();
 

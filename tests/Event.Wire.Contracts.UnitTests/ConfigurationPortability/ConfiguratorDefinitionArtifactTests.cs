@@ -36,6 +36,12 @@ public sealed class ConfiguratorDefinitionArtifactTests
         await Assert.That(selectors["locale"]).IsEqualTo("en");
         await Assert.That(native.RootElement.GetProperty("artifacts").GetArrayLength()).IsEqualTo(5);
         await Assert.That(native.RootElement.GetProperty("fields").GetArrayLength() > 1).IsTrue();
+        await Assert.That(native.RootElement.GetProperty("fields").EnumerateArray()
+            .Any(field => field.GetProperty("id").GetString() == "env.IDENTITY_DATABASE_CONNECTION_STRING")).IsFalse();
+        JsonElement environment = native.RootElement.GetProperty("artifacts").EnumerateArray()
+            .Single(artifact => artifact.GetProperty("id").GetString() == "environment");
+        await Assert.That(environment.GetProperty("projection").GetProperty("members")
+            .TryGetProperty("IDENTITY_DATABASE_CONNECTION_STRING", out _)).IsFalse();
         foreach (JsonElement field in native.RootElement.GetProperty("fields").EnumerateArray())
         {
             if (field.GetProperty("sensitivity").GetString() is not "public")

@@ -734,7 +734,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 "EVENT_DP_API_MINIMUM_GENERATION", "EVENT_DP_BFF_MINIMUM_GENERATION",
                 "EVENT_DP_COMBINED_MINIMUM_GENERATION", "DATABASE_PROVIDER", "DATABASE_HOST",
                 "DATABASE_PORT", "DATABASE_NAME", "DATABASE_SCHEMA", "DATABASE_RUNTIME_USERNAME",
-                "DATABASE_GLOBAL_USERNAME", "DATABASE_INSTANCE_KEY_READ_USERNAME",
+                "DATABASE_GLOBAL_USERNAME", "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "DATABASE_INSTANCE_KEY_READ_USERNAME",
                 "DATABASE_INSTANCE_KEY_WRITE_USERNAME", "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME",
                 "DATABASE_PLATFORM_KEY_REPORT_USERNAME", "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME",
                 "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME", "DATABASE_MIGRATOR_USERNAME", "DATABASE_TLS_MODE",
@@ -763,7 +763,9 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 "KEYCLOAK_REQUIRE_HTTPS_METADATA", "IDENTITY_DATABASE_PROVIDER", "IDENTITY_DATABASE_HOST",
                 "IDENTITY_DATABASE_PORT", "IDENTITY_DATABASE_NAME", "IDENTITY_DATABASE_SCHEMA",
                 "IDENTITY_DATABASE_TLS_MODE", "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE",
+                "IDENTITY_DATABASE_SERVER_VERSION",
                 "IDENTITY_DATABASE_RUNTIME_USERNAME", "IDENTITY_DATABASE_MIGRATOR_USERNAME",
+                "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
                 "HOSTING_REPLICA_COUNT", "PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION",
                 "CONTROL_PLANE_MANAGED_MODE", "CONTROL_PLANE_URL", "CONTROL_PLANE_INSTANCE_ID",
                 "CONTROL_PLANE_MAXIMUM_TENANT_COUNT", "CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL",
@@ -832,6 +834,18 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
             foreach (var client in builder.Configuration.GetSection("Keycloak:PermittedClients").GetChildren())
                 context.EnvironmentVariables[$"KEYCLOAK__PERMITTEDCLIENTS__{client.Key}"] = client.Value
                     ?? throw new InvalidOperationException("keycloak_permitted_client_invalid");
+        }
+        if (consumer == SecretConsumer.Migration)
+        {
+            foreach (string key in new[]
+            {
+                "IDENTITY_DATABASE_TOPOLOGY", "IDENTITY_DATABASE_PROVIDER", "IDENTITY_DATABASE_HOST",
+                "IDENTITY_DATABASE_PORT", "IDENTITY_DATABASE_NAME", "IDENTITY_DATABASE_SCHEMA",
+                "IDENTITY_DATABASE_TLS_MODE", "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE",
+                "IDENTITY_DATABASE_SERVER_VERSION"
+            })
+                if (builder.Configuration[key] is { } value && !context.EnvironmentVariables.ContainsKey(key))
+                    context.EnvironmentVariables[key] = value;
         }
         if (consumer == SecretConsumer.Bff)
         {

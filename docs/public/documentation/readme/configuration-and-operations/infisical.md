@@ -345,6 +345,8 @@ Primary application database. Every key maps into the structured `Database:*` co
 | `DATABASE_RUNTIME_PASSWORD` | Runtime login password. |
 | `DATABASE_GLOBAL_USERNAME` | Independent Global login for API-owned bounded cross-tenant capabilities. |
 | `DATABASE_GLOBAL_PASSWORD` | Startup-owned Global login password. |
+| `DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | Dedicated application-side Local Identity workflow login; distinct from Runtime, Global and Migrator. |
+| `DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | Dedicated workflow password, delivered only to the owning API or combined host; role enrollment needs the username, not this password. |
 | `DATABASE_INSTANCE_KEY_READ_USERNAME`, `DATABASE_INSTANCE_KEY_READ_PASSWORD` | Dedicated instance-key metadata login/password. |
 | `DATABASE_INSTANCE_KEY_WRITE_USERNAME`, `DATABASE_INSTANCE_KEY_WRITE_PASSWORD` | Dedicated fixed policy/revocation login/password. |
 | `DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME`, `DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD` | Dedicated issuance and metadata-only recovery login/password. |
@@ -432,7 +434,6 @@ External Local Identity credential store, used only when `IDENTITY_DATABASE_TOPO
 | Key | Purpose |
 |---|---|
 | `IDENTITY_DATABASE_PROVIDER` | `PostgreSql`, `Sqlite`, `SqlServer`, `MariaDb`, or `MySql`. |
-| `IDENTITY_DATABASE_CONNECTION_STRING` | Optional complete operator-managed connection string. Prefer the discrete fields below. |
 | `IDENTITY_DATABASE_HOST` | Credential database host. |
 | `IDENTITY_DATABASE_PORT` | Credential database port. |
 | `IDENTITY_DATABASE_NAME` | Credential database name or persisted SQLite path. |
@@ -441,6 +442,9 @@ External Local Identity credential store, used only when `IDENTITY_DATABASE_TOPO
 | `IDENTITY_DATABASE_RUNTIME_PASSWORD` | Runtime credential password. |
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | Schema-owner credential username. |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | Schema-owner credential password. |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | Dedicated C# lifecycle writer login; distinct from Runtime and Migrator. |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | Dedicated lifecycle writer password. |
+| `IDENTITY_DATABASE_SERVER_VERSION` | Explicit MariaDB/MySQL server version when overriding provider defaults. |
 | `IDENTITY_DATABASE_TLS_MODE` | `Prefer`, `Required`, or `Disabled`. |
 | `IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE` | `false` for strict CA verification. |
 

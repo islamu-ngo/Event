@@ -1,1 +1,41 @@
-{"applicationVersion":"0.0.0-development","artifactCount":5,"artifacts":[{"id":"environment","wireValidation":"dotenv-runtime-and-host-issuer-check"},{"id":"configuration-manifest","wireDigest":"17e96cb5531e1d8129f9a56a75718432bd3061ff7065b45af4cd547c41971554"},{"id":"tenant-package","wireDigest":"62a5c840f3b4efcd10e91fea063dcf759353e785008d19386199458634e9bd5c"},{"id":"operator-identity","wireDigest":"546ad80a0e1e367ab41860eb01391b08524b110c5cec4b94c789397339ce0a9c"},{"id":"legal-drafts","wireDigest":"7cc42f86a7f778949fee5ac40937905aa6d8a523b49b00e3aa570211149aee75"}],"authoringSourceDigest":"e9ebea6a963e4a1c6becb862e8c72bd4e765dccf894fbc15e6e7ee828a3ac996","browserLaunchFragment":"src=https%3A%2F%2Fraw.githubusercontent.com%2FISLAMU%2FEvent%2Fdevelop%2Fconfigurator%2Fdefinitions%2Fislamu-event%2Fdefinition.json\u0026digest=b50171ca0a52aa48c3099088db925e440791aff3a450e03e1caca97cf3e4066e\u0026appVersion=0.0.0-development\u0026entry=configuration-manifest\u0026locale=en","canonicalProfile":"configurator-v1-ordinal-decimal-system-text-json","compiler":{"authoringSchemaVersion":"urn:islamu:configurator:authoring:v1","commandSchemaVersion":"islamu-configurator-command/v1","executableSha256":"5031706878d98386f78f69f07845b680d107c183993ee8aab07587c827e59f97","runtimeSchemaVersion":1},"definitionDigest":"b50171ca0a52aa48c3099088db925e440791aff3a450e03e1caca97cf3e4066e","definitionSchema":"Configurator/schemas/setup-definition-v1.schema.json","definitionSource":"https://raw.githubusercontent.com/ISLAMU/Event/develop/configurator/definitions/islamu-event/definition.json","dependencyProvenance":"Event-owned Domain, Wire and environment metadata; no Configurator runtime dependency","environmentCatalogueDigest":"9b48dbe1a03c2f945896369ff096e92e4f6689c946e69cc310efaff353fd4f70","environmentFieldCount":361,"familyId":"a4bcfaa6-9979-43e5-b1f5-00d552618cdf","fieldCount":427,"generatedBy":"eng/configurator/DefinitionExporter","hostAcceptance":"Event wire parser and backend semantic validation","portableSchemaDigest":"6d89b21a42464500e514430dbd97efad1b54c63fa68d98ac7da219fee9969a12","rendererEquivalence":"not-established-for-specialized-workflows","revision":6,"sourceRepository":"https://github.com/ISLAMU/Event","trustedIssuerCount":1}
+{
+  "applicationVersion": "0.0.0-development",
+  "artifactCount": 5,
+  "artifacts": [
+    { "id": "environment", "wireValidation": "dotenv-runtime-and-host-issuer-check" },
+    { "id": "configuration-manifest", "wireDigest": "17e96cb5531e1d8129f9a56a75718432bd3061ff7065b45af4cd547c41971554" },
+    { "id": "tenant-package", "wireDigest": "62a5c840f3b4efcd10e91fea063dcf759353e785008d19386199458634e9bd5c" },
+    { "id": "operator-identity", "wireDigest": "546ad80a0e1e367ab41860eb01391b08524b110c5cec4b94c789397339ce0a9c" },
+    { "id": "legal-drafts", "wireDigest": "7cc42f86a7f778949fee5ac40937905aa6d8a523b49b00e3aa570211149aee75" }
+  ],
+  "authoringSourceDigest": "3df6562718a075cfe52741c1781b16a6c16355b5c2af59047c0630dc19a304a1",
+  "browserLaunchFragment": "src=https%3A%2F%2Fraw.githubusercontent.com%2FISLAMU%2FEvent%2Fdevelop%2Fconfigurator%2Fdefinitions%2Fislamu-event%2Fdefinition.json&digest=03d5a2f23232ead39443bb08aff6a5f4dbaa97261df1486120bea4383380aa3e&appVersion=0.0.0-development&entry=configuration-manifest&locale=en",
+  "canonicalProfile": "configurator-v1-ordinal-decimal-system-text-json",
+  "compiler": {
+    "authoringSchemaVersion": "urn:islamu:configurator:authoring:v1",
+    "commandSchemaVersion": "islamu-configurator-command/v2",
+    "executableSha256": "41bc93fb5fd0863f40e2963025e0707b87b04ae000c9b4fe3b5ad0d6b829bd60",
+    "runtimeSchemaVersion": 1,
+    "sourceRepository": "https://github.com/islamu-ngo/Configurator",
+    "sourceCommit": "dd88fe13cadc9cd7285ad1efb0967cbc97d6c98d",
+    "workflowRunId": 39323685477,
+    "artifactId": 12221142241,
+    "artifactSha256": "77dca08c1a6b6897c77f8e0f3eb184595b4bd4f317c086d81ca1ddc4038d3b03",
+    "distributionStatus": "unsigned-development-validation-artifact"
+  },
+  "definitionDigest": "03d5a2f23232ead39443bb08aff6a5f4dbaa97261df1486120bea4383380aa3e",
+  "definitionSchema": "Configurator/schemas/setup-definition-v1.schema.json",
+  "definitionSource": "https://raw.githubusercontent.com/ISLAMU/Event/develop/configurator/definitions/islamu-event/definition.json",
+  "dependencyProvenance": "Event-owned Domain, Wire and environment metadata; no Configurator runtime dependency",
+  "environmentCatalogueDigest": "4165ad30123e5662aebfe64a1cab6f2a36ed887dfbf1d98ae9350546b6aacf5b",
+  "environmentFieldCount": 364,
+  "familyId": "a4bcfaa6-9979-43e5-b1f5-00d552618cdf",
+  "fieldCount": 430,
+  "generatedBy": "islamu-configurator definition build",
+  "hostAcceptance": "Event wire parser and backend semantic validation",
+  "portableSchemaDigest": "6d89b21a42464500e514430dbd97efad1b54c63fa68d98ac7da219fee9969a12",
+  "rendererEquivalence": "not-established-for-specialized-workflows",
+  "revision": 8,
+  "sourceRepository": "https://github.com/ISLAMU/Event",
+  "trustedIssuerCount": 1
+}

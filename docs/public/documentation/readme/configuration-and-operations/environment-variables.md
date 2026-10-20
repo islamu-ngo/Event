@@ -129,6 +129,14 @@ Each role must use its own fields: generic `Database:Username/Password` and
 An explicit empty structured role value also cannot fall back to an environment
 alias. Inject the exact password bytes; binding does not trim a real password.
 
+Local Identity C# lifecycle workflows select a separate
+`DATABASE_LOCAL_IDENTITY_WRITER_USERNAME/PASSWORD` purpose before resolving their
+stores or handlers. Do not reuse Runtime, Global or Migrator credentials. With
+external identity storage, additionally inject the external database's
+`IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME/PASSWORD`. These accounts may
+modify their fixed identity inventory; ordinary Runtime and Global do not inherit
+those rights. Credential theft can bypass C# workflow rules within those grants.
+
 Only the migration service receives migration credentials; API runtime does not
 inherit them. Provision real database roles/grants separately: setup readiness
 is not proof of permission separation. Runtime must not have DDL, superuser or
@@ -655,7 +663,6 @@ passwordless authority.
 | `ATPROTO_LOGIN_ENABLED` | Baseline | `false` | Enables AT Protocol login. It must be `true` when `AUTHENTICATION_PROVIDER=atproto`. |
 | `IDENTITY_DATABASE_TOPOLOGY` | **Baseline** | `colocated` | Local credential storage: `colocated` with the application database or `external`. |
 | `IDENTITY_DATABASE_PROVIDER` | External topology | None | External credential provider: PostgreSQL, SQLite, SQL Server, MariaDB, or MySQL. |
-| `IDENTITY_DATABASE_CONNECTION_STRING` | External topology (Secret) | None | Complete operator-managed connection string. Prefer the discrete runtime/migrator settings below. |
 | `IDENTITY_DATABASE_HOST` | External topology | None | External credential database host. |
 | `IDENTITY_DATABASE_PORT` | External topology | Provider default | External credential database port. |
 | `IDENTITY_DATABASE_NAME` | External topology | None | External credential database name or persisted SQLite path. |
@@ -666,6 +673,14 @@ passwordless authority.
 | `IDENTITY_DATABASE_RUNTIME_PASSWORD` | External topology (Secret) | None | Least-privilege runtime credential password. |
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | External topology | None | Schema-owner/migrator credential username. |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | External topology (Secret) | None | Schema-owner/migrator credential password. |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | External topology | None | Dedicated C# Local Identity lifecycle writer login; no Runtime/Migrator fallback. |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | External topology (Secret) | None | Dedicated lifecycle writer password. |
+| `IDENTITY_DATABASE_SERVER_VERSION` | MariaDB/MySQL | Provider default | Explicit server version for provider composition. |
+
+External Identity binding requires the discrete endpoint and selected purpose's
+credentials. A shared `IDENTITY_DATABASE_CONNECTION_STRING` is not supported;
+unsupported purposes cannot borrow Migrator credentials. An explicitly empty
+structured credential masks its environment alias and fails validation.
 
 ### Keycloak resource and client context
 
@@ -1237,7 +1252,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `DATABASE_TRUST_SERVER_CERTIFICATE` | database | public | false | defaulted | process |
 | `KEYCLOAK_REQUIRE_HTTPS_METADATA` | identity | public | None | optional | process |
 | `IDENTITY_DATABASE_PROVIDER` | integration | public | None | optional | process |
-| `IDENTITY_DATABASE_CONNECTION_STRING` | integration | secret | None (secret) | optional | process |
 | `IDENTITY_DATABASE_HOST` | integration | public | None | optional | process |
 | `IDENTITY_DATABASE_PORT` | integration | public | None | optional | process |
 | `IDENTITY_DATABASE_NAME` | integration | public | None | optional | process |
@@ -1248,6 +1262,9 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `IDENTITY_DATABASE_RUNTIME_PASSWORD` | integration | secret | None (secret) | optional | process |
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | integration | public | None | optional | process |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | integration | secret | None (secret) | optional | process |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | identity | public | None | external topology | process |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | identity | secret | None (secret) | external topology | process |
+| `IDENTITY_DATABASE_SERVER_VERSION` | integration | public | Provider default | optional | process |
 | `SETUP_SECRET_REQUIRED` | platform | sensitive | None | optional | process |
 | `HOSTING_REPLICA_COUNT` | deployment | public | 1 | defaulted | deployment |
 | `PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION` | platform | public | None | optional | process |

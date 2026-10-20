@@ -8,10 +8,10 @@ priority: high
 
 # External Configurator usage pointer
 
-Use [ISLAMU Configurator](https://github.com/ISLAMU/Configurator), installed
+Use [ISLAMU Configurator](https://github.com/islamu-ngo/Configurator), installed
 separately from Event. Its own
-[CLI guide](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/cli.md)
-and generated `schemas/islamu-configurator-command-v1.schema.json` own executable
+[CLI guide](https://github.com/islamu-ngo/Configurator/blob/HEAD/docs/public/cli.md)
+and generated `schemas/islamu-configurator-command-v2.schema.json` own executable
 grammar and the machine result contract. Event does not maintain a second parser
 or command registry. The bundled offline source roots, focused tests and release
 targets are removed; install the external package and keep its notices.
@@ -34,8 +34,9 @@ targets are removed; install the external package and keep its notices.
    islamu-configurator env render --definition configurator/definitions/islamu-event/definition.json --artifact environment --input environment-answers.json --output deployment.env --machine
    ```
 
-4. Branch on `exitCode` and the `islamu-configurator-command/v1` envelope, not
-   rendered text. Success reports `host-validation-required`. `--dry-run`
+4. Branch on `exitCode` and the `islamu-configurator-command/v2` envelope, not
+   rendered text. Authoring and runtime definition schemas remain v1. Preparation
+   does not establish target acceptance. `--dry-run`
    never writes an artifact or authorizes restricted stdout.
 5. Keep answer values and prepared artifacts on the protected native host.
    Never put secrets in process arguments, logs, environment variable names

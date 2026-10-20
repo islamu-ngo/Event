@@ -10,6 +10,141 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class ConfigurationExtensionsTests
 {
     [Test]
+    public async Task IsolatedAuthorityCannotPairItsWriterPasswordWithALowerSourceUsername()
+    {
+        string selectedUsername = $"selected_{Guid.CreateVersion7():N}";
+        string selectedPassword = Guid.CreateVersion7().ToString("N");
+        var bootstrap = new Dictionary<string, string?>
+        {
+            ["SecretProvider:Provider"] = "Environment",
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"] = $"lower_{Guid.CreateVersion7():N}",
+        };
+        var selected = new Dictionary<string, string?>
+        {
+            ["IDENTITY_DATABASE_TOPOLOGY"] = "external",
+            ["IDENTITY_DATABASE_PROVIDER"] = "PostgreSql",
+            ["IDENTITY_DATABASE_HOST"] = "localhost",
+            ["IDENTITY_DATABASE_NAME"] = $"identity_{Guid.CreateVersion7():N}",
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"] = selectedUsername,
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = selectedPassword,
+        };
+        IConfiguration control = BuildConfiguration(selected, bootstrap);
+        var accepted = Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(
+            control, PrimaryDatabaseRole.LocalIdentityWriter);
+        var connection = new Npgsql.NpgsqlConnectionStringBuilder(accepted.ConnectionString);
+        await Assert.That(connection.Username).IsEqualTo(selectedUsername);
+        await Assert.That(connection.Password == selectedPassword).IsTrue();
+
+        selected.Remove("IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME");
+        IConfiguration missingUsername = BuildConfiguration(selected, bootstrap);
+
+        await Assert.That(() => Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(
+            missingUsername, PrimaryDatabaseRole.LocalIdentityWriter))
+            .Throws<Microsoft.Extensions.Options.OptionsValidationException>();
+        await Assert.That(missingUsername["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"]).IsNull();
+    }
+
+    [Test]
+    [Arguments("MySql", "8.0.37")]
+    [Arguments("MariaDb", "10.11.8")]
+    public async Task IsolatedAuthorityPreservesItsExplicitExternalServerVersion(string provider, string version)
+    {
+        IConfiguration mapped = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["IDENTITY_DATABASE_TOPOLOGY"] = "external",
+            ["IDENTITY_DATABASE_PROVIDER"] = provider,
+            ["IDENTITY_DATABASE_HOST"] = "localhost",
+            ["IDENTITY_DATABASE_NAME"] = $"identity_{Guid.CreateVersion7():N}",
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"] = $"writer_{Guid.CreateVersion7():N}",
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = Guid.CreateVersion7().ToString("N"),
+            ["IdentityDatabase__ServerVersion"] = version,
+        }, new Dictionary<string, string?>
+        {
+            ["SecretProvider:Provider"] = "Environment",
+        });
+
+        var selected = Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(
+            mapped, PrimaryDatabaseRole.LocalIdentityWriter);
+
+        await Assert.That(selected.ServerVersion).IsEqualTo(Version.Parse(version));
+    }
+
+    [Test]
+    public async Task IsolatedAuthorityWithoutExternalVersionCannotBorrowLowerSourceAlias()
+    {
+        IConfiguration mapped = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["IDENTITY_DATABASE_TOPOLOGY"] = "external",
+            ["IDENTITY_DATABASE_PROVIDER"] = "MySql",
+            ["IDENTITY_DATABASE_HOST"] = "localhost",
+            ["IDENTITY_DATABASE_NAME"] = $"identity_{Guid.CreateVersion7():N}",
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"] = $"writer_{Guid.CreateVersion7():N}",
+            ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = Guid.CreateVersion7().ToString("N"),
+        }, new Dictionary<string, string?>
+        {
+            ["SecretProvider:Provider"] = "Environment",
+            ["IDENTITY_DATABASE_SERVER_VERSION"] = "8.0.37",
+        });
+
+        var selected = Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(
+            mapped, PrimaryDatabaseRole.LocalIdentityWriter);
+
+        await Assert.That(selected.ServerVersion).IsEqualTo(new Version(8, 4));
+    }
+
+    [Test]
+    [Arguments("Runtime", "RUNTIME")]
+    [Arguments("Migrator", "MIGRATOR")]
+    [Arguments("LocalIdentityWriter", "LOCAL_IDENTITY_WRITER")]
+    public async Task ExplicitIdentityPurposeSurvivesApiAuthorityMapping(string role, string alias)
+    {
+        string username = $"identity_{Guid.CreateVersion7():N}";
+        string password = Guid.CreateVersion7().ToString("N");
+        IConfiguration mapped = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["IDENTITY_DATABASE_TOPOLOGY"] = "external",
+            ["IDENTITY_DATABASE_PROVIDER"] = "PostgreSql",
+            ["IDENTITY_DATABASE_HOST"] = "localhost",
+            ["IDENTITY_DATABASE_NAME"] = "identity_mapping",
+            [$"IDENTITY_DATABASE_{alias}_USERNAME"] = username,
+            [$"IDENTITY_DATABASE_{alias}_PASSWORD"] = password,
+        });
+        var selected = Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(mapped,
+            Enum.Parse<PrimaryDatabaseRole>(role));
+        var connection = new Npgsql.NpgsqlConnectionStringBuilder(selected.ConnectionString);
+        await Assert.That(connection.Username).IsEqualTo(username);
+        await Assert.That(connection.Password == password).IsTrue();
+    }
+
+    [Test]
+    [Arguments("Runtime", "RUNTIME", "Username")]
+    [Arguments("Runtime", "RUNTIME", "Password")]
+    [Arguments("Migrator", "MIGRATOR", "Username")]
+    [Arguments("Migrator", "MIGRATOR", "Password")]
+    [Arguments("LocalIdentityWriter", "LOCAL_IDENTITY_WRITER", "Username")]
+    [Arguments("LocalIdentityWriter", "LOCAL_IDENTITY_WRITER", "Password")]
+    public async Task BlankIdentityCredentialCannotAcquireAuthorityFromItsAlias(
+        string role, string alias, string field)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["IdentityDatabase:Topology"] = "external",
+            ["IdentityDatabase:Provider"] = "PostgreSql",
+            ["IdentityDatabase:Host"] = "localhost",
+            ["IdentityDatabase:Name"] = "identity_mapping",
+            [$"IdentityDatabase:{role}:Username"] = $"identity_{Guid.CreateVersion7():N}",
+            [$"IdentityDatabase:{role}:Password"] = Guid.CreateVersion7().ToString("N"),
+            // SetEnvironmentVariable removes empty strings; whitespace survives the selected authority.
+            [$"IdentityDatabase:{role}:{field}"] = " ",
+            [$"IDENTITY_DATABASE_{alias}_{field.ToUpperInvariant()}"] = Guid.CreateVersion7().ToString("N"),
+        };
+        IConfiguration mapped = BuildConfiguration(values);
+        var purpose = Enum.Parse<PrimaryDatabaseRole>(role);
+        await Assert.That(() => Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(mapped, purpose))
+            .Throws<Microsoft.Extensions.Options.OptionsValidationException>();
+    }
+
+    [Test]
     public async Task AddSecretAuthorityConfiguration_MapsLocalPasswordPolicyWithoutOverwritingCanonicalInputs()
     {
         var mapped = BuildConfiguration(new Dictionary<string, string?>
@@ -495,12 +630,15 @@ public sealed class ConfigurationExtensionsTests
             .IsEqualTo("secret_authority_user_secrets_environment_invalid");
     }
 
-    private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
+    private static IConfiguration BuildConfiguration(
+        Dictionary<string, string?> values, Dictionary<string, string?>? bootstrapValues = null)
     {
         values.TryAdd("SecretProvider:Provider", "Environment");
         var ambientDatabaseKeys = Environment.GetEnvironmentVariables().Keys.OfType<string>()
             .Where(key => key.StartsWith("Database__", StringComparison.OrdinalIgnoreCase)
-                || key.StartsWith("DATABASE_", StringComparison.Ordinal))
+                || key.StartsWith("DATABASE_", StringComparison.Ordinal)
+                || key.StartsWith("IdentityDatabase__", StringComparison.OrdinalIgnoreCase)
+                || key.StartsWith("IDENTITY_DATABASE_", StringComparison.Ordinal))
             .ToArray();
         var previous = values.Keys.Concat(ambientDatabaseKeys).Distinct(StringComparer.Ordinal).ToDictionary(
             key => key,
@@ -518,7 +656,7 @@ public sealed class ConfigurationExtensionsTests
             }
 
             var builder = new ConfigurationBuilder()
-                .AddInMemoryCollection(values);
+                .AddInMemoryCollection(bootstrapValues ?? values);
             builder.AddSecretAuthorityConfiguration("Testing");
             return builder.Build();
         }

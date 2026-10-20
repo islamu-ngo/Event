@@ -2016,6 +2016,42 @@ fields:
     sensitivity: public
     title: DATABASE_HOST
     type: string
+  env.DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.identity-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    disclosure: advanced
+    group: database
+    help: Dedicated application Local Identity writer credential; never substitute Runtime, Global or Migrator credentials.
+    required: false
+    sensitivity: secret
+    title: DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD
+    type: string
+  env.DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.identity-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    disclosure: advanced
+    group: database
+    help: Dedicated application Local Identity writer login; migration enrollment consumes this name without its password.
+    required: false
+    sensitivity: public
+    title: DATABASE_LOCAL_IDENTITY_WRITER_USERNAME
+    type: string
   env.DATABASE_MIGRATOR_PASSWORD:
     activeWhen:
       op: all
@@ -3305,24 +3341,6 @@ fields:
     sensitivity: public
     title: IDENTITYCORRELATION__TRUSTEDISSUERS__0
     type: string
-  env.IDENTITY_DATABASE_CONNECTION_STRING:
-    activeWhen:
-      op: all
-      operands:
-      - field: operation
-        op: equals
-        value: environment
-      - field: select.feature.identity-config
-        op: equals
-        value: true
-    consequence: 'Host restart: process; startup-owned: true'
-    disclosure: advanced
-    group: integration
-    help: 'Host validator: database-setting. Host validation remains required.'
-    required: false
-    sensitivity: secret
-    title: IDENTITY_DATABASE_CONNECTION_STRING
-    type: string
   env.IDENTITY_DATABASE_HOST:
     activeWhen:
       op: all
@@ -3340,6 +3358,42 @@ fields:
     required: false
     sensitivity: public
     title: IDENTITY_DATABASE_HOST
+    type: string
+  env.IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.identity-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    disclosure: advanced
+    group: integration
+    help: Dedicated external Identity lifecycle writer credential; never substitute Runtime or Migrator credentials.
+    required: false
+    sensitivity: secret
+    title: IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD
+    type: string
+  env.IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:
+    activeWhen:
+      op: all
+      operands:
+      - field: operation
+        op: equals
+        value: environment
+      - field: select.feature.identity-config
+        op: equals
+        value: true
+    consequence: 'Host restart: process; startup-owned: true'
+    disclosure: advanced
+    group: integration
+    help: Dedicated external Identity lifecycle writer login; migration enrollment consumes this name without its password.
+    required: false
+    sensitivity: public
+    title: IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME
     type: string
   env.IDENTITY_DATABASE_MIGRATOR_PASSWORD:
     activeWhen:
@@ -8603,7 +8657,7 @@ fields:
     type: object
 identity:
   familyId: a4bcfaa6-9979-43e5-b1f5-00d552618cdf
-  revision: 6
+  revision: 8
 locales:
 - en
 outputs:
@@ -8892,6 +8946,12 @@ outputs:
         DATABASE_HOST:
           field: env.DATABASE_HOST
           op: copy
+        DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD:
+          field: env.DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD
+          op: copy
+        DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:
+          field: env.DATABASE_LOCAL_IDENTITY_WRITER_USERNAME
+          op: copy
         DATABASE_MIGRATOR_PASSWORD:
           field: env.DATABASE_MIGRATOR_PASSWORD
           op: copy
@@ -9105,11 +9165,14 @@ outputs:
         IDENTITYCORRELATION__TRUSTEDISSUERS__0:
           field: env.IDENTITYCORRELATION__TRUSTEDISSUERS__0
           op: copy
-        IDENTITY_DATABASE_CONNECTION_STRING:
-          field: env.IDENTITY_DATABASE_CONNECTION_STRING
-          op: copy
         IDENTITY_DATABASE_HOST:
           field: env.IDENTITY_DATABASE_HOST
+          op: copy
+        IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD:
+          field: env.IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD
+          op: copy
+        IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME:
+          field: env.IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME
           op: copy
         IDENTITY_DATABASE_MIGRATOR_PASSWORD:
           field: env.IDENTITY_DATABASE_MIGRATOR_PASSWORD

@@ -1509,10 +1509,14 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/database/DATABASE_RUNTIME_PASSWORD` | Runtime database password |
 | `/database/DATABASE_GLOBAL_USERNAME` | Independent bounded-capability database username |
 | `/database/DATABASE_GLOBAL_PASSWORD` | Startup-owned Global database password |
+| `/database/DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | Dedicated application-side Local Identity workflow login; distinct from Runtime, Global and Migrator |
+| `/database/DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | Dedicated Local Identity workflow password; never a sibling-role fallback |
 | `/database/DATABASE_MIGRATOR_USERNAME` | Migrator database username |
 | `/database/DATABASE_MIGRATOR_PASSWORD` | Migrator database password |
 | `/database/ERASURE_DATABASE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase` |
 | `/database/IDENTITY_DATABASE_TOPOLOGY` | Identity database topology: `colocated` or `external` |
+| `/database/identity/IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | External Identity lifecycle writer login |
+| `/database/identity/IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | External Identity lifecycle writer password |
 | `/database/erasure/ERASURE_DATABASE_PROVIDER` | External authority provider (fixed to `PostgreSql`) |
 | `/database/erasure/ERASURE_DATABASE_HOST` | External authority PostgreSQL host |
 | `/database/erasure/ERASURE_DATABASE_PORT` | External authority PostgreSQL port (default: `5432`) |

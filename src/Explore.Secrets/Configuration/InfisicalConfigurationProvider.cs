@@ -393,7 +393,6 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             {
                 "IDENTITY_DATABASE_TOPOLOGY" => "IdentityDatabase:Topology",
                 "IDENTITY_DATABASE_PROVIDER" or "PROVIDER" => "IdentityDatabase:Provider",
-                "IDENTITY_DATABASE_CONNECTION_STRING" or "CONNECTION_STRING" => "IdentityDatabase:ConnectionString",
                 "IDENTITY_DATABASE_HOST" or "HOST" => "IdentityDatabase:Host",
                 "IDENTITY_DATABASE_PORT" or "PORT" => "IdentityDatabase:Port",
                 "IDENTITY_DATABASE_NAME" or "DATABASE" or "NAME" => "IdentityDatabase:Name",
@@ -402,6 +401,9 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 "IDENTITY_DATABASE_RUNTIME_PASSWORD" or "RUNTIME_PASSWORD" => "IdentityDatabase:Runtime:Password",
                 "IDENTITY_DATABASE_MIGRATOR_USERNAME" or "MIGRATOR_USERNAME" => "IdentityDatabase:Migrator:Username",
                 "IDENTITY_DATABASE_MIGRATOR_PASSWORD" or "MIGRATOR_PASSWORD" => "IdentityDatabase:Migrator:Password",
+                "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME" or "LOCAL_IDENTITY_WRITER_USERNAME" => "IdentityDatabase:LocalIdentityWriter:Username",
+                "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "LOCAL_IDENTITY_WRITER_PASSWORD" => "IdentityDatabase:LocalIdentityWriter:Password",
+                "IDENTITY_DATABASE_SERVER_VERSION" or "SERVER_VERSION" => "IdentityDatabase:ServerVersion",
                 "IDENTITY_DATABASE_TLS_MODE" or "TLS_MODE" => "IdentityDatabase:TlsMode",
                 "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE" or "TRUST_SERVER_CERTIFICATE" => "IdentityDatabase:TrustServerCertificate",
                 _ => $"IdentityDatabase:{ToPascalCase(secretKey)}"
@@ -422,6 +424,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 "DATABASE_RUNTIME_PASSWORD" or "RUNTIME_PASSWORD" => "Database:Runtime:Password",
                 "DATABASE_GLOBAL_USERNAME" or "GLOBAL_USERNAME" => "Database:Global:Username",
                 "DATABASE_GLOBAL_PASSWORD" or "GLOBAL_PASSWORD" => "Database:Global:Password",
+                "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME" or "LOCAL_IDENTITY_WRITER_USERNAME" => "Database:LocalIdentityWriter:Username",
+                "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "LOCAL_IDENTITY_WRITER_PASSWORD" => "Database:LocalIdentityWriter:Password",
                 "DATABASE_INSTANCE_KEY_READ_USERNAME" or "INSTANCE_KEY_READ_USERNAME" => "Database:InstanceKeyRead:Username",
                 "DATABASE_INSTANCE_KEY_READ_PASSWORD" or "INSTANCE_KEY_READ_PASSWORD" => "Database:InstanceKeyRead:Password",
                 "DATABASE_INSTANCE_KEY_WRITE_USERNAME" or "INSTANCE_KEY_WRITE_USERNAME" => "Database:InstanceKeyWrite:Username",

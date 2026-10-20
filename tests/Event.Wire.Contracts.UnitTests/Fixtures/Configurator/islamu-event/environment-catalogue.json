@@ -1,10 +1,10 @@
 {
   "_metadata": {
     "about": [
-      "Generated value-safe environment catalogue; do not edit by hand.",
-      "Owned by eng/configurator/DefinitionExporter."
+      "Test-owned value-safe environment catalogue.",
+      "Independent Event contract expectations; not a Configurator-generated release."
     ],
-    "generatedBy": "eng/configurator/DefinitionExporter"
+    "maintainedBy": "Event Wire contract tests"
   },
   "schemaVersion": 1,
   "definitions": [
@@ -4177,31 +4177,6 @@
       "documentation": {
         "localizationKey": "environment.integration.identity_database_provider",
         "helpKey": "environment.help.identity_database_provider",
-        "anchor": "environment-integration"
-      },
-      "activation": {
-        "kind": "feature",
-        "identifier": "identity-config",
-        "operands": []
-      }
-    },
-    {
-      "key": "IDENTITY_DATABASE_CONNECTION_STRING",
-      "category": "integration",
-      "sensitivity": "secret",
-      "requirement": "optional",
-      "order": 163,
-      "hasSafeDefault": false,
-      "validatorId": "database-setting",
-      "restartBehavior": "process",
-      "generation": {
-        "surfaces": 6,
-        "composeOrder": 14,
-        "composeRequired": false
-      },
-      "documentation": {
-        "localizationKey": "environment.integration.identity_database_connection_string",
-        "helpKey": "environment.help.identity_database_connection_string",
         "anchor": "environment-integration"
       },
       "activation": {
@@ -10871,9 +10846,115 @@
           }
         ]
       }
+    },
+    {
+      "key": "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+      "category": "database",
+      "sensitivity": "public",
+      "requirement": "optional",
+      "order": 428,
+      "hasSafeDefault": false,
+      "validatorId": "database-setting",
+      "restartBehavior": "process",
+      "generation": {
+        "surfaces": 7,
+        "dotenvOrder": 120,
+        "composeOrder": 352,
+        "composeRequired": false
+      },
+      "documentation": {
+        "localizationKey": "environment.database.database_local_identity_writer_username",
+        "helpKey": "environment.help.database_local_identity_writer_username",
+        "anchor": "environment-database"
+      },
+      "activation": {
+        "kind": "feature",
+        "identifier": "identity-config",
+        "operands": []
+      }
+    },
+    {
+      "key": "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+      "category": "database",
+      "sensitivity": "secret",
+      "requirement": "optional",
+      "order": 429,
+      "hasSafeDefault": false,
+      "validatorId": "database-setting",
+      "restartBehavior": "process",
+      "generation": {
+        "surfaces": 7,
+        "dotenvOrder": 121,
+        "composeOrder": 353,
+        "composeRequired": false
+      },
+      "documentation": {
+        "localizationKey": "environment.database.database_local_identity_writer_password",
+        "helpKey": "environment.help.database_local_identity_writer_password",
+        "anchor": "environment-database"
+      },
+      "activation": {
+        "kind": "feature",
+        "identifier": "identity-config",
+        "operands": []
+      }
+    },
+    {
+      "key": "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+      "category": "integration",
+      "sensitivity": "public",
+      "requirement": "optional",
+      "order": 430,
+      "hasSafeDefault": false,
+      "validatorId": "database-setting",
+      "restartBehavior": "process",
+      "generation": {
+        "surfaces": 7,
+        "dotenvOrder": 122,
+        "composeOrder": 354,
+        "composeRequired": false
+      },
+      "documentation": {
+        "localizationKey": "environment.integration.identity_database_local_identity_writer_username",
+        "helpKey": "environment.help.identity_database_local_identity_writer_username",
+        "anchor": "environment-integration"
+      },
+      "activation": {
+        "kind": "feature",
+        "identifier": "identity-config",
+        "operands": []
+      }
+    },
+    {
+      "key": "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+      "category": "integration",
+      "sensitivity": "secret",
+      "requirement": "optional",
+      "order": 431,
+      "hasSafeDefault": false,
+      "validatorId": "database-setting",
+      "restartBehavior": "process",
+      "generation": {
+        "surfaces": 7,
+        "dotenvOrder": 123,
+        "composeOrder": 355,
+        "composeRequired": false
+      },
+      "documentation": {
+        "localizationKey": "environment.integration.identity_database_local_identity_writer_password",
+        "helpKey": "environment.help.identity_database_local_identity_writer_password",
+        "anchor": "environment-integration"
+      },
+      "activation": {
+        "kind": "feature",
+        "identifier": "identity-config",
+        "operands": []
+      }
     }
   ],
   "secretBindingEnvironmentKeys": [
+    "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+    "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
     "ADMISSIONS_CREDENTIAL_LOOKUP_HMAC_KEY",
     "ADMISSIONS_RECOVERY_CAPABILITY_HMAC_KEY",
     "ADMISSIONS_SCANNER_CAPABILITY_HMAC_KEY",
@@ -10900,7 +10981,6 @@
     "EVENT_DP_COMBINED_ADMISSION",
     "EVENT_DP_COMBINED_RING",
     "GOOGLE_CLIENT_SECRET",
-    "IDENTITY_DATABASE_CONNECTION_STRING",
     "IDENTITY_DATABASE_MIGRATOR_PASSWORD",
     "IDENTITY_DATABASE_RUNTIME_PASSWORD",
     "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
@@ -11063,7 +11143,11 @@
     "CONFIGURATION_MANIFEST_PATH",
     "CONFIGURATION_MANIFEST_HOST_DIRECTORY",
     "ISLAMU_SETUP_SIGNING",
-    "ISLAMU_SETUP_ENCRYPTION"
+    "ISLAMU_SETUP_ENCRYPTION",
+    "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+    "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+    "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+    "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"
   ],
   "composeEnvironmentKeys": [
     "KEYCLOAK_REALM",
@@ -11080,7 +11164,6 @@
     "AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS",
     "IDENTITY_DATABASE_TOPOLOGY",
     "IDENTITY_DATABASE_PROVIDER",
-    "IDENTITY_DATABASE_CONNECTION_STRING",
     "IDENTITY_DATABASE_HOST",
     "IDENTITY_DATABASE_PORT",
     "IDENTITY_DATABASE_NAME",
@@ -11417,7 +11500,11 @@
     "OSPREY_RUST_LOG",
     "OSPREY_POD_IP",
     "OSPREY_BIDI_STREAM_PORT",
-    "OSPREY_SYNC_ACTION_PORT"
+    "OSPREY_SYNC_ACTION_PORT",
+    "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+    "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+    "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+    "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"
   ],
   "composeRequiredEnvironmentKeys": [
     "SECRET_PROVIDER"
@@ -11550,7 +11637,6 @@
     "DATABASE_TRUST_SERVER_CERTIFICATE",
     "KEYCLOAK_REQUIRE_HTTPS_METADATA",
     "IDENTITY_DATABASE_PROVIDER",
-    "IDENTITY_DATABASE_CONNECTION_STRING",
     "IDENTITY_DATABASE_HOST",
     "IDENTITY_DATABASE_PORT",
     "IDENTITY_DATABASE_NAME",
@@ -11756,6 +11842,10 @@
     "ANALYTICS_POSTHOG_HOST",
     "ANALYTICS_PERSONAL_API_KEY",
     "LOCALIZATION_TMS_API_KEY",
-    "CONTROL_PLANE_REGISTRATION_CREDENTIALS"
+    "CONTROL_PLANE_REGISTRATION_CREDENTIALS",
+    "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+    "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+    "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+    "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"
   ]
 }

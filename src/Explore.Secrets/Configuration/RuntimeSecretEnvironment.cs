@@ -34,13 +34,55 @@ public static class RuntimeSecretEnvironment
 
         foreach (SecretDefinition definition in SecretDefinitionRegistry.All.Values)
         {
-            if (!SecretAcquisitionPolicy.AllowsPath(consumer, definition.DefaultInfisicalPath))
+            if (!SecretAcquisitionPolicy.AllowsPath(consumer, definition.DefaultInfisicalPath)
+                || Forbidden(definition.DefaultEnvironmentVariableName, consumer))
                 continue;
             string name = definition.DefaultEnvironmentVariableName;
             if (provider == SecretProviderType.Environment && operatorInputs[name] is { } value)
                 target[name] = value;
             else if (provider == SecretProviderType.Infisical)
                 target[name] = string.Empty;
+        }
+
+        // Enrollment identifies configured accounts without borrowing their credentials.
+        // Infisical consumers must obtain these coordinates from their own authority.
+        if (provider == SecretProviderType.Environment
+            && consumer is SecretConsumer.Api or SecretConsumer.Combined or SecretConsumer.Migration)
+        {
+            foreach (string name in new[]
+            {
+                "DATABASE_RUNTIME_USERNAME", "DATABASE_GLOBAL_USERNAME", "DATABASE_MIGRATOR_USERNAME",
+                "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME", "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME",
+                "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "IDENTITY_DATABASE_RUNTIME_USERNAME",
+                "IDENTITY_DATABASE_MIGRATOR_USERNAME", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"
+            })
+                if (operatorInputs[name] is { } value
+                    && (!target.TryGetValue(name, out object? existing) || existing is string { Length: 0 }))
+                    target[name] = value;
+
+            string? identityServerVersion = operatorInputs["IdentityDatabase:ServerVersion"]
+                ?? operatorInputs["IDENTITY_DATABASE_SERVER_VERSION"];
+            if (identityServerVersion is not null)
+                target["IDENTITY_DATABASE_SERVER_VERSION"] = identityServerVersion;
+
+            foreach ((string section, string databasePrefix) in new[]
+            {
+                ("Database", "DATABASE"), ("IdentityDatabase", "IDENTITY_DATABASE")
+            })
+            {
+                foreach (string field in new[] { "Username", "Password" })
+                {
+                    if (field == "Password" && consumer == SecretConsumer.Migration)
+                        continue;
+                    string canonical = $"{section}:LocalIdentityWriter:{field}";
+                    if (operatorInputs[canonical] is not { } value)
+                        continue;
+
+                    // A declared canonical value, including empty, masks its flat alias.
+                    target[canonical.Replace(":", "__", StringComparison.Ordinal)] = value;
+                    target[$"{databasePrefix}_LOCAL_IDENTITY_WRITER_{field.ToUpperInvariant()}"] = string.Empty;
+                }
+            }
         }
 
         if (consumer is SecretConsumer.Bff or SecretConsumer.Combined)
@@ -106,6 +148,10 @@ public static class RuntimeSecretEnvironment
     private static bool Forbidden(string name, SecretConsumer consumer)
     {
         string normalized = name.Replace("__", "_", StringComparison.Ordinal).Replace(':', '_').ToUpperInvariant();
+        if (consumer is not (SecretConsumer.Api or SecretConsumer.Combined)
+            && normalized is "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "DATABASE_LOCALIDENTITYWRITER_PASSWORD"
+                or "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "IDENTITYDATABASE_LOCALIDENTITYWRITER_PASSWORD")
+            return true;
         if (normalized.StartsWith("INFISICAL_", StringComparison.Ordinal)
             || normalized.StartsWith("SECRETPROVIDER_INFISICAL_", StringComparison.Ordinal)
             || normalized.StartsWith("APPHOST_", StringComparison.Ordinal)

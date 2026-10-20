@@ -423,7 +423,10 @@ public sealed class ExploreDbContextModelProviderTests
         {
             ["IdentityDatabase:Topology"] = "external",
             ["IdentityDatabase:Provider"] = provider.ToString(),
-            ["IdentityDatabase:ConnectionString"] = PrimaryDatabaseConfiguration.BuildConnectionString(database).ConnectionString,
+            ["IdentityDatabase:Host"] = database.Host,
+            ["IdentityDatabase:Name"] = database.Database,
+            ["IdentityDatabase:Runtime:Username"] = database.Username,
+            ["IdentityDatabase:Runtime:Password"] = database.Password,
             ["IdentityDatabase:Schema"] = database.Schema,
             ["IdentityDatabase:ServerVersion"] = database.ServerVersion?.ToString()
         }).Build();

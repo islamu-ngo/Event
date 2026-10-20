@@ -4,7 +4,7 @@ description: "Prepare Event configuration with separately installed ISLAMU Confi
 
 # External Configurator for Event
 
-Install [ISLAMU Configurator](https://github.com/ISLAMU/Configurator) separately.
+Install [ISLAMU Configurator](https://github.com/islamu-ngo/Configurator) separately.
 Event no longer bundles the offline CLI, terminal, desktop, browser or shared
 preparation engine. The extraction changes tooling, not Event's environment,
 database schema, authentication, bootstrap or backend configuration authority.
@@ -24,16 +24,19 @@ canonical JSON; clients consume the selected compiled `definition.json`.
 The YAML is not automatically generated or kept fresh. `release.json` records
 the selected release metadata; retained receipts do not prove edited source was
 compiled. Digests enable comparison, not publisher authentication, legal approval
-or release promotion. Revision 6 replaces
-traversal field numbers with semantic paths; synthetic answer keys changed, and
-real answer workspaces are not migrated implicitly. The delivery directory contains
+or release promotion. Selected revision 8 includes the optional application and
+external Identity LocalIdentityWriter username/password fields and removes the
+obsolete shared Identity connection-string field. External Identity uses discrete
+endpoint and purpose-specific credentials. It retains revision 6's
+semantic paths in place of traversal field numbers; real answer workspaces are
+not migrated implicitly. The delivery directory contains
 only this YAML source, `definition.json` and `release.json`. Synthetic inputs,
 answers and expected artifacts live under
 `tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`;
 they are test data, not deployment defaults. Event still accepts JSON/dotenv
 artifacts; YAML is only the authoring format.
 
-Configurator's [packaging guide](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/packaging.md)
+Configurator's [packaging guide](https://github.com/islamu-ngo/Configurator/blob/HEAD/docs/public/packaging.md)
 owns install/build instructions and host support. Copy the complete package
 directory, including license and third-party notices. CLI, terminal, desktop
 and static browser are separately packaged surfaces. A packaged RID is not
@@ -41,8 +44,9 @@ proof of protected-save support: native restricted output currently requires
 Linux and a filesystem where owner-only, create-only protection can be proved.
 Windows/macOS output fails closed; desktop packaging supports Linux x64 only.
 
-The [CLI guide](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/cli.md)
-owns executable grammar and the `islamu-configurator-command/v1` result envelope.
+The [CLI guide](https://github.com/islamu-ngo/Configurator/blob/HEAD/docs/public/cli.md)
+owns executable grammar and the `islamu-configurator-command/v2` result envelope.
+Authoring and runtime definition schemas remain v1.
 For native interactive preparation:
 
 ```bash
@@ -87,8 +91,9 @@ declared format, rather than adding an unsupported YAML conversion switch.
 public-field answers; they never go to stdout. Output is create-only, and an
 existing file is left unchanged.
 
-Machine success means `host-validation-required`, not permission to apply to
-Event. `doctor` checks local writer/schema availability, not target readiness.
+Machine success describes preparation, not permission to apply to Event;
+target acceptance remains separate. `doctor` checks local writer/schema
+availability, not target readiness.
 Keep artifacts separate from runtime secret authority and use Event's existing
 authorized import workflow for promotion.
 
@@ -103,11 +108,11 @@ See [Event definition ownership](../../internal/CONFIGURATOR_DEFINITION_EXPORT.m
 
 Maintainers install the standalone CLI and copy the complete
 `skills/configurator-integrate/` directory from its package or
-[repository](https://github.com/ISLAMU/Configurator/blob/HEAD/skills/configurator-integrate/SKILL.md)
+[repository](https://github.com/islamu-ngo/Configurator/blob/HEAD/skills/configurator-integrate/SKILL.md)
 into their agent's supported skill location. The agent reads Event's public
 configuration code/contracts and authors the supported compact source; it does
-not inspect private answers or launch Event. Confirm the installed v1 command
-and authoring contracts, then use native commands:
+not inspect private answers or launch Event. Confirm the installed v2 command
+result contract and v1 authoring/runtime schemas, then use native commands:
 
 ```bash
 islamu-configurator --help

@@ -14,9 +14,27 @@ internal static class IdentityDatabaseConfiguration
     internal const string SectionName = "IdentityDatabase";
     internal const string DefaultSchema = "islamu_identity";
 
+    /// <summary>Resolves only the declared username for a supported external Identity purpose.</summary>
+    internal static string BindUsername(IConfiguration configuration, PrimaryDatabaseRole role) =>
+        TryBindUsername(configuration, role, out string? username)
+            ? username! : throw new InvalidOperationException($"Missing explicit IdentityDatabase:{role}:Username authority.");
+
+    internal static bool TryBindUsername(IConfiguration configuration, PrimaryDatabaseRole role, out string? username)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        var (roleName, credentialAlias) = RoleAuthority(role);
+        string? declared = Read(configuration, $"{roleName}:Username", $"{credentialAlias}_USERNAME");
+        username = null;
+        if (declared is null or "") return false;
+        if (declared != declared.Trim() || declared.Any(char.IsControl))
+            throw new InvalidOperationException($"IdentityDatabase:{role}:Username must preserve an exact declared login without surrounding whitespace or control characters.");
+        username = declared;
+        return true;
+    }
+
     internal static IdentityDatabaseTopology GetTopology(IConfiguration configuration)
     {
-        string? value = configuration[$"{SectionName}:Topology"]?.Trim();
+        string? value = Read(configuration, "Topology", "TOPOLOGY")?.Trim();
         if (string.IsNullOrWhiteSpace(value)
             || value.Equals("colocated", StringComparison.OrdinalIgnoreCase))
         {
@@ -39,7 +57,7 @@ internal static class IdentityDatabaseConfiguration
                 "External Identity database configuration is available only when IdentityDatabase:Topology is external.");
         }
 
-        string? providerValue = configuration[$"{SectionName}:Provider"]?.Trim();
+        string? providerValue = Read(configuration, "Provider", "PROVIDER")?.Trim();
         if (!Enum.TryParse(providerValue, true, out PrimaryDatabaseProvider provider)
             || !Enum.IsDefined(provider))
         {
@@ -47,37 +65,26 @@ internal static class IdentityDatabaseConfiguration
                 "IdentityDatabase:Provider must be PostgreSql, Sqlite, SqlServer, MariaDb, or MySql.");
         }
 
-        string schema = configuration[$"{SectionName}:Schema"]?.Trim() ?? string.Empty;
+        string schema = Read(configuration, "Schema", "SCHEMA")?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(schema))
         {
             schema = DefaultSchema;
         }
 
-        string? directConnectionString = configuration[$"{SectionName}:ConnectionString"];
-        if (!string.IsNullOrWhiteSpace(directConnectionString))
-        {
-            return new ExternalIdentityDatabaseDescriptor(
-                provider,
-                directConnectionString,
-                schema,
-                GetServerVersion(provider, configuration),
-                GetServerFlavor(provider));
-        }
-
-        string roleName = role == PrimaryDatabaseRole.Runtime ? "Runtime" : "Migrator";
+        var (roleName, credentialAlias) = RoleAuthority(role);
         var options = new PrimaryDatabaseConnectionOptions
         {
             Role = role,
             Provider = provider,
-            Host = configuration[$"{SectionName}:Host"],
-            Port = ReadOptionalInt(configuration[$"{SectionName}:Port"]),
-            Database = configuration[$"{SectionName}:Name"],
+            Host = Read(configuration, "Host", "HOST"),
+            Port = ReadOptionalInt(Read(configuration, "Port", "PORT")),
+            Database = Read(configuration, "Name", "NAME"),
             Schema = schema,
-            Username = configuration[$"{SectionName}:{roleName}:Username"],
-            Password = configuration[$"{SectionName}:{roleName}:Password"],
-            TlsMode = ReadTlsMode(configuration[$"{SectionName}:TlsMode"], provider),
+            Username = Read(configuration, $"{roleName}:Username", $"{credentialAlias}_USERNAME"),
+            Password = Read(configuration, $"{roleName}:Password", $"{credentialAlias}_PASSWORD"),
+            TlsMode = ReadTlsMode(Read(configuration, "TlsMode", "TLS_MODE"), provider),
             TrustServerCertificate =
-                bool.TryParse(configuration[$"{SectionName}:TrustServerCertificate"], out bool trust)
+                bool.TryParse(Read(configuration, "TrustServerCertificate", "TRUST_SERVER_CERTIFICATE"), out bool trust)
                 && trust,
             ServerFlavor = GetServerFlavor(provider),
             ServerVersion = GetServerVersion(provider, configuration),
@@ -90,6 +97,17 @@ internal static class IdentityDatabaseConfiguration
             options.ServerVersion,
             options.ServerFlavor);
     }
+
+    private static string? Read(IConfiguration configuration, string name, string alias) =>
+        configuration[$"{SectionName}:{name}"] ?? configuration[$"IDENTITY_DATABASE_{alias}"];
+
+    private static (string Name, string Alias) RoleAuthority(PrimaryDatabaseRole role) => role switch
+    {
+        PrimaryDatabaseRole.Runtime => ("Runtime", "RUNTIME"),
+        PrimaryDatabaseRole.Migrator => ("Migrator", "MIGRATOR"),
+        PrimaryDatabaseRole.LocalIdentityWriter => ("LocalIdentityWriter", "LOCAL_IDENTITY_WRITER"),
+        _ => throw new InvalidOperationException("The selected purpose cannot access the external Identity database.")
+    };
 
     private static int? ReadOptionalInt(string? value) =>
         string.IsNullOrWhiteSpace(value)
@@ -128,7 +146,7 @@ internal static class IdentityDatabaseConfiguration
         PrimaryDatabaseProvider provider,
         IConfiguration configuration)
     {
-        string? value = configuration[$"{SectionName}:ServerVersion"];
+        string? value = Read(configuration, "ServerVersion", "SERVER_VERSION");
         if (!string.IsNullOrWhiteSpace(value))
         {
             return Version.TryParse(value, out Version? version)

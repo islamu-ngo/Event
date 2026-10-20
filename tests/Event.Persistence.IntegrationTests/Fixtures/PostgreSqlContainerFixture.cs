@@ -50,7 +50,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime,
             PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
             PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
-            PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport
+            PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport,
+            PrimaryDatabaseRole.LocalIdentityWriter
         }.ToDictionary(role => role, role => (
             Username: $"queue_{(int)role}_{suffix}",
             Password: Convert.ToHexString(RandomNumberGenerator.GetBytes(24))));

@@ -147,6 +147,42 @@ public sealed class HumanSecuritySourceGateTests
         await Assert.That(HumanSecuritySourceGate.TryRequireCurrent(original)).IsTrue();
     }
 
+    [Test]
+    public async Task CompletedLeaseCleanupFailureDoesNotReplaceTheOperationDuringLaterAdapterDisposal()
+    {
+        await using var original = CreateContext();
+        await using var contender = CreateContext();
+        var gate = new HumanSecuritySourceGate(original);
+        var lease = await gate.AcquireAsync();
+        await original.Database.GetDbConnection().CloseAsync();
+
+        var cleanup = await Assert.ThrowsAsync<InvalidOperationException>(() => lease.DisposeAsync().AsTask());
+        await Assert.That(cleanup.Message).IsEqualTo("human_security_source_cleanup_lost_custody");
+        await Assert.That(HumanSecuritySourceGate.TryRequireCurrent(original)).IsFalse();
+        await Assert.That(original.Database.CurrentTransaction).IsNull();
+        await using var nextGate = new HumanSecuritySourceGate(contender);
+        await using var next = await nextGate.AcquireAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        nextGate.RequireCurrent();
+
+        var operation = new InvalidOperationException("Original operation failure retained by its caller.");
+        var combined = new AggregateException(operation, cleanup);
+        var observed = await Assert.ThrowsAsync<AggregateException>(async () =>
+        {
+            await using (gate)
+                throw combined;
+        });
+        await Assert.That(observed).IsSameReferenceAs(combined);
+        await Assert.That(observed.InnerExceptions[0]).IsSameReferenceAs(operation);
+        await Assert.That(observed.InnerExceptions[1]).IsSameReferenceAs(cleanup);
+
+        // Only the adapter's later cleanup is idempotent: the returned lease's
+        // original cleanup task still exposes its failure to its owner.
+        var repeated = await Assert.ThrowsAsync<InvalidOperationException>(() => lease.DisposeAsync().AsTask());
+        await Assert.That(repeated).IsSameReferenceAs(cleanup);
+        await gate.DisposeAsync();
+        nextGate.RequireCurrent();
+    }
+
     private static ExploreDbContext CreateContext()
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>()

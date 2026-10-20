@@ -43,7 +43,11 @@ internal sealed class HumanSecuritySourceGate : IAsyncDisposable
         lock (_lifecycle)
         {
             _disposed = true;
-            return _custody?.DisposeAsync() ?? ValueTask.CompletedTask;
+            // The returned lease/acquisition retains its first cleanup result.
+            // A later DI disposal must not replace the caller's composed failure.
+            if (_custody is null || _custody.HasCompletedCleanup)
+                return ValueTask.CompletedTask;
+            return _custody.DisposeAsync();
         }
     }
 }

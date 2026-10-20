@@ -3089,3 +3089,26 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; reusable failure-atomicity lesson with a real provider regression.
 
 ---
+
+[2026-10-20 Europe/Brussels] — Completed lease cleanup must not mask the owner's failure
+
+**Context**: PR #75's application-owned persistence refactor composes the operation error with original-connector and gate-release failures. The same gate adapter can later be disposed by dependency injection.
+
+**Symptom / Observation**: A real PostgreSQL post-COMMIT connector-loss regression reached the injected fault, but later scope disposal exposed only `human_security_source_cleanup_lost_custody`, replacing the original uncertain-settlement classification. A focused SQLite regression reproduces the later-adapter-disposal masking without a host or private data.
+
+**Root Cause**: The returned lease and scoped adapter both awaited the custody's cached cleanup task. Releasing the lease correctly reported its failure; disposing the adapter later rethrew that already-completed failure over the caller's composed exception.
+
+**Resolution**: The adapter skips only already-completed cleanup. Direct lease disposal still returns the original failure, pending cleanup still joins its original task, and disposal prevents reacquisition through the adapter. Independent HEAD-plus-fix verification passed all seven gate cases with `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/HumanSecuritySourceGateTests/*" --minimum-expected-tests 7 --progress off --maximum-parallel-tests 1`. This primitive correction does not by itself certify the command wrapper's separate post-settlement error composition or the whole PostgreSQL workflow.
+
+**Why This Matters for Future Work**: Distinguish the lease owner's first cleanup result from a containing DI scope's later cleanup. Do not suppress the first failure, abandon a pending release, or replay a possibly committed business operation because cleanup failed.
+
+**References**:
+- `src/Explore.Persistence/Security/HumanSecuritySourceGate.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/HumanSecuritySourceGateCustody.cs`
+- `tests/Event.Persistence.IntegrationTests/HumanSecuritySourceGateTests.cs`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; a concrete ownership and failure-composition lesson, not a new authorization policy.
+
+---

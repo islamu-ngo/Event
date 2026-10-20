@@ -8,6 +8,7 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
@@ -17,6 +18,67 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 [NotInParallel("PersistenceDb")]
 public sealed class PostgresPdsQueueAdmissionAuthorityTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ReapplyingInstalledPermissionsPreservesExactColumnsAndRefusesGrantDrift(bool grantOption)
+    {
+        await using var context = fixture.CreateDbContext();
+        await PostgresPdsQueueAdmissionContract.ApplyAsync(context);
+        await PostgresPdsQueueAdmissionContract.ApplyAsync(context);
+
+        var entity = context.Model.FindEntityType(typeof(PdsSyncOutbox))!;
+        var table = StoreObjectIdentifier.Table(
+            entity.GetTableName()!, entity.GetSchema());
+        var names = context.GetService<ISqlGenerationHelper>();
+        string relation = names.DelimitIdentifier(table.Name, table.Schema);
+        string column = entity.FindProperty(grantOption
+            ? nameof(PdsSyncOutbox.Id) : nameof(PdsSyncOutbox.LeaseOwner))!.GetColumnName(table)!;
+        string identifier = names.DelimitIdentifier(column);
+        string owner = names.DelimitIdentifier(PostgresPdsQueueAdmissionContract.OwnerRole);
+        await using var administrator = new NpgsqlConnection(fixture.ConnectionString);
+        await administrator.OpenAsync();
+        await using (var grant = administrator.CreateCommand())
+        {
+            grant.CommandText = $"GRANT SELECT ({identifier}) ON {relation} TO {owner}"
+                + (grantOption ? " WITH GRANT OPTION" : string.Empty);
+            await grant.ExecuteNonQueryAsync();
+        }
+        try
+        {
+            bool rejected = false;
+            try { await PostgresPdsQueueAdmissionContract.ApplyAsync(context); }
+            catch (PostgresException exception) when (exception.SqlState == "P0001")
+            {
+                rejected = true;
+            }
+            await Assert.That(rejected).IsTrue();
+            await using var observe = administrator.CreateCommand();
+            observe.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_attribute attribute
+                    CROSS JOIN LATERAL pg_catalog.aclexplode(attribute.attacl) privilege
+                    WHERE attribute.attrelid = @relation::regclass AND attribute.attname = @column
+                      AND privilege.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = @owner)
+                      AND privilege.privilege_type = 'SELECT' AND privilege.is_grantable = @grantable)
+                """;
+            observe.Parameters.AddWithValue("relation", relation);
+            observe.Parameters.AddWithValue("column", column);
+            observe.Parameters.AddWithValue("owner", PostgresPdsQueueAdmissionContract.OwnerRole);
+            observe.Parameters.AddWithValue("grantable", grantOption);
+            await Assert.That(await observe.ExecuteScalarAsync()).IsEqualTo(true);
+        }
+        finally
+        {
+            await using var revoke = administrator.CreateCommand();
+            revoke.CommandText = grantOption
+                ? $"REVOKE GRANT OPTION FOR SELECT ({identifier}) ON {relation} FROM {owner}"
+                : $"REVOKE SELECT ({identifier}) ON {relation} FROM {owner}";
+            await revoke.ExecuteNonQueryAsync();
+        }
+        await PostgresPdsQueueAdmissionContract.ApplyAsync(context);
+    }
+
     [Test]
     public async Task GlobalAdmissionClaimsOrderedBoundedIdentitiesWithoutPrivateTableAuthority()
     {

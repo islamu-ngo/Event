@@ -103,9 +103,10 @@ public static class PostgresPdsQueueAdmissionContract
         string records = sql.DelimitIdentifier(recordEntity.GetTableName()!, recordSchema);
         string schema = sql.DelimitIdentifier(queueSchema);
         string dependencySchema = sql.DelimitIdentifier(recordSchema);
-        string Column(IEntityType entity, string property) =>
-            sql.DelimitIdentifier(entity.FindProperty(property)!.GetColumnName(
-                StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!);
+        string ColumnName(IEntityType entity, string property) =>
+            entity.FindProperty(property)!.GetColumnName(
+                StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!;
+        string Column(IEntityType entity, string property) => sql.DelimitIdentifier(ColumnName(entity, property));
         string Q(string property) => Column(queueEntity, property);
         string R(string property) => Column(recordEntity, property);
         string Literal(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
@@ -125,11 +126,25 @@ public static class PostgresPdsQueueAdmissionContract
         string uri = R(nameof(AtprotoRecord.Uri));
         string cid = R(nameof(AtprotoRecord.Cid));
         string tombstoned = R(nameof(AtprotoRecord.TombstonedAt));
-        string[] readColumns = [id, tenant, user, status, created, retry, superseded, dependency, token, expires, fence];
-        string[] writeColumns = [status, owner, token, expires, fence];
-        string[] recordColumns = [recordId, uri, cid, tombstoned];
-        string Names(IEnumerable<string> columns) => string.Join(", ", columns.Select(column =>
-            Literal(column[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal))));
+        string[] readProperties =
+        [
+            nameof(PdsSyncOutbox.Id), nameof(PdsSyncOutbox.TenantId), nameof(PdsSyncOutbox.UserId),
+            nameof(PdsSyncOutbox.Status), nameof(PdsSyncOutbox.CreatedAt), nameof(PdsSyncOutbox.NextRetryAt),
+            nameof(PdsSyncOutbox.SupersededAt), nameof(PdsSyncOutbox.DependsOnAtprotoRecordId),
+            nameof(PdsSyncOutbox.LeaseToken), nameof(PdsSyncOutbox.LeaseExpiresAt), nameof(PdsSyncOutbox.LeaseFence)
+        ];
+        string[] writeProperties =
+        [
+            nameof(PdsSyncOutbox.Status), nameof(PdsSyncOutbox.LeaseOwner), nameof(PdsSyncOutbox.LeaseToken),
+            nameof(PdsSyncOutbox.LeaseExpiresAt), nameof(PdsSyncOutbox.LeaseFence)
+        ];
+        string[] recordProperties =
+        [nameof(AtprotoRecord.Id), nameof(AtprotoRecord.Uri), nameof(AtprotoRecord.Cid), nameof(AtprotoRecord.TombstonedAt)];
+        string[] readColumns = readProperties.Select(Q).ToArray();
+        string[] writeColumns = writeProperties.Select(Q).ToArray();
+        string[] recordColumns = recordProperties.Select(R).ToArray();
+        string Names(IEntityType entity, IEnumerable<string> properties) =>
+            string.Join(", ", properties.Select(property => Literal(ColumnName(entity, property))));
         string function = FunctionSql(context);
         string signature = $"{function}(integer, text, timestamp with time zone, timestamp with time zone, uuid[])";
         long lockKey = RelationalNamedLock.ComputeStableKey("atproto-pds-outbox-claim");
@@ -194,11 +209,11 @@ public static class PostgresPdsQueueAdmissionContract
                       AND role.rolname IN ('{OwnerRole}', '{GlobalRole}')
                       AND (role.rolname = '{GlobalRole}' OR privilege.is_grantable OR NOT (
                           (attribute.attrelid = {Literal(queue)}::pg_catalog.regclass
-                           AND ((privilege.privilege_type = 'SELECT' AND attribute.attname IN ({Names(readColumns)}))
-                             OR (privilege.privilege_type = 'UPDATE' AND attribute.attname IN ({Names(writeColumns)}))))
+                           AND ((privilege.privilege_type = 'SELECT' AND attribute.attname IN ({Names(queueEntity, readProperties)}))
+                             OR (privilege.privilege_type = 'UPDATE' AND attribute.attname IN ({Names(queueEntity, writeProperties)}))))
                           OR (attribute.attrelid = {Literal(records)}::pg_catalog.regclass
                               AND privilege.privilege_type = 'SELECT'
-                              AND attribute.attname IN ({Names(recordColumns)}))))) THEN
+                              AND attribute.attname IN ({Names(recordEntity, recordProperties)}))))) THEN
                     RAISE EXCEPTION 'unsafe PDS admission column grants';
                 END IF;
             END $contract$;

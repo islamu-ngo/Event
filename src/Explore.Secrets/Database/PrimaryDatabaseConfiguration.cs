@@ -61,6 +61,7 @@ public static partial class PrimaryDatabaseConfiguration
             PrimaryDatabaseRole.PlatformKeyReport => nameof(PrimaryDatabaseRole.PlatformKeyReport),
             PrimaryDatabaseRole.EmailPolicyInstanceMutation => nameof(PrimaryDatabaseRole.EmailPolicyInstanceMutation),
             PrimaryDatabaseRole.EmailPolicyTenantMutation => nameof(PrimaryDatabaseRole.EmailPolicyTenantMutation),
+            PrimaryDatabaseRole.LocalIdentityWriter => nameof(PrimaryDatabaseRole.LocalIdentityWriter),
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
         });
         var providerValue = ReadRequired(configuration, root, roleSection, "Provider", role);
@@ -502,6 +503,7 @@ public static partial class PrimaryDatabaseConfiguration
             PrimaryDatabaseRole.PlatformKeyReport => "PLATFORM_KEY_REPORT",
             PrimaryDatabaseRole.EmailPolicyInstanceMutation => "EMAIL_POLICY_INSTANCE_MUTATION",
             PrimaryDatabaseRole.EmailPolicyTenantMutation => "EMAIL_POLICY_TENANT_MUTATION",
+            PrimaryDatabaseRole.LocalIdentityWriter => "LOCAL_IDENTITY_WRITER",
             _ => databaseRole.ToString().ToUpperInvariant()
         };
         string? value = role[key] ?? configuration[$"DATABASE_{environmentRole}_{key.ToUpperInvariant()}"];

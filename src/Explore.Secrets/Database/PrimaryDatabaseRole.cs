@@ -11,4 +11,5 @@ public enum PrimaryDatabaseRole
     PlatformKeyReport = 7,
     EmailPolicyInstanceMutation = 8,
     EmailPolicyTenantMutation = 9,
+    LocalIdentityWriter = 10,
 }

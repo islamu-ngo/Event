@@ -6,6 +6,72 @@ namespace Event.Application.UnitTests.Features.Management;
 public sealed class ManagedTenantWorkerCreationSnapshotTests
 {
     [Test]
+    public async Task OriginalScheduledPendingRequestCanBeRetainedBeforeItsCreatorStarts()
+    {
+        var operation = Operation();
+        operation.Status = ManagedTenantProvisioningStatus.Pending;
+
+        var snapshot = ManagedTenantWorkerCreationSnapshot.CapturePending(operation, operation.CurrentOutboxMessageId);
+
+        snapshot.RequireCurrent(operation);
+        await Assert.That(snapshot.OperationId).IsEqualTo(operation.Id);
+        await Assert.That(snapshot.OutboxMessageId).IsEqualTo(operation.CurrentOutboxMessageId);
+        await Assert.That(ManagedTenantProvisioningRequestCodec.ComputeHash(snapshot.ReadRequest()))
+            .IsEqualTo(operation.RequestHash);
+        await Assert.That(operation.Status).IsEqualTo(ManagedTenantProvisioningStatus.Pending);
+    }
+
+    [Test]
+    [Arguments(ManagedTenantProvisioningStatus.Processing)]
+    [Arguments(ManagedTenantProvisioningStatus.Succeeded)]
+    [Arguments(ManagedTenantProvisioningStatus.Failed)]
+    [Arguments(ManagedTenantProvisioningStatus.Cancelled)]
+    public async Task PendingCaptureCannotRelabelAnotherLifecycleStage(ManagedTenantProvisioningStatus status)
+    {
+        var operation = Operation();
+        operation.Status = status;
+
+        await Assert.That(() => ManagedTenantWorkerCreationSnapshot.CapturePending(operation, operation.CurrentOutboxMessageId))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task StartingTheOperationDoesNotSilentlyRewriteItsRetainedPendingImage()
+    {
+        var operation = Operation();
+        operation.Status = ManagedTenantProvisioningStatus.Pending;
+        var snapshot = ManagedTenantWorkerCreationSnapshot.CapturePending(operation, operation.CurrentOutboxMessageId);
+
+        operation.Start(DateTime.UtcNow);
+
+        await Assert.That(() => snapshot.RequireCurrent(operation)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task PendingCaptureCannotFollowAReplacedDeliveryGeneration()
+    {
+        var operation = Operation();
+        operation.Status = ManagedTenantProvisioningStatus.Pending;
+        var snapshot = ManagedTenantWorkerCreationSnapshot.CapturePending(operation, operation.CurrentOutboxMessageId);
+        operation.CurrentOutboxMessageId = Guid.CreateVersion7();
+
+        await Assert.That(() => snapshot.RequireCurrent(operation)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task RehashingAnotherRequestCannotReplaceTheOriginalScheduledPendingRequest()
+    {
+        var operation = Operation();
+        operation.Status = ManagedTenantProvisioningStatus.Pending;
+        var snapshot = ManagedTenantWorkerCreationSnapshot.CapturePending(operation, operation.CurrentOutboxMessageId);
+        operation.RequestJson = operation.RequestJson!.Replace("Original Tenant", "Other Tenant", StringComparison.Ordinal);
+        operation.RequestHash = ManagedTenantProvisioningRequestCodec.ComputeHash(
+            ManagedTenantProvisioningRequestCodec.Deserialize(operation.RequestJson));
+
+        await Assert.That(() => snapshot.RequireCurrent(operation)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task PaddedTenantNameReturnsTheSameNormalizedRequestThatWasHashed()
     {
         var operation = Operation();

@@ -36,13 +36,22 @@ public sealed class ManagedTenantWorkerCreationSnapshot
     public ManagementTenantProvisioningRequestDto ReadRequest() =>
         ManagedTenantProvisioningRequestCodec.Deserialize(requestImage);
 
+    /// <summary>Retains the scheduled generation before the original creator starts it.</summary>
+    public static ManagedTenantWorkerCreationSnapshot CapturePending(
+        ManagedTenantProvisioningOperation operation, Guid expectedOutboxMessageId) =>
+        CaptureCore(operation, expectedOutboxMessageId, ManagedTenantProvisioningStatus.Pending);
+
     public static ManagedTenantWorkerCreationSnapshot Capture(
-        ManagedTenantProvisioningOperation operation, Guid expectedOutboxMessageId)
+        ManagedTenantProvisioningOperation operation, Guid expectedOutboxMessageId) =>
+        CaptureCore(operation, expectedOutboxMessageId, ManagedTenantProvisioningStatus.Processing);
+
+    private static ManagedTenantWorkerCreationSnapshot CaptureCore(
+        ManagedTenantProvisioningOperation operation, Guid expectedOutboxMessageId, ManagedTenantProvisioningStatus status)
     {
         ArgumentNullException.ThrowIfNull(operation);
         if (operation.Id == Guid.Empty || operation.ManagedInstanceId == Guid.Empty
             || expectedOutboxMessageId == Guid.Empty || operation.CurrentOutboxMessageId != expectedOutboxMessageId
-            || operation.Status != ManagedTenantProvisioningStatus.Processing
+            || operation.Status != status
             || string.IsNullOrWhiteSpace(operation.RequestJson))
             throw Changed();
         ManagementTenantProvisioningRequestDto request;

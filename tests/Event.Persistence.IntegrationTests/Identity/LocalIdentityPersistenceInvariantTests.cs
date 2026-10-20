@@ -100,7 +100,7 @@ public sealed class LocalIdentityPersistenceInvariantTests
                 ["IdentityDatabase:Name"] = provider == PrimaryDatabaseProvider.Sqlite ? "identity-model.db" : "identity_model",
                 ["IdentityDatabase:Migrator:Username"] = provider == PrimaryDatabaseProvider.Sqlite ? null : "identity_model_migrator",
                 ["IdentityDatabase:Migrator:Password"] = provider == PrimaryDatabaseProvider.Sqlite ? null : TestPassword(),
-                ["IdentityDatabase:TrustServerCertificate"] = "true",
+                ["IdentityDatabase:TrustServerCertificate"] = provider == PrimaryDatabaseProvider.Sqlite ? null : "true",
                 ["IdentityDatabase:ServerVersion"] = provider == PrimaryDatabaseProvider.MySql
                     ? "8.4"
                     : null,

@@ -146,7 +146,7 @@ public static class PostgresLocalizationSecretStatusReadPermissions
                     AND NULLIF(pg_catalog.current_setting('app.current_tenant_id',true),'')::uuid IS NOT DISTINCT FROM @tenant
                 """;
             identity.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid)
-                { Value = (object?)tenant ?? DBNull.Value });
+            { Value = (object?)tenant ?? DBNull.Value });
             if (await identity.ExecuteScalarAsync(cancellationToken) is not true)
                 throw new UnauthorizedAccessException("localization_status_read_permissions_not_ready");
             RequireOriginal();

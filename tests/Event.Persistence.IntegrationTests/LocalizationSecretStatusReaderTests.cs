@@ -78,7 +78,7 @@ public sealed class LocalizationSecretStatusReaderTests(PostgreSqlContainerFixtu
         if (role == PrimaryDatabaseRole.Runtime)
             options.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
         var context = new ExploreDbContext(options.Options)
-            { TenantContext = tenant.HasValue ? new SelectedTenant(tenant.Value) : null };
+        { TenantContext = tenant.HasValue ? new SelectedTenant(tenant.Value) : null };
         context.BindTenantLease();
         return context;
     }

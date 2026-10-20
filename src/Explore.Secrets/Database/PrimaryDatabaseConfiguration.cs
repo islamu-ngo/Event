@@ -43,6 +43,22 @@ public static partial class PrimaryDatabaseConfiguration
             "Username", role) ?? throw new InvalidOperationException($"Missing explicit Database:{role}:Username authority.");
     }
 
+    /// <summary>Detects an explicit purpose username without loading its password or another purpose's credentials.</summary>
+    public static bool TryBindUsername(IConfiguration configuration, PrimaryDatabaseRole role, out string? username)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        if (!Enum.IsDefined(role))
+            throw new ArgumentOutOfRangeException(nameof(role), role, null);
+        string? declared = ReadDeclaredRoleCredential(configuration,
+            configuration.GetSection(SectionName).GetSection(role.ToString()), "Username", role);
+        username = null;
+        if (declared is null or "") return false;
+        if (declared != declared.Trim() || declared.Any(char.IsControl))
+            throw new InvalidOperationException($"Database:{role}:Username must preserve an exact declared login without surrounding whitespace or control characters.");
+        username = declared;
+        return true;
+    }
+
     public static PrimaryDatabaseConnectionOptions Bind(IConfiguration configuration, PrimaryDatabaseRole role)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -494,6 +510,14 @@ public static partial class PrimaryDatabaseConfiguration
     private static string? ReadRoleCredential(
         IConfiguration configuration, IConfiguration role, string key, PrimaryDatabaseRole databaseRole)
     {
+        string? value = ReadDeclaredRoleCredential(configuration, role, key, databaseRole);
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return key == "Password" ? value : value.Trim();
+    }
+
+    private static string? ReadDeclaredRoleCredential(
+        IConfiguration configuration, IConfiguration role, string key, PrimaryDatabaseRole databaseRole)
+    {
         // Explicit empty values fail closed; a role cannot inherit shared or another role's credentials.
         string environmentRole = databaseRole switch
         {
@@ -506,9 +530,7 @@ public static partial class PrimaryDatabaseConfiguration
             PrimaryDatabaseRole.LocalIdentityWriter => "LOCAL_IDENTITY_WRITER",
             _ => databaseRole.ToString().ToUpperInvariant()
         };
-        string? value = role[key] ?? configuration[$"DATABASE_{environmentRole}_{key.ToUpperInvariant()}"];
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        return key == "Password" ? value : value.Trim();
+        return role[key] ?? configuration[$"DATABASE_{environmentRole}_{key.ToUpperInvariant()}"];
     }
 
     private static string? ReadOptional(IConfiguration configuration, IConfiguration root, IConfiguration role, string key, PrimaryDatabaseRole? databaseRole = null)

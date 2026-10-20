@@ -43,15 +43,17 @@ public sealed class CustomPropertyPatternLengthLifecycleTests
             await fixture.CreateOptionsAsync(provider));
         var tenantIdentity = new TenantIdentity(Guid.CreateVersion7());
         await using var context = new ExploreDbContext(options.Options) { TenantContext = tenantIdentity };
+        context.BindTenantLease();
         IMigrationsAssembly assembly = context.GetService<IMigrationsAssembly>();
         string[] migrations = context.Database.GetMigrations().ToArray();
         string target = migrations.Single(id => id.EndsWith(
             "_ReconcileCustomPropertyPatternLength", StringComparison.Ordinal));
         int targetIndex = Array.IndexOf(migrations, target);
         await Assert.That(targetIndex).IsGreaterThan(0);
-        await Assert.That(migrations[^1]).IsEqualTo(target);
         string predecessor = migrations[targetIndex - 1];
         string[] beforeHistory = migrations[..targetIndex];
+        // This lifecycle targets the reconciliation, not subsequently added migrations.
+        string[] throughTargetHistory = migrations[..(targetIndex + 1)];
         Migration generated = assembly.CreateMigration(assembly.Migrations[target], context.Database.ProviderName!);
         AlterColumnOperation[] reductions = generated.DownOperations.OfType<AlterColumnOperation>().ToArray();
         await Assert.That(reductions.Length).IsEqualTo(5);
@@ -107,7 +109,7 @@ public sealed class CustomPropertyPatternLengthLifecycleTests
         await AssertPatternAsync(context, definitionTable, definition.Id, fitting);
 
         await TransitionAsync(context, migrator, predecessor, target, exportedScript);
-        await AssertHistoryAsync(context, migrations);
+        await AssertHistoryAsync(context, throughTargetHistory);
         await AssertWidthsAsync(context, reductions, 2048);
         await AssertPatternAsync(context, definitionTable, definition.Id, fitting);
 
@@ -132,7 +134,7 @@ public sealed class CustomPropertyPatternLengthLifecycleTests
         }
         await Assert.That(rejection).IsNotNull();
         await Assert.That(rejection!.Message).Contains("ck_varchar_narrowing_");
-        await AssertHistoryAsync(context, migrations);
+        await AssertHistoryAsync(context, throughTargetHistory);
         await AssertWidthsAsync(context, reductions, 2048);
         await AssertPatternAsync(context, definitionTable, definition.Id, overflow);
         await Assert.That(await ScalarAsync(connection, "SELECT @@SESSION.sql_mode")).IsEqualTo(string.Empty);
@@ -147,7 +149,7 @@ public sealed class CustomPropertyPatternLengthLifecycleTests
         await AssertNoGuardsAsync(context, reductions);
 
         await TransitionAsync(context, migrator, predecessor, target, exportedScript);
-        await AssertHistoryAsync(context, migrations);
+        await AssertHistoryAsync(context, throughTargetHistory);
         await AssertWidthsAsync(context, reductions, 2048);
         await AssertPatternAsync(context, definitionTable, definition.Id, fitting);
         await AssertNoGuardsAsync(context, reductions);

@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Settings;
+using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -42,20 +43,28 @@ public sealed class ManagedTenantProvisioningPreflight(
         TenantSettingDefinitions.WhiteLabelingEnabled.Key
     ];
 
-    public async Task<ManagedTenantProvisioningPreflightResult> EvaluateAsync(
+    public Task<ManagedTenantProvisioningPreflightResult> EvaluateAsync(
         ManagementTenantProvisioningRequestDto request,
         bool requireProvisionablePlan,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        EvaluateFromSourcesAsync(request, requireProvisionablePlan,
+            new RepositorySources(tenantRepository, tenantPlanRepository, moduleDefinitionRepository,
+                tenantDomains, systemSettingRepository, brandingLockService, storageQuotaCeilingPolicy, credentials),
+            cancellationToken);
+
+    /// <summary>Runs the same policy against the original caller's retained read-only sources.</summary>
+    public static async Task<ManagedTenantProvisioningPreflightResult> EvaluateFromSourcesAsync(
+        ManagementTenantProvisioningRequestDto request, bool requireProvisionablePlan,
+        IManagedTenantProvisioningPreflightSource source, CancellationToken cancellationToken)
     {
-        Tenant? existingTenant = await tenantRepository.GetTenantBySlug(request.TenantSlug);
-        if (existingTenant is not null)
+        if (await source.TenantSlugExistsAsync(request.TenantSlug, cancellationToken))
         {
             return ManagedTenantProvisioningPreflightResult.Fail(
                 "tenant_slug_conflict",
                 "The requested tenant slug is already in use.");
         }
 
-        TenantPlanVersion? planVersion = await tenantPlanRepository.GetVersionAsync(
+        TenantPlanVersion? planVersion = await source.GetPlanVersionAsync(
             request.Plan.VersionId,
             cancellationToken);
         if (planVersion is null
@@ -82,7 +91,7 @@ public sealed class ManagedTenantProvisioningPreflight(
                 "The requested quotas do not match the immutable tenant plan version.");
         }
 
-        string? quotaError = await storageQuotaCeilingPolicy.ValidateAsync(
+        string? quotaError = await source.ValidateStorageQuotasAsync(
             planVersion.Quotas,
             cancellationToken);
         if (quotaError is not null)
@@ -92,7 +101,7 @@ public sealed class ManagedTenantProvisioningPreflight(
                 "The requested plan storage quota exceeds the Event instance ceiling.");
         }
 
-        IReadOnlyList<ModuleDefinition> modules = await moduleDefinitionRepository.GetActiveByKeysAsync(
+        IReadOnlyList<ModuleDefinition> modules = await source.GetActiveModulesAsync(
             request.ApprovedModules,
             cancellationToken);
         if (modules.Count != request.ApprovedModules.Count)
@@ -104,6 +113,7 @@ public sealed class ManagedTenantProvisioningPreflight(
 
         ManagedTenantProvisioningPreflightResult? domainFailure = await ValidateDomainIntentAsync(
             request,
+            source,
             cancellationToken);
         if (domainFailure is not null)
         {
@@ -111,7 +121,7 @@ public sealed class ManagedTenantProvisioningPreflight(
         }
 
         if (request.Administrator.LocalIdentity is { } local
-            && await credentials.ReadLinkedIdentityAsync(local.LocalSubjectId, cancellationToken) is null)
+            && await source.ReadLocalAdministratorAsync(local.LocalSubjectId, cancellationToken) is null)
         {
             return ManagedTenantProvisioningPreflightResult.Fail(
                 "tenant_local_administrator_unavailable",
@@ -119,8 +129,8 @@ public sealed class ManagedTenantProvisioningPreflight(
         }
 
         BrandingSettings branding = MapBranding(request);
-        var brandingLockState = await brandingLockService.GetLockStateAsync(cancellationToken);
-        IReadOnlyList<string> brandingErrors = brandingLockService.ValidateAllowedChanges(
+        var brandingLockState = await source.ReadBrandingLocksAsync(cancellationToken);
+        IReadOnlyList<string> brandingErrors = TenantBrandingSettingsDocumentLockService.ValidateChanges(
             new BrandingSettings { DisplayName = request.TenantName },
             branding,
             brandingLockState);
@@ -134,6 +144,7 @@ public sealed class ManagedTenantProvisioningPreflight(
         ManagedTenantProvisioningSettingsResult settings = await ResolveSettingsAsync(
             request,
             planVersion,
+            source,
             cancellationToken);
         if (!settings.Success)
         {
@@ -149,8 +160,9 @@ public sealed class ManagedTenantProvisioningPreflight(
                 branding));
     }
 
-    private async Task<ManagedTenantProvisioningPreflightResult?> ValidateDomainIntentAsync(
+    private static async Task<ManagedTenantProvisioningPreflightResult?> ValidateDomainIntentAsync(
         ManagementTenantProvisioningRequestDto request,
+        IManagedTenantProvisioningPreflightSource source,
         CancellationToken cancellationToken)
     {
         if (request.Domain is null)
@@ -171,10 +183,7 @@ public sealed class ManagedTenantProvisioningPreflight(
 
         foreach (string host in new[] { subdomain, customDomain }.OfType<string>())
         {
-            TenantSetting? collision = await tenantDomains.GetByDomainHostAsync(
-                host,
-                cancellationToken);
-            if (collision is not null)
+            if (await source.DomainHostExistsAsync(host, cancellationToken))
             {
                 return ManagedTenantProvisioningPreflightResult.Fail(
                     "tenant_domain_conflict",
@@ -187,7 +196,7 @@ public sealed class ManagedTenantProvisioningPreflight(
             return null;
         }
 
-        SystemSetting? allowCustomDomain = await systemSettingRepository.GetByKey(
+        SystemSetting? allowCustomDomain = await source.ReadPolicySettingAsync(
             GovernanceSettingKeys.Domains.AllowTenantCustomDomain,
             cancellationToken);
         if (!SettingValueSerializer.DeserializeBool(allowCustomDomain?.Value, true))
@@ -200,9 +209,10 @@ public sealed class ManagedTenantProvisioningPreflight(
         return null;
     }
 
-    private async Task<ManagedTenantProvisioningSettingsResult> ResolveSettingsAsync(
+    private static async Task<ManagedTenantProvisioningSettingsResult> ResolveSettingsAsync(
         ManagementTenantProvisioningRequestDto request,
         TenantPlanVersion planVersion,
+        IManagedTenantProvisioningPreflightSource source,
         CancellationToken cancellationToken)
     {
         var settings = new Dictionary<string, TenantSettingOverrideUpsert>(StringComparer.Ordinal);
@@ -214,6 +224,7 @@ public sealed class ManagedTenantProvisioningPreflight(
                 planSetting.JsonValue,
                 planSetting.IsLocked,
                 allowPlanSetting: true,
+                source,
                 cancellationToken);
             if (failure is not null)
             {
@@ -229,6 +240,7 @@ public sealed class ManagedTenantProvisioningPreflight(
                 initialSetting.JsonValue,
                 isLocked: false,
                 allowPlanSetting: false,
+                source,
                 cancellationToken);
             if (failure is not null)
             {
@@ -244,6 +256,7 @@ public sealed class ManagedTenantProvisioningPreflight(
                 JsonSerializer.Serialize(request.Domain.Subdomain),
                 isLocked: false,
                 allowPlanSetting: true,
+                source,
                 cancellationToken);
             if (failure is not null)
             {
@@ -259,6 +272,7 @@ public sealed class ManagedTenantProvisioningPreflight(
                 JsonSerializer.Serialize(request.Domain.CustomDomain),
                 isLocked: false,
                 allowPlanSetting: true,
+                source,
                 cancellationToken);
             if (failure is not null)
             {
@@ -270,12 +284,13 @@ public sealed class ManagedTenantProvisioningPreflight(
             settings.Values.OrderBy(setting => setting.SettingKey, StringComparer.Ordinal).ToArray());
     }
 
-    private async Task<ManagedTenantProvisioningSettingsResult?> TryAddSettingAsync(
+    private static async Task<ManagedTenantProvisioningSettingsResult?> TryAddSettingAsync(
         IDictionary<string, TenantSettingOverrideUpsert> settings,
         string key,
         string value,
         bool isLocked,
         bool allowPlanSetting,
+        IManagedTenantProvisioningPreflightSource source,
         CancellationToken cancellationToken)
     {
         SettingDefinition? definition = SettingRegistry.Get(key);
@@ -297,7 +312,7 @@ public sealed class ManagedTenantProvisioningPreflight(
                 $"Setting '{key}' does not match its registered value contract.");
         }
 
-        if (await systemSettingRepository.IsLocked(key, cancellationToken))
+        if (await source.IsPolicyLockedAsync(key, cancellationToken))
         {
             return ManagedTenantProvisioningSettingsResult.Fail(
                 "tenant_setting_locked",
@@ -368,6 +383,32 @@ public sealed class ManagedTenantProvisioningPreflight(
         FaviconUrl = request.Branding?.FaviconUrl,
         CustomCssUrl = request.Branding?.CustomCssUrl
     };
+
+    private sealed class RepositorySources(ITenantRepository tenants, ITenantPlanRepository plans,
+        IModuleDefinitionRepository modules, IManagedTenantDomainRepository domains,
+        ISystemSettingRepository settings, ITenantBrandingSettingsDocumentLockService branding,
+        TenantPlanStorageQuotaCeilingPolicy quota, ILocalCredentialAdministration local)
+        : IManagedTenantProvisioningPreflightSource
+    {
+        public async Task<bool> TenantSlugExistsAsync(string slug, CancellationToken cancellationToken) =>
+            await tenants.GetTenantBySlug(slug) is not null;
+        public Task<TenantPlanVersion?> GetPlanVersionAsync(Guid versionId, CancellationToken cancellationToken) =>
+            plans.GetVersionAsync(versionId, cancellationToken);
+        public Task<IReadOnlyList<ModuleDefinition>> GetActiveModulesAsync(IReadOnlyCollection<string> keys,
+            CancellationToken cancellationToken) => modules.GetActiveByKeysAsync(keys, cancellationToken);
+        public async Task<bool> DomainHostExistsAsync(string host, CancellationToken cancellationToken) =>
+            await domains.GetByDomainHostAsync(host, cancellationToken) is not null;
+        public Task<SystemSetting?> ReadPolicySettingAsync(string key, CancellationToken cancellationToken) =>
+            settings.GetByKey(key, cancellationToken);
+        public Task<bool> IsPolicyLockedAsync(string key, CancellationToken cancellationToken) =>
+            settings.IsLocked(key, cancellationToken);
+        public Task<LocalIdentityBinding?> ReadLocalAdministratorAsync(Guid subject, CancellationToken cancellationToken) =>
+            local.ReadLinkedIdentityAsync(subject, cancellationToken);
+        public Task<string?> ValidateStorageQuotasAsync(IEnumerable<TenantPlanVersionQuota> quotas,
+            CancellationToken cancellationToken) => quota.ValidateAsync(quotas, cancellationToken);
+        public Task<TenantBrandingSettingsDocumentLockState> ReadBrandingLocksAsync(CancellationToken cancellationToken) =>
+            branding.GetLockStateAsync(cancellationToken);
+    }
 }
 
 public sealed record ManagedTenantProvisioningResolvedBootstrap(

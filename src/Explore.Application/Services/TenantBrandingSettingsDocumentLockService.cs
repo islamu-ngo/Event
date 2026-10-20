@@ -38,23 +38,33 @@ public sealed class TenantBrandingSettingsDocumentLockService(
         }
 
         var whiteLabeling = await systemSettingRepository.GetByKey(GovernanceSettingKeys.Tenants.WhiteLabelingEnabled, cancellationToken);
-        var isWhiteLabelingEnabled = DeserializeBoolean(whiteLabeling?.Value, false);
         var displayName = await systemSettingRepository.GetByKey(GovernanceSettingKeys.Branding.DisplayName, cancellationToken);
         var logoUrl = await systemSettingRepository.GetByKey(GovernanceSettingKeys.Branding.LogoUrl, cancellationToken);
         var faviconUrl = await systemSettingRepository.GetByKey(GovernanceSettingKeys.Branding.FaviconUrl, cancellationToken);
         var customCssUrl = await systemSettingRepository.GetByKey(GovernanceSettingKeys.Branding.CustomCssUrl, cancellationToken);
 
-        return new TenantBrandingSettingsDocumentLockState(
-            CanChangeDisplayName: displayName?.IsLocked != true,
-            CanChangeLogoUrl: isWhiteLabelingEnabled && logoUrl?.IsLocked != true,
-            CanChangeFaviconUrl: isWhiteLabelingEnabled && faviconUrl?.IsLocked != true,
-            CanChangeCustomCssUrl: isWhiteLabelingEnabled && customCssUrl?.IsLocked != true);
+        return AssessLockState(deploymentMode?.Value, whiteLabeling?.Value, displayName?.IsLocked == true,
+            logoUrl?.IsLocked == true, faviconUrl?.IsLocked == true, customCssUrl?.IsLocked == true);
     }
 
     public IReadOnlyList<string> ValidateAllowedChanges(
         BrandingSettings currentPayload,
         BrandingSettings requestedPayload,
-        TenantBrandingSettingsDocumentLockState lockState)
+        TenantBrandingSettingsDocumentLockState lockState) =>
+        ValidateChanges(currentPayload, requestedPayload, lockState);
+
+    /// <summary>Assesses already retained nonsecret governance facts without another repository read.</summary>
+    public static TenantBrandingSettingsDocumentLockState AssessLockState(string? deploymentMode,
+        string? whiteLabeling, bool displayNameLocked, bool logoLocked, bool faviconLocked, bool customCssLocked)
+    {
+        if (!DeserializeString(deploymentMode, "SingleTenant").Equals("MultiTenant", StringComparison.OrdinalIgnoreCase))
+            return TenantBrandingSettingsDocumentLockState.AllowAll;
+        bool enabled = DeserializeBoolean(whiteLabeling, false);
+        return new(!displayNameLocked, enabled && !logoLocked, enabled && !faviconLocked, enabled && !customCssLocked);
+    }
+
+    public static IReadOnlyList<string> ValidateChanges(BrandingSettings currentPayload,
+        BrandingSettings requestedPayload, TenantBrandingSettingsDocumentLockState lockState)
     {
         List<string> errors = [];
         AddIfDisallowedChange(errors, "Display name", currentPayload.DisplayName, requestedPayload.DisplayName, lockState.CanChangeDisplayName);

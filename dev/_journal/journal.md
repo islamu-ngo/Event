@@ -3139,3 +3139,26 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; concrete tracked-entity and concurrency ownership lesson.
 
 ---
+
+[2026-10-21 Europe/Brussels] — Table-privilege cleanup must restore column grants
+
+**Context**: PR75's EF authentication cutover retains adversarial tests that temporarily widen a PostgreSQL permission and prove both admission and installation refuse the drift.
+
+**Symptom / Observation**: The scanner profile's table-SELECT attack passed initial admission and all four refusal/no-repair assertions, but failed its final healthy check. Twenty-three subsequent scanner cases then failed before their intended assertions because they shared the damaged fixture.
+
+**Root Cause**: PostgreSQL table-level privilege revocation also removes the corresponding column privileges. Revoking the deliberately added table SELECT therefore removed the profile's legitimate fixed column SELECT grants; revoking a broader grant is not necessarily the inverse of adding it.
+
+**Resolution**: Only that attack's cleanup now revokes table SELECT and restores the declared sixteen non-grantable column SELECT permissions in one Migrator-owned transaction inside its execution strategy. It uses the fixed property inventory and EF-mapped, quoted physical identifiers, not live ACL inference or production installation as silent repair. All four refusal assertions and the final healthy check remain. The complete scanner class passed 30/30 with no skips using `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/ScannerAuthenticationReadPortTests/*" --minimum-expected-tests 30 --progress off --maximum-parallel-tests 1`. This does not certify the separate capability or API cohorts.
+
+**Why This Matters for Future Work**: Permission-drift tests need an independently known starting manifest and a healthy check after cleanup. Restore exactly the original authority; do not weaken readiness, expand grants, or interpret a cleanup cascade as many independent product defects.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/ScannerAuthenticationReadPortTests.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresAdmissionScannerAuthenticationContract.cs`
+- [PostgreSQL 18 REVOKE semantics](https://www.postgresql.org/docs/18/sql-revoke.html), official documentation checked through Context7 on 2026-10-21; behavior facts only, no SQL examples or implementation copied.
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; concrete adversarial-fixture restoration lesson. No dependency or production authority change.
+
+---

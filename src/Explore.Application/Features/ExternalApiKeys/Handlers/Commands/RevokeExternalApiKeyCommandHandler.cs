@@ -91,7 +91,7 @@ public class RevokeExternalApiKeyCommandHandler : ICommandHandler<RevokeExternal
             externalApiKey.ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Revoked;
             externalApiKey.UpdatedAt = DateTime.UtcNow;
             externalApiKey.UpdatedBy = currentUserId;
-            await _externalApiKeyRepository.Update(externalApiKey);
+            await _externalApiKeyRepository.Update(externalApiKey, token);
             token.ThrowIfCancellationRequested();
             revokedKey = externalApiKey;
             return true;

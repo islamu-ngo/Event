@@ -22,8 +22,8 @@ public static partial class PostgresAiConversationOwnerFenceContract
         THEN RAISE EXCEPTION 'ai_conversation_owner_body_drift' USING ERRCODE = '55000'; END IF;
         """;
 
-    private static string CallerPrivilegeGuard(SourceSql sql, PostgresNativeQueueEnrollment enrollment) =>
-        ActorPublisherCatalogProof.CallerPrivilegeGuard(sql.Names, sql.Sources.Keys, enrollment, "ai_conversation_owner",
+    private static string CallerPrivilegeGuard(ExploreDbContext context, SourceSql sql, PostgresNativeQueueEnrollment enrollment) =>
+        ActorPublisherCatalogProof.CallerPrivilegeGuard(context, sql.Names, sql.Sources.Keys, enrollment, "ai_conversation_owner",
             allowRuntimeCatalogueRoleRead: true);
 
     private static string PolicyGuard(SourceSql sql, IReadOnlyDictionary<Type, string> policies) =>

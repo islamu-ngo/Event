@@ -13,11 +13,11 @@ namespace Explore.Persistence.Security;
 /// </summary>
 internal static class ActorPublisherCatalogProof
 {
-    internal static string CallerPrivilegeGuard(HumanPrincipalSourceSql names, IReadOnlyCollection<Type> sources,
+    internal static string CallerPrivilegeGuard(ExploreDbContext context, HumanPrincipalSourceSql names, IReadOnlyCollection<Type> sources,
         PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix, bool allowRuntimeCatalogueRoleRead = false)
     {
-        if (allowRuntimeCatalogueRoleRead && sources.Contains(typeof(Role)))
-            return CatalogueAwareCallerPrivilegeGuard(names, sources, enrollment, diagnosticPrefix, allowRuntimeCatalogueRoleRead);
+        if (allowRuntimeCatalogueRoleRead && sources.Contains(typeof(Role)) || sources.Contains(typeof(Tenant)))
+            return CatalogueAwareCallerPrivilegeGuard(context, names, sources, enrollment, diagnosticPrefix, allowRuntimeCatalogueRoleRead);
 
         string relations = string.Join(",", sources.Select(type => Text(names.Table(type)) + "::regclass"));
         return string.Join("\n", new[] { enrollment.RuntimeLogin, enrollment.GlobalLogin }.Select(login => $"""
@@ -37,7 +37,7 @@ internal static class ActorPublisherCatalogProof
             """));
     }
 
-    private static string CatalogueAwareCallerPrivilegeGuard(HumanPrincipalSourceSql names,
+    private static string CatalogueAwareCallerPrivilegeGuard(ExploreDbContext context, HumanPrincipalSourceSql names,
         IReadOnlyCollection<Type> sources, PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix,
         bool allowRuntimeCatalogueRoleRead)
     {
@@ -56,6 +56,8 @@ internal static class ActorPublisherCatalogProof
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                     WHERE acl.grantee = 0 AND acl.privilege_type = 'SELECT')
                 """ : "false";
+            if (login == enrollment.RuntimeLogin && sources.Contains(typeof(Tenant)))
+                referenceRead = $"({referenceRead}) OR ({PostgresTenantApiKeyStoragePermissions.RuntimeParentReadPredicate(context, enrollment, "r.oid", "t.oid", "a.attname", "'SELECT'")})";
             return $"""
                 IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                     WHERE pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')

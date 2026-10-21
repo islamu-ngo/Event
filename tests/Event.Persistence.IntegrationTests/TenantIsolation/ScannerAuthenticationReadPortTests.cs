@@ -7,6 +7,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -22,6 +23,10 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
     public async Task PairedLookupRejectsCrossedDigestsAndAmbiguousCredentials()
     {
         await using var migrator = Open(PrimaryDatabaseRole.Migrator);
+        await using var human = new HumanSecuritySourceGate(migrator);
+        await using var humanLease = await human.AcquireAsync(default);
+        await using var enrollmentGate = new EventDiscoveryEnrollmentGate(migrator);
+        await using var enrollmentLease = await enrollmentGate.AcquireAsync(default);
         Guid userId = Guid.CreateVersion7();
         var actor = new Actor
         {
@@ -51,7 +56,7 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
             await Assert.That(denied.SqlState).IsEqualTo("42501");
         }
         var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
-        var repository = new AdmissionScannerAuthenticationRepository(factory);
+        var repository = new AdmissionScannerAuthenticationRepository(factory, fixture.NativeQueueEnrollment);
         string differentDigest = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         await Assert.That(await repository.FindByDigestCandidatesAsync(
             [new(7, differentDigest), new(8, digest)], default)).IsNull();
@@ -106,94 +111,116 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
     }
 
     [Test]
-    [Arguments("runtime-execute")]
+    [Arguments("runtime-select")]
     [Arguments("runtime-executor")]
     [Arguments("runtime-via-global-login")]
     [Arguments("runtime-via-migrator-login")]
-    [Arguments("runtime-owner")]
-    [Arguments("runtime-migrator")]
-    [Arguments("global-owner")]
-    [Arguments("global-migrator")]
+    [Arguments("runtime-update")]
+    [Arguments("retired-owner")]
+    [Arguments("retired-migrator")]
+    [Arguments("profile-create-role")]
     [Arguments("global-via-migrator-login")]
-    [Arguments("owner-flags")]
-    [Arguments("migrator-flags")]
-    [Arguments("executor-flags")]
-    [Arguments("owner-membership-inherit")]
-    [Arguments("owner-membership-set")]
-    [Arguments("owner-membership-admin")]
-    [Arguments("migrator-membership-inherit")]
-    [Arguments("migrator-membership-set")]
-    [Arguments("migrator-membership-admin")]
+    [Arguments("profile-bypass")]
+    [Arguments("profile-inherit")]
+    [Arguments("profile-login")]
+    [Arguments("profile-create-db")]
+    [Arguments("profile-replication")]
+    [Arguments("profile-table-select")]
+    [Arguments("global-table-select")]
+    [Arguments("profile-grant-option")]
+    [Arguments("unexpected-policy")]
     [Arguments("global-membership-inherit")]
     [Arguments("global-membership-set")]
     [Arguments("global-membership-admin")]
     [Arguments("missing-enrollment")]
     [Arguments("global-column")]
-    [Arguments("owner-write")]
+    [Arguments("profile-write")]
     public async Task AuthorityDriftRejectsEntryAndInstallerWithoutRepair(string drift)
     {
         await using var migrator = Open(PrimaryDatabaseRole.Migrator);
-        await using var transaction = await migrator.Database.BeginTransactionAsync();
         var enrollment = fixture.NativeQueueEnrollment;
         string owner = PostgresAdmissionScannerAuthenticationContract.OwnerRole;
         string executor = PostgresAdmissionScannerAuthenticationContract.GlobalRole;
         string migration = PostgresAdmissionScannerAuthenticationContract.MigratorRole;
-        string signature = PostgresAdmissionScannerAuthenticationContract.FunctionSql(migrator) + "(integer[], text[])";
         var entity = migrator.Model.FindEntityType(typeof(AdmissionScannerCapability))!;
         string table = $"{Quote(entity.GetSchema()!)}.{Quote(entity.GetTableName()!)}";
         string column = Quote(entity.FindProperty(nameof(AdmissionScannerCapability.LookupDigest))!.GetColumnName()!);
-        string grant = drift switch
+        string global = Quote(enrollment.GlobalLogin);
+        string runtime = Quote(enrollment.RuntimeLogin);
+        var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        await using var selected = await factory.CreateDbContextAsync(default);
+        await PostgresAdmissionScannerAuthenticationContract.RequireReadyAsync(selected, enrollment);
+        (string apply, string undo) = drift switch
         {
-            "runtime-execute" => $"GRANT EXECUTE ON FUNCTION {signature} TO {Quote(enrollment.RuntimeLogin)}",
-            "runtime-executor" => $"GRANT {executor} TO {Quote(enrollment.RuntimeLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
-            "runtime-via-global-login" => $"GRANT {Quote(enrollment.GlobalLogin)} TO {Quote(enrollment.RuntimeLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
-            "runtime-via-migrator-login" => $"GRANT {Quote(enrollment.MigratorLogin)} TO {Quote(enrollment.RuntimeLogin)} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE",
-            "runtime-owner" => $"GRANT {owner} TO {Quote(enrollment.RuntimeLogin)} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE",
-            "runtime-migrator" => $"GRANT {migration} TO {Quote(enrollment.RuntimeLogin)} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE",
-            "global-owner" => $"GRANT {owner} TO {Quote(enrollment.GlobalLogin)} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE",
-            "global-migrator" => $"GRANT {migration} TO {Quote(enrollment.GlobalLogin)} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE",
-            "global-via-migrator-login" => $"GRANT {Quote(enrollment.MigratorLogin)} TO {Quote(enrollment.GlobalLogin)} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE",
-            "owner-flags" => $"ALTER ROLE {owner} BYPASSRLS",
-            "migrator-flags" => $"ALTER ROLE {migration} INHERIT",
-            "executor-flags" => $"ALTER ROLE {executor} LOGIN",
-            "owner-membership-inherit" => $"GRANT {owner} TO {migration} WITH INHERIT TRUE, SET TRUE, ADMIN FALSE",
-            "owner-membership-set" => $"GRANT {owner} TO {migration} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE",
-            "owner-membership-admin" => $"GRANT {owner} TO {migration} WITH INHERIT FALSE, SET TRUE, ADMIN TRUE",
-            "migrator-membership-inherit" => $"GRANT {migration} TO {Quote(enrollment.MigratorLogin)} WITH INHERIT TRUE, SET TRUE, ADMIN FALSE",
-            "migrator-membership-set" => $"GRANT {migration} TO {Quote(enrollment.MigratorLogin)} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE",
-            "migrator-membership-admin" => $"GRANT {migration} TO {Quote(enrollment.MigratorLogin)} WITH INHERIT FALSE, SET TRUE, ADMIN TRUE",
-            "global-membership-inherit" => $"GRANT {executor} TO {Quote(enrollment.GlobalLogin)} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE",
-            "global-membership-set" => $"GRANT {executor} TO {Quote(enrollment.GlobalLogin)} WITH INHERIT TRUE, SET TRUE, ADMIN FALSE",
-            "global-membership-admin" => $"GRANT {executor} TO {Quote(enrollment.GlobalLogin)} WITH INHERIT TRUE, SET FALSE, ADMIN TRUE",
-            "missing-enrollment" => $"REVOKE {migration} FROM {Quote(enrollment.MigratorLogin)}",
-            "global-column" => $"GRANT SELECT ({column}) ON {table} TO {Quote(enrollment.GlobalLogin)}",
-            "owner-write" => $"GRANT UPDATE ({column}) ON {table} TO {owner}",
+            "runtime-select" => ($"GRANT SELECT ({column}) ON {table} TO {runtime}", $"REVOKE SELECT ({column}) ON {table} FROM {runtime}"),
+            "runtime-update" => ($"GRANT UPDATE ({column}) ON {table} TO {runtime}", $"REVOKE UPDATE ({column}) ON {table} FROM {runtime}"),
+            "runtime-executor" => ($"GRANT {executor} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE", $"REVOKE {executor} FROM {runtime}"),
+            "runtime-via-global-login" => ($"GRANT {global} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE", $"REVOKE {global} FROM {runtime}"),
+            "runtime-via-migrator-login" => ($"GRANT {Quote(enrollment.MigratorLogin)} TO {runtime} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE", $"REVOKE {Quote(enrollment.MigratorLogin)} FROM {runtime}"),
+            "global-via-migrator-login" => ($"GRANT {Quote(enrollment.MigratorLogin)} TO {global} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE", $"REVOKE {Quote(enrollment.MigratorLogin)} FROM {global}"),
+            "retired-owner" => ($"CREATE ROLE {owner} NOLOGIN", $"DROP ROLE {owner}"),
+            "retired-migrator" => ($"CREATE ROLE {migration} NOLOGIN", $"DROP ROLE {migration}"),
+            "profile-create-role" => ($"ALTER ROLE {executor} CREATEROLE", $"ALTER ROLE {executor} NOCREATEROLE"),
+            "profile-bypass" => ($"ALTER ROLE {executor} BYPASSRLS", $"ALTER ROLE {executor} NOBYPASSRLS"),
+            "profile-inherit" => ($"ALTER ROLE {executor} INHERIT", $"ALTER ROLE {executor} NOINHERIT"),
+            "profile-login" => ($"ALTER ROLE {executor} LOGIN", $"ALTER ROLE {executor} NOLOGIN"),
+            "profile-create-db" => ($"ALTER ROLE {executor} CREATEDB", $"ALTER ROLE {executor} NOCREATEDB"),
+            "profile-replication" => ($"ALTER ROLE {executor} REPLICATION", $"ALTER ROLE {executor} NOREPLICATION"),
+            "profile-table-select" => ($"GRANT SELECT ON {table} TO {executor}", $"REVOKE SELECT ON {table} FROM {executor}"),
+            "global-table-select" => ($"GRANT SELECT ON {table} TO {global}", $"REVOKE SELECT ON {table} FROM {global}"),
+            "profile-grant-option" => ($"GRANT SELECT ({column}) ON {table} TO {executor} WITH GRANT OPTION", $"REVOKE GRANT OPTION FOR SELECT ({column}) ON {table} FROM {executor}"),
+            "unexpected-policy" => ($"CREATE POLICY auth_unexpected ON {table} FOR SELECT TO {global} USING(true)", $"DROP POLICY auth_unexpected ON {table}"),
+            "global-membership-inherit" => ($"GRANT {executor} TO {global} WITH INHERIT FALSE, SET FALSE, ADMIN FALSE", $"GRANT {executor} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE"),
+            "global-membership-set" => ($"GRANT {executor} TO {global} WITH INHERIT TRUE, SET TRUE, ADMIN FALSE", $"GRANT {executor} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE"),
+            "global-membership-admin" => ($"GRANT {executor} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN TRUE", $"GRANT {executor} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE"),
+            "missing-enrollment" => ($"REVOKE {executor} FROM {global}", $"GRANT {executor} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE"),
+            "global-column" => ($"GRANT SELECT ({column}) ON {table} TO {global}", $"REVOKE SELECT ({column}) ON {table} FROM {global}"),
+            "profile-write" => ($"GRANT UPDATE ({column}) ON {table} TO {executor}", $"REVOKE UPDATE ({column}) ON {table} FROM {executor}"),
             _ => throw new ArgumentOutOfRangeException(nameof(drift))
         };
-        await migrator.Database.ExecuteSqlRawAsync(grant);
-        await transaction.CreateSavepointAsync("before_entry");
-        // Without inherited EXECUTE, use the fixture's superuser to reach the native entry guard.
-        if (drift != "global-membership-inherit")
-            await migrator.Database.ExecuteSqlRawAsync(
-                $"SET LOCAL SESSION AUTHORIZATION {Quote(enrollment.GlobalLogin)}");
-        await using (var command = migrator.Database.GetDbConnection().CreateCommand())
+        await migrator.Database.ExecuteSqlRawAsync(apply);
+        try
         {
-            command.Transaction = transaction.GetDbTransaction();
-            command.CommandText = $"SELECT * FROM {PostgresAdmissionScannerAuthenticationContract.FunctionSql(migrator)}(@versions, @digests)";
-            command.Parameters.Add(new NpgsqlParameter("versions", new[] { 7 }));
-            command.Parameters.Add(new NpgsqlParameter("digests", new[] { Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
-            var denied = await Assert.ThrowsAsync<PostgresException>(async () => { await command.ExecuteNonQueryAsync(); });
-            await Assert.That(denied.SqlState).IsEqualTo("55000");
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+                await PostgresAdmissionScannerAuthenticationContract.RequireReadyAsync(selected, enrollment));
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+                await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migrator, enrollment));
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+                await PostgresAdmissionScannerAuthenticationContract.RequireReadyAsync(selected, enrollment));
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+                await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migrator, enrollment));
         }
-        await transaction.RollbackToSavepointAsync("before_entry");
-        await transaction.CreateSavepointAsync("before_install");
-        var reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migrator, enrollment));
-        await Assert.That(reinstall.SqlState).IsEqualTo("55000");
-        await transaction.RollbackToSavepointAsync("before_install");
-        var stillDrifted = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migrator, enrollment));
-        await Assert.That(stillDrifted.SqlState).IsEqualTo("55000");
+        finally
+        {
+            if (drift == "profile-table-select")
+            {
+                string[] properties =
+                [
+                    nameof(AdmissionScannerCapability.Id), nameof(AdmissionScannerCapability.TenantId),
+                    nameof(AdmissionScannerCapability.IssueRequestId), nameof(AdmissionScannerCapability.EventId),
+                    nameof(AdmissionScannerCapability.AdmissionTargetId), nameof(AdmissionScannerCapability.LookupKeyVersion),
+                    nameof(AdmissionScannerCapability.LookupDigest), nameof(AdmissionScannerCapability.DeviceLabel),
+                    nameof(AdmissionScannerCapability.Actions), nameof(AdmissionScannerCapability.ExpiresAt),
+                    nameof(AdmissionScannerCapability.IssuedByActorId), nameof(AdmissionScannerCapability.IssuedAt),
+                    nameof(AdmissionScannerCapability.RevokedByActorId), nameof(AdmissionScannerCapability.RevokedAt),
+                    nameof(AdmissionScannerCapability.RevocationReason), nameof(AdmissionScannerCapability.ConcurrencyStamp)
+                ];
+                string columns = string.Join(",", properties.Select(property =>
+                    Quote(entity.FindProperty(property)!.GetColumnName()!)));
+                await migrator.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+                {
+                    await using var transaction = await migrator.Database.BeginTransactionAsync();
+                    await migrator.Database.ExecuteSqlRawAsync(undo);
+                    await migrator.Database.ExecuteSqlRawAsync($"GRANT SELECT ({columns}) ON {table} TO {Quote(executor)}");
+                    await transaction.CommitAsync();
+                });
+            }
+            else
+            {
+                await migrator.Database.ExecuteSqlRawAsync(undo);
+            }
+        }
+        await PostgresAdmissionScannerAuthenticationContract.RequireReadyAsync(selected, enrollment);
     }
 
     [Test]
@@ -202,7 +229,7 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
         await using var migrator = Open(PrimaryDatabaseRole.Migrator);
         await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
         var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
-        var repository = new AdmissionScannerAuthenticationRepository(factory);
+        var repository = new AdmissionScannerAuthenticationRepository(factory, fixture.NativeQueueEnrollment);
         await Assert.That(await repository.FindByDigestCandidatesAsync(
             [new(7, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))], default)).IsNull();
     }
@@ -217,9 +244,8 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
             GlobalLogin = enrollment.EmailInstanceMutationLogin,
             EmailInstanceMutationLogin = enrollment.GlobalLogin
         };
-        var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migrator, changed));
-        await Assert.That(denied.SqlState).IsEqualTo("55000");
     }
 
     [Test]
@@ -228,17 +254,10 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
     [Arguments(PrimaryDatabaseRole.Migrator)]
     public async Task UnenrolledSessionCannotExecuteWithCleanEnrollment(PrimaryDatabaseRole role)
     {
-        await using var migrator = Open(PrimaryDatabaseRole.Migrator);
-        await using var transaction = await migrator.Database.BeginTransactionAsync();
-        await migrator.Database.ExecuteSqlRawAsync(
-            $"SET LOCAL SESSION AUTHORIZATION {Quote(fixture.GetNativeQueueOptions(role).Username!)}");
-        await using var command = migrator.Database.GetDbConnection().CreateCommand();
-        command.Transaction = transaction.GetDbTransaction();
-        command.CommandText = $"SELECT * FROM {PostgresAdmissionScannerAuthenticationContract.FunctionSql(migrator)}(@versions, @digests)";
-        command.Parameters.Add(new NpgsqlParameter("versions", new[] { 7 }));
-        command.Parameters.Add(new NpgsqlParameter("digests", new[] { Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
-        var denied = await Assert.ThrowsAsync<PostgresException>(async () => { await command.ExecuteNonQueryAsync(); });
-        await Assert.That(denied.SqlState).IsEqualTo("42501");
+        await using var selected = Open(role);
+        if (role != PrimaryDatabaseRole.Migrator) selected.BindTenantLease();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+            await PostgresAdmissionScannerAuthenticationContract.RequireReadyAsync(selected, fixture.NativeQueueEnrollment));
     }
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
@@ -248,6 +267,8 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
         var options = new DbContextOptionsBuilder<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(role));
         if (role == PrimaryDatabaseRole.Runtime) options.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
-        return new ExploreDbContext(options.Options);
+        var context = new ExploreDbContext(options.Options);
+        if (role == PrimaryDatabaseRole.Migrator) context.BindTenantLease();
+        return context;
     }
 }

@@ -18,8 +18,8 @@ public static partial class PostgresEventCreationPublisherReadContract
         THEN RAISE EXCEPTION 'event_creation_publisher_body_drift' USING ERRCODE = '55000'; END IF;
         """;
 
-    private static string CallerPrivilegeGuard(SourceSql sql, PostgresNativeQueueEnrollment enrollment) =>
-        ActorPublisherCatalogProof.CallerPrivilegeGuard(sql.Names, sql.Sources.Keys, enrollment, "event_creation_publisher");
+    private static string CallerPrivilegeGuard(ExploreDbContext context, SourceSql sql, PostgresNativeQueueEnrollment enrollment) =>
+        ActorPublisherCatalogProof.CallerPrivilegeGuard(context, sql.Names, sql.Sources.Keys, enrollment, "event_creation_publisher");
 
     private static string PolicyGuard(SourceSql sql, IReadOnlyDictionary<Type, string> policies) =>
         string.Join("\n", policies.SelectMany(pair => new[] { false, true }.Select(permissive =>

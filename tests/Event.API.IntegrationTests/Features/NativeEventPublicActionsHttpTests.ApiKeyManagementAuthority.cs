@@ -5,6 +5,7 @@ using Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +19,7 @@ public sealed partial class NativeEventPublicActionsHttpTests
         await using var factory = new NativeEventSeriesFactory();
         var data = await Seed(factory);
         using var scope = Scope(factory, data.OwnerId);
+        scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext!.RequestServices = scope.ServiceProvider;
         var key = ManagedKey(data.ForeignTenantId, data.OwnerId, ExternalApiKeyOwnerType.User);
         await using (var foreign = await scope.ServiceProvider
                          .GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContextAsync())

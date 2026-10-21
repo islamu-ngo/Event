@@ -110,7 +110,7 @@ public static class PostgresExternalLoginReadPermissions
                         SELECT 1 FROM pg_catalog.pg_attribute a
                         CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) acl
                         WHERE a.attrelid = pg_catalog.to_regclass({relation}) AND a.attname = expected.name
-                            AND acl.grantee = pg_catalog.to_regrole({login})::oid
+                            AND acl.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = {login})
                             AND acl.privilege_type = 'SELECT' AND NOT acl.is_grantable))
             """ : "";
         return $"""

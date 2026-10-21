@@ -151,7 +151,7 @@ public static partial class PostgresAiActorContextReadContract
                 new(MigratorRole, enrollment.MigratorLogin, false, true, false),
                 new(RuntimeRole, enrollment.RuntimeLogin, true, false, false)]);
         string guard = PostgresPrivilegeGuard.BuildAssertSql(privileges) + SourceGuard(context, sql, enrollment)
-            + PolicyGuard(sql, policies) + CallerPrivilegeGuard(sql, enrollment);
+            + PolicyGuard(sql, policies) + CallerPrivilegeGuard(context, sql, enrollment);
         string body = $"""
             DECLARE v_count integer := 0;
             BEGIN

@@ -98,7 +98,7 @@ public class UpdateExternalApiKeyPolicyCommandHandler : ICommandHandler<UpdateEx
             }
             externalApiKey.UpdatedAt = DateTime.UtcNow;
             externalApiKey.UpdatedBy = currentUserId;
-            await _externalApiKeyRepository.Update(externalApiKey);
+            await _externalApiKeyRepository.Update(externalApiKey, token);
             token.ThrowIfCancellationRequested();
             updatedKey = externalApiKey;
             return BaseCommandResponse.Success(externalApiKey.Id, "External API key updated successfully.");

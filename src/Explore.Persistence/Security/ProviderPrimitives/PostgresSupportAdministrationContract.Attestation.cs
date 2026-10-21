@@ -226,13 +226,19 @@ public static partial class PostgresSupportAdministrationContract
                     AND NOT t.tgdeferrable AND NOT t.tginitdeferred AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL)
             THEN RAISE EXCEPTION 'support_administration_writer_drift' USING ERRCODE = '55000'; END IF;
             """));
-        string callerDenial = string.Join("\n", Inventory.Select(source => $"""
+        string callerDenial = string.Join("\n", Inventory.Select(source =>
+        {
+            string scalarAuthority = $"pg_catalog.has_any_column_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(source.Type))}::regclass,'SELECT,INSERT,UPDATE,REFERENCES')";
+            string scalarDenial = source.Type == typeof(Explore.Domain.Tenant)
+                ? $"({scalarAuthority}) AND NOT COALESCE(({PostgresTenantApiKeyStoragePermissions.CompleteManifest(context, enrollment)}),false)"
+                : scalarAuthority;
+            return $"""
             IF pg_catalog.has_table_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(source.Type))}::regclass,
                     'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                OR pg_catalog.has_any_column_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(source.Type))}::regclass,
-                    'SELECT,INSERT,UPDATE,REFERENCES')
+                OR ({scalarDenial})
             THEN RAISE EXCEPTION 'support_administration_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
-            """));
+            """;
+        }));
         return $"""
             {SourceGuard(context, enrollment)}
             {OriginalSources(context, enrollment)}

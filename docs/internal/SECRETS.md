@@ -736,15 +736,72 @@ The complete override audience is returned; instance locks, deployment mode and
 backfill precedence remain Application decisions. Generic setting reads used
 inside other mutation transactions do not route through this capability.
 
-Pre-tenant authentication readers also acquire independent sealed-null Global
-leases. Grant the selected Global login `event_api_key_authentication_global`,
-`event_scanner_authentication_global` and `event_user_membership_global`, with inheritance enabled and role
-switching disabled. Their owner/migrator groups and direct private-table grants
-remain unavailable to Runtime and Global.
-Exact key lookup preserves inactive/expired rows for the authentication handler's
-persisted-credential precedence; its usage function changes only last-use time
-and IP. Scanner lookup pairs each digest with its version and returns up to two
-matches so ambiguity is rejected. Membership discovery returns the complete
+Pre-tenant API-key and scanner authentication readers acquire independent
+sealed-null Global leases. The Migrator installs fixed column permissions through
+`event_api_key_authentication_global` and `event_scanner_authentication_global`,
+inherited only by the declared Global login with role switching disabled. The
+API-key profile reads its 20 mapped credential/metadata columns, including the
+one-way secret hash, and updates only `LastUsedAt` and `LastUsedIp`. The scanner
+profile reads its 16 mapped columns, including lookup digest/version, with no
+writes. No table-wide grant, Runtime authentication-profile grant, raw key or
+HMAC-key read, credential-management permission or identity-write authority is
+added. Every trusted service holding Global can enumerate these fixed columns
+directly; exact lookup is a C# restriction, not a database guarantee against
+credential theft. Protect and rotate Global accordingly.
+
+Ordinary tenant-key storage is a separate fixed Runtime descriptor: metadata
+SELECT18 excludes `SecretHash` and `LastUsedIp`; INSERT20 supports EF's complete
+new-key image; UPDATE7 covers `Id` fencing, name/scopes/expiry/status and update
+audit fields. Digest-only issuance receipts have SELECT/INSERT6, with no DELETE.
+Supporting global lookups expose only credit-period/owner-type `Id` and status
+`Id`/`IsUsable`; status `UPDATE(Id)` supports the existing replay row fence.
+Their descriptive text remains unreadable, and no tenant policy is invented
+for these global reference tables. The fixed manifest verifies their complete
+physical shape and rejects extra columns/grants without repairing them.
+The parent-existence check has only Runtime `Tenant.Id` SELECT; it receives no
+tenant descriptive/status/audit columns, tenant writes or `User`/PII reads.
+Tenant roots remain non-RLS, so this fixed read exposes IDs including inactive
+roots. Key/receipt tenant isolation still requires the exact selected nonnull
+tenant. Source catalogues recognize only this mapped direct Migrator-origin
+parent-key grant; no inherited role or broader source inventory is admitted.
+Dormant policies for unrelated retained owners can coexist on the non-RLS
+Tenant root; Runtime/PUBLIC-applicable policies are rejected without repair.
+A Runtime-only restrictive policy intersects the existing nullable-tenant policy
+and requires an exact nonnull session tenant on keys and receipts; it does not
+open Global access. Metadata entities are projected without fetching private
+fields, and management persists only intended policy/status changes, never the
+redacted hash/IP placeholders. API key DTOs retain `LastUsedAt` and have no
+`LastUsedIp` field. Authentication admission recognizes only this compiled storage
+manifest; unexpected columns, private reads, widened grants or policy drift are
+refused, not repaired. C# still authorizes owner selection, issuance and receipt
+recovery. A stolen Runtime database credential can choose a tenant session and
+insert credential hashes or alter permitted key policy/status outside those API
+checks; its status-key UPDATE also permits direct status lookup key tampering
+subject to database constraints, not edits to usability or descriptive fields.
+Treat and rotate Runtime as sensitive application write authority, not
+as an independently business-authorized principal. A stolen Runtime credential
+can enumerate tenant IDs, not their descriptive or private user data, through
+this parent-key permission.
+
+EF queries retain exact ordinal key matching and paired scanner digest/version
+candidates; multiple scanner matches fail as ambiguity. Inactive/expired key rows
+remain visible to the authentication handler's persisted-credential precedence.
+Usage updates retain their strict interval compare-and-set. Without a caller
+transaction, pre-commit work uses the configured execution strategy and retains
+the original connector; one COMMIT and disposal run outside that retry delegate.
+An existing caller transaction remains caller-owned. A commit-acknowledgement or
+cleanup failure is propagated with its original causes, not converted to a false
+update result or a claim of rollback.
+
+The former authentication owner/migrator roles and three lookup/usage routines
+must be absent. Installation and readiness reject retained artifacts or privilege
+drift without dropping or repairing them. Use an explicitly disposable fresh
+development cluster or a separately reviewed retained-data transition; do not
+delete retained data merely to pass readiness.
+
+Membership discovery continues to use `event_user_membership_global` with
+inheritance enabled and role switching disabled; its owner/migrator groups and
+direct private-table grants remain unavailable to Runtime and Global. It returns the complete
 active membership/Tenant/TenantStatus graph for one server-resolved user; checking
 a chosen target tenant uses an independent exact Runtime lease instead.
 Standalone external-login lookup uses the exact provider/account pair through

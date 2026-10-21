@@ -164,7 +164,10 @@ public static class ExploreDatabaseMigrator
         await PostgresAtprotoMaterializationContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresAtprotoGovernanceContract.ApplyAsync(executionDatabase, cancellationToken);
         if (queueEnrollment is not null)
+        {
+            await PostgresTenantApiKeyStoragePermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+        }
         await PostgresInstanceApiKeyManagementContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresInstanceApiKeyIssuanceContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresPlatformApiKeyUsageReportContract.ApplyAsync(executionDatabase, cancellationToken);

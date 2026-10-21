@@ -3,7 +3,7 @@ using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Persistence;
 
-public interface IExternalApiKeyRepository : IGenericRepository<ExternalApiKey, Guid>
+public interface IExternalApiKeyRepository
 {
     Task<List<ExternalApiKey>> GetByOwner(ExternalApiKeyOwnerType ownerType, Guid ownerId, CancellationToken cancellationToken = default);
     Task<List<ExternalApiKey>> GetByOwners(ExternalApiKeyOwnerType ownerType, IReadOnlyCollection<Guid> ownerIds, CancellationToken cancellationToken = default);
@@ -15,4 +15,6 @@ public interface IExternalApiKeyRepository : IGenericRepository<ExternalApiKey, 
     /// <summary>Fences and rereads the exact visible key in the caller-owned Serializable transaction.</summary>
     Task<ExternalApiKey?> GetForManagementAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>Persists only the key's management policy, revocation status and update audit fields.</summary>
+    Task Update(ExternalApiKey entity, CancellationToken cancellationToken);
 }

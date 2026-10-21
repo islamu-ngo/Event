@@ -14,7 +14,11 @@ internal static class PostgresTenantRuntimeReadiness
     {
         string globalPolicyException = enrolledGlobalLogin is null
             ? "FALSE"
-            : PostgresEmailRetentionReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin);
+            : $"""
+                ({PostgresEmailRetentionReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresExternalApiKeyAuthenticationContract.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresAdmissionScannerAuthenticationContract.GlobalPolicyException(context, enrolledGlobalLogin)})
+                """;
         var command = connection.CreateCommand();
         command.CommandTimeout = 5;
         command.CommandText = $$"""

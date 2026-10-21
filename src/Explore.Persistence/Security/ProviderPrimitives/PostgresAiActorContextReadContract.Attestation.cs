@@ -18,8 +18,8 @@ public static partial class PostgresAiActorContextReadContract
         THEN RAISE EXCEPTION 'ai_actor_context_body_drift' USING ERRCODE = '55000'; END IF;
         """;
 
-    private static string CallerPrivilegeGuard(SourceSql sql, PostgresNativeQueueEnrollment enrollment) =>
-        ActorPublisherCatalogProof.CallerPrivilegeGuard(sql.Names, sql.Sources.Keys, enrollment, "ai_actor_context",
+    private static string CallerPrivilegeGuard(ExploreDbContext context, SourceSql sql, PostgresNativeQueueEnrollment enrollment) =>
+        ActorPublisherCatalogProof.CallerPrivilegeGuard(context, sql.Names, sql.Sources.Keys, enrollment, "ai_actor_context",
             allowRuntimeCatalogueRoleRead: true);
 
     private static string PolicyGuard(SourceSql sql, IReadOnlyDictionary<Type, string> policies) =>

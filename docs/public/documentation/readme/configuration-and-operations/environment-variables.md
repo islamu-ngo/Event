@@ -357,15 +357,62 @@ enablement, backfill enablement and backfill mode overrides across tenants;
 instance locks and the configured deployment mode still determine which
 overrides take effect.
 
-For pre-tenant credential and membership discovery, grant
-`event_api_key_authentication_global`, `event_scanner_authentication_global`,
-`event_user_membership_global`
-to the configured Global login, with inheritance enabled and role switching
-disabled. Keep their owner/migrator groups and direct private-table access away
-from both application logins. These capabilities provide exact credential
-lookup, narrow usage metadata updates and one user's active tenant memberships.
-They do not grant credential
-management, check-in mutation or identity-write authority.
+Pre-tenant API-key and scanner authentication use the configured Global login;
+no additional credential pair is required. Run the application Migrator to install
+the fixed column permissions through `event_api_key_authentication_global` and
+`event_scanner_authentication_global`, with inheritance enabled and role switching
+disabled. The API-key profile reads only its mapped lookup/metadata fields,
+including the one-way secret hash, and changes only last-use time and IP. The
+scanner profile reads its mapped lookup fields, including digest/version, and
+cannot write. Runtime receives no authentication-profile permissions; there is
+no table-wide grant, raw-key/HMAC-key read, credential management, check-in
+mutation or identity-write authority from these profiles.
+
+Ordinary tenant-key management uses a separate fixed Runtime storage permission
+set, not either authentication role. Runtime can read key metadata but cannot
+read credential hashes or last-use IP addresses; it can insert new keys and
+digest-only issuance receipts and update the declared policy/status fields.
+Its supporting lookup access is limited to credit-period/owner-type IDs and
+status ID/usability, with status-ID writes for the existing transaction fence;
+lookup descriptions remain unreadable. These global lookups receive no tenant
+policy, and unexpected columns or grants make readiness fail without repair.
+Runtime can also read tenant IDs for parent-existence checks, including inactive
+tenant IDs; it cannot read tenant descriptions or private user data through this
+permission. This does not broaden the tenant-key or receipt policies.
+Restrictive tenant policies keep this storage access within the selected nonnull
+tenant and hide platform keys. The API retains issuance authorization, secret
+disclosure and replay rules. A stolen Runtime database credential can choose a
+tenant session and forge a new key or change its permitted policy/status without
+those API checks; its narrow status-ID write also permits key tampering subject
+to database constraints, but cannot change usability or descriptions. Protect
+and rotate Runtime as sensitive application write
+authority; fixed storage permissions do not independently authorize a human.
+Credential theft also permits enumeration of tenant IDs, not tenant descriptions
+or private user data, through the fixed parent-key read.
+The Migrator rejects partial installations and unexpected grants or policies
+instead of silently repairing them.
+
+The API performs exact key matching, preserves persisted credential precedence
+and rejects ambiguous scanner matches. Usage changes are transactional and
+conditional on the update interval. A failed commit acknowledgement or cleanup
+is reported as an error, not silently retried into a misleading unchanged result;
+do not assume that such an error proves rollback. All trusted services sharing
+Global can directly read the profile's fixed lookup fields across tenants.
+Protect that credential as sensitive application authority and rotate or revoke
+it on suspected compromise; the API's exact-lookup rules do not constrain someone
+who has stolen the database credential.
+
+Do not restore the former authentication owner/migrator roles or lookup/usage
+routines. Installation rejects those retained artifacts and changed permissions
+instead of removing or repairing them. Use an explicitly disposable fresh
+development cluster or arrange a reviewed transition for retained data; do not
+delete retained data just to pass startup.
+
+Membership discovery continues to use `event_user_membership_global` on the
+configured Global login, with inheritance enabled and role switching disabled.
+Keep its owner/migrator groups and direct private-table access away from both
+application logins. It supplies one user's active tenant memberships, not
+credential management, check-in mutation or identity-write authority.
 
 External provider-account binding lookup uses EF with the existing Global
 credential. The Migrator installs SELECT only on the binding's ID, user ID,

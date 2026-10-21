@@ -25,9 +25,8 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
     public async Task MetadataExecutorReadsOnlyRedactedMetadataAndCannotWriteOrReadTables()
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        await InstallAndGrantAdministrator(rows.UserId);
-        await using var role = await Executor.CreateAsync(fixture, rows.RuntimeOptions,
-            PrimaryDatabaseRole.InstanceKeyRead, PostgresInstanceApiKeyManagementContract.ReadExecutor);
+        await GrantAdministratorAsync(rows.UserId);
+        await using var role = Executor.Create(fixture, PrimaryDatabaseRole.InstanceKeyRead);
         await using var db = role.Context();
         await new InstanceApiKeyCapabilitySql(db).RequireReadyAsync(
             PostgresInstanceApiKeyManagementContract.ReadExecutor,
@@ -55,9 +54,8 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
     public async Task FixedPolicyWritePreservesCredentialAndOwnershipAndTreatsNamesAsValues()
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        await InstallAndGrantAdministrator(rows.UserId);
-        await using var role = await Executor.CreateAsync(fixture, rows.RuntimeOptions,
-            PrimaryDatabaseRole.InstanceKeyWrite, PostgresInstanceApiKeyManagementContract.WriteExecutor);
+        await GrantAdministratorAsync(rows.UserId);
+        await using var role = Executor.Create(fixture, PrimaryDatabaseRole.InstanceKeyWrite);
         await using var db = role.Context();
         await using var store = new InstanceApiKeyCapabilityStore(
             db, PrimaryDatabaseRole.InstanceKeyWrite, rows.UserId, rows.PlatformKey.Id, null, new HttpContextAccessor());
@@ -83,9 +81,8 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
     public async Task IssuanceRecoveryBindsDigestAndRejectsRevokedCurrentAdministration()
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        Guid grantId = await InstallAndGrantAdministrator(rows.UserId);
-        await using var role = await Executor.CreateAsync(fixture, rows.RuntimeOptions,
-            PrimaryDatabaseRole.InstanceKeyIssuance, PostgresInstanceApiKeyIssuanceContract.ExecutorRole);
+        Guid grantId = await GrantAdministratorAsync(rows.UserId);
+        await using var role = Executor.Create(fixture, PrimaryDatabaseRole.InstanceKeyIssuance);
         await using var db = role.Context();
         string operation = Guid.CreateVersion7().ToString("N");
         DateTime createdAt = DateTime.UtcNow;
@@ -141,12 +138,13 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
     public async Task HistoricalReportIncludesInactiveTenantAndInstanceAggregatesWithoutLedgerAccess()
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        await InstallAndGrantAdministrator(rows.UserId);
+        await GrantAdministratorAsync(rows.UserId);
         DateOnly from = new(2026, 1, 1);
         DateOnly to = new(2026, 1, 31);
         Guid inactiveKeyId = Guid.CreateVersion7();
         await using (var seed = fixture.CreateDbContext())
         {
+            seed.BindTenantLease();
             seed.ExternalApiKeys.Add(new ExternalApiKey
             {
                 Id = inactiveKeyId,
@@ -175,8 +173,7 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
                 });
             await seed.SaveChangesAsync();
         }
-        await using var role = await Executor.CreateAsync(fixture, rows.RuntimeOptions,
-            PrimaryDatabaseRole.PlatformKeyReport, PostgresPlatformApiKeyUsageReportContract.ExecutorRole);
+        await using var role = Executor.Create(fixture, PrimaryDatabaseRole.PlatformKeyReport);
         await using var db = role.Context();
         await using var store = new InstanceApiKeyCapabilityStore(
             db, PrimaryDatabaseRole.PlatformKeyReport, rows.UserId, null, null, new HttpContextAccessor());
@@ -198,16 +195,8 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
     public async Task EveryDedicatedExecutorRejectsCommittedAdministratorRevocation(PrimaryDatabaseRole role)
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        Guid grantId = await InstallAndGrantAdministrator(rows.UserId);
-        string executor = role switch
-        {
-            PrimaryDatabaseRole.InstanceKeyRead => PostgresInstanceApiKeyManagementContract.ReadExecutor,
-            PrimaryDatabaseRole.InstanceKeyWrite => PostgresInstanceApiKeyManagementContract.WriteExecutor,
-            PrimaryDatabaseRole.InstanceKeyIssuance => PostgresInstanceApiKeyIssuanceContract.ExecutorRole,
-            PrimaryDatabaseRole.PlatformKeyReport => PostgresPlatformApiKeyUsageReportContract.ExecutorRole,
-            _ => throw new ArgumentOutOfRangeException(nameof(role))
-        };
-        await using var login = await Executor.CreateAsync(fixture, rows.RuntimeOptions, role, executor);
+        Guid grantId = await GrantAdministratorAsync(rows.UserId);
+        await using var login = Executor.Create(fixture, role);
         await using var db = login.Context();
         await using var store = new InstanceApiKeyCapabilityStore(
             db, role, rows.UserId, rows.PlatformKey.Id, Guid.CreateVersion7().ToString("N"), new HttpContextAccessor());
@@ -243,9 +232,8 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
     public async Task ReadExecutorCannotBeAdmittedAsWriteExecutor()
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        await InstallAndGrantAdministrator(rows.UserId);
-        await using var role = await Executor.CreateAsync(fixture, rows.RuntimeOptions,
-            PrimaryDatabaseRole.InstanceKeyRead, PostgresInstanceApiKeyManagementContract.ReadExecutor);
+        await GrantAdministratorAsync(rows.UserId);
+        await using var role = Executor.Create(fixture, PrimaryDatabaseRole.InstanceKeyRead);
         await using var db = role.Context();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -269,11 +257,11 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
         bool report, bool scanner, bool directGrant)
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        await InstallAndGrantAdministrator(rows.UserId);
+        await GrantAdministratorAsync(rows.UserId);
         string executor = report ? PostgresPlatformApiKeyUsageReportContract.ExecutorRole
             : PostgresInstanceApiKeyManagementContract.ReadExecutor;
-        await using var login = await Executor.CreateAsync(fixture, rows.RuntimeOptions,
-            report ? PrimaryDatabaseRole.PlatformKeyReport : PrimaryDatabaseRole.InstanceKeyRead, executor);
+        await using var login = Executor.Create(fixture,
+            report ? PrimaryDatabaseRole.PlatformKeyReport : PrimaryDatabaseRole.InstanceKeyRead);
         await using var db = login.Context();
         InstanceApiKeySqlFunction[] functions = report
             ? [PostgresPlatformApiKeyUsageReportContract.Function(db)]
@@ -282,17 +270,54 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
         await admission.RequireReadyAsync(executor, functions, default, PlatformApiKeyNativeSourceTests.Enrollment(fixture));
         string contaminatedRole = scanner ? PostgresAdmissionScannerAuthenticationContract.GlobalRole
             : PostgresExternalApiKeyAuthenticationContract.GlobalRole;
-        string signature = scanner
-            ? PostgresAdmissionScannerAuthenticationContract.FunctionSql(db) + "(integer[], text[])"
-            : PostgresExternalApiKeyAuthenticationContract.FunctionSql(db) + "(text)";
+        string selectedLogin = await db.Database.SqlQueryRaw<string>("SELECT CURRENT_USER::text AS \"Value\"").SingleAsync();
+        await using var administration = new NpgsqlConnection(fixture.ConnectionString);
+        await administration.OpenAsync();
+        if (!directGrant)
+        {
+            await login.GrantContaminationAsync(contaminatedRole, string.Empty, directGrant: false);
+            await using var membership = administration.CreateCommand();
+            membership.CommandText = "SELECT pg_catalog.pg_has_role(@login, @role, 'USAGE')";
+            membership.Parameters.AddWithValue("login", selectedLogin);
+            membership.Parameters.AddWithValue("role", contaminatedRole);
+            await Assert.That(await membership.ExecuteScalarAsync()).IsEqualTo(true);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => admission.RequireReadyAsync(
+                executor, functions, default, PlatformApiKeyNativeSourceTests.Enrollment(fixture)));
+            return;
+        }
 
-        await login.GrantContaminationAsync(contaminatedRole, signature, directGrant);
-
-        await Assert.That(await db.Database.SqlQueryRaw<bool>(
-            "SELECT pg_catalog.has_function_privilege(current_user, pg_catalog.to_regprocedure(@signature), 'EXECUTE') AS \"Value\"",
-            new NpgsqlParameter("signature", signature)).SingleAsync()).IsTrue();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => admission.RequireReadyAsync(
-            executor, functions, default, PlatformApiKeyNativeSourceTests.Enrollment(fixture)));
+        string quotedLogin = "\"" + selectedLogin.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        string sourceTable = scanner ? admission.Table<AdmissionScannerCapability>() : admission.Table<ExternalApiKey>();
+        string sourceColumn = db.Model.FindEntityType(scanner ? typeof(AdmissionScannerCapability) : typeof(ExternalApiKey))!
+            .FindProperty(scanner ? nameof(AdmissionScannerCapability.LookupDigest) : nameof(ExternalApiKey.SecretHash))!
+            .GetColumnName()!;
+        string quotedColumn = scanner
+            ? admission.Column<AdmissionScannerCapability>(nameof(AdmissionScannerCapability.LookupDigest))
+            : admission.Column<ExternalApiKey>(nameof(ExternalApiKey.SecretHash));
+        await Assert.That(await db.Database.SqlQuery<bool>($"""
+            SELECT CURRENT_USER::text = {selectedLogin}
+                AND NOT pg_catalog.has_column_privilege(CURRENT_USER, {sourceTable}, {sourceColumn}, 'SELECT') AS "Value"
+            """).SingleAsync()).IsTrue().Because($"report={report}; scanner={scanner}; directGrant={directGrant}; stage=before_column_grant");
+        await using var contamination = administration.CreateCommand();
+        contamination.CommandText = $"GRANT SELECT ({quotedColumn}) ON {sourceTable} TO {quotedLogin}";
+        await contamination.ExecuteNonQueryAsync();
+        try
+        {
+            await using var privilege = administration.CreateCommand();
+            privilege.CommandText = "SELECT pg_catalog.has_column_privilege(@login, @table, @column, 'SELECT')";
+            privilege.Parameters.AddWithValue("login", selectedLogin);
+            privilege.Parameters.AddWithValue("table", sourceTable);
+            privilege.Parameters.AddWithValue("column", sourceColumn);
+            await Assert.That(await privilege.ExecuteScalarAsync()).IsEqualTo(true)
+                .Because($"report={report}; scanner={scanner}; directGrant={directGrant}; stage=after_column_grant");
+            await Assert.ThrowsAsync<InvalidOperationException>(() => admission.RequireReadyAsync(
+                executor, functions, default, PlatformApiKeyNativeSourceTests.Enrollment(fixture)));
+        }
+        finally
+        {
+            contamination.CommandText = $"REVOKE SELECT ({quotedColumn}) ON {sourceTable} FROM {quotedLogin}";
+            await contamination.ExecuteNonQueryAsync();
+        }
     }
 
     [Test]
@@ -306,10 +331,10 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
         PrimaryDatabaseRole selected, PrimaryDatabaseRole contaminated)
     {
         await using var rows = await Rows.CreateAsync(fixture);
-        await InstallAndGrantAdministrator(rows.UserId);
+        await GrantAdministratorAsync(rows.UserId);
         string executor = selected == PrimaryDatabaseRole.PlatformKeyReport
             ? PostgresPlatformApiKeyUsageReportContract.ExecutorRole : PostgresInstanceApiKeyManagementContract.ReadExecutor;
-        await using var login = await Executor.CreateAsync(fixture, rows.RuntimeOptions, selected, executor);
+        await using var login = Executor.Create(fixture, selected);
         await using var db = login.Context();
         InstanceApiKeySqlFunction[] admitted = selected == PrimaryDatabaseRole.PlatformKeyReport
             ? [PostgresPlatformApiKeyUsageReportContract.Function(db)]
@@ -338,13 +363,10 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
             executor, admitted, default, PlatformApiKeyNativeSourceTests.Enrollment(fixture)));
     }
 
-    private async Task<Guid> InstallAndGrantAdministrator(Guid userId)
+    private async Task<Guid> GrantAdministratorAsync(Guid userId)
     {
         await using var db = fixture.CreateDbContext();
-        await PostgresInstanceApiKeyManagementContract.ApplyAsync(db);
-        await PostgresInstanceApiKeyIssuanceContract.ApplyAsync(db);
-        await PostgresPlatformApiKeyUsageReportContract.ApplyAsync(db);
-        await PostgresPlatformApiKeySourceContract.ApplyAsync(db, PlatformApiKeyNativeSourceTests.Enrollment(fixture));
+        db.BindTenantLease();
         Guid id = Guid.CreateVersion7();
         db.PlatformUserRoles.Add(new PlatformUserRole
         {
@@ -360,9 +382,12 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
     }
 
     private sealed class Executor(
-        PostgreSqlContainerFixture fixture, string login, string executor, PrimaryDatabaseConnectionOptions options)
+        PostgreSqlContainerFixture fixture, PrimaryDatabaseConnectionOptions options)
         : IAsyncDisposable
     {
+        private readonly string _login = "\"" + (options.Username
+            ?? throw new InvalidOperationException("The selected executor login is missing."))
+            .Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
         private string? _contaminationRevocation;
 
         internal async Task GrantContaminationAsync(string roleName, string signature, bool directGrant)
@@ -371,30 +396,16 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
             await administration.OpenAsync();
             await using var command = administration.CreateCommand();
             command.CommandText = directGrant
-                ? $"GRANT EXECUTE ON FUNCTION {signature} TO \"{login}\";"
-                : $"GRANT {roleName} TO \"{login}\" WITH INHERIT TRUE, SET FALSE;";
+                ? $"GRANT EXECUTE ON FUNCTION {signature} TO {_login};"
+                : $"GRANT {roleName} TO {_login} WITH INHERIT TRUE, SET FALSE;";
             await command.ExecuteNonQueryAsync();
             _contaminationRevocation = directGrant
-                ? $"REVOKE EXECUTE ON FUNCTION {signature} FROM \"{login}\";"
-                : $"REVOKE {roleName} FROM \"{login}\";";
+                ? $"REVOKE EXECUTE ON FUNCTION {signature} FROM {_login};"
+                : $"REVOKE {roleName} FROM {_login};";
         }
 
-        internal static async Task<Executor> CreateAsync(
-            PostgreSqlContainerFixture fixture, PrimaryDatabaseConnectionOptions runtime,
-            PrimaryDatabaseRole role, string executor)
-        {
-            string login = $"instance_key_{Guid.CreateVersion7():N}";
-            string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-            await using var administration = new NpgsqlConnection(fixture.ConnectionString);
-            await administration.OpenAsync();
-            await using var command = administration.CreateCommand();
-            command.CommandText = $"""
-                CREATE ROLE "{login}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{password}';
-                GRANT {executor} TO "{login}" WITH INHERIT TRUE, SET FALSE;
-                """;
-            await command.ExecuteNonQueryAsync();
-            return new(fixture, login, executor, runtime with { Role = role, Username = login, Password = password });
-        }
+        internal static Executor Create(PostgreSqlContainerFixture fixture, PrimaryDatabaseRole role) =>
+            new(fixture, fixture.GetNativeQueueOptions(role));
 
         internal ExploreDbContext Context()
         {
@@ -408,12 +419,11 @@ public sealed class PostgresInstanceApiKeyCapabilityTests(PostgreSqlContainerFix
 
         public async ValueTask DisposeAsync()
         {
-            using var pool = new NpgsqlConnection(PrimaryDatabaseConfiguration.BuildConnectionString(options).ConnectionString);
-            NpgsqlConnection.ClearPool(pool);
+            if (_contaminationRevocation is null) return;
             await using var administration = new NpgsqlConnection(fixture.ConnectionString);
             await administration.OpenAsync();
             await using var command = administration.CreateCommand();
-            command.CommandText = $"{_contaminationRevocation} REVOKE {executor} FROM \"{login}\"; DROP ROLE \"{login}\";";
+            command.CommandText = _contaminationRevocation;
             await command.ExecuteNonQueryAsync();
         }
     }

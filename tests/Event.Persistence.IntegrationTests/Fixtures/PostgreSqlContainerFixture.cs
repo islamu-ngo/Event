@@ -38,6 +38,11 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     public PostgresNativeQueueEnrollment NativeQueueEnrollment { get; }
 
     public PostgreSqlContainerFixture()
+        : this(string.Empty)
+    {
+    }
+
+    protected PostgreSqlContainerFixture(string globalLoginSuffix)
     {
         _container = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("explore_db_test")
@@ -53,7 +58,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport,
             PrimaryDatabaseRole.LocalIdentityWriter
         }.ToDictionary(role => role, role => (
-            Username: $"queue_{(int)role}_{suffix}",
+            Username: $"queue_{(int)role}_{suffix}{(role == PrimaryDatabaseRole.Global ? globalLoginSuffix : string.Empty)}",
             Password: Convert.ToHexString(RandomNumberGenerator.GetBytes(24))));
         NativeQueueEnrollment = new PostgresNativeQueueEnrollment(
             "postgres",
@@ -82,6 +87,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         // Apply all migrations for production-faithful schema
         await using (var migratorContext = CreateDbContextInternal(PrimaryDatabaseRole.Migrator))
         {
+            migratorContext.BindTenantLease();
             await migratorContext.Database.MigrateAsync();
             await PostgresModelConstraintApplier.ApplyAsync(migratorContext);
             await PostgresTenantRowLevelSecurityModel.ApplyAsync(migratorContext);
@@ -114,13 +120,16 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresEmailDispatchAdmissionContract.ApplyAsync(migratorContext);
             await PostgresAtprotoMaterializationContract.ApplyAsync(migratorContext);
             await PostgresAtprotoGovernanceContract.ApplyAsync(migratorContext);
+            await PostgresTenantApiKeyStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresInstanceApiKeyManagementContract.ApplyAsync(migratorContext);
+            await PostgresInstanceApiKeyIssuanceContract.ApplyAsync(migratorContext);
             await PostgresPlatformApiKeyUsageReportContract.ApplyAsync(migratorContext);
             foreach (var (role, executor) in new[]
             {
                 (PrimaryDatabaseRole.InstanceKeyRead, PostgresInstanceApiKeyManagementContract.ReadExecutor),
                 (PrimaryDatabaseRole.InstanceKeyWrite, PostgresInstanceApiKeyManagementContract.WriteExecutor),
+                (PrimaryDatabaseRole.InstanceKeyIssuance, PostgresInstanceApiKeyIssuanceContract.ExecutorRole),
                 (PrimaryDatabaseRole.PlatformKeyReport, PostgresPlatformApiKeyUsageReportContract.ExecutorRole)
             })
             {
@@ -425,6 +434,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         await _reset.ResetAsync(connection);
 
         await using var context = CreateDbContextInternal();
+        context.BindTenantLease();
         await LookupTableSeeder.SeedAsync(context);
     }
 

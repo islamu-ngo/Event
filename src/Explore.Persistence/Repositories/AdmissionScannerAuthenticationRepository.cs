@@ -2,10 +2,12 @@ using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class AdmissionScannerAuthenticationRepository(IGlobalExploreDbContextFactory factory)
+public sealed class AdmissionScannerAuthenticationRepository(IGlobalExploreDbContextFactory factory,
+    PostgresNativeQueueEnrollment? enrollment = null)
     : IAdmissionScannerAuthenticationRepository
 {
     public async Task<AdmissionScannerCapability?> FindByDigestCandidatesAsync(
@@ -20,6 +22,6 @@ public sealed class AdmissionScannerAuthenticationRepository(IGlobalExploreDbCon
             return null;
 
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        return await AdmissionScannerAuthenticationQuery.ReadAsync(context, candidates, cancellationToken);
+        return await AdmissionScannerAuthenticationQuery.ReadAsync(context, candidates, cancellationToken, enrollment);
     }
 }

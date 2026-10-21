@@ -237,7 +237,8 @@ internal sealed class InstanceApiKeyCapabilitySql(ExploreDbContext context)
         string[] privateTables =
         [
             Table<User>(), Table<UserExternalLogin>(), Table<PlatformUserRole>(),
-            Table<ExternalApiKey>(), Table<ExternalApiKeyIssuanceReceipt>(), Table<ExternalApiKeyQuota>()
+            Table<ExternalApiKey>(), Table<ExternalApiKeyIssuanceReceipt>(), Table<ExternalApiKeyQuota>(),
+            Table<AdmissionScannerCapability>()
         ];
         const string query = """
             WITH RECURSIVE inherited_roles(roleid) AS (

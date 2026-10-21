@@ -60,7 +60,7 @@ public class ExternalApiKeyRepositoryBypassTests(PostgreSqlContainerFixture fixt
 
         var repository = new ExternalApiKeyRepository(tenantBContext);
         await using var global = await PostgresAuthenticationLookupAuthorityTests.AuthenticationGlobalAuthority.CreateAsync(fixture);
-        var authentication = new ExternalApiKeyAuthenticationRepository(global.Factory);
+        var authentication = new ExternalApiKeyAuthenticationRepository(global.Factory, fixture.NativeQueueEnrollment);
         var tenantAAuthenticationKey = await authentication.GetByKeyIdForAuthentication(tenantAKey.KeyId);
         var usageTouched = await authentication.TouchUsageMetadata(
             tenantAKey.Id,

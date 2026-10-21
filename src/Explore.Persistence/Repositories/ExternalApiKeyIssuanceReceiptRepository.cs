@@ -99,9 +99,9 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
         await RelationalEntityRowFence.AcquireLookupAsync<ExternalApiKeyStatus>(
             dbContext, [status], cancellationToken);
         DateTime now = DateTime.UtcNow;
-        return await ownedKeys.SingleOrDefaultAsync(key =>
-            key.ExternalApiKeyStatus.IsUsable && (key.ExpiresAt == null || key.ExpiresAt > now),
-            cancellationToken);
+        return await ExternalApiKeyMetadataProjection.Apply(ownedKeys.Where(key =>
+                key.ExternalApiKeyStatus.IsUsable && (key.ExpiresAt == null || key.ExpiresAt > now)))
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     /// <inheritdoc />

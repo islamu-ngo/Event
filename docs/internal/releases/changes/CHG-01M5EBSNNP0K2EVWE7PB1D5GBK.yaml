@@ -1,0 +1,32 @@
+Change-Id: CHG-01M5EBSNNP0K2EVWE7PB1D5GBK
+Title: "Move credential lookups and key usage to EF"
+Type: fix
+Scope: access
+Summary: "Keep exact credential matching, scanner ambiguity rejection and conditional usage updates in C# and EF, while separating private authentication columns from ordinary tenant-key management."
+Group: ef-owned-credential-storage
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Authentication requires fixed Global column profiles and ordinary key management requires the separate fixed Runtime storage manifest. Former authentication owner/migrator roles and lookup/usage routines must be absent; startup refuses retained artifacts or drift without repairing them.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Runtime management reads exclude credential hashes and usage IPs. Dedicated key read/report purposes also reject direct scanner-table or column access after routine retirement. Global can directly read its fixed authentication columns across tenants; API exact-lookup rules do not constrain a stolen database credential. Runtime retains legitimate key creation and policy/status writes, not independent human authorization.
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: No EF model migration or data backfill is introduced. Security installation changes fixed grants and policies and refuses obsolete routines or unexpected catalogues. Use an explicitly disposable fresh development database or a separately reviewed retained-data transition; never drop retained data or rewrite migration history to satisfy readiness.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Existing Runtime, Global and Migrator credentials remain selected by the same authority. No new credential pair or Configurator runtime dependency is added; the Migrator installs only the declared fixed profiles.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Protect and rotate application database credentials according to their fixed read/write reach. Usage commit-acknowledgement or cleanup errors remain errors and do not prove rollback; do not blindly replay them as unchanged operations.

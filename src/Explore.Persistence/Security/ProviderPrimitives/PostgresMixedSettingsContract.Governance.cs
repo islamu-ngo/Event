@@ -16,9 +16,10 @@ public static partial class PostgresMixedSettingsContract
     private static string GovernanceData(ExploreDbContext context)
     {
         var sql = new HumanPrincipalSourceSql(context);
+        string tenantExpression = $"'{PlatformDefaults.DefaultTenantId:D}'";
         string rows = string.Join(",", MixedSettingsDataImage.GovernanceReadTypes.Select(type =>
             $"{Text(type.Name)},(SELECT COALESCE(pg_catalog.jsonb_agg({Projection(context, type, "r")} ORDER BY r.{sql.Column(type, "Id")}),"
-            + $"'[]'::jsonb) FROM {sql.Table(type)} r WHERE {MixedSettingsDataImage.GovernancePredicate(context, type)})"));
+            + $"'[]'::jsonb) FROM {sql.Table(type)} r WHERE {MixedSettingsDataImage.GovernancePredicate(context, type, tenantExpression)})"));
         return $"CASE WHEN p_request ? 'Governance' THEN pg_catalog.jsonb_build_object({rows}) ELSE pg_catalog.jsonb_build_object() END";
     }
 

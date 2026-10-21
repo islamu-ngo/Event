@@ -104,11 +104,13 @@ internal static partial class MixedSettingsDataImage
                 command.Parameters.Add(parameter);
             }
             Parameter("tenant", tenant, DbType.Guid);
+            if (original?.Governance is not null)
+                Parameter("governanceTenant", PlatformDefaults.DefaultTenantId, DbType.Guid);
             if (original?.PlanAssignment is { } plan)
                 Parameter("assignment", plan.AssignmentId, DbType.Guid);
             for (int index = 0; index < keys.Length; index++)
                 Parameter($"key{index}", keys[index], DbType.String);
-            string predicate = GovernanceReadTypes.Contains(type) ? GovernancePredicate(context, type)
+            string predicate = GovernanceReadTypes.Contains(type) ? GovernancePredicate(context, type, "@governanceTenant")
                 : PlanReadTypes.Contains(type) ? PlanPredicate(context, type, "@assignment")
                 : typed && type == typeof(SystemSetting) ? "1 = 1"
                 : typed && type == typeof(TenantSetting) ? $"(@tenant IS NULL OR r.{sql.Column(type, "TenantId")} = @tenant)"

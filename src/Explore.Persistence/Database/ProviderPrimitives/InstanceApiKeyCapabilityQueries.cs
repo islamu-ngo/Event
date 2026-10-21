@@ -37,7 +37,13 @@ internal sealed class InstanceApiKeyCapabilityQueries(ExploreDbContext context)
 
     internal Task<List<TenantApiKeyUsageSummary>> ReportAsync(object[] parameters, CancellationToken token) =>
         context.Database.SqlQueryRaw<TenantApiKeyUsageSummary>(
-                        $"SELECT * FROM {_sql.Function(PostgresPlatformApiKeyUsageReportContract.ReportFunction)}(@actor, @provider, @account, @from, @to)",
+                        $"""
+                        SELECT "ApiKeyId" AS api_key_id, "ApiKeyName" AS api_key_name,
+                            "TenantId" AS tenant_id, "OwnerType" AS owner_type, "OwnerId" AS owner_id,
+                            "TotalRequestCount" AS total_request_count,
+                            "TotalCreditsUsed" AS total_credits_used, "CreditLimit" AS credit_limit
+                        FROM {_sql.Function(PostgresPlatformApiKeyUsageReportContract.ReportFunction)}(@actor, @provider, @account, @from, @to)
+                        """,
                         parameters)
                     .ToListAsync(token);
 }

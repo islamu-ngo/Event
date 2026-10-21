@@ -3114,3 +3114,28 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; a concrete ownership and failure-composition lesson, not a new authorization policy.
 
 ---
+
+[2026-10-21 Europe/Brussels] — Email-only saves must retain the account concurrency check
+
+**Context**: While replacing broad account updates with a tracked EF Core profile save in PR75, the email mirror and account verification flag were reviewed together.
+
+**Symptom / Observation**: A real SQLite regression advanced the persisted User stamp, changed only UserPii.Email on the previously loaded account, and saved successfully instead of throwing DbUpdateConcurrencyException. Changing EmailVerified as well had correctly rejected the stale account.
+
+**Root Cause**: UserPii has no concurrency token. When only its email changes, User remains Unchanged, so the normal SaveChanges pipeline neither updates User nor compares its original ConcurrencyStamp. A token on a related entity does not automatically protect an independent row update.
+
+**Resolution**: After validating the narrow dirty-field inventory, SaveIdentityProfileAsync marks only User.ConcurrencyStamp modified for an actual email-only change. Existing SaveChanges rotates its value while retaining the loaded original concurrency predicate. Sync also uses the tracked account resolved inside each retry rather than the outer entity cleared by rollback. The isolated five-path candidate passed all seven profile cases with `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/UserIdentityProfilePersistenceTests/*" --minimum-expected-tests 7 --progress off --maximum-parallel-tests 1` and all46 ActorFederationMapperTests; neither requires a grant or model change.
+
+**Why This Matters for Future Work**: Verify both successful and stale email-only changes when reducing broad EF updates. Do not reset original token values, mark the entire entity Modified, or assume a principal token protects an unchanged principal's dependents. Ordinary SaveChanges still flushes other pending entries in the unit of work; this method is not an exclusive graph-save boundary.
+
+**References**:
+- `src/Explore.Persistence/Repositories/UserRepository.cs`
+- `src/Explore.Persistence/ExploreDbContext.SaveChanges.cs`
+- `src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/UserIdentityProfilePersistenceTests.cs`
+- [EF Core concurrency documentation](https://learn.microsoft.com/en-us/ef/core/saving/concurrency)
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; concrete tracked-entity and concurrency ownership lesson.
+
+---

@@ -23,6 +23,30 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
     public Task<User?> GetUserWithDetails(Guid id) =>
         GetUserWithDetails(id, CancellationToken.None);
 
+    public async Task SaveIdentityProfileAsync(User user, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        cancellationToken.ThrowIfCancellationRequested();
+        _dbContext.RequireBoundTenantLease();
+        if (_dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Identity profile synchronization requires its original account transaction.");
+        _dbContext.ChangeTracker.DetectChanges();
+        var entry = _dbContext.Entry(user);
+        if (entry.State is not (EntityState.Unchanged or EntityState.Modified)
+            || entry.Property(row => row.Id).OriginalValue != user.Id
+            || user.Pii is null)
+            throw new InvalidOperationException("Identity profile synchronization requires its existing tracked user.");
+        var profile = _dbContext.Entry(user.Pii);
+        if (profile.State is not (EntityState.Unchanged or EntityState.Modified)
+            || profile.Property(row => row.UserId).OriginalValue != user.Id || user.Pii.UserId != user.Id
+            || entry.Properties.Any(property => property.IsModified && property.Metadata.Name != nameof(User.EmailVerified))
+            || profile.Properties.Any(property => property.IsModified && property.Metadata.Name != nameof(UserPii.Email)))
+            throw new InvalidOperationException("Identity profile synchronization may change only its email mirror.");
+        if (profile.Property(row => row.Email).IsModified && entry.State == EntityState.Unchanged)
+            entry.Property(row => row.ConcurrencyStamp).IsModified = true;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<User?> GetUserWithDetails(Guid id, CancellationToken cancellationToken)
     {
         return await _dbContext.Users

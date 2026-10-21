@@ -7,6 +7,9 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IUserRepository : IGenericRepository<User, Guid>
 {
+    /// <summary>Saves the existing tracked user's email mirror within its original account transaction.</summary>
+    Task SaveIdentityProfileAsync(User user, CancellationToken cancellationToken);
+
     Task<User?> GetUserWithDetails(Guid id);
     Task<User?> GetUserWithDetails(Guid id, CancellationToken cancellationToken);
     Task<User?> GetUserByEmail(string email);

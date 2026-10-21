@@ -223,6 +223,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                         && current.Decision != IdentityCorrelationDecision.ExactBinding))
                     return ExplicitBindingRequired();
 
+                User? currentUser = current.User;
+
                 UserExternalLogin? currentLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
                 var observation = new IdentityEmailObservation(
                     email, emailVerified == true,
@@ -233,21 +235,21 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 {
                     if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, currentLogin, ct,
                             request.LocalLifecycleSynchronization)
-                        || user is null || currentLogin!.UserId != user.Id)
+                        || currentUser is null || currentLogin!.UserId != currentUser.Id)
                     {
                         return ExplicitBindingRequired();
                     }
                 }
-                else if (currentLogin is not null && (user is null || currentLogin.UserId != user.Id))
+                else if (currentLogin is not null && (currentUser is null || currentLogin.UserId != currentUser.Id))
                 {
                     return ExplicitBindingRequired();
                 }
-                else if (user is not null && currentLogin is null && await IsLocalOwnedAsync(user.Id, ct))
+                else if (currentUser is not null && currentLogin is null && await IsLocalOwnedAsync(currentUser.Id, ct))
                 {
                     return ExplicitBindingRequired();
                 }
 
-                if (user == null)
+                if (currentUser == null)
                 {
                     if (observation.CanClaimIdentityEmail && observation.EmailVerified
                         && !string.IsNullOrWhiteSpace(email)
@@ -290,23 +292,23 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 else
                 {
                     UserExternalLogin login = await EnsureExternalLoginLinkInTransactionAsync(
-                        user, accountKey, loginId, ct);
+                        currentUser, accountKey, loginId, ct);
                     IdentityEmailSynchronizationOutcome emailOutcome =
-                        await _identityEmailSynchronization.ExecuteAsync(user, login, observation, ct);
+                        await _identityEmailSynchronization.ExecuteAsync(currentUser, login, observation, ct);
                     if (!string.IsNullOrWhiteSpace(email)
                         && emailOutcome != IdentityEmailSynchronizationOutcome.ConflictingOwner)
                     {
-                        user.Email = email;
+                        currentUser.Email = email;
                     }
 
                     if (emailVerified.HasValue)
                     {
-                        user.EmailVerified = emailVerified;
+                        currentUser.EmailVerified = emailVerified;
                     }
 
-                    await _userRepository.Update(user);
+                    await _userRepository.SaveIdentityProfileAsync(currentUser, ct);
 
-                    return BaseCommandResponse.Success(id: user.Id,
+                    return BaseCommandResponse.Success(id: currentUser.Id,
                         message: emailOutcome == IdentityEmailSynchronizationOutcome.ConflictingOwner
                             ? "Account synchronized; the identity address needs recovery or operator support."
                             : "User synchronized successfully.");

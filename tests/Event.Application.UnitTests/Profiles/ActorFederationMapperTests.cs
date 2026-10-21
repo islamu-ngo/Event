@@ -747,6 +747,7 @@ public sealed class ActorFederationMapperTests
     private sealed class UserStore : Store<User, Guid>, IUserRepository
     {
         public override Task<bool> Exists(Guid id) => Task.FromResult(id == OwnerId);
+        public Task SaveIdentityProfileAsync(User user, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<User?> GetUserWithDetails(Guid id) => throw new NotSupportedException();
         public Task<User?> GetUserWithDetails(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<User?> GetUserByEmail(string email) => throw new NotSupportedException();

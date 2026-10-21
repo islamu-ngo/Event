@@ -3306,16 +3306,22 @@ and await the final programme run.
 The selected primary database remains the email delivery ledger. Parent-aware content retention is implemented by the `email-dispatch-retention-cleanup` Quartz job (`EmailDispatchRetentionCleanupJob`): it runs bounded transactional passes, supports dry-run, and records only counts and cutoff timestamps in summary logs. Per-tenant failure warnings retain only the fixed `retention_cleanup_failed` category, never the exception object or provider message. Failed tenants remain counted, cancellation still propagates, and this diagnostic boundary does not change transaction or retry behavior.
 
 Retention acquires bounded tenant UUIDs from `IEmailRetentionTenantDiscoveryRepository`
-using a fresh unbound Global context. PostgreSQL executes the column-only
-`PostgresEmailRetentionDiscoveryContract`; other supported relational engines
-use the same bounded identity projection. Missing native authority fails discovery
-instead of reporting an empty successful fleet. `IEmailRetentionExecutionScopeFactory`
+using a fresh bound, tenantless Global context. All supported relational engines
+use the same EF Core eligibility, grouping and ordering query. PostgreSQL's
+`PostgresEmailRetentionReadPermissions` installs only seven metadata-column reads:
+`TenantId`, `CreatedAt`, `Status`, `SentAt`, `LastFailureAt`, `ContentRedactedAt`
+and `IsDeleted`. No stored discovery workflow is installed. Missing or changed
+permission authority fails discovery instead of reporting an empty successful
+fleet. `IEmailRetentionExecutionScopeFactory`
 then seals a fresh selected-tenant Runtime lease before constructing each
 repository and unit of work. Counts and all four redaction relations keep normal
 tenant/soft-delete filtering and explicit tenant predicates. Global receives no
 private content access or redaction authority. Production composition and the
 post-RLS migrator install this capability; source/specifications await final
-programme executable assurance.
+programme executable assurance. Existing obsolete email-retention routines or
+cluster-global capability roles are rejected without automatic cleanup. Use a
+fresh isolated development PostgreSQL cluster without those objects, or perform
+operator-owned, dependency-checked decommissioning before installation.
 
 - Sent and skipped content redacts after the configured 180-day default; attempt and receipt free text/provider IDs follow the selected parent in the same transaction.
 - Dead-lettered, `Unknown`, and parked replay material remains until its explicit resolution timestamp, then follows the same retention clock. `ContentRedactedAt` permanently removes replay authority.

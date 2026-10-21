@@ -7,7 +7,9 @@ using Explore.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -30,7 +32,7 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
     {
         var unsupported = new UnsupportedFactory();
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await new EmailRetentionTenantDiscoveryRepository(unsupported).GetTenantIdsAsync(Cutoff, 1, CancellationToken.None));
+            await new EmailRetentionTenantDiscoveryRepository(unsupported, null).GetTenantIdsAsync(Cutoff, 1, CancellationToken.None));
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await new EmailRetentionExecutionScopeFactory(unsupported).CreateAsync(Guid.CreateVersion7(), CancellationToken.None));
 
@@ -45,7 +47,7 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
     {
         await fixture.ResetAsync();
         await using var setup = fixture.CreateDbContext();
-        await PostgresEmailRetentionDiscoveryContract.ApplyAsync(setup, fixture.NativeQueueEnrollment);
+        await PostgresEmailRetentionReadPermissions.ApplyAsync(setup, fixture.NativeQueueEnrollment);
         await GrantRuntimeAsync(setup);
         var first = await SeedAsync(setup, "native-first", EmailDispatchStatus.Sent, Cutoff.AddDays(-2));
         var second = await SeedAsync(setup, "native-second", EmailDispatchStatus.Skipped, Cutoff.AddDays(-1));
@@ -53,7 +55,7 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
         var recent = await SeedAsync(setup, "native-recent", EmailDispatchStatus.Sent, Cutoff.AddDays(1));
         var global = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
         var runtime = new TenantExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime), poolSize: 1);
-        var discovery = new EmailRetentionTenantDiscoveryRepository(global);
+        var discovery = new EmailRetentionTenantDiscoveryRepository(global, fixture.NativeQueueEnrollment);
         var scopes = new EmailRetentionExecutionScopeFactory(runtime);
         var owners = await discovery.GetTenantIdsAsync(Cutoff, 1, CancellationToken.None);
         await Assert.That(owners.Single()).IsEqualTo(first.TenantId);
@@ -72,9 +74,9 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
                 await globalView.EmailDispatchOutbox.IgnoreQueryFilters().Select(row => row.Subject).ToArrayAsync());
             await Assert.ThrowsAsync<PostgresException>(async () =>
                 await globalView.EmailDispatchOutbox.IgnoreQueryFilters().ExecuteDeleteAsync());
-            await Assert.That(await globalView.Database.SqlQuery<bool>(
-                $"SELECT pg_has_role(session_user, {PostgresEmailRetentionDiscoveryContract.OwnerRole}, 'SET') AS \"Value\"")
-                .SingleAsync()).IsFalse();
+            await Assert.That(await globalView.Database.SqlQueryRaw<bool>(
+                "SELECT NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='email_retention_discovery_owner') AS \"Value\"")
+                .SingleAsync()).IsTrue();
         }
         await using (var scope = await scopes.CreateAsync(first.TenantId, CancellationToken.None))
             await Assert.That(await scope.RedactAsync(Cutoff, Now, 1, CancellationToken.None)).IsEqualTo(1);
@@ -112,7 +114,7 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
     {
         await fixture.ResetAsync();
         await using var setup = fixture.CreateDbContext();
-        await PostgresEmailRetentionDiscoveryContract.ApplyAsync(setup, fixture.NativeQueueEnrollment);
+        await PostgresEmailRetentionReadPermissions.ApplyAsync(setup, fixture.NativeQueueEnrollment);
         await GrantRuntimeAsync(setup);
         var first = await SeedAsync(setup, "rollback-first", EmailDispatchStatus.Sent, Cutoff.AddDays(-2));
         var second = await SeedAsync(setup, "rollback-second", EmailDispatchStatus.Sent, Cutoff.AddDays(-1));
@@ -131,7 +133,7 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
         {
             var runtime = new TenantExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime), poolSize: 1);
             var result = await Service(new EmailRetentionTenantDiscoveryRepository(new GlobalExploreDbContextFactory(
-                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1)),
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1), fixture.NativeQueueEnrollment),
                 new EmailRetentionExecutionScopeFactory(runtime), dryRun: false).CleanupAsync(Now);
             await Assert.That(result.FailedTenantCount).IsEqualTo(1);
             await Assert.That(result.SucceededTenantCount).IsEqualTo(1);
@@ -152,26 +154,26 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
 
     [Test]
     [Arguments("policy")]
-    [Arguments("owner_content")]
+    [Arguments("inherited_content")]
     [Arguments("global_content")]
-    [Arguments("executor")]
+    [Arguments("global_delegation")]
     [Arguments("rls")]
     public async Task DiscoveryDriftFailsVisiblyAndReinstallDoesNotNormalizeIt(string drift)
     {
         await using var setup = fixture.CreateDbContext();
-        await PostgresEmailRetentionDiscoveryContract.ApplyAsync(setup, fixture.NativeQueueEnrollment);
+        await PostgresEmailRetentionReadPermissions.ApplyAsync(setup, fixture.NativeQueueEnrollment);
         string table = Table<EmailDispatchOutbox>(setup);
-        string signature = PostgresEmailRetentionDiscoveryContract.FunctionSql(setup) + "(timestamp with time zone,integer)";
         string global = Quote(fixture.NativeQueueEnrollment.GlobalLogin);
         string runtime = Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
-        string owner = PostgresEmailRetentionDiscoveryContract.OwnerRole;
-        string policy = PostgresEmailRetentionDiscoveryContract.PolicyName;
+        string inherited = Quote("email_retention_content_" + Guid.CreateVersion7().ToString("N"));
+        const string policy = "email_retention_metadata_global_read";
         (string Inject, string Restore) fault = drift switch
         {
             "policy" => ($"ALTER POLICY {policy} ON {table} USING (false)", $"ALTER POLICY {policy} ON {table} USING (true)"),
-            "owner_content" => ($"GRANT SELECT (subject) ON {table} TO {owner}", $"REVOKE SELECT (subject) ON {table} FROM {owner}"),
+            "inherited_content" => ($"CREATE ROLE {inherited} NOLOGIN; GRANT SELECT (subject) ON {table} TO {inherited}; GRANT {inherited} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
+                $"REVOKE {inherited} FROM {global}; REVOKE SELECT (subject) ON {table} FROM {inherited}; DROP ROLE {inherited}"),
             "global_content" => ($"GRANT SELECT (subject) ON {table} TO {global}", $"REVOKE SELECT (subject) ON {table} FROM {global}"),
-            "executor" => ($"GRANT EXECUTE ON FUNCTION {signature} TO {runtime}", $"REVOKE EXECUTE ON FUNCTION {signature} FROM {runtime}"),
+            "global_delegation" => ($"GRANT {global} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE", $"REVOKE {global} FROM {runtime}"),
             "rls" => ($"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY", $"ALTER TABLE {table} FORCE ROW LEVEL SECURITY"),
             _ => throw new ArgumentOutOfRangeException(nameof(drift))
         };
@@ -179,15 +181,24 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
         try
         {
             var discovery = new EmailRetentionTenantDiscoveryRepository(new GlobalExploreDbContextFactory(
-                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1));
-            var entry = await Assert.ThrowsAsync<RetryLimitExceededException>(async () =>
-                await discovery.GetTenantIdsAsync(Cutoff, 2, CancellationToken.None));
-            await Assert.That((entry?.InnerException as PostgresException)?.SqlState).IsEqualTo("55000");
-            var reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await PostgresEmailRetentionDiscoveryContract.ApplyAsync(setup, fixture.NativeQueueEnrollment));
-            await Assert.That(reinstall?.SqlState).IsEqualTo("55000");
-            await Assert.ThrowsAsync<RetryLimitExceededException>(async () =>
-                await discovery.GetTenantIdsAsync(Cutoff, 2, CancellationToken.None));
+                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1), fixture.NativeQueueEnrollment);
+            async Task RequireRejectedAsync()
+            {
+                if (drift is "policy" or "rls")
+                {
+                    var denied = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                        discovery.GetTenantIdsAsync(Cutoff, 2, CancellationToken.None));
+                    await Assert.That(denied.Message).IsEqualTo("postgres_tenant_runtime_authority_not_ready");
+                }
+                else
+                    await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                        discovery.GetTenantIdsAsync(Cutoff, 2, CancellationToken.None));
+            }
+            await RequireRejectedAsync();
+            var reinstall = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                PostgresEmailRetentionReadPermissions.ApplyAsync(setup, fixture.NativeQueueEnrollment));
+            await Assert.That(reinstall.Message).IsEqualTo("email_retention_read_permissions_drift");
+            await RequireRejectedAsync();
         }
         finally
         {
@@ -209,7 +220,7 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
             var unresolved = await SeedAsync(seed, "sqlite-unknown", EmailDispatchStatus.Unknown, Cutoff.AddDays(-3));
             var recent = await SeedAsync(seed, "sqlite-recent", EmailDispatchStatus.Sent, Cutoff.AddDays(1));
             var factory = new SqliteFactory(path);
-            var discovery = new EmailRetentionTenantDiscoveryRepository(factory);
+            var discovery = new EmailRetentionTenantDiscoveryRepository(factory, null);
             var scopes = new EmailRetentionExecutionScopeFactory(factory);
             await Assert.That((await discovery.GetTenantIdsAsync(Cutoff, 1, CancellationToken.None)).Single())
                 .IsEqualTo(first.TenantId);
@@ -269,25 +280,26 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
     public async Task MissingDiscoveryGrantCannotReportAnEmptySuccessfulFleet()
     {
         await using var migration = fixture.CreateDbContext();
-        await PostgresEmailRetentionDiscoveryContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
-        string signature = PostgresEmailRetentionDiscoveryContract.FunctionSql(migration)
-            + "(timestamp with time zone,integer)";
-        string executor = PostgresEmailRetentionDiscoveryContract.ExecutorRole;
-        await migration.Database.ExecuteSqlRawAsync($"REVOKE EXECUTE ON FUNCTION {signature} FROM {executor}");
+        await PostgresEmailRetentionReadPermissions.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+        var names = new HumanPrincipalSourceSql(migration);
+        string table = names.Table(typeof(EmailDispatchOutbox));
+        string tenant = names.Column(typeof(EmailDispatchOutbox), nameof(EmailDispatchOutbox.TenantId));
+        string global = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
+        await migration.Database.ExecuteSqlRawAsync($"REVOKE SELECT ({tenant}) ON {table} FROM {global}");
         try
         {
             var discovery = new EmailRetentionTenantDiscoveryRepository(new GlobalExploreDbContextFactory(
-                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1));
-            var missing = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await discovery.GetTenantIdsAsync(Now, 2, CancellationToken.None));
-            await Assert.That(missing?.SqlState).IsEqualTo("42501");
-            var reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await PostgresEmailRetentionDiscoveryContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
-            await Assert.That(reinstall?.SqlState).IsEqualTo("55000");
+                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1), fixture.NativeQueueEnrollment);
+            var missing = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                discovery.GetTenantIdsAsync(Now, 2, CancellationToken.None));
+            await Assert.That(missing.Message).IsEqualTo("email_retention_read_permissions_not_ready");
+            var reinstall = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                PostgresEmailRetentionReadPermissions.ApplyAsync(migration, fixture.NativeQueueEnrollment));
+            await Assert.That(reinstall.Message).IsEqualTo("email_retention_read_permissions_drift");
         }
         finally
         {
-            await migration.Database.ExecuteSqlRawAsync($"GRANT EXECUTE ON FUNCTION {signature} TO {executor}");
+            await migration.Database.ExecuteSqlRawAsync($"GRANT SELECT ({tenant}) ON {table} TO {global}");
         }
     }
 
@@ -295,30 +307,35 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
     public async Task NativeDiscoveryRejectsInvalidBoundsAndTenantSelectedGlobalSessions()
     {
         await using var setup = fixture.CreateDbContext();
-        await PostgresEmailRetentionDiscoveryContract.ApplyAsync(setup, fixture.NativeQueueEnrollment);
+        await PostgresEmailRetentionReadPermissions.ApplyAsync(setup, fixture.NativeQueueEnrollment);
         var options = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global);
         var globalFactory = new GlobalExploreDbContextFactory(options, poolSize: 1);
+        var discovery = new EmailRetentionTenantDiscoveryRepository(globalFactory, fixture.NativeQueueEnrollment);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => discovery.GetTenantIdsAsync(Cutoff, 0, default));
+        foreach (DateTime infinite in new[] { DateTime.MinValue, DateTime.MaxValue })
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => discovery.GetTenantIdsAsync(
+                DateTime.SpecifyKind(infinite, DateTimeKind.Utc), 1, default));
+        await Assert.ThrowsAsync<ArgumentException>(() => discovery.GetTenantIdsAsync(
+            DateTime.SpecifyKind(Cutoff, DateTimeKind.Unspecified), 1, default));
+        var selected = new EmailRetentionTenantDiscoveryRepository(
+            new TenantSelectedGlobalFactory(globalFactory, Guid.CreateVersion7()), fixture.NativeQueueEnrollment);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => selected.GetTenantIdsAsync(Cutoff, 1, default));
+
         await using var global = await globalFactory.CreateDbContextAsync();
-        string function = PostgresEmailRetentionDiscoveryContract.FunctionSql(global);
-        var invalid = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await global.Database.ExecuteSqlRawAsync($"SELECT * FROM {function}({{0}}, 0)", Cutoff));
-        await Assert.That(invalid?.SqlState).IsEqualTo("22023");
-        await using var connection = new NpgsqlConnection(
-            PrimaryDatabaseConfiguration.BuildConnectionString(options).ConnectionString);
-        await connection.OpenAsync();
-        await using var transaction = await connection.BeginTransactionAsync();
-        await using var bind = connection.CreateCommand();
-        bind.Transaction = transaction;
-        bind.CommandText = "SELECT set_config('app.current_tenant_id', @tenant, true)";
-        bind.Parameters.AddWithValue("tenant", Guid.CreateVersion7().ToString());
-        await bind.ExecuteNonQueryAsync();
-        await using var call = connection.CreateCommand();
-        call.Transaction = transaction;
-        call.CommandText = $"SELECT * FROM {function}(@cutoff, 1)";
-        call.Parameters.AddWithValue("cutoff", Cutoff);
-        var selected = await Assert.ThrowsAsync<PostgresException>(async () => await call.ExecuteNonQueryAsync());
-        await Assert.That(selected?.SqlState).IsEqualTo("42501");
-        await transaction.RollbackAsync();
+        await global.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await global.Database.OpenConnectionAsync();
+            try
+            {
+                await using var transaction = await global.Database.BeginTransactionAsync();
+                await global.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_catalog.set_config('app.current_tenant_id', {Guid.CreateVersion7().ToString()}, true)");
+                await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    PostgresEmailRetentionReadPermissions.RequireReadyAsync(global, fixture.NativeQueueEnrollment));
+                await transaction.RollbackAsync();
+            }
+            finally { await global.Database.CloseConnectionAsync(); }
+        });
     }
 
     private static EmailDispatchRetentionCleanupService Service(
@@ -345,6 +362,11 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
     private static async Task<Graph> SeedAsync(
         ExploreDbContext context, string suffix, EmailDispatchStatus status, DateTime settledAt)
     {
+        context.BindTenantLease();
+        await using var humanGate = new HumanSecuritySourceGate(context);
+        await using var human = await humanGate.AcquireAsync();
+        await using var enrollmentGate = new EventDiscoveryEnrollmentGate(context);
+        await using var enrollment = await enrollmentGate.AcquireAsync();
         var seeded = await EmailDispatchSqliteFixture.SeedProcessingDispatchAsync(context, suffix);
         var dispatch = await context.EmailDispatchOutbox.IgnoreQueryFilters().SingleAsync(row => row.Id == seeded.OutboxId);
         dispatch.Status = status;
@@ -410,6 +432,12 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
     private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
     private sealed record Graph(Guid TenantId, Guid OutboxId, Guid ReceiptId, Guid PublishEventId);
     private sealed record TenantIdentity(Guid TenantId) : ITenantContext;
+    private sealed class TenantSelectedGlobalFactory(GlobalExploreDbContextFactory factory, Guid tenantId)
+        : IGlobalExploreDbContextFactory
+    {
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+            ((IMixedSettingsDbContextFactory)factory).CreateMixedSettingsAsync(tenantId, cancellationToken);
+    }
 
     private sealed class UnsupportedFactory : IGlobalExploreDbContextFactory, ITenantExploreDbContextFactory
     {
@@ -426,7 +454,9 @@ public sealed class PostgresEmailRetentionAuthorityTests(PostgreSqlContainerFixt
         public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(EmailDispatchSqliteFixture.CreateContext(path));
+            var context = EmailDispatchSqliteFixture.CreateContext(path);
+            context.BindTenantLease();
+            return Task.FromResult(context);
         }
 
         public Task<ExploreDbContext> CreateDbContextAsync(Guid tenantId, CancellationToken cancellationToken = default)

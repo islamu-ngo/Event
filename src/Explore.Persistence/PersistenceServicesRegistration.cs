@@ -632,7 +632,10 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEventResourceAuditOwnerDiscoveryRepository, EventResourceAuditOwnerDiscoveryRepository>();
         services.AddScoped<IRegistrationRetentionTenantDiscoveryRepository, RegistrationRetentionTenantDiscoveryRepository>();
         services.AddScoped<IRegistrationRetentionExecutionScopeFactory, RegistrationRetentionExecutionScopeFactory>();
-        services.AddScoped<IEmailRetentionTenantDiscoveryRepository, EmailRetentionTenantDiscoveryRepository>();
+        services.AddScoped<IEmailRetentionTenantDiscoveryRepository>(provider =>
+            new EmailRetentionTenantDiscoveryRepository(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IEmailRetentionExecutionScopeFactory, EmailRetentionExecutionScopeFactory>();
         services.AddScoped<IEventResourceAuditRetentionExecutionScopeFactory, EventResourceAuditRetentionExecutionScopeFactory>();
         services.AddScoped<IEventResourceProviderActivationRepository, EventResourceProviderActivationRepository>();

@@ -29,7 +29,11 @@ public sealed class GlobalExploreDbContextFactory :
         var builder = new DbContextOptionsBuilder<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         if (options.Provider == PrimaryDatabaseProvider.PostgreSql)
-            builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+        {
+            string globalLogin = options.Username
+                ?? throw new ArgumentException("PostgreSQL Global contexts require an explicit login.", nameof(options));
+            builder.AddInterceptors(PostgresTenantSessionInterceptor.ForGlobalLogin(globalLogin));
+        }
         _pool = new PooledDbContextFactory<ExploreDbContext>(builder.Options, poolSize);
     }
 

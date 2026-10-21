@@ -249,7 +249,7 @@ public static class ExploreDatabaseMigrator
             await PostgresRefundReconciliationHealthContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresTicketingRecoveryHealthContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
-            await PostgresEmailRetentionDiscoveryContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresEmailRetentionReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         }
         await PostgresVisitorPolicyAuthorityContract.ApplyAsync(executionDatabase, cancellationToken);

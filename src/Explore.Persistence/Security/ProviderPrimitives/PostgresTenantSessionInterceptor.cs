@@ -12,18 +12,28 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
     public static readonly PostgresTenantSessionInterceptor Instance = new();
     internal static readonly PostgresTenantSessionInterceptor RuntimeInstance = new(true);
     private readonly bool _verifyRuntimeAuthority;
+    private readonly string? _enrolledGlobalLogin;
 
     public PostgresTenantSessionInterceptor() { }
 
-    private PostgresTenantSessionInterceptor(bool verifyRuntimeAuthority) =>
+    private PostgresTenantSessionInterceptor(bool verifyRuntimeAuthority, string? enrolledGlobalLogin = null)
+    {
         _verifyRuntimeAuthority = verifyRuntimeAuthority;
+        _enrolledGlobalLogin = enrolledGlobalLogin;
+    }
+
+    internal static PostgresTenantSessionInterceptor ForGlobalLogin(string enrolledGlobalLogin)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(enrolledGlobalLogin);
+        return new(true, enrolledGlobalLogin);
+    }
 
     public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
     {
         if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext context)
         {
             context.IsPostgresRuntimeReady = false;
-            using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context);
+            using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context, _enrolledGlobalLogin);
             PostgresTenantRuntimeReadiness.RequireReady(readiness.ExecuteScalar());
         }
         ApplyTenantSessionState(connection, eventData.Context);
@@ -39,7 +49,7 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
         if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext context)
         {
             context.IsPostgresRuntimeReady = false;
-            await using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context);
+            await using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context, _enrolledGlobalLogin);
             PostgresTenantRuntimeReadiness.RequireReady(await readiness.ExecuteScalarAsync(cancellationToken));
         }
         await ApplyTenantSessionStateAsync(connection, eventData.Context, cancellationToken);

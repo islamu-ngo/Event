@@ -248,7 +248,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresRefundReconciliationHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTicketingRecoveryHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresEmailRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEmailRetentionReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresVisitorPolicyAuthorityContract.ApplyAsync(migratorContext);
             await PostgresEmailDeliveryPolicyContract.ApplyAsync(migratorContext, NativeQueueEnrollment);

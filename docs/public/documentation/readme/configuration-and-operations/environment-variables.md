@@ -491,6 +491,17 @@ governance, claims and recovery; payload/credential access and settlement stay
 tenant-bound. Use inheritance-enabled, role-switch-disabled memberships without
 owner/migrator groups or direct private-table grants.
 
+Email retention uses migrator-installed Global reads on only seven queue
+metadata columns: `TenantId`, `CreatedAt`, `Status`, `SentAt`, `LastFailureAt`,
+`ContentRedactedAt` and `IsDeleted`. C# selects bounded eligible tenant pages;
+message contents, recipients and redaction remain tenant-bound. The same Global
+credential can enumerate those metadata columns directly, but receives no
+content or write authority. Run the application migrator; do not substitute
+table-wide grants or manually recreate the retired discovery routine. Existing
+obsolete email-retention routines or capability roles require a fresh isolated
+development PostgreSQL cluster without those objects, or operator-owned,
+dependency-checked decommissioning. Installation performs no destructive cleanup.
+
 Registration finalization drains require `event_registration_finalization_global`
 on Global for bounded effect claiming only. Financial/order work and settlement
 use fresh exact Runtime tenant scopes; the claim capability never exposes

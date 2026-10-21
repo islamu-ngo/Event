@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Explore.Persistence.Security;
@@ -8,11 +9,15 @@ namespace Explore.Persistence.Security;
 /// </summary>
 internal static class PostgresTenantRuntimeReadiness
 {
-    internal static DbCommand CreateCommand(DbConnection connection, ExploreDbContext context)
+    internal static DbCommand CreateCommand(
+        DbConnection connection, ExploreDbContext context, string? enrolledGlobalLogin = null)
     {
+        string globalPolicyException = enrolledGlobalLogin is null
+            ? "FALSE"
+            : PostgresEmailRetentionReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin);
         var command = connection.CreateCommand();
         command.CommandTimeout = 5;
-        command.CommandText = """
+        command.CommandText = $$"""
             SELECT
                 NOT EXISTS (
                     SELECT 1 FROM pg_roles r
@@ -45,6 +50,7 @@ internal static class PostgresTenantRuntimeReadiness
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE n.nspname = ANY(@schemas) AND c.relname = ANY(@tables)
                       AND p.polname <> 'tenant_isolation' AND p.polpermissive
+                      AND NOT COALESCE(({{globalPolicyException}}), FALSE)
                       AND EXISTS (
                           SELECT 1 FROM unnest(p.polroles) AS role_id
                           WHERE role_id = 0 OR pg_has_role(current_user, role_id, 'USAGE')))

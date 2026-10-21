@@ -23,16 +23,29 @@ public sealed partial class PostgresEmailRetentionReadPermissionTests
 
         var factory = new GlobalExploreDbContextFactory(
             fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
+        IDbContextOptions owner;
         await using (var configured = await factory.CreateDbContextAsync(token))
+        {
+            owner = configured.GetService<IDbContextOptions>();
             await Assert.That(configured.Database.CreateExecutionStrategy().RetriesOnFailure).IsTrue();
+        }
         var repository = new EmailRetentionTenantDiscoveryRepository(factory, fixture.NativeQueueEnrollment);
         DateTime cutoff = new(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        using var fault = new EmailRetentionRetryFault();
+        using var fault = new EmailRetentionRetryFault(owner);
+        var foreignFactory = new GlobalExploreDbContextFactory(
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
+        var foreignRepository = new EmailRetentionTenantDiscoveryRepository(foreignFactory, fixture.NativeQueueEnrollment);
+        await Assert.That(await foreignRepository.GetTenantIdsAsync(cutoff, 2, token)).IsEmpty();
+        await Assert.That(fault.WarmReads).IsEqualTo(0)
+            .Because("a different factory's successful read must not become the fault's original owner");
         var healthy = await repository.GetTenantIdsAsync(cutoff, 2, token);
         await Assert.That(healthy).IsEmpty();
         await Assert.That(fault.WarmReads).IsGreaterThanOrEqualTo(1);
 
         fault.Arm();
+        await Assert.That(await foreignRepository.GetTenantIdsAsync(cutoff, 2, token)).IsEmpty();
+        await Assert.That(fault.Faults).IsEqualTo(0)
+            .Because("an armed fault must not interrupt another factory's owner");
         IReadOnlyList<Guid>? escaped = null;
         Exception? failure = null;
         try
@@ -62,6 +75,7 @@ public sealed partial class PostgresEmailRetentionReadPermissionTests
     private sealed class EmailRetentionRetryFault : IObserver<DiagnosticListener>,
         IObserver<KeyValuePair<string, object?>>, IDisposable
     {
+        private readonly IDbContextOptions owner;
         private readonly IDisposable listeners;
         private readonly System.Collections.Concurrent.ConcurrentBag<IDisposable> subscriptions = [];
         private ExploreDbContext? originalContext;
@@ -76,7 +90,11 @@ public sealed partial class PostgresEmailRetentionReadPermissionTests
         public bool ReplacementBackendObserved { get; private set; }
         public bool SameOwnerOnSubsequentReads { get; private set; } = true;
 
-        public EmailRetentionRetryFault() => listeners = DiagnosticListener.AllListeners.Subscribe(this);
+        public EmailRetentionRetryFault(IDbContextOptions owner)
+        {
+            this.owner = owner;
+            listeners = DiagnosticListener.AllListeners.Subscribe(this);
+        }
 
         public void Arm()
         {
@@ -96,6 +114,7 @@ public sealed partial class PostgresEmailRetentionReadPermissionTests
             if (diagnostic.Value is not CommandExecutedEventData command
                 || command.ExecuteMethod != DbCommandMethod.ExecuteReader
                 || command.Context is not ExploreDbContext context
+                || !ReferenceEquals(context.GetService<IDbContextOptions>(), owner)
                 || command.Command.Connection is not NpgsqlConnection connection)
                 return;
             if (!armed)

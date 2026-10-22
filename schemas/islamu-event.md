@@ -29,6 +29,49 @@ Table "external_api_key_issuance_receipts" {
   Note: 'Durable one-time issuance identity. Digests only; no recoverable credential, TTL, or cascading user/key foreign key. Null tenant denotes explicit global scope.'
 }
 
+Table "integration_sync_outbox" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "kind" int [not null]
+  "source_type" varchar(100) [not null]
+  "source_id" uuid [not null]
+  "event_id" uuid [ref: > events.id]
+  "registration_order_id" uuid
+  "user_id" uuid [ref: > users.id]
+  "subscriber_email" varchar(320) [not null]
+  "subscriber_name" varchar(320)
+  "subscriber_payload_json" jsonb [not null]
+  "listmonk_list_id" int [not null]
+  "preconfirm_subscriptions" boolean [not null]
+  "status" int [not null]
+  "evidence_kind" int [not null, note: '0 None; 1 handoff in doubt; 2 ambiguous outcome; 3 accepted by operator evidence; 4 definitely-not-accepted retry; 5 operator dead letter. Range 0–5; C# validates status compatibility. Never derived from last_error.']
+  "attempt_count" int [not null]
+  "max_attempts" int [not null, default: 5]
+  "next_attempt_at" timestamptz
+  "processing_started_at" timestamptz
+  "processing_lease_token" uuid
+  "completed_at" timestamptz
+  "dead_lettered_at" timestamptz
+  "last_failure_at" timestamptz
+  "last_error" varchar(2000)
+  "correlation_id" varchar(200)
+  "created_at" timestamptz [not null]
+  "created_by" uuid
+  "updated_at" timestamptz
+  "updated_by" uuid
+  "is_deleted" boolean [not null]
+  "deleted_at" timestamptz
+  "deleted_by" uuid
+  indexes {
+    (status, next_attempt_at, created_at)
+    (tenant_id, source_type, source_id, kind) [note: 'Unique for non-deleted rows; provider-specific implementation is EF-owned.']
+    (tenant_id, status, last_failure_at)
+  }
+  Note: 'Claim-fenced Listmonk subscriber delivery. Private subscriber/diagnostic data remains separate from non-private typed recovery evidence.'
+}
+
+Ref: integration_sync_outbox.(tenant_id, registration_order_id) > registration_orders.(tenant_id, id) [delete: restrict]
+
 Table "event_discovery_snapshot_reservations" {
   "tenant_id" uuid [pk, not null]
   Note: 'Dedicated native reservation fence. No public-source foreign key; capture acquires this before source reads.'

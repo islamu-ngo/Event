@@ -26,6 +26,18 @@ Deploy matching native definitions with the application through the controlled
 migrator before reopening traffic. Runtime rejects stale or changed definitions
 rather than repairing them or selecting another database authority.
 
+## Repeating PostgreSQL PDS permission installation
+
+Use the migration tooling matching the application version before reopening
+traffic. PDS permission installation uses EF Core's mapped column names so a
+repeat run can recognize its existing valid grants, including names the provider
+does not quote. This correction adds no database permissions or settings.
+
+If installation still reports `unsafe PDS admission column grants`, investigate
+the actual installed privileges. Unexpected column access and grant options
+remain errors; do not widen permissions, remove the check or reorder installers
+to force startup through.
+
 ## Interrupted PostgreSQL lock reacquisition
 
 If logs report `named_lock_acquisition_cleanup_unconfirmed`, the API could not
@@ -290,6 +302,23 @@ and security failures still fail closed.
 
 ## 4. Upgrade Runbook (Pre-1.0 Releases)
 
+### Application-owned storage development migrations
+
+The current development migration set uses `ApplicationOwnedProgrammeModel`
+for the application database and `ApplicationOwnedLocalIdentityEligibility`
+for the separate local-identity database. These generated migrations replace
+unapplied development drafts on a confirmed clean development target. Apply the
+matching release and provider artifacts through the migration service, including
+the application changes that route federation settings to their dedicated tables.
+They do not copy old generic federation settings or rewrite migration history.
+
+Do not use their Down migrations as a data-preserving rollback: they remove new
+federation, policy and eligibility storage and typed evidence classification.
+For a deployment containing data you intend to retain, use the verified backup
+and recovery procedure above rather than relabeling history or resetting shared
+volumes. Application C# workflows remain responsible for authorization, canonical
+row creation and completion; schema creation alone does not execute those workflows.
+
 Because the project is pre-1.0 and in active development, breaking schema changes may occur between minor versions. Follow this strict procedure when updating your instance:
 
 1. **Review Release Notes**: Check the latest release notes and `API_CHANGELOG.md` for breaking changes or new required environment variables.
@@ -319,6 +348,128 @@ reopening traffic. Do not treat an older image as a schema rollback. If an
 upgrade is not explicitly image-only reversible, use a tested recovery plan that
 retains newer erasure facts. Keep the prior software and verified artifacts until
 acceptance completes; a successful startup is not itself a restore rehearsal.
+
+### Dedicated federation settings development transition
+
+The dedicated federation settings migration separates event federation enablement,
+backfill enablement, and backfill mode from private generic settings. Validation
+profiles and each user's publication consent remain in their existing stores.
+The API owns setting interpretation; the database retains value, uniqueness,
+tenant-boundary, and referential-integrity checks.
+
+The related API-owned discovery-revision design gives Runtime and Global narrowly
+bounded access to revision identifiers and two revision counters. Creation may
+insert those four fields; subsequent updates may change only the counters, not
+the keys. C# creates the canonical row in the tenant's original transaction.
+Global can also read tenant identifiers, including inactive
+tenants, so an instance-wide setting change cannot omit them. This revision capability does not grant
+access to private tenant settings or descriptive tenant fields. Tenant-selected
+sessions retain tenant isolation; cross-tenant revision access requires the
+original Global identity without a selected tenant, except for an INSERT-only
+permission for tenantless Runtime creation. That exception gives tenantless
+Runtime no revision read or update visibility. Revision deletion is not granted.
+
+Ordinary administrator tenant creation uses a separate, narrowly listed Global
+permission set. The API checks the authenticated administrator, creates the new
+tenant, its required settings documents and canonical revision atomically, and
+may create that same person's administrator membership in the new tenant. Global
+therefore has fixed column-level INSERT permissions for membership and role-grant
+rows, with only the necessary tenant, role and capacity metadata reads. Runtime
+receives no new rights, and this does not grant private account or credential reads.
+
+Creation readiness also rejects unexpected database columns, executable defaults
+and altered or non-enforced CHECK constraints on its write tables. If schema drift
+blocks startup or creation, investigate it against the generated migrations and
+documented installation rather than disabling checks or broadening permissions.
+These database checks protect the expected storage structure; the API still owns
+the administrator's authorization, capacity decisions and atomic creation workflow.
+
+There is an important accepted trade-off: **a stolen Global database credential
+could insert administrator access into an existing tenant**, even though normal
+API calls are restricted to their newly created tenant. INSERT-only permissions
+and database constraints limit the available operations but do not enforce the
+API's human authorization or new-tenant-only workflow. Protect Global as sensitive
+application authority, keep its secret separate from Runtime and rotate or revoke
+it if compromise is suspected. Do not treat RLS or a successful installation as
+protection against this direct-credential attack.
+
+The separately approved mandatory-document permission is limited to creating
+Branding and DirectoryOperatorIdentity documents. A restrictive database policy
+limits Global to those two keys and an unselected tenant session; the ordinary
+tenant policy cannot bypass that restriction. Existing documents cannot be replaced
+with this INSERT permission. However, a stolen Global credential could create
+either missing document in an existing tenant. The API normally permits these
+effects only as part of its own newly created tenant graph.
+
+The managed provisioning worker has its own approved creation boundary, separate
+from a signed-in administrator. It must retain the original admitted queue delivery
+and request, then atomically create the exact application graph and complete its
+operation. Its narrowly declared permissions may create accounts, identity links,
+profiles and provisioning records and change email-verification state, but do not
+read passwords, password hashes, security stamps or token values. A stolen Global
+credential could misuse those writes to forge accounts or links, alter verification
+state or fabricate provisioning records. This is an accepted additional risk,
+not a guarantee that database credentials enforce API authorization.
+
+The worker's Local-account eligibility must track the current credential lifecycle
+without exposing credentials. When Identity and application data use separate
+databases, the API coordinates participating lifecycle changes through settlement;
+there is no distributed atomic transaction and direct database edits can bypass
+that coordination. After an uncertain commit, the worker must reconcile the original
+operation before retrying creation. These are required implementation and deployment
+checks, not a claim that the current worker tests have already passed.
+
+Runtime and Global are separate database logins used by the API, not human
+administrator roles. Runtime normally handles one selected tenant; Global is
+reserved for admitted instance-wide operations. PostgreSQL row-level security (RLS) is a
+database filter/check that uses the API's selected tenant to restrict which rows
+an operation can see or change. Global does not mean a superuser or unrestricted
+access to all tables. RLS is a second boundary alongside API
+authorization, not a replacement for it. Someone who steals a database login
+can supply their own tenant session within that login's fixed permissions;
+RLS does not authenticate the human or make that credential harmless.
+
+Protect those database credentials as application authority. Unlike the former
+routine-only boundary, a stolen credential can directly alter revision metadata
+or fabricate a missing revision row within its permissions, including the
+tenantless Runtime insertion exception, even though the API normally validates authorization and
+updates settings and revision counters atomically. Installation rejects changed
+permissions or policies; do not broaden grants or disable RLS to repair startup.
+Deployment readiness still requires the native permission, rollback and concurrent
+workflow checks, not merely a successful migration build.
+
+The API coordinates parent and tenant setting changes using shared ordered
+setting-key leases, acquired before the transaction and retained until it settles.
+It also coordinates tenant creation/deletion with instance-wide audience changes.
+There is no new privileged parent-locking routine and Runtime cannot update an
+instance parent merely to lock it. This prevents races between participating API
+operations, but a direct parent-setting edit made with stolen Global credentials
+can bypass that coordination. Protect the database credentials accordingly; this
+design does not promise parent stability against direct credential misuse.
+
+If tenant creation rolls back to a savepoint, the API rejects completion of that
+whole attempt, even if earlier saves succeeded. Retry the complete operation
+with fresh state; do not manually roll back part of a creation transaction and
+then commit what remains. The creation protocol requires EF-managed transaction
+and savepoint APIs, not direct rollback SQL or provider-level rollback calls.
+
+Use an explicitly disposable development application database for this transition.
+For PostgreSQL, the retired `event_atproto_governance_owner`,
+`event_atproto_governance_migrator` and `event_atproto_governance_runtime` roles
+must also be absent from the cluster. The former governance routine and its
+`atproto_governance_overrides` policy must be absent from the mapped tenant-setting
+table. A new database alone does not remove cluster-wide roles. Installation and
+reads reject these leftovers without automatically dropping or changing them;
+do not remove shared roles or retained objects without a reviewed operator plan.
+Existing generic rows for these three settings are rejected, not automatically
+copied, deleted, or overwritten. If settings or other application data must survive,
+stop and arrange a reviewed transition before applying the migration. Do not edit
+migration history or delete independent Identity, encryption-key, or privacy-erasure
+stores to get startup to succeed.
+
+Reversing this migration deletes the dedicated settings. The custom-property
+provider reconciliation below is a separate migration, not part of federation
+storage.
 
 ### Custom-property limits and maintenance downgrades
 

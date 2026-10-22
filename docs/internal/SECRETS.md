@@ -316,6 +316,29 @@ requires the maintenance cutover and exact cleanup transaction. A resolved
 credential proves acquisition, not a successful user sign-in or completed
 multi-process convergence.
 
+## Local Identity Signing Authority
+
+Local access-token and credential-replacement challenge issuance and validation
+use the same selected deployment `Authentication:Local:JwtKey` authority
+(`AUTHENTICATION_LOCAL_JWT_KEY` alias). Both paths require Base64 material of at
+least 256 bits. An explicitly blank canonical declaration refuses signing rather
+than borrowing the alias. `LocalJwtTokenGenerator` does not read database secret
+bindings: its selected identity-writing context must not gain private
+`SecretBinding` access merely to sign a response. This does not change generic
+`SecretResolver` binding precedence or authorize runtime database key rotation.
+
+The original identity-synchronization context reads only bootstrap status, mode,
+provider kind and completing-user ID, ordered by generation, creation time and
+row ID. `IIdentitySynchronizationBootstrapReader` projects these facts without
+materializing configured-administrator fingerprints. Identity correlation checks
+erasure presence through `ExistsBySubjectAsync`, selecting only `SubjectId`, not
+the saga's receipt, lifecycle state or fence payload. The Local Identity writer
+inventory grants exactly these seven bootstrap columns and the erasure subject
+column for SELECT, with no DML on either source. A stolen writer credential can
+enumerate this metadata and erased-subject IDs; it still cannot read those
+private payloads. Existing partial profiles fail readiness rather than receiving
+an inferred union of grants; use a freshly provisioned development profile.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as
@@ -741,14 +764,32 @@ Cancellation after admission leaves a durable recoverable claim. Recovery keeps
 SMTP in-doubt work Unknown across outbox, attempt, receipt and delivery ledgers.
 
 ATProto audience and recovery-policy resolution use
-`IAtprotoGovernanceSettingRepository` on a separate sealed-null Global lease.
-Grant `event_atproto_governance_runtime` to Global with inheritance enabled and
-role switching disabled. Its fixed-search-path function returns tenant overrides
-only for event enablement, backfill enablement and backfill mode. Neither Global
-nor Runtime receives the owner/migrator roles or private setting-table reads.
-The complete override audience is returned; instance locks, deployment mode and
-backfill precedence remain Application decisions. Generic setting reads used
-inside other mutation transactions do not route through this capability.
+`IAtprotoFederationGlobalReadRepository` on a separate sealed-null Global lease.
+EF reads the dedicated instance and tenant federation-setting entities; the
+complete tenant override audience is loaded in one query, not a per-tenant loop.
+Only event enablement, backfill enablement and backfill mode belong in these
+tables. Validation profiles, publication consent and private generic settings
+remain separate. Instance locks, deployment mode and backfill precedence remain
+Application decisions. Scoped reads retain the caller's context and transaction;
+the independent Global reader cannot borrow an existing caller transaction.
+
+`PostgresAtprotoFederationSettingPermissions` installs a fixed, model-checked
+column privilege manifest. Runtime and Global read the dedicated columns;
+tenant writes remain tenant-constrained, and only Global can insert or update
+instance settings. The separate Global SELECT policy permits complete tenant
+override discovery without granting private setting-table reads or bypassing RLS.
+Pre/post admission rechecks the configured login, original physical connector,
+transaction, model, live privileges and stamped policies. Unexpected grants,
+owner-role reachability or altered policies fail closed rather than being repaired.
+
+Do not grant or restore `event_atproto_governance_runtime`. Installation and read
+admission require the retired governance owner, migrator and runtime roles, the
+mapped former governance routine and its `atproto_governance_overrides` policy
+to be absent. PostgreSQL roles are cluster-wide, so merely creating another
+database on the same old cluster does not establish a clean transition. These
+checks inspect catalogs only: startup never drops roles, routines, policies or
+application data. See [the development transition](BACKUP_RESTORE_UPGRADE.md)
+before applying the generated schema changes to any retained database.
 
 Pre-tenant API-key and scanner authentication readers acquire independent
 sealed-null Global leases. The Migrator installs fixed column permissions through
@@ -796,6 +837,50 @@ Treat and rotate Runtime as sensitive application write authority, not
 as an independently business-authorized principal. A stolen Runtime credential
 can enumerate tenant IDs, not their descriptive or private user data, through
 this parent-key permission.
+
+Scanner management shares that fixed storage installer, not the Global
+authentication role. Its Runtime descriptor declares SELECT/INSERT for all 16
+mapped scanner fields and UPDATE only for `Id` (the check-in row fence), the
+three revocation fields and `ConcurrencyStamp`. Existing repository entity reads
+include the lookup digest/version; neither is the raw scanner token or its HMAC
+key. The restrictive nonnull-tenant policy also covers scanners, so bypassing
+EF's tenant filter does not reveal another tenant's rows. Revocation persists
+only its declared fields and original concurrency stamp, including detached
+entities; it never rewrites the credential or issuance identity. Authentication
+readiness verifies the exact storage manifest instead of forbidding legitimate
+Runtime writes. Broad grants, grant options and digest UPDATE remain refused.
+The transport supplies the authenticated platform User ID, not an Actor ID.
+The Application service resolves its tenant-associated personal Actor through
+the fixed ownership reader inside the original issue/revoke transaction before
+persisting either actor foreign key. Ownership facts do not grant authorization;
+the existing event-management authorization remains tied to the platform User.
+Issuance and EF tenant-reference validation additionally read only event
+`Id`/`TenantId`/`IsDeleted` and participation-configuration
+`Id`/`TenantId`/`IsDeleted`/`ParticipationHandlingModeId`. These declared reference
+intersections confer no event content reads or event/configuration writes; the
+retained private-read owners recognize precisely these columns, not live ACLs.
+The four instance-key machine purposes retain their separate scanner-access
+denial. A stolen Runtime credential can select tenant sessions, read their
+scanner digests, insert scanners and revoke or fence them outside C# workflow
+authorization; this is the already documented application-credential threat
+boundary, not independent database business authority.
+
+Admission target storage has a separate fixed Runtime inventory: SELECT and
+INSERT for its nine mapped identity, scope, status and concurrency columns, and
+UPDATE only for `AdmissionOperationalStatusId` and `ConcurrencyStamp`. It grants
+neither target-key UPDATE nor private event-content access. C# target creation,
+scanner issuance, check-in and stop workflows retain authorization and domain
+rules. `AdmissionTargetTransaction` acquires cooperative tenant/target
+coordination before opening the original single-attempt Serializable transaction,
+so a waiting workflow establishes its snapshot after the previous owner commits.
+Repositories and the unit of work check the original context, tenant, target,
+connector and physical transaction. No privileged target-lock routine is needed.
+SQLite additionally takes its existing database writer reservation; its named
+coordination is process-local and assumes the documented single-instance topology.
+Direct database edits can bypass this cooperative protocol, including target
+creation or status changes with a stolen Runtime credential. A known acknowledged
+commit followed by cleanup failure is not reclassified as an unknown commit and
+is never automatically replayed; genuine settlement uncertainty remains unknown.
 
 EF queries retain exact ordinal key matching and paired scanner digest/version
 candidates; multiple scanner matches fail as ambiguity. Inactive/expired key rows

@@ -3019,9 +3019,12 @@ retained audit rows have expired or been purged.
 
 Owner discovery uses an independent Global context and returns only tenant IDs,
 including suspended tenants that still own audit rows. PostgreSQL requires
-`PostgresEventResourceAuditRetentionContract` after tenant RLS; its function
-owner reads only audit tenant keys and directory IDs. Global does not receive
-audit content or deletion authority. Each deletion batch creates a fresh
+`PostgresEventResourceAuditReadPermissions` after tenant RLS; it grants the
+configured Global login only the audit `TenantId` column alongside its existing
+directory-key permission. `EventResourceAuditOwnerDiscoveryRepository` expresses
+existence, exclusive UUID pagination and ordering through EF Core in its original
+ReadCommitted transaction. No stored discovery workflow is installed. Global
+does not receive audit content or deletion authority. Each deletion batch creates a fresh
 ordinary Runtime tenant context, reads current governance and deletes within
 one serializable transaction. Invalid governance preserves evidence and fails
 the pass. Acquisition does not install or repair the discovery capability.
@@ -3318,10 +3321,7 @@ repository and unit of work. Counts and all four redaction relations keep normal
 tenant/soft-delete filtering and explicit tenant predicates. Global receives no
 private content access or redaction authority. Production composition and the
 post-RLS migrator install this capability; source/specifications await final
-programme executable assurance. Existing obsolete email-retention routines or
-cluster-global capability roles are rejected without automatic cleanup. Use a
-fresh isolated development PostgreSQL cluster without those objects, or perform
-operator-owned, dependency-checked decommissioning before installation.
+programme executable assurance.
 
 - Sent and skipped content redacts after the configured 180-day default; attempt and receipt free text/provider IDs follow the selected parent in the same transaction.
 - Dead-lettered, `Unknown`, and parked replay material remains until its explicit resolution timestamp, then follows the same retention clock. `ContentRedactedAt` permanently removes replay authority.

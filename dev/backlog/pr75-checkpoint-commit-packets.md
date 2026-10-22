@@ -1,0 +1,1220 @@
+# PR75 — stopped implementation: explicit preservation commit packets
+
+Date: 2026-10-22. User requested all current WIP be committed and pushed with completion deferred. This replaces older phase-close recipes; it does not certify completed features. Final composed source passed the two affected Release builds, but known runtime counterexamples and unexecuted acceptance remain in the main handoff report.
+
+The generated schema union is inseparable from its sixteen model sources. The larger policy-workflow packet is a structural dependency closure, not merely all dirty files: selected-identity leases are used by Human source queries and bootstrap receipts; creator/worker policy projection and canonical discovery partials call each other; source/write interfaces are changed together with all scalar/batch settings consumers; migrator/profile intersections and DI reference those same concrete implementations. Splitting this packet by project would leave missing helpers, invalid constructor contracts, or misleading activation. No compatibility scaffolding is being invented merely to fragment this stopped checkpoint. Independent schema, Listmonk, scanner, finite-read, source-producer and documentation outcomes remain separate.
+
+Only exact owned paths are staged. Normal hooks are mandatory. No source reset, database reset, broad add, commit-a, stash replay, history rewrite or force push. The original pending manifest is in the main handoff; new fragments and these durable reports are explicitly added below. No per-packet passing build is claimed: build receipts belong to the final composed image, not every intermediate Git tree.
+
+## model: feat(database)!: persist the application-owned programme model
+
+Preserve the generated application and external-identity schema closure for dedicated federation storage, eligibility, provisioning policy and typed integration evidence. The eight provider/store migration pairs and snapshots are generated from the same model image and must travel with its sixteen handwritten model sources. This is a development checkpoint, not completed runtime acceptance; see dev/backlog/pr75-remaining-implementation-handoff.md.
+
+```text
+BREAKING CHANGE: Use the matching freshly generated application and identity migrations in disposable development databases. Generic federation keys are rejected and typed evidence has new persisted meaning; no retained-data compatibility path is provided.
+Change-Id: CHG-01M5JMWR8NEWNCWYTJABNNV1DR
+```
+
+Exact 47-path manifest:
+
+```text
+src/Explore.Domain/IntegrationSyncOutbox.cs
+src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs
+src/Explore.Persistence.Migrations.MySql/Migrations/Identity/ExternalIdentityDbContextModelSnapshot.cs
+src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs
+src/Explore.Persistence.Migrations.SqlServer/Migrations/Identity/ExternalIdentityDbContextModelSnapshot.cs
+src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs
+src/Explore.Persistence.Migrations.Sqlite/Migrations/Identity/ExternalIdentityDbContextModelSnapshot.cs
+src/Explore.Persistence/Configurations/Entities/IntegrationSyncOutboxConfiguration.cs
+src/Explore.Persistence/Configurations/Entities/SystemSettingConfiguration.cs
+src/Explore.Persistence/Configurations/Entities/TenantSettingConfiguration.cs
+src/Explore.Persistence/ExploreDbContext.DbSets.cs
+src/Explore.Persistence/ExploreDbContext.QueryFilters.cs
+src/Explore.Persistence/Identity/ExternalIdentityDbContextFactory.cs
+src/Explore.Persistence/Identity/IdentityDatabaseProviderComposition.cs
+src/Explore.Persistence/Identity/Migrations/ExternalIdentityDbContextModelSnapshot.cs
+src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs
+src/Explore.Persistence/Schema/PortableRelationalModelPolicy.cs
+tests/Event.Persistence.IntegrationTests/Migrations/ApplicationInitialLifecycleProviderTests.cs
+src/Explore.Domain/LocalIdentityEligibility.cs
+src/Explore.Domain/ManagedTenantProvisioningPolicySetting.cs
+src/Explore.Domain/Settings/ManagedTenantProvisioningPolicyInventory.cs
+src/Explore.Persistence.Migrations.MySql/Migrations/20261021034405_ApplicationOwnedProgrammeModel.Designer.cs
+src/Explore.Persistence.Migrations.MySql/Migrations/20261021034405_ApplicationOwnedProgrammeModel.cs
+src/Explore.Persistence.Migrations.MySql/Migrations/Identity/20261021034407_ApplicationOwnedLocalIdentityEligibility.Designer.cs
+src/Explore.Persistence.Migrations.MySql/Migrations/Identity/20261021034407_ApplicationOwnedLocalIdentityEligibility.cs
+src/Explore.Persistence.Migrations.SqlServer/Migrations/20261021034353_ApplicationOwnedProgrammeModel.Designer.cs
+src/Explore.Persistence.Migrations.SqlServer/Migrations/20261021034353_ApplicationOwnedProgrammeModel.cs
+src/Explore.Persistence.Migrations.SqlServer/Migrations/Identity/20261021034355_ApplicationOwnedLocalIdentityEligibility.Designer.cs
+src/Explore.Persistence.Migrations.SqlServer/Migrations/Identity/20261021034355_ApplicationOwnedLocalIdentityEligibility.cs
+src/Explore.Persistence.Migrations.Sqlite/Migrations/20261021034341_ApplicationOwnedProgrammeModel.Designer.cs
+src/Explore.Persistence.Migrations.Sqlite/Migrations/20261021034341_ApplicationOwnedProgrammeModel.cs
+src/Explore.Persistence.Migrations.Sqlite/Migrations/Identity/20261021034343_ApplicationOwnedLocalIdentityEligibility.Designer.cs
+src/Explore.Persistence.Migrations.Sqlite/Migrations/Identity/20261021034343_ApplicationOwnedLocalIdentityEligibility.cs
+src/Explore.Persistence/Configurations/Entities/AtprotoFederationInstanceSettingConfiguration.cs
+src/Explore.Persistence/Configurations/Entities/AtprotoFederationTenantSettingConfiguration.cs
+src/Explore.Persistence/Configurations/Entities/ManagedTenantProvisioningPolicySettingConfiguration.cs
+src/Explore.Persistence/Identity/Configurations/LocalIdentityEligibilityConfiguration.cs
+src/Explore.Persistence/Identity/Migrations/20261021034331_ApplicationOwnedLocalIdentityEligibility.Designer.cs
+src/Explore.Persistence/Identity/Migrations/20261021034331_ApplicationOwnedLocalIdentityEligibility.cs
+src/Explore.Persistence/Migrations/20261021034329_ApplicationOwnedProgrammeModel.Designer.cs
+src/Explore.Persistence/Migrations/20261021034329_ApplicationOwnedProgrammeModel.cs
+tests/Event.Domain.UnitTests/Identity/LocalIdentityEligibilityLockoutTests.cs
+tests/Event.Domain.UnitTests/Identity/LocalIdentityEligibilityTests.cs
+tests/Event.Domain.UnitTests/Settings/ManagedTenantProvisioningPolicyProjectionTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/ExternalIdentityModelScaffoldingTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/ManagedTenantProvisioningPolicyProjectionTests.cs
+docs/internal/releases/changes/CHG-01M5JMWR8NEWNCWYTJABNNV1DR.yaml
+```
+
+Commands (inspect index first; force only the five intentionally ignored backlog reports):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -- \
+  'src/Explore.Domain/IntegrationSyncOutbox.cs' \
+  'src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence.Migrations.MySql/Migrations/Identity/ExternalIdentityDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence.Migrations.SqlServer/Migrations/Identity/ExternalIdentityDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence.Migrations.Sqlite/Migrations/Identity/ExternalIdentityDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence/Configurations/Entities/IntegrationSyncOutboxConfiguration.cs' \
+  'src/Explore.Persistence/Configurations/Entities/SystemSettingConfiguration.cs' \
+  'src/Explore.Persistence/Configurations/Entities/TenantSettingConfiguration.cs' \
+  'src/Explore.Persistence/ExploreDbContext.DbSets.cs' \
+  'src/Explore.Persistence/ExploreDbContext.QueryFilters.cs' \
+  'src/Explore.Persistence/Identity/ExternalIdentityDbContextFactory.cs' \
+  'src/Explore.Persistence/Identity/IdentityDatabaseProviderComposition.cs' \
+  'src/Explore.Persistence/Identity/Migrations/ExternalIdentityDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs' \
+  'src/Explore.Persistence/Schema/PortableRelationalModelPolicy.cs' \
+  'tests/Event.Persistence.IntegrationTests/Migrations/ApplicationInitialLifecycleProviderTests.cs' \
+  'src/Explore.Domain/LocalIdentityEligibility.cs' \
+  'src/Explore.Domain/ManagedTenantProvisioningPolicySetting.cs' \
+  'src/Explore.Domain/Settings/ManagedTenantProvisioningPolicyInventory.cs' \
+  'src/Explore.Persistence.Migrations.MySql/Migrations/20261021034405_ApplicationOwnedProgrammeModel.Designer.cs' \
+  'src/Explore.Persistence.Migrations.MySql/Migrations/20261021034405_ApplicationOwnedProgrammeModel.cs' \
+  'src/Explore.Persistence.Migrations.MySql/Migrations/Identity/20261021034407_ApplicationOwnedLocalIdentityEligibility.Designer.cs' \
+  'src/Explore.Persistence.Migrations.MySql/Migrations/Identity/20261021034407_ApplicationOwnedLocalIdentityEligibility.cs' \
+  'src/Explore.Persistence.Migrations.SqlServer/Migrations/20261021034353_ApplicationOwnedProgrammeModel.Designer.cs' \
+  'src/Explore.Persistence.Migrations.SqlServer/Migrations/20261021034353_ApplicationOwnedProgrammeModel.cs' \
+  'src/Explore.Persistence.Migrations.SqlServer/Migrations/Identity/20261021034355_ApplicationOwnedLocalIdentityEligibility.Designer.cs' \
+  'src/Explore.Persistence.Migrations.SqlServer/Migrations/Identity/20261021034355_ApplicationOwnedLocalIdentityEligibility.cs' \
+  'src/Explore.Persistence.Migrations.Sqlite/Migrations/20261021034341_ApplicationOwnedProgrammeModel.Designer.cs' \
+  'src/Explore.Persistence.Migrations.Sqlite/Migrations/20261021034341_ApplicationOwnedProgrammeModel.cs' \
+  'src/Explore.Persistence.Migrations.Sqlite/Migrations/Identity/20261021034343_ApplicationOwnedLocalIdentityEligibility.Designer.cs' \
+  'src/Explore.Persistence.Migrations.Sqlite/Migrations/Identity/20261021034343_ApplicationOwnedLocalIdentityEligibility.cs' \
+  'src/Explore.Persistence/Configurations/Entities/AtprotoFederationInstanceSettingConfiguration.cs' \
+  'src/Explore.Persistence/Configurations/Entities/AtprotoFederationTenantSettingConfiguration.cs' \
+  'src/Explore.Persistence/Configurations/Entities/ManagedTenantProvisioningPolicySettingConfiguration.cs' \
+  'src/Explore.Persistence/Identity/Configurations/LocalIdentityEligibilityConfiguration.cs' \
+  'src/Explore.Persistence/Identity/Migrations/20261021034331_ApplicationOwnedLocalIdentityEligibility.Designer.cs' \
+  'src/Explore.Persistence/Identity/Migrations/20261021034331_ApplicationOwnedLocalIdentityEligibility.cs' \
+  'src/Explore.Persistence/Migrations/20261021034329_ApplicationOwnedProgrammeModel.Designer.cs' \
+  'src/Explore.Persistence/Migrations/20261021034329_ApplicationOwnedProgrammeModel.cs' \
+  'tests/Event.Domain.UnitTests/Identity/LocalIdentityEligibilityLockoutTests.cs' \
+  'tests/Event.Domain.UnitTests/Identity/LocalIdentityEligibilityTests.cs' \
+  'tests/Event.Domain.UnitTests/Settings/ManagedTenantProvisioningPolicyProjectionTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/ExternalIdentityModelScaffoldingTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/ManagedTenantProvisioningPolicyProjectionTests.cs' \
+  'docs/internal/releases/changes/CHG-01M5JMWR8NEWNCWYTJABNNV1DR.yaml'
+git -c core.fsmonitor=false commit -m 'feat(database)!: persist the application-owned programme model' -m 'Preserve the generated application and external-identity schema closure for dedicated federation storage, eligibility, provisioning policy and typed integration evidence. The eight provider/store migration pairs and snapshots are generated from the same model image and must travel with its sixteen handwritten model sources. This is a development checkpoint, not completed runtime acceptance; see dev/backlog/pr75-remaining-implementation-handoff.md.' -m 'BREAKING CHANGE: Use the matching freshly generated application and identity migrations in disposable development databases. Generic federation keys are rejected and typed evidence has new persisted meaning; no retained-data compatibility path is provided.
+Change-Id: CHG-01M5JMWR8NEWNCWYTJABNNV1DR'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+git -c core.fsmonitor=false diff --cached --name-only
+```
+
+## core: feat(federation)!: preserve the application-owned policy workflow cutover
+
+Preserve the connected C# federation/discovery, selected identity, bootstrap and tenant-creation cutover with its actual consumers, fixed permission inventories, composition roots and adversarial tests. Shared selected-owner leases, original-transaction protocols, context partials and installer/profile intersections form one compile-time and activation dependency closure; omitting their helpers or consumers creates false intermediate contracts. Independent schema, finite reads, scanner, Listmonk and producer repairs are separate commits. This is explicitly incomplete: Setup claim access, bootstrap receipt acceptance, worker Human custody and final provider assurance remain open in dev/backlog/pr75-remaining-implementation-handoff.md.
+
+```text
+BREAKING CHANGE: Federation settings use dedicated storage and workflows select explicitly configured application-owned execution purposes. Apply the matching generated schema and deployment authority configuration; no legacy governance runtime or compatibility shim is restored.
+Change-Id: CHG-01M58P7943Z4SP14QHVSR1YHPS
+```
+
+Exact 383-path manifest:
+
+```text
+src/Event.MigrationService/Worker.cs
+src/Explore.API/Extensions/AuthenticationExtensions.cs
+src/Explore.API/Extensions/ConfigurationExtensions.cs
+src/Explore.API/Hosting/AgentBrowserPersonaStartup.cs
+src/Explore.API/Hosting/ApiHostStartupExtensions.cs
+src/Explore.Application/Configuration/LocalIdentityOptions.cs
+src/Explore.Application/Contracts/Operations/IPolicyMutationExecutionScopeFactory.cs
+src/Explore.Application/Contracts/Persistence/IAtprotoGovernanceSettingRepository.cs
+src/Explore.Application/Contracts/Persistence/IExternalLoginAuthenticationRepository.cs
+src/Explore.Application/Contracts/Persistence/IHumanSettingsMutationPreparation.cs
+src/Explore.Application/Contracts/Persistence/IOrdinarySettingsMutationStore.cs
+src/Explore.Application/Contracts/Persistence/IPrivacyErasureStateRepository.cs
+src/Explore.Application/Contracts/Persistence/IUserRepository.cs
+src/Explore.Application/Features/EmailDispatch/IHumanEmailMutationPreparation.cs
+src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/ApplyInstanceTenantPlanAssignmentCommandHandler.cs
+src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/LockInstanceTenantSettingCommandHandler.cs
+src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/SetInstanceTenantSettingCommandHandler.cs
+src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/UnlockInstanceTenantSettingCommandHandler.cs
+src/Explore.Application/Features/InstanceOnboarding/Handlers/Commands/SaveInstanceOnboardingProfileCommandHandler.cs
+src/Explore.Application/Features/InstanceOnboarding/Handlers/Commands/UpdateInstanceSubResourceHandlers.cs
+src/Explore.Application/Features/InstanceOnboarding/Services/ITrustedSetupSettingsWriter.cs
+src/Explore.Application/Features/InstanceOnboarding/Services/InstanceOnboardingCompletionOperation.cs
+src/Explore.Application/Features/InstanceOnboarding/Services/LocalAdministratorBootstrapOperation.cs
+src/Explore.Application/Features/InstanceOnboarding/Services/ProviderConfigurationMutation.cs
+src/Explore.Application/Features/ManagedProviderProvisioning/Handlers/Commands/EnsureManagedProviderClientProvisionedCommandHandler.cs
+src/Explore.Application/Features/ManagedProviderProvisioning/HumanManagedProviderProvisioningCoordinator.cs
+src/Explore.Application/Features/Management/Handlers/ManagedTenantProvisioningHandlers.cs
+src/Explore.Application/Features/Settings/Handlers/Commands/LockSettingCommandHandler.cs
+src/Explore.Application/Features/Settings/Handlers/Commands/ResetSettingCommandHandler.cs
+src/Explore.Application/Features/Settings/Handlers/Commands/UnlockSettingCommandHandler.cs
+src/Explore.Application/Features/Settings/Handlers/Commands/UpdateSettingBatchCommandHandler.cs
+src/Explore.Application/Features/Settings/Handlers/Commands/UpdateSettingCommandHandler.cs
+src/Explore.Application/Features/Settings/MixedSettingsBatchMutation.cs
+src/Explore.Application/Features/Tenants/Handlers/Commands/CreateTenant/CreateTenantCommandHandler.cs
+src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs
+src/Explore.Application/OperationServicesRegistration.cs
+src/Explore.Application/Operations/HumanScopeQueryHandler.cs
+src/Explore.Application/Operations/MutationScopeCommandHandler.cs
+src/Explore.Application/Operations/PolicyMutationCommandScope.cs
+src/Explore.Application/Services/EventResourceProviderControlPlane.cs
+src/Explore.Application/Services/Federation/AtprotoJetstreamTenantPresentationResolver.cs
+src/Explore.Application/Services/Federation/AtprotoPdsRecoveryPolicyResolver.cs
+src/Explore.Application/Services/IdentityAccountResolver.cs
+src/Explore.Application/Services/InstanceOperatorIdentityService.cs
+src/Explore.Application/Services/PrivacyErasureApplier.cs
+src/Explore.Application/Services/RetainedAuthorityPrivacyErasureWorkflow.cs
+src/Explore.Application/Settings/StorageSettingsMutation.cs
+src/Explore.Infrastructure/Authentication/LocalIdentityLifecycleDeliveryWorker.cs
+src/Explore.Infrastructure/Authentication/LocalIdentityLifecycleEmailService.cs
+src/Explore.Infrastructure/Authentication/LocalJwtTokenGenerator.cs
+src/Explore.Infrastructure/InfrastructureServicesRegistration.cs
+src/Explore.Infrastructure/Mail/HumanEmailMutationPreparation.Mixed.cs
+src/Explore.Infrastructure/Mail/HumanEmailMutationPreparation.cs
+src/Explore.Infrastructure/Services/ConfiguredAdministratorBootstrapStartupRunner.cs
+src/Explore.Infrastructure/Services/HierarchicalSettingsReader.cs
+src/Explore.Infrastructure/Services/HierarchicalSettingsResolver.cs
+src/Explore.Infrastructure/Services/HumanManagedProviderProvisioningPreparationRegistration.cs
+src/Explore.Infrastructure/Services/HumanSettingsMutationPreparation.EventResourceProvider.cs
+src/Explore.Infrastructure/Services/HumanSettingsMutationPreparation.cs
+src/Explore.Infrastructure/Services/HumanTenantMutationPreparation.cs
+src/Explore.Infrastructure/Services/TrustedSetupSettingsAuthority.cs
+src/Explore.Persistence/Database/PolicyMutationExecutionScopeFactory.cs
+src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs
+src/Explore.Persistence/Database/ProviderPrimitives/AtprotoGovernanceSettingQuery.cs
+src/Explore.Persistence/Database/ProviderPrimitives/ConfigurationImportRepositoryNativeOperations.cs
+src/Explore.Persistence/Database/ProviderPrimitives/ConfigurationRepositoryNativeOperations.cs
+src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoveryDisclosureProviderOperations.cs
+src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoveryDisclosureTransactionInterceptor.cs
+src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoverySourceProviderOperations.cs
+src/Explore.Persistence/Database/ProviderPrimitives/GenericOutboxExecutionAuthority.cs
+src/Explore.Persistence/EfCoreUnitOfWork.cs
+src/Explore.Persistence/ExploreDbContext.Disclosure.cs
+src/Explore.Persistence/ExploreDbContext.HumanTenantAuthority.cs
+src/Explore.Persistence/ExploreDbContext.SaveChanges.cs
+src/Explore.Persistence/ExploreDbContext.StorageReferences.cs
+src/Explore.Persistence/ExploreDbContext.cs
+src/Explore.Persistence/Identity/ExternalIdentityDatabaseMigrator.cs
+src/Explore.Persistence/Identity/LocalIdentityAuthService.cs
+src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.Administration.cs
+src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.AdministrationEffects.cs
+src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.cs
+src/Explore.Persistence/Identity/LocalIdentityLifecycleDeliveryStore.cs
+src/Explore.Persistence/Identity/LocalIdentityLifecycleStore.cs
+src/Explore.Persistence/OriginalOwnerSettlement.cs
+src/Explore.Persistence/PersistenceServicesRegistration.cs
+src/Explore.Persistence/RelationalSettingMutationLock.cs
+src/Explore.Persistence/Repositories/AnonymousCancellationRepository.cs
+src/Explore.Persistence/Repositories/AtprotoGovernanceSettingRepository.cs
+src/Explore.Persistence/Repositories/PrivacyErasureStateRepository.cs
+src/Explore.Persistence/Repositories/SystemSettingRepository.cs
+src/Explore.Persistence/Repositories/TenantSettingRepository.cs
+src/Explore.Persistence/Repositories/UserRepository.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/ExploreDatabaseMigrator.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresExternalLoginReadPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLookupCatalogueReadPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresUserTenantNavigationReadPermissions.cs
+src/Explore.Persistence/Security/ConfigurationManifestBootstrapOwnerFactory.Compilation.cs
+src/Explore.Persistence/Security/ConfigurationManifestBootstrapOwnerFactory.cs
+src/Explore.Persistence/Security/HumanAdministratorCommitScope.cs
+src/Explore.Persistence/Security/HumanAuthorizationRouteSource.cs
+src/Explore.Persistence/Security/HumanMixedSettingsSourceProtocol.cs
+src/Explore.Persistence/Security/HumanPrincipalSourceFence.cs
+src/Explore.Persistence/Security/OrdinarySettingsDataImage.cs
+src/Explore.Persistence/Security/OrdinarySettingsMutationStore.cs
+src/Explore.Persistence/Security/PolicySourceSetFence.cs
+src/Explore.Persistence/Security/ProviderPrimitives/ActorPublisherCatalogProof.cs
+src/Explore.Persistence/Security/ProviderPrimitives/ConfigurationManifestBootstrapData.cs
+src/Explore.Persistence/Security/ProviderPrimitives/ConfigurationManifestBootstrapProviderOperations.cs
+src/Explore.Persistence/Security/ProviderPrimitives/EventReadProjectionSql.cs
+src/Explore.Persistence/Security/ProviderPrimitives/HumanAuthorizationRouteQueries.cs
+src/Explore.Persistence/Security/ProviderPrimitives/HumanPrincipalSourceQueries.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PolicySourceSetProviderLock.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresAtprotoGovernanceContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresAtprotoModerationCompensationContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresConfigurationManifestBootstrapContract.Sql.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresConfigurationManifestBootstrapContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresDiscoveryTraversalContract.Installer.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresDiscoveryTraversalContract.Sql.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresDiscoveryTraversalContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresEmailDeliveryPolicyContract.Controls.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresEventResourceProviderContract.Installer.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresExternalApiKeyAuthenticationContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresManagedProviderProvisioningContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresMixedSettingsContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresMixedSettingsContract.Sql.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresOperatorIdentityEditorContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Disclosure.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Sql.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresProviderConfigurationContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresPublicEventResponseClockContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresPublicEventResponseClockContract.Installer.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresPublicationFanoutExecutionContract.Installer.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresRegistrationPrivateReadContract.Installer.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresRegistrationPrivateReadContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresResolverConfigurationContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresStorageConfigurationContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresStorageProbeSourceContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresSupportAdministrationContract.Attestation.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRuntimeReadiness.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantSessionInterceptor.cs
+src/Explore.Persistence/Security/ProviderPrimitives/ProvisioningSharedWriterAssertions.cs
+src/Explore.Persistence/Seed/DatabaseSeeder.cs
+src/Explore.Persistence/Seed/LookupTableSeeder.cs
+src/Explore.Persistence/Seed/SeedIds.cs
+src/Explore.Persistence/Services/AtprotoModerationCompensationStore.cs
+src/Explore.Persistence/Services/EventDiscoveryDisclosureMutationScope.cs
+src/Explore.Persistence/Services/EventResourceSettingsWriter.cs
+src/Explore.Persistence/Services/HumanSettingsDataBoundary.cs
+src/Explore.Persistence/Services/InstanceApiKeyCapabilityStore.cs
+src/Explore.Persistence/Services/InternalEmailDeliverySettingsWriter.cs
+src/Explore.Persistence/Services/MixedSettingsBatchStore.Location.cs
+src/Explore.Persistence/Services/MixedSettingsBatchStore.cs
+src/Explore.Persistence/Services/ProviderConfigurationSettingsWriter.cs
+src/Explore.Persistence/Services/ResolverConfigurationSettingsWriter.cs
+src/Explore.Persistence/Services/StorageConfigurationWriter.cs
+src/Explore.Persistence/Services/TypedSettingsOriginalStore.Governance.cs
+src/Explore.Persistence/Services/TypedSettingsOriginalStore.cs
+src/Explore.Persistence/Services/VisitorAccessSettingsWriter.cs
+tests/Event.API.IntegrationTests/Authentication/HumanAuthenticationLifetimeTests.cs
+tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.Mixed.cs
+tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.MixedSources.cs
+tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.Sources.cs
+tests/Event.API.IntegrationTests/Authentication/HumanTenantDeletionOwnershipTests.cs
+tests/Event.API.IntegrationTests/Authentication/ManagedProviderProvisioningOrchestrationTests.cs
+tests/Event.API.IntegrationTests/Authentication/TenantPlanCatalogueOriginalAdmissionTests.Scenarios.cs
+tests/Event.API.IntegrationTests/Authentication/TenantPlanCatalogueOriginalAdmissionTests.cs
+tests/Event.API.IntegrationTests/Authentication/TrustedSetupSettingsAuthorityTests.cs
+tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj
+tests/Event.API.IntegrationTests/Features/ConfigurationManifestBootstrapWorkerNativeTests.cs
+tests/Event.API.IntegrationTests/Features/LocalRbacAuthorizationTests.cs
+tests/Event.API.IntegrationTests/Features/SetupLiveAuthoritySecurityTests.cs
+tests/Event.API.IntegrationTests/Fixtures/AuthenticatedWebApplicationFactory.cs
+tests/Event.API.IntegrationTests/Fixtures/LocalIdentityLifecycleHttpFixture.cs
+tests/Event.API.IntegrationTests/Fixtures/TestDbContextServiceCollectionExtensions.cs
+tests/Event.Application.UnitTests/Features/InstanceAdmin/Commands/TenantIdentityActivationConcurrencyTests.cs
+tests/Event.Application.UnitTests/Features/InstanceOnboarding/InstanceOnboardingCompletionOperationTests.cs
+tests/Event.Application.UnitTests/Notifications/DefaultNotificationOrchestratorTests.cs
+tests/Event.Application.UnitTests/Profiles/ActorFederationMapperTests.cs
+tests/Event.Application.UnitTests/Settings/AtprotoJetstreamTenantPresentationResolverTests.cs
+tests/Event.Architecture.Tests/ConfiguredAdministratorBootstrapArchitectureTests.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestAtomicPersistenceTests.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapOriginTests.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapTestHost.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestConcurrencyTests.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestProviderValueNativeTests.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/PostgresManifestExportAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/Discovery/PostgresDiscoveryTraversalTests.cs
+tests/Event.Persistence.IntegrationTests/EventResourceCleanupTests.cs
+tests/Event.Persistence.IntegrationTests/Federation/ModerationCommandCompensationTests.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.Postgres.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.Sqlite.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/EmailDispatchSqliteFixture.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/InstanceSettingsCommandFixture.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/LocalIdentitySqliteTemplate.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/LocalLifecycleDeliveryFixture.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/PostgreSqlContainerFixture.cs
+tests/Event.Persistence.IntegrationTests/HumanPrincipalNativeSourceFenceTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.CompletionFixture.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.SettingsCustody.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialCreationTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialFirstUseTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialLifecycleTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityAuthServiceTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/ManagedTenantLocalAdministratorLinkageTests.cs
+tests/Event.Persistence.IntegrationTests/Onboarding/ConfiguredAdministratorBootstrapStartupConcurrencyTests.cs
+tests/Event.Persistence.IntegrationTests/OrdinarySettingsNativeContractTests.Disclosure.cs
+tests/Event.Persistence.IntegrationTests/Privacy/GlobalLocationPrivacyErasureTests.cs
+tests/Event.Persistence.IntegrationTests/Privacy/PostgresSubjectPrivacyErasureAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/EventDiscoveryDisclosureMutationTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/LocationUnicodeWriteAtomicityTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/PolicyMutationExecutionScopeSqliteFixture.cs
+tests/Event.Persistence.IntegrationTests/Repositories/PolicyMutationExecutionScopeTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/PublicEventDetailNativeContractTests.Catalogue.cs
+tests/Event.Persistence.IntegrationTests/Repositories/WebhookLocalDeliveryNativeAuthorityTests.Health.cs
+tests/Event.Persistence.IntegrationTests/Seed/DatabaseSeederTests.cs
+tests/Event.Persistence.IntegrationTests/Settings/AtprotoFederationPersistenceTests.cs
+tests/Event.Persistence.IntegrationTests/SupportAdministrationNativeContractTests.Custody.cs
+tests/Event.Persistence.IntegrationTests/SupportAdministrationNativeContractTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/AuthenticationEfSourceTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/ExternalApiKeyRepositoryBypassTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresAuthenticationLookupAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresMachineMutationAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresMachineRoomMutationAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresModerationCompensationAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresTenantApplicationTableIsolationTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresUserIdentityLookupAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/TicketTransferConcurrencyTests.cs
+tests/Explore.Infrastructure.Tests/Authentication/LocalJwtTokenGeneratorTests.cs
+tests/Explore.Infrastructure.Tests/Infrastructure/ConfiguredAdministratorBootstrapProviderTests.cs
+tests/Explore.Infrastructure.Tests/Settings/HierarchicalSettingsResolverTests.cs
+tests/Shared/Settings/SmtpSettingsDatabase.cs
+docs/internal/releases/changes/CHG-01M58P7943Z4SP14QHVSR1YHPS.yaml
+src/Explore.Application/Contracts/Identity/ILocalBootstrapReceiptSource.cs
+src/Explore.Application/Contracts/Identity/ILocalIdentityEligibilityRevocation.cs
+src/Explore.Application/Contracts/Identity/ILocalIdentityExecutionScopeFactory.cs
+src/Explore.Application/Contracts/Identity/IManagedTenantLocalEligibilitySource.cs
+src/Explore.Application/Contracts/Persistence/IAtprotoFederationGlobalReadRepository.cs
+src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingRepository.cs
+src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingsMutationStore.cs
+src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingsSource.cs
+src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingsWriter.cs
+src/Explore.Application/Contracts/Persistence/IHumanTenantCreationPort.cs
+src/Explore.Application/Contracts/Persistence/IIdentitySynchronizationBootstrapReader.cs
+src/Explore.Application/Contracts/Persistence/IManagedTenantProvisioningSchedulingPort.cs
+src/Explore.Application/Contracts/Persistence/IManagedTenantProvisioningSchedulingSource.cs
+src/Explore.Application/Contracts/Persistence/IManagedTenantWorkerCreationPort.cs
+src/Explore.Application/Features/Management/ManagedTenantProvisioningSchedulingOperation.cs
+src/Explore.Application/Features/Tenants/HumanTenantCreationPrincipalProjection.cs
+src/Explore.Application/Operations/LocalIdentityOperationScope.cs
+src/Explore.Application/Settings/AtprotoFederationSettingFacts.cs
+src/Explore.Infrastructure/Services/HumanTenantCreationPort.cs
+src/Explore.Infrastructure/Services/ManagedTenantWorkerCreationPort.cs
+src/Explore.Persistence/Database/ManagedTenantWorkerCreationOwnerFactory.cs
+src/Explore.Persistence/Database/PostgresRuntimeIdentityOptionsExtension.cs
+src/Explore.Persistence/Database/ProviderPrimitives/LocalIdentityExecutionContextCustody.cs
+src/Explore.Persistence/Database/ProviderPrimitives/LocalIdentityLifecycleGateCustody.cs
+src/Explore.Persistence/Database/ProviderPrimitives/ManagedTenantWorkerCreationAdmission.cs
+src/Explore.Persistence/ExploreDbContext.DiscoveryEnrollment.cs
+src/Explore.Persistence/ExploreDbContext.ManagedWorkerCreation.cs
+src/Explore.Persistence/ExploreDbContext.ProvisioningPolicy.cs
+src/Explore.Persistence/Identity/ConfiguredLocalBootstrapReceiptSource.cs
+src/Explore.Persistence/Identity/ConfiguredLocalIdentityEligibilityRevocation.cs
+src/Explore.Persistence/Identity/ConfiguredManagedTenantLocalEligibilitySource.cs
+src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.Authentication.cs
+src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.Eligibility.cs
+src/Explore.Persistence/Identity/LocalIdentityEligibilityRevocation.cs
+src/Explore.Persistence/Identity/LocalIdentityExecutionLease.cs
+src/Explore.Persistence/Identity/LocalIdentityExecutionScopeFactory.cs
+src/Explore.Persistence/Identity/LocalIdentityLifecycleExecutionCustody.cs
+src/Explore.Persistence/Identity/LocalIdentityWriterDbContextFactory.cs
+src/Explore.Persistence/Identity/LocalIdentityWriterInventory.cs
+src/Explore.Persistence/Identity/ManagedTenantLocalEligibilitySource.cs
+src/Explore.Persistence/Repositories/AtprotoFederationGlobalReadRepository.cs
+src/Explore.Persistence/Repositories/AtprotoFederationSettingRepository.cs
+src/Explore.Persistence/Repositories/IdentityWriterExternalLoginAuthenticationRepository.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/AtprotoFederationReadAdmission.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresAtprotoFederationSettingPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresDiscoveryMetadataPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLocalIdentitySystemSettingPolicies.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLocalIdentityWriterPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresManagedTenantWorkerCreationPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresProvisioningPolicyPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantCreationPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantMembershipMutationPermissions.cs
+src/Explore.Persistence/Security/AtprotoFederationSettingImage.cs
+src/Explore.Persistence/Security/AtprotoFederationSettingsMutationStore.Source.cs
+src/Explore.Persistence/Security/AtprotoFederationSettingsMutationStore.Writes.cs
+src/Explore.Persistence/Security/AtprotoFederationSettingsMutationStore.cs
+src/Explore.Persistence/Security/HumanTenantCreationGraphWriter.cs
+src/Explore.Persistence/Security/IdentityWriterHumanSourceQueries.cs
+src/Explore.Persistence/Security/ManagedTenantProvisioningSchedulingSource.cs
+src/Explore.Persistence/Security/ManagedTenantWorkerCreationGraphWriter.cs
+src/Explore.Persistence/Security/ManagedTenantWorkerCreationInventory.cs
+src/Explore.Persistence/Security/ManagedTenantWorkerCreationSources.cs
+src/Explore.Persistence/Services/AtprotoFederationSettingsWriter.cs
+src/Explore.Persistence/Services/IdentitySynchronizationBootstrapReader.cs
+src/Explore.Persistence/Services/ManagedSettingsDiscoveryDisclosure.cs
+src/Explore.Persistence/Services/ManagedTenantProvisioningPolicyProjection.cs
+src/Explore.Persistence/Services/ManagedTenantProvisioningSchedulingPort.cs
+src/Explore.Persistence/Services/SettingsDiscoveryDisclosureObservation.cs
+tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.DiscoveryCoordination.cs
+tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.ResourceProviderCoordination.cs
+tests/Event.API.IntegrationTests/Authentication/LocalSigningAuthorityConfigurationTests.cs
+tests/Event.API.IntegrationTests/Features/ApiStartupOwnerSelectionTests.cs
+tests/Event.API.IntegrationTests/Features/LocalIdentityLifecycleOwnerSelectionTests.cs
+tests/Event.API.IntegrationTests/Features/TenantDiscoveryCreationNativeTests.SecurityGate.cs
+tests/Event.API.IntegrationTests/Features/TenantDiscoveryCreationNativeTests.cs
+tests/Event.Application.UnitTests/Operations/InstanceOnboardingOwnerSelectionTests.cs
+tests/Event.Application.UnitTests/Operations/LocalIdentityOwnerSelectionTests.cs
+tests/Event.Application.UnitTests/Settings/AtprotoFederationSettingFactsTests.cs
+tests/Event.Application.UnitTests/Settings/AtprotoFederationSettingsCommandRoutingTests.cs
+tests/Event.Application.UnitTests/Settings/AtprotoPdsRecoveryPolicyResolverTests.cs
+tests/Event.Application.UnitTests/Tenants/HumanTenantCreationPrincipalProjectionTests.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestAtomicPersistenceTests.Revisions.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapOriginTests.FederationPreservation.cs
+tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapOriginTests.Revisions.cs
+tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsMutationTests.Batch.cs
+tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsMutationTests.Concurrency.cs
+tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsMutationTests.cs
+tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsPersistenceTests.cs
+tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsReadTests.cs
+tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataAuthorityTests.Enrollment.cs
+tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataAuthorityTests.Migrator.cs
+tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataFreshEnrollmentTests.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.Canonical.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.Deletion.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.Fanout.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.LocalWriterCleanup.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.LocalWriters.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.OrganizationPii.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.WorkerSources.cs
+tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.Email.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.ManagedWorker.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.TenantCreation.cs
+tests/Event.Persistence.IntegrationTests/Fixtures/DiscoveryMetadataEnrollmentPostgresFixture.cs
+tests/Event.Persistence.IntegrationTests/HumanAdministratorBulkProducerGateTests.cs
+tests/Event.Persistence.IntegrationTests/HumanSecuritySourceMutationGuardTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/ConfiguredLocalIdentityEligibilityRevocationTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/ConfiguredManagedTenantLocalEligibilitySourceTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.ReceiptSource.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityEligibilityLifecycleTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityExecutionLeaseTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityExecutionScopeFactoryTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentitySelectedLifecycleTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentitySigningAuthorityNativeTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterDbContextFactoryTests.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.Authentication.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.Migrations.cs
+tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.cs
+tests/Event.Persistence.IntegrationTests/IdentityWriterExternalLoginAuthenticationTests.cs
+tests/Event.Persistence.IntegrationTests/IdentityWriterHumanSourceOwnerTests.cs
+tests/Event.Persistence.IntegrationTests/IdentityWriterHumanSourceQueryTests.cs
+tests/Event.Persistence.IntegrationTests/IdentityWriterSourceRegistrationTests.cs
+tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.SchedulingGate.cs
+tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.SecurityGate.cs
+tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.Settlement.cs
+tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.Workflow.cs
+tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.cs
+tests/Event.Persistence.IntegrationTests/OrdinarySettingsNativeContractTests.Reads.cs
+tests/Event.Persistence.IntegrationTests/Repositories/HumanEmailSecurityGateTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/InternalEmailDeliverySecurityGateTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/MutationScopeHumanGateTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/PolicyMutationExecutionScopeTests.HumanGate.cs
+tests/Event.Persistence.IntegrationTests/Seed/DatabaseSeederSecurityGateTests.cs
+tests/Event.Persistence.IntegrationTests/SetupLive/SetupLiveRuntimeStorageTests.cs
+tests/Event.Persistence.IntegrationTests/SupportAdministrationNativeContractTests.MembershipPermissions.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/ManagedTenantWorkerCreationPermissionsNativeTests.Migrations.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/ManagedTenantWorkerCreationPermissionsNativeTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/ProvisioningPolicyPermissionsNativeTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationCatalogueCompositionTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationExternalPermissionsNativeTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationLookupCatalogueTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.Checks.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.Drift.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.MembershipBaseline.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantMembershipMutationPermissionsNativeTests.cs
+```
+
+Commands (inspect index first; force only the five intentionally ignored backlog reports):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -- \
+  'src/Event.MigrationService/Worker.cs' \
+  'src/Explore.API/Extensions/AuthenticationExtensions.cs' \
+  'src/Explore.API/Extensions/ConfigurationExtensions.cs' \
+  'src/Explore.API/Hosting/AgentBrowserPersonaStartup.cs' \
+  'src/Explore.API/Hosting/ApiHostStartupExtensions.cs' \
+  'src/Explore.Application/Configuration/LocalIdentityOptions.cs' \
+  'src/Explore.Application/Contracts/Operations/IPolicyMutationExecutionScopeFactory.cs' \
+  'src/Explore.Application/Contracts/Persistence/IAtprotoGovernanceSettingRepository.cs' \
+  'src/Explore.Application/Contracts/Persistence/IExternalLoginAuthenticationRepository.cs' \
+  'src/Explore.Application/Contracts/Persistence/IHumanSettingsMutationPreparation.cs' \
+  'src/Explore.Application/Contracts/Persistence/IOrdinarySettingsMutationStore.cs' \
+  'src/Explore.Application/Contracts/Persistence/IPrivacyErasureStateRepository.cs' \
+  'src/Explore.Application/Contracts/Persistence/IUserRepository.cs' \
+  'src/Explore.Application/Features/EmailDispatch/IHumanEmailMutationPreparation.cs' \
+  'src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/ApplyInstanceTenantPlanAssignmentCommandHandler.cs' \
+  'src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/LockInstanceTenantSettingCommandHandler.cs' \
+  'src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/SetInstanceTenantSettingCommandHandler.cs' \
+  'src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/UnlockInstanceTenantSettingCommandHandler.cs' \
+  'src/Explore.Application/Features/InstanceOnboarding/Handlers/Commands/SaveInstanceOnboardingProfileCommandHandler.cs' \
+  'src/Explore.Application/Features/InstanceOnboarding/Handlers/Commands/UpdateInstanceSubResourceHandlers.cs' \
+  'src/Explore.Application/Features/InstanceOnboarding/Services/ITrustedSetupSettingsWriter.cs' \
+  'src/Explore.Application/Features/InstanceOnboarding/Services/InstanceOnboardingCompletionOperation.cs' \
+  'src/Explore.Application/Features/InstanceOnboarding/Services/LocalAdministratorBootstrapOperation.cs' \
+  'src/Explore.Application/Features/InstanceOnboarding/Services/ProviderConfigurationMutation.cs' \
+  'src/Explore.Application/Features/ManagedProviderProvisioning/Handlers/Commands/EnsureManagedProviderClientProvisionedCommandHandler.cs' \
+  'src/Explore.Application/Features/ManagedProviderProvisioning/HumanManagedProviderProvisioningCoordinator.cs' \
+  'src/Explore.Application/Features/Management/Handlers/ManagedTenantProvisioningHandlers.cs' \
+  'src/Explore.Application/Features/Settings/Handlers/Commands/LockSettingCommandHandler.cs' \
+  'src/Explore.Application/Features/Settings/Handlers/Commands/ResetSettingCommandHandler.cs' \
+  'src/Explore.Application/Features/Settings/Handlers/Commands/UnlockSettingCommandHandler.cs' \
+  'src/Explore.Application/Features/Settings/Handlers/Commands/UpdateSettingBatchCommandHandler.cs' \
+  'src/Explore.Application/Features/Settings/Handlers/Commands/UpdateSettingCommandHandler.cs' \
+  'src/Explore.Application/Features/Settings/MixedSettingsBatchMutation.cs' \
+  'src/Explore.Application/Features/Tenants/Handlers/Commands/CreateTenant/CreateTenantCommandHandler.cs' \
+  'src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs' \
+  'src/Explore.Application/OperationServicesRegistration.cs' \
+  'src/Explore.Application/Operations/HumanScopeQueryHandler.cs' \
+  'src/Explore.Application/Operations/MutationScopeCommandHandler.cs' \
+  'src/Explore.Application/Operations/PolicyMutationCommandScope.cs' \
+  'src/Explore.Application/Services/EventResourceProviderControlPlane.cs' \
+  'src/Explore.Application/Services/Federation/AtprotoJetstreamTenantPresentationResolver.cs' \
+  'src/Explore.Application/Services/Federation/AtprotoPdsRecoveryPolicyResolver.cs' \
+  'src/Explore.Application/Services/IdentityAccountResolver.cs' \
+  'src/Explore.Application/Services/InstanceOperatorIdentityService.cs' \
+  'src/Explore.Application/Services/PrivacyErasureApplier.cs' \
+  'src/Explore.Application/Services/RetainedAuthorityPrivacyErasureWorkflow.cs' \
+  'src/Explore.Application/Settings/StorageSettingsMutation.cs' \
+  'src/Explore.Infrastructure/Authentication/LocalIdentityLifecycleDeliveryWorker.cs' \
+  'src/Explore.Infrastructure/Authentication/LocalIdentityLifecycleEmailService.cs' \
+  'src/Explore.Infrastructure/Authentication/LocalJwtTokenGenerator.cs' \
+  'src/Explore.Infrastructure/InfrastructureServicesRegistration.cs' \
+  'src/Explore.Infrastructure/Mail/HumanEmailMutationPreparation.Mixed.cs' \
+  'src/Explore.Infrastructure/Mail/HumanEmailMutationPreparation.cs' \
+  'src/Explore.Infrastructure/Services/ConfiguredAdministratorBootstrapStartupRunner.cs' \
+  'src/Explore.Infrastructure/Services/HierarchicalSettingsReader.cs' \
+  'src/Explore.Infrastructure/Services/HierarchicalSettingsResolver.cs' \
+  'src/Explore.Infrastructure/Services/HumanManagedProviderProvisioningPreparationRegistration.cs' \
+  'src/Explore.Infrastructure/Services/HumanSettingsMutationPreparation.EventResourceProvider.cs' \
+  'src/Explore.Infrastructure/Services/HumanSettingsMutationPreparation.cs' \
+  'src/Explore.Infrastructure/Services/HumanTenantMutationPreparation.cs' \
+  'src/Explore.Infrastructure/Services/TrustedSetupSettingsAuthority.cs' \
+  'src/Explore.Persistence/Database/PolicyMutationExecutionScopeFactory.cs' \
+  'src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/AtprotoGovernanceSettingQuery.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/ConfigurationImportRepositoryNativeOperations.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/ConfigurationRepositoryNativeOperations.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoveryDisclosureProviderOperations.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoveryDisclosureTransactionInterceptor.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoverySourceProviderOperations.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/GenericOutboxExecutionAuthority.cs' \
+  'src/Explore.Persistence/EfCoreUnitOfWork.cs' \
+  'src/Explore.Persistence/ExploreDbContext.Disclosure.cs' \
+  'src/Explore.Persistence/ExploreDbContext.HumanTenantAuthority.cs' \
+  'src/Explore.Persistence/ExploreDbContext.SaveChanges.cs' \
+  'src/Explore.Persistence/ExploreDbContext.StorageReferences.cs' \
+  'src/Explore.Persistence/ExploreDbContext.cs' \
+  'src/Explore.Persistence/Identity/ExternalIdentityDatabaseMigrator.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityAuthService.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.Administration.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.AdministrationEffects.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityLifecycleDeliveryStore.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityLifecycleStore.cs' \
+  'src/Explore.Persistence/OriginalOwnerSettlement.cs' \
+  'src/Explore.Persistence/PersistenceServicesRegistration.cs' \
+  'src/Explore.Persistence/RelationalSettingMutationLock.cs' \
+  'src/Explore.Persistence/Repositories/AnonymousCancellationRepository.cs' \
+  'src/Explore.Persistence/Repositories/AtprotoGovernanceSettingRepository.cs' \
+  'src/Explore.Persistence/Repositories/PrivacyErasureStateRepository.cs' \
+  'src/Explore.Persistence/Repositories/SystemSettingRepository.cs' \
+  'src/Explore.Persistence/Repositories/TenantSettingRepository.cs' \
+  'src/Explore.Persistence/Repositories/UserRepository.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/ExploreDatabaseMigrator.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresExternalLoginReadPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLookupCatalogueReadPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresUserTenantNavigationReadPermissions.cs' \
+  'src/Explore.Persistence/Security/ConfigurationManifestBootstrapOwnerFactory.Compilation.cs' \
+  'src/Explore.Persistence/Security/ConfigurationManifestBootstrapOwnerFactory.cs' \
+  'src/Explore.Persistence/Security/HumanAdministratorCommitScope.cs' \
+  'src/Explore.Persistence/Security/HumanAuthorizationRouteSource.cs' \
+  'src/Explore.Persistence/Security/HumanMixedSettingsSourceProtocol.cs' \
+  'src/Explore.Persistence/Security/HumanPrincipalSourceFence.cs' \
+  'src/Explore.Persistence/Security/OrdinarySettingsDataImage.cs' \
+  'src/Explore.Persistence/Security/OrdinarySettingsMutationStore.cs' \
+  'src/Explore.Persistence/Security/PolicySourceSetFence.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/ActorPublisherCatalogProof.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/ConfigurationManifestBootstrapData.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/ConfigurationManifestBootstrapProviderOperations.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/EventReadProjectionSql.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/HumanAuthorizationRouteQueries.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/HumanPrincipalSourceQueries.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PolicySourceSetProviderLock.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresAtprotoGovernanceContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresAtprotoModerationCompensationContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresConfigurationManifestBootstrapContract.Sql.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresConfigurationManifestBootstrapContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresDiscoveryTraversalContract.Installer.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresDiscoveryTraversalContract.Sql.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresDiscoveryTraversalContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresEmailDeliveryPolicyContract.Controls.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresEventResourceProviderContract.Installer.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresExternalApiKeyAuthenticationContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresManagedProviderProvisioningContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresMixedSettingsContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresMixedSettingsContract.Sql.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresOperatorIdentityEditorContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Disclosure.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Sql.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresProviderConfigurationContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresPublicEventResponseClockContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresPublicEventResponseClockContract.Installer.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresPublicationFanoutExecutionContract.Installer.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresRegistrationPrivateReadContract.Installer.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresRegistrationPrivateReadContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresResolverConfigurationContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresStorageConfigurationContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresStorageProbeSourceContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresSupportAdministrationContract.Attestation.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRuntimeReadiness.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantSessionInterceptor.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/ProvisioningSharedWriterAssertions.cs' \
+  'src/Explore.Persistence/Seed/DatabaseSeeder.cs' \
+  'src/Explore.Persistence/Seed/LookupTableSeeder.cs' \
+  'src/Explore.Persistence/Seed/SeedIds.cs' \
+  'src/Explore.Persistence/Services/AtprotoModerationCompensationStore.cs' \
+  'src/Explore.Persistence/Services/EventDiscoveryDisclosureMutationScope.cs' \
+  'src/Explore.Persistence/Services/EventResourceSettingsWriter.cs' \
+  'src/Explore.Persistence/Services/HumanSettingsDataBoundary.cs' \
+  'src/Explore.Persistence/Services/InstanceApiKeyCapabilityStore.cs' \
+  'src/Explore.Persistence/Services/InternalEmailDeliverySettingsWriter.cs' \
+  'src/Explore.Persistence/Services/MixedSettingsBatchStore.Location.cs' \
+  'src/Explore.Persistence/Services/MixedSettingsBatchStore.cs' \
+  'src/Explore.Persistence/Services/ProviderConfigurationSettingsWriter.cs' \
+  'src/Explore.Persistence/Services/ResolverConfigurationSettingsWriter.cs' \
+  'src/Explore.Persistence/Services/StorageConfigurationWriter.cs' \
+  'src/Explore.Persistence/Services/TypedSettingsOriginalStore.Governance.cs' \
+  'src/Explore.Persistence/Services/TypedSettingsOriginalStore.cs' \
+  'src/Explore.Persistence/Services/VisitorAccessSettingsWriter.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/HumanAuthenticationLifetimeTests.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.Mixed.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.MixedSources.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.Sources.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/HumanTenantDeletionOwnershipTests.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/ManagedProviderProvisioningOrchestrationTests.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/TenantPlanCatalogueOriginalAdmissionTests.Scenarios.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/TenantPlanCatalogueOriginalAdmissionTests.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/TrustedSetupSettingsAuthorityTests.cs' \
+  'tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj' \
+  'tests/Event.API.IntegrationTests/Features/ConfigurationManifestBootstrapWorkerNativeTests.cs' \
+  'tests/Event.API.IntegrationTests/Features/LocalRbacAuthorizationTests.cs' \
+  'tests/Event.API.IntegrationTests/Features/SetupLiveAuthoritySecurityTests.cs' \
+  'tests/Event.API.IntegrationTests/Fixtures/AuthenticatedWebApplicationFactory.cs' \
+  'tests/Event.API.IntegrationTests/Fixtures/LocalIdentityLifecycleHttpFixture.cs' \
+  'tests/Event.API.IntegrationTests/Fixtures/TestDbContextServiceCollectionExtensions.cs' \
+  'tests/Event.Application.UnitTests/Features/InstanceAdmin/Commands/TenantIdentityActivationConcurrencyTests.cs' \
+  'tests/Event.Application.UnitTests/Features/InstanceOnboarding/InstanceOnboardingCompletionOperationTests.cs' \
+  'tests/Event.Application.UnitTests/Notifications/DefaultNotificationOrchestratorTests.cs' \
+  'tests/Event.Application.UnitTests/Profiles/ActorFederationMapperTests.cs' \
+  'tests/Event.Application.UnitTests/Settings/AtprotoJetstreamTenantPresentationResolverTests.cs' \
+  'tests/Event.Architecture.Tests/ConfiguredAdministratorBootstrapArchitectureTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestAtomicPersistenceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapOriginTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapTestHost.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestConcurrencyTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestProviderValueNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/PostgresManifestExportAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Discovery/PostgresDiscoveryTraversalTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/EventResourceCleanupTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/ModerationCommandCompensationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.Postgres.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.Sqlite.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/EmailDispatchSqliteFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/InstanceSettingsCommandFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/LocalIdentitySqliteTemplate.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/LocalLifecycleDeliveryFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/PostgreSqlContainerFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/HumanPrincipalNativeSourceFenceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.CompletionFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.SettingsCustody.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialCreationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialFirstUseTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialLifecycleTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityAuthServiceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/ManagedTenantLocalAdministratorLinkageTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Onboarding/ConfiguredAdministratorBootstrapStartupConcurrencyTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/OrdinarySettingsNativeContractTests.Disclosure.cs' \
+  'tests/Event.Persistence.IntegrationTests/Privacy/GlobalLocationPrivacyErasureTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Privacy/PostgresSubjectPrivacyErasureAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/EventDiscoveryDisclosureMutationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/LocationUnicodeWriteAtomicityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/PolicyMutationExecutionScopeSqliteFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/PolicyMutationExecutionScopeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/PublicEventDetailNativeContractTests.Catalogue.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/WebhookLocalDeliveryNativeAuthorityTests.Health.cs' \
+  'tests/Event.Persistence.IntegrationTests/Seed/DatabaseSeederTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Settings/AtprotoFederationPersistenceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/SupportAdministrationNativeContractTests.Custody.cs' \
+  'tests/Event.Persistence.IntegrationTests/SupportAdministrationNativeContractTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/AuthenticationEfSourceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/ExternalApiKeyRepositoryBypassTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresAuthenticationLookupAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresMachineMutationAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresMachineRoomMutationAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresModerationCompensationAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresTenantApplicationTableIsolationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresUserIdentityLookupAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TicketTransferConcurrencyTests.cs' \
+  'tests/Explore.Infrastructure.Tests/Authentication/LocalJwtTokenGeneratorTests.cs' \
+  'tests/Explore.Infrastructure.Tests/Infrastructure/ConfiguredAdministratorBootstrapProviderTests.cs' \
+  'tests/Explore.Infrastructure.Tests/Settings/HierarchicalSettingsResolverTests.cs' \
+  'tests/Shared/Settings/SmtpSettingsDatabase.cs' \
+  'docs/internal/releases/changes/CHG-01M58P7943Z4SP14QHVSR1YHPS.yaml' \
+  'src/Explore.Application/Contracts/Identity/ILocalBootstrapReceiptSource.cs' \
+  'src/Explore.Application/Contracts/Identity/ILocalIdentityEligibilityRevocation.cs' \
+  'src/Explore.Application/Contracts/Identity/ILocalIdentityExecutionScopeFactory.cs' \
+  'src/Explore.Application/Contracts/Identity/IManagedTenantLocalEligibilitySource.cs' \
+  'src/Explore.Application/Contracts/Persistence/IAtprotoFederationGlobalReadRepository.cs' \
+  'src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingRepository.cs' \
+  'src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingsMutationStore.cs' \
+  'src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingsSource.cs' \
+  'src/Explore.Application/Contracts/Persistence/IAtprotoFederationSettingsWriter.cs' \
+  'src/Explore.Application/Contracts/Persistence/IHumanTenantCreationPort.cs' \
+  'src/Explore.Application/Contracts/Persistence/IIdentitySynchronizationBootstrapReader.cs' \
+  'src/Explore.Application/Contracts/Persistence/IManagedTenantProvisioningSchedulingPort.cs' \
+  'src/Explore.Application/Contracts/Persistence/IManagedTenantProvisioningSchedulingSource.cs' \
+  'src/Explore.Application/Contracts/Persistence/IManagedTenantWorkerCreationPort.cs' \
+  'src/Explore.Application/Features/Management/ManagedTenantProvisioningSchedulingOperation.cs' \
+  'src/Explore.Application/Features/Tenants/HumanTenantCreationPrincipalProjection.cs' \
+  'src/Explore.Application/Operations/LocalIdentityOperationScope.cs' \
+  'src/Explore.Application/Settings/AtprotoFederationSettingFacts.cs' \
+  'src/Explore.Infrastructure/Services/HumanTenantCreationPort.cs' \
+  'src/Explore.Infrastructure/Services/ManagedTenantWorkerCreationPort.cs' \
+  'src/Explore.Persistence/Database/ManagedTenantWorkerCreationOwnerFactory.cs' \
+  'src/Explore.Persistence/Database/PostgresRuntimeIdentityOptionsExtension.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/LocalIdentityExecutionContextCustody.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/LocalIdentityLifecycleGateCustody.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/ManagedTenantWorkerCreationAdmission.cs' \
+  'src/Explore.Persistence/ExploreDbContext.DiscoveryEnrollment.cs' \
+  'src/Explore.Persistence/ExploreDbContext.ManagedWorkerCreation.cs' \
+  'src/Explore.Persistence/ExploreDbContext.ProvisioningPolicy.cs' \
+  'src/Explore.Persistence/Identity/ConfiguredLocalBootstrapReceiptSource.cs' \
+  'src/Explore.Persistence/Identity/ConfiguredLocalIdentityEligibilityRevocation.cs' \
+  'src/Explore.Persistence/Identity/ConfiguredManagedTenantLocalEligibilitySource.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.Authentication.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.Eligibility.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityEligibilityRevocation.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityExecutionLease.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityExecutionScopeFactory.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityLifecycleExecutionCustody.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityWriterDbContextFactory.cs' \
+  'src/Explore.Persistence/Identity/LocalIdentityWriterInventory.cs' \
+  'src/Explore.Persistence/Identity/ManagedTenantLocalEligibilitySource.cs' \
+  'src/Explore.Persistence/Repositories/AtprotoFederationGlobalReadRepository.cs' \
+  'src/Explore.Persistence/Repositories/AtprotoFederationSettingRepository.cs' \
+  'src/Explore.Persistence/Repositories/IdentityWriterExternalLoginAuthenticationRepository.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/AtprotoFederationReadAdmission.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresAtprotoFederationSettingPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresDiscoveryMetadataPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLocalIdentitySystemSettingPolicies.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresLocalIdentityWriterPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresManagedTenantWorkerCreationPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresProvisioningPolicyPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantCreationPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantMembershipMutationPermissions.cs' \
+  'src/Explore.Persistence/Security/AtprotoFederationSettingImage.cs' \
+  'src/Explore.Persistence/Security/AtprotoFederationSettingsMutationStore.Source.cs' \
+  'src/Explore.Persistence/Security/AtprotoFederationSettingsMutationStore.Writes.cs' \
+  'src/Explore.Persistence/Security/AtprotoFederationSettingsMutationStore.cs' \
+  'src/Explore.Persistence/Security/HumanTenantCreationGraphWriter.cs' \
+  'src/Explore.Persistence/Security/IdentityWriterHumanSourceQueries.cs' \
+  'src/Explore.Persistence/Security/ManagedTenantProvisioningSchedulingSource.cs' \
+  'src/Explore.Persistence/Security/ManagedTenantWorkerCreationGraphWriter.cs' \
+  'src/Explore.Persistence/Security/ManagedTenantWorkerCreationInventory.cs' \
+  'src/Explore.Persistence/Security/ManagedTenantWorkerCreationSources.cs' \
+  'src/Explore.Persistence/Services/AtprotoFederationSettingsWriter.cs' \
+  'src/Explore.Persistence/Services/IdentitySynchronizationBootstrapReader.cs' \
+  'src/Explore.Persistence/Services/ManagedSettingsDiscoveryDisclosure.cs' \
+  'src/Explore.Persistence/Services/ManagedTenantProvisioningPolicyProjection.cs' \
+  'src/Explore.Persistence/Services/ManagedTenantProvisioningSchedulingPort.cs' \
+  'src/Explore.Persistence/Services/SettingsDiscoveryDisclosureObservation.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.DiscoveryCoordination.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/HumanSettingsMutationPreparationTests.ResourceProviderCoordination.cs' \
+  'tests/Event.API.IntegrationTests/Authentication/LocalSigningAuthorityConfigurationTests.cs' \
+  'tests/Event.API.IntegrationTests/Features/ApiStartupOwnerSelectionTests.cs' \
+  'tests/Event.API.IntegrationTests/Features/LocalIdentityLifecycleOwnerSelectionTests.cs' \
+  'tests/Event.API.IntegrationTests/Features/TenantDiscoveryCreationNativeTests.SecurityGate.cs' \
+  'tests/Event.API.IntegrationTests/Features/TenantDiscoveryCreationNativeTests.cs' \
+  'tests/Event.Application.UnitTests/Operations/InstanceOnboardingOwnerSelectionTests.cs' \
+  'tests/Event.Application.UnitTests/Operations/LocalIdentityOwnerSelectionTests.cs' \
+  'tests/Event.Application.UnitTests/Settings/AtprotoFederationSettingFactsTests.cs' \
+  'tests/Event.Application.UnitTests/Settings/AtprotoFederationSettingsCommandRoutingTests.cs' \
+  'tests/Event.Application.UnitTests/Settings/AtprotoPdsRecoveryPolicyResolverTests.cs' \
+  'tests/Event.Application.UnitTests/Tenants/HumanTenantCreationPrincipalProjectionTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestAtomicPersistenceTests.Revisions.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapOriginTests.FederationPreservation.cs' \
+  'tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapOriginTests.Revisions.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsMutationTests.Batch.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsMutationTests.Concurrency.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsMutationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsPersistenceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/AtprotoFederationSettingsReadTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataAuthorityTests.Enrollment.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataAuthorityTests.Migrator.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/DiscoveryMetadataFreshEnrollmentTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.Canonical.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.Deletion.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.Fanout.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.LocalWriterCleanup.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.LocalWriters.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.OrganizationPii.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.WorkerSources.cs' \
+  'tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.Email.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.ManagedWorker.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/AuthenticatedSettingsFixture.TenantCreation.cs' \
+  'tests/Event.Persistence.IntegrationTests/Fixtures/DiscoveryMetadataEnrollmentPostgresFixture.cs' \
+  'tests/Event.Persistence.IntegrationTests/HumanAdministratorBulkProducerGateTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/HumanSecuritySourceMutationGuardTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/ConfiguredLocalIdentityEligibilityRevocationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/ConfiguredManagedTenantLocalEligibilitySourceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.ReceiptSource.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityEligibilityLifecycleTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityExecutionLeaseTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityExecutionScopeFactoryTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentitySelectedLifecycleTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentitySigningAuthorityNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterDbContextFactoryTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.Authentication.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.Migrations.cs' \
+  'tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/IdentityWriterExternalLoginAuthenticationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/IdentityWriterHumanSourceOwnerTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/IdentityWriterHumanSourceQueryTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/IdentityWriterSourceRegistrationTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.SchedulingGate.cs' \
+  'tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.SecurityGate.cs' \
+  'tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.Settlement.cs' \
+  'tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.Workflow.cs' \
+  'tests/Event.Persistence.IntegrationTests/ManagedTenantWorkerCreationNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/OrdinarySettingsNativeContractTests.Reads.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/HumanEmailSecurityGateTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/InternalEmailDeliverySecurityGateTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/MutationScopeHumanGateTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/PolicyMutationExecutionScopeTests.HumanGate.cs' \
+  'tests/Event.Persistence.IntegrationTests/Seed/DatabaseSeederSecurityGateTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/SetupLive/SetupLiveRuntimeStorageTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/SupportAdministrationNativeContractTests.MembershipPermissions.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/ManagedTenantWorkerCreationPermissionsNativeTests.Migrations.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/ManagedTenantWorkerCreationPermissionsNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/ProvisioningPolicyPermissionsNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationCatalogueCompositionTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationExternalPermissionsNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationLookupCatalogueTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.Checks.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.Drift.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.MembershipBaseline.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantCreationPermissionsNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantMembershipMutationPermissionsNativeTests.cs'
+git -c core.fsmonitor=false commit -m 'feat(federation)!: preserve the application-owned policy workflow cutover' -m 'Preserve the connected C# federation/discovery, selected identity, bootstrap and tenant-creation cutover with its actual consumers, fixed permission inventories, composition roots and adversarial tests. Shared selected-owner leases, original-transaction protocols, context partials and installer/profile intersections form one compile-time and activation dependency closure; omitting their helpers or consumers creates false intermediate contracts. Independent schema, finite reads, scanner, Listmonk and producer repairs are separate commits. This is explicitly incomplete: Setup claim access, bootstrap receipt acceptance, worker Human custody and final provider assurance remain open in dev/backlog/pr75-remaining-implementation-handoff.md.' -m 'BREAKING CHANGE: Federation settings use dedicated storage and workflows select explicitly configured application-owned execution purposes. Apply the matching generated schema and deployment authority configuration; no legacy governance runtime or compatibility shim is restored.
+Change-Id: CHG-01M58P7943Z4SP14QHVSR1YHPS'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+git -c core.fsmonitor=false diff --cached --name-only
+```
+
+## producer: fix(access): coordinate membership and tenant-status source mutations
+
+Retain original Human custody before observing authorization or beginning membership removal and tenant-status transactions. Preserve borrowed custody, current authorization after waits and atomic settlement. Final current-image provider acceptance remains deferred in the PR75 backlog report.
+
+```text
+Change-Id: CHG-01M5D3N71ES2PKP3818HDN69K2
+```
+
+Exact 7-path manifest:
+
+```text
+src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/TransitionInstanceTenantLifecycleCommandHandler.cs
+src/Explore.Application/Features/TenantUsers/Handlers/Commands/RemoveTenantMembershipCommandHandler.cs
+src/Explore.Persistence/Repositories/TenantRepository.cs
+src/Explore.Persistence/Repositories/TenantUserRepository.cs
+tests/Event.Persistence.IntegrationTests/Privacy/TenantMembershipRemovalTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/TenantLifecycleTransitionRepositoryTests.cs
+docs/internal/releases/changes/CHG-01M5D3N71ES2PKP3818HDN69K2.yaml
+```
+
+Commands (inspect index first; force only the five intentionally ignored backlog reports):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -- \
+  'src/Explore.Application/Features/InstanceAdmin/Handlers/Commands/TransitionInstanceTenantLifecycleCommandHandler.cs' \
+  'src/Explore.Application/Features/TenantUsers/Handlers/Commands/RemoveTenantMembershipCommandHandler.cs' \
+  'src/Explore.Persistence/Repositories/TenantRepository.cs' \
+  'src/Explore.Persistence/Repositories/TenantUserRepository.cs' \
+  'tests/Event.Persistence.IntegrationTests/Privacy/TenantMembershipRemovalTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/TenantLifecycleTransitionRepositoryTests.cs' \
+  'docs/internal/releases/changes/CHG-01M5D3N71ES2PKP3818HDN69K2.yaml'
+git -c core.fsmonitor=false commit -m 'fix(access): coordinate membership and tenant-status source mutations' -m 'Retain original Human custody before observing authorization or beginning membership removal and tenant-status transactions. Preserve borrowed custody, current authorization after waits and atomic settlement. Final current-image provider acceptance remains deferred in the PR75 backlog report.' -m 'Change-Id: CHG-01M5D3N71ES2PKP3818HDN69K2'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+git -c core.fsmonitor=false diff --cached --name-only
+```
+
+## notifications: fix(notifications)!: separate recovery evidence from provider diagnostics
+
+Persist bounded typed Listmonk evidence through claim-fenced EF transitions and read it for ambiguity and operator recovery. Provider error text remains diagnostic, never authority. Keep the outbox model in the preceding generated programme closure. Final worker/provider acceptance remains deferred in the PR75 backlog report.
+
+```text
+BREAKING CHANGE: Existing development queue error strings are not migrated into typed recovery evidence. Stop dispatch and recreate disposable development storage or perform a separately reviewed retained-work transition; never blindly replay uncertain work.
+Change-Id: CHG-01M5DMVM8Q7ER86B0VXE0DKPMM
+```
+
+Exact 13-path manifest:
+
+```text
+docs/public/documentation/readme/communications-and-notifications/listmonk.md
+src/Explore.Application/Contracts/Persistence/IIntegrationSyncOutboxRepository.cs
+src/Explore.Infrastructure/IntegrationSyncDrainService.cs
+src/Explore.Persistence/Database/ProviderPrimitives/QueueDrainHealthQuery.cs
+src/Explore.Persistence/Repositories/IntegrationSyncOutboxRepository.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresQueueDrainHealthContract.cs
+tests/Event.API.IntegrationTests/Features/NativeListmonkHttpTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/IntegrationSyncOutboxRepositoryTests.cs
+tests/Event.Persistence.IntegrationTests/Repositories/QueueDrainHealthNativeAuthorityTests.cs
+tests/Explore.Infrastructure.Tests/Infrastructure/Listmonk/IntegrationSyncDrainServiceTests.cs
+docs/internal/integrations/listmonk-outbox.md
+docs/internal/releases/changes/CHG-01M5DMVM8Q7ER86B0VXE0DKPMM.yaml
+tests/Event.Domain.UnitTests/Entities/IntegrationSyncEvidenceTests.cs
+```
+
+Commands (inspect index first; force only the five intentionally ignored backlog reports):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -- \
+  'docs/public/documentation/readme/communications-and-notifications/listmonk.md' \
+  'src/Explore.Application/Contracts/Persistence/IIntegrationSyncOutboxRepository.cs' \
+  'src/Explore.Infrastructure/IntegrationSyncDrainService.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/QueueDrainHealthQuery.cs' \
+  'src/Explore.Persistence/Repositories/IntegrationSyncOutboxRepository.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresQueueDrainHealthContract.cs' \
+  'tests/Event.API.IntegrationTests/Features/NativeListmonkHttpTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/IntegrationSyncOutboxRepositoryTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/Repositories/QueueDrainHealthNativeAuthorityTests.cs' \
+  'tests/Explore.Infrastructure.Tests/Infrastructure/Listmonk/IntegrationSyncDrainServiceTests.cs' \
+  'docs/internal/integrations/listmonk-outbox.md' \
+  'docs/internal/releases/changes/CHG-01M5DMVM8Q7ER86B0VXE0DKPMM.yaml' \
+  'tests/Event.Domain.UnitTests/Entities/IntegrationSyncEvidenceTests.cs'
+git -c core.fsmonitor=false commit -m 'fix(notifications)!: separate recovery evidence from provider diagnostics' -m 'Persist bounded typed Listmonk evidence through claim-fenced EF transitions and read it for ambiguity and operator recovery. Provider error text remains diagnostic, never authority. Keep the outbox model in the preceding generated programme closure. Final worker/provider acceptance remains deferred in the PR75 backlog report.' -m 'BREAKING CHANGE: Existing development queue error strings are not migrated into typed recovery evidence. Stop dispatch and recreate disposable development storage or perform a separately reviewed retained-work transition; never blindly replay uncertain work.
+Change-Id: CHG-01M5DMVM8Q7ER86B0VXE0DKPMM'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+git -c core.fsmonitor=false diff --cached --name-only
+```
+
+## scanner: fix(access): admit scanner writes with fixed storage permissions
+
+Preserve bounded scanner/document storage rights and original-transaction parent admission without private-source expansion. Include capability services, repositories, physical transaction owner and real adversarial fixtures together. Gitar's remaining workflow finding still requires fresh current-image native acceptance; this checkpoint does not claim its closure.
+
+```text
+Change-Id: CHG-01M5JMWRTB1GCH6J065VVTN7AZ
+```
+
+Exact 17-path manifest:
+
+```text
+src/Explore.Application/Contracts/Admissions/AdmissionScannerCapabilityContracts.cs
+src/Explore.Application/Services/Registration/AdmissionCheckInOperationsService.cs
+src/Explore.Application/Services/Registration/AdmissionCheckInService.cs
+src/Explore.Application/Services/Registration/AdmissionScannerCapabilityService.cs
+src/Explore.Persistence/Repositories/AdmissionCheckInRepository.cs
+src/Explore.Persistence/Repositories/AdmissionScannerCapabilityRepository.cs
+src/Explore.Persistence/Repositories/AdmissionTargetOperationsRepository.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantApiKeyStoragePermissions.cs
+tests/Event.API.IntegrationTests/Fixtures/LocalAdmissionWebApplicationFactory.cs
+tests/Event.Application.UnitTests/Contracts/Admissions/AdmissionCheckInOrchestrationRedTests.cs
+tests/Event.Persistence.IntegrationTests/AdmissionCheckInPersistenceRedTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/ScannerAuthenticationReadPortTests.cs
+src/Explore.Application/Contracts/Admissions/IAdmissionTargetTransaction.cs
+src/Explore.Persistence/Database/ProviderPrimitives/AdmissionTargetTransaction.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/DocumentKeyAdmissionNativeTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/InstanceIssuanceTenantKeyStorageCoexistenceTests.cs
+docs/internal/releases/changes/CHG-01M5JMWRTB1GCH6J065VVTN7AZ.yaml
+```
+
+Commands (inspect index first; force only the five intentionally ignored backlog reports):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -- \
+  'src/Explore.Application/Contracts/Admissions/AdmissionScannerCapabilityContracts.cs' \
+  'src/Explore.Application/Services/Registration/AdmissionCheckInOperationsService.cs' \
+  'src/Explore.Application/Services/Registration/AdmissionCheckInService.cs' \
+  'src/Explore.Application/Services/Registration/AdmissionScannerCapabilityService.cs' \
+  'src/Explore.Persistence/Repositories/AdmissionCheckInRepository.cs' \
+  'src/Explore.Persistence/Repositories/AdmissionScannerCapabilityRepository.cs' \
+  'src/Explore.Persistence/Repositories/AdmissionTargetOperationsRepository.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantApiKeyStoragePermissions.cs' \
+  'tests/Event.API.IntegrationTests/Fixtures/LocalAdmissionWebApplicationFactory.cs' \
+  'tests/Event.Application.UnitTests/Contracts/Admissions/AdmissionCheckInOrchestrationRedTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/AdmissionCheckInPersistenceRedTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/ScannerAuthenticationReadPortTests.cs' \
+  'src/Explore.Application/Contracts/Admissions/IAdmissionTargetTransaction.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/AdmissionTargetTransaction.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/DocumentKeyAdmissionNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/InstanceIssuanceTenantKeyStorageCoexistenceTests.cs' \
+  'docs/internal/releases/changes/CHG-01M5JMWRTB1GCH6J065VVTN7AZ.yaml'
+git -c core.fsmonitor=false commit -m 'fix(access): admit scanner writes with fixed storage permissions' -m 'Preserve bounded scanner/document storage rights and original-transaction parent admission without private-source expansion. Include capability services, repositories, physical transaction owner and real adversarial fixtures together. Gitar'\''s remaining workflow finding still requires fresh current-image native acceptance; this checkpoint does not claim its closure.' -m 'Change-Id: CHG-01M5JMWRTB1GCH6J065VVTN7AZ'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+git -c core.fsmonitor=false diff --cached --name-only
+```
+
+## finite: fix(database): read finite discovery and preference facts through EF
+
+Preserve owner-local EF membership, preference, retention and discovery reads with fixed source-column permissions and drift-refusing admission. Remove their obsolete routine implementations without merging security owners. Complete current-image native authority acceptance remains deferred in the PR75 backlog report.
+
+```text
+Change-Id: CHG-01M5JMWSE2DN6ARGTAA68VS4X8
+```
+
+Exact 37-path manifest:
+
+```text
+src/Explore.Persistence/Database/ProviderPrimitives/EventResourceAuditOwnerQuery.cs
+src/Explore.Persistence/Database/ProviderPrimitives/IntegrationSyncDiscoveryQuery.cs
+src/Explore.Persistence/Database/ProviderPrimitives/InventoryHoldExpiryQuery.cs
+src/Explore.Persistence/Database/ProviderPrimitives/RegistrationRetentionTenantDiscoveryRepository.cs
+src/Explore.Persistence/Database/ProviderPrimitives/UserTenantMembershipNativeQuery.cs
+src/Explore.Persistence/InventoryHoldExpiryServicesRegistration.cs
+src/Explore.Persistence/Repositories/EventResourceAuditOwnerDiscoveryRepository.cs
+src/Explore.Persistence/Repositories/UserTenantMembershipRepository.cs
+src/Explore.Persistence/Security/HumanTenantPreferenceStore.cs
+src/Explore.Persistence/Security/ProviderPrimitives/HumanTenantPreferenceDataOperations.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresEventResourceAuditRetentionContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresIntegrationSyncDiscoveryContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresInventoryHoldExpiryDiscoveryContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresRegistrationRetentionDiscoveryContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantPreferenceContract.cs
+src/Explore.Persistence/Security/ProviderPrimitives/PostgresUserTenantMembershipContract.cs
+src/Explore.Persistence/Services/IntegrationSyncQueueDiscovery.cs
+src/Explore.Persistence/Services/InventoryHoldExpiryDiscovery.cs
+tests/Event.Persistence.IntegrationTests/EventResourceAuditRetentionPersistenceTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresEventResourceAuditRetentionLeaseTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresInventoryHoldExpiryScopeTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresRegistrationRetentionAuthorityTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/RegistrationRetentionUnsupportedProviderTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantPreferenceContractTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/UserMembershipReadPortTests.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresEventResourceAuditReadPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresIntegrationSyncReadPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresInventoryHoldExpiryReadPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresRegistrationRetentionReadPermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantPreferencePermissions.cs
+src/Explore.Persistence/Schema/ProviderPrimitives/PostgresUserTenantMembershipReadPermissions.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/EventResourceAuditOwnerEfNativeTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresIntegrationSyncDiscoveryEfTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresInventoryHoldExpiryReadPermissionTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantPreferenceEfTests.cs
+tests/Event.Persistence.IntegrationTests/TenantIsolation/UserTenantMembershipReadEnrollmentTests.cs
+docs/internal/releases/changes/CHG-01M5JMWSE2DN6ARGTAA68VS4X8.yaml
+```
+
+Commands (inspect index first; force only the five intentionally ignored backlog reports):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -- \
+  'src/Explore.Persistence/Database/ProviderPrimitives/EventResourceAuditOwnerQuery.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/IntegrationSyncDiscoveryQuery.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/InventoryHoldExpiryQuery.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/RegistrationRetentionTenantDiscoveryRepository.cs' \
+  'src/Explore.Persistence/Database/ProviderPrimitives/UserTenantMembershipNativeQuery.cs' \
+  'src/Explore.Persistence/InventoryHoldExpiryServicesRegistration.cs' \
+  'src/Explore.Persistence/Repositories/EventResourceAuditOwnerDiscoveryRepository.cs' \
+  'src/Explore.Persistence/Repositories/UserTenantMembershipRepository.cs' \
+  'src/Explore.Persistence/Security/HumanTenantPreferenceStore.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/HumanTenantPreferenceDataOperations.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresEventResourceAuditRetentionContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresIntegrationSyncDiscoveryContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresInventoryHoldExpiryDiscoveryContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresRegistrationRetentionDiscoveryContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantPreferenceContract.cs' \
+  'src/Explore.Persistence/Security/ProviderPrimitives/PostgresUserTenantMembershipContract.cs' \
+  'src/Explore.Persistence/Services/IntegrationSyncQueueDiscovery.cs' \
+  'src/Explore.Persistence/Services/InventoryHoldExpiryDiscovery.cs' \
+  'tests/Event.Persistence.IntegrationTests/EventResourceAuditRetentionPersistenceTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresEventResourceAuditRetentionLeaseTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresInventoryHoldExpiryScopeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresRegistrationRetentionAuthorityTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/RegistrationRetentionUnsupportedProviderTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantPreferenceContractTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/UserMembershipReadPortTests.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresEventResourceAuditReadPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresIntegrationSyncReadPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresInventoryHoldExpiryReadPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresRegistrationRetentionReadPermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresTenantPreferencePermissions.cs' \
+  'src/Explore.Persistence/Schema/ProviderPrimitives/PostgresUserTenantMembershipReadPermissions.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/EventResourceAuditOwnerEfNativeTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresIntegrationSyncDiscoveryEfTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresInventoryHoldExpiryReadPermissionTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/TenantPreferenceEfTests.cs' \
+  'tests/Event.Persistence.IntegrationTests/TenantIsolation/UserTenantMembershipReadEnrollmentTests.cs' \
+  'docs/internal/releases/changes/CHG-01M5JMWSE2DN6ARGTAA68VS4X8.yaml'
+git -c core.fsmonitor=false commit -m 'fix(database): read finite discovery and preference facts through EF' -m 'Preserve owner-local EF membership, preference, retention and discovery reads with fixed source-column permissions and drift-refusing admission. Remove their obsolete routine implementations without merging security owners. Complete current-image native authority acceptance remains deferred in the PR75 backlog report.' -m 'Change-Id: CHG-01M5JMWSE2DN6ARGTAA68VS4X8'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+git -c core.fsmonitor=false diff --cached --name-only
+```
+
+## docs: docs(documentation): preserve the complete PR75 deferred-work handoff
+
+Graduate remaining implementation, accepted architecture decisions, known counterexamples, migration source closure, exact pending paths and physical verification receipts into the tracked backlog. Preserve dated SQL and duplication review evidence and the older programme's detailed open acceptance contracts separately, without treating stale unchecked boxes as fresh defects or source authorship as execution evidence.
+
+```text
+Changelog: skip
+Changelog-Reason: Durable implementation handoff and paired technical/operator documentation; no completion or release approval is asserted.
+```
+
+Exact 18-path manifest:
+
+```text
+dev/_journal/journal.md
+docs/internal/API.md
+docs/internal/BACKUP_RESTORE_UPGRADE.md
+docs/internal/CONFIGURATION_MANIFEST.md
+docs/internal/INTEGRATIONS.md
+docs/internal/OPERATIONS.md
+docs/internal/SECRETS.md
+docs/public/documentation/readme/administration-and-branding/admin-guide.md
+docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md
+schemas/islamu-event.md
+dev/backlog/pr75-historical-sql-review.md
+dev/backlog/pr75-historical-duplication-review.md
+dev/backlog/pr75-programme-open-acceptance-snapshot.md
+dev/backlog/pr75-remaining-implementation-handoff.md
+dev/backlog/pr75-checkpoint-commit-packets.md
+```
+
+Commands (inspect index first; force only the five intentionally ignored backlog reports):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -f -- \
+  'dev/_journal/journal.md' \
+  'docs/internal/API.md' \
+  'docs/internal/BACKUP_RESTORE_UPGRADE.md' \
+  'docs/internal/CONFIGURATION_MANIFEST.md' \
+  'docs/internal/INTEGRATIONS.md' \
+  'docs/internal/OPERATIONS.md' \
+  'docs/internal/SECRETS.md' \
+  'docs/public/documentation/readme/administration-and-branding/admin-guide.md' \
+  'docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md' \
+  'docs/public/documentation/readme/configuration-and-operations/environment-variables.md' \
+  'docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md' \
+  'islamic-value-sensitive-design/workstreams/i-vsd-event-api-security-remediation.md' \
+  'schemas/islamu-event.md' \
+  'dev/backlog/pr75-historical-sql-review.md' \
+  'dev/backlog/pr75-historical-duplication-review.md' \
+  'dev/backlog/pr75-programme-open-acceptance-snapshot.md' \
+  'dev/backlog/pr75-remaining-implementation-handoff.md' \
+  'dev/backlog/pr75-checkpoint-commit-packets.md'
+git -c core.fsmonitor=false commit -m 'docs(documentation): preserve the complete PR75 deferred-work handoff' -m 'Graduate remaining implementation, accepted architecture decisions, known counterexamples, migration source closure, exact pending paths and physical verification receipts into the tracked backlog. Preserve dated SQL and duplication review evidence and the older programme'\''s detailed open acceptance contracts separately, without treating stale unchecked boxes as fresh defects or source authorship as execution evidence.' -m 'Changelog: skip
+Changelog-Reason: Durable implementation handoff and paired technical/operator documentation; no completion or release approval is asserted.'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+git -c core.fsmonitor=false diff --cached --name-only
+```

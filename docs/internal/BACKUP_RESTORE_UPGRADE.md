@@ -25,6 +25,19 @@ accepting application traffic. Expected bodies and fingerprints remain exact:
 Runtime must reject an old or drifted installation, not normalize it, switch
 authority or repair it on demand.
 
+## PDS admission permission reapplication
+
+PDS installation compares raw catalog column names from EF Core model metadata
+and separately delimits those names for SQL identifiers. Provider formatting can
+leave safe names unquoted; stripping presumed quotation marks corrupts the
+catalog allowlist and can make a repeated migration reject its own valid grants.
+
+The fixed inventories remain queue SELECT11/UPDATE5 and record SELECT4. Repeated
+installation must accept that exact profile while rejecting unexpected column
+privileges and grant options without repairing them. Apply the matching
+migration tooling before reopening traffic; do not broaden permissions or
+reorder installers to conceal a remaining catalog mismatch.
+
 ## Uncertain PostgreSQL session-lock reacquisition
 
 `RelationalNamedLock` preserves the original connection when a sent acquisition
@@ -420,6 +433,171 @@ Before traffic resumes, restore the verified backup on any failed validation. Af
 resumes, pause writers and deploy a new additive forward migration. Do not use destructive
 rollback for evidence-bearing webhook rows and do not guess provider success during repair.
 
+### Dedicated federation settings development boundary
+
+The generated `ApplicationOwnedProgrammeModel` migration consolidates the
+unapplied development drafts for federation settings, application-owned policy
+and identity eligibility, and typed integration evidence. Its companion
+`ApplicationOwnedLocalIdentityEligibility` migration belongs to the separate
+ExternalIdentity context. Each context has generated PostgreSQL, SQLite,
+SQL Server and MySQL/MariaDB artifacts; preserve the selected provider and owner
+when applying them. The development database was confirmed clean before this
+replacement: no retained-history bridge, history stamping or data conversion is
+part of this change. These migrations add storage, not application workflow
+authority. Reversing them removes their new data and evidence classification;
+Down is a disposable-development lifecycle operation, not a data-preserving
+production rollback. Run the matching C# routing and seed changes with this model.
+
+`ApplicationOwnedProgrammeModel` introduces EF-mapped instance and tenant
+relations for exactly `federation.atproto_events_enabled`,
+`federation.atproto_events_backfill_enabled` and
+`federation.atproto_events_backfill_mode`. The validation-profile setting and
+user publication consent do not move. Closed-key/value constraints, unique keys,
+and the tenant FK are generated from the model; generic setting tables reject
+these three keys. There is no dual write, historical value conversion, or
+migration-history stamping. A retained generic row with one of these keys causes
+the exclusion check to fail, rather than silently discarding operator choices.
+
+The API-owned disclosure design permits the enrolled Runtime and Global logins
+to read only `EventDiscoveryRevision.Id`, `TenantId`, `IdentityEpoch` and
+`DisclosureEpoch`, insert those four columns for a newly created revision, and
+update only the two epoch columns. The original creation workflow constructs the
+canonical UUIDv7/epoch image in C# and inserts it in the same transaction as its
+tenant; an existing native provisioning insertion must not be duplicated. Global additionally
+reads `Tenant.Id` to form the complete audience, including inactive tenants; this
+revision capability grants no descriptive tenant field or tenant-key mutation. Equality RLS remains
+effective for tenant-selected sessions. Additional Global revision policies permit
+cross-tenant metadata access only for the original enrolled Global identity with
+a null tenant session. A separate INSERT-only policy permits the enrolled Runtime
+identity's sealed-null creation owner to insert a revision without giving it
+tenantless SELECT or UPDATE visibility. DELETE and key UPDATE remain ungranted.
+Installation attests a fixed manifest rather
+than deriving new grants from the database's existing ACLs, and rejects drift
+instead of repairing it.
+
+Ordinary human tenant creation has a separate, fixed Global permission manifest:
+`Tenant` INSERT9/SELECT3 (`Id`, `Slug`, `TenantStatusId`), mandatory
+`TenantSettingsDocument` INSERT11, `TenantStatus` SELECT2, bounded bootstrap and
+provisioning capacity metadata, `TenantUser` INSERT19,
+`TenantUserRoleGrant` INSERT14, and `Role` SELECT3 (`Id`, `MasterCode`,
+`RoleScopeId`). `PostgresTenantCreationPermissions` owns the exact model-mapped
+inventory; it adds no private User, Actor, local credential or RolePermission
+read, table-wide grant, UPDATE, DELETE, grant option or Runtime permission.
+The original authenticated human creation port authorizes the command, pins its
+new UUIDv7 identities and original transaction, constructs the complete canonical
+graph in C#, and admits only the optional self-administrator effect for that new
+tenant. Its completion proof must not hide unrelated membership or permission drift.
+
+Creator admission separately checks the fixed database storage surface. For its
+four INSERT targets it matches every mapped column, the final EF model's finite
+defaults and five declared CHECK expressions, including PostgreSQL 18 enforcement
+and validation flags. Extra default-bearing columns and added or changed CHECKs
+are rejected, not repaired. Required foreign keys and source-owned writer mechanics
+remain independently attested. This is schema/catalog admission, not a database
+implementation of tenant authorization, capacity rules or graph construction.
+The bounded proof does not claim immunity against arbitrary expression indexes,
+custom operator classes or privileged system-catalog tampering.
+
+The approved credential-compromise consequence is broader than revision tampering:
+someone holding Global can directly insert membership and administrator role-grant
+rows for an **existing tenant**, subject to retained schema constraints. Fixed
+INSERT-only grants and C# new-tenant checks do not prevent that attack outside
+the API. This is an explicitly accepted API-owned authorization boundary, not
+a claim that RLS or opaque C# authority objects constrain stolen credentials.
+Keep Global isolated, protect its secret authority and rotate/revoke it on suspected
+compromise; do not equate successful installation with completed workflow verification.
+
+The separately approved document boundary permits INSERT only for the mandatory
+Branding and DirectoryOperatorIdentity keys. An exact Global restrictive INSERT
+policy requires the original enrolled session with no selected tenant and one of
+those keys; the PUBLIC permissive tenant policy must not provide an alternate
+path around that restriction. Uniqueness prevents replacing an existing document,
+but a stolen Global credential can create either missing document in an existing
+tenant. This consequence is explicitly accepted; C# still limits the genuine
+human workflow to its newly created graph. No document UPDATE or DELETE is granted
+by this capability.
+
+Managed-worker creation has a separate approved API-owned authority boundary. Its
+issuer must retain the original admitted outbox generation and operation request
+image, select its dedicated Global creation purpose before observations or BEGIN,
+and settle the exact graph and operation in one physical application transaction.
+It must not borrow human creation authority or rebind a Runtime context. The
+fixed worker manifest may include noncredential account, identity-link, PII and
+provisioning graph writes, including the explicitly approved EmailVerified change;
+it excludes password hashes, security/concurrency stamps and token values.
+Consequently a stolen Global credential with these rights can forge account links,
+change verification state or fabricate provisioning graphs outside the API.
+That risk is accepted separately from membership and revision tampering.
+
+Local eligibility must be a current nonsecret projection owned by credential
+lifecycle transactions, not a cached operation stage or a private credential read.
+Every participating lifecycle change must maintain its current generation and
+share coordination retained through application settlement. For separate Identity
+and application stores, this is an explicitly cooperative API protocol, not a
+distributed atomic transaction or protection against direct database edits.
+Unknown commit outcomes require reconciliation of the original operation and exact
+graph before acknowledgement or replay. These approved contracts are not claims
+that the current worker implementation or native acceptance tests are complete.
+
+Runtime and Global are deployment database login purposes, not end-user roles:
+Runtime serves tenant-selected application work; Global serves explicitly
+admitted instance-wide work. The API authenticates the human separately and seals
+the selected tenant on its context. Global is not a superuser or permission to
+read every table; each capability still has a fixed column inventory. PostgreSQL row-level security (RLS) then
+filters visible rows and checks inserted/updated rows against that session's
+tenant setting. That setting is supplied by the application, not a cryptographic
+proof against someone holding the database credential. A stolen Runtime login
+can establish its own tenant session within its fixed database privileges; do not
+describe equality RLS as preventing arbitrary tenant selection by that attacker.
+
+This deliberately changes the database-credential threat boundary: the API must
+enforce original human authorization, exact accepted effects, concurrency and
+atomic disclosure completion in C#. A stolen Runtime or Global credential can
+tamper with revision metadata or fabricate a missing revision row within its
+database privileges, including the explicit tenantless Runtime INSERT boundary;
+these grants do not retain the previous routine-only guarantee. Protect and rotate the separate
+database identities accordingly. Neither metadata grants nor successful installer
+attestation prove that the complete replacement workflow has passed its native
+authority and concurrency tests.
+
+Parent/child setting race prevention is deliberately API-owned. Every participating
+API writer must acquire the same ordered setting-key coordination before its
+transaction and retain it through settlement; tenant-enrollment and whole-audience
+updates also use the original owner's pre-transaction enrollment gate. The API
+revalidates the current parent image inside this protocol. Runtime receives no
+instance-parent UPDATE grant and no new privileged parent-row-locking routine is
+installed. These cooperative locks serialize participating API operations, not
+direct database edits: a stolen Global credential can bypass them and race a
+parent setting change. Do not describe this as database-enforced parent stability
+or assume transaction isolation alone makes a nonparticipating edit obey the protocol.
+
+Tracked creation receipts are bound to the original context, connector and
+physical transaction. EF savepoint rollback invalidates those receipts and
+poisons completion even after disclosure flush; the caller must roll back the
+whole attempt and retry with fresh state. It must not catch a partial rollback,
+clear EF tracking and commit the remaining attempt. Creation workflows use EF
+transaction/savepoint APIs: raw provider rollback methods or rollback SQL bypass
+the interceptor and are unsupported by this protocol.
+
+This transition targets an explicitly disposable development application database.
+For PostgreSQL, the dedicated permission manifest also requires absence of all
+three retired `event_atproto_governance_*` roles, the EF-mapped TenantSetting
+routine named `<mapped-table>_atproto_governance`, and the mapped relation's
+`atproto_governance_overrides` policy. Roles are cluster-wide: creating another
+database in the same retained cluster does not remove that old authority.
+Installer preflight and read admission inspect catalogs and reject leftovers;
+they never drop, revoke, normalize or silently replace them. A shared cluster or
+retained objects require a separately reviewed operator transition, not an
+automatic cleanup from the API or migration service.
+If its settings or other state must survive, stop before migration and arrange a
+separately reviewed export/transition. Preserve independent Local Identity, Data
+Protection, and privacy-erasure stores. Rebuilding the application database is
+not permission to remove those authorities.
+
+Reversing the dedicated federation migration deletes both dedicated relations
+and their data. The provider-model reconciliation below is a separate prerequisite,
+not part of federation storage or its rollback target.
+
 ### Custom-property provider-model reconciliation
 
 Separate generated SQL Server and MySQL migrations reconcile five nullable
@@ -452,6 +630,10 @@ and verify a fresh attempt before reopening writers. Do not truncate patterns,
 disable checks, edit history, or blindly remove a guard to force a downgrade.
 Prefer a forward repair or a verified matching application backup when a lossless
 downgrade cannot be established.
+
+Generation and source review alone do not certify application, seed idempotency,
+permission installation, or rollback. The provider migration lifecycle and native
+authority verification remain required workstream gates.
 
 ## Rollback Rules
 

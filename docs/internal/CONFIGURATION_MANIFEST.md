@@ -497,26 +497,26 @@ receipt; a representation mismatch must not become an incidental SQL cast error
 or weaken that guard. Failure-injection tests derive their status column/literal
 from the same relational model and verify actual rollback evidence.
 
-`ConfigurationManifestBootstrapOwnerFactory` coordinates mutation with its
-normalized ordered setting-key session leases in C#. Acquire them before opening
-the original Serializable transaction and hold them through commit or rollback.
-A cooperating successor waits before BEGIN, then observes the previous owner's
-settled image. Native source reads request no SHARE table locks, FOR UPDATE row
-locks or duplicate advisory mutex. The no-login native owner receives only the
-fixed mapped-column SELECT grants admitted by its existing authority contract;
-INSERT/UPDATE remain column-constrained. Global receives function execution, not
-owner membership or broader direct table permissions. Installed-body attestation,
-exact before/after effects and affected-row checks remain fail-closed.
+`ConfigurationManifestBootstrapOwnerFactory` coordinates mutation in C#: acquire
+the enrollment gate, then normalized ordered setting-key session leases, before
+opening the original Serializable transaction. Hold that custody through commit
+or rollback. Waiting before BEGIN ensures a cooperating successor observes the
+previous owner's committed image, rather than retaining an older snapshot.
+Native reads do not request SHARE table locks, FOR UPDATE row locks, or a second
+native advisory mutex. Fixed column permissions, scope checks, installed-body
+attestation, exact before/after effects and affected-row checks remain unchanged.
+Global receives function execution, not native-owner membership or broader direct
+table permissions.
 
-This is cooperative API coordination, not a fence against arbitrary database
-writers. Direct edits outside the protocol can race, including inserts of absent
-settings. Serializable supplies a consistent transaction image, not fresh reads
-of arbitrary later commits; exact-effect checks do not guarantee detection of
-every out-of-protocol edit. Conflicts abort rather than automatically replaying
-an attempt. Operators must use the API for configuration changes. The native
-regression proves both retained API mutex custody and that an independent
-EXCLUSIVE table lock succeeds, excluding the old table/row fences. Separate
-cooperating-owner tests verify create-once/skip-second behavior.
+This is cooperative API coordination, not a database fence against every writer.
+Direct database edits outside the C# protocol can race, including inserts of
+previously absent settings. Serializable provides a consistent transaction image,
+not fresh observations of arbitrary commits; exact-effect checks and constraints
+do not promise to detect every such edit. Conflicts abort rather than replaying
+an attempt automatically. Operators must use the API for configuration changes.
+The native regression checks both retained API mutex custody and absence of the
+old table/row fences; concurrency tests observe actual advisory-lock contention
+between cooperating owners before asserting create-once/skip-second outcomes.
 
 Bootstrap stores its effect envelope in the same original transaction as the
 configuration, operation audit and tenant results. Production startup selects

@@ -25,14 +25,25 @@ list; otherwise it selects the latest active membership or no destination. A
 navigation result is a convenience, not permission to enter a tenant, and does
 not change the saved preference.
 
-The configured Global database login can read exactly the user's identifier,
-deleted flag and preferred tenant identifier through EF Core. Global is an API
-database purpose, not an administrator's human role. Runtime gains no User-table
-access, and profile fields, audit fields and preference writes remain separately
-restricted. Protect Global credentials: someone holding that database login can
-enumerate those user/preference associations even though the API selects only
-the authenticated user. Database row-level security does not authenticate a human
-using stolen application credentials.
+The configured Global database login can read the user's identifier, deleted flag,
+preferred tenant identifier and preference-update audit timestamp/user through EF Core.
+The preference profile permits updates only to the preferred tenant and those two audit
+fields. The API still changes only the authenticated user's preference, verifies active
+membership, and commits the preference and audit image together; a suspended tenant
+is not excluded when membership remains active. Runtime gains no User-table access
+from this feature, and private profile fields remain outside these rights.
+
+Global is an API database purpose, not an administrator's human role. Protect its
+credentials: their holder can enumerate these associations and directly change the
+permitted preference/audit columns outside the API's self-selection checks. Database
+row-level security does not authenticate a human using stolen application credentials.
+Other explicitly configured storage purposes have their own separately checked rights.
+
+The old preference write/image routines and capability roles are no longer installed.
+Use a fresh isolated development PostgreSQL cluster without those obsolete roles, or
+have an operator check dependencies and decommission them explicitly. Starting only
+a new database in the same cluster does not remove cluster-global roles. Startup does
+not repair obsolete installations or delete their data automatically.
 
 This pre-release cutover removes the old navigation routine and its capability
 roles. Startup refuses leftover `user_tenant_navigation_read` routines or

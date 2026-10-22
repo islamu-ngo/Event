@@ -85,13 +85,27 @@ remain current through settlement; support forwarding does not replace self.
 Selecting a tenant imposes no tenant-status condition and grants no resource access.
 
 HumanTenantPreferenceStore accepts only the registered preparation's current
-mutation. Its native function can update only the exact user's
-last_active_tenant_id, updated_at and updated_by. Global has execute-only mutation access
-plus the separate three-column navigation read described above;
-Runtime receives no direct user-table privilege. A separate canonical image
-function and contract attestation run before final source/lifetime checks.
+mutation. Common EF updates only the exact non-deleted user's
+last_active_tenant_id, updated_at and updated_by, with active membership and target
+existence in the update predicate. Suspended tenants remain valid preference targets;
+ConcurrencyStamp is neither compared nor changed. A separate EF image query checks
+all three resulting fields before final source/lifetime checks. The original context,
+sealed-null tenant lease, open connector/backend and Serializable transaction remain
+pinned across admission, mutation and completion; configured retries cannot replace
+that owner.
+
+Global has fixed direct SELECT on User.Id, IsDeleted, LastActiveTenantId, UpdatedAt
+and UpdatedBy, and UPDATE on the latter three preference/audit fields. These include
+the navigation read subset. Runtime receives no new User authority, and this profile
+does not grant UserPii access or table-wide privileges. A holder of Global credentials
+can use those fixed column rights outside resolved-self C# admission; database grants
+do not authenticate a human. Other explicitly installed owner profiles remain separately
+attested, not inferred from live ACLs. The two old preference routines and their roles
+are retired. Existing installations are rejected without repair: use a fresh isolated
+development PostgreSQL cluster, or operator-owned dependency-checked decommissioning
+of obsolete roles and routines. No automatic data deletion or compatibility routine is provided.
 Missing membership causes whole-attempt rollback and false; cache invalidation
-occurs only after successful settlement. Discovery reads confer no write grant.
+occurs only after successful settlement. Navigation reads alone confer no write grant.
 
 ## Human Commit Identity and Source Contracts
 

@@ -36,10 +36,11 @@ session and a current active membership in the selected target tenant through
 transaction settlement. Revoked or foreign memberships do not change the saved
 preference. Support forwarding cannot substitute another user's self authority.
 An inactive tenant can remain a preference; lifecycle guards still control access.
-If native preference admission fails, inspect credential validity, membership
-state and the installed Global execution contract; do not grant Runtime direct
-user-table access. Restore the approved native contract before retrying a
-reported contract-image or execution-grant mismatch.
+If original-human preference authorization fails, inspect credential validity and
+membership state. The C# workflow uses fixed Global database storage permissions;
+Runtime must not receive direct user-table access. A storage-permission or final
+image mismatch requires investigating the declared grants and original transaction,
+not restoring obsolete preference routines or widening database rights.
 
 ## AppHost Package Audit Failures
 
@@ -869,8 +870,11 @@ specifications await final executable verification.
 Email content retention discovers only a bounded set of tenant identities, then
 redacts each tenant through separate Runtime authority. A missing PostgreSQL
 discovery capability fails the pass rather than reporting no eligible content.
-Restore the migrator-installed retention capability; do not grant Global private
-email table access. Dry-run counts use the same selected-tenant scope, and a failed
+Restore the migrator-installed fixed metadata read profile; discovery eligibility
+and ordering run in the C# application through EF Core, not a stored routine.
+Global can read tenant IDs and retention timestamps/status, but not email bodies,
+recipients or related private rows. Do not substitute table-wide grants or recreate
+the retired discovery routine. Dry-run counts use the same selected-tenant scope, and a failed
 tenant remains counted while the pass continues for others. Sent/skipped cutoff,
 batch limits and unresolved-message preservation remain in effect. These source
 changes and native/SQLite specifications await final executable assurance.

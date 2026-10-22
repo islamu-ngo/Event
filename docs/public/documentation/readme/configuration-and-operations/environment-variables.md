@@ -153,6 +153,14 @@ external identity storage, additionally inject the external database's
 modify their fixed identity inventory; ordinary Runtime and Global do not inherit
 those rights. Credential theft can bypass C# workflow rules within those grants.
 
+Login synchronization also needs limited read-only bootstrap metadata and the
+existence of an erased identity. Its writer can read bootstrap status, mode,
+provider, completing-user ID and ordering keys, plus erasure subject IDs—not
+configured-administrator fingerprints or private erasure receipts, state and
+fences. A stolen writer credential can enumerate that metadata. Reprovision a
+fresh development permission profile when adopting this inventory; readiness
+rejects an older partial profile instead of silently expanding its permissions.
+
 Only the migration service receives migration credentials; API runtime does not
 inherit them. Provision real database roles/grants separately: setup readiness
 is not proof of permission separation. Runtime must not have DDL, superuser or
@@ -365,13 +373,20 @@ concurrency caps and reminder backlog controls remain enforced together.
 Cancellation before sending can be recovered, while an uncertain SMTP outcome
 remains Unknown for reconciliation rather than automatic resend.
 
-For ATProto ingestion and recovery-policy discovery, grant
-`event_atproto_governance_runtime` to the configured Global login with
-inheritance enabled and role switching disabled. Do not grant its owner/migrator
-roles or private tenant-setting table access. This capability reads only event
-enablement, backfill enablement and backfill mode overrides across tenants;
-instance locks and the configured deployment mode still determine which
-overrides take effect.
+ATProto ingestion and recovery-policy discovery require no additional credential
+pair or governance executor-role grant. The Migrator installs the fixed column
+permissions for dedicated, non-secret federation settings on the configured
+Runtime and Global logins. Global can read the complete tenant override audience;
+ordinary tenant writes remain tenant-constrained. Only Global can write instance
+settings. Private generic tenant settings are not exposed. The API still applies
+instance locks, deployment mode and backfill precedence.
+
+Do not restore or grant `event_atproto_governance_runtime` or its owner/migrator
+roles. The replacement rejects leftover governance roles, the former routine or
+its policy; it does not remove them automatically. Roles are PostgreSQL
+cluster-wide, so a fresh database on an old cluster may still be rejected. Use an
+explicitly disposable development environment or arrange a reviewed transition
+for retained data. See [the development transition](backup-restore-upgrade.md#dedicated-federation-settings-development-transition).
 
 Pre-tenant API-key and scanner authentication use the configured Global login;
 no additional credential pair is required. Run the application Migrator to install
@@ -407,6 +422,33 @@ Credential theft also permits enumeration of tenant IDs, not tenant descriptions
 or private user data, through the fixed parent-key read.
 The Migrator rejects partial installations and unexpected grants or policies
 instead of silently repairing them.
+
+Tenant scanner management uses the same fixed Runtime storage installation,
+without inheriting the Global authentication role. Runtime can read and insert
+the 16 mapped scanner fields, including lookup digest/version, and update only
+revocation, concurrency and the existing row-fence key. It cannot update an
+issued scanner's digest or identity. Issuance also reads fixed event identity/deletion metadata and participation
+mode, not private event content or event write permissions. Those permissions
+support the API's own issuance checks rather than a database business routine.
+The API separately resolves the authorized user's personal Actor for issuance
+and revocation records; platform User and Actor identifiers are not interchangeable.
+Restrictive tenant policies hide foreign
+rows even when application query filters are bypassed; the raw scanner token and
+HMAC key are not database read permissions. Instance-key management/report
+credentials remain unable to read or write scanners. Protect Runtime accordingly:
+credential theft allows direct scanner enumeration, creation or revocation in
+its selected tenant sessions without the API's human authorization.
+
+Runtime also has fixed admission-target reads and inserts, with updates limited
+to operational status and its concurrency marker. The C# application coordinates
+target creation, scanner issuance, check-in and stopping; waiting operations begin
+their transaction only after the previous coordinated workflow finishes. These
+permissions do not provide private event content or target-key updates. Direct
+database edits bypass that coordination, so administrative tools must not make
+concurrent target changes outside the application workflow. SQLite deployment
+continues to require a single application instance for process-local coordination.
+An acknowledged commit followed by cleanup failure is reported without replaying
+the operation; an uncertain commit must be reconciled rather than blindly retried.
 
 The API performs exact key matching, preserves persisted credential precedence
 and rejects ambiguous scanner matches. Usage changes are transactional and
@@ -459,7 +501,7 @@ If startup rejects retained localization routines or roles, use a reviewed
 development database transition; installation does not remove them automatically.
 Do not delete retained data merely to pass readiness.
 
-This development cutover requires a fresh isolated PostgreSQL instance/cluster
+The external provider-account binding cutover requires a fresh isolated PostgreSQL instance/cluster
 without the obsolete `event_external_login_authentication_owner`,
 `event_external_login_authentication_migrator` and
 `event_external_login_authentication_global` roles. Provision the database and
@@ -546,24 +588,17 @@ object ownership, or effective table/column/sequence access on their execution
 groups. This includes grants in unrelated non-system schemas. Provision these
 groups for function execution only; remove unintended authority through your
 approved database administration process before retrying installation.
-Resource audit retention
-requires `event_resource_audit_retention_runtime` on Global for owner discovery
-only; deletion uses exact Runtime tenant scopes. Local webhook delivery requires
+Resource audit retention uses migrator-installed, fixed Global read permission
+on audit tenant IDs, not an execution-group membership or stored discovery
+routine. Audit contents remain private; deletion uses exact Runtime tenant
+scopes. Email retention similarly reads only seven queue metadata columns through
+Global; message contents, recipients and redaction remain tenant-bound. Run the
+application migrator to install these profiles; do not substitute table-wide
+grants or manually recreate the retired business routines. Local webhook delivery requires
 `event_local_webhook_admission_global` on Global for discovery, seven-key
 governance, claims and recovery; payload/credential access and settlement stay
 tenant-bound. Use inheritance-enabled, role-switch-disabled memberships without
 owner/migrator groups or direct private-table grants.
-
-Email retention uses migrator-installed Global reads on only seven queue
-metadata columns: `TenantId`, `CreatedAt`, `Status`, `SentAt`, `LastFailureAt`,
-`ContentRedactedAt` and `IsDeleted`. C# selects bounded eligible tenant pages;
-message contents, recipients and redaction remain tenant-bound. The same Global
-credential can enumerate those metadata columns directly, but receives no
-content or write authority. Run the application migrator; do not substitute
-table-wide grants or manually recreate the retired discovery routine. Existing
-obsolete email-retention routines or capability roles require a fresh isolated
-development PostgreSQL cluster without those objects, or operator-owned,
-dependency-checked decommissioning. Installation performs no destructive cleanup.
 
 Registration finalization drains require `event_registration_finalization_global`
 on Global for bounded effect claiming only. Financial/order work and settlement
@@ -755,6 +790,14 @@ External Identity binding requires the discrete endpoint and selected purpose's
 credentials. A shared `IDENTITY_DATABASE_CONNECTION_STRING` is not supported;
 unsupported purposes cannot borrow Migrator credentials. An explicitly empty
 structured credential masks its environment alias and fails validation.
+
+Local token issuance and validation use the same deployment signing key; the
+identity writer does not need access to private database secret bindings. Supply
+Base64 key material of at least 256 bits through the selected secret authority.
+The structured `Authentication:Local:JwtKey` declaration takes precedence over
+`AUTHENTICATION_LOCAL_JWT_KEY`; explicitly blank structured input refuses signing
+instead of falling back to the alias. Change the deployment authority and restart
+the API to replace this key; changing a database secret binding does not rotate it.
 
 ### Keycloak resource and client context
 

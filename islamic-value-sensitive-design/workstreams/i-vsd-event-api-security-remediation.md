@@ -346,6 +346,107 @@ development data and provision a fresh isolated PostgreSQL cluster when obsolete
 cluster-global roles remain; installation never silently drops them or repairs
 drift. No new credential, personal-data purpose or retention policy is introduced.
 
+### Dedicated federation storage and API-owned discovery metadata amendment
+
+Status: explicit maintainer authorization and reviewed design; runtime assurance
+remains open. The three non-secret ATProto governance settings move to dedicated
+EF-mapped storage so background readers can observe the complete bounded override
+set in one query without gaining private generic-setting access. Domain validates
+the finite keys/values; Application retains lock precedence and the SingleTenant
+exception. Scoped readers must retain the original selected tenant, connection and
+transaction; independent Global reads must include inactive tenants. This is an
+internal backend authority change, not a new public read endpoint or permission
+to expose audit identifiers in telemetry. Dedicated entities retain actor audit
+IDs; those remain backend records, not public DTO fields or diagnostic payloads.
+
+The maintainer separately approved fixed Runtime/Global revision-metadata access
+and complete Global Tenant.Id observation. C# must enforce original human action,
+actual effects, source custody, exact concurrency and atomic completion; simple
+tenant RLS and relational constraints remain. A stolen database credential can now
+tamper with the metadata and undermine revision-based freshness/invalidation.
+The previous function-only protection against that attack is deliberately not
+promised. No Tenant.Id UPDATE, private Tenant/User columns, private generic-setting
+grants, role union or generic privileged executor is authorized by this decision.
+
+The design uses the original pre-transaction membership gate and pre-existing
+revision rows, then ordered epoch locks, exact coverage and EF expected-image
+updates. Managed provisioning already creates its canonical revision; it must not
+insert a second copy. Canonical native writes for unmoved settings retain their
+effect and physical-finished proofs while one C# owner consumes actual private
+completion receipts and advances each affected epoch once. Source or finalization
+failure must poison the original attempt even when caught. Unknown commits are
+not replayed as though rollback were proven.
+
+The maintainer explicitly approved bounded four-column revision INSERT by Runtime
+and Global on each creator's original transaction, with canonical creation and
+workflow authorization in C#. This includes an INSERT-only sealed-null Runtime
+creation boundary, not tenantless Runtime SELECT or UPDATE. A stolen credential
+can fabricate a missing revision within these explicit database privileges; the
+API must not turn that permission into lazy repair or duplicate insertion.
+
+The read-only Runtime parent-setting boundary is now resolved in favor of
+API-owned coordination: shared ordered setting-key leases before transactions,
+retained through settlement, with current-parent revalidation. The maintainer
+rejected a new privileged parent-row-locking routine; no Runtime parent UPDATE
+is authorized. A direct parent-setting write using stolen Global credentials can
+bypass this cooperative protocol. That accepted threat boundary is distinct from
+tenant RLS, and must not be described as database-enforced parent stability.
+Scoped adversarial evidence now exists for participating federation API writers;
+this is not a promise against direct database edits or complete operational readiness.
+
+Historical evidence before the 2026-10-19 checkpoint remains capability-specific: Domain58, storage/compiler15,
+Application facts/routing/background81 and SQLite reader/gate32 passed. All four
+provider migration pairs were generated and source-reviewed, not all applied.
+PostgreSQL enrolled-reader controls2 and exact metadata installation1 passed.
+Reader drift36 passed34/failed2; metadata38 passed37/failed1. Their demonstrated
+RLS/owner-membership gaps have source fixes pending fresh GREEN. The initial-open
+gate test also reproduced an open connector after readiness rejection; its fix is
+source-reviewed, not natively verified. Mutation9 failed host composition before
+authentication/preparation and provides no writer-behavior proof. Production
+source/writer integration, all membership producers, zero-PII diagnostics, real
+native revocation/concurrency/rollback and all five providers remain acceptance gates.
+The new tests and fail-closed scaffolds are not operational capability. No release,
+deployment, old-data deletion or compatibility migration is authorized by this
+design receipt.
+
+Scoped evidence refresh, cutoff2026-10-19, working tree at53f4dc27c plus the
+uncommitted federation amendment: PostgreSQL metadata60 passed with bounded
+INSERT, exact installed permissions, tenant/null-session boundaries and forbidden
+key/deletion/private-source writes. Creation/deletion16 passed, including two
+savepoint counterexamples reproduced before the fix. The private creation receipt
+now becomes unusable after EF savepoint rollback; only whole-attempt recovery is
+supported. Raw provider rollback methods and raw rollback SQL bypass that protocol
+and are explicitly unsupported. This is a recovery obligation, not a claim that
+tracked EF state automatically rewinds with the database.
+
+One real PostgreSQL parent/child test passed after catalog-proven contention and
+committed parent lock: the waiting child was rejected before its write callback,
+with exact audit/epoch and unchanged foreign/private images. That supports the
+approved cooperative API boundary. It does not protect against a stolen login
+choosing another tenant session within its fixed privileges or ignoring API
+coordination. PostgreSQL RLS uses application-selected session state; it is not
+cryptographic proof of the human's identity against the credential holder.
+
+Assurance remains partial. The complete SQLite bootstrap atomicity class passed
+all11cases, including canonical creation/skip, revision failure rollback, strict
+effect envelopes and failed-history handling. The real co-located tenant-creation
+workflow also passed twice. PostgreSQL's failed-history status guard and read-only
+validation passed2cases after a real string-conversion regression was reproduced
+and corrected; this is not full native failed-history completion. Bootstrap's column-permission case passed; its
+earlier pairing cases failed admission before exercising their claimed invariant.
+The maintainer subsequently explicitly approved cooperative API-only coordination
+for generic bootstrap inputs as well. The inherited table/row locks and redundant
+native mutex are removed without widening permissions; C# acquires enrollment and
+ordered setting leases before BEGIN and retains them through settlement. Direct
+database writers can bypass that protocol and race, including absent-setting
+inserts. Serializable snapshots and exact-effect checks do not imply universal
+detection. The obsolete independent-insert blocking test is replaced by retained
+API custody and absence-of-native-fence checks, with real cooperating-owner
+contention coverage. Those changed native cohorts await completed verification;
+approval of the risk is not execution evidence. Exact commands and results are
+in the task's `pr75-persistence-verification-current.md`; full provider lifecycle,
+zero-PII, complete source/creator coverage and deployment acceptance remain open.
+
 ## Bootstrap delivery privacy and truthful completion — 2026-10-19
 
 The maintainer approved a versioned durable effect containing only changed

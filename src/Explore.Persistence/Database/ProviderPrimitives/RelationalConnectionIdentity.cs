@@ -41,4 +41,7 @@ internal sealed class RelationalConnectionIdentity
 
     internal bool Owns(DbTransaction transaction) =>
         ReferenceEquals(connection, transaction.Connection);
+
+    /// <summary>Closes the captured connector after its caller proves ownership of a failed initial opening.</summary>
+    internal Task CloseAfterFailedOpenAsync() => connection.CloseAsync();
 }

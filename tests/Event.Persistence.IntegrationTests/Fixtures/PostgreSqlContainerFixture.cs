@@ -276,6 +276,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresInstanceStorageAdministrationContract.ApplyAsync(migratorContext);
             await PostgresStorageReconciliationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLocalStorageQuarantineContract.ApplyAsync(migratorContext);
+            await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
         // Retain source custody metadata; ordinary DELETE must invalidate the original rows.

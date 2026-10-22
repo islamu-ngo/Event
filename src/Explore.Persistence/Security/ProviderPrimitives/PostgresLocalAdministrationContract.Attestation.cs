@@ -181,7 +181,21 @@ public static partial class PostgresLocalAdministrationContract
                     AND NOT t.tgdeferrable AND NOT t.tginitdeferred AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL)
             THEN RAISE EXCEPTION 'local_administration_writer_drift' USING ERRCODE = '55000'; END IF;
             """));
-        string callerDenial = string.Join("\n", Inventory.Select(source => $"""
+        string callerDenial = string.Join("\n", Inventory.Select(source => source.Type == typeof(Explore.Domain.Actor) ? $"""
+            IF EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
+                WHERE t.oid={Text(sql.Table(source.Type))}::regclass
+                    AND pg_catalog.pg_has_role((SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(enrollment.RuntimeLogin)}),r.oid,'MEMBER')
+                    AND (r.oid=t.relowner OR r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication
+                        OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+                            CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
+                            WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped
+                                AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
+                                    OR (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,permission.privilege)
+                                        AND NOT ({PostgresActorOwnershipReadPermissions.RuntimeReadPredicate(context, source.Type,
+                                            enrollment.RuntimeLogin, "r.oid", "t.oid", "a.attname", "permission.privilege")}))))))
+            THEN RAISE EXCEPTION 'local_administration_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
+            """ : $"""
             IF pg_catalog.has_table_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(source.Type))}::regclass,
                     'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                 OR pg_catalog.has_any_column_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(source.Type))}::regclass,

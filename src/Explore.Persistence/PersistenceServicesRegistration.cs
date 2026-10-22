@@ -491,6 +491,9 @@ public static class PersistenceServicesRegistration
 
         // Actor Repositories
         services.AddScoped<IActorRepository, ActorRepository>();
+        services.AddScoped<IActorOwnershipReader>(provider => new ActorOwnershipReader(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IAtprotoIdentityRepository, AtprotoIdentityRepository>();
         services.AddScoped<IActorReferenceConsolidationRepository, ActorReferenceConsolidationRepository>();
         services.AddScoped<IActorKeyStoreRepository, ActorKeyStoreRepository>();

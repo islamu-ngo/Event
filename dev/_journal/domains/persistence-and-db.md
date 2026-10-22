@@ -100,3 +100,35 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 ```
 
 **Reuse**: Distinguish different-name index replacement, which can create the successor first, from same-name replacement, which needs temporary FK coverage. Verify both Up and Down on the real engine; a model-valid final schema does not prove each intermediate DDL operation is legal.
+
+---
+
+[2026-10-22 Europe/Brussels] — Balance EF openings independently of physical connection state
+
+**Context**: Replacing full-profile actor ownership reads with a selected-tenant EF projection in PR #75 exposed two connection-lifetime failures.
+
+**Symptom / Observation**: An interceptor rejected readiness after the physical connection opened, leaving it open. Separately, terminating only the test's original PostgreSQL query backend let the same context recover successfully, but its second read finished with the connection Open instead of Closed. Both failures were reproduced before their corresponding corrections.
+
+**Root Cause**: Physical connection state and EF's successful explicit-opening count represent different ownership facts. Capturing the connector only after opening misses interceptor failure. Skipping a balancing EF close merely because the connector broke retains an opening count that leaks into the next operation.
+
+**Resolution**: `ActorOwnershipReader` witnesses the original connector before opening, preserves interruption as a failed-read condition and separately records reopening. A successful EF opening is balanced on that same owner, including a closed connector that has not reopened. A failed initial opening uses physical cleanup only when the original backend is still witnessed. Replacement context, connector or transaction references never qualify; primary and cleanup errors remain observable.
+
+The isolated Persistence Release build passed, followed by all 28 PostgreSQL reader/permission cases (0 failed/skipped, 318.930s, exit0) using:
+
+```bash
+dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll \
+  --treenode-filter '/*/*/(ActorOwnershipReaderTests)|(ActorOwnershipReadPermissionTests)/*' \
+  --minimum-expected-tests 28 --progress off --maximum-parallel-tests 1
+```
+
+**Why This Matters for Future Work**: Cleanup must discharge the operation's actual EF ownership without treating a closed or replacement physical connection as proof of the same thing. Verify recovery on the same context, not only the first rejected invocation. Do not generalize these PostgreSQL receipts into unexecuted provider evidence.
+
+**References**:
+- `src/Explore.Persistence/Repositories/ActorOwnershipReader.cs`
+- `src/Explore.Persistence/Database/ProviderPrimitives/RelationalConnectionIdentity.cs`
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/ActorOwnershipReaderTests.cs`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+- Framework behavior reference: https://learn.microsoft.com/en-us/ef/core/performance/advanced-performance-topics
+
+**Promotion Consideration**:
+- [x] Stays in journal only; do not introduce another general connection wrapper without a demonstrated caller need.

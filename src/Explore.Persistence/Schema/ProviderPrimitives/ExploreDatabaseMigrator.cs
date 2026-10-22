@@ -276,6 +276,8 @@ public static class ExploreDatabaseMigrator
         if (queueEnrollment is not null)
             await PostgresStorageReconciliationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         await PostgresLocalStorageQuarantineContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresActorOwnershipReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         await EventDiscoveryRankBackfill.ApplyAsync(executionDatabase, cancellationToken);
     }
 

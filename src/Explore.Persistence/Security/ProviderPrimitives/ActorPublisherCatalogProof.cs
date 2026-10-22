@@ -16,7 +16,8 @@ internal static class ActorPublisherCatalogProof
     internal static string CallerPrivilegeGuard(ExploreDbContext context, HumanPrincipalSourceSql names, IReadOnlyCollection<Type> sources,
         PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix, bool allowRuntimeCatalogueRoleRead = false)
     {
-        if (allowRuntimeCatalogueRoleRead && sources.Contains(typeof(Role)) || sources.Contains(typeof(Tenant)))
+        if (allowRuntimeCatalogueRoleRead && sources.Contains(typeof(Role)) || sources.Contains(typeof(Tenant))
+            || sources.Any(type => PostgresActorOwnershipReadPermissions.TryGetRuntimeReadColumns(context, type, out _)))
             return CatalogueAwareCallerPrivilegeGuard(context, names, sources, enrollment, diagnosticPrefix, allowRuntimeCatalogueRoleRead);
 
         string relations = string.Join(",", sources.Select(type => Text(names.Table(type)) + "::regclass"));
@@ -58,6 +59,13 @@ internal static class ActorPublisherCatalogProof
                 """ : "false";
             if (login == enrollment.RuntimeLogin && sources.Contains(typeof(Tenant)))
                 referenceRead = $"({referenceRead}) OR ({PostgresTenantApiKeyStoragePermissions.RuntimeParentReadPredicate(context, enrollment, "r.oid", "t.oid", "a.attname", "'SELECT'")})";
+            if (login == enrollment.RuntimeLogin)
+            {
+                string ownershipReads = string.Join(" OR ", sources.Select(type =>
+                    PostgresActorOwnershipReadPermissions.RuntimeReadPredicate(context, type, login,
+                        "r.oid", "t.oid", "a.attname", "'SELECT'")));
+                if (ownershipReads.Length != 0) referenceRead = $"({referenceRead}) OR ({ownershipReads})";
+            }
             return $"""
                 IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                     WHERE pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')

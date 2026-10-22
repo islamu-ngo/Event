@@ -3,6 +3,20 @@ ABOUTME: Covers bootstrap selection, safe diagnostics, health monitoring, and ro
 
 # Secrets Management
 
+## Actor ownership reads
+
+Application workflows establish the original user and selected tenant before
+`IActorOwnershipReader` projects ownership facts through EF Core. Its PostgreSQL
+Runtime profile grants only `Actor.Id/UserId/GroupId/OrganizationId/IsDeleted`
+and `TenantUser.TenantId/ActorId/IsDeleted` SELECT. Existing membership storage
+rights remain separately owned; this read profile does not install them.
+Tenant membership filters and RLS remain active. Actor linkage metadata itself is
+not user-row-isolated: a stolen Runtime credential can enumerate these fixed
+Actor identifiers without Application admission. It cannot use this profile to
+read private profiles, moderation or audit fields, write Actor data, or delegate
+permissions. Installation and readiness reject drift rather than repairing it;
+the reader retains the caller's selected context, connection and transaction.
+
 ## Consumer-isolated acquisition and orchestration
 
 `SecretAcquisitionPolicy` admits the compiled consumer's exact roots before

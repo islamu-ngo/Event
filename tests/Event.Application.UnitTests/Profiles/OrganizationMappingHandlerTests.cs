@@ -445,7 +445,6 @@ public sealed class OrganizationMappingHandlerTests
         public Task<IReadOnlyList<Actor>> SearchAiReferenceActorsAsync(string searchTerm, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Actor?> GetActorByUserId(Guid userId) => throw new NotSupportedException();
         public Task<Actor?> GetTrackedActorByUserId(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<Actor?> GetActorByUserIdAndTenantId(Guid userId, Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Actor?> GetActorByOrganizationId(Guid organizationId) => throw new NotSupportedException();
         public Task<Actor?> GetActorByGroupId(Guid groupId) => throw new NotSupportedException();
         public Task<int> ForgetPiiAsync(Guid actorId) => throw new NotSupportedException();

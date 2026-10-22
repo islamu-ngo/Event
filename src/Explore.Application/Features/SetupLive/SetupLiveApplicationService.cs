@@ -49,7 +49,7 @@ public sealed partial class SetupLiveApplicationService(
     ISetupLiveRepository setupLiveRepository,
     ISecretBindingRepository secretBindingRepository,
     IUnitOfWork unitOfWork,
-    IActorRepository actorRepository,
+    IActorOwnershipReader actorOwnership,
     IAuthorizationProvider authorization,
     ITenantContext tenantContext,
     ISetupSecretBindingWriter secretBindingWriter,
@@ -348,7 +348,7 @@ public sealed partial class SetupLiveApplicationService(
             return new(SetupLiveApplicationStatus.Forbidden);
         }
 
-        Explore.Domain.Actor? actor = await actorRepository.GetActorByUserIdAndTenantId(
+        ActorOwnershipFacts? actor = await actorOwnership.ReadForUserAsync(
             userId,
             tenantId,
             cancellationToken);
@@ -609,7 +609,7 @@ public sealed partial class SetupLiveApplicationService(
             return new(SetupLiveApplicationStatus.Unavailable);
         }
 
-        Explore.Domain.Actor? actor = await actorRepository.GetActorByUserIdAndTenantId(
+        ActorOwnershipFacts? actor = await actorOwnership.ReadForUserAsync(
             userId,
             tenantId,
             cancellationToken);
@@ -919,7 +919,7 @@ public sealed partial class SetupLiveApplicationService(
             return null;
         }
 
-        Explore.Domain.Actor? actor = await actorRepository.GetActorByUserIdAndTenantId(
+        ActorOwnershipFacts? actor = await actorOwnership.ReadForUserAsync(
             userId,
             tenantId,
             cancellationToken);

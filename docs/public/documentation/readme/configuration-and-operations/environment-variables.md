@@ -4,6 +4,7 @@ description: Comprehensive reference for all baseline, advanced, and profile-spe
 
 # Environment Variables Reference
 
+
 ISLAMU Event follows **Convention over Configuration**. The platform includes sensible defaults for all advanced operational dials so that everyday self-hosters can launch a production instance with minimal friction.
 
 > [!TIP]
@@ -13,8 +14,23 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
-## Guided Setup Adds No Environment Inputs
+## Runtime actor ownership access
 
+The existing Runtime database login can read only the Actor linkage identifiers
+needed by enrollment, reporting, admission decisions and ticket purchasing:
+actor ID, user/group/organization IDs and the deletion flag, plus tenant ID,
+actor ID and deletion flag on tenant memberships. No new credential or
+environment variable is required. This access does not include private Actor
+profiles, moderation fields, writes or permission delegation.
+
+C# workflows authorize the caller and enforce the selected tenant; membership
+RLS remains a database safeguard. Direct access with a stolen Runtime credential
+can bypass C# admission and enumerate the permitted Actor linkage metadata.
+Treat that credential as sensitive even though private profile columns remain
+unavailable. Installation refuses unexpected privileges instead of silently
+normalizing them; investigate drift before restarting migration or enrollment.
+
+## Guided Setup Adds No Environment Inputs
 Offline preparation uses separately installed
 [ISLAMU Configurator](https://github.com/ISLAMU/Configurator) and Event's local
 definition, not new environment switches. Follow

@@ -109,11 +109,17 @@ public class UpdateBrandingSettingsCommandHandler(
         if (!request.Patch.HasChanges())
             return GovernancePatchExecution.Invalid("At least one branding setting must be provided.");
         var prepared = await preparation.PrepareAsync(request, cancellationToken);
-        await mutationLock.ExecuteOrderedGroupsAsync([TenantBrandingGovernanceMutationLockKeys.All], async ct =>
+        Exception? primaryFailure = null;
+        try
         {
-            await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, ct);
-            return true;
-        }, cancellationToken);
+            await mutationLock.ExecuteOrderedGroupsAsync([TenantBrandingGovernanceMutationLockKeys.All], async ct =>
+            {
+                await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, ct);
+                return true;
+            }, cancellationToken);
+        }
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await preparation.CloseAsync(prepared, primaryFailure); }
         return BaseCommandResponse.Success(Guid.Empty, "Branding settings updated successfully.");
     }
 }
@@ -147,15 +153,21 @@ public class UpdateTenantDelegationSettingsCommandHandler(
         if (!request.Patch.HasChanges())
             return GovernancePatchExecution.Invalid("At least one tenant delegation setting must be provided.");
         var prepared = await preparation.PrepareAsync(request, cancellationToken);
-        async Task<bool> ApplyAsync(CancellationToken token)
+        Exception? primaryFailure = null;
+        try
         {
-            await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, token);
-            return true;
+            async Task<bool> ApplyAsync(CancellationToken token)
+            {
+                await GovernancePatchExecution.ApplyAsync(preparation, store, prepared, notificationHandlers, token);
+                return true;
+            }
+            if (request.Patch.LockTenantSmtp.HasValue)
+                await mutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All], ApplyAsync, cancellationToken);
+            else
+                await ApplyAsync(cancellationToken);
         }
-        if (request.Patch.LockTenantSmtp.HasValue)
-            await mutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All], ApplyAsync, cancellationToken);
-        else
-            await ApplyAsync(cancellationToken);
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await preparation.CloseAsync(prepared, primaryFailure); }
         return BaseCommandResponse.Success(Guid.Empty, "Tenant delegation settings updated successfully.");
     }
 }

@@ -133,13 +133,15 @@ public static class OperationServicesRegistration
                 var performanceFactory = ActivatorUtilities.CreateFactory(performance.MakeGenericType(arguments), [contract]);
                 var mutationFactory = definition == typeof(ICommandHandler<,>) &&
                     (PolicyMutationCommandScope.Handles(arguments[0]) || ModerationMutationCommandScope.Handles(arguments[0])
+                        || LocalIdentityOperationScope.Handles(arguments[0])
                         || requiresHumanPreparation)
                     ? ActivatorUtilities.CreateFactory(typeof(MutationScopeCommandHandler<,>).MakeGenericType(arguments),
                         [typeof(IServiceProvider), typeof(Type)])
                     : null;
-                var queryFactory = definition == typeof(IQueryHandler<,>) && requiresHumanPreparation
+                var queryFactory = definition == typeof(IQueryHandler<,>)
+                    && (requiresHumanPreparation || LocalIdentityOperationScope.Handles(arguments[0]))
                     ? ActivatorUtilities.CreateFactory(typeof(HumanScopeQueryHandler<,>).MakeGenericType(arguments),
-                        [typeof(IServiceProvider), typeof(Type)])
+                        [typeof(IServiceProvider), typeof(Type), typeof(bool)])
                     : null;
                 var entry = ServiceDescriptor.Scoped(contract, provider =>
                 {
@@ -150,7 +152,7 @@ public static class OperationServicesRegistration
                         var inner = mutationFactory is not null
                             ? mutationFactory(provider, [provider, implementation])
                             : queryFactory is not null
-                                ? queryFactory(provider, [provider, implementation])
+                                ? queryFactory(provider, [provider, implementation, requiresHumanPreparation])
                                 : provider.GetRequiredService(implementation);
                         var timed = performanceFactory(provider, [inner]);
                         return authorizeFactory(provider, [timed]);

@@ -365,7 +365,8 @@ public sealed class HumanAuthenticationLifetimeTests
             () => services.GetRequiredService<IHumanSupportAccessSourceFactory>(),
             () => services.GetRequiredService<IPolicySourceSetFence>(),
             () => services.GetRequiredService<IHumanActionCommitFinalizer>(),
-            () => services.GetRequiredService<ISerializableAttemptOwner>());
+            () => services.GetRequiredService<ISerializableAttemptOwner>(),
+            () => services.GetRequiredService<IEventDiscoveryEnrollmentGate>());
         await Assert.ThrowsAsync<Explore.Application.Exceptions.AuthorizationException>(() =>
             preparation.PrepareAsync(HumanTenantMutationKind.Delete, target));
         var prepared = await preparation.PrepareAsync(HumanTenantMutationKind.RegistrationProviderConnections, target);
@@ -499,7 +500,8 @@ public sealed class HumanAuthenticationLifetimeTests
             () => services.GetRequiredService<IHumanActionCommitFinalizer>(),
             () => new ProviderConnectionAfterBodyOwner(
                 services.GetRequiredService<ISerializableAttemptOwner>(), token =>
-                    afterBody is null ? Task.CompletedTask : afterBody(token)));
+                    afterBody is null ? Task.CompletedTask : afterBody(token)),
+            () => services.GetRequiredService<IEventDiscoveryEnrollmentGate>());
         var repository = services.GetRequiredService<IRegistrationProviderRepository>();
         var tuple = Explore.Infrastructure.Registration.NativeRegistrationProviderDescriptor.NativeTuple;
         var registry = new Explore.Infrastructure.Registration.RegistrationProviderRegistry(

@@ -1,5 +1,7 @@
 using System.Data.Common;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Persistence.Identity;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -13,6 +15,7 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
     internal static readonly PostgresTenantSessionInterceptor RuntimeInstance = new(true);
     private readonly bool _verifyRuntimeAuthority;
     private readonly string? _enrolledGlobalLogin;
+    private readonly IdentityWriterProfile? _identityWriter;
 
     public PostgresTenantSessionInterceptor() { }
 
@@ -25,15 +28,39 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
     internal static PostgresTenantSessionInterceptor ForGlobalLogin(string enrolledGlobalLogin)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(enrolledGlobalLogin);
-        return new(true, enrolledGlobalLogin);
+        return new PostgresTenantSessionInterceptor(true, enrolledGlobalLogin);
     }
+
+    private PostgresTenantSessionInterceptor(IdentityWriterProfile identityWriter)
+    {
+        _verifyRuntimeAuthority = true;
+        _identityWriter = identityWriter;
+    }
+
+    internal static PostgresTenantSessionInterceptor ForLocalIdentityWriter(PostgresLocalIdentityWriterEnrollment enrollment,
+        IdentityDatabaseTopology topology, LocalIdentityWriterInventory.Store store)
+    {
+        ArgumentNullException.ThrowIfNull(enrollment);
+        enrollment.Validate();
+        if (!Enum.IsDefined(topology)) throw new ArgumentOutOfRangeException(nameof(topology));
+        if (!Enum.IsDefined(store)) throw new ArgumentOutOfRangeException(nameof(store));
+        return new(new IdentityWriterProfile(enrollment, topology, store));
+    }
+
+    private DbCommand CreateReadinessCommand(DbConnection connection, DbContext context) =>
+        _identityWriter is { } writer
+            ? PostgresLocalIdentityWriterPermissions.CreateReadinessCommand(connection, context,
+                writer.Enrollment, writer.Topology, writer.Store)
+            : context is ExploreDbContext application
+                ? PostgresTenantRuntimeReadiness.CreateCommand(connection, application, _enrolledGlobalLogin)
+                : throw new InvalidOperationException("postgres_tenant_runtime_context_required");
 
     public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
     {
-        if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext context)
+        if (_verifyRuntimeAuthority && eventData.Context is { } context)
         {
-            context.IsPostgresRuntimeReady = false;
-            using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context, _enrolledGlobalLogin);
+            if (context is ExploreDbContext application) application.IsPostgresRuntimeReady = false;
+            using var readiness = CreateReadinessCommand(connection, context);
             PostgresTenantRuntimeReadiness.RequireReady(readiness.ExecuteScalar());
         }
         ApplyTenantSessionState(connection, eventData.Context);
@@ -46,10 +73,10 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
         ConnectionEndEventData eventData,
         CancellationToken cancellationToken = default)
     {
-        if (_verifyRuntimeAuthority && eventData.Context is ExploreDbContext context)
+        if (_verifyRuntimeAuthority && eventData.Context is { } context)
         {
-            context.IsPostgresRuntimeReady = false;
-            await using var readiness = PostgresTenantRuntimeReadiness.CreateCommand(connection, context, _enrolledGlobalLogin);
+            if (context is ExploreDbContext application) application.IsPostgresRuntimeReady = false;
+            await using var readiness = CreateReadinessCommand(connection, context);
             PostgresTenantRuntimeReadiness.RequireReady(await readiness.ExecuteScalarAsync(cancellationToken));
         }
         await ApplyTenantSessionStateAsync(connection, eventData.Context, cancellationToken);
@@ -159,4 +186,7 @@ public sealed class PostgresTenantSessionInterceptor : DbConnectionInterceptor, 
             exploreDbContext.ValidateTenantLease();
         }
     }
+
+    private sealed record IdentityWriterProfile(PostgresLocalIdentityWriterEnrollment Enrollment, IdentityDatabaseTopology Topology,
+        LocalIdentityWriterInventory.Store Store);
 }

@@ -8,19 +8,19 @@ using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Users.Handlers.Queries;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +30,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -53,17 +52,13 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
     [Arguments("delivery-required")]
     [Arguments("malformed-policy")]
     [Arguments("verified-malformed-policy")]
-    public async Task GenuineLocalSessionValidatesOnRuntimeWithoutPrivateIdentityGrants(string mutation)
+    public async Task GenuineLocalSessionKeepsRuntimeFactsAndSelectedWriterValidationWithoutPrivateRuntimeGrants(string mutation)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         CancellationToken token = timeout.Token;
         byte[] key = RandomNumberGenerator.GetBytes(64);
-        var secrets = Substitute.For<ISecretResolver>();
-        secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, Convert.ToBase64String(key),
-                SecretSourceType.EnvironmentVariable, SecretScope.Instance, null, DateTimeOffset.UtcNow)));
-        var signer = new LocalJwtTokenGenerator(secrets, Options.Create(new LocalIdentityOptions()), TimeProvider.System);
+        var signer = new LocalJwtTokenGenerator(
+            Options.Create(new LocalIdentityOptions { JwtKey = Convert.ToBase64String(key) }), TimeProvider.System);
         var jwt = new JwtSecurityTokenHandler { MapInboundClaims = false };
         TokenValidationParameters Validation(string audience) => new()
         {
@@ -93,15 +88,39 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
                 .AddEntityFrameworkStores<ExploreDbContext>();
             return services.BuildIsolatedServiceProvider(validateScopes: true);
         }
-        LocalIdentityAuthService Authentication(ExploreDbContext context, UserManager<LocalIdentityUser> manager) => new(
-            manager, signer, SystemSettingRepository.CreateReadOnly(context,
-                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context))),
-            new LocalIdentityCredentialStateStore(context, context, manager, TimeProvider.System),
-            fixture.NativeQueueEnrollment);
+        await fixture.PrepareLocalIdentityWriterAsync();
+        ServiceProvider WriterServices(Guid? tenantId)
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            var options = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter);
+            var enrollment = new PostgresLocalIdentityWriterEnrollment(fixture.NativeQueueEnrollment.MigratorLogin,
+                fixture.NativeQueueEnrollment.RuntimeLogin, options.Username!, fixture.NativeQueueEnrollment.GlobalLogin);
+            services.AddSingleton(new LocalIdentityWriterDbContextFactory(options, poolSize: 1,
+                applicationEnrollment: enrollment));
+            services.AddPooledDbContextFactory<ExploreDbContext>(builder =>
+            {
+                PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
+                    fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+                builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+            });
+            services.AddScoped<ExploreDbContextExecutionLease>();
+            if (tenantId is { } selectedTenant)
+                services.AddScoped<ITenantContext>(_ => new TenantIdentity(selectedTenant));
+            services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>()
+                .AddEntityFrameworkStores<ExploreDbContext>();
+            services.AddLocalIdentityExecutionContextSelection(IdentityDatabaseTopology.Colocated);
+            return services.BuildIsolatedServiceProvider(validateScopes: true);
+        }
 
         await using var setup = Services(PrimaryDatabaseRole.Migrator);
         await using var setupScope = setup.CreateAsyncScope();
         var migration = setupScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        migration.BindTenantLease();
+        await using var setupHuman = new HumanSecuritySourceGate(migration);
+        await using var setupHumanLease = await setupHuman.AcquireAsync(token);
+        await using var setupDiscovery = new EventDiscoveryEnrollmentGate(migration);
+        await using var setupDiscoveryLease = await setupDiscovery.AcquireAsync(token);
         var manager = setupScope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
         var store = new LocalIdentityCredentialStateStore(migration, migration, manager, TimeProvider.System);
         var initiator = new User
@@ -157,7 +176,27 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
         await Assert.That(await store.ActivateChangeRequiredAsync(
             new LocalCredentialActivationRequest(receipt.OperationId, pending.OperationConcurrencyStamp), token))
             .IsEqualTo(LocalCredentialActivationOutcome.Activated);
-        var authentication = Authentication(migration, manager);
+        if (mutation == "none")
+        {
+            var credential = (await manager.FindByIdAsync(receipt.LocalSubjectId.ToString("D")))!;
+            var idle = await store.ReadReplacementSubjectAsync(receipt.LocalSubjectId, credential.SecurityStamp!, token);
+            await Assert.That(idle).IsNotNull();
+            await Assert.That(idle!.LocalSubjectId).IsEqualTo(receipt.LocalSubjectId);
+            await Assert.That(idle.OperationId).IsEqualTo(receipt.OperationId);
+            await migration.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var callerTransaction = await migration.Database.BeginTransactionAsync(token);
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    store.ReadReplacementSubjectAsync(receipt.LocalSubjectId, credential.SecurityStamp!, token));
+                await Assert.That(migration.Database.CurrentTransaction).IsSameReferenceAs(callerTransaction);
+                await callerTransaction.RollbackAsync(token);
+            });
+            var restored = await store.ReadReplacementSubjectAsync(receipt.LocalSubjectId, credential.SecurityStamp!, token);
+            await Assert.That(restored).IsNotNull();
+            await Assert.That(restored!.LocalSubjectId).IsEqualTo(idle.LocalSubjectId);
+            await Assert.That(restored.OperationId).IsEqualTo(idle.OperationId);
+        }
+        var authentication = new LocalIdentityAuthService(manager, signer, store);
         var first = await authentication.AuthenticateAsync(new LocalAuthRequestDto(email, created.TemporaryPassword!), token);
         await Assert.That(first.Outcome).IsEqualTo(LocalAuthOutcome.ReplacementRequired);
         var challengePrincipal = jwt.ValidateToken(first.ReplacementChallenge!.Token,
@@ -179,26 +218,45 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
         bool controlsPolicy = !emailConfirmed || mutation == "verified-malformed-policy";
         var originalPolicy = controlsPolicy ? await migration.SystemSettings.AsNoTracking()
             .SingleOrDefaultAsync(row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled, token) : null;
+        var originalProjection = controlsPolicy ? await migration.Set<ManagedTenantProvisioningPolicySetting>().AsNoTracking()
+            .SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled, token) : null;
         Guid policyId = originalPolicy?.Id ?? Guid.CreateVersion7();
+        bool policyPrepared = false;
+        bool policyCorrupted = false;
+        async Task SavePolicyValueAsync(string value)
+        {
+            await migration.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var transaction = await migration.Database.BeginTransactionAsync(token);
+                var setting = await migration.SystemSettings
+                    .SingleOrDefaultAsync(row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled, token);
+                if (setting is null)
+                {
+                    setting = new SystemSetting
+                    {
+                        Id = policyId,
+                        SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                        Value = value,
+                        ValueType = SettingValueType.Boolean,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    migration.SystemSettings.Add(setting);
+                }
+                else
+                {
+                    await Assert.That(setting.Id).IsEqualTo(policyId);
+                    setting.Value = value;
+                }
+                await migration.SaveChangesAsync(token);
+                await transaction.CommitAsync(token);
+            });
+        }
         try
         {
             if (controlsPolicy)
             {
-                if (originalPolicy is null)
-                {
-                    migration.SystemSettings.Add(new SystemSetting
-                    {
-                        Id = policyId,
-                        SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-                        Value = "false",
-                        ValueType = SettingValueType.Boolean,
-                        CreatedAt = DateTime.UtcNow
-                    });
-                    await migration.SaveChangesAsync(token);
-                }
-                else
-                    await migration.SystemSettings.Where(row => row.Id == policyId)
-                        .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value, "false"), token);
+                await SavePolicyValueAsync("false");
+                policyPrepared = true;
             }
             var login = await authentication.AuthenticateAsync(new LocalAuthRequestDto(email, password), token);
             await Assert.That(login.Outcome).IsEqualTo(LocalAuthOutcome.Authenticated);
@@ -213,11 +271,14 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
                 case "none": break;
                 case "unverified-off": break;
                 case "delivery-required":
+                    await SavePolicyValueAsync("true");
+                    break;
                 case "malformed-policy":
                 case "verified-malformed-policy":
-                    await migration.SystemSettings.Where(row => row.Id == policyId)
-                        .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value,
-                            mutation == "delivery-required" ? "true" : "not-a-boolean"), token);
+                    int corrupted = await migration.SystemSettings.Where(row => row.Id == policyId && row.Value == "false")
+                        .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value, "not-a-boolean"), token);
+                    policyCorrupted = corrupted == 1;
+                    await Assert.That(corrupted).IsEqualTo(1);
                     break;
                 case "stamp":
                     await migration.LocalIdentityUsers.Where(row => row.Id == user.Id)
@@ -268,47 +329,126 @@ public sealed class HumanPrincipalNativeSourceFenceTests(PostgreSqlContainerFixt
                     break;
                 default: throw new ArgumentOutOfRangeException(nameof(mutation));
             }
+            await setupDiscoveryLease.DisposeAsync();
+            await setupHumanLease.DisposeAsync();
             await using var runtime = Services(PrimaryDatabaseRole.Runtime);
             await using var runtimeScope = runtime.CreateAsyncScope();
             var context = runtimeScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            var runtimeAuthentication = Authentication(context,
-                runtimeScope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>());
-            // Runtime with no tenant is the authentication boundary for instance routes.
+            // Runtime retains its native facts boundary; current session decisions use the selected writer.
             LocalSessionValidationOutcome expected = mutation switch
             {
                 "none" or "unverified-off" or "verified-malformed-policy" => LocalSessionValidationOutcome.Valid,
                 "malformed-policy" => LocalSessionValidationOutcome.Unavailable,
                 _ => LocalSessionValidationOutcome.Invalid
             };
-            if (expected != LocalSessionValidationOutcome.Unavailable)
+            async Task AssertRuntimeFactsAsync(ExploreDbContext original)
             {
-                var states = new LocalIdentityCredentialStateStore(context, context,
-                    runtimeScope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
-                await Assert.That(await states.ValidateReadySessionAsync(authority,
-                    fixture.NativeQueueEnrollment, token)).IsEqualTo(expected == LocalSessionValidationOutcome.Valid);
+                JsonElement image = await PostgresHumanPrincipalSourceContract.ReadSessionAsync(
+                    original, fixture.NativeQueueEnrollment, authority, token);
+                var account = image.GetProperty("l0").EnumerateArray().Single();
+                await Assert.That(account.GetProperty("Id").GetGuid()).IsEqualTo(receipt.LocalSubjectId);
+                await Assert.That(account.GetProperty("HasPassword").GetBoolean()).IsEqualTo(mutation != "password");
+                await Assert.That(account.GetProperty("StampMatches").GetBoolean()).IsEqualTo(mutation != "stamp");
+                await Assert.That(account.GetProperty("EmailConfirmed").GetBoolean())
+                    .IsEqualTo(emailConfirmed && mutation != "email");
+                var metadata = JsonSerializer.Deserialize<LocalCredentialStateMetadata>(
+                    image.GetProperty("l1").EnumerateArray().Single().GetProperty("Value").GetString()!)!;
+                await Assert.That(metadata.State).IsEqualTo(LocalCredentialState.Ready);
+                await Assert.That(metadata.OperationId).IsEqualTo(receipt.OperationId);
+                await Assert.That(metadata.ApplicationUserId).IsEqualTo(mutation == "metadata" ? initiator.Id : user.Id);
+                var operation = image.GetProperty("l2").EnumerateArray().Single(row => row.GetProperty("Id").GetGuid() == receipt.OperationId);
+                await Assert.That(operation.GetProperty("LocalSubjectId").GetGuid()).IsEqualTo(receipt.LocalSubjectId);
+                await Assert.That(operation.GetProperty("Stage").GetInt32()).IsEqualTo((int)(mutation == "stage"
+                    ? LocalCredentialOperationStage.ChangeRequired : LocalCredentialOperationStage.Replaced));
+                await Assert.That(operation.GetProperty("PersonalActorId").GetGuid()).IsEqualTo(receipt.PersonalActorId);
+                await Assert.That(operation.GetProperty("ExternalLoginId").GetGuid()).IsEqualTo(receipt.ExternalLoginId);
+                await Assert.That(image.GetProperty("q0").EnumerateArray().Single().GetProperty("IsDeleted").GetBoolean())
+                    .IsEqualTo(mutation == "account-deleted");
+                var bindings = image.GetProperty("q1").EnumerateArray().ToArray();
+                await Assert.That(bindings.Length).IsEqualTo(mutation == "binding" ? 0 : 1);
+                await Assert.That(bindings.Any(row => row.GetProperty("Id").GetGuid() == receipt.ExternalLoginId))
+                    .IsEqualTo(mutation is not ("binding" or "binding-id"));
+                await Assert.That(image.GetProperty("l3").EnumerateArray().Single().GetProperty("IsSuspended").GetBoolean())
+                    .IsEqualTo(mutation == "actor");
+                if (controlsPolicy)
+                    await Assert.That(image.GetProperty("l4").EnumerateArray().Single().GetProperty("Value").GetString())
+                        .IsEqualTo(mutation == "delivery-required" ? "true"
+                            : mutation is "malformed-policy" or "verified-malformed-policy" ? "not-a-boolean" : "false");
+                await Assert.That(original.ChangeTracker.Entries<LocalIdentityUser>().Any()).IsFalse();
+                await Assert.That(original.Database.CurrentTransaction).IsNull();
             }
-            await Assert.That(await runtimeAuthentication.ValidateSessionAsync(authority, token)).IsEqualTo(expected);
-            await Assert.That(context.ChangeTracker.Entries<LocalIdentityUser>().Any()).IsFalse();
-            await Assert.That(context.Database.CurrentTransaction).IsNull();
+            await AssertRuntimeFactsAsync(context);
             var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
                 await context.Set<IdentityUserToken<Guid>>().AsNoTracking().AnyAsync(row => row.UserId == user.Id, token));
             await Assert.That(denied!.SqlState).IsEqualTo("42501");
             await using var tenantScope = runtime.CreateAsyncScope();
             var tenantContext = tenantScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             tenantContext.TenantContext = new TenantIdentity(tenant.Id);
-            var tenantAuthentication = Authentication(tenantContext,
-                tenantScope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>());
-            await Assert.That(await tenantAuthentication.ValidateSessionAsync(authority, token)).IsEqualTo(expected);
+            await AssertRuntimeFactsAsync(tenantContext);
+
+            foreach (Guid? selectedTenant in new Guid?[] { null, tenant.Id })
+            {
+                await using var writers = WriterServices(selectedTenant);
+                await using var request = writers.CreateAsyncScope();
+                await using var selected = await request.ServiceProvider
+                    .GetRequiredService<ILocalIdentityExecutionScopeFactory>().CreateAsync(token);
+                var application = selected.Services.GetRequiredService<ExploreDbContext>();
+                var selectedManager = selected.Services.GetRequiredService<UserManager<LocalIdentityUser>>();
+                var execution = selected.Services.GetRequiredService<LocalIdentityExecutionLease>();
+                execution.RequireCurrent(application, application);
+                await Assert.That(application.TenantFilterTenantId).IsEqualTo(selectedTenant);
+                var states = new LocalIdentityCredentialStateStore(application, application, selectedManager,
+                    TimeProvider.System, execution);
+                var selectedAuthentication = new LocalIdentityAuthService(selectedManager, signer, states);
+                await Assert.That(await selectedAuthentication.ValidateSessionAsync(authority, token)).IsEqualTo(expected);
+                execution.RequireCurrent(application, application);
+                await Assert.That(application.ChangeTracker.Entries<LocalIdentityUser>().Any()).IsFalse();
+                await Assert.That(application.Database.CurrentTransaction).IsNull();
+            }
         }
         finally
         {
-            if (controlsPolicy)
+            if (policyPrepared)
             {
-                if (originalPolicy is null)
-                    await migration.SystemSettings.Where(row => row.Id == policyId).ExecuteDeleteAsync(CancellationToken.None);
-                else
-                    await migration.SystemSettings.Where(row => row.Id == policyId)
-                        .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value, originalPolicy.Value), CancellationToken.None);
+                await setupDiscoveryLease.DisposeAsync();
+                await setupHumanLease.DisposeAsync();
+                await using var cleanupServices = Services(PrimaryDatabaseRole.Migrator);
+                await using var cleanupScope = cleanupServices.CreateAsyncScope();
+                var cleanup = cleanupScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+                cleanup.BindTenantLease();
+                await using var cleanupHuman = new HumanSecuritySourceGate(cleanup);
+                await using var cleanupHumanLease = await cleanupHuman.AcquireAsync(CancellationToken.None);
+                await using var cleanupDiscovery = new EventDiscoveryEnrollmentGate(cleanup);
+                await using var cleanupDiscoveryLease = await cleanupDiscovery.AcquireAsync(CancellationToken.None);
+                await cleanup.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+                {
+                    await using var transaction = await cleanup.Database.BeginTransactionAsync(CancellationToken.None);
+                    if (policyCorrupted)
+                    {
+                        int restored = await cleanup.SystemSettings.Where(row => row.Id == policyId && row.Value == "not-a-boolean")
+                            .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value, "false"), CancellationToken.None);
+                        await Assert.That(restored).IsEqualTo(1);
+                    }
+                    var setting = await cleanup.SystemSettings.SingleAsync(row => row.Id == policyId, CancellationToken.None);
+                    if (originalPolicy is null)
+                        cleanup.SystemSettings.Remove(setting);
+                    else
+                        setting.Value = originalPolicy.Value;
+                    await cleanup.SaveChangesAsync(CancellationToken.None);
+                    await transaction.CommitAsync(CancellationToken.None);
+                });
+                var restoredSource = await cleanup.SystemSettings.AsNoTracking()
+                    .SingleOrDefaultAsync(row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled, CancellationToken.None);
+                await Assert.That(restoredSource?.Id).IsEqualTo(originalPolicy?.Id);
+                await Assert.That(restoredSource?.Value).IsEqualTo(originalPolicy?.Value);
+                await Assert.That(restoredSource?.IsLocked).IsEqualTo(originalPolicy?.IsLocked);
+                var restoredProjection = await cleanup.Set<ManagedTenantProvisioningPolicySetting>().AsNoTracking()
+                    .SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled, CancellationToken.None);
+                await Assert.That(restoredProjection.Id).IsEqualTo(originalProjection!.Id);
+                await Assert.That(restoredProjection.IsPresent).IsEqualTo(originalProjection.IsPresent);
+                await Assert.That(restoredProjection.IsLocked).IsEqualTo(originalProjection.IsLocked);
+                await Assert.That(restoredProjection.Value).IsEqualTo(originalProjection.Value);
+                await Assert.That(restoredProjection.Revision).IsGreaterThanOrEqualTo(originalProjection.Revision);
             }
         }
     }

@@ -37,6 +37,7 @@ public class ResetSettingCommandHandler
     private readonly ISettingMutationLock _mutationLock;
     private readonly IHumanCommitScopePreparation _humanCommitScope;
     private readonly IHumanSettingsMutationPreparation _settingsPreparation;
+    private readonly IAtprotoFederationSettingsWriter _federationSettings;
 
     public ResetSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -57,6 +58,7 @@ public class ResetSettingCommandHandler
         ISettingMutationLock mutationLock,
         IHumanCommitScopePreparation humanCommitScope,
         IHumanSettingsMutationPreparation settingsPreparation,
+        IAtprotoFederationSettingsWriter federationSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -80,6 +82,7 @@ public class ResetSettingCommandHandler
         _mutationLock = mutationLock;
         _humanCommitScope = humanCommitScope;
         _settingsPreparation = settingsPreparation;
+        _federationSettings = federationSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -162,114 +165,138 @@ public class ResetSettingCommandHandler
             request.Scope, _tenantContext, resolvedUserId);
 
         var prepared = await _settingsPreparation.PrepareAsync(request, cancellationToken);
-        SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
-        DateTime occurredAtUtc = DateTime.UtcNow;
-        PublicationPolicyMutationResult mutationResult = await _mutationLock.ExecuteOrderedGroupsAsync(
-            [PublicationPolicySettingKeys.All],
-            outerToken => _settingsPreparation.ExecutePreparedAsync(prepared, async (_, token) =>
-            {
-                await SettingCommandHelper.RequireCommitAuthorizationAsync(
-                    request.Scope, resolvedUserId, _tenantContext.TenantId,
-                    _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, token);
-                return await _publicationPolicyMutationBoundary.ApplyTenantAsync(
-                    new PublicationPolicyTenantMutationRequest(
-                        _tenantContext.TenantId, actorId, occurredAtUtc,
-                        [new PublicationPolicySettingMutation(request.Key, PublicationPolicyMutationKind.Remove,
+        Exception? primaryFailure = null;
+        try
+        {
+            SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
+            DateTime occurredAtUtc = DateTime.UtcNow;
+            PublicationPolicyMutationResult mutationResult = await _mutationLock.ExecuteOrderedGroupsAsync(
+                [PublicationPolicySettingKeys.All],
+                outerToken => _settingsPreparation.ExecutePreparedAsync(prepared, async (_, token) =>
+                {
+                    await SettingCommandHelper.RequireCommitAuthorizationAsync(
+                        request.Scope, resolvedUserId, _tenantContext.TenantId,
+                        _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, token);
+                    return await _publicationPolicyMutationBoundary.ApplyTenantAsync(
+                        new PublicationPolicyTenantMutationRequest(
+                            _tenantContext.TenantId, actorId, occurredAtUtc,
+                            [new PublicationPolicySettingMutation(request.Key, PublicationPolicyMutationKind.Remove,
                             JsonValue: null, _tenantContext.TenantId, IsLocked: null)],
-                        PublicationPolicyLockedSystemBehavior.RemoveOverride), token);
-            }, outerToken),
-            cancellationToken);
-        if (!mutationResult.Success)
-        {
-            string failureCode = string.IsNullOrWhiteSpace(mutationResult.FailureCode)
-                ? "event_reporting_intake_policy_invalid" : mutationResult.FailureCode;
-            string failureMessage = string.IsNullOrWhiteSpace(mutationResult.Message)
-                ? PublicationPolicyMutationMessages.InvalidPolicy : mutationResult.Message;
-            return BaseCommandResponse.Failure<Guid>(failureCode, failureMessage);
-        }
+                            PublicationPolicyLockedSystemBehavior.RemoveOverride), token);
+                }, outerToken),
+                cancellationToken);
+            if (!mutationResult.Success)
+            {
+                string failureCode = string.IsNullOrWhiteSpace(mutationResult.FailureCode)
+                    ? "event_reporting_intake_policy_invalid" : mutationResult.FailureCode;
+                string failureMessage = string.IsNullOrWhiteSpace(mutationResult.Message)
+                    ? PublicationPolicyMutationMessages.InvalidPolicy : mutationResult.Message;
+                return BaseCommandResponse.Failure<Guid>(failureCode, failureMessage);
+            }
 
-        _resolver.InvalidateCache(request.Scope, scopeId);
-        foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
-        {
-            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
-        }
+            _resolver.InvalidateCache(request.Scope, scopeId);
+            foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
+            {
+                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+            }
 
-        _logger.LogInformation("Setting reset: {SettingKey} at {Scope} scope. Actor: {ActorId}",
-            request.Key, request.Scope, actorId);
-        return BaseCommandResponse.Success(scopeId, $"Setting '{request.Key}' reset to inherited value.");
+            _logger.LogInformation("Setting reset: {SettingKey} at {Scope} scope. Actor: {ActorId}",
+                request.Key, request.Scope, actorId);
+            return BaseCommandResponse.Success(scopeId, $"Setting '{request.Key}' reset to inherited value.");
+        }
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await _settingsPreparation.CloseAsync(prepared, primaryFailure); }
     }
 
     private async Task<BaseCommandResponse<Guid>> ResetOrdinaryAsync(
         ResetSettingCommand request, Guid? resolvedUserId, CancellationToken cancellationToken)
     {
         var prepared = await _settingsPreparation.PrepareAsync(request, cancellationToken);
-        var actorId = SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId).PrincipalId;
-        var (scopeId, _) = SettingCommandHelper.GetScopeAndActorIds(request.Scope, _tenantContext, actorId);
-        IReadOnlyList<LocationPrivacyProjectionIdentity> corrected = [];
-        (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) outcome;
+        Exception? primaryFailure = null;
         try
         {
-            outcome = await _mutationLock.ExecuteOrderedGroupsAsync(
-                [[request.Key]],
-                token => _settingsPreparation.ExecutePreparedAsync<(BaseCommandResponse<Guid>, SettingChangedNotification?)>(
-                    prepared, async (_, ownerToken) =>
-                    {
-                        var context = SettingCommandHelper.BuildSettingContext(request.Scope, _tenantContext, actorId);
-                        var resolved = await _resolver.ResolveWithMetadataAsync(request.Key, context, ownerToken);
-                        if (request.Scope == SettingScope.User)
-                        {
-                            if (!await _userPreferenceRepository.RemoveOverride(_tenantContext.TenantId, actorId, request.Key))
-                            {
-                                string message = $"No user override found for '{request.Key}'.";
-                                return (BaseCommandResponse.Validation<Guid>([message], message), null);
-                            }
-                        }
-                        else if (_locationPrivacyMutations?.Handles(request.Key) == true)
-                        {
-                            var location = await _locationPrivacyMutations.ExecuteAsync(request.Key,
-                                SettingRegistry.Get(request.Key)!.DefaultValue, request.Scope, scopeId, actorId,
-                                async persistToken =>
-                                {
-                                    await _resolver.RemoveOverrideAsync(request.Key, request.Scope, scopeId, actorId, persistToken);
-                                    return resolved?.Value;
-                                }, ownerToken);
-                            if (!location.Accepted)
-                                return (BaseCommandResponse.Validation<Guid>([location.Error!], location.Error), null);
-                            corrected = location.CorrectedProjections;
-                        }
-                        else
-                        {
-                            await _resolver.RemoveOverrideAsync(request.Key, request.Scope, scopeId, actorId, ownerToken);
-                        }
-                        return (BaseCommandResponse.Success(scopeId, $"Setting '{request.Key}' reset to inherited value."),
-                            new SettingChangedNotification(request.Key, resolved?.Value, null,
-                                SettingCommandHelper.MapScopeToSource(request.Scope),
-                                _tenantContext.TenantId, actorId, DateTime.UtcNow));
-                    }, token),
-                cancellationToken);
-        }
-        catch (SettingSystemLockedException exception)
-        {
-            return BaseCommandResponse.Failure<Guid>(SettingSystemLockedException.Code, exception.Message);
-        }
-
-        if (outcome.Notification is not null)
-        {
-            if (_locationPrivacyMutations?.Handles(request.Key) == true)
-                await _locationPrivacyMutations.InvalidateMutationAsync(request.Scope, scopeId,
-                    corrected, CancellationToken.None);
-            if (request.Scope == SettingScope.User)
-                _resolver.InvalidateUserCache(_tenantContext.TenantId, actorId);
-            else
+            var actorId = SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId).PrincipalId;
+            var (scopeId, _) = SettingCommandHelper.GetScopeAndActorIds(request.Scope, _tenantContext, actorId);
+            IReadOnlyList<LocationPrivacyProjectionIdentity> corrected = [];
+            (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) outcome;
+            try
             {
-                _resolver.InvalidateCache(request.Scope, scopeId);
-                CerbosSettingsCacheInvalidation.InvalidateIfCerbosSettingChanged(
-                    _cerbosConfigResolver, request.Key, request.Scope, scopeId);
+                outcome = await _mutationLock.ExecuteOrderedGroupsAsync(
+                    [[request.Key]],
+                    token => _settingsPreparation.ExecutePreparedAsync<(BaseCommandResponse<Guid>, SettingChangedNotification?)>(
+                        prepared, async (_, ownerToken) =>
+                        {
+                            var context = SettingCommandHelper.BuildSettingContext(request.Scope, _tenantContext, actorId);
+                            var resolved = await _resolver.ResolveWithMetadataAsync(request.Key, context, ownerToken);
+                            if (AtprotoFederationSettingPolicy.IsDedicatedKey(request.Key))
+                            {
+                                var written = await _federationSettings.ApplyCurrentAsync(new(
+                                    HumanSettingsOperation.TenantSettings, request.Scope, scopeId, null,
+                                    request.Key, HumanSettingsMutationKind.Remove), ownerToken);
+                                if (!written.Applied)
+                                    return (BaseCommandResponse.Failure<Guid>(written.FailureCode ?? "federation_setting_not_applied",
+                                        "The federation setting reset was not applied."), null);
+                                return (BaseCommandResponse.Success(scopeId, $"Setting '{request.Key}' reset to inherited value."),
+                                    new SettingChangedNotification(request.Key, written.PreviousValue, written.CurrentValue,
+                                        SettingCommandHelper.MapScopeToSource(request.Scope), _tenantContext.TenantId, actorId, DateTime.UtcNow));
+                            }
+                            if (request.Scope == SettingScope.User)
+                            {
+                                if (!await _userPreferenceRepository.RemoveOverride(_tenantContext.TenantId, actorId, request.Key))
+                                {
+                                    string message = $"No user override found for '{request.Key}'.";
+                                    return (BaseCommandResponse.Validation<Guid>([message], message), null);
+                                }
+                            }
+                            else if (_locationPrivacyMutations?.Handles(request.Key) == true)
+                            {
+                                var location = await _locationPrivacyMutations.ExecuteAsync(request.Key,
+                                    SettingRegistry.Get(request.Key)!.DefaultValue, request.Scope, scopeId, actorId,
+                                    async persistToken =>
+                                    {
+                                        await _resolver.RemoveOverrideAsync(request.Key, request.Scope, scopeId, actorId, persistToken);
+                                        return resolved?.Value;
+                                    }, ownerToken);
+                                if (!location.Accepted)
+                                    return (BaseCommandResponse.Validation<Guid>([location.Error!], location.Error), null);
+                                corrected = location.CorrectedProjections;
+                            }
+                            else
+                            {
+                                await _resolver.RemoveOverrideAsync(request.Key, request.Scope, scopeId, actorId, ownerToken);
+                            }
+                            return (BaseCommandResponse.Success(scopeId, $"Setting '{request.Key}' reset to inherited value."),
+                                new SettingChangedNotification(request.Key, resolved?.Value, null,
+                                    SettingCommandHelper.MapScopeToSource(request.Scope),
+                                    _tenantContext.TenantId, actorId, DateTime.UtcNow));
+                        }, token),
+                    cancellationToken);
             }
-            _logger.LogInformation("Setting reset: {SettingKey} at {Scope} scope. Actor: {ActorId}",
-                request.Key, request.Scope, actorId);
-            await _notificationHandlers.HandleAsync(outcome.Notification, CancellationToken.None);
+            catch (SettingSystemLockedException exception)
+            {
+                return BaseCommandResponse.Failure<Guid>(SettingSystemLockedException.Code, exception.Message);
+            }
+
+            if (outcome.Notification is not null)
+            {
+                if (_locationPrivacyMutations?.Handles(request.Key) == true)
+                    await _locationPrivacyMutations.InvalidateMutationAsync(request.Scope, scopeId,
+                        corrected, CancellationToken.None);
+                if (request.Scope == SettingScope.User)
+                    _resolver.InvalidateUserCache(_tenantContext.TenantId, actorId);
+                else
+                {
+                    _resolver.InvalidateCache(request.Scope, scopeId);
+                    CerbosSettingsCacheInvalidation.InvalidateIfCerbosSettingChanged(
+                        _cerbosConfigResolver, request.Key, request.Scope, scopeId);
+                }
+                _logger.LogInformation("Setting reset: {SettingKey} at {Scope} scope. Actor: {ActorId}",
+                    request.Key, request.Scope, actorId);
+                await _notificationHandlers.HandleAsync(outcome.Notification, CancellationToken.None);
+            }
+            return outcome.Response;
         }
-        return outcome.Response;
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await _settingsPreparation.CloseAsync(prepared, primaryFailure); }
     }
 }

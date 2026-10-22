@@ -6,6 +6,7 @@ using Explore.Domain;
 using Explore.Persistence.Entities;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -74,7 +75,19 @@ internal sealed class ConfigurationRepositoryNativeOperations
         ImmutableArray<PublicationPolicySettingMutation> mutations, Guid? actor, DateTime occurred, CancellationToken token) =>
         PostgresConfigurationImportPublicationPolicyContract.WriteTenantAsync(context, tenant, mutations, actor, occurred, token);
 
-    internal Task<CoordinatedSettingMutationWriteResult> WriteInstanceAsync(
-        ImmutableArray<PublicationPolicySettingMutation> mutations, Guid actor, DateTime occurred, CancellationToken token) =>
-        PostgresConfigurationImportPublicationPolicyContract.WriteInstanceAsync(context, mutations, actor, occurred, token);
+    internal async Task<CoordinatedSettingMutationWriteResult> WriteInstanceAsync(
+        ImmutableArray<PublicationPolicySettingMutation> mutations, Guid actor, DateTime occurred, CancellationToken token)
+    {
+        var result = await PostgresConfigurationImportPublicationPolicyContract.WriteInstanceAsync(
+            context, mutations, actor, occurred, token);
+        foreach (var mutation in mutations)
+            await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, mutation.Key,
+                mutation.Kind == PublicationPolicyMutationKind.Remove ? null : new SystemSetting
+                {
+                    SettingKey = mutation.Key,
+                    Value = mutation.JsonValue!,
+                    IsLocked = mutation.IsLocked!.Value
+                }, token);
+        return result;
+    }
 }

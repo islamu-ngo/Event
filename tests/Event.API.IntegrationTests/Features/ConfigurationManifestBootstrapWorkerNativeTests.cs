@@ -436,7 +436,8 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
         var locks = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
         return new HierarchicalSettingsReader(SystemSettingRepository.CreateReadOnly(context, locks),
             TenantSettingRepository.CreateReadOnly(context, locks), new OrganizationSettingRepository(context),
-            new GroupSettingRepository(context), UserPreferenceRepository.CreateReadOnly(context), cache);
+            new GroupSettingRepository(context), UserPreferenceRepository.CreateReadOnly(context), cache,
+            new AtprotoFederationSettingRepository(context, null));
     }
 
     private static async Task<ReceiptSnapshot> ReadReceiptAsync(PostgreSqlContainerFixture database, Guid operationId)

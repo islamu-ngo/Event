@@ -153,7 +153,9 @@ public static partial class PostgresMixedSettingsContract
                 IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
                     AND t.relkind = 'r' AND t.relpersistence = 'p'
                     AND t.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid
-                    AND t.relrowsecurity = {tenant.ToString().ToLowerInvariant()} AND t.relforcerowsecurity = {tenant.ToString().ToLowerInvariant()})
+                    AND ({(source.Type == typeof(Explore.Domain.SystemSetting)
+                        ? PostgresLocalIdentitySystemSettingPolicies.Compatible(OwnerRole, "t")
+                        : $"t.relrowsecurity = {tenant.ToString().ToLowerInvariant()} AND t.relforcerowsecurity = {tenant.ToString().ToLowerInvariant()}")}))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class = pg_catalog.to_regclass({table}))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i
                         WHERE i.inhrelid = pg_catalog.to_regclass({table}) OR i.inhparent = pg_catalog.to_regclass({table}))
@@ -236,11 +238,24 @@ public static partial class PostgresMixedSettingsContract
                 AND NOT a.atthasdef AND a.attcollation = 0)
             THEN RAISE EXCEPTION 'mixed_settings_receipt_column_drift' USING ERRCODE = '55000'; END IF;
             """));
-        string scalarDenial = string.Join("\n", AllWriteTypes.Select(type => $"""
-            IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,REFERENCES')
-            THEN RAISE EXCEPTION 'mixed_settings_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
-            """));
+        string scalarDenial = string.Join("\n", AllWriteTypes.Select(type =>
+        {
+            string insertDenial = $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT')";
+            // Only the actual creator INSERT-source intersection may coexist.
+            // Its complete catalogue proof includes the restrictive document-key policy.
+            if (PostgresTenantCreationPermissions.TryGetGlobalColumns(context, type, out _, out var insertColumns)
+                && insertColumns.Count != 0)
+                insertDenial += $" AND ({PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
+            if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, type, out _, out var workerInsert, out _)
+                && workerInsert.Count != 0)
+                insertDenial += $" AND ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
+            return $"""
+                IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                    OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{Text(sql.Table(type))}::regclass,'UPDATE,REFERENCES')
+                    OR ({insertDenial})
+                THEN RAISE EXCEPTION 'mixed_settings_ambient_scalar_authority' USING ERRCODE = '55000'; END IF;
+                """;
+        }));
         return $"""
             {SourceGuard(context, enrollment)}
             {PostgresManagedProviderProvisioningContract.SharedWriterAssertionSql(context, enrollment)}

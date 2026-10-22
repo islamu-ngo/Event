@@ -12,6 +12,7 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Privacy;
 using Explore.Persistence;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.QueryFilters;
@@ -672,6 +673,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         var outboxRepository = new OutboxRepository(context);
         var stateRepository = new PrivacyErasureStateRepository(context);
         HybridCache cache = cacheProvider.GetRequiredService<HybridCache>();
+        var localEligibility = new LocalIdentityEligibilityRevocation(context, context, authority, TimeProvider.System);
         var applier = new PrivacyErasureApplier(
             userRepository,
             userPiiRepository,
@@ -687,7 +689,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             cache,
             TimeProvider.System,
             NullLogger<PrivacyErasureApplier>.Instance,
-            Options.Create(new PrivacyErasureOptions()));
+            Options.Create(new PrivacyErasureOptions()), localEligibility);
         var service = new RetainedAuthorityPrivacyErasureWorkflow(
             checkpointRepository,
             stateRepository,
@@ -695,7 +697,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             new EfCoreUnitOfWork(context),
             applier,
             Options.Create(new PrivacyErasureOptions()),
-            TimeProvider.System);
+            TimeProvider.System, localEligibility);
         return new ErasureRuntime(
             service,
             new PrivacyErasureReplayService(service),

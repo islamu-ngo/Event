@@ -51,11 +51,13 @@ public sealed partial class MixedSettingsBatchStore(
     internal IConfiguration Deployment { get; private set; } = null!;
     private readonly Dictionary<string, Completion> completions = new(StringComparer.Ordinal);
     private readonly List<RowEffect> emitted = [];
+    private SettingsDiscoveryDisclosureObservation? discovery;
+    private ImmutableArray<object> pendingRows = [];
 
     public DateTime OccurredAt { get; private set; }
     internal MixedSettingsBatchMutation Mutation => mutation ?? throw new UnauthorizedAccessException("Mixed acquisition is required.");
 
-    public Task ObserveAsync(UpdateSettingBatchCommand request, IHumanMixedSettingsSource originalSource,
+    public async Task ObserveAsync(UpdateSettingBatchCommand request, IHumanMixedSettingsSource originalSource,
         ISerializableAttemptOwner originalOwner, CancellationToken cancellationToken)
     {
         services.GetRequiredService<IHumanEmailMutationPreparation>().RequireMixedSource(originalSource);
@@ -81,11 +83,12 @@ public sealed partial class MixedSettingsBatchStore(
         OccurredAt = clock.GetUtcNow().UtcDateTime;
         if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
             OccurredAt = new DateTime(OccurredAt.Ticks - OccurredAt.Ticks % 10, DateTimeKind.Utc);
+        discovery = await SettingsDiscoveryDisclosureObservation.ObserveAsync(
+            context, selection, request, originalSource.Subject, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
     }
 
-    public Task AcquireAsync(MixedSettingsBatchMutation prepared, CancellationToken cancellationToken)
+    public async Task AcquireAsync(MixedSettingsBatchMutation prepared, CancellationToken cancellationToken)
     {
         RequireSelection();
         if (mutation is not null || !ReferenceEquals(prepared.Original, original)
@@ -95,8 +98,12 @@ public sealed partial class MixedSettingsBatchStore(
         transaction = RequireTransaction();
         mutation = prepared;
         Active.Add(context, this);
+        if (discovery is not null)
+        {
+            await discovery.BindAsync(cancellationToken);
+            context.DisclosureMutations.EnlistSettingsSource(this, prepared);
+        }
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<ResolvedSetting>> ResolveOriginalAsync(MixedSettingsBatchMutation prepared,
@@ -109,7 +116,9 @@ public sealed partial class MixedSettingsBatchStore(
             ? MixedSettingsDataImage.Rows<TenantSetting>(before!).Where(row => row.TenantId == tenant)
                 .ToDictionary(row => row.SettingKey, StringComparer.Ordinal) : null;
         IReadOnlyList<ResolvedSetting> resolved = original!.Values.Keys.Select(key =>
-            HierarchicalSettingMerge.Resolve(key, system, tenants) ?? new ResolvedSetting { Key = key }).ToArray();
+            AtprotoFederationSettingPolicy.IsDedicatedKey(key)
+                ? RequireFederationStore(prepared).ResolveMixedOriginal(prepared.FederationSource!, prepared, key)
+                : HierarchicalSettingMerge.Resolve(key, system, tenants) ?? new ResolvedSetting { Key = key }).ToArray();
         return Task.FromResult(resolved);
     }
 
@@ -127,14 +136,17 @@ public sealed partial class MixedSettingsBatchStore(
             throw new UnauthorizedAccessException("Original mixed data changed before compilation.");
         if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
             OccurredAt = await PostgresMixedSettingsContract.CompileAsync(context, enrollment!, source.TenantId,
-                original, prepared.Accepted, cancellationToken);
+                original, NativeAccepted(prepared), cancellationToken);
         compiled = true;
+        if (prepared.FederationSource is { } federationSource)
+            RequireFederationStore(prepared).FreezeMixedAccepted(federationSource, prepared);
     }
 
     public async Task ApplyOrdinaryAsync(MixedSettingsBatchMutation prepared, string key, CancellationToken cancellationToken)
     {
         Require(prepared);
-        if (!prepared.Accepted.TryGetValue(key, out string? value) || EmailDeliverySettingKeys.Contains(key)
+        if (!prepared.Accepted.TryGetValue(key, out string? value) || AtprotoFederationSettingPolicy.IsDedicatedKey(key)
+            || EmailDeliverySettingKeys.Contains(key)
             || EventResourceSettingMutationGuard.Handles(key) || VisitorAccessSettingMutationGuard.Handles(key)
             || PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal)
             || LocationPrivacySettingDefinitions.All.Any(definition => definition.Key == key))
@@ -208,11 +220,26 @@ public sealed partial class MixedSettingsBatchStore(
 
     public async Task RequireCompletedAsync(MixedSettingsBatchMutation prepared, CancellationToken cancellationToken)
     {
+        await RequirePrivateCompletionsAsync(prepared, cancellationToken);
+        if (discovery is not null)
+            await context.DisclosureMutations.RequireSettingsCompleteAsync(this, prepared, cancellationToken);
+        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+            await PostgresMixedSettingsContract.CompleteAsync(context, enrollment!, source!.TenantId,
+                expected!.ToJsonString(), cancellationToken);
         Require(prepared);
-        if (completed || prepared.Accepted.Any(pair => !completions.TryGetValue(pair.Key, out var receipt)
+        completed = true;
+    }
+
+    private async Task RequirePrivateCompletionsAsync(MixedSettingsBatchMutation prepared, CancellationToken cancellationToken)
+    {
+        Require(prepared);
+        if (prepared.FederationSource is { } federationSource)
+            await RequireFederationStore(prepared).RequireMixedEffectsCompleteAsync(federationSource, prepared, cancellationToken);
+        var nativeAccepted = NativeAccepted(prepared);
+        if (completed || nativeAccepted.Any(pair => !completions.TryGetValue(pair.Key, out var receipt)
                 || !ReferenceEquals(receipt.Mutation, prepared) || receipt.Key != pair.Key || receipt.Value != pair.Value))
             throw new UnauthorizedAccessException("Every accepted mixed slice requires its real private writer completion.");
-        foreach (var pair in prepared.Accepted)
+        foreach (var pair in nativeAccepted)
         {
             string? value = prepared.TenantId is { } tenant
                 ? Rows<TenantSetting>().SingleOrDefault(row => row.TenantId == tenant && row.SettingKey == pair.Key)?.Value
@@ -223,10 +250,7 @@ public sealed partial class MixedSettingsBatchStore(
         string actual = await ReadDataAsync(cancellationToken);
         if (!MixedSettingsDataImage.Same(expected!.ToJsonString(), actual))
             throw new UnauthorizedAccessException("Mixed rows, absence, metadata or projections changed after their writers completed.");
-        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
-            await PostgresMixedSettingsContract.CompleteAsync(context, enrollment!, source!.TenantId,
-                expected.ToJsonString(), cancellationToken);
-        else
+        if ((RelationalProviderClassifier.Classify(context.Database) != RelationalProvider.PostgreSql))
             foreach (var effect in emitted)
             {
                 var stored = await MixedSettingsDataImage.ReadSqliteEffectAsync(context, effect.Type, effect.Id, cancellationToken);
@@ -234,7 +258,34 @@ public sealed partial class MixedSettingsBatchStore(
                     throw new UnauthorizedAccessException("A completed mixed writer effect changed.");
             }
         Require(prepared);
-        completed = true;
+    }
+
+    internal SettingsDiscoveryDisclosureObservation RequireDiscoveryObservation(MixedSettingsBatchMutation prepared)
+    {
+        RequireSelection();
+        if (!ReferenceEquals(mutation, prepared) || !ReferenceEquals(transaction, RequireTransaction()))
+            throw new UnauthorizedAccessException("The original acquired mixed discovery source is required.");
+        return discovery ?? throw new UnauthorizedAccessException("The original mixed discovery observation is missing.");
+    }
+
+    internal bool OwnsPendingDiscoveryRow(MixedSettingsBatchMutation prepared, object entity)
+    {
+        Require(prepared);
+        return pendingRows.Any(row => ReferenceEquals(row, entity));
+    }
+
+    internal async Task<SettingsDiscoveryEffects> RequireDisclosureEffectsAsync(MixedSettingsBatchMutation prepared,
+        CancellationToken token)
+    {
+        await RequirePrivateCompletionsAsync(prepared, token);
+        bool root = emitted.Any(effect => effect.Type == typeof(SystemSetting)
+            && EventDiscoveryDisclosureMutationScope.IsDisclosureSetting(effect.After[nameof(SystemSetting.SettingKey)]!.GetValue<string>()));
+        var tenants = emitted.Where(effect => effect.Type == typeof(EventLocation)
+                || effect.Type == typeof(TenantSetting) && EventDiscoveryDisclosureMutationScope.IsDisclosureSetting(
+                    effect.After[nameof(TenantSetting.SettingKey)]!.GetValue<string>()))
+            .Select(effect => Guid.Parse(effect.After[nameof(TenantSetting.TenantId)]!.GetValue<string>()))
+            .Distinct().ToImmutableArray();
+        return new(root, tenants);
     }
 
     public void Close(MixedSettingsBatchMutation prepared)
@@ -280,9 +331,21 @@ public sealed partial class MixedSettingsBatchStore(
         if (!MixedSettingsDataImage.Keys(original!).Contains(key, StringComparer.Ordinal))
             throw new UnauthorizedAccessException("This key is outside the original mixed read closure.");
         cancellationToken.ThrowIfCancellationRequested();
+        if (AtprotoFederationSettingPolicy.IsDedicatedKey(key))
+            return Task.FromResult<ResolvedSetting?>(RequireFederationStore(prepared)
+                .ResolveMixedOriginal(prepared.FederationSource!, prepared, key, instanceOnly: true));
         return Task.FromResult(HierarchicalSettingMerge.Resolve(key, MixedSettingsDataImage.Rows<SystemSetting>(before!)
             .ToDictionary(row => row.SettingKey, StringComparer.Ordinal)));
     }
+
+    private static ImmutableDictionary<string, string> NativeAccepted(MixedSettingsBatchMutation prepared) =>
+        prepared.Accepted.Where(pair => !AtprotoFederationSettingPolicy.IsDedicatedKey(pair.Key))
+            .ToImmutableDictionary(StringComparer.Ordinal);
+
+    private AtprotoFederationSettingsMutationStore RequireFederationStore(MixedSettingsBatchMutation prepared) =>
+        prepared.FederationSource is not null
+            && services.GetRequiredService<IAtprotoFederationSettingsMutationStore>() is AtprotoFederationSettingsMutationStore store
+                ? store : throw new UnauthorizedAccessException("The original concrete dedicated mixed source owner is required.");
 
     private void RequireSelection()
     {
@@ -384,6 +447,7 @@ public sealed partial class MixedSettingsBatchStore(
             effects.Add(new(type, id, after));
         }
         if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+        {
             await PostgresMixedSettingsContract.WriteAsync(context, enrollment!, source.TenantId, slice,
                 new JsonObject
                 {
@@ -391,14 +455,30 @@ public sealed partial class MixedSettingsBatchStore(
                     ["Rows"] = rows,
                     ["Complete"] = complete
                 }.ToJsonString(), token);
+            foreach (var effect in effects.Where(effect => effect.Type == typeof(SystemSetting)))
+            {
+                string key = effect.After[nameof(SystemSetting.SettingKey)]!.GetValue<string>();
+                await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, key, new SystemSetting
+                {
+                    SettingKey = key,
+                    Value = effect.After[nameof(SystemSetting.Value)]!.GetValue<string>(),
+                    IsLocked = effect.After[nameof(SystemSetting.IsLocked)]!.GetValue<bool>()
+                }, token);
+            }
+        }
         else if (!writes.IsEmpty)
         {
             if (context.ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
                 && !writes.Any(write => ReferenceEquals(write.Entity, entry.Entity))))
                 throw new UnauthorizedAccessException("An unrelated tracked write cannot join a mixed slice.");
-            foreach (var (entity, state) in writes)
-                context.Entry(entity).State = state;
-            await context.SaveChangesAsync(token);
+            pendingRows = writes.Select(write => write.Entity).ToImmutableArray();
+            try
+            {
+                foreach (var (entity, state) in writes)
+                    context.Entry(entity).State = state;
+                await context.SaveChangesAsync(token);
+            }
+            finally { pendingRows = []; }
         }
         foreach (var effect in effects)
         {
@@ -414,7 +494,7 @@ public sealed partial class MixedSettingsBatchStore(
         }
         foreach (var (entity, _) in writes)
             context.Entry(entity).State = EntityState.Detached;
-        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+        if (discovery is null && (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
         {
             // The independent mixed source reservation already fences tenant creation.
             // Retain the existing disclosure algorithm's exact enrollment side effects;

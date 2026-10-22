@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -19,6 +20,29 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
     private readonly DbContextId _contextLease;
     private readonly Guid? _tenant;
     private readonly HumanAuthorizationRouteQueries _queries;
+    private readonly LocalIdentityExecutionLease? _selectedExecution;
+
+    internal HumanAuthorizationRouteSource(LocalIdentityExecutionLease execution, HumanCommitSubject subject)
+    {
+        ArgumentNullException.ThrowIfNull(execution);
+        ArgumentNullException.ThrowIfNull(subject);
+        _context = execution.Application ?? throw new UnauthorizedAccessException("The selected application owner is required.");
+        var identity = execution.Identity ?? throw new UnauthorizedAccessException("The selected identity owner is required.");
+        execution.RequireCurrent(_context, identity);
+        if (subject.PrincipalId == Guid.Empty || subject.AccountKey is null)
+            throw new InvalidOperationException("human_route_requires_resolved_provider_account");
+        if (!_context.Database.IsRelational() || _context.Database.CurrentTransaction is not null
+            || identity.Database.CurrentTransaction is not null
+            || _context.IsConfigurationInstanceImportOwner)
+            throw new InvalidOperationException("human_route_requires_selected_idle_owner");
+        _tenant = _context.TenantFilterTenantId;
+        _purpose = _tenant.HasValue ? PolicySourceSetPurpose.RuntimeTenant : PolicySourceSetPurpose.Global;
+        _connection = RelationalConnectionIdentity.Capture(_context);
+        _contextLease = _context.ContextId;
+        _selectedExecution = execution;
+        _queries = new(_context, subject, _purpose, null, _connection, _tenant, execution);
+        RequireSelection();
+    }
 
     public HumanAuthorizationRouteSource(ExploreDbContext context, HumanCommitSubject subject,
         PolicySourceSetPurpose purpose, PostgresNativeQueueEnrollment? enrollment = null)
@@ -45,7 +69,8 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
     public async Task<HumanAuthorizationRouteFacts> ObserveAsync(CancellationToken cancellationToken = default)
     {
         RequireSelection();
-        if (_context.Database.CurrentTransaction is not null || System.Transactions.Transaction.Current is not null)
+        if (_context.Database.CurrentTransaction is not null || System.Transactions.Transaction.Current is not null
+            || _selectedExecution?.Identity?.Database.CurrentTransaction is not null)
             throw new InvalidOperationException("human_route_observation_requires_no_transaction");
         bool opened = _connection.State != ConnectionState.Open;
         if (opened) await _context.Database.OpenConnectionAsync(cancellationToken);
@@ -65,6 +90,8 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
     {
         ArgumentNullException.ThrowIfNull(sourceSet);
         DbTransaction transaction = RequireOwner();
+        if (_selectedExecution is not null)
+            PolicySourceSetFence.RequireSelectedLease(sourceSet, _selectedExecution, _context, transaction);
         // As with the principal source port, the parent supplies THIS owner's preceding source-set lease.
         await sourceSet.ValidateAsync(cancellationToken);
         var facts = await _queries.ReadAsync(transaction, cancellationToken);
@@ -76,6 +103,12 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
 
     private void RequireSelection()
     {
+        if (_selectedExecution is not null)
+        {
+            _selectedExecution.RequireCurrent(_context, _selectedExecution.Identity
+                ?? throw new UnauthorizedAccessException("The selected identity owner is required."));
+            HumanSecuritySourceGate.RequireCurrent(_context);
+        }
         _context.ValidateTenantLease();
         if (_context.ContextId != _contextLease || _context.IsTenantFilterBypassed
             || _context.TenantFilterTenantId != _tenant
@@ -104,6 +137,8 @@ public sealed class HumanAuthorizationRouteSource : IHumanAuthorizationRouteSour
         {
             if (!ReferenceEquals(transaction, source.RequireOwner()))
                 throw new InvalidOperationException("human_route_original_transaction_changed");
+            if (source._selectedExecution is not null)
+                PolicySourceSetFence.RequireSelectedLease(sourceSet, source._selectedExecution, source._context, transaction);
             await sourceSet.ValidateAsync(cancellationToken);
             var current = await source._queries.ReadAsync(transaction, cancellationToken);
             if (!ReferenceEquals(transaction, source.RequireOwner()))

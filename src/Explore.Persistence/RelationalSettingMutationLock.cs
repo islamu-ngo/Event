@@ -139,7 +139,7 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                 "Ordered setting-lock groups must be acquired before the caller-owned transaction begins.");
         }
 
-        return !allowReplay || _dbContext.HasHumanCommitContextLease
+        return !allowReplay || _dbContext.HasOriginalCommitContextLease
             ? ExecuteOnceAsync()
             : _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(ExecuteOnceAsync);
 

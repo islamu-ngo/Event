@@ -10,6 +10,7 @@
     <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.cs" Link="Fixtures\AuthenticatedSettingsFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.Postgres.cs" Link="Fixtures\AuthenticatedSettingsFixture.Postgres.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.TenantCreation.cs" Link="Fixtures\AuthenticatedSettingsFixture.TenantCreation.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\TestDbContextOptions.cs" Link="Fixtures\NativeTestDbContextOptions.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\PostgreSqlContainerFixture.cs" Link="Fixtures\NativePostgreSqlContainerFixture.cs" />

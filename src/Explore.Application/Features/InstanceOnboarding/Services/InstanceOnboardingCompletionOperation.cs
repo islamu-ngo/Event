@@ -47,6 +47,8 @@ public sealed class InstanceOnboardingCompletionOperation(
     IInstanceOnboardingGenerationReader generationReader,
     IConfiguration configuration,
     Explore.Application.Services.PrivacyIdentityFenceOperation identityFence,
+    IEventDiscoveryEnrollmentGate enrollmentGate,
+    ILocalBootstrapReceiptSource receiptSource,
     IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null,
     ITrustedSetupSettingsWriter? setupSettingsWriter = null)
 {
@@ -63,6 +65,11 @@ public sealed class InstanceOnboardingCompletionOperation(
         ClaimConfiguredInstanceAdministratorCommand command,
         CancellationToken cancellationToken) =>
         CompleteAsync(CompletionInput.Configured(command), cancellationToken);
+
+    internal Task<BaseCommandResponse<Guid>> ClaimConfiguredWithinEnrollmentAsync(
+        ClaimConfiguredInstanceAdministratorCommand command,
+        CancellationToken cancellationToken) =>
+        CompleteWithinEnrollmentAsync(CompletionInput.Configured(command), cancellationToken);
 
     internal Task<BaseCommandResponse<Guid>> CompleteLocalBootstrapAsync(
         ConfiguredAdministratorBootstrapBinding? binding,
@@ -85,6 +92,17 @@ public sealed class InstanceOnboardingCompletionOperation(
                 "Configured administrator identity is not ready.");
         }
 
+        await using ILocalBootstrapReceiptLease? receipt = input.LocalCredential is { } local
+            ? await receiptSource.AcquireAsync(local, cancellationToken) : null;
+        input = input with { LocalReceiptLease = receipt };
+        await using var enrollment = await enrollmentGate.AcquireAsync(cancellationToken);
+        return await CompleteWithinEnrollmentAsync(input, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> CompleteWithinEnrollmentAsync(
+        CompletionInput input, CancellationToken cancellationToken)
+    {
+        enrollmentGate.RequireCurrent();
         PersistenceOutcome outcome;
         try
         {
@@ -98,6 +116,7 @@ public sealed class InstanceOnboardingCompletionOperation(
                         : await unitOfWork.ExecuteBootstrapConvergenceAsync(inner => PersistAsync(input, inner), token);
                 },
                 cancellationToken);
+            enrollmentGate.RequireCurrent();
         }
         catch (TenantDirectoryOperatorIdentityReadinessException exception)
         {
@@ -239,7 +258,7 @@ public sealed class InstanceOnboardingCompletionOperation(
         AddDeploymentMode(writes, admission.DeploymentMode);
         AddSiteProfile(writes, admission.SiteProfile!, singleTenant);
         AddAdministrationAccess(writes, admission.Settings!, singleTenant);
-        var source = new TrustedSetupSettingsSource(input.AccountKey, admission.Binding, input.LocalCredential);
+        var source = new TrustedSetupSettingsSource(input.AccountKey, admission.Binding, input.LocalCredential, input.LocalReceiptLease);
         Guid expectedBootstrapId = bootstrap?.Id ?? input.BootstrapId;
         long expectedGeneration = bootstrap?.Generation ?? 1;
         using var apply = new TrustedSetupSettingsApply<PersistenceOutcome>(unitOfWork, source, writes,
@@ -831,6 +850,7 @@ public sealed class InstanceOnboardingCompletionOperation(
         LocalCredentialProvisioningSnapshot? LocalCredential = null,
         ConfiguredAdministratorBootstrapBinding? LocalBinding = null)
     {
+        public ILocalBootstrapReceiptLease? LocalReceiptLease { get; init; }
         public Guid PersonalActorId { get; } = Guid.CreateVersion7();
         public Guid IdentityClaimId { get; } = Guid.CreateVersion7();
         public Guid IdentityEvidenceId { get; } = Guid.CreateVersion7();

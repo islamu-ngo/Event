@@ -19,6 +19,7 @@ namespace Explore.Persistence.Security;
 /// <summary>Closed model-derived row vocabulary for the original nonhuman manifest writer.</summary>
 internal sealed class ConfigurationManifestBootstrapData(ExploreDbContext context)
 {
+    internal const string RevisionTag = "Revisions";
     internal static readonly (string Tag, Type Type)[] Types =
     [
         ("Systems", typeof(SystemSetting)), ("Tenants", typeof(Tenant)), ("Overrides", typeof(TenantSetting)),
@@ -36,9 +37,27 @@ internal sealed class ConfigurationManifestBootstrapData(ExploreDbContext contex
         internal string Field(string name) => Columns.Single(column => column.Name == name).Sql;
     }
 
-    internal ImmutableArray<Relation> Relations => [.. Types.Select(pair =>
+    internal ImmutableArray<Relation> ConfigurationRelations => [.. Types.Select(pair => Describe(pair.Tag, pair.Type))];
+
+    internal Relation RevisionRelation
     {
-        var entity = context.Model.FindEntityType(pair.Type)!;
+        get
+        {
+            var relation = Describe(RevisionTag, typeof(EventDiscoveryRevision));
+            if (relation.Columns.Length != 4
+                || !relation.Columns.Select(column => column.Name).ToHashSet(StringComparer.Ordinal).SetEquals(
+                    [nameof(EventDiscoveryRevision.Id), nameof(EventDiscoveryRevision.TenantId),
+                        nameof(EventDiscoveryRevision.IdentityEpoch), nameof(EventDiscoveryRevision.DisclosureEpoch)]))
+                throw new InvalidOperationException("The bootstrap revision requires its fixed four-column model.");
+            return relation;
+        }
+    }
+
+    internal ImmutableArray<Relation> Relations => [.. ConfigurationRelations, RevisionRelation];
+
+    private Relation Describe(string tag, Type entityType)
+    {
+        var entity = context.Model.FindEntityType(entityType)!;
         var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
         var sql = context.GetService<ISqlGenerationHelper>();
         var columns = entity.GetProperties().OrderBy(property => property.Name, StringComparer.Ordinal).Select(property =>
@@ -49,11 +68,11 @@ internal sealed class ConfigurationManifestBootstrapData(ExploreDbContext contex
                 storeType, type == typeof(DateTime) || type == typeof(DateTimeOffset),
                 storeType is "jsonb" or "json", property);
         }).ToImmutableArray();
-        return new Relation(pair.Tag, pair.Type, sql.DelimitIdentifier(entity.GetTableName()!,
+        return new Relation(tag, entityType, sql.DelimitIdentifier(entity.GetTableName()!,
                 context.Database.IsNpgsql() ? entity.GetSchema() ?? "public" : entity.GetSchema()),
             entity.GetSchema() ?? "public", columns,
             entity.FindPrimaryKey()!.Properties.Select(property => columns.Single(column => column.Property == property)).ToImmutableArray());
-    })];
+    }
 
     internal JsonObject Row(object entity)
     {
@@ -202,6 +221,8 @@ internal sealed class ConfigurationManifestBootstrapData(ExploreDbContext contex
         {
             "Systems" => In(relation.Field("SettingKey"), SystemReadKeys),
             "Tenants" => $"({relation.Field("Id")} IN ({selectedTenants}) OR {In(relation.Field("Id"), Ids("Tenants"))})",
+            RevisionTag => $"({relation.Field("TenantId")} IN ({selectedTenants}) OR " +
+                $"{In(relation.Field("TenantId"), Ids("Tenants"))} OR {In(relation.Field("Id"), Ids(RevisionTag))})",
             "Overrides" => $"({In(relation.Field("SettingKey"), CrossTenantKeys)} OR " +
                 $"({relation.Field("TenantId")} IN ({selectedTenants}) OR {In(relation.Field("TenantId"), Ids("Tenants"))}) " +
                 $"AND {In(relation.Field("SettingKey"), ConfigurationManifestCatalog.TenantSettings.Keys)})",

@@ -248,6 +248,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
     private static async Task<Guid> SeedPlatformAdministratorAsync(LocalIdentityLifecycleHttpFixture fixture)
     {
         await using var seed = fixture.Native.CreateDatabase();
+        seed.BindTenantLease();
         int roleId = await seed.Roles.Where(role => role.MasterCode == "platform.admin"
             && role.RoleScopeId == (int)RoleScopeEnum.Platform).Select(role => role.Id).SingleAsync();
         var grant = new PlatformUserRole

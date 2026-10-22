@@ -187,7 +187,8 @@ public static partial class PostgresOrdinarySettingsContract
             """;
     }
 
-    private static bool Specialized(string key) => EmailDeliverySettingKeys.Contains(key)
+    private static bool Specialized(string key) => AtprotoFederationSettingPolicy.IsDedicatedKey(key)
+        || EmailDeliverySettingKeys.Contains(key)
         || key.Trim().Equals(EventResourceProviderBindingDocument.SettingKey, StringComparison.OrdinalIgnoreCase)
         || EventResourceSettingMutationGuard.Handles(key) || VisitorAccessSettingMutationGuard.Handles(key)
         || PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal)
@@ -232,7 +233,7 @@ public static partial class PostgresOrdinarySettingsContract
             $"({Text(definition.Key)},{(int)definition.ValueType},{Text(definition.Description)},{Text(definition.Category)})"));
         return $"""
             DECLARE admitted {sql.Name(AttemptTable)}%ROWTYPE; p_tenant uuid; p_user uuid;
-                effect jsonb; canonical jsonb; changed boolean := true; actual jsonb; kind integer; affected uuid[];
+                effect jsonb; canonical jsonb; changed boolean := true; actual jsonb; kind integer;
             BEGIN
                 {Guard(context, enrollment)}
                 {AttemptRead(context, enrollment)}
@@ -289,18 +290,6 @@ public static partial class PostgresOrdinarySettingsContract
                 END IF;
                 IF canonical IS DISTINCT FROM p_after
                 THEN RAISE EXCEPTION 'ordinary_settings_noncanonical_effect' USING ERRCODE = '42501'; END IF;
-                IF changed AND p_group <> 'User' AND p_key COLLATE "C" = ANY({DisclosureKeysSql()}) THEN
-                    IF p_group = 'System' THEN
-                        SELECT COALESCE(array_agg(id ORDER BY id),ARRAY[]::uuid[]) INTO affected
-                            FROM {PostgresDiscoveryDisclosureContract.FunctionSql(context, "dependencies")}('all',ARRAY[]::uuid[]) id;
-                    ELSE affected := ARRAY[p_tenant]; END IF;
-                    SELECT COALESCE(array_agg(DISTINCT id ORDER BY id),ARRAY[]::uuid[]) INTO affected
-                        FROM unnest(admitted.disclosure_tenants || affected) id;
-                    IF cardinality(affected) > {EventDiscoveryDisclosureMutationScope.MaximumAffectedTenants}
-                    THEN RAISE EXCEPTION 'discovery_disclosure_fanout_exceeded' USING ERRCODE = '54000'; END IF;
-                    UPDATE {sql.Name(AttemptTable)} SET disclosure_tenants = affected
-                        WHERE attempt = admitted.attempt AND backend = admitted.backend;
-                END IF;
                 UPDATE {sql.Name(AttemptTable)} SET finished = false, observed = false,
                     pending = pg_catalog.jsonb_build_object('Group',p_group,'Key',p_key,'Before',p_before,'After',canonical)
                     WHERE attempt = admitted.attempt AND backend = admitted.backend;

@@ -41,7 +41,8 @@ public interface ITrustedSetupSettingsAuthorityLease
 public sealed class TrustedSetupSettingsSource
 {
     internal TrustedSetupSettingsSource(ProviderAccountKey? account,
-        ConfiguredAdministratorBootstrapBinding? binding, LocalCredentialProvisioningSnapshot? local)
+        ConfiguredAdministratorBootstrapBinding? binding, LocalCredentialProvisioningSnapshot? local,
+        ILocalBootstrapReceiptLease? localReceiptLease = null)
     {
         Account = account;
         ConfiguredAccount = binding?.AccountKey;
@@ -50,6 +51,7 @@ public sealed class TrustedSetupSettingsSource
         ConfiguredSettings = binding is null ? null : JsonSerializer.Serialize(binding.Settings);
         ConfiguredProfile = binding?.AdministratorProfile;
         Local = local;
+        LocalReceiptLease = localReceiptLease;
     }
 
     public ProviderAccountKey? Account { get; }
@@ -59,6 +61,7 @@ public sealed class TrustedSetupSettingsSource
     public string? ConfiguredSettings { get; }
     public ConfiguredAdministratorProfile? ConfiguredProfile { get; }
     public LocalCredentialProvisioningSnapshot? Local { get; }
+    public ILocalBootstrapReceiptLease? LocalReceiptLease { get; }
     public override string ToString() => nameof(TrustedSetupSettingsSource);
 }
 

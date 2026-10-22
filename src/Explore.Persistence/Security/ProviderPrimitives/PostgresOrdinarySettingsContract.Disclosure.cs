@@ -61,7 +61,7 @@ public static partial class PostgresOrdinarySettingsContract
     {
         var sql = new HumanPrincipalSourceSql(context);
         return $"""
-            DECLARE admitted {sql.Name(AttemptTable)}%ROWTYPE; v_tenant uuid;
+            DECLARE admitted {sql.Name(AttemptTable)}%ROWTYPE;
             BEGIN
                 {Guard(context, enrollment)}
                 IF current_user <> '{OwnerRole}' OR TG_WHEN <> 'AFTER' OR TG_LEVEL <> 'ROW'
@@ -82,20 +82,6 @@ public static partial class PostgresOrdinarySettingsContract
                         image = pg_catalog.jsonb_build_object(),completed = pg_catalog.jsonb_build_object(),
                         disclosure_tenants = ARRAY[]::uuid[]
                     WHERE attempt = admitted.attempt AND backend = admitted.backend;
-                IF cardinality(admitted.disclosure_tenants) > 0 THEN
-                    PERFORM {PostgresDiscoveryDisclosureContract.FunctionSql(context, "fence_tenants")}(admitted.disclosure_tenants);
-                    FOR v_tenant IN SELECT unnest(admitted.disclosure_tenants) ORDER BY 1 LOOP
-                        PERFORM pg_catalog.pg_advisory_xact_lock(
-                            ('x' || substr(encode(sha256(convert_to(
-                                'discovery-epoch:' || replace(v_tenant::text, '-', ''), 'UTF8')), 'hex'), 1, 16))::bit(64)::bigint);
-                    END LOOP;
-                    PERFORM {PostgresDiscoveryDisclosureContract.FunctionSql(context, "finalize")}(
-                        admitted.disclosure_tenants,
-                        ARRAY(SELECT pg_catalog.uuidv7() FROM unnest(admitted.disclosure_tenants)),
-                        ARRAY(SELECT true FROM unnest(admitted.disclosure_tenants)),
-                        ARRAY(SELECT NULL::bigint FROM unnest(admitted.disclosure_tenants)),
-                        ARRAY(SELECT 0::bigint FROM unnest(admitted.disclosure_tenants)));
-                END IF;
                 RETURN NULL;
             END;
             """;

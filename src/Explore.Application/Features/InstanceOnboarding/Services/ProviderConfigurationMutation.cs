@@ -260,17 +260,23 @@ public sealed class ProviderConfigurationMutation : IAsyncDisposable
             UpdateAuthorizationProviderConfigurationCommand command => await preparation.PrepareAsync(command, this, token),
             _ => null
         };
-        var notifications = await Services.GetRequiredService<ISettingMutationLock>().ExecuteOrderedGroupsAsync(
-            [ProviderConfigurationState.Keys], ct => IsSetup
-                ? ((ISerializableAttemptOwner)OriginalOwner).ExecuteAsync(inner =>
-                {
-                    writer.PrepareSetupAttempt(this);
-                    return writer.ExecuteAsync(this, inner);
-                }, ct)
-                : preparation.ExecutePreparedAsync(prepared!, (owner, inner) =>
-                    preparation.ExecuteProviderJoinedAsync(owner, this, (_, joined) => writer.ExecuteAsync(this, joined), inner), ct), token);
-        foreach (var notification in notifications)
-            await Services.GetServices<INotificationHandler<SettingChangedNotification>>().HandleAsync(notification, CancellationToken.None);
+        Exception? primaryFailure = null;
+        try
+        {
+            var notifications = await Services.GetRequiredService<ISettingMutationLock>().ExecuteOrderedGroupsAsync(
+                [ProviderConfigurationState.Keys], ct => IsSetup
+                    ? ((ISerializableAttemptOwner)OriginalOwner).ExecuteAsync(inner =>
+                    {
+                        writer.PrepareSetupAttempt(this);
+                        return writer.ExecuteAsync(this, inner);
+                    }, ct)
+                    : preparation.ExecutePreparedAsync(prepared!, (owner, inner) =>
+                        preparation.ExecuteProviderJoinedAsync(owner, this, (_, joined) => writer.ExecuteAsync(this, joined), inner), ct), token);
+            foreach (var notification in notifications)
+                await Services.GetServices<INotificationHandler<SettingChangedNotification>>().HandleAsync(notification, CancellationToken.None);
+        }
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { if (prepared is not null) await preparation.CloseAsync(prepared, primaryFailure); }
     }
 
     public void ClaimOnce()

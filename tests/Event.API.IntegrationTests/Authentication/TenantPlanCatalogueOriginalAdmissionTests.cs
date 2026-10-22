@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
@@ -14,16 +15,112 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Event.Api.IntegrationTests.Authentication;
 
 [NotInParallel]
 public sealed partial class TenantPlanCatalogueOriginalAdmissionTests
 {
+    [Test]
+    [Arguments("create-draft")]
+    [Arguments("create-version")]
+    [Arguments("update-version")]
+    [Arguments("clone")]
+    [Arguments("publish")]
+    [Arguments("archive")]
+    public async Task PlanWriterWaitsBeforeBeginAndRetainsEnrollmentThroughSettlement(string operation)
+    {
+        var transactions = new PlanTransactionObserver();
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(
+            interceptor: transactions, configureServices: services =>
+                services.Replace(ServiceDescriptor.Scoped<IEventDiscoveryEnrollmentGate>(provider =>
+                    new ObservedPlanGate(new EventDiscoveryEnrollmentGate(provider.GetRequiredService<ExploreDbContext>())))));
+        var seed = await SeedAsync(fixture);
+        await using var request = new Request(fixture.Host.Services);
+        await request.AuthenticateAsync(await fixture.SignInAsync());
+        await request.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(default);
+        var context = request.Services.GetRequiredService<ExploreDbContext>();
+        transactions.Owner = context;
+        var gate = (ObservedPlanGate)request.Services.GetRequiredService<IEventDiscoveryEnrollmentGate>();
+        var owner = new PlanSettlementObserver((ISerializableAttemptOwner)new EfCoreUnitOfWork(context),
+            context, gate, request.Services.GetRequiredService<IHumanActionCommitFinalizer>());
+        await using var blockerContext = fixture.Native.CreateDatabase();
+        blockerContext.BindTenantLease();
+        await using var blocker = new EventDiscoveryEnrollmentGate(blockerContext);
+        IAsyncDisposable? blockingLease = await blocker.AcquireAsync(LocalIdentityLifecycleHttpFixture.CancellationToken);
+        await using var contenderContext = fixture.Native.CreateDatabase();
+        contenderContext.BindTenantLease();
+        await using var contender = new EventDiscoveryEnrollmentGate(contenderContext);
+        Task<IAsyncDisposable>? competingAcquisition = null;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(LocalIdentityLifecycleHttpFixture.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        object command = operation == "create-draft"
+            ? new CreateInstanceTenantPlanDraftCommand(Draft(seed.CloneKey))
+            : Command(operation, seed, fixture.Binding.LocalSubjectId);
+        Task<BaseCommandResponse<Guid>> execution = InvokeAsync(request.Services, command, owner);
+        try
+        {
+            Task firstBoundary = await Task.WhenAny(gate.Requested.Task, owner.Entered.Task, execution)
+                .WaitAsync(deadline.Token);
+            await Assert.That(ReferenceEquals(firstBoundary, gate.Requested.Task)).IsTrue()
+                .Because("Plan authority must wait for enrollment before entering its transaction owner.");
+            await Assert.That(gate.Acquisition!.IsCompleted).IsFalse();
+            await Assert.That(owner.Entered.Task.IsCompleted).IsFalse();
+            await Assert.That(transactions.Starts).IsEqualTo(0);
+            await Assert.That(context.Database.CurrentTransaction).IsNull();
+
+            await blockingLease.DisposeAsync();
+            blockingLease = null;
+            await Task.WhenAny(owner.TerminalReached.Task, execution).WaitAsync(deadline.Token);
+            if (!owner.TerminalReached.Task.IsCompleted) await execution;
+            await Assert.That(owner.TerminalReached.Task.IsCompleted).IsTrue();
+            await Assert.That(transactions.Starts).IsEqualTo(1);
+            await Assert.That(context.Database.CurrentTransaction).IsNotNull();
+            competingAcquisition = contender.AcquireAsync(deadline.Token);
+            await Assert.That(competingAcquisition.IsCompleted).IsFalse();
+
+            owner.ReleaseTerminal.TrySetResult();
+            await Task.WhenAny(owner.Settled.Task, execution).WaitAsync(deadline.Token);
+            if (!owner.Settled.Task.IsCompleted) await execution;
+            await Assert.That(owner.Settled.Task.IsCompleted).IsTrue();
+            await Assert.That(context.Database.CurrentTransaction).IsNull();
+            gate.RequireCurrent();
+            await Assert.That(competingAcquisition.IsCompleted).IsFalse();
+            owner.ReleaseSettlement.TrySetResult();
+            var result = await execution.WaitAsync(deadline.Token);
+            await Assert.That(result.IsSuccess).IsTrue();
+            await using var nextLease = await competingAcquisition.WaitAsync(deadline.Token);
+            contender.RequireCurrent();
+            await using var observed = fixture.Native.CreateDatabase();
+            if (operation == "create-draft")
+                await Assert.That(await observed.TenantPlans.AnyAsync(row => row.Id == result.Id && row.Key == seed.CloneKey)).IsTrue();
+            else
+                await RequireEffectAsync(observed, seed, operation, fixture.Binding.LocalSubjectId, deadline.Token);
+        }
+        finally
+        {
+            owner.ReleaseTerminal.TrySetResult();
+            owner.ReleaseSettlement.TrySetResult();
+            if (blockingLease is not null) await blockingLease.DisposeAsync();
+            // Drain the real owner on assertion failure before disposing its request scope.
+            try { await execution.WaitAsync(deadline.Token); }
+            catch { }
+            await deadline.CancelAsync();
+            if (competingAcquisition is not null)
+            {
+                try { await (await competingAcquisition).DisposeAsync(); }
+                catch (OperationCanceledException) { }
+            }
+        }
+    }
+
     [Test]
     [Arguments("clone")]
     [Arguments("create-version")]
@@ -335,6 +432,7 @@ public sealed partial class TenantPlanCatalogueOriginalAdmissionTests
             : ActivatorUtilities.CreateInstance<T>(services, owner);
         return command switch
         {
+            CreateInstanceTenantPlanDraftCommand value => Handler<CreateInstanceTenantPlanDraftCommandHandler>().ExecuteAsync(value, default),
             CloneInstanceTenantPlanCommand value => Handler<CloneInstanceTenantPlanCommandHandler>().ExecuteAsync(value, default),
             CreateInstanceTenantPlanVersionDraftCommand value => Handler<CreateInstanceTenantPlanVersionDraftCommandHandler>().ExecuteAsync(value, default),
             UpdateInstanceTenantPlanVersionDraftCommand value => Handler<UpdateInstanceTenantPlanVersionDraftCommandHandler>().ExecuteAsync(value, default),
@@ -344,6 +442,72 @@ public sealed partial class TenantPlanCatalogueOriginalAdmissionTests
             RollbackInstanceTenantPlanAssignmentCommand value => Handler<RollbackInstanceTenantPlanAssignmentCommandHandler>().ExecuteAsync(value, default),
             _ => throw new ArgumentOutOfRangeException(nameof(command))
         };
+    }
+
+    private sealed class ObservedPlanGate(EventDiscoveryEnrollmentGate inner) : IEventDiscoveryEnrollmentGate, IAsyncDisposable
+    {
+        internal TaskCompletionSource Requested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal Task<IAsyncDisposable>? Acquisition { get; private set; }
+
+        public Task<IAsyncDisposable> AcquireAsync(CancellationToken cancellationToken = default)
+        {
+            Acquisition = inner.AcquireAsync(cancellationToken);
+            Requested.TrySetResult();
+            return Acquisition;
+        }
+
+        public void RequireCurrent() => inner.RequireCurrent();
+        public bool TryRequireCurrent() => inner.TryRequireCurrent();
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
+
+    private sealed class PlanSettlementObserver(ISerializableAttemptOwner inner, ExploreDbContext context,
+        IEventDiscoveryEnrollmentGate gate, IHumanActionCommitFinalizer finalizer) : ISerializableAttemptOwner
+    {
+        internal TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource TerminalReached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource ReleaseTerminal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Settled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource ReleaseSettlement { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
+            CancellationToken cancellationToken = default)
+        {
+            Entered.TrySetResult();
+            T result = await inner.ExecuteAsync(async token =>
+            {
+                T value = await operation(token);
+                finalizer.Register(async finalToken =>
+                {
+                    gate.RequireCurrent();
+                    if (context.Database.CurrentTransaction is null)
+                        throw new InvalidOperationException("The terminal read must retain the original transaction.");
+                    TerminalReached.TrySetResult();
+                    await ReleaseTerminal.Task.WaitAsync(finalToken);
+                    gate.RequireCurrent();
+                }, _ => { });
+                return value;
+            }, cancellationToken);
+            gate.RequireCurrent();
+            if (context.Database.CurrentTransaction is not null)
+                throw new InvalidOperationException("The real transaction owner must settle before returning.");
+            Settled.TrySetResult();
+            await ReleaseSettlement.Task.WaitAsync(cancellationToken);
+            return result;
+        }
+    }
+
+    private sealed class PlanTransactionObserver : DbTransactionInterceptor
+    {
+        internal ExploreDbContext? Owner { get; set; }
+        internal int Starts { get; private set; }
+
+        public override ValueTask<DbTransaction> TransactionStartedAsync(DbConnection connection,
+            TransactionEndEventData eventData, DbTransaction result, CancellationToken cancellationToken = default)
+        {
+            if (ReferenceEquals(eventData.Context, Owner)) Starts++;
+            return ValueTask.FromResult(result);
+        }
     }
 
     private sealed class BodyBoundary(ISerializableAttemptOwner inner,

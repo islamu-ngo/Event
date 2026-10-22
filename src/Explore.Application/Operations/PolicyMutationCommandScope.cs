@@ -12,6 +12,7 @@ using Explore.Application.Features.Settings;
 using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
+using Explore.Application.Features.Tenants.Requests.Commands;
 using Explore.Domain.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -42,6 +43,9 @@ internal static class PolicyMutationCommandScope
         || request == typeof(UpdateRenderPolicySettingsCommand)
         || request == typeof(UpdateEventPolicyCommand)
         || request == typeof(EnsureManagedProviderClientProvisionedCommand)
+        || request == typeof(CreateTenantCommand)
+        || request == typeof(CompleteInstanceOnboardingCommand)
+        || request == typeof(CompleteLocalInstanceOnboardingCommand)
         || request == typeof(CompleteTenantOnboardingCommand)
         || request == typeof(UpdateTenantReportingIntakePolicyCommand);
 
@@ -51,6 +55,12 @@ internal static class PolicyMutationCommandScope
         if (FooterOperationScope.Handles(request.GetType()))
             return ValueTask.FromResult<PolicyMutationScope?>(FooterOperationScope.Select(request, services.GetService<ITenantContextAccessor>()));
         cancellationToken.ThrowIfCancellationRequested();
+        if (request is CreateTenantCommand)
+        {
+            if (services.GetRequiredService<IMachinePrincipalAccessor>().IsMachineCaller)
+                throw new UnauthorizedAccessException("Human tenant creation cannot borrow machine authority.");
+            return ValueTask.FromResult<PolicyMutationScope?>(PolicyMutationScope.TenantCreation);
+        }
         if (request is EnsureManagedProviderClientProvisionedCommand provisioning)
         {
             if (provisioning.ManagementRequest is not null || provisioning.OperationId.HasValue
@@ -70,6 +80,8 @@ internal static class PolicyMutationCommandScope
     {
         UpdateLocalizationGovernanceCommand => PolicyMutationScope.Instance,
         UpdateUserLastActiveTenantCommand => PolicyMutationScope.Instance,
+        CompleteInstanceOnboardingCommand => PolicyMutationScope.Instance,
+        CompleteLocalInstanceOnboardingCommand => PolicyMutationScope.Instance,
         UpdateEventPolicyCommand => PolicyMutationScope.MixedSettingsInstance,
         CompleteTenantOnboardingCommand => MixedSettingsScope(SettingScope.Tenant, tenantContext),
         UpdateTenantReportingIntakePolicyCommand command when command.TenantId == tenantContext?.TenantId =>

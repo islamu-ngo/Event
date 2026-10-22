@@ -43,7 +43,7 @@ public sealed class TrustedSetupSettingsAuthorityTests
         try
         {
             var authority = new TrustedSetupSettingsAuthority(accessor, [], setup,
-                application.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>(),
+                application.ServiceProvider.GetRequiredService<ILocalBootstrapReceiptSource>(),
                 application.ServiceProvider.GetRequiredService<IAuthenticationProviderDispatcher>(),
                 application.ServiceProvider.GetServices<IConfiguredAdministratorBootstrapProvider>(), TimeProvider.System);
             var lease = await authority.CaptureAsync(new TrustedSetupSettingsSource(null, null, null),

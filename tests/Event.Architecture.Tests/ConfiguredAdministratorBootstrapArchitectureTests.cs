@@ -282,7 +282,8 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
             typeof(ConfiguredAdministratorBootstrapProvider),
             typeof(IInstanceBootstrapStateRepository),
             typeof(IUnitOfWork),
-            typeof(TimeProvider)
+            typeof(TimeProvider),
+            typeof(IEventDiscoveryEnrollmentGate)
         ]);
     }
 

@@ -8,6 +8,10 @@ namespace Explore.Persistence.Repositories;
 public sealed class PrivacyErasureStateRepository(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null)
     : IPrivacyErasureStateRepository
 {
+    public Task<bool> ExistsBySubjectAsync(Guid subjectId, CancellationToken cancellationToken) =>
+        dbContext.PrivacyErasureSagas.IgnoreAutoIncludes()
+            .AnyAsync(saga => saga.SubjectId == subjectId, cancellationToken);
+
     public Task<PrivacyErasureSaga?> GetBySubjectAsync(
         Guid subjectId,
         CancellationToken cancellationToken) =>

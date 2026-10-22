@@ -410,8 +410,11 @@ public sealed partial class LocalBootstrapConvergenceTests
         internal async Task PrepareAsync()
         {
             await using var scope = Provider.CreateAsyncScope();
+            var application = Application(scope);
+            application.BindTenantLease();
             await new ConfiguredAdministratorBootstrapStartupRunner(BootstrapProvider(scope),
-                new InstanceBootstrapStateRepository(Application(scope)), new EfCoreUnitOfWork(Application(scope)), TimeProvider.System)
+                new InstanceBootstrapStateRepository(application), new EfCoreUnitOfWork(application), TimeProvider.System,
+                new EventDiscoveryEnrollmentGate(application))
                 .PrepareAsync(Token);
         }
 
@@ -427,6 +430,9 @@ public sealed partial class LocalBootstrapConvergenceTests
         internal LocalAdministratorBootstrapOperation Operation(AsyncServiceScope scope)
         {
             var application = Application(scope);
+            application.BindTenantLease();
+            var receipts = scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
+            var enrollment = new EventDiscoveryEnrollmentGate(application);
             var unitOfWork = new EfCoreUnitOfWork(application);
             var bootstrap = new InstanceBootstrapStateRepository(application);
             var provider = BootstrapProvider(scope);
@@ -444,7 +450,7 @@ public sealed partial class LocalBootstrapConvergenceTests
                 systemSettings, cache, Options.Create(new AuthenticationProviderDeploymentOptions()));
             var trustedAuthority = new Explore.Infrastructure.Services.TrustedSetupSettingsAuthority(
                 new Microsoft.AspNetCore.Http.HttpContextAccessor(), [], setup,
-                scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Credentials, dispatcher,
+                receipts, dispatcher,
                 [provider], TimeProvider.System);
             var trustedWriter = new TrustedSetupSettingsWriter(
                 application, trustedAuthority, mutationLock, unitOfWork);
@@ -463,10 +469,11 @@ public sealed partial class LocalBootstrapConvergenceTests
                 GenerationReader(scope), Configuration,
                 new PrivacyIdentityFenceOperation(
                     Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()),
+                enrollment, receipts,
                 OperatorOptions, trustedWriter);
-            return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
+            return new LocalAdministratorBootstrapOperation(bootstrap, provider, new BootstrapLocalScopes(this), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,
-                dispatcher);
+                dispatcher, enrollment);
         }
 
         internal IInstanceOnboardingGenerationReader GenerationReader(AsyncServiceScope scope)
@@ -530,7 +537,7 @@ public sealed partial class LocalBootstrapConvergenceTests
                     ApiAuthenticationSchemeNames.SetupSecret, _ => { });
             services.AddSingleton<IDeploymentModeProvider, DeploymentModeProvider>();
             services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
-            services.AddScoped(_ => new SetupReceiptCustody(this));
+            services.AddScoped(provider => new SetupReceiptCustody(this, provider.GetRequiredService<ExploreDbContext>()));
             services.AddScoped<IInstanceBootstrapStateReader, Explore.Persistence.Services.InstanceBootstrapStateReader>();
             services.AddSingleton<IGlobalExploreDbContextFactory>(_ => new GlobalExploreDbContextFactory(
                 new PrimaryDatabaseConnectionOptions

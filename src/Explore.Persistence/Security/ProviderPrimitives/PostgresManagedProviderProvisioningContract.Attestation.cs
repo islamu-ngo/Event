@@ -1,3 +1,4 @@
+using Explore.Domain;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -119,10 +120,28 @@ public static partial class PostgresManagedProviderProvisioningContract
     {
         var sql = new HumanPrincipalSourceSql(context);
         var tenantTables = PostgresTenantRowLevelSecurityModel.GetTenantTables(context.Model);
+        bool creatorIntersection = Sources.Any(relation =>
+            PostgresTenantCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out _));
+        string creatorProof = creatorIntersection
+            ? PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment) : "true";
         string policies = string.Join("\n", Sources.Select(relation =>
         {
             var table = tenantTables.SingleOrDefault(item => item.TableName == context.Model.FindEntityType(relation.Type)!.GetTableName());
             string name = Text(sql.Table(relation.Type));
+            bool creatorInserts = PostgresTenantCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out var insert)
+                && insert.Count != 0;
+            string columnWrites = creatorInserts ? $"""
+                EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+                    CROSS JOIN (VALUES ('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
+                    WHERE a.attrelid={name}::regclass AND a.attnum<>0 AND NOT a.attisdropped
+                        AND (pg_catalog.has_column_privilege({Text(enrollment.GlobalLogin)},a.attrelid,a.attnum,permission.privilege || ' WITH GRANT OPTION')
+                            OR (pg_catalog.has_column_privilege({Text(enrollment.GlobalLogin)},a.attrelid,a.attnum,permission.privilege)
+                                AND NOT (a.attnum>0 AND permission.privilege='INSERT'
+                                    AND a.attname=ANY(ARRAY[{string.Join(',', insert.Select(Text))}]::text[])))))
+                """ : $"pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{name}::regclass,'INSERT,UPDATE,REFERENCES')";
+            if (PostgresManagedTenantWorkerCreationPermissions.TryGetGlobalColumns(context, relation.Type, out _, out var workerInsert, out var workerUpdate)
+                && (workerInsert.Count != 0 || workerUpdate.Count != 0))
+                columnWrites = $"({columnWrites}) AND ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}) IS NOT TRUE";
             return (table is null ? "" : $"""
                 IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid = {name}::regclass
                     AND p.polname = '{Policy}' AND p.polcmd = '*' AND p.polpermissive
@@ -142,8 +161,10 @@ public static partial class PostgresManagedProviderProvisioningContract
                     AND (0::oid = ANY(p.polroles) OR EXISTS (SELECT 1 FROM unnest(p.polroles) r
                         WHERE pg_catalog.pg_has_role('{OwnerRole}',r,'USAGE'))))
                 THEN RAISE EXCEPTION 'human_provisioning_rls_widened' USING ERRCODE = '55000'; END IF;
-                IF pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{name}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                    OR pg_catalog.has_any_column_privilege({Text(enrollment.GlobalLogin)},{name}::regclass,'INSERT,UPDATE,REFERENCES')
+                IF {(relation.Type == typeof(EventDiscoveryRevision) ? $"NOT ({PostgresDiscoveryMetadataPermissions.RevisionAuthorityPredicate(context, enrollment.GlobalLogin)})" : $"""
+                    pg_catalog.has_table_privilege({Text(enrollment.GlobalLogin)},{name}::regclass,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                    OR {columnWrites}
+                    """)}
                 THEN RAISE EXCEPTION 'human_provisioning_ambient_write_authority' USING ERRCODE = '55000'; END IF;
                 """;
         }));
@@ -169,6 +190,8 @@ public static partial class PostgresManagedProviderProvisioningContract
             {SourceCatalog(context, enrollment)}
             {OriginalSources(context, enrollment)}
             {PostgresPrivilegeGuard.BuildAssertSql(Privileges(context, enrollment))}
+            IF NOT ({creatorProof})
+            THEN RAISE EXCEPTION 'human_provisioning_ambient_write_authority' USING ERRCODE = '55000'; END IF;
             {routines}
             {policies}
             {triggers}

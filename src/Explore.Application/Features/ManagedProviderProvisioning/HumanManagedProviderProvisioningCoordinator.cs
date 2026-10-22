@@ -25,7 +25,8 @@ public sealed class HumanManagedProviderProvisioningCoordinator(
     PrivacyIdentityFenceOperation identityFence,
     IOriginalOwnerSettlementBoundary owner,
     ISettingMutationLock mutationLock,
-    IOptions<ManagedControlPlaneOptions> managedOptions)
+    IOptions<ManagedControlPlaneOptions> managedOptions,
+    Func<IEventDiscoveryEnrollmentGate> enrollmentGate)
 {
     public async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> ExecuteAsync(
         EnsureManagedProviderClientProvisionedCommand command, CancellationToken cancellationToken)
@@ -53,6 +54,7 @@ public sealed class HumanManagedProviderProvisioningCoordinator(
             await humanScope.PrepareAsync(cancellationToken);
             var subject = humanScope.Subject
                 ?? throw new UnauthorizedAccessException("Original provisioning administrator authority is required.");
+            await using var enrollment = await enrollmentGate().AcquireAsync(cancellationToken);
             var prepared = await preparation.PrepareAsync(command, subject.PrincipalId, cancellationToken);
             return await identityFence.ExecuteSettledEnrollmentAsync(account, command, owner, async token =>
             {

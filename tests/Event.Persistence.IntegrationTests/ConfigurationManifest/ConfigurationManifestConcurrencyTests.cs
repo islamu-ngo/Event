@@ -1,17 +1,16 @@
 using System.Data.Common;
+using System.Net;
+using System.Net.Http.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.PaidEventPolicies;
-using Explore.Application.Features.Management;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Explore.Application.Features.Tenants;
-using Explore.Application.Features.Tenants.Handlers.Commands.CreateTenant;
-using Explore.Application.Features.Tenants.Requests.Commands;
-using Explore.Application.Management;
+using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -20,16 +19,18 @@ using Explore.Domain.Services.Registration;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Explore.Infrastructure.Services;
+using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
@@ -42,23 +43,45 @@ public sealed class ConfigurationManifestConcurrencyTests(
     public async Task ConcurrentBootstrap_SameSlugCreatesOnceAndAuditsSecondAsSkipped()
     {
         await fixture.ResetAsync();
-        await using ExploreDbContext firstContext = fixture.CreateDbContext();
-        await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        var initialGate = new InitialPreflightGate(participantCount: 2);
+        await using ExploreDbContext observer = fixture.CreateDbContext();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var firstOwnerEntered = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstOwner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondReachedSettingLocks = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var firstHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
         await using var secondHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
-        firstHandler.BeforeLock = secondHandler.BeforeLock = (key, _, token) =>
-            key == ConfigurationManifestLockKeys.InstanceManifest ? initialGate.SignalAndWaitAsync(token) : Task.CompletedTask;
+        firstHandler.BeforeLock = async (key, actual, token) =>
+        {
+            if (key != ConfigurationManifestLockKeys.InstanceManifest) return;
+            EventDiscoveryEnrollmentGate.RequireCurrent(actual);
+            firstOwnerEntered.TrySetResult(((NpgsqlConnection)actual.Database.GetDbConnection()).ProcessID);
+            await releaseFirstOwner.Task.WaitAsync(token);
+        };
+        secondHandler.BeforeLock = (_, _, _) =>
+        {
+            secondReachedSettingLocks.TrySetResult();
+            return Task.CompletedTask;
+        };
         var source = ConfigurationManifestApplicationTestSupport.Source("collision");
+        var firstTask = firstHandler.ExecuteAsync(new ApplyConfigurationManifestCommand(source), timeout.Token);
+        int firstBackend = await AwaitCheckpointAsync(firstOwnerEntered.Task, firstTask, timeout.Token);
+        var secondTask = secondHandler.ExecuteAsync(new ApplyConfigurationManifestCommand(source), timeout.Token);
+        bool secondWasPending;
+        bool settingLocksWereNotReached;
+        try
+        {
+            await WaitForAdvisoryWaiterAsync(observer, firstBackend, secondTask, timeout.Token);
+            secondWasPending = !secondTask.IsCompleted;
+            settingLocksWereNotReached = !secondReachedSettingLocks.Task.IsCompleted;
+        }
+        finally
+        {
+            releaseFirstOwner.TrySetResult();
+        }
+        var results = await Task.WhenAll(firstTask, secondTask).WaitAsync(timeout.Token);
 
-        var results = await Task.WhenAll(
-            firstHandler.ExecuteAsync(
-                new ApplyConfigurationManifestCommand(source),
-                CancellationToken.None),
-            secondHandler.ExecuteAsync(
-                new ApplyConfigurationManifestCommand(source),
-                CancellationToken.None));
-
+        await Assert.That(secondWasPending).IsTrue();
+        await Assert.That(settingLocksWereNotReached).IsTrue();
         await Assert.That(results.All(result => result.IsSuccess)).IsTrue();
         await using ExploreDbContext verification = fixture.CreateDbContext();
         ConfigurationManifestOperation[] operations =
@@ -107,28 +130,33 @@ public sealed class ConfigurationManifestConcurrencyTests(
         string slugLockKey = TenantMutationLockKeys.ForSlug(slug);
         var laterLockAttempted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseLaterLockAttempt = new TaskCompletionSource(
+        var releaseWriter = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        await using ExploreDbContext manifestContext = fixture.CreateDbContext();
+        await using ExploreDbContext observer = fixture.CreateDbContext();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         bool transactionWasActiveAtLaterAttempt = true;
         await using ExploreDbContext writerContext = fixture.CreateDbContext();
-        var writerLockAcquired = new TaskCompletionSource(
+        writerContext.ClearTenantFilterBypass();
+        writerContext.BindTenantLease();
+        var writerLockAcquired = new TaskCompletionSource<int>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         Guid committedTenantId = Guid.CreateVersion7();
         Task writerTask = writerContext.Database
             .CreateExecutionStrategy()
             .ExecuteAsync(async () =>
             {
+                await using var enrollment = new EventDiscoveryEnrollmentGate(writerContext);
+                await using var enrollmentLease = await enrollment.AcquireAsync(timeout.Token);
                 await using var writerTransaction =
                     await writerContext.Database.BeginTransactionAsync(
-                        System.Data.IsolationLevel.Serializable);
+                        System.Data.IsolationLevel.Serializable, timeout.Token);
                 await using IAsyncDisposable writerLease =
                     await RelationalNamedLock.AcquireTransactionAsync(
                         writerContext,
                         $"explore:setting-mutation:{slugLockKey}",
-                        CancellationToken.None);
-                writerLockAcquired.TrySetResult();
-                await laterLockAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                        timeout.Token);
+                writerLockAcquired.TrySetResult(((NpgsqlConnection)writerContext.Database.GetDbConnection()).ProcessID);
+                await releaseWriter.Task.WaitAsync(timeout.Token);
                 writerContext.Tenants.Add(new Tenant
                 {
                     Id = committedTenantId,
@@ -138,18 +166,18 @@ public sealed class ConfigurationManifestConcurrencyTests(
                     TenantStatus = null!,
                     CreatedAt = DateTime.UtcNow
                 });
-                await writerContext.SaveChangesAsync();
-                await writerTransaction.CommitAsync();
+                await writerContext.SaveChangesAsync(timeout.Token);
+                await writerTransaction.CommitAsync(timeout.Token);
             });
-        await writerLockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        int writerBackend = await AwaitCheckpointAsync(writerLockAcquired.Task, writerTask, timeout.Token);
         var observed = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
-        handler.BeforeLock = async (key, actualOwner, cancellationToken) =>
+        handler.BeforeLock = (key, actualOwner, _) =>
         {
-            if (key != slugLockKey) return;
+            if (key != slugLockKey) return Task.CompletedTask;
             transactionWasActiveAtLaterAttempt = actualOwner.Database.CurrentTransaction is not null;
             laterLockAttempted.TrySetResult();
-            await releaseLaterLockAttempt.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            return Task.CompletedTask;
         };
         handler.AfterObservation = async (actualOwner, _, token) =>
         {
@@ -164,17 +192,18 @@ public sealed class ConfigurationManifestConcurrencyTests(
             handler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport.Source(slug)),
-                CancellationToken.None);
-        await laterLockAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30));
-
+                timeout.Token);
         try
         {
-            await writerTask.WaitAsync(TimeSpan.FromSeconds(30));
+            await WaitForAdvisoryWaiterAsync(observer, writerBackend, manifestTask, timeout.Token);
+            await Assert.That(laterLockAttempted.Task.IsCompleted).IsFalse();
         }
         finally
         {
-            releaseLaterLockAttempt.TrySetResult();
+            releaseWriter.TrySetResult();
         }
+        await writerTask.WaitAsync(timeout.Token);
+        await laterLockAttempted.Task.WaitAsync(timeout.Token);
 
         Guid observedTenant = await observed.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Explore.Application.Responses.BaseCommandResponse<Guid> result =
@@ -192,6 +221,129 @@ public sealed class ConfigurationManifestConcurrencyTests(
         await Assert.That(operation.SkippedExistingTenantCount).IsEqualTo(1);
         await Assert.That((await verification.ConfigurationManifestTenantResults.IgnoreQueryFilters().SingleAsync()).Status)
             .IsEqualTo(ConfigurationManifestTenantResultStatus.SkippedExisting);
+    }
+
+    [Test]
+    public async Task CancelledBootstrap_LaterSettingWaitReleasesEarlierLeasesBeforeAnyTransaction()
+    {
+        await fixture.ResetAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
+        const string slug = "cancel-before-begin";
+        string laterKey = TenantMutationLockKeys.ForSlug(slug);
+        await using var holder = fixture.CreateDbContext();
+        await holder.Database.OpenConnectionAsync(timeout.Token);
+        await using var heldKey = await RelationalNamedLock.AcquireSessionAsync(
+            holder, $"explore:setting-mutation:{laterKey}", timeout.Token);
+        int holderBackend = ((NpgsqlConnection)holder.Database.GetDbConnection()).ProcessID;
+        await using var observer = fixture.CreateDbContext();
+        var data = new ConfigurationManifestBootstrapData(observer);
+        var systemsBefore = (await observer.SystemSettings.AsNoTracking().ToArrayAsync(timeout.Token))
+            .Select(row => data.Row(row).ToJsonString()).ToArray();
+        var policiesBefore = (await observer.PaidEventPolicyVersions.IgnoreQueryFilters().AsNoTracking().ToArrayAsync(timeout.Token))
+            .Select(row => data.Row(row).ToJsonString()).ToArray();
+        var attempted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var earlierKeys = new List<string>();
+        bool transactionWasActive = true;
+        await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        handler.BeforeLock = (key, original, _) =>
+        {
+            if (key != laterKey)
+                earlierKeys.Add(key);
+            else
+            {
+                EventDiscoveryEnrollmentGate.RequireCurrent(original);
+                transactionWasActive = original.Database.CurrentTransaction is not null;
+                attempted.TrySetResult(((NpgsqlConnection)original.Database.GetDbConnection()).ProcessID);
+            }
+            return Task.CompletedTask;
+        };
+        var bootstrap = handler.ExecuteAsync(new ApplyConfigurationManifestCommand(
+            ConfigurationManifestApplicationTestSupport.Source(slug)), cancellation.Token);
+        Exception? originalFailure = null;
+        try
+        {
+            int bootstrapBackend = await AwaitCheckpointAsync(attempted.Task, bootstrap, timeout.Token);
+            await WaitForAdvisoryWaiterAsync(observer, holderBackend, bootstrap, timeout.Token, bootstrapBackend);
+            await Assert.That(transactionWasActive).IsFalse();
+            await Assert.That(earlierKeys.Contains(ConfigurationManifestLockKeys.InstanceManifest)).IsTrue();
+
+            cancellation.Cancel();
+            bool cancelled = false;
+            try
+            {
+                await bootstrap.WaitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested && !timeout.IsCancellationRequested)
+            {
+                cancelled = true;
+            }
+            await Assert.That(cancelled).IsTrue();
+
+            // The independent later-key holder stays active while all bootstrap-owned resources are proved reusable.
+            await using (var probe = fixture.CreateDbContext())
+            {
+                probe.ClearTenantFilterBypass();
+                probe.BindTenantLease();
+                await using var enrollment = new EventDiscoveryEnrollmentGate(probe);
+                await using var gate = await enrollment.AcquireAsync(timeout.Token);
+                var leases = new List<IAsyncDisposable>();
+                try
+                {
+                    foreach (string key in earlierKeys)
+                        leases.Add(await RelationalNamedLock.AcquireSessionAsync(
+                            probe, $"explore:setting-mutation:{key}", timeout.Token));
+                    EventDiscoveryEnrollmentGate.RequireCurrent(probe);
+                }
+                finally
+                {
+                    for (int index = leases.Count - 1; index >= 0; index--)
+                        await leases[index].DisposeAsync();
+                }
+            }
+
+            await Assert.That((await observer.SystemSettings.AsNoTracking().ToArrayAsync(timeout.Token))
+                .Select(row => data.Row(row).ToJsonString())).IsEquivalentTo(systemsBefore);
+            await Assert.That((await observer.PaidEventPolicyVersions.IgnoreQueryFilters().AsNoTracking().ToArrayAsync(timeout.Token))
+                .Select(row => data.Row(row).ToJsonString())).IsEquivalentTo(policiesBefore);
+            await Assert.That(await observer.Tenants.AnyAsync(timeout.Token)).IsFalse();
+            await Assert.That(await observer.Set<EventDiscoveryRevision>().IgnoreQueryFilters().AnyAsync(timeout.Token)).IsFalse();
+            await Assert.That(await observer.TenantSettingOverrides.IgnoreQueryFilters().AnyAsync(timeout.Token)).IsFalse();
+            await Assert.That(await observer.TenantSettingsDocuments.IgnoreQueryFilters().AnyAsync(timeout.Token)).IsFalse();
+            await Assert.That(await observer.ConfigurationManifestOperations.AnyAsync(timeout.Token)).IsFalse();
+            await Assert.That(await observer.ConfigurationManifestTenantResults.IgnoreQueryFilters().AnyAsync(timeout.Token)).IsFalse();
+            await Assert.That(await observer.OutboxMessages.IgnoreQueryFilters().AnyAsync(timeout.Token)).IsFalse();
+        }
+        catch (Exception exception)
+        {
+            originalFailure = exception;
+            throw;
+        }
+        finally
+        {
+            try
+            {
+                cancellation.Cancel();
+            }
+            catch when (originalFailure is not null)
+            {
+                // An assertion failure remains primary even if a cancellation callback also fails.
+            }
+            finally
+            {
+                try
+                {
+                    await bootstrap;
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                {
+                }
+                catch when (originalFailure is not null)
+                {
+                    // Preserve the original invariant failure after observing the operation's cleanup failure.
+                }
+            }
+        }
     }
 
     [Test]
@@ -437,75 +589,136 @@ public sealed class ConfigurationManifestConcurrencyTests(
     }
 
     [Test]
-    public async Task ConcurrentManifestAndOrdinaryCreateShareNormalizedSlugLock()
+    public async Task ConcurrentManifestAndOrdinaryCreateSettleOneCanonicalTenant()
     {
         await fixture.ResetAsync();
-        await using ExploreDbContext manifestContext = fixture.CreateDbContext();
-        var initialGate = new InitialPreflightGate(participantCount: 2);
-        await using ExploreDbContext ordinaryContext = fixture.CreateDbContext(new OrdinarySlugObservation(initialGate));
+        const string slug = "shared";
+        var ordinarySave = new OrdinaryCreationSavePause(slug);
+        await using var authentication = await AuthenticatedSettingsFixture.CreateForTenantCreationApiAsync(
+            OpenMigrator, fixture, ordinarySave);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(60));
+        await using var observer = OpenMigrator();
         await using var manifestHandler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
-        manifestHandler.BeforeLock = (key, _, token) =>
-            key == ConfigurationManifestLockKeys.InstanceManifest ? initialGate.SignalAndWaitAsync(token) : Task.CompletedTask;
-        var ordinaryRepository = new TenantRepository(ordinaryContext);
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var ordinaryHandler = new CreateTenantCommandHandler(
-            ordinaryRepository,
-            new TenantUserRoleGrantRepository(ordinaryContext),
-            new TenantUserRepository(ordinaryContext),
-            new RoleRepository(ordinaryContext),
-            new TenantCreationService(
-                ordinaryRepository,
-                new TenantSettingsDocumentRepository(ordinaryContext)),
-            new TypedSettingsDocumentResolver(new TenantSettingsDocumentRepository(ordinaryContext), cache),
-            NullLogger<CreateTenantCommandHandler>.Instance,
-            new RelationalSettingMutationLock(
-                ordinaryContext,
-                new EfCoreUnitOfWork(ordinaryContext)),
-            new TenantActivationCapacityPolicy(
-                new InstanceBootstrapStateRepository(ordinaryContext),
-                ordinaryRepository,
-                new ManagedTenantProvisioningOperationRepository(ordinaryContext),
-                Options.Create(new ManagedControlPlaneOptions())));
-        var ordinaryCommand = new CreateTenantCommand
+        var manifestBackend = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        manifestHandler.BeforeLock = (_, actual, _) =>
         {
-            TenantDto = new CreateTenantDto
-            {
-                FullName = "Shared Community",
-                Slug = "shared",
-                IsActive = false,
-                AssignCurrentUserAsTenantAdmin = false
-            }
+            manifestBackend.TrySetResult(((NpgsqlConnection)actual.Database.GetDbConnection()).ProcessID);
+            return Task.CompletedTask;
         };
+        ordinarySave.Armed = true;
+        Task<HttpResponseMessage> ordinaryTask = authentication.CreateTenantViaApiAsync(new CreateTenantDto
+        {
+            FullName = "Shared Community",
+            Slug = slug,
+            IsActive = false,
+            AssignCurrentUserAsTenantAdmin = false
+        }, deadline.Token);
+        Task<BaseCommandResponse<Guid>>? manifestTask = null;
+        bool completed = false;
+        try
+        {
+            int creatorBackend = await AwaitCheckpointAsync(ordinarySave.Persisted.Task, ordinaryTask, deadline.Token);
+            manifestTask = manifestHandler.ExecuteAsync(new ApplyConfigurationManifestCommand(
+                ConfigurationManifestApplicationTestSupport.Source(slug)), deadline.Token);
+            await WaitForAdvisoryWaiterAsync(observer, creatorBackend, manifestTask, deadline.Token);
 
-        var results = await Task.WhenAll(
-            manifestHandler.ExecuteAsync(
-                new ApplyConfigurationManifestCommand(
-                    ConfigurationManifestApplicationTestSupport.Source("shared")),
-                CancellationToken.None),
-            ordinaryHandler.ExecuteAsync(ordinaryCommand, CancellationToken.None));
+            // Both creators first own the enrollment gate. Observe that real wait;
+            // do not mislabel it as contention on the later normalized-slug lock.
+            await using var waiting = observer.Database.GetDbConnection().CreateCommand();
+            waiting.CommandText = """
+                SELECT DISTINCT locks.pid FROM pg_catalog.pg_locks locks
+                JOIN pg_catalog.pg_stat_activity activity ON activity.pid = locks.pid
+                WHERE locks.locktype = 'advisory' AND NOT locks.granted
+                    AND @holder = ANY (pg_catalog.pg_blocking_pids(locks.pid))
+                    AND activity.usename = @login
+                """;
+            waiting.Parameters.Add(new NpgsqlParameter("holder", creatorBackend));
+            waiting.Parameters.Add(new NpgsqlParameter("login", fixture.NativeQueueEnrollment.GlobalLogin));
+            var waiters = new List<int>();
+            await using (var rows = await waiting.ExecuteReaderAsync(deadline.Token))
+                while (await rows.ReadAsync(deadline.Token)) waiters.Add(rows.GetInt32(0));
+            await Assert.That(waiters.Count).IsEqualTo(1);
+            await Assert.That(manifestTask.IsCompleted).IsFalse();
+            await Assert.That(manifestBackend.Task.IsCompleted).IsFalse();
+            ordinarySave.Release.TrySetResult();
 
-        await Assert.That(results[0].IsSuccess).IsTrue();
-        await using ExploreDbContext verification = fixture.CreateDbContext();
-        await Assert.That(await verification.Tenants.CountAsync(tenant =>
-            tenant.Slug == "shared")).IsEqualTo(1);
-        ConfigurationManifestOperation operation =
-            await verification.ConfigurationManifestOperations
-                .AsNoTracking()
-                .SingleAsync();
-        await Assert.That(operation.CreatedTenantCount + operation.SkippedExistingTenantCount)
-            .IsEqualTo(1);
+            using var response = await ordinaryTask.WaitAsync(deadline.Token);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+                .Because(authentication.TenantCreationFailureDescription);
+            var ordinaryResult = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>(cancellationToken: deadline.Token);
+            await Assert.That(ordinaryResult).IsNotNull();
+            await Assert.That(ordinaryResult!.IsSuccess).IsTrue();
+            var manifestResult = await manifestTask.WaitAsync(deadline.Token);
+            await Assert.That(manifestResult.IsSuccess).IsTrue();
+            await Assert.That(await manifestBackend.Task.WaitAsync(deadline.Token)).IsEqualTo(waiters.Single());
+
+            await using var verification = OpenMigrator();
+            var tenants = await verification.Tenants.AsNoTracking().Where(tenant => tenant.Slug == slug)
+                .ToArrayAsync(deadline.Token);
+            await Assert.That(tenants.Length).IsEqualTo(1);
+            await Assert.That(tenants[0].Id).IsEqualTo(ordinaryResult.Id);
+            var revisions = await verification.Set<EventDiscoveryRevision>()
+                .IgnoreTenantFilter("Independent native observer verifies the exact tenant created by the competing original owners.")
+                .AsNoTracking().Where(row => row.TenantId == tenants[0].Id).ToArrayAsync(deadline.Token);
+            await Assert.That(revisions.Length).IsEqualTo(1);
+            await Assert.That(revisions[0].Id.Version).IsEqualTo(7);
+            await Assert.That(revisions[0].IdentityEpoch).IsEqualTo(0L);
+            await Assert.That(revisions[0].DisclosureEpoch).IsEqualTo(1L);
+            var operation = await verification.ConfigurationManifestOperations.AsNoTracking().SingleAsync(deadline.Token);
+            await Assert.That(operation.Status).IsEqualTo(ConfigurationManifestOperationStatus.Applied);
+            await Assert.That(operation.CreatedTenantCount).IsEqualTo(0);
+            await Assert.That(operation.SkippedExistingTenantCount).IsEqualTo(1);
+            completed = true;
+        }
+        finally
+        {
+            ordinarySave.Release.TrySetResult();
+            if (!completed) await deadline.CancelAsync();
+            try { (await ordinaryTask.WaitAsync(TimeSpan.FromSeconds(15))).Dispose(); }
+            catch when (!completed) { }
+            if (manifestTask is not null)
+            {
+                try { await manifestTask.WaitAsync(TimeSpan.FromSeconds(15)); }
+                catch when (!completed) { }
+            }
+        }
+
+        ExploreDbContext OpenMigrator()
+        {
+            var options = TestDbContextOptions.Create<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+            var context = new ExploreDbContext(options.Options);
+            context.BindTenantLease();
+            return context;
+        }
     }
 
-    private sealed class OrdinarySlugObservation(InitialPreflightGate gate) : DbCommandInterceptor
+    private sealed class OrdinaryCreationSavePause(string slug) : SaveChangesInterceptor
     {
-        private int observed;
-        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
-            DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
-            CancellationToken cancellationToken = default)
+        internal bool Armed { get; set; }
+        internal TaskCompletionSource<int> Persisted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async ValueTask<int> SavedChangesAsync(SaveChangesCompletedEventData eventData,
+            int result, CancellationToken cancellationToken = default)
         {
-            if (command.Parameters.Cast<DbParameter>().Any(parameter => parameter.Value is "shared")
-                && Interlocked.Exchange(ref observed, 1) == 0)
-                await gate.SignalAndWaitAsync(cancellationToken);
+            if (!Armed || eventData.Context is not ExploreDbContext context
+                || context.ChangeTracker.Entries<Tenant>().SingleOrDefault(entry =>
+                    entry.State == EntityState.Unchanged && entry.Entity.Slug == slug) is not { } created)
+                return result;
+            Armed = false;
+            await Assert.That(context.TenantFilterTenantId).IsNull();
+            await Assert.That(context.IsTenantFilterBypassed).IsFalse();
+            var transaction = context.Database.CurrentTransaction?.GetDbTransaction()
+                ?? throw new InvalidOperationException("The original creator transaction must remain active after Save.");
+            await Assert.That(transaction.IsolationLevel).IsEqualTo(System.Data.IsolationLevel.Serializable);
+            await Assert.That(ReferenceEquals(transaction.Connection, context.Database.GetDbConnection())).IsTrue();
+            await Assert.That(context.ChangeTracker.Entries<EventDiscoveryRevision>().Count(entry =>
+                entry.Entity.TenantId == created.Entity.Id && entry.State == EntityState.Unchanged)).IsEqualTo(1);
+            Persisted.TrySetResult(((NpgsqlConnection)context.Database.GetDbConnection()).ProcessID);
+            await Release.Task.WaitAsync(cancellationToken);
             return result;
         }
     }
@@ -546,6 +759,45 @@ public sealed class ConfigurationManifestConcurrencyTests(
                         cancellationToken);
             },
             CancellationToken.None);
+    }
+
+    private static async Task<T> AwaitCheckpointAsync<T>(Task<T> checkpoint, Task operation, CancellationToken token)
+    {
+        await Task.WhenAny(checkpoint, operation).WaitAsync(token);
+        if (!checkpoint.IsCompleted)
+        {
+            await operation;
+            throw new InvalidOperationException("The operation completed before its required concurrency checkpoint.");
+        }
+        return await checkpoint.WaitAsync(token);
+    }
+
+    private static async Task WaitForAdvisoryWaiterAsync(ExploreDbContext observer, int holderBackend,
+        Task operation, CancellationToken token, int? waiterBackend = null)
+    {
+        await observer.Database.OpenConnectionAsync(token);
+        await using var command = observer.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"""
+            SELECT EXISTS (
+                SELECT 1 FROM pg_catalog.pg_locks waiting
+                WHERE waiting.locktype = 'advisory' AND NOT waiting.granted
+                    {(waiterBackend.HasValue ? "AND waiting.pid = @waiter" : "")}
+                    AND @holder = ANY (pg_catalog.pg_blocking_pids(waiting.pid)))
+            """;
+        command.Parameters.Add(new NpgsqlParameter { ParameterName = "holder", Value = holderBackend });
+        if (waiterBackend.HasValue)
+            command.Parameters.Add(new NpgsqlParameter { ParameterName = "waiter", Value = waiterBackend.Value });
+        while (true)
+        {
+            if (operation.IsCompleted)
+            {
+                await operation;
+                throw new InvalidOperationException("The operation completed before its PostgreSQL advisory wait was observed.");
+            }
+            if (await command.ExecuteScalarAsync(token) is true)
+                return;
+            await Task.WhenAny(operation, Task.Delay(TimeSpan.FromMilliseconds(25), token)).WaitAsync(token);
+        }
     }
 
     private sealed class InitialPreflightGate(int participantCount)

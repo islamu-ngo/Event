@@ -43,7 +43,7 @@ public sealed class PostgresUserIdentityLookupAuthorityTests(PostgreSqlContainer
             .Where(row => row.UserId == rows.UserId).Select(row => row.TenantId).ToArrayAsync())
             .IsEquivalentTo([rows.A]);
         await using var global = await PostgresAuthenticationLookupAuthorityTests.AuthenticationGlobalAuthority.CreateAsync(fixture);
-        var repository = new UserTenantMembershipRepository(global.Factory, new TenantExploreDbContextFactory(rows.RuntimeOptions));
+        var repository = new UserTenantMembershipRepository(global.Factory, new TenantExploreDbContextFactory(rows.RuntimeOptions), fixture.NativeQueueEnrollment);
 
         List<TenantUser> memberships = await repository.GetActiveTenantsForUserAsync(rows.UserId);
 
@@ -67,7 +67,7 @@ public sealed class PostgresUserIdentityLookupAuthorityTests(PostgreSqlContainer
         await rows.AssertOrdinaryRoleAsync(request);
 
         await using var global = await PostgresAuthenticationLookupAuthorityTests.AuthenticationGlobalAuthority.CreateAsync(fixture);
-        bool active = await new UserTenantMembershipRepository(global.Factory, new TenantExploreDbContextFactory(rows.RuntimeOptions))
+        bool active = await new UserTenantMembershipRepository(global.Factory, new TenantExploreDbContextFactory(rows.RuntimeOptions), fixture.NativeQueueEnrollment)
             .IsActiveTenantUserAsync(rows.B, rows.UserId);
 
         await Assert.That(active).IsTrue();

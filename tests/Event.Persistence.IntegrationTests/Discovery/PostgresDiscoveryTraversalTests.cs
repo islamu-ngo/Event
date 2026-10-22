@@ -225,11 +225,11 @@ public sealed class PostgresDiscoveryTraversalTests(PostgreSqlContainerFixture f
         string name = new HumanPrincipalSourceSql(first).Name("discovery_traversal_revision_acquire");
         await using (var winner = await second.Database.BeginTransactionAsync(IsolationLevel.Serializable))
         {
-            await second.Database.ExecuteSqlRawAsync($"SELECT * FROM {name}({{0}},{{1}})", tenant, Guid.CreateVersion7());
+            await second.Database.ExecuteSqlRawAsync($"SELECT * FROM {name}({{0}})", tenant);
             await winner.CommitAsync();
         }
         var denied = await Assert.ThrowsAsync<PostgresException>(() =>
-            first.Database.ExecuteSqlRawAsync($"SELECT * FROM {name}({{0}},{{1}})", tenant, Guid.CreateVersion7()));
+            first.Database.ExecuteSqlRawAsync($"SELECT * FROM {name}({{0}})", tenant));
         await Assert.That(denied?.SqlState).IsEqualTo("40001");
         await stale.RollbackAsync();
     }

@@ -4,6 +4,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Modules;
 using Explore.Domain.Settings.Definitions;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Seed;
@@ -95,6 +96,7 @@ public static class LookupTableSeeder
         await SeedRegistrationModesAsync(context, cancellationToken);
         await SeedRolesAsync(context, cancellationToken);
         await SeedSystemSettingsAsync(context, cancellationToken);
+        await SeedAtprotoFederationSettingsAsync(context, cancellationToken);
         await SeedTagTypesAsync(context, cancellationToken);
         await SeedVisibilityTypesAsync(context, cancellationToken);
         await SeedPermissionsAsync(context, cancellationToken);
@@ -2012,6 +2014,7 @@ public static class LookupTableSeeder
 
     internal static async Task SeedSystemSettingsAsync(ExploreDbContext context, CancellationToken ct)
     {
+        await ManagedTenantProvisioningPolicyProjection.InitializeAsync(context, ct);
         var seedTimestamp = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var expectedSettings = new[]
         {
@@ -2085,10 +2088,7 @@ public static class LookupTableSeeder
             new SystemSetting { Id = SeedIds.SystemSettingSupportAccessRequireTicketReferenceId, SettingKey = GovernanceSettingKeys.SupportAccess.RequireTicketReference, Value = "true", ValueType = SettingValueType.Boolean, IsLocked = true, Description = "Require a ticket or external reference before starting support access", Category = "SupportAccess", DisplayOrder = 5, CreatedAt = seedTimestamp },
             new SystemSetting { Id = SeedIds.SystemSettingSupportAccessOneActiveSessionPerActorId, SettingKey = GovernanceSettingKeys.SupportAccess.OneActiveSessionPerActor, Value = "true", ValueType = SettingValueType.Boolean, IsLocked = true, Description = "Restrict each actor to one active support-access session", Category = "SupportAccess", DisplayOrder = 6, CreatedAt = seedTimestamp },
 
-            new SystemSetting { Id = SeedIds.SystemSettingAtprotoEventsEnabledId, SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Value = "false", ValueType = SettingValueType.Boolean, IsLocked = true, Description = "Enable ATProto event fetching and eligible outbound publication", Category = "AtprotoFederation", DisplayOrder = 1, CreatedAt = seedTimestamp },
-            new SystemSetting { Id = SeedIds.SystemSettingAtprotoEventValidationProfileId, SettingKey = GovernanceSettingKeys.Federation.AtprotoEventValidationProfile, Value = "\"platform\"", ValueType = SettingValueType.String, IsLocked = true, AllowedValues = "[\"platform\",\"community_lexicon\"]", Description = "Select platform or community-lexicon event publication readiness", Category = "AtprotoFederation", DisplayOrder = 2, CreatedAt = seedTimestamp },
-            new SystemSetting { Id = SeedIds.SystemSettingAtprotoEventsBackfillEnabledId, SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, Value = "false", ValueType = SettingValueType.Boolean, IsLocked = true, Description = "Enable recovery of inbound ATProto events that were missed while processing was unavailable", Category = "AtprotoFederation", DisplayOrder = 3, CreatedAt = seedTimestamp },
-            new SystemSetting { Id = SeedIds.SystemSettingAtprotoEventsBackfillModeId, SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, Value = "\"downtime_only\"", ValueType = SettingValueType.String, IsLocked = true, AllowedValues = "[\"downtime_only\",\"full\"]", Description = "Limit inbound ATProto event recovery to downtime gaps or allow a full replay", Category = "AtprotoFederation", DisplayOrder = 4, CreatedAt = seedTimestamp }
+            new SystemSetting { Id = SeedIds.SystemSettingAtprotoEventValidationProfileId, SettingKey = GovernanceSettingKeys.Federation.AtprotoEventValidationProfile, Value = "\"platform\"", ValueType = SettingValueType.String, IsLocked = true, AllowedValues = "[\"platform\",\"community_lexicon\"]", Description = "Select platform or community-lexicon event publication readiness", Category = "AtprotoFederation", DisplayOrder = 2, CreatedAt = seedTimestamp }
         };
 
         var existingIds = await context.Set<SystemSetting>()
@@ -2108,6 +2108,33 @@ public static class LookupTableSeeder
 
         context.Set<SystemSetting>().AddRange(missingSettings);
         await context.SaveChangesAsync(ct);
+    }
+
+    internal static async Task SeedAtprotoFederationSettingsAsync(ExploreDbContext context, CancellationToken ct)
+    {
+        var seedTimestamp = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var expectedSettings = new[]
+        {
+            (SeedIds.AtprotoFederationEventsEnabledId, GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "false"),
+            (SeedIds.AtprotoFederationEventsBackfillEnabledId, GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, "false"),
+            (SeedIds.AtprotoFederationEventsBackfillModeId, GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, "\"downtime_only\"")
+        };
+        var existingKeys = await context.Set<AtprotoFederationInstanceSetting>()
+            .AsNoTracking().Select(setting => setting.SettingKey).ToListAsync(ct);
+        var existingKeySet = existingKeys.ToHashSet(StringComparer.Ordinal);
+        bool added = false;
+        foreach (var (id, key, value) in expectedSettings)
+        {
+            if (existingKeySet.Contains(key))
+                continue;
+
+            var setting = AtprotoFederationInstanceSetting.Create(key, value, true, seedTimestamp, null);
+            context.Add(setting).Property(row => row.Id).CurrentValue = id;
+            added = true;
+        }
+
+        if (added)
+            await context.SaveChangesAsync(ct);
     }
 
     private static async Task SeedTagTypesAsync(ExploreDbContext context, CancellationToken ct)

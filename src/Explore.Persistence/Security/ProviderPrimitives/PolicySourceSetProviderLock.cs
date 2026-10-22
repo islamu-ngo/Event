@@ -23,6 +23,19 @@ internal sealed class PolicySourceSetProviderLock(
 {
     private readonly DbConnection _connection = connection.Connection;
 
+    internal Task AcquireSelectedWriterAsync(DbTransaction transaction, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        // Session custody is checked by the selected owner. SQLite additionally needs
+        // the original transaction's real writer reservation, even with no source rows.
+        if (_context.Database.IsSqlite())
+            return AcquirePortableAsync(transaction, ct);
+        if (_context.Database.IsNpgsql() || _context.Database.IsSqlServer()
+            || _context.Database.ProviderName == RelationalNamedLock.MySqlProvider)
+            return Task.CompletedTask;
+        throw new NotSupportedException("policy_source_set_provider_not_supported");
+    }
+
     internal async Task AcquirePostgresAsync(DbTransaction transaction, CancellationToken ct)
     {
         await using var command = Command(transaction);

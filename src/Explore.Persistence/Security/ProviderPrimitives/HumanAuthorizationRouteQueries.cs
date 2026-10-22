@@ -7,6 +7,7 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -19,13 +20,16 @@ namespace Explore.Persistence.Security;
 /// </summary>
 internal sealed class HumanAuthorizationRouteQueries(
     ExploreDbContext _context, HumanCommitSubject _subject, PolicySourceSetPurpose _purpose,
-    PostgresNativeQueueEnrollment? _enrollment, RelationalConnectionIdentity connection, Guid? _tenant)
+    PostgresNativeQueueEnrollment? _enrollment, RelationalConnectionIdentity connection, Guid? _tenant,
+    LocalIdentityExecutionLease? selectedExecution = null)
 {
     private readonly DbConnection _connection = connection.Connection;
     private static readonly JsonSerializerOptions Json = new() { AllowDuplicateProperties = false };
 
     internal async Task<HumanAuthorizationRouteFacts> ReadAsync(DbTransaction? transaction, CancellationToken ct)
     {
+        if (selectedExecution is not null)
+            return await IdentityWriterHumanSourceQueries.ReadRouteAsync(selectedExecution, _subject, ct);
         if (_context.Database.IsNpgsql())
         {
             await using var command = _connection.CreateCommand();

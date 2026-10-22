@@ -21,6 +21,7 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
     IInstanceBootstrapAuditLogger instanceBootstrapAuditLogger,
     IUnitOfWork unitOfWork,
     IConfiguration configuration,
+    IEventDiscoveryEnrollmentGate enrollmentGate,
     ITrustedSetupSettingsWriter? setupSettingsWriter = null)
     : ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>
 {
@@ -52,6 +53,7 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
                 "Invalid onboarding profile.");
         }
 
+        await using var enrollment = await enrollmentGate.AcquireAsync(cancellationToken);
         var response = await unitOfWork.ExecuteBootstrapConvergenceAsync(async transactionToken =>
         {
             var current = await instanceBootstrapStateRepository.GetCurrentForUpdate(transactionToken);

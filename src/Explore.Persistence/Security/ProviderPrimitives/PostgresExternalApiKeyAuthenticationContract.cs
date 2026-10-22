@@ -177,9 +177,9 @@ internal sealed class PostgresAuthenticationSourceProfile(Type type, string role
                         AND acl.privilege_type=permission.privilege AND NOT acl.is_grantable)
                     AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl WHERE acl.grantee=0 AND acl.privilege_type=permission.privilege))
                 """;
-            string runtime = type == typeof(ExternalApiKey) && login == enrollment.RuntimeLogin
+            string runtime = (type == typeof(ExternalApiKey) || type == typeof(AdmissionScannerCapability)) && login == enrollment.RuntimeLogin
                 ? PostgresTenantApiKeyStoragePermissions.RuntimeColumnException(context, enrollment,
-                    "r.oid", "a.attrelid", "a.attname", "permission.privilege") : "false";
+                    "r.oid", "a.attrelid", "a.attname", "permission.privilege", type) : "false";
             return $"(({global}) OR ({runtime}))";
         }
         string callers = string.Join(" AND ", new[] { enrollment.RuntimeLogin, enrollment.GlobalLogin }.Select(login => $"""
@@ -222,7 +222,7 @@ internal sealed class PostgresAuthenticationSourceProfile(Type type, string role
                 AND NOT pg_catalog.pg_has_role({RoleId(enrollment.RuntimeLogin)},{RoleId(enrollment.GlobalLogin)},'MEMBER')
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname IN ({string.Join(',', obsoleteRoles.Select(Text))}))
                 AND ({retired}) AND ({callers}) AND ({installed})
-                AND ({(type == typeof(ExternalApiKey) ? PostgresTenantApiKeyStoragePermissions.CompleteManifest(context, enrollment) : "true")})
+                AND ({PostgresTenantApiKeyStoragePermissions.CompleteManifest(context, enrollment)})
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid=pg_catalog.to_regclass({Text(source.Table)})
                     AND (0::oid=ANY(p.polroles) OR EXISTS (SELECT 1 FROM unnest(p.polroles) policy_role(oid)
                         WHERE CASE WHEN policy_role.oid=0 THEN false ELSE pg_catalog.pg_has_role({RoleId(enrollment.GlobalLogin)},policy_role.oid,'MEMBER') END))

@@ -52,7 +52,22 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
             var parentConflict = await Assert.ThrowsAsync<PostgresException>(() => contender.Database.ExecuteSqlRawAsync(
                 $"SELECT id FROM {state.LocationTable} WHERE id = {{0}} FOR UPDATE NOWAIT", [move ? state.DestinationId : state.SourceId], token));
             await Assert.That(parentConflict!.SqlState).IsEqualTo(PostgresErrorCodes.LockNotAvailable);
-            await Assert.That(await db.ExternalApiKeys.IgnoreQueryFilters().AnyAsync(key => key.Id == rows.PlatformKey.Id, token)).IsFalse();
+            await Assert.That(await db.ExternalApiKeys.IgnoreQueryFilters()
+                .AnyAsync(key => key.Id == rows.PlatformKey.Id, token)).IsFalse();
+            var transaction = db.Database.CurrentTransaction!;
+            await transaction.CreateSavepointAsync("runtime_private_key_denial", token);
+            try
+            {
+                var denied = await Assert.ThrowsAsync<PostgresException>(() =>
+                    db.ExternalApiKeys.IgnoreQueryFilters().Where(key => key.Id == rows.PlatformKey.Id)
+                        .Select(key => key.SecretHash).SingleOrDefaultAsync(token));
+                await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+            }
+            finally
+            {
+                await transaction.RollbackToSavepointAsync("runtime_private_key_denial", token);
+                await transaction.ReleaseSavepointAsync("runtime_private_key_denial", token);
+            }
             return true;
         });
     }
@@ -73,6 +88,7 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
         var authority = state.Authority(db, TimeProvider.System);
         await using (var change = fixture.CreateDbContext())
         {
+            change.BindTenantLease();
             var key = await change.ExternalApiKeys.SingleAsync(row => row.Id == state.Key.Id);
             switch (drift)
             {
@@ -178,13 +194,20 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
         });
         var sql = new InstanceApiKeyCapabilitySql(db);
         var function = PostgresMachineMutationAuthorityContract.Function(db);
-        string signature = footer
-            ? sql.Function(function.Name) + "(" + function.ArgumentTypes + ")"
-            : PostgresExternalApiKeyAuthenticationContract.FunctionSql(db) + "(text)";
-        await admin.Database.ExecuteSqlRawAsync(
-            $"GRANT EXECUTE ON FUNCTION {signature} TO {PostgresMachineRoomMutationAuthorityContract.RuntimeRole}");
+        string signature = sql.Function(function.Name) + "(" + function.ArgumentTypes + ")";
+        if (footer)
+            await admin.Database.ExecuteSqlRawAsync(
+                $"GRANT EXECUTE ON FUNCTION {signature} TO {PostgresMachineRoomMutationAuthorityContract.RuntimeRole}");
+        else
+            await admin.Database.ExecuteSqlRawAsync(
+                $"GRANT SELECT ({sql.Column<ExternalApiKey>(nameof(ExternalApiKey.SecretHash))}) ON {sql.Table<ExternalApiKey>()} TO {PostgresMachineRoomMutationAuthorityContract.RuntimeRole}");
         try
         {
+            if (!footer)
+                await Assert.That(await admin.Database.SqlQuery<bool>($"""
+                    SELECT pg_catalog.has_any_column_privilege(
+                        {PostgresMachineRoomMutationAuthorityContract.RuntimeRole}, {sql.Table<ExternalApiKey>()}, 'SELECT') AS "Value"
+                    """).SingleAsync()).IsTrue();
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 new EfCoreUnitOfWork(db).ExecuteSerializableAsync(async token =>
                 {
@@ -194,8 +217,12 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
         }
         finally
         {
-            await admin.Database.ExecuteSqlRawAsync(
-                $"REVOKE EXECUTE ON FUNCTION {signature} FROM {PostgresMachineRoomMutationAuthorityContract.RuntimeRole}");
+            if (footer)
+                await admin.Database.ExecuteSqlRawAsync(
+                    $"REVOKE EXECUTE ON FUNCTION {signature} FROM {PostgresMachineRoomMutationAuthorityContract.RuntimeRole}");
+            else
+                await admin.Database.ExecuteSqlRawAsync(
+                    $"REVOKE SELECT ({sql.Column<ExternalApiKey>(nameof(ExternalApiKey.SecretHash))}) ON {sql.Table<ExternalApiKey>()} FROM {PostgresMachineRoomMutationAuthorityContract.RuntimeRole}");
         }
     }
 
@@ -207,12 +234,16 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
         await using var admin = fixture.CreateDbContext();
         await PostgresMachineMutationAuthorityContract.ApplyAsync(admin);
         string login = $"\"{rows.RuntimeOptions.Username}\"";
-        await admin.Database.ExecuteSqlRawAsync(
-            $"GRANT {PostgresMachineMutationAuthorityContract.RuntimeRole} TO {login} WITH INHERIT TRUE, SET FALSE");
+        bool ownsFooterMembership = !await rows.HasDirectPurposeMembershipAsync(
+            admin, PostgresMachineMutationAuthorityContract.RuntimeRole);
+        if (ownsFooterMembership)
+            await admin.Database.ExecuteSqlRawAsync(
+                $"GRANT {PostgresMachineMutationAuthorityContract.RuntimeRole} TO {login} WITH INHERIT TRUE, SET FALSE");
         await using var db = state.Context();
         var sql = new InstanceApiKeyCapabilitySql(db);
         var function = PostgresMachineRoomMutationAuthorityContract.Function(db);
         string signature = sql.Function(function.Name) + "(" + function.ArgumentTypes + ")";
+        bool ownsRoomExecutionGrant = false;
         try
         {
             await new EfCoreUnitOfWork(db).ExecuteSerializableAsync(async token =>
@@ -223,6 +254,7 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
             });
             await admin.Database.ExecuteSqlRawAsync(
                 $"GRANT EXECUTE ON FUNCTION {signature} TO {PostgresMachineMutationAuthorityContract.RuntimeRole}");
+            ownsRoomExecutionGrant = true;
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 new EfCoreUnitOfWork(db).ExecuteSerializableAsync(async token =>
                 {
@@ -232,10 +264,12 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
         }
         finally
         {
-            await admin.Database.ExecuteSqlRawAsync(
-                $"REVOKE EXECUTE ON FUNCTION {signature} FROM {PostgresMachineMutationAuthorityContract.RuntimeRole}");
-            await admin.Database.ExecuteSqlRawAsync(
-                $"REVOKE {PostgresMachineMutationAuthorityContract.RuntimeRole} FROM {login}");
+            if (ownsRoomExecutionGrant)
+                await admin.Database.ExecuteSqlRawAsync(
+                    $"REVOKE EXECUTE ON FUNCTION {signature} FROM {PostgresMachineMutationAuthorityContract.RuntimeRole}");
+            if (ownsFooterMembership)
+                await admin.Database.ExecuteSqlRawAsync(
+                    $"REVOKE {PostgresMachineMutationAuthorityContract.RuntimeRole} FROM {login}");
         }
     }
 
@@ -271,18 +305,20 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
     }
 
     private sealed class RoomRows(PostgreSqlContainerFixture fixture, Rows rows, ExternalApiKey key,
-        Guid roomId, Guid sourceId, Guid destinationId, string[] tables) : IAsyncDisposable
+        Guid roomId, Guid sourceId, Guid destinationId, string roomTable, string locationTable,
+        bool ownsPurposeMembership) : IAsyncDisposable
     {
         internal ExternalApiKey Key { get; } = key;
         internal Guid RoomId { get; } = roomId;
         internal Guid SourceId { get; } = sourceId;
         internal Guid DestinationId { get; } = destinationId;
-        internal string RoomTable => tables[^2];
-        internal string LocationTable => tables[^1];
+        internal string RoomTable { get; } = roomTable;
+        internal string LocationTable { get; } = locationTable;
 
         internal static async Task<RoomRows> CreateAsync(PostgreSqlContainerFixture fixture, Rows rows, ExternalApiKeyOwnerType owner)
         {
             await using var seed = fixture.CreateDbContext();
+            seed.BindTenantLease();
             await PostgresMachineRoomMutationAuthorityContract.ApplyAsync(seed);
             var key = await seed.ExternalApiKeys.SingleAsync(row => row.Id ==
                 (owner == ExternalApiKeyOwnerType.InstanceAdmin ? rows.PlatformKey.Id : rows.KeyA.Id));
@@ -312,20 +348,18 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
             };
             seed.AddRange(source, destination, room);
             await seed.SaveChangesAsync();
-            Type[] types = [typeof(ExternalApiKey), typeof(User), typeof(PlatformUserRole), typeof(Role),
-                typeof(Tenant), typeof(TenantStatus), typeof(TenantUser), typeof(TenantUserRoleGrant), typeof(LocationRoom), typeof(Location)];
             var helper = seed.GetService<ISqlGenerationHelper>();
-            string[] tables = types.Select(type =>
-            {
-                var entity = seed.Model.FindEntityType(type)!;
-                return helper.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
-            }).ToArray();
+            var roomEntity = seed.Model.FindEntityType(typeof(LocationRoom))!;
+            var locationEntity = seed.Model.FindEntityType(typeof(Location))!;
+            string roomTable = helper.DelimitIdentifier(roomEntity.GetTableName()!, roomEntity.GetSchema());
+            string locationTable = helper.DelimitIdentifier(locationEntity.GetTableName()!, locationEntity.GetSchema());
             string login = $"\"{rows.RuntimeOptions.Username}\"";
-            foreach (string table in tables)
-                await seed.Database.ExecuteSqlRawAsync($"GRANT SELECT, UPDATE (id) ON {table} TO {login}");
-            await seed.Database.ExecuteSqlRawAsync(
-                $"GRANT {PostgresMachineRoomMutationAuthorityContract.RuntimeRole} TO {login} WITH INHERIT TRUE, SET FALSE");
-            return new(fixture, rows, key, room.Id, source.Id, destination.Id, tables);
+            bool ownsPurposeMembership = !await rows.HasDirectPurposeMembershipAsync(
+                seed, PostgresMachineRoomMutationAuthorityContract.RuntimeRole);
+            if (ownsPurposeMembership)
+                await seed.Database.ExecuteSqlRawAsync(
+                    $"GRANT {PostgresMachineRoomMutationAuthorityContract.RuntimeRole} TO {login} WITH INHERIT TRUE, SET FALSE");
+            return new(fixture, rows, key, room.Id, source.Id, destination.Id, roomTable, locationTable, ownsPurposeMembership);
         }
 
         internal ExploreDbContext Context(IInterceptor? interceptor = null)
@@ -334,7 +368,9 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, rows.RuntimeOptions);
             options.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
             if (interceptor is not null) options.AddInterceptors(interceptor);
-            return new ExploreDbContext(options.Options) { TenantContext = new TenantScope(rows.A) };
+            var context = new ExploreDbContext(options.Options) { TenantContext = new TenantScope(rows.A) };
+            context.BindTenantLease();
+            return context;
         }
 
         internal MachineMutationCommitAuthority Authority(ExploreDbContext db, TimeProvider clock)
@@ -355,11 +391,10 @@ public sealed class PostgresMachineRoomMutationAuthorityTests(PostgreSqlContaine
 
         public async ValueTask DisposeAsync()
         {
+            if (!ownsPurposeMembership) return;
             await using var admin = fixture.CreateDbContext();
             string login = $"\"{rows.RuntimeOptions.Username}\"";
             await admin.Database.ExecuteSqlRawAsync($"REVOKE {PostgresMachineRoomMutationAuthorityContract.RuntimeRole} FROM {login}");
-            foreach (string table in tables)
-                await admin.Database.ExecuteSqlRawAsync($"REVOKE SELECT, UPDATE (id) ON {table} FROM {login}");
         }
 
         private sealed record TenantScope(Guid TenantId) : ITenantContext;

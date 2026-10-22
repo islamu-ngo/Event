@@ -32,43 +32,6 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    public async Task AtprotoGovernanceRejectsUnknownExecutorBeforeReadAndReplacement()
-    {
-        await using var data = await OrdinaryRows.CreateAsync(fixture);
-        string key = GovernanceSettingKeys.Federation.AtprotoEventsEnabled;
-        await using var migrator = fixture.CreateDbContext();
-        migrator.TenantSettingOverrides.Add(
-            new TenantSetting { TenantId = data.A, Tenant = null!, SettingKey = key, Value = "true" });
-        await migrator.SaveChangesAsync();
-        await using var outsider = await GlobalLookupAuthority.CreateAsync(fixture);
-        await using var ordinary = await GlobalLookupAuthority.CreateAsync(fixture, atprotoGovernance: true);
-        string function = PostgresAtprotoGovernanceContract.FunctionSql(migrator);
-        await migrator.Database.ExecuteSqlRawAsync(
-            $"GRANT EXECUTE ON FUNCTION {function}(text) TO \"{outsider.Role}\"");
-        try
-        {
-            PostgresException entry = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await new AtprotoGovernanceSettingRepository(outsider.Factory).GetOverridesAsync(key));
-            await Assert.That(entry.SqlState).IsEqualTo("55000");
-            PostgresException reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await PostgresAtprotoGovernanceContract.ApplyAsync(migrator));
-            await Assert.That(reinstall.SqlState).IsEqualTo("55000");
-            await Assert.That(await migrator.Database.SqlQueryRaw<bool>(
-                $"SELECT pg_catalog.has_function_privilege('{outsider.Role}', '{function}(text)', 'EXECUTE') AS \"Value\"")
-                .SingleAsync()).IsTrue();
-        }
-        finally
-        {
-            await migrator.Database.ExecuteSqlRawAsync(
-                $"REVOKE EXECUTE ON FUNCTION {function}(text) FROM \"{outsider.Role}\"");
-        }
-        await PostgresAtprotoGovernanceContract.ApplyAsync(migrator);
-        List<TenantSetting> settings = await new AtprotoGovernanceSettingRepository(ordinary.Factory)
-            .GetOverridesAsync(key);
-        await Assert.That(settings.Single(row => row.TenantId == data.A).Value).IsEqualTo("true");
-    }
-
-    [Test]
     public async Task RuntimeAdmissionPolicyIntegrityDoesNotDependOnConnectionSearchPath()
     {
         await using var data = await OrdinaryRows.CreateAsync(fixture);
@@ -89,52 +52,6 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
 
             await Assert.That(await readiness.ExecuteScalarAsync()).IsEqualTo(true);
         }
-    }
-
-    [Test]
-    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsEnabled)]
-    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled)]
-    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode)]
-    public async Task AtprotoGovernanceDiscoveryReturnsCompleteFixedKeyAudienceWithoutRequestTenant(string key)
-    {
-        await using var data = await OrdinaryRows.CreateAsync(fixture);
-        await using (var seed = fixture.CreateDbContext())
-        {
-            seed.TenantSettingOverrides.AddRange(
-                new TenantSetting { TenantId = data.A, Tenant = null!, SettingKey = key, Value = "true" },
-                new TenantSetting { TenantId = data.B, Tenant = null!, SettingKey = key, Value = "false" });
-            await seed.SaveChangesAsync();
-        }
-        await using var request = data.CreateContext(null);
-        await data.AssertOrdinaryAuthorityAsync(request);
-        await Assert.That(await request.TenantSettingOverrides.IgnoreQueryFilters()
-            .CountAsync(row => row.SettingKey == key)).IsEqualTo(0);
-
-        await using var global = await GlobalLookupAuthority.CreateAsync(fixture, atprotoGovernance: true);
-        List<TenantSetting> settings = await new AtprotoGovernanceSettingRepository(global.Factory)
-            .GetOverridesAsync(key);
-
-        await Assert.That(settings.Where(row => row.TenantId == data.A || row.TenantId == data.B)
-            .Select(row => row.TenantId)).IsEquivalentTo([data.A, data.B]);
-        await Assert.That(settings.All(row => row.SettingKey == key)).IsTrue();
-        await Assert.That(settings.Single(row => row.TenantId == data.A).Value).IsEqualTo("true");
-        await Assert.That(settings.Single(row => row.TenantId == data.B).Value).IsEqualTo("false");
-        await Assert.That(request.TenantFilterTenantId).IsNull();
-        await using var globalContext = await global.Factory.CreateDbContextAsync();
-        await globalContext.Database.OpenConnectionAsync();
-        await Assert.That(globalContext.TenantFilterTenantId).IsNull();
-        var entity = globalContext.Model.FindEntityType(typeof(TenantSetting))!;
-        string privateRead = $"SELECT count(*)::integer AS \"Value\" FROM \"{entity.GetSchema()}\".\"{entity.GetTableName()}\"";
-        PostgresException denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await globalContext.Database.SqlQueryRaw<int>(privateRead).SingleAsync());
-        await Assert.That(denied.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
-        string invalidKey = $"SELECT * FROM {PostgresAtprotoGovernanceContract.FunctionSql(globalContext)}({{0}})";
-        PostgresException invalid = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await globalContext.Database.ExecuteSqlRawAsync(invalidKey, data.Key));
-        await Assert.That(invalid.SqlState).IsEqualTo(PostgresErrorCodes.InvalidParameterValue);
-        await Assert.That(await globalContext.Database
-            .SqlQueryRaw<bool>("SELECT pg_has_role(current_user, 'event_atproto_governance_owner', 'MEMBER') AS \"Value\"")
-            .SingleAsync()).IsFalse();
     }
 
     [Test]
@@ -531,8 +448,8 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
                 5, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), CancellationToken.None);
             await Assert.That(hidden).IsEmpty();
         }
-        await using var global = await GlobalIntegrationSyncAuthority.CreateAsync(fixture);
-        var discovery = new IntegrationSyncQueueDiscovery(global.Factory);
+        var global = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        var discovery = new IntegrationSyncQueueDiscovery(global, fixture.NativeQueueEnrollment);
         var discovered = await discovery.GetPendingAsync(
             5, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), CancellationToken.None);
         await Assert.That(discovered.Select(row => row.OutboxId)).IsEquivalentTo(data.QueueIds)
@@ -542,45 +459,36 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
             1, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), CancellationToken.None);
         await Assert.That(bounded.Count).IsEqualTo(1);
 
-        await using var executor = await global.Factory.CreateDbContextAsync();
+        await using var executor = await global.CreateDbContextAsync();
         await executor.Database.OpenConnectionAsync();
         await using (var role = executor.Database.GetDbConnection().CreateCommand())
         {
             role.CommandText = $"""
-                SELECT rolsuper OR rolbypassrls
-                    OR pg_has_role(current_user, '{PostgresIntegrationSyncDiscoveryContract.OwnerRole}', 'MEMBER')
-                    OR pg_has_role(current_user, '{PostgresIntegrationSyncDiscoveryContract.MigratorRole}', 'MEMBER')
+                SELECT rolsuper OR rolbypassrls OR session_user <> @login OR current_user <> session_user
                 FROM pg_roles WHERE rolname = current_user
                 """;
+            role.Parameters.Add(new NpgsqlParameter("login", fixture.NativeQueueEnrollment.GlobalLogin));
             await Assert.That(await role.ExecuteScalarAsync()).IsEqualTo(false);
         }
         var deniedRead = await Assert.ThrowsAsync<PostgresException>(async () =>
             await executor.IntegrationSyncOutbox.IgnoreQueryFilters().AsNoTracking().ToListAsync());
         await Assert.That(deniedRead?.SqlState).IsEqualTo("42501");
         await using var ordinary = data.CreateContext(data.A);
-        string function = PostgresIntegrationSyncDiscoveryContract.FunctionSql(ordinary);
-        string discoverySql = $"SELECT * FROM {function}({{0}}, {{1}}, {{2}})";
-        var deniedDiscovery = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await ordinary.Database.ExecuteSqlRawAsync(
-                discoverySql,
-                DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), 5));
-        await Assert.That(deniedDiscovery?.SqlState).IsEqualTo("42501");
+        ordinary.BindTenantLease();
+        await ordinary.Database.OpenConnectionAsync();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Explore.Persistence.Schema.PostgresIntegrationSyncReadPermissions.RequireReadyAsync(ordinary, fixture.NativeQueueEnrollment));
     }
 
     [Test]
     [Arguments(0)]
     [Arguments(1001)]
-    public async Task ApplicationBoundaryIntegrationDiscoveryRejectsUnboundedSqlRequests(int take)
+    public async Task ApplicationBoundaryIntegrationDiscoveryRejectsUnboundedRequests(int take)
     {
-        await using var global = await GlobalIntegrationSyncAuthority.CreateAsync(fixture);
-        await using var executor = await global.Factory.CreateDbContextAsync();
-        string function = PostgresIntegrationSyncDiscoveryContract.FunctionSql(executor);
-        string discoverySql = $"SELECT * FROM {function}({{0}}, {{1}}, {{2}})";
-        var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await executor.Database.ExecuteSqlRawAsync(
-                discoverySql,
-                DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), take));
-        await Assert.That(denied?.SqlState).IsEqualTo("22023");
+        var global = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        var discovery = new IntegrationSyncQueueDiscovery(global, fixture.NativeQueueEnrollment);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            discovery.GetPendingAsync(take, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(-5), CancellationToken.None));
     }
 
     [Test]
@@ -594,8 +502,8 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
             await setup.IntegrationSyncOutbox.Where(row => row.Id == data.QueueIds[1])
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.NextAttemptAt, DateTime.UtcNow.AddDays(2)));
         }
-        await using var global = await GlobalIntegrationSyncAuthority.CreateAsync(fixture);
-        var discovery = new IntegrationSyncQueueDiscovery(global.Factory);
+        var global = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        var discovery = new IntegrationSyncQueueDiscovery(global, fixture.NativeQueueEnrollment);
         var candidates = await discovery.GetPendingAsync(
             1000, DateTime.UtcNow.AddDays(3), DateTime.UtcNow, CancellationToken.None);
         await Assert.That(candidates.Any(row => data.QueueIds.Contains(row.OutboxId))).IsFalse()
@@ -622,10 +530,10 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
                         scenario == "missing-start" ? (DateTime?)null : DateTime.UtcNow.AddHours(-1))
                     .SetProperty(row => row.ProcessingLeaseToken,
                         scenario == "missing-lease" ? (Guid?)null : Guid.CreateVersion7())
-                    .SetProperty(row => row.LastError, IntegrationSyncFailureCodes.ProviderHandoffInDoubt));
+                    .SetProperty(row => row.EvidenceKind, IntegrationSyncEvidenceKind.ProviderHandoffInDoubt));
         }
-        await using var global = await GlobalIntegrationSyncAuthority.CreateAsync(fixture);
-        await using var services = data.CreateIntegrationWorkerServices(global.Factory);
+        var global = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
+        await using var services = data.CreateIntegrationWorkerServices(global);
         var worker = new IntegrationSyncDrainService(
             services.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(new IntegrationSyncProcessorSettings { BatchSize = 1000 }),
@@ -649,7 +557,10 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
                 await Assert.That(row.ProcessingStartedAt).IsNull();
                 await Assert.That(row.NextAttemptAt).IsNull();
                 if (recovery)
-                    await Assert.That(row.LastError).IsEqualTo(IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous);
+                {
+                    await Assert.That(row.EvidenceKind).IsEqualTo(IntegrationSyncEvidenceKind.ProviderOutcomeAmbiguous);
+                    await Assert.That(row.LastError).IsNull();
+                }
                 else
                     await Assert.That(row.LastFailureAt).IsNotNull();
             }
@@ -667,60 +578,6 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
 
     private sealed record FixedTenant(Guid TenantId) : ITenantContext;
 
-    private sealed class GlobalIntegrationSyncAuthority(PostgreSqlContainerFixture fixture) : IAsyncDisposable
-    {
-        private readonly string _role = $"integration_global_{Guid.CreateVersion7():N}";
-        private string _connectionString = null!;
-        internal GlobalExploreDbContextFactory Factory { get; private set; } = null!;
-
-        internal static async Task<GlobalIntegrationSyncAuthority> CreateAsync(PostgreSqlContainerFixture fixture)
-        {
-            var authority = new GlobalIntegrationSyncAuthority(fixture);
-            await using var migrator = fixture.CreateDbContext();
-            await PostgresIntegrationSyncDiscoveryContract.ApplyAsync(migrator);
-            string schema = migrator.Model.FindEntityType(typeof(IntegrationSyncOutbox))!.GetSchema()!;
-            string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-            await using var administration = new NpgsqlConnection(fixture.ConnectionString);
-            await administration.OpenAsync();
-            await using var grant = administration.CreateCommand();
-            grant.CommandText = $"""
-                CREATE ROLE "{authority._role}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{password}';
-                GRANT {PostgresIntegrationSyncDiscoveryContract.RuntimeRole} TO "{authority._role}";
-                """;
-            await grant.ExecuteNonQueryAsync();
-            var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
-            var options = new PrimaryDatabaseConnectionOptions
-            {
-                Role = PrimaryDatabaseRole.Global,
-                Provider = PrimaryDatabaseProvider.PostgreSql,
-                Host = connection.Host,
-                Port = connection.Port,
-                Database = connection.Database,
-                Schema = schema,
-                Username = authority._role,
-                Password = password,
-                TlsMode = PrimaryDatabaseTlsMode.Disabled
-            };
-            authority._connectionString = PrimaryDatabaseConfiguration.BuildConnectionString(options).ConnectionString;
-            authority.Factory = new GlobalExploreDbContextFactory(options, poolSize: 1);
-            return authority;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            using var pool = new NpgsqlConnection(_connectionString);
-            NpgsqlConnection.ClearPool(pool);
-            await using var administration = new NpgsqlConnection(fixture.ConnectionString);
-            await administration.OpenAsync();
-            await using var revoke = administration.CreateCommand();
-            revoke.CommandText = $"""
-                REVOKE {PostgresIntegrationSyncDiscoveryContract.RuntimeRole} FROM "{_role}";
-                DROP ROLE "{_role}";
-                """;
-            await revoke.ExecuteNonQueryAsync();
-        }
-    }
-
     internal sealed class GlobalLookupAuthority : IAsyncDisposable
     {
         internal string Role { get; } = $"lookup_global_{Guid.CreateVersion7():N}";
@@ -728,17 +585,15 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
         private string _connectionString = null!;
         private readonly PostgreSqlContainerFixture _fixture;
 
-        private readonly bool _atprotoGovernance;
-        private GlobalLookupAuthority(PostgreSqlContainerFixture fixture, bool atprotoGovernance)
+        private GlobalLookupAuthority(PostgreSqlContainerFixture fixture)
         {
             _fixture = fixture;
-            _atprotoGovernance = atprotoGovernance;
         }
 
         internal static async Task<GlobalLookupAuthority> CreateAsync(
-            PostgreSqlContainerFixture fixture, bool atprotoGovernance = false)
+            PostgreSqlContainerFixture fixture)
         {
-            var authority = new GlobalLookupAuthority(fixture, atprotoGovernance);
+            var authority = new GlobalLookupAuthority(fixture);
             await using var migrator = fixture.CreateDbContext();
             await PostgresTenantLookupContract.ApplyAsync(migrator);
             string schema = migrator.Model.FindEntityType(typeof(Tenant))!.GetSchema()!;
@@ -749,7 +604,6 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
             grant.CommandText = $"""
                 CREATE ROLE "{authority.Role}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{password}';
                 GRANT {PostgresTenantLookupContract.GlobalRole} TO "{authority.Role}";
-                {(atprotoGovernance ? $"GRANT {PostgresAtprotoGovernanceContract.RuntimeRole} TO \"{authority.Role}\" WITH INHERIT TRUE, SET FALSE;" : "")}
                 """;
             await grant.ExecuteNonQueryAsync();
             var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString)
@@ -783,7 +637,6 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
             await using var revoke = administration.CreateCommand();
             revoke.CommandText = $"""
                 REVOKE {PostgresTenantLookupContract.GlobalRole} FROM "{Role}";
-                {(_atprotoGovernance ? $"REVOKE {PostgresAtprotoGovernanceContract.RuntimeRole} FROM \"{Role}\";" : "")}
                 DROP ROLE "{Role}";
                 """;
             await revoke.ExecuteNonQueryAsync();
@@ -923,6 +776,7 @@ public sealed class PostgresTenantApplicationTableIsolationTests(PostgreSqlConta
             services.AddHttpContextAccessor();
             services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
             services.AddSingleton(globalFactory);
+            services.AddSingleton(fixture.NativeQueueEnrollment);
             services.AddScoped<IIntegrationSyncQueueDiscovery, IntegrationSyncQueueDiscovery>();
             services.AddPooledDbContextFactory<ExploreDbContext>(options => options
                 .UseNpgsql(_connectionString)

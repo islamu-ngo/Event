@@ -18,7 +18,7 @@ namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 [NotInParallel("PersistenceDb")]
-public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContainerFixture fixture)
+public sealed partial class ConfigurationManifestBootstrapOriginTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
     public async Task OriginalAbsentSetting_UsesApiCoordinationWithoutNativeTableOrRowFences()
@@ -219,6 +219,12 @@ public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContaine
     {
         await fixture.ResetAsync();
         await using var host = ConfigurationManifestBootstrapTestHost.ForPostgres(fixture);
+        await using var validationHost = ConfigurationManifestBootstrapTestHost.ForPostgres(
+            fixture, mode: ConfigurationManifestMode.ValidateOnly);
+        var validationRequest = new ApplyConfigurationManifestCommand(
+            ConfigurationManifestApplicationTestSupport.Source("native-body-control"));
+        await Assert.That((await validationHost.ExecuteAsync(validationRequest, CancellationToken.None)).IsSuccess).IsTrue();
+        await AssertNoBootstrapAsync();
         await using var migration = fixture.CreateDbContext();
         await migration.Database.OpenConnectionAsync();
         var sql = migration.GetService<ISqlGenerationHelper>();
@@ -247,6 +253,7 @@ public sealed class ConfigurationManifestBootstrapOriginTests(PostgreSqlContaine
         {
             await migration.Database.ExecuteSqlRawAsync(original);
         }
+        await Assert.That((await validationHost.ExecuteAsync(validationRequest, CancellationToken.None)).IsSuccess).IsTrue();
         await AssertNoBootstrapAsync();
     }
 

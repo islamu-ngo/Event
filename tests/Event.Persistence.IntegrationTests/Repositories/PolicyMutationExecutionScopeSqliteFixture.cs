@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.API.Extensions;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Operations;
 using Explore.Application.Telemetry;
@@ -15,15 +17,18 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Services;
+using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using NSubstitute;
 using IAsyncInitializer = TUnit.Core.Interfaces.IAsyncInitializer;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
@@ -34,6 +39,7 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
     private readonly string _runtimePath = Path.Combine(Path.GetTempPath(), $"policy-runtime-{Guid.CreateVersion7():N}.db");
     private readonly string _globalPath = Path.Combine(Path.GetTempPath(), $"policy-global-{Guid.CreateVersion7():N}.db");
     private ServiceProvider? _provider;
+    private Action<ExploreDbContext>? _beforePreparation;
 
     internal Guid CallerTenantId { get; } = Guid.CreateVersion7();
     internal Guid TargetTenantId { get; } = Guid.CreateVersion7();
@@ -48,6 +54,11 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
         await EmailDispatchSqliteFixture.CreateDatabaseAsync(_globalPath);
         await using (var runtime = EmailDispatchSqliteFixture.CreateContext(_runtimePath))
         {
+            runtime.BindTenantLease();
+            await using var humanGate = new HumanSecuritySourceGate(runtime);
+            await using var humanLease = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(runtime);
+            await using var discoveryLease = await discoveryGate.AcquireAsync();
             AdministratorId = await InstanceSettingsCommandFixture.SeedAdministratorAsync(runtime);
             runtime.SystemSettings.Add(AuthorityMarker("\"runtime\""));
             foreach (Guid tenantId in new[] { CallerTenantId, TargetTenantId })
@@ -99,6 +110,11 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
         }
         await using (var global = EmailDispatchSqliteFixture.CreateContext(_globalPath))
         {
+            global.BindTenantLease();
+            await using var humanGate = new HumanSecuritySourceGate(global);
+            await using var humanLease = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(global);
+            await using var discoveryLease = await discoveryGate.AcquireAsync();
             // The independent Global administration reader must see the same persisted actor
             // as the Runtime caller; a claim alone never grants instance administration.
             var role = await global.Roles.SingleAsync(row => row.MasterCode == "platform.admin");
@@ -137,6 +153,10 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
         }).Services;
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
+        var webEnvironment = Substitute.For<IWebHostEnvironment>();
+        webEnvironment.EnvironmentName.Returns("Testing");
+        services.AddSingleton(webEnvironment);
+        services.AddApiAuthentication(configuration, webEnvironment, skipAuthorityWarmup: true);
         services.AddHybridCache();
         services.AddMetrics();
         services.AddSingleton<ProjectionMetrics>();
@@ -162,6 +182,9 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
         services.AddScoped<ITenantResolverService, TenantResolverService>();
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<PolicyScopeDisposalWitness>();
+        services.AddScoped<IHumanCommitScopePreparation>(provider => new ObservedHumanPreparation(
+            (IHumanCommitScopePreparation)provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>(),
+            provider.GetRequiredService<ExploreDbContext>(), this));
 
         // Keep the real writer and its full DI graph. Capture the immutable lease facts at
         // construction, before execution-scope disposal resets a pooled context.
@@ -186,16 +209,43 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
         return scope;
     }
 
+    internal IDisposable ObserveNextPreparation(Action<ExploreDbContext> observation)
+    {
+        if (Interlocked.CompareExchange(ref _beforePreparation, observation, null) is not null)
+            throw new InvalidOperationException("A preparation observation is already pending.");
+        return new PreparationObservation(this, observation);
+    }
+
+    private sealed class ObservedHumanPreparation(IHumanCommitScopePreparation actual,
+        ExploreDbContext context, PolicyMutationExecutionScopeSqliteFixture fixture) : IHumanCommitScopePreparation
+    {
+        public HumanCommitSubject? Subject => actual.Subject;
+
+        public ValueTask PrepareAsync(CancellationToken cancellationToken)
+        {
+            Interlocked.Exchange(ref fixture._beforePreparation, null)?.Invoke(context);
+            return actual.PrepareAsync(cancellationToken);
+        }
+    }
+
+    private sealed class PreparationObservation(PolicyMutationExecutionScopeSqliteFixture fixture,
+        Action<ExploreDbContext> observation) : IDisposable
+    {
+        public void Dispose() => Interlocked.CompareExchange(ref fixture._beforePreparation, null, observation);
+    }
+
     internal IDisposable AuthenticateAdministrator()
     {
         var accessor = Services.GetRequiredService<IHttpContextAccessor>();
         var previous = accessor.HttpContext;
+        var request = Services.CreateScope();
         accessor.HttpContext = new DefaultHttpContext
         {
+            RequestServices = request.ServiceProvider,
             User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, AdministratorId.ToString())], "policy-scope-fixture"))
         };
-        return new RestoreHttpContext(accessor, previous);
+        return new RestoreHttpContext(accessor, previous, request);
     }
 
     private static SystemSetting AuthorityMarker(string value) => new()
@@ -222,9 +272,14 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
         }
     }
 
-    private sealed class RestoreHttpContext(IHttpContextAccessor accessor, HttpContext? previous) : IDisposable
+    private sealed class RestoreHttpContext(IHttpContextAccessor accessor, HttpContext? previous,
+        IServiceScope request) : IDisposable
     {
-        public void Dispose() => accessor.HttpContext = previous;
+        public void Dispose()
+        {
+            accessor.HttpContext = previous;
+            request.Dispose();
+        }
     }
 }
 

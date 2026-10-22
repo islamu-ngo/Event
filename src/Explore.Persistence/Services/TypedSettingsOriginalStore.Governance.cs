@@ -365,6 +365,8 @@ public sealed partial class TypedSettingsOriginalStore
             }).ToJsonString(), token);
         else
             await TypedSettingsSqliteWriter.WriteAsync(context, transaction, type, id, old, after, token);
+        if (type == typeof(SystemSetting))
+            await RecordProvisioningPolicyAsync(after[nameof(SystemSetting.SettingKey)]!.GetValue<string>(), after, token);
         var rows = expected![type.Name]!.AsArray();
         var present = rows.OfType<JsonObject>().SingleOrDefault(row => row["Id"]!.GetValue<string>() == id.ToString("D"));
         if (present is not null) rows.Remove(present);

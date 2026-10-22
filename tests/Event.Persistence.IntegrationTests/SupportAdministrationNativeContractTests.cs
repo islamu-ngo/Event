@@ -99,7 +99,7 @@ public sealed partial class SupportAdministrationNativeContractTests(PostgreSqlC
 
     private async Task<Seeded> SeedAsync()
     {
-        await using var setup = fixture.CreateDbContext();
+        await using var setup = MembershipMigrator();
         var tenant = new Tenant
         {
             Id = Guid.CreateVersion7(),

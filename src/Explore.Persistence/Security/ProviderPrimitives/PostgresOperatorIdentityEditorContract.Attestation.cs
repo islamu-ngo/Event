@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Security;
@@ -75,7 +76,9 @@ public static partial class PostgresOperatorIdentityEditorContract
             return $"""
                 IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class r WHERE r.oid = pg_catalog.to_regclass({Text(table)})
                     AND r.relkind = 'r' AND r.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid
-                    AND NOT r.relrowsecurity AND NOT r.relforcerowsecurity)
+                    AND ({(source.Type == typeof(SystemSetting)
+                        ? PostgresLocalIdentitySystemSettingPolicies.Compatible(OwnerRole, "r")
+                        : "NOT r.relrowsecurity AND NOT r.relforcerowsecurity")}))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite w WHERE w.ev_class = pg_catalog.to_regclass({Text(table)}))
                     OR (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = pg_catalog.to_regclass({Text(table)})
                         AND a.attnum > 0 AND NOT a.attisdropped) <> {source.Columns.Length}

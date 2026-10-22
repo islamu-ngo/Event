@@ -53,6 +53,23 @@ public sealed class MixedSettingsBatchMutation
         accepted ?? throw new InvalidOperationException("The original batch has not been compiled.");
     internal IMixedSettingsBatchStore Store { get; }
     internal ISerializableAttemptOwner Owner { get; }
+    internal IAtprotoFederationSettingsMutationStore? FederationStore { get; private set; }
+    /// <summary>The original issuer's opaque observation; exposing it does not authorize a writer.</summary>
+    public IAtprotoFederationSettingsSource? FederationSource { get; private set; }
+    internal IAsyncDisposable? EnrollmentGate { get; private set; }
+
+    internal void RetainSourceOwners(object originalIssuer,
+        IAtprotoFederationSettingsMutationStore? federationStore,
+        IAtprotoFederationSettingsSource? federationSource, IAsyncDisposable? enrollmentGate)
+    {
+        if (!ReferenceEquals(issuer, originalIssuer) || consumed != 0 || active || accepted is not null
+            || FederationStore is not null || FederationSource is not null || EnrollmentGate is not null
+            || (federationStore is null) != (federationSource is null))
+            throw new UnauthorizedAccessException("Only the idle original mixed issuer can retain its source owners.");
+        FederationStore = federationStore;
+        FederationSource = federationSource;
+        EnrollmentGate = enrollmentGate;
+    }
 
     internal void Compile(UpdateSettingBatchCommand original, ImmutableDictionary<string, string> values)
     {

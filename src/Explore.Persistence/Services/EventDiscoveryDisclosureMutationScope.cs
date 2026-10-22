@@ -1,4 +1,6 @@
 using Explore.Domain;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.Settings;
 using Explore.Domain.Federation;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Modules;
@@ -37,7 +39,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
     private bool _flushed;
     private bool _finalizationFailed;
     private bool _tenantEnrollmentFenced;
-    private bool _nativeOrdinarySettings;
+    private ManagedSettingsDiscoveryDisclosure? _managedSettings;
 
     private static readonly HashSet<Type> TenantSources =
     [
@@ -66,6 +68,43 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         || key == "deployment.mode"
         || key == "custom_properties.projection_discovery_enabled";
 
+    internal static bool RequiresWholeAudience(EntityEntry entry) =>
+        entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+        && (entry.Entity switch
+        {
+            SystemSetting setting => IsDisclosureSetting(setting.SettingKey),
+            ModuleDefinition or EventStatus or EventSessionStatus or EventType or EventFormat or VisibilityType
+                or AudienceAge or AudienceGender or ActorType or EventRegistrationPolicy
+                or Madhab or Language or EventProvenanceType or ParticipationHandlingMode
+                or AdvanceRegistrationObligation or IdentityAccessMode
+                or EventPublicActionKind or EventPublicActionHealthState or EventSessionKind or RegistrationMode
+                => entry.State != EntityState.Added,
+            _ => false
+        });
+
+    internal static bool RequiresEnrollmentGate(EntityEntry entry)
+    {
+        if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            return false;
+        // Rank-only writes still share source coordination, without enrolling an epoch change.
+        return TenantSources.Contains(entry.Metadata.ClrType) || RequiresWholeAudience(entry)
+            || (entry.Entity switch
+            {
+                Tenant or ManagedControlPlaneRegistration or InstanceBootstrapState
+                    or TenantPlan or TenantPlanVersion or TenantPlanVersionSetting or TenantPlanVersionQuota
+                    or Actor or ActorPii or AtprotoIdentity or AtprotoRecord or AtprotoEventProjection or OrganizationPii
+                    or LocationPii or EventIslamicAspect or EventTechAspect or EventSessionIslamicAspect
+                    or EventCustomPropertyOption or EventSessionCustomPropertyOption or CustomPropertyOption => true,
+                Organization or Group => entry.State != EntityState.Added,
+                User => entry.State == EntityState.Deleted
+                    || entry.State == EntityState.Modified && entry.Property(nameof(User.IsDeleted)).IsModified,
+                EventDiscoveryIdentity => entry.State == EntityState.Deleted
+                    || entry.State == EntityState.Modified && entry.Property(nameof(EventDiscoveryIdentity.IsDeleted)).IsModified,
+                TenantSetting setting => IsDisclosureSetting(setting.SettingKey),
+                _ => false
+            });
+    }
+
     internal void Enlist(IEnumerable<Guid> tenantIds)
     {
         EnsureTransaction();
@@ -79,7 +118,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             if (_deletedTenants.Contains(tenantId))
                 throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
             _tenants.Add(tenantId);
-            if (_tenants.Union(_identityRevisions.Keys).Count() > MaximumAffectedTenants)
+            if (_tenants.Union(_identityRevisions.Keys).Union(context.DiscoveryEnrollmentCreationIds).Count() > MaximumAffectedTenants)
                 throw new InvalidOperationException("discovery_disclosure_fanout_exceeded");
         }
     }
@@ -98,7 +137,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _identityRevisions[tenantId] = (
             pending.Expected ?? expected,
             checked(pending.Advancement + (advance ? 1 : 0)));
-        if (_tenants.Union(_identityRevisions.Keys).Count() > MaximumAffectedTenants)
+        if (_tenants.Union(_identityRevisions.Keys).Union(context.DiscoveryEnrollmentCreationIds).Count() > MaximumAffectedTenants)
             throw new InvalidOperationException("discovery_disclosure_fanout_exceeded");
     }
 
@@ -118,6 +157,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _deletedTenants.Add(tenantId);
         _tenants.Remove(tenantId);
         _identityRevisions.Remove(tenantId);
+        context.ForgetDiscoveryEnrollmentCreation(tenantId);
     }
 
     internal async Task EnlistAllTenantsAsync(CancellationToken cancellationToken)
@@ -133,13 +173,15 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             .Select(entry => entry.Entity.Id));
     }
 
-    private async Task FenceTenantEnrollmentAsync(CancellationToken cancellationToken)
+    private Task FenceTenantEnrollmentAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Enlist([]);
-        if (_tenantEnrollmentFenced)
-            return;
-        await EventDiscoverySourceProviderOperations.FenceTenantEnrollmentAsync(context, cancellationToken);
+        // Membership/root producers bring the original pre-BEGIN custody. Never
+        // retrofit a late privileged parent write or a replacement observation.
+        EventDiscoveryEnrollmentGate.RequireCurrent(context);
         _tenantEnrollmentFenced = true;
+        return Task.CompletedTask;
     }
 
     internal async Task EnlistActorsAsync(IReadOnlyCollection<Guid> actorIds, CancellationToken cancellationToken)
@@ -236,6 +278,12 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _storedSources.Clear();
         EntityEntry[] pending = context.ChangeTracker.Entries()
             .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted).ToArray();
+        // A concrete original source may persist only its own already-compiled
+        // row references. Its private completion ledger supplies disclosure after
+        // independently proving persisted images; speculative Capture is not a receipt.
+        if (_managedSettings is not null)
+            pending = pending.Where(entry => !_managedSettings.OwnsPending(entry.Entity)).ToArray();
+        pending = context.OriginalManagedWorkerCreationPending(pending);
         if (pending.Any(entry => entry.Entity is ITenantEntity owned && _deletedTenants.Contains(owned.TenantId)
                 || entry.Entity is Tenant tenant && _deletedTenants.Contains(tenant.Id)))
             throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
@@ -262,8 +310,11 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             }
         }
         EntityEntry[] entries = pending;
-        _newActors.UnionWith(entries.Where(entry => entry.State == EntityState.Added && entry.Entity is Actor)
-            .Select(entry => ((Actor)entry.Entity).Id));
+        Guid[] newUsers = entries.Where(entry => entry.State == EntityState.Added && entry.Entity is User)
+            .Select(entry => ((User)entry.Entity).Id).ToArray();
+        Guid[] newActors = entries.Where(entry => entry.State == EntityState.Added && entry.Entity is Actor)
+            .Select(entry => ((Actor)entry.Entity).Id).ToArray();
+        _newActors.UnionWith(newActors);
         _newRecords.UnionWith(entries.Where(entry => entry.State == EntityState.Added && entry.Entity is AtprotoRecord)
             .Select(entry => ((AtprotoRecord)entry.Entity).Id));
         if (entries.Any(entry => entry.Entity is Tenant && entry.State == EntityState.Added))
@@ -291,7 +342,8 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             .Concat(classifications.Where(entry => entry.Entity is Event)
                 .SelectMany(entry => Keys(entry, nameof(Event.SubmittedByUserId))))
             .Concat(users).Distinct().ToArray();
-        await FenceKeysAsync<User>(enrollmentUsers, cancellationToken);
+        // New anchors have no committed audience; their original INSERT and FK constraints own creation.
+        await FenceKeysAsync<User>(enrollmentUsers.Except(newUsers), cancellationToken);
 
         Guid[] organizations = ChangedKeys(owners, "OrganizationId")
             .Concat(entries.Where(entry => entry.Entity is Organization or OrganizationPii)
@@ -313,13 +365,19 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             .Concat(ChangedKeys(owners, nameof(Event.OrganizerActorId)))
             .Concat(classifications.SelectMany(entry => Keys(entry, nameof(Event.ActorId))))
             .Concat(classifications.Where(entry => entry.Entity is Event)
-                .SelectMany(entry => Keys(entry, nameof(Event.OrganizerActorId)))), cancellationToken);
+                .SelectMany(entry => Keys(entry, nameof(Event.OrganizerActorId))))
+            .Except(newActors), cancellationToken);
         await FenceKeysAsync<AtprotoRecord>(records.Concat(ChangedKeys(owners, "AtprotoRecordId"))
             .Concat(classifications.Where(entry => entry.Entity is Event)
                 .SelectMany(entry => Keys(entry, nameof(Event.AtprotoRecordId)))), cancellationToken);
 
         foreach (EntityEntry entry in entries)
         {
+            if (RequiresWholeAudience(entry))
+            {
+                await EnlistAllTenantsAsync(cancellationToken);
+                continue;
+            }
             switch (entry.Entity)
             {
                 case Tenant tenant when entry.State != EntityState.Added:
@@ -331,20 +389,6 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
                     break;
                 case TenantSetting setting when IsDisclosureSetting(setting.SettingKey):
                     Enlist(Keys(entry, nameof(TenantSetting.TenantId)));
-                    break;
-                case SystemSetting setting when IsDisclosureSetting(setting.SettingKey):
-                    await EnlistAllTenantsAsync(cancellationToken);
-                    break;
-                case ModuleDefinition when entry.State != EntityState.Added:
-                    await EnlistAllTenantsAsync(cancellationToken);
-                    break;
-                case EventStatus or EventSessionStatus or EventType or EventFormat or VisibilityType
-                    or AudienceAge or AudienceGender or ActorType or EventRegistrationPolicy
-                    or Madhab or Language or EventProvenanceType or ParticipationHandlingMode
-                    or AdvanceRegistrationObligation or IdentityAccessMode
-                    or EventPublicActionKind or EventPublicActionHealthState or EventSessionKind or RegistrationMode
-                    when entry.State != EntityState.Added:
-                    await EnlistAllTenantsAsync(cancellationToken);
                     break;
             }
         }
@@ -496,10 +540,24 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
             throw new InvalidOperationException("A failed disclosure finalization requires transaction rollback.");
         try
         {
-            if (_nativeOrdinarySettings)
+            if (_flushed)
+                return;
+            Guid[] created = context.RequireDiscoveryEnrollmentCreations();
+            if (_managedSettings is not null && created.Length != 0)
+                throw new InvalidOperationException("Original managed Settings cannot mix discovery mutation owners.");
+            foreach (Guid tenantId in created)
             {
-                // The private ordinary attempt owns tenant discovery and the single
-                // deferred epoch write. Managed flush only seals this same transaction.
+                if (_identityRevisions.TryGetValue(tenantId, out var identity)
+                    && identity.Expected is { } expected && expected != 0)
+                    throw new InvalidOperationException("discovery_revision_conflict");
+                // The first successful Tenant save already emitted disclosure 1.
+                // Later initial source effects join it; genuine identity effects
+                // remain in their original finalizer and are never discarded.
+                _tenants.Remove(tenantId);
+            }
+            if (_managedSettings is not null)
+            {
+                await _managedSettings.FlushAsync(cancellationToken);
                 _flushed = true;
                 _terminal = true;
                 return;
@@ -511,8 +569,15 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
                         () => context.Set<EventDiscoverySnapshotReservation>().IgnoreAllFilters(Reason)
                             .AnyAsync(row => row.TenantId == tenantId, cancellationToken), cancellationToken))
                     throw new InvalidOperationException("Discovery writes cannot follow physical tenant deletion.");
-            if (_flushed || _tenants.Count == 0 && _identityRevisions.Count == 0 && _deletedTenants.Count == 0)
+            if (_tenants.Count == 0 && _identityRevisions.Count == 0 && _deletedTenants.Count == 0)
+            {
+                if (created.Length != 0)
+                {
+                    _flushed = true;
+                    _terminal = true;
+                }
                 return;
+            }
             if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) && context.IsConfigurationInstanceImportOwner)
             {
                 Guid[] ordered = _tenants.Union(_identityRevisions.Keys)
@@ -541,6 +606,7 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
 
     internal void Reset()
     {
+        context.ResetDiscoveryEnrollmentCreations();
         _transactionId = null;
         _tenants.Clear();
         _tenantParents.Clear();
@@ -556,24 +622,70 @@ internal sealed class EventDiscoveryDisclosureMutationScope(ExploreDbContext con
         _flushed = false;
         _finalizationFailed = false;
         _tenantEnrollmentFenced = false;
-        _nativeOrdinarySettings = false;
+        _managedSettings = null;
     }
 
-    internal void EnlistNativeOrdinarySettings()
+    internal void EnlistSettingsSource(OrdinarySettingsMutationStore store, IOrdinarySettingsSource source)
+    {
+        RequireSettingsAccumulation();
+        (_managedSettings ??= new(context)).Attach(store, source);
+    }
+
+    internal void EnlistSettingsSource(AtprotoFederationSettingsMutationStore store, IAtprotoFederationSettingsSource source)
+    {
+        RequireSettingsAccumulation();
+        (_managedSettings ??= new(context)).Attach(store, source);
+    }
+
+    internal void EnlistSettingsSource(MixedSettingsBatchStore store, MixedSettingsBatchMutation mutation)
+    {
+        RequireSettingsAccumulation();
+        (_managedSettings ??= new(context)).Attach(store, mutation);
+    }
+
+    internal Task RequireSettingsCompleteAsync(OrdinarySettingsMutationStore store, IOrdinarySettingsSource source, CancellationToken token) =>
+        (_managedSettings ?? throw new UnauthorizedAccessException("The original ordinary discovery owner is missing."))
+            .RequireCompleteAsync(store, source, token);
+
+    internal Task RequireSettingsCompleteAsync(AtprotoFederationSettingsMutationStore store, IAtprotoFederationSettingsSource source, CancellationToken token) =>
+        (_managedSettings ?? throw new UnauthorizedAccessException("The original federation discovery owner is missing."))
+            .RequireCompleteAsync(store, source, token);
+
+    internal Task RequireSettingsCompleteAsync(MixedSettingsBatchStore store, MixedSettingsBatchMutation mutation, CancellationToken token) =>
+        (_managedSettings ?? throw new UnauthorizedAccessException("The original mixed discovery owner is missing."))
+            .RequireCompleteAsync(store, mutation, token);
+
+    private void RequireSettingsAccumulation()
     {
         EnsureTransaction();
-        if (!(RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql) || _terminal || _finalizationFailed
+        if (_terminal || _finalizationFailed
             || _tenants.Count != 0 || _identityRevisions.Count != 0 || _deletedTenants.Count != 0
+            || context.DiscoveryEnrollmentCreationIds.Any()
             || _tenantParents.Count != 0 || _tenantEnrollmentFenced || _actors.Count != 0
             || _users.Count != 0 || _records.Count != 0 || _newActors.Count != 0 || _newRecords.Count != 0)
-            throw new InvalidOperationException("Native ordinary Settings cannot mix discovery mutation owners.");
-        _nativeOrdinarySettings = true;
+            throw new InvalidOperationException("Original managed Settings cannot mix discovery mutation owners.");
     }
 
     private void RequireGenericAccumulation()
     {
-        if (_nativeOrdinarySettings)
-            throw new InvalidOperationException("Native ordinary Settings cannot mix discovery mutation owners.");
+        if (_managedSettings is not null)
+            throw new InvalidOperationException("Original managed Settings cannot mix discovery mutation owners.");
+    }
+
+    internal void RequireEnrollmentCreation()
+    {
+        EnsureTransaction();
+        RequireGenericAccumulation();
+        if (_terminal || _finalizationFailed)
+            throw new InvalidOperationException("Source writes cannot follow the terminal discovery fence.");
+    }
+
+    internal void InvalidateEnrollmentCreation() => _finalizationFailed = true;
+
+    internal void RequireEnrollmentCapacity()
+    {
+        if (_tenants.Union(_identityRevisions.Keys).Union(context.DiscoveryEnrollmentCreationIds).Count() > MaximumAffectedTenants)
+            throw new InvalidOperationException("discovery_disclosure_fanout_exceeded");
     }
 
     private void EnsureTransaction()

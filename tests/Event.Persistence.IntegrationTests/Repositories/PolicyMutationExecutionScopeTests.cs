@@ -18,7 +18,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 
 [ClassDataSource<PolicyMutationExecutionScopeSqliteFixture>(Shared = SharedType.PerClass)]
 [NotInParallel("PolicyMutationExecutionScopeSqlite")]
-public sealed class PolicyMutationExecutionScopeTests(PolicyMutationExecutionScopeSqliteFixture fixture)
+public sealed partial class PolicyMutationExecutionScopeTests(PolicyMutationExecutionScopeSqliteFixture fixture)
 {
     [Test]
     [Arguments(false)]

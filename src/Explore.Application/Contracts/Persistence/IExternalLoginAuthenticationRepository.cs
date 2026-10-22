@@ -3,7 +3,7 @@ using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;
 
-/// <summary>Reads a committed provider binding for standalone principal resolution, outside identity-write transactions.</summary>
+/// <summary>Reads a provider binding using the selected standalone owner or the original Local identity workflow transaction.</summary>
 public interface IExternalLoginAuthenticationRepository
 {
     Task<UserExternalLogin?> GetByProviderAndKey(

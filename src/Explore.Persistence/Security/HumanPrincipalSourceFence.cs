@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -23,6 +24,37 @@ public sealed class HumanPrincipalSourceFence : IHumanPrincipalSourceFence
     private readonly DbContextId _contextLease;
     private readonly Guid? _tenant;
     private readonly HumanPrincipalSourceQueries _queries;
+    private readonly LocalIdentityExecutionLease? _selectedExecution;
+    private readonly LocalSessionAuthority? _selectedLocalSession;
+
+    internal HumanPrincipalSourceFence(LocalIdentityExecutionLease execution, HumanCommitSubject subject,
+        LocalSessionAuthority? localSession = null)
+    {
+        ArgumentNullException.ThrowIfNull(execution);
+        ArgumentNullException.ThrowIfNull(subject);
+        _context = execution.Application ?? throw new UnauthorizedAccessException("The selected application owner is required.");
+        var identity = execution.Identity ?? throw new UnauthorizedAccessException("The selected identity owner is required.");
+        execution.RequireCurrent(_context, identity);
+        if (!_context.Database.IsRelational() || _context.Database.CurrentTransaction is not null
+            || identity.Database.CurrentTransaction is not null
+            || _context.IsConfigurationInstanceImportOwner)
+            throw new InvalidOperationException("human_principal_requires_selected_idle_owner");
+        bool localBinding = subject.AccountKey?.ProviderKind == AuthenticationProviderKind.Local;
+        if (localBinding != (localSession is not null))
+            throw new InvalidOperationException("human_principal_local_session_observation_required");
+        if (localSession is not null && (localSession.LocalSubjectId != subject.PrincipalId
+            || subject.AccountKey!.Value != localSession.LocalSubjectId.ToString("D")))
+            throw new InvalidOperationException("human_principal_local_binding_mismatch");
+        _subject = subject;
+        _tenant = _context.TenantFilterTenantId;
+        _purpose = _tenant.HasValue ? PolicySourceSetPurpose.RuntimeTenant : PolicySourceSetPurpose.Global;
+        _connection = RelationalConnectionIdentity.Capture(_context);
+        _contextLease = _context.ContextId;
+        _selectedExecution = execution;
+        _selectedLocalSession = localSession;
+        _queries = new(_context, subject, _purpose, localSession, null, _connection, _tenant, execution);
+        RequireSelection();
+    }
 
     public HumanPrincipalSourceFence(
         ExploreDbContext context, HumanCommitSubject subject, PolicySourceSetPurpose purpose,
@@ -61,7 +93,8 @@ public sealed class HumanPrincipalSourceFence : IHumanPrincipalSourceFence
     public async Task<HumanPrincipalSourceFacts> ObserveAsync(CancellationToken cancellationToken = default)
     {
         RequireSelection();
-        if (_context.Database.CurrentTransaction is not null || System.Transactions.Transaction.Current is not null)
+        if (_context.Database.CurrentTransaction is not null || System.Transactions.Transaction.Current is not null
+            || _selectedExecution?.Identity?.Database.CurrentTransaction is not null)
             throw new InvalidOperationException("human_principal_preparation_requires_no_transaction");
         bool opened = _connection.State != ConnectionState.Open;
         if (opened) await _context.Database.OpenConnectionAsync(cancellationToken);
@@ -74,13 +107,16 @@ public sealed class HumanPrincipalSourceFence : IHumanPrincipalSourceFence
     {
         ArgumentNullException.ThrowIfNull(sourceSet);
         DbTransaction transaction = RequireOwner();
+        if (_selectedExecution is not null)
+            PolicySourceSetFence.RequireSelectedLease(sourceSet, _selectedExecution, _context, transaction);
         // The parent must supply the lease from THIS selected owner's source-set port, acquired FIRST.
         await sourceSet.ValidateAsync(cancellationToken);
-        await HumanSourceProviderOperations.LockAsync(_context, _queries, transaction, cancellationToken);
+        if (_selectedExecution is null)
+            await HumanSourceProviderOperations.LockAsync(_context, _queries, transaction, cancellationToken);
         HumanPrincipalSourceFacts facts = await ReadAsync(transaction, cancellationToken);
         if (!ReferenceEquals(transaction, RequireOwner()))
             throw new InvalidOperationException("human_principal_transaction_changed");
-        if (_context.HasHumanCommitContextLease
+        if (_selectedExecution is null && _context.HasHumanCommitContextLease
             && _tenant is { } tenantId && facts.Tenants.Any(tenant => tenant.Id == tenantId))
             HumanSourceProviderOperations.RetainNativeTenantOwner(_context, _subject, tenantId);
         return new Lease(this, sourceSet, transaction, facts);
@@ -88,6 +124,15 @@ public sealed class HumanPrincipalSourceFence : IHumanPrincipalSourceFence
 
     private void RequireSelection()
     {
+        if (_selectedExecution is not null)
+        {
+            var identity = _selectedExecution.Identity
+                ?? throw new UnauthorizedAccessException("The selected identity owner is required.");
+            _selectedExecution.RequireCurrent(_context, identity);
+            HumanSecuritySourceGate.RequireCurrent(_context);
+            if (_selectedLocalSession is not null)
+                LocalIdentityLifecycleGateCustody.RequireHeld(identity);
+        }
         _context.ValidateTenantLease();
         if (_context.ContextId != _contextLease || _context.IsTenantFilterBypassed
             || _context.TenantFilterTenantId != _tenant
@@ -118,6 +163,8 @@ public sealed class HumanPrincipalSourceFence : IHumanPrincipalSourceFence
         {
             if (!ReferenceEquals(transaction, source.RequireOwner()))
                 throw new InvalidOperationException("human_principal_lease_expired");
+            if (source._selectedExecution is not null)
+                PolicySourceSetFence.RequireSelectedLease(sourceSet, source._selectedExecution, source._context, transaction);
             await sourceSet.ValidateAsync(cancellationToken);
             var current = await source.ReadAsync(transaction, cancellationToken);
             await sourceSet.ValidateAsync(cancellationToken);

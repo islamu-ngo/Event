@@ -18,6 +18,7 @@ public interface IHumanEmailMutationPreparation
         CancellationToken cancellationToken = default);
     Task<T> ExecuteMixedPreparedAsync<T>(MixedSettingsBatchMutation mutation,
         Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default);
+    Task CloseMixedAsync(MixedSettingsBatchMutation mutation, Exception? primaryFailure);
     void RequireMixedSource(IHumanMixedSettingsSource source);
 
     Task<IPreparedHumanEmailMutation> PreparePreviewAsync(

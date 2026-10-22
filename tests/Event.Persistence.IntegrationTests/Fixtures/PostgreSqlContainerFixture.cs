@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
@@ -28,8 +29,10 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 {
     private readonly PostgreSqlContainer _container;
+    private readonly IdentityDatabaseTopology _identityTopology;
     private readonly object _initializationLock = new();
     private Task? _initialization;
+    private Task? _localIdentityWriterPreparation;
     private readonly ConcurrentBag<string> _isolatedSchemas = new();
     private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
@@ -37,31 +40,37 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     private readonly IReadOnlyDictionary<PrimaryDatabaseRole, (string Username, string Password)> _nativeQueueLogins;
     public PostgresNativeQueueEnrollment NativeQueueEnrollment { get; }
 
-    public PostgreSqlContainerFixture()
-        : this(string.Empty)
+    public PostgreSqlContainerFixture() : this(IdentityDatabaseTopology.Colocated)
     {
     }
 
-    protected PostgreSqlContainerFixture(string globalLoginSuffix)
+    protected PostgreSqlContainerFixture(
+        IdentityDatabaseTopology identityTopology, bool distinctMigrator = false, string? globalLoginSuffix = null)
     {
+        if (!Enum.IsDefined(identityTopology))
+            throw new ArgumentOutOfRangeException(nameof(identityTopology));
+        _identityTopology = identityTopology;
         _container = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("explore_db_test")
             .WithUsername("postgres")
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
             .Build();
         string suffix = Guid.CreateVersion7().ToString("N");
-        _nativeQueueLogins = new[]
+        var purposes = new[]
         {
             PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime,
             PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
             PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
             PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport,
             PrimaryDatabaseRole.LocalIdentityWriter
-        }.ToDictionary(role => role, role => (
-            Username: $"queue_{(int)role}_{suffix}{(role == PrimaryDatabaseRole.Global ? globalLoginSuffix : string.Empty)}",
+        }.ToList();
+        if (distinctMigrator) purposes.Add(PrimaryDatabaseRole.Migrator);
+        _nativeQueueLogins = purposes.ToDictionary(role => role, role => (
+            Username: $"queue_{(int)role}_{suffix}" + (role == PrimaryDatabaseRole.Global ? globalLoginSuffix : null),
             Password: Convert.ToHexString(RandomNumberGenerator.GetBytes(24))));
         NativeQueueEnrollment = new PostgresNativeQueueEnrollment(
-            "postgres",
+            _nativeQueueLogins.TryGetValue(PrimaryDatabaseRole.Migrator, out var migrator)
+                ? migrator.Username : "postgres",
             _nativeQueueLogins[PrimaryDatabaseRole.Global].Username,
             _nativeQueueLogins[PrimaryDatabaseRole.Runtime].Username,
             _nativeQueueLogins[PrimaryDatabaseRole.EmailPolicyInstanceMutation].Username,
@@ -77,6 +86,29 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     {
         lock (_initializationLock)
             return _initialization ??= InitializeCoreAsync();
+    }
+
+    /// <summary>
+    /// Activates the API host's declared writer profile; independent installer tests retain a fresh profile.
+    /// </summary>
+    internal Task PrepareLocalIdentityWriterAsync()
+    {
+        lock (_initializationLock)
+            return _localIdentityWriterPreparation ??= PrepareLocalIdentityWriterCoreAsync();
+    }
+
+    private async Task PrepareLocalIdentityWriterCoreAsync()
+    {
+        await InitializeAsync();
+        await using var migrator = CreateDbContextInternal(PrimaryDatabaseRole.Migrator);
+        migrator.BindTenantLease();
+        var enrollment = new PostgresLocalIdentityWriterEnrollment(
+            NativeQueueEnrollment.MigratorLogin,
+            NativeQueueEnrollment.RuntimeLogin,
+            _nativeQueueLogins[PrimaryDatabaseRole.LocalIdentityWriter].Username,
+            NativeQueueEnrollment.GlobalLogin);
+        await PostgresLocalIdentityWriterPermissions.ApplyAsync(migrator, enrollment,
+            _identityTopology, LocalIdentityWriterInventory.Store.Application);
     }
 
     private async Task InitializeCoreAsync()
@@ -116,10 +148,9 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresPdsSettlementContract.ApplyAsync(migratorContext);
             await PostgresPdsQueueAdmissionContract.ApplyAsync(migratorContext);
             await PostgresAtprotoModerationCompensationContract.ApplyAsync(migratorContext);
-            await PostgresIntegrationSyncDiscoveryContract.ApplyAsync(migratorContext);
+            await PostgresIntegrationSyncReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEmailDispatchAdmissionContract.ApplyAsync(migratorContext);
             await PostgresAtprotoMaterializationContract.ApplyAsync(migratorContext);
-            await PostgresAtprotoGovernanceContract.ApplyAsync(migratorContext);
             await PostgresTenantApiKeyStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresInstanceApiKeyManagementContract.ApplyAsync(migratorContext);
@@ -140,13 +171,12 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
                     """);
             }
             await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresUserTenantMembershipContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresUserTenantMembershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresExternalLoginReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAdministrativeAuthorityContract.ApplyAsync(migratorContext);
             foreach (string executor in new[]
             {
-                PostgresAdministrativeAuthorityContract.GlobalRole,
-                PostgresUserTenantMembershipContract.GlobalRole
+                PostgresAdministrativeAuthorityContract.GlobalRole
             })
             {
                 await migratorContext.Database.ExecuteSqlRawAsync(
@@ -168,6 +198,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresRegistrationPrivateReadContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresPublicEventResponseClockContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLookupCatalogueReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresAtprotoFederationSettingPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""
                 GRANT "{PostgresNotificationOutboxAdmissionContract.GlobalRole}", "{PostgresGenericOutboxAdmissionContract.GlobalRole}"
@@ -228,7 +259,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
                     """);
             await PostgresIncomingWebhookQueueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventReportOperationsContract.ApplyAsync(migratorContext);
-            await PostgresEventResourceAuditRetentionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEmailRetentionReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEventResourceAuditReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresWebhookLocalDeliveryAdmissionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresWebhookClaimEndpointStateContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresWebhookLocalDeliveryHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
@@ -238,9 +270,12 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresHumanAuthorizationRouteContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresHumanEventAssignmentSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresHumanSupportAccessSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresLocalAdministrationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresSupportAdministrationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresManagedProviderProvisioningContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            if (_identityTopology == IdentityDatabaseTopology.Colocated)
+            {
+                await PostgresLocalAdministrationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+                await PostgresSupportAdministrationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+                await PostgresManagedProviderProvisioningContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            }
             await PostgresHumanEmailSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresPlatformApiKeySourceContract.ApplyAsync(migratorContext,
                 new PlatformApiKeySourceEnrollment(NativeQueueEnrollment,
@@ -256,9 +291,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresCheckoutDispatchContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresRefundReconciliationHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTicketingRecoveryHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresEmailRetentionReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresInventoryHoldExpiryReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresVisitorPolicyAuthorityContract.ApplyAsync(migratorContext);
             await PostgresEmailDeliveryPolicyContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresOperatorIdentityEditorContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
@@ -269,13 +302,15 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresMixedSettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresOrdinarySettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresTenantPreferenceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresTenantPreferencePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresUserTenantNavigationReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresEventResourceProviderContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresPaidPolicyCeilingContract.ApplyAsync(migratorContext);
             await PostgresInstanceStorageAdministrationContract.ApplyAsync(migratorContext);
             await PostgresStorageReconciliationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLocalStorageQuarantineContract.ApplyAsync(migratorContext);
+            await PostgresDiscoveryMetadataPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresTenantMembershipMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
@@ -479,12 +514,16 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         NativeQueueEnrollment.Validate();
         await using var connection = new NpgsqlConnection(_container.GetConnectionString());
         await connection.OpenAsync();
-        foreach (var login in _nativeQueueLogins.Values)
+        foreach (var (role, login) in _nativeQueueLogins)
         {
             await using var command = connection.CreateCommand();
             string username = "\"" + login.Username.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
             string password = "'" + login.Password.Replace("'", "''", StringComparison.Ordinal) + "'";
-            command.CommandText = $"CREATE ROLE {username} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD {password}";
+            // Only the opt-in migration administrator is demoted after creating its own schema.
+            string attributes = role == PrimaryDatabaseRole.Migrator
+                ? "SUPERUSER CREATEDB CREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
+                : "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS";
+            command.CommandText = $"CREATE ROLE {username} LOGIN {attributes} PASSWORD {password}";
             await command.ExecuteNonQueryAsync();
         }
     }
@@ -521,6 +560,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         string? schema = null)
     {
         var container = new NpgsqlConnectionStringBuilder(_container.GetConnectionString());
+        bool declaredMigrator = _nativeQueueLogins.TryGetValue(PrimaryDatabaseRole.Migrator, out var migrator);
         return new PrimaryDatabaseConnectionOptions
         {
             Role = role,
@@ -529,8 +569,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             Port = container.Port,
             Database = container.Database,
             Schema = schema ?? RelationalModelNamespace.DefaultSchema,
-            Username = container.Username,
-            Password = container.Password,
+            Username = declaredMigrator ? migrator.Username : container.Username,
+            Password = declaredMigrator ? migrator.Password : container.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
     }

@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Settings.Documents;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Database.ProviderPrimitives;
@@ -52,8 +53,12 @@ internal sealed class ConfigurationImportRepositoryNativeOperations(ExploreDbCon
         Guid actorId, CancellationToken token) =>
         PostgresConfigurationImportTenantSettingContract.UpsertAsync(context, tenantId, overrides, actorId, token);
 
-    internal Task<string?> UpsertSystemSettingAsync(SystemSetting setting, CancellationToken token) =>
-        PostgresConfigurationImportScalarSettingContract.UpsertAsync(context, setting, token);
+    internal async Task<string?> UpsertSystemSettingAsync(SystemSetting setting, CancellationToken token)
+    {
+        string? previous = await PostgresConfigurationImportScalarSettingContract.UpsertAsync(context, setting, token);
+        await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, setting.SettingKey, setting, token);
+        return previous;
+    }
 
     internal Task<IReadOnlyList<Tenant>> ReadTenantsBySlugsAsync(string[] slugs, CancellationToken token) =>
         PostgresConfigurationImportSnapshotContract.ReadTenantsBySlugsAsync(context, slugs, token);

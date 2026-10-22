@@ -43,12 +43,14 @@ public static partial class PostgresConfigurationManifestBootstrapContract
         var grants = data.Relations.Select(relation =>
         {
             string columns = string.Join(", ", relation.Columns.Select(column => column.Sql));
+            if (relation.Tag == ConfigurationManifestBootstrapData.RevisionTag)
+                return $"GRANT SELECT ({columns}), INSERT ({columns}) ON {relation.Table} TO {OwnerRole};";
             string update = string.Join(", ", UpdateNames(relation).Select(name => relation.Field(name)));
             return $"GRANT SELECT ({columns}) ON {relation.Table} TO {OwnerRole};\n" +
                 $"GRANT INSERT ({columns}) ON {relation.Table} TO {OwnerRole};" +
                 (update.Length == 0 ? "" : $"\nGRANT UPDATE ({update}) ON {relation.Table} TO {OwnerRole};");
         });
-        var policies = data.Relations.Where(relation => relation.Columns.Any(column => column.Name == "TenantId"))
+        var policies = data.ConfigurationRelations.Where(relation => relation.Columns.Any(column => column.Name == "TenantId"))
             .Select(relation =>
             {
                 string predicate = RowBoundary(relation);
@@ -64,7 +66,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
                             FROM pg_catalog.pg_policy p WHERE p.polrelid = {Text(relation.Table)}::regclass AND p.polname = '{policy.Item1}');
                     END;$stamp$;
                     """));
-            });
+            }).Append(RevisionPolicyInstallation(data.RevisionRelation));
         string ddl = string.Join("\n", functions.Select(function => $"""
             CREATE OR REPLACE FUNCTION {function.Name}({function.Arguments}) RETURNS {function.Returns}
                 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $body${function.Body}$body$;
@@ -234,7 +236,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             new[] { "SELECT", "INSERT" }.Concat(UpdateNames(relation).Contains(column.Name) ? ["UPDATE"] : [])
                 .Select(privilege => $"({Text(relation.Table)}::regclass,{Text(column.Property.GetColumnName())},{Text(privilege)})")));
         string expected = string.Join(", ", access);
-        var policies = data.Relations.Where(relation => relation.Columns.Any(column => column.Name == "TenantId")).Select(relation =>
+        var policies = data.ConfigurationRelations.Where(relation => relation.Columns.Any(column => column.Name == "TenantId")).Select(relation =>
         {
             string prefix = Prefix + Hash(RowBoundary(relation)) + ":";
             return $"""
@@ -248,7 +250,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
                             pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.polqual::text,'UTF8')),'hex') || ':' ||
                             pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.polwithcheck::text,'UTF8')),'hex')))
                 """;
-        });
+        }).Append(RevisionPolicyAuthority(data.RevisionRelation));
         string functionIds = string.Join(", ", new[] { ("assert_authority", ""), ("source", "jsonb"), ("validate_source", "jsonb"), ("write", "jsonb,jsonb,jsonb,jsonb"),
                 ("write_failed", "jsonb,jsonb,jsonb,jsonb") }
             .Select(item => Text(Function(context, item.Item1) + "(" + item.Item2 + ")") + "::regprocedure"));
@@ -334,6 +336,50 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             $"AND {relation.Field("EventType")} = {Text(ConfigurationManifestEffectOutbox.EventType)}",
         _ => "true"
     };
+
+    private static readonly (string Name, bool Permissive, string Command, string Code)[] RevisionPolicies =
+    [
+        ("manifest_bootstrap_revision_read", true, "SELECT", "r"),
+        ("manifest_bootstrap_revision_read_boundary", false, "SELECT", "r"),
+        ("manifest_bootstrap_revision_insert", true, "INSERT", "a"),
+        ("manifest_bootstrap_revision_insert_boundary", false, "INSERT", "a")
+    ];
+
+    private static string RevisionPolicyInstallation(ConfigurationManifestBootstrapData.Relation relation) =>
+        string.Join("\n", RevisionPolicies.Select(policy => $"""
+            DROP POLICY IF EXISTS "{policy.Name}" ON {relation.Table};
+            CREATE POLICY "{policy.Name}" ON {relation.Table} AS {(policy.Permissive ? "PERMISSIVE" : "RESTRICTIVE")}
+                FOR {policy.Command} TO {OwnerRole} {(policy.Command == "SELECT" ? "USING (true)" : "WITH CHECK (true)")};
+            DO $stamp$ BEGIN
+                EXECUTE (SELECT pg_catalog.format('COMMENT ON POLICY %I ON %s IS %L', p.polname,
+                    {Text(relation.Table)}, {Text(Prefix + Hash("true") + ":")} ||
+                    pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(COALESCE(p.polqual::text,''), 'UTF8')), 'hex') || ':' ||
+                    pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(COALESCE(p.polwithcheck::text,''), 'UTF8')), 'hex'))
+                    FROM pg_catalog.pg_policy p WHERE p.polrelid = {Text(relation.Table)}::regclass AND p.polname = {Text(policy.Name)});
+            END;$stamp$;
+            """));
+
+    private static string RevisionPolicyAuthority(ConfigurationManifestBootstrapData.Relation relation)
+    {
+        string expected = string.Join(",", RevisionPolicies.Select(policy =>
+            $"({Text(policy.Name)},{(policy.Permissive ? "true" : "false")},{Text(policy.Code)})"));
+        return $"""
+            NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class r WHERE r.oid = {Text(relation.Table)}::regclass
+                AND r.relrowsecurity AND r.relforcerowsecurity)
+            OR EXISTS (SELECT 1 FROM (VALUES {expected}) expected(name,permissive,command)
+                WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid = {Text(relation.Table)}::regclass
+                    AND p.polname = expected.name AND p.polpermissive = expected.permissive AND p.polcmd::text = expected.command
+                    AND p.polroles = ARRAY[(SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}')]
+                    AND (p.polcmd = 'r' AND p.polqual IS NOT NULL AND p.polwithcheck IS NULL
+                        OR p.polcmd = 'a' AND p.polqual IS NULL AND p.polwithcheck IS NOT NULL)
+                    AND pg_catalog.obj_description(p.oid,'pg_policy') = {Text(Prefix + Hash("true") + ":")} ||
+                        pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(COALESCE(p.polqual::text,''),'UTF8')),'hex') || ':' ||
+                        pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(COALESCE(p.polwithcheck::text,''),'UTF8')),'hex')))
+            OR EXISTS (SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid = {Text(relation.Table)}::regclass
+                AND (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}') = ANY(p.polroles)
+                AND p.polname <> ALL ({Values(RevisionPolicies.Select(policy => policy.Name))}))
+            """;
+    }
 
     private static string Function(ExploreDbContext context, string name) =>
         context.GetService<ISqlGenerationHelper>().DelimitIdentifier("configuration_manifest_bootstrap_" + name,

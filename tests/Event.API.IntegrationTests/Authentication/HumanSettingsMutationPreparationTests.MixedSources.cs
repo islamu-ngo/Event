@@ -256,6 +256,7 @@ public sealed partial class HumanSettingsMutationPreparationTests
     private static async Task SeedMixedTenantAdministratorAsync(LocalIdentityLifecycleHttpFixture fixture)
     {
         await using var seed = fixture.Native.CreateDatabase();
+        seed.BindTenantLease();
         var member = await seed.TenantUsers.SingleOrDefaultAsync(row =>
             row.TenantId == PlatformDefaults.DefaultTenantId && row.UserId == fixture.Binding.LocalSubjectId);
         if (member is null)

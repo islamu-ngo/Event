@@ -28,7 +28,7 @@ public partial class ExploreDbContext
         return await SaveWithStorageReferencesAsync(async acceptChanges =>
         {
             PrepareTrackedEntities();
-            return await base.SaveChangesAsync(acceptChanges, cancellationToken);
+            return await SaveWithProvisioningPolicyAsync(acceptChanges, cancellationToken);
         }, acceptAllChangesOnSuccess, cancellationToken);
     }
 
@@ -94,6 +94,10 @@ public partial class ExploreDbContext
 
         foreach (var entry in ChangeTracker.Entries())
         {
+            if (entry.Entity is IntegrationSyncOutbox integrationSync
+                && entry.State is EntityState.Added or EntityState.Modified)
+                integrationSync.RequireValidEvidence();
+
             if (entry.Entity is SystemSetting or TenantSetting
                 && entry.State is EntityState.Added or EntityState.Modified
                 && (entry.Property(nameof(SystemSetting.SettingKey)).CurrentValue is Explore.Domain.Ai.AiCredentialReference.RetiredSettingKey

@@ -104,6 +104,7 @@ public partial class ExploreDbContext : DbContext
         _nativePaymentReconciliationOwner = null;
         _nativeHumanTenantOwner = null;
         ResetHumanCommitAdmissions();
+        ResetManagedWorkerCreationContextLease();
         _outboxExecutionClaim = null;
         ResetTrustedSetupSettingsAdmissions();
         ResetNativeWebhookClaims();

@@ -9,6 +9,7 @@ using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Privacy;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
@@ -455,14 +456,15 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         var checkpoints = new PrivacyErasureReplayCheckpointRepository(context);
         var state = new PrivacyErasureStateRepository(context);
         var options = Options.Create(new PrivacyErasureOptions());
+        var localEligibility = new LocalIdentityEligibilityRevocation(context, context, authority, TimeProvider.System);
         var applier = new PrivacyErasureApplier(new UserRepository(context),
             new GenericRepository<UserPii, Guid>(context), new UserAuthenticationTokenRepository(context),
             erasure, erasure, new AiConversationRepository(context),
             new PrivacyErasureProviderWorkRepository(context), protector, checkpoints, state,
             new OutboxRepository(context), cacheProvider.GetRequiredService<HybridCache>(), TimeProvider.System,
-            NullLogger<PrivacyErasureApplier>.Instance, options);
+            NullLogger<PrivacyErasureApplier>.Instance, options, localEligibility);
         var workflow = new RetainedAuthorityPrivacyErasureWorkflow(checkpoints, state, authority,
-            new EfCoreUnitOfWork(context), applier, options, TimeProvider.System);
+            new EfCoreUnitOfWork(context), applier, options, TimeProvider.System, localEligibility);
         return new(workflow, new PrivacyErasureReplayService(workflow), cacheProvider);
     }
 

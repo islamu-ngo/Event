@@ -1,12 +1,11 @@
-using System.IdentityModel.Tokens.Jwt;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Text;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
-using Explore.Application.Authentication;
-using Explore.Application.Contracts.Identity;
+using Event.Testing.DataProtection;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Domain;
@@ -15,10 +14,14 @@ using Explore.Domain.Enums;
 using Explore.Domain.Modules;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -36,10 +39,9 @@ namespace Event.Api.IntegrationTests.Features;
 /// <para>The RuntimeAuthorizationProvider routes to FallbackAuthorizationService when
 /// <c>authorization.provider</c> is <c>"local"</c> (or unset).</para>
 ///
-/// <para>Uses real Keycloak JWTs for authentication and NSubstitute mocks for
-/// IAdminContext/ITenantContext to control which role each test persona has,
-/// since test users in Keycloak don't have matching domain state
-/// (PlatformUserRoles, tenant role grants, etc.) in the InMemory DB.</para>
+/// <para>Uses real Keycloak JWTs and persisted application users, platform roles
+/// and selected-tenant grants. Tenant selection and absence of BYO configuration
+/// are controlled independently of the production identity checks.</para>
 /// </summary>
 [Category(TestCategories.Security)]
 [ClassDataSource<KeycloakOnlyFixture>(Shared = SharedType.PerAssembly)]
@@ -48,7 +50,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
 {
     private readonly KeycloakOnlyFixture _keycloak;
 
-    private readonly WebApplicationFactory<Program> _instanceAdminFactory;
+    private readonly LocalRbacWebApplicationFactory _instanceAdminFactory;
     private readonly HttpClient _instanceAdminClient;
 
     private readonly WebApplicationFactory<Program> _tenantAdminFactory;
@@ -60,9 +62,6 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     private readonly WebApplicationFactory<Program> _anonymousFactory;
     private readonly HttpClient _anonymousClient;
 
-    private readonly IAdminContext _instanceAdminContext;
-    private readonly IAdminContext _tenantAdminContext;
-    private readonly IAdminContext _regularUserContext;
     private readonly ITenantContext _tenantContext;
     private readonly ICerbosConfigResolver _cerbosConfigResolver;
 
@@ -72,30 +71,27 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     {
         _keycloak = keycloak;
 
-        _instanceAdminContext = CreateInstanceAdminContext();
-        _tenantAdminContext = CreateTenantAdminContext();
-        _regularUserContext = CreateRegularUserContext();
         _tenantContext = CreateTenantContext();
         _cerbosConfigResolver = CreateCerbosConfigResolver();
 
         _instanceAdminFactory = new LocalRbacWebApplicationFactory(
-            keycloak.Authority, keycloak.MetadataAddress,
-            _instanceAdminContext, _tenantContext, _cerbosConfigResolver);
+            keycloak.Authority, keycloak.MetadataAddress, keycloak.TokenClient,
+            _tenantContext, _cerbosConfigResolver);
         _instanceAdminClient = _instanceAdminFactory.CreateClient();
 
         _tenantAdminFactory = new LocalRbacWebApplicationFactory(
-            keycloak.Authority, keycloak.MetadataAddress,
-            _tenantAdminContext, _tenantContext, _cerbosConfigResolver);
+            keycloak.Authority, keycloak.MetadataAddress, keycloak.TokenClient,
+            _tenantContext, _cerbosConfigResolver);
         _tenantAdminClient = _tenantAdminFactory.CreateClient();
 
         _regularUserFactory = new LocalRbacWebApplicationFactory(
-            keycloak.Authority, keycloak.MetadataAddress,
-            _regularUserContext, _tenantContext, _cerbosConfigResolver);
+            keycloak.Authority, keycloak.MetadataAddress, keycloak.TokenClient,
+            _tenantContext, _cerbosConfigResolver);
         _regularUserClient = _regularUserFactory.CreateClient();
 
         _anonymousFactory = new LocalRbacWebApplicationFactory(
-            keycloak.Authority, keycloak.MetadataAddress,
-            _regularUserContext, _tenantContext, _cerbosConfigResolver);
+            keycloak.Authority, keycloak.MetadataAddress, keycloak.TokenClient,
+            _tenantContext, _cerbosConfigResolver);
         _anonymousClient = _anonymousFactory.CreateClient();
     }
 
@@ -220,20 +216,19 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     public async Task LocalRbac_InstanceAdmin_CanUpdateSettings()
     {
         var token = await _keycloak.TokenClient.GetAdminTokenAsync();
-        await SeedProviderBindingAsync(_instanceAdminFactory, token, _instanceAdminContext.UserId!.Value);
         using var request = CreateAuthorizedRequest(HttpMethod.Patch, "/api/instance/settings/modules", token, ModuleSettingsJson);
 
         var response = await _instanceAdminClient.SendAsync(request);
 
         await Assert.That(new[] { HttpStatusCode.OK, HttpStatusCode.NotFound }).Contains(response.StatusCode).Because("instance admin should be allowed to update settings via local RBAC " +
-        "(actual status depends on whether the setting exists, not authorization)");
+        "(actual status depends on whether the setting exists, not authorization); " +
+        _instanceAdminFactory.RequestFailureSummary);
     }
 
     [Test]
     public async Task LocalRbac_RegularUser_DeniedSettingUpdate()
     {
         var token = await _keycloak.TokenClient.GetUserTokenAsync();
-        await SeedProviderBindingAsync(_regularUserFactory, token, _regularUserContext.UserId!.Value);
         using var request = CreateAuthorizedRequest(HttpMethod.Patch, "/api/instance/settings/modules", token, ModuleSettingsJson);
 
         var response = await _regularUserClient.SendAsync(request);
@@ -295,37 +290,6 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
 
     private const string ModuleSettingsJson = "{\"enableIslamicModule\":{\"hasValue\":true,\"value\":true},\"enableTechModule\":{\"hasValue\":true,\"value\":true}}";
 
-    private static async Task SeedProviderBindingAsync(WebApplicationFactory<Program> factory, string token, Guid userId)
-    {
-        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-        var account = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(jwt.Issuer, jwt.Subject);
-        await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
-        var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var user = new User
-        {
-            Id = userId,
-            Pii = new UserPii
-            {
-                Email = $"local-rbac-{userId:N}@example.test",
-                FirstName = "Local",
-                LastName = "Rbac"
-            },
-            CreatedAt = DateTime.UtcNow
-        };
-        database.Users.Add(user);
-        database.UserExternalLogins.Add(new UserExternalLogin
-        {
-            Id = Guid.CreateVersion7(),
-            UserId = userId,
-            User = user,
-            AuthenticationProviderId = (int)account.ProviderKind,
-            AuthenticationProvider = null!,
-            ProviderKey = account.Value,
-            CreatedAt = DateTime.UtcNow
-        });
-        await database.SaveChangesAsync();
-    }
-
     private static string CreateTenantJson()
     {
         var suffix = Guid.NewGuid().ToString("N");
@@ -342,55 +306,6 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
         }
 
         return request;
-    }
-
-    private static IAdminContext CreateInstanceAdminContext()
-    {
-        var adminContext = Substitute.For<IAdminContext>();
-        adminContext.UserId.Returns(Guid.NewGuid());
-        adminContext.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns(Guid.NewGuid());
-        adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
-        adminContext.IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
-        adminContext.IsTenantAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
-        adminContext.IsOrganizationAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
-        adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns(
-            new List<Guid> { DefaultTenantId }.AsReadOnly());
-        adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns(
-            new List<Guid>().AsReadOnly());
-        return adminContext;
-    }
-
-    private static IAdminContext CreateTenantAdminContext()
-    {
-        var adminContext = Substitute.For<IAdminContext>();
-        adminContext.UserId.Returns(Guid.NewGuid());
-        adminContext.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns(Guid.NewGuid());
-        adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsTenantAdminAsync(DefaultTenantId, Arg.Any<CancellationToken>()).Returns(true);
-        adminContext.IsTenantAdminAsync(Arg.Is<Guid>(id => id != DefaultTenantId), Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsOrganizationAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns(
-            new List<Guid> { DefaultTenantId }.AsReadOnly());
-        adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns(
-            new List<Guid>().AsReadOnly());
-        return adminContext;
-    }
-
-    private static IAdminContext CreateRegularUserContext()
-    {
-        var adminContext = Substitute.For<IAdminContext>();
-        adminContext.UserId.Returns(Guid.NewGuid());
-        adminContext.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns(Guid.NewGuid());
-        adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsTenantAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsOrganizationAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns(
-            new List<Guid>().AsReadOnly());
-        adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns(
-            new List<Guid>().AsReadOnly());
-        return adminContext;
     }
 
     private static ITenantContext CreateTenantContext()
@@ -414,28 +329,31 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     /// <summary>
     /// WebApplicationFactory configured for Local RBAC authorization.
     /// Sets authorization.provider = "local" (or leaves unset, which defaults to local).
-    /// Uses real Keycloak JWTs for authentication and NSubstitute mocks for
-    /// IAdminContext/ITenantContext/ICerbosConfigResolver to control which role
-    /// each test persona has and ensure no BYO Cerbos override is attempted.
+    /// Uses real Keycloak JWTs and persisted role grants. Tenant selection and
+    /// ICerbosConfigResolver control scope and ensure no BYO override is attempted.
     /// </summary>
     private sealed class LocalRbacWebApplicationFactory : WebApplicationFactory<Program>
     {
+        private readonly KeycloakTokenClient _keycloakTokens;
+        private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
+        private readonly RequestFailureObserver _requestFailures = new();
         private readonly string _keycloakAuthority;
         private readonly string _keycloakMetadataAddress;
-        private readonly IAdminContext _adminContext;
         private readonly ITenantContext _tenantContext;
         private readonly ICerbosConfigResolver _cerbosConfigResolver;
+
+        internal string RequestFailureSummary => _requestFailures.Summary;
 
         public LocalRbacWebApplicationFactory(
             string keycloakAuthority,
             string keycloakMetadataAddress,
-            IAdminContext adminContext,
+            KeycloakTokenClient keycloakTokens,
             ITenantContext tenantContext,
             ICerbosConfigResolver cerbosConfigResolver)
         {
+            _keycloakTokens = keycloakTokens;
             _keycloakAuthority = keycloakAuthority;
             _keycloakMetadataAddress = keycloakMetadataAddress;
-            _adminContext = adminContext;
             _tenantContext = tenantContext;
             _cerbosConfigResolver = cerbosConfigResolver;
         }
@@ -476,13 +394,10 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
             {
                 services.RemoveExploreDbContextRegistrations();
 
-                services.AddInMemoryExploreDbContext($"LocalRbacDb_{Guid.NewGuid():N}");
+                services.AddKeycloakSecurityDbContext($"LocalRbacDb_{Guid.NewGuid():N}", _keycloakTokens, _tenantContext.TenantId);
 
                 services.RemoveAll<IDistributedCache>();
                 services.AddDistributedMemoryCache();
-
-                services.RemoveAll<IAdminContext>();
-                services.AddScoped(_ => _adminContext);
 
                 services.RemoveAll<ITenantContext>();
                 services.AddScoped(_ => _tenantContext);
@@ -495,12 +410,9 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
 
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<Microsoft.AspNetCore.Authentication.IClaimsTransformation>();
-                services.AddSingleton<Microsoft.AspNetCore.Authentication.IClaimsTransformation>(
-                    new TestInternalUserClaimsTransformation(
-                        _adminContext.UserId
-                        ?? throw new InvalidOperationException("The Local RBAC persona requires a deterministic user ID.")));
-
+                services.Insert(0, ServiceDescriptor.Singleton<IExceptionHandler>(_requestFailures));
+                services.RemoveAll<IExternalDataProtectionSource>();
+                services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
                 {
                     options.RequireHttpsMetadata = false;
@@ -537,10 +449,51 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
                 });
             });
         }
+
+        private sealed class RequestFailureObserver : IExceptionHandler
+        {
+            private string _summary = "No request exception metadata was observed.";
+
+            internal string Summary => Volatile.Read(ref _summary);
+
+            public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
+                CancellationToken cancellationToken)
+            {
+                try
+                {
+                    var chain = new List<string>();
+                    for (Exception? current = exception; current is not null && chain.Count < 8;
+                        current = current.InnerException)
+                    {
+                        string description = current.GetType().FullName ?? current.GetType().Name;
+                        StackFrame? frame = (new StackTrace(current, fNeedFileInfo: true).GetFrames() ?? [])
+                            .FirstOrDefault(candidate => candidate.GetMethod()?.DeclaringType?.Namespace is { } name
+                                && (name.StartsWith("Explore.", StringComparison.Ordinal)
+                                    || name.StartsWith("Event.", StringComparison.Ordinal)));
+                        if (frame?.GetMethod() is { } method)
+                            description += $" at {method.DeclaringType?.FullName}.{method.Name}:line {frame.GetFileLineNumber()}";
+                        if (current is DbUpdateConcurrencyException concurrency)
+                            description += "; entries=[" + string.Join(",", concurrency.Entries
+                                .Select(entry => entry.Metadata.ClrType.FullName ?? entry.Metadata.ClrType.Name)
+                                .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Take(16)) + "]";
+                        if (current is SqliteException sqlite)
+                            description += $"; sqlite={sqlite.SqliteErrorCode}/{sqlite.SqliteExtendedErrorCode}";
+                        chain.Add(description);
+                    }
+                    Volatile.Write(ref _summary, string.Join(" -> ", chain));
+                }
+                catch
+                {
+                    Volatile.Write(ref _summary, "Exception metadata unavailable.");
+                }
+                // Production handlers retain exception classification, response and logging.
+                return ValueTask.FromResult(false);
+            }
+        }
     }
 
     /// <summary>
-    /// Seeds the authorization.provider = "local" SystemSetting into the InMemory DB
+    /// Seeds the authorization.provider = "local" SystemSetting into the shared-memory SQLite database
     /// so RuntimeAuthorizationProvider routes to FallbackAuthorizationService.
     /// Runs as a hosted service after the app starts.
     /// </summary>

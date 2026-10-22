@@ -4,12 +4,10 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -22,7 +20,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
@@ -124,21 +121,8 @@ public sealed class LocalIdentityAuthServiceTests
     public async Task LoginIssuesASecretBackedSignedToken()
     {
         byte[] key = RandomNumberGenerator.GetBytes(64);
-        var resolver = Substitute.For<ISecretResolver>();
-        resolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                null,
-                Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                Convert.ToBase64String(key),
-                SecretSourceType.EnvironmentVariable,
-                SecretScope.Instance,
-                null,
-                Now)));
         var tokenGenerator = new LocalJwtTokenGenerator(
-            resolver,
-            Options.Create(new LocalIdentityOptions()),
+            Options.Create(new LocalIdentityOptions { JwtKey = Convert.ToBase64String(key) }),
             new FixedTimeProvider(Now));
         await using TestFixture fixture = await CreateFixtureAsync(tokenGenerator);
 
@@ -294,17 +278,9 @@ public sealed class LocalIdentityAuthServiceTests
 
     private static Task<TestFixture> CreateSignedFixtureAsync()
     {
-        var secrets = Substitute.For<ISecretResolver>();
-        secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                SettingKey: SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                Value: Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Source: SecretSourceType.EnvironmentVariable,
-                Scope: SecretScope.Instance,
-                ScopeId: null,
-                ResolvedAt: Now)));
         return TestFixture.CreateAsync(new LocalJwtTokenGenerator(
-            secrets, Options.Create(new LocalIdentityOptions()), new FixedTimeProvider(Now)));
+            Options.Create(new LocalIdentityOptions { JwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)) }),
+            new FixedTimeProvider(Now)));
     }
 
     private static string CreateValidPassword() =>
@@ -399,7 +375,6 @@ public sealed class LocalIdentityAuthServiceTests
                 fixture.Service = new LocalIdentityAuthService(
                     fixture.UserManager,
                     tokenGenerator,
-                    fixture._systemSettings,
                     new LocalIdentityCredentialStateStore(
                         identityDbContext: context,
                         applicationDbContext: context,

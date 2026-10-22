@@ -40,6 +40,8 @@ public class SystemSettingRepository : ISystemSettingRepository
         string key,
         CancellationToken cancellationToken = default)
     {
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+            return await boundary.ReadOrdinarySystemAsync(_dbContext, ordinary, key, cancellationToken);
         return await _dbContext.SystemSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.SettingKey == key, cancellationToken);
@@ -181,6 +183,8 @@ public class SystemSettingRepository : ISystemSettingRepository
 
     public async Task<bool> IsLocked(string key, CancellationToken cancellationToken = default)
     {
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+            return (await boundary.ReadOrdinarySystemAsync(_dbContext, ordinary, key, cancellationToken))?.IsLocked ?? false;
         var setting = await _dbContext.SystemSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.SettingKey == key, cancellationToken);

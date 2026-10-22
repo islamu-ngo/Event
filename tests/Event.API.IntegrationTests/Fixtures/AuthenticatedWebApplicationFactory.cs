@@ -87,6 +87,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
         {
             if (_ownsDatabase)
                 _database.InitializeAsync().GetAwaiter().GetResult();
+            _database.PrepareLocalIdentityWriterAsync().GetAwaiter().GetResult();
             var runtime = _database.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime);
             TestDatabaseConfiguration.AddPostgreSql(nativeConfiguration, new NpgsqlConnectionStringBuilder
             {

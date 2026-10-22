@@ -14,64 +14,6 @@ internal static class EventDiscoverySourceProviderOperations
 {
     internal const string TenantEnrollmentResource = "discovery-tenant-enrollment";
 
-    internal static async Task FenceTenantEnrollmentAsync(
-        ExploreDbContext context, CancellationToken cancellationToken)
-    {
-        RequireCurrentGlobalRead(context);
-        if (context.Database.ProviderName == RelationalNamedLock.SqlServerProvider
-            && context.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel == IsolationLevel.Snapshot)
-            throw new InvalidOperationException("Discovery tenant enrollment requires a current-read transaction.");
-
-        // Both global fanout and INSERT take this transaction-owned gate before
-        // inspecting membership, including the first tenant. SQLite uses its native
-        // writer fence below, not a process semaphore acquired behind a writer lock.
-        if (context.Database.ProviderName != RelationalNamedLock.SqliteProvider)
-            await RelationalNamedLock.AcquireTransactionAsync(context, TenantEnrollmentResource, cancellationToken);
-        if (context.Database.IsNpgsql())
-        {
-            // A no-op minimum-row write rejects a stale nonempty snapshot.
-            // With no row, retain the gate and probe through the same authority.
-            string query = $"SELECT {PostgresDiscoveryDisclosureContract.FunctionSql(context, "enrollment")}() AS \"Value\"";
-            Guid anchor = await context.Database.SqlQueryRaw<Guid>(query).SingleAsync(cancellationToken);
-            if (anchor == Guid.Empty
-                && context.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.ReadCommitted)
-                await RequireEmptyCurrentCatalogAsync(context, cancellationToken);
-        }
-        else
-        {
-            Guid anchor = await context.Tenants
-                .IgnoreAllFilters(TenantFilterBypassReasons.DiscoveryDisclosureMutation)
-                .OrderBy(tenant => tenant.Id).Select(tenant => tenant.Id).FirstOrDefaultAsync(cancellationToken);
-            await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, anchor, cancellationToken);
-        }
-    }
-
-    private static async Task RequireEmptyCurrentCatalogAsync(
-        ExploreDbContext context, CancellationToken cancellationToken)
-    {
-        // There is no row to update in an empty snapshot. While enrollment is
-        // excluded by the native gate, distinguish actual bootstrap from a snapshot
-        // predating the first committed tenant using the same configured authority.
-        var options = (DbContextOptions<ExploreDbContext>)context.GetService<IDbContextOptions>();
-        var relational = options.Extensions.OfType<RelationalOptionsExtension>().Single();
-        await using var connection = DbProviderFactories.GetFactory(context.Database.GetDbConnection())?.CreateConnection()
-            ?? throw new InvalidOperationException("Discovery enrollment requires a provider connection factory.");
-        connection.ConnectionString = relational.ConnectionString ?? context.Database.GetDbConnection().ConnectionString;
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>(options);
-        ((IDbContextOptionsBuilderInfrastructure)builder)
-            .AddOrUpdateExtension(relational.WithConnection(connection, false));
-        await using var current = new ExploreDbContext(builder.Options) { TenantContext = context.TenantContext };
-        await current.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
-        {
-            await using var transaction = await current.Database.BeginTransactionAsync(
-                IsolationLevel.ReadCommitted, cancellationToken);
-            string query = $"SELECT {PostgresDiscoveryDisclosureContract.FunctionSql(current, "catalog")}() AS \"Value\"";
-            if (await current.Database.SqlQueryRaw<bool>(query).SingleAsync(cancellationToken))
-                throw new DbUpdateConcurrencyException("Discovery tenant enrollment changed after the empty snapshot.");
-            await transaction.CommitAsync(cancellationToken);
-        });
-    }
-
     internal static void RequireCurrentClassificationRead(ExploreDbContext context)
     {
         if (context.Database.ProviderName == RelationalNamedLock.MySqlProvider

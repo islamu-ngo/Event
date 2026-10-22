@@ -38,6 +38,7 @@ public sealed class TenantIdentityActivationConcurrencyTests
         var activationAtCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var allowActivationCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var mutationLock = new EventControlledMutationLock();
+        using var humanGate = new InMemoryHumanGate();
         var tenantRepository = Substitute.For<ITenantRepository>();
         tenantRepository.GetByIdAsNoTrackingAsync(tenantId, Arg.Any<CancellationToken>())
             .Returns(_ => TenantWithStatus(tenantId, (TenantStatusEnum)Volatile.Read(ref tenantStatus)));
@@ -91,7 +92,8 @@ public sealed class TenantIdentityActivationConcurrencyTests
                 tenantRepository,
                 Substitute.For<IManagedTenantProvisioningOperationRepository>(),
                 Microsoft.Extensions.Options.Options.Create(new ManagedControlPlaneOptions())),
-            readiness);
+            readiness,
+            () => humanGate);
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(tenantId);
         ICommandHandler<PatchTenantDirectoryOperatorIdentityDocumentCommand, BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>> patchHandler = new PatchTenantDirectoryOperatorIdentityDocumentCommandHandler(
@@ -186,6 +188,46 @@ public sealed class TenantIdentityActivationConcurrencyTests
             IsActiveState = status == TenantStatusEnum.Active
         }
     };
+
+    /// <summary>
+    /// Application-only cooperative lease; database custody is covered by the real
+    /// persistence producer tests, not by this identity-document state race.
+    /// </summary>
+    private sealed class InMemoryHumanGate : IHumanSecuritySourceGate, IDisposable
+    {
+        private readonly SemaphoreSlim _resource = new(1, 1);
+        private int _held;
+
+        public async Task<IAsyncDisposable> AcquireAsync(CancellationToken cancellationToken = default)
+        {
+            await _resource.WaitAsync(cancellationToken);
+            Volatile.Write(ref _held, 1);
+            return new Lease(this);
+        }
+
+        public bool TryRequireCurrent() => Volatile.Read(ref _held) == 1;
+
+        public void RequireCurrent()
+        {
+            if (!TryRequireCurrent()) throw new InvalidOperationException("The Application race lost its Human lease.");
+        }
+
+        private sealed class Lease(InMemoryHumanGate owner) : IAsyncDisposable
+        {
+            private int _disposed;
+            public ValueTask DisposeAsync()
+            {
+                if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                {
+                    Volatile.Write(ref owner._held, 0);
+                    owner._resource.Release();
+                }
+                return ValueTask.CompletedTask;
+            }
+        }
+
+        public void Dispose() => _resource.Dispose();
+    }
 
     private sealed class EventControlledMutationLock : ISettingMutationLock, IDisposable
     {

@@ -56,7 +56,7 @@ public sealed class IdentityAccountResolver(
             }
         }
 
-        if (user is not null && await privacyErasure.GetBySubjectAsync(user.Id, cancellationToken) is not null)
+        if (user is not null && await privacyErasure.ExistsBySubjectAsync(user.Id, cancellationToken))
             bindingConflict = true;
         cancellationToken.ThrowIfCancellationRequested();
         IdentityCorrelationDecision decision = IdentityCorrelationPolicy.Evaluate(

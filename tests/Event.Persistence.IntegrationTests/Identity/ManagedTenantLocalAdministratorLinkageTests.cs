@@ -23,13 +23,16 @@ using Explore.Domain.Secrets;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Persistence.IntegrationTests.Identity;
@@ -41,7 +44,8 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
     {
         await using var fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
         await using var scope = fixture.Provider.CreateAsyncScope();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Handler(scope).EnsureAsync(
+        var handler = fixture.Handler(scope);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.EnsureAsync(
             ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(fixture.Request()),
             managementRequest: null, operationId: null, expectedOutboxMessageId: null, fixture.Token));
         await fixture.AssertNoTenantAsync();
@@ -79,6 +83,20 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             .GetByIdAsNoTrackingAsync(operation.Id, fixture.Token);
         await Assert.That(terminal!.Status).IsEqualTo(ManagedTenantProvisioningStatus.Succeeded);
         await Assert.That(terminal.TenantAdministratorUserId).IsEqualTo(fixture.Receipt.LocalSubjectId);
+        var tenant = await new TenantRepository(fixture.Application(observe))
+            .GetTenantBySlug(fixture.Request().TenantSlug);
+        await Assert.That(tenant).IsNotNull();
+        Guid tenantId = tenant!.Id;
+        await Assert.That(terminal.TenantId).IsEqualTo(tenantId);
+        var revisions = await fixture.Application(observe).Set<EventDiscoveryRevision>().AsNoTracking()
+            .IgnoreTenantFilter("Independent SQLite verification of the original worker operation's exact tenant.")
+            .Where(row => row.TenantId == tenantId).ToListAsync(fixture.Token);
+        await Assert.That(revisions.Count).IsEqualTo(1);
+        var revision = revisions.Single();
+        await Assert.That(revision.TenantId).IsEqualTo(terminal.TenantId!.Value);
+        await Assert.That(revision.Id.Version).IsEqualTo(7);
+        await Assert.That(revision.IdentityEpoch).IsEqualTo(0);
+        await Assert.That(revision.DisclosureEpoch).IsEqualTo(1);
         var documents = await new TenantSettingsDocumentRepository(fixture.Application(observe)).GetByTenantAndDocumentKey(
             terminal.TenantId!.Value, Explore.Domain.Settings.Documents.SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity, fixture.Token);
         using var payload = JsonDocument.Parse(documents!.PayloadJson);
@@ -135,35 +153,8 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 new TenantPlanStorageQuotaCeilingPolicy(settings), Store(scope));
         }
 
-        internal EnsureManagedProviderClientProvisionedCommandHandler Handler(AsyncServiceScope scope)
-        {
-            var app = Application(scope);
-            var tenants = new TenantRepository(app);
-            var unit = new EfCoreUnitOfWork(app);
-            var mutation = new RelationalSettingMutationLock(app, unit);
-            var settings = SystemSettingRepository.CreateReadOnly(app, mutation);
-            var tenantSettings = TenantSettingRepository.CreateReadOnly(app, mutation);
-            var documents = new TenantSettingsDocumentRepository(app);
-            var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
-            var typed = new TypedSettingsDocumentResolver(documents, cache);
-            var hierarchy = new HierarchicalSettingsReader(settings, tenantSettings, new OrganizationSettingRepository(app),
-                new GroupSettingRepository(app), UserPreferenceRepository.CreateReadOnly(app), cache);
-            return new(tenants, new UserRepository(app), new ActorRepository(app), new UserExternalLoginRepository(app),
-                new TenantUserRepository(app), new TenantUserProfileRepository(app), new TenantUserRoleGrantRepository(app),
-                new RoleRepository(app), new OrganizationRepository(app), new OrganizationTenantRepository(app),
-                new OrganizationMemberRepository(app), new GroupRepository(app), new GroupTenantRepository(app),
-                new GroupMemberRepository(app), new ExternalBindingRepository(app), new TenantOnboardingStateRepository(app),
-                new ManagedTenantProvisioningOperationRepository(app), new TenantPlanRepository(app), new TenantCapabilityRepository(app),
-                tenantSettings, documents, new TenantCreationService(tenants, documents), Store(scope),
-                new ManagedControlPlaneRegistrationRepository(app),
-                Provider.GetRequiredService<IDeploymentModeProvider>(), new AuditLogRepository(app),
-                new TenantBrandingSettingsDocumentProvisioningService(tenants, documents, typed), typed, hierarchy, Preflight(scope),
-                new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(app), tenants,
-                    new ManagedTenantProvisioningOperationRepository(app), _managedOptions), _managedOptions,
-                mutation, NullLogger<EnsureManagedProviderClientProvisionedCommandHandler>.Instance,
-                new PrivacyIdentityFenceOperation(
-                    NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()));
-        }
+        internal EnsureManagedProviderClientProvisionedCommandHandler Handler(AsyncServiceScope scope) =>
+            ActivatorUtilities.GetServiceOrCreateInstance<EnsureManagedProviderClientProvisionedCommandHandler>(scope.ServiceProvider);
 
         internal async Task<ManagedTenantProvisioningOperation> ScheduleAsync()
         {
@@ -171,11 +162,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             var app = Application(scope);
             await SeedManagedPrerequisitesAsync(app);
             var operations = new ManagedTenantProvisioningOperationRepository(app);
-            var tenants = new TenantRepository(app);
-            var handler = new ScheduleManagedTenantProvisioningCommandHandler(Provider.GetRequiredService<IDeploymentModeProvider>(),
-                new ManagedControlPlaneRegistrationRepository(app), operations, new ExternalBindingRepository(app), tenants,
-                new OutboxRepository(app), new RelationalSettingMutationLock(app, new EfCoreUnitOfWork(app)),
-                new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(app), tenants, operations, _managedOptions), Preflight(scope));
+            var handler = ActivatorUtilities.GetServiceOrCreateInstance<ScheduleManagedTenantProvisioningCommandHandler>(scope.ServiceProvider);
             var result = await handler.ExecuteAsync(new ScheduleManagedTenantProvisioningCommand(ManagedInstanceId, Request()), Token);
             await Assert.That(result.IsSuccess).IsTrue();
             return (await operations.GetByIdAsNoTrackingAsync(result.Id!.OperationId, Token))!;
@@ -184,8 +171,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         internal async Task ProcessAsync(ManagedTenantProvisioningOperation operation)
         {
             await using var scope = Provider.CreateAsyncScope();
-            await new ProcessManagedTenantProvisioningOperationCommandHandler(
-                new ManagedTenantProvisioningOperationRepository(Application(scope)), Handler(scope))
+            await ActivatorUtilities.GetServiceOrCreateInstance<ProcessManagedTenantProvisioningOperationCommandHandler>(scope.ServiceProvider)
                 .ExecuteAsync(new ProcessManagedTenantProvisioningOperationCommand(operation.Id, operation.CurrentOutboxMessageId), Token);
         }
 
@@ -205,8 +191,17 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
             services.Configure<DeploymentSettings>(settings => settings.Mode = DeploymentMode.MultiTenant);
             services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
+            services.AddScoped<IInstanceBootstrapStateReader, InstanceBootstrapStateReader>();
             services.AddSingleton<IDeploymentModeProvider, DeploymentModeProvider>();
             services.AddDbContext<ExploreDbContext>(options => Configure(options, _applicationPath));
+            services.Replace(ServiceDescriptor.Scoped<ExploreDbContext>(provider =>
+            {
+                // This fixture owns each fresh scoped application context. Seal
+                // its null Runtime selection before exposing it to any producer.
+                var context = new ExploreDbContext(provider.GetRequiredService<DbContextOptions<ExploreDbContext>>());
+                context.BindTenantLease();
+                return context;
+            }));
             services.AddSingleton<IGlobalExploreDbContextFactory>(_ => new GlobalExploreDbContextFactory(
                 new PrimaryDatabaseConnectionOptions
                 {

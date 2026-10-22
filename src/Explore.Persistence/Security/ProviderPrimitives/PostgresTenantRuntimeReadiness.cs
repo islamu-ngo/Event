@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
@@ -12,15 +13,27 @@ internal static class PostgresTenantRuntimeReadiness
     internal static DbCommand CreateCommand(
         DbConnection connection, ExploreDbContext context, string? enrolledGlobalLogin = null)
     {
+        var command = connection.CreateCommand();
+        command.CommandTimeout = 5;
+        var options = context.GetService<IDbContextOptions>();
+        string? declaredRuntimeLogin = options.FindExtension<PostgresRuntimeIdentityOptionsExtension>()?.DeclaredLogin;
+        string runtimePolicyException = declaredRuntimeLogin is null
+            ? "FALSE" : PostgresDiscoveryMetadataPermissions.RuntimePolicyException(context, declaredRuntimeLogin);
         string globalPolicyException = enrolledGlobalLogin is null
             ? "FALSE"
             : $"""
-                ({PostgresEmailRetentionReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                ({PostgresAtprotoFederationSettingPermissions.GlobalReadPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresDiscoveryMetadataPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresTenantCreationPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresManagedTenantWorkerCreationPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresUserTenantMembershipReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresEmailRetentionReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresEventResourceAuditReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresInventoryHoldExpiryReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
+                OR ({PostgresIntegrationSyncReadPermissions.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresExternalApiKeyAuthenticationContract.GlobalPolicyException(context, enrolledGlobalLogin)})
                 OR ({PostgresAdmissionScannerAuthenticationContract.GlobalPolicyException(context, enrolledGlobalLogin)})
                 """;
-        var command = connection.CreateCommand();
-        command.CommandTimeout = 5;
         command.CommandText = $$"""
             SELECT
                 NOT EXISTS (
@@ -54,7 +67,7 @@ internal static class PostgresTenantRuntimeReadiness
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE n.nspname = ANY(@schemas) AND c.relname = ANY(@tables)
                       AND p.polname <> 'tenant_isolation' AND p.polpermissive
-                      AND NOT COALESCE(({{globalPolicyException}}), FALSE)
+                      AND NOT COALESCE(({{globalPolicyException}}) OR ({{runtimePolicyException}}), FALSE)
                       AND EXISTS (
                           SELECT 1 FROM unnest(p.polroles) AS role_id
                           WHERE role_id = 0 OR pg_has_role(current_user, role_id, 'USAGE')))

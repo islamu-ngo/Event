@@ -11,6 +11,7 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Services;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -93,8 +94,15 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
         var locks = new List<IAsyncDisposable>();
         Rejection? rejected = null;
         ConfigurationManifestOperation? operation = null;
+        await using var enrollment = new EventDiscoveryEnrollmentGate(context);
+        var enrollmentGate = await enrollment.AcquireAsync(token);
         try
         {
+            owner.BindEnrollment();
+            await owner.RequireAsync(token);
+            // Cooperating API writers coordinate before BEGIN so the first snapshot follows
+            // any prior owner. Direct database writers can bypass this protocol; no source
+            // table/row locks or broader privileges are requested to fence them.
             foreach (string key in RelationalSettingMutationLock.NormalizeOrderedSettingKeyGroups(
                          ConfigurationManifestLockKeys.CompileOrderedGroups(plan).Select(group => group.AsEnumerable())))
             {
@@ -152,7 +160,14 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
         }
         finally
         {
-            for (int index = locks.Count - 1; index >= 0; index--) await locks[index].DisposeAsync();
+            try
+            {
+                for (int index = locks.Count - 1; index >= 0; index--) await locks[index].DisposeAsync();
+            }
+            finally
+            {
+                await enrollmentGate.DisposeAsync();
+            }
         }
         if (rejected is not null)
         {
@@ -208,6 +223,7 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
     private static Reservations Reserve(ConfigurationManifestApplyPlan plan)
     {
         var directories = plan.Tenants.ToImmutableDictionary(tenant => tenant.PlannedTenantId, _ => Guid.CreateVersion7());
+        var revisions = plan.Tenants.ToImmutableDictionary(tenant => tenant.PlannedTenantId, _ => Guid.CreateVersion7());
         var policies = plan.Tenants.Where(tenant => tenant.PaidEventPolicy is not null)
             .ToImmutableDictionary(tenant => tenant.PlannedTenantId, _ => Guid.CreateVersion7());
         Guid? instancePolicy = plan.Instance.PaidEventPolicy?.ProposedRevision is null ? null : Guid.CreateVersion7();
@@ -216,15 +232,16 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
             ["Slugs"] = JsonSerializer.SerializeToNode(plan.Tenants.Select(tenant => tenant.Slug)),
             ["Tenants"] = JsonSerializer.SerializeToNode(plan.Tenants.Select(tenant => tenant.PlannedTenantId)),
             ["CreatedTenants"] = JsonSerializer.SerializeToNode(plan.Tenants.Select(tenant => tenant.PlannedTenantId)),
+            [ConfigurationManifestBootstrapData.RevisionTag] = JsonSerializer.SerializeToNode(revisions.Values),
             ["Documents"] = JsonSerializer.SerializeToNode(plan.Tenants.Select(tenant => tenant.BrandingDocument.DocumentId).Concat(directories.Values)),
             ["Policies"] = JsonSerializer.SerializeToNode(policies.Values.Concat(instancePolicy is { } id ? [id] : [])),
             ["Operations"] = JsonSerializer.SerializeToNode(new[] { plan.OperationId }),
             ["Operation"] = JsonValue.Create(plan.OperationId),
             ["Effect"] = JsonValue.Create(plan.EffectOutboxId)
-        }, directories, policies, instancePolicy);
+        }, directories, revisions, policies, instancePolicy);
     }
     private sealed record Reservations(JsonObject Scope, ImmutableDictionary<Guid, Guid> Directories,
-        ImmutableDictionary<Guid, Guid> Policies, Guid? InstancePolicy);
+        ImmutableDictionary<Guid, Guid> Revisions, ImmutableDictionary<Guid, Guid> Policies, Guid? InstancePolicy);
 
     private static DateTime Instant(ExploreDbContext context, DateTime value) =>
         ConfigurationManifestBootstrapProviderOperations.Instant(context, value);
@@ -263,6 +280,7 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
         private readonly int? backend;
         private readonly ConfigurationManifestBootstrapProviderOperations provider;
         private int writeConsumed;
+        private bool enrollmentBound;
         internal ConfigurationManifestBootstrapData Data { get; }
         internal string Target { get; }
         internal DbTransaction? Transaction { get; private set; }
@@ -276,6 +294,14 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
             Target = connection.DataSource + "\n" + connection.Database + "\n" + string.Join("\n", Data.Relations.Select(relation => relation.Table));
             provider = new(context, Data, configuration);
             RequirePhysical();
+        }
+        internal void BindEnrollment()
+        {
+            RequirePhysical();
+            if (enrollmentBound || Transaction is not null)
+                throw new UnauthorizedAccessException("Bootstrap enrollment belongs to its original pre-BEGIN owner.");
+            EventDiscoveryEnrollmentGate.RequireCurrent(context);
+            enrollmentBound = true;
         }
         internal void Bind(IDbContextTransaction transaction)
         {
@@ -302,6 +328,8 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory(
                 || Transaction is not null && (!ReferenceEquals(Transaction, context.Database.CurrentTransaction?.GetDbTransaction())
                     || !connection.Owns(Transaction) || Transaction.IsolationLevel != IsolationLevel.Serializable))
                 throw new UnauthorizedAccessException("Original nonhuman Global context, connector and namespace custody changed.");
+            if (enrollmentBound)
+                EventDiscoveryEnrollmentGate.RequireCurrent(context);
         }
         internal async Task RequireAsync(CancellationToken token)
         {

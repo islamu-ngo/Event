@@ -118,10 +118,16 @@ public sealed class EventResourceSettingsWriter : IEventResourceSettingsWriter
             return await preparation.ExecuteCurrentJoinedAsync(effects,
                 (_, token) => ApplyCoreAsync(mutations, subject, operation, actorUserId, token), cancellationToken);
         var prepared = await preparation.PrepareResourceAsync(mutations, operation, actorUserId, cancellationToken);
-        return await mutationLock.ExecuteOrderedGroupsAsync([EventResourceSettingMutationGuard.Keys],
-            token => preparation.ExecutePreparedAsync(prepared,
-                (_, inner) => ApplyCoreAsync(mutations, subject, operation, actorUserId, inner), token),
-            cancellationToken);
+        Exception? primaryFailure = null;
+        try
+        {
+            return await mutationLock.ExecuteOrderedGroupsAsync([EventResourceSettingMutationGuard.Keys],
+                token => preparation.ExecutePreparedAsync(prepared,
+                    (_, inner) => ApplyCoreAsync(mutations, subject, operation, actorUserId, inner), token),
+                cancellationToken);
+        }
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await preparation.CloseAsync(prepared, primaryFailure); }
     }
 
     public Task<EventResourceSettingsWriteResult> ApplyCurrentHumanAsync(
@@ -378,6 +384,9 @@ public sealed class EventResourceSettingsWriter : IEventResourceSettingsWriter
                 await PostgresConfigurationImportEventResourceContract.WriteAsync(
                     context, entity, state, originals.GetValueOrDefault(identity), subject!,
                     instanceAuthority!, actorUserId, now, token);
+                if (entity is SystemSetting system)
+                    await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, system.SettingKey,
+                        state == EntityState.Deleted ? null : system, token);
             }
             return new(true, null, notifications.ToImmutable());
         }

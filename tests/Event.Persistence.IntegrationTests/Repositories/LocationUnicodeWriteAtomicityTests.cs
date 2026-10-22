@@ -44,7 +44,8 @@ internal static class LocationUnicodeWriteAtomicityTests
         var settings = new HierarchicalSettingsReader(
             SystemSettingRepository.CreateReadOnly(context, mutationLock), TenantSettingRepository.CreateReadOnly(context, mutationLock),
             new OrganizationSettingRepository(context), new GroupSettingRepository(context),
-            UserPreferenceRepository.CreateReadOnly(context), cache);
+            UserPreferenceRepository.CreateReadOnly(context), cache,
+            new AtprotoFederationSettingRepository(context, null));
         // Cerbos is the external authorization boundary; all local policy and persistence behavior is real.
         var authorization = Substitute.For<IAuthorizationProvider>();
         authorization.AuthorizeAsync(Arg.Any<AuthorizationRequest>(), Arg.Any<CancellationToken>())

@@ -62,6 +62,7 @@ public sealed class EventResourceProviderControlPlane(
     private async Task<T> ExecuteAsync<T>(IPreparedHumanSettingsMutation prepared,
         Func<EventResourceProviderOriginal, CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
+        Exception? primary = null;
         try
         {
             return await mutationLock.ExecuteOrderedGroupsAsync([[EventResourceProviderBindingDocument.SettingKey]],
@@ -70,7 +71,11 @@ public sealed class EventResourceProviderControlPlane(
                         ?? throw new UnauthorizedAccessException("The original resource-provider owner is required."),
                     selectedToken), token), cancellationToken);
         }
-        finally { preparation.CloseEventResourceProvider(prepared); }
+        catch (Exception failure) { primary = failure; throw; }
+        finally
+        {
+            await preparation.CloseAsync(prepared, primary);
+        }
     }
 
     private async Task RequireAdministratorAsync(CancellationToken token)

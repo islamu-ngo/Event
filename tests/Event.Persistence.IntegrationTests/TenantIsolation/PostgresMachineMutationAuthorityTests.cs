@@ -48,8 +48,22 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
             var conflict = await Assert.ThrowsAsync<PostgresException>(() => contender.Database.ExecuteSqlRawAsync(
                 $"SELECT id FROM {grant.GroupTable} WHERE id = {{0}} FOR UPDATE NOWAIT", [grant.GroupId], token));
             await Assert.That(conflict!.SqlState).IsEqualTo(PostgresErrorCodes.LockNotAvailable);
-            await Assert.That(await db.ExternalApiKeys.IgnoreQueryFilters().AnyAsync(
-                key => key.Id == rows.PlatformKey.Id, token)).IsFalse();
+            await Assert.That(await db.ExternalApiKeys.IgnoreQueryFilters()
+                .AnyAsync(key => key.Id == rows.PlatformKey.Id, token)).IsFalse();
+            var transaction = db.Database.CurrentTransaction!;
+            await transaction.CreateSavepointAsync("runtime_private_key_denial", token);
+            try
+            {
+                var denied = await Assert.ThrowsAsync<PostgresException>(() =>
+                    db.ExternalApiKeys.IgnoreQueryFilters().Where(key => key.Id == rows.PlatformKey.Id)
+                        .Select(key => key.SecretHash).SingleOrDefaultAsync(token));
+                await Assert.That(denied!.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+            }
+            finally
+            {
+                await transaction.RollbackToSavepointAsync("runtime_private_key_denial", token);
+                await transaction.ReleaseSavepointAsync("runtime_private_key_denial", token);
+            }
             return true;
         });
     }
@@ -75,6 +89,7 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
         var authority = grant.Authority(db, new ControlledClock(DateTimeOffset.UtcNow));
         await using (var changed = fixture.CreateDbContext())
         {
+            changed.BindTenantLease();
             var key = await changed.ExternalApiKeys.SingleAsync(row => row.Id == grant.Key.Id);
             switch (drift)
             {
@@ -142,6 +157,7 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
         await using var grant = await FooterRows.CreateAsync(fixture, rows, owner);
         await using var blocker = fixture.CreateDbContext();
         Guid foreignGroup = Guid.CreateVersion7();
+        blocker.BindTenantLease();
         blocker.TenantFooterLinkGroups.Add(new TenantFooterLinkGroup
         {
             Id = foreignGroup,
@@ -261,21 +277,51 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
             : purpose switch
             {
                 "global" => (PostgresTenantLookupContract.GlobalRole, PostgresTenantLookupContract.FunctionSql(db) + "()"),
-                "authentication" => (PostgresExternalApiKeyAuthenticationContract.GlobalRole,
-                    PostgresExternalApiKeyAuthenticationContract.FunctionSql(db) + "(text)"),
-                "scanner" => (PostgresAdmissionScannerAuthenticationContract.GlobalRole,
-                    PostgresAdmissionScannerAuthenticationContract.FunctionSql(db) + "(integer[], text[])"),
+                "authentication" => (PostgresExternalApiKeyAuthenticationContract.GlobalRole, string.Empty),
+                "scanner" => (PostgresAdmissionScannerAuthenticationContract.GlobalRole, string.Empty),
                 _ => throw new ArgumentOutOfRangeException(nameof(purpose))
             };
-        string change = directGrant
-            ? $"GRANT EXECUTE ON FUNCTION {signature} TO \"{rows.RuntimeOptions.Username}\""
-            : $"GRANT {executor} TO \"{rows.RuntimeOptions.Username}\" WITH INHERIT TRUE, SET FALSE";
-        string restore = directGrant
-            ? $"REVOKE EXECUTE ON FUNCTION {signature} FROM \"{rows.RuntimeOptions.Username}\""
-            : $"REVOKE {executor} FROM \"{rows.RuntimeOptions.Username}\"";
+        bool directAuthenticationColumn = directGrant && (purpose is "authentication" or "scanner");
+        string runtimeLogin = rows.RuntimeOptions.Username!;
+        string quotedRuntime = "\"" + runtimeLogin.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        string sourceTable = string.Empty;
+        string sourceColumn = string.Empty;
+        string change;
+        string restore;
+        if (directAuthenticationColumn)
+        {
+            bool scanner = purpose == "scanner";
+            sourceTable = scanner ? sql.Table<AdmissionScannerCapability>() : sql.Table<ExternalApiKey>();
+            sourceColumn = db.Model.FindEntityType(scanner ? typeof(AdmissionScannerCapability) : typeof(ExternalApiKey))!
+                .FindProperty(scanner ? nameof(AdmissionScannerCapability.LookupDigest) : nameof(ExternalApiKey.SecretHash))!
+                .GetColumnName()!;
+            string quotedColumn = scanner
+                ? sql.Column<AdmissionScannerCapability>(nameof(AdmissionScannerCapability.LookupDigest))
+                : sql.Column<ExternalApiKey>(nameof(ExternalApiKey.SecretHash));
+            await Assert.That(await db.Database.SqlQuery<bool>($"""
+                SELECT CURRENT_USER::text = {runtimeLogin}
+                    AND NOT pg_catalog.has_column_privilege(CURRENT_USER, {sourceTable}, {sourceColumn}, 'SELECT') AS "Value"
+                """).SingleAsync()).IsTrue().Because($"purpose={purpose}; directGrant={directGrant}; stage=before_column_grant");
+            change = $"GRANT SELECT ({quotedColumn}) ON {sourceTable} TO {quotedRuntime}";
+            restore = $"REVOKE SELECT ({quotedColumn}) ON {sourceTable} FROM {quotedRuntime}";
+        }
+        else
+        {
+            change = directGrant
+                ? $"GRANT EXECUTE ON FUNCTION {signature} TO {quotedRuntime}"
+                : $"GRANT {executor} TO {quotedRuntime} WITH INHERIT TRUE, SET FALSE";
+            restore = directGrant
+                ? $"REVOKE EXECUTE ON FUNCTION {signature} FROM {quotedRuntime}"
+                : $"REVOKE {executor} FROM {quotedRuntime}";
+        }
         await administration.Database.ExecuteSqlRawAsync(change);
         try
         {
+            if (directAuthenticationColumn)
+                await Assert.That(await db.Database.SqlQuery<bool>($"""
+                    SELECT CURRENT_USER::text = {runtimeLogin}
+                        AND pg_catalog.has_column_privilege(CURRENT_USER, {sourceTable}, {sourceColumn}, 'SELECT') AS "Value"
+                    """).SingleAsync()).IsTrue().Because($"purpose={purpose}; directGrant={directGrant}; stage=after_column_grant");
             await using var changedTransaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 PostgresMachineMutationAuthorityContract.RequireReadyAsync(db, default));
@@ -366,7 +412,7 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
     }
 
     private sealed class FooterRows(PostgreSqlContainerFixture fixture, Rows rows, ExternalApiKey key,
-        Guid groupId, Guid linkId, string groupTable, string linkTable, string[] tables) : IAsyncDisposable
+        Guid groupId, Guid linkId, string groupTable, string linkTable, bool ownsPurposeMembership) : IAsyncDisposable
     {
         internal ExternalApiKey Key { get; } = key;
         internal Guid GroupId { get; } = groupId;
@@ -378,6 +424,7 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
             PostgreSqlContainerFixture fixture, Rows rows, ExternalApiKeyOwnerType owner)
         {
             await using var seed = fixture.CreateDbContext();
+            seed.BindTenantLease();
             await PostgresMachineMutationAuthorityContract.ApplyAsync(seed);
             await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(seed, fixture.NativeQueueEnrollment);
             var key = await seed.ExternalApiKeys.SingleAsync(row => row.Id ==
@@ -412,21 +459,18 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
                 IsActive = true
             });
             await seed.SaveChangesAsync();
-            Type[] types = [typeof(ExternalApiKey), typeof(User), typeof(PlatformUserRole), typeof(Role),
-                typeof(Tenant), typeof(TenantStatus), typeof(TenantUser), typeof(TenantUserRoleGrant),
-                typeof(TenantFooterLinkGroup), typeof(TenantFooterLink)];
             var helper = seed.GetService<ISqlGenerationHelper>();
-            string[] tables = types.Select(type =>
-            {
-                var entity = seed.Model.FindEntityType(type)!;
-                return helper.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
-            }).ToArray();
+            var groupEntity = seed.Model.FindEntityType(typeof(TenantFooterLinkGroup))!;
+            var linkEntity = seed.Model.FindEntityType(typeof(TenantFooterLink))!;
+            string groupTable = helper.DelimitIdentifier(groupEntity.GetTableName()!, groupEntity.GetSchema());
+            string linkTable = helper.DelimitIdentifier(linkEntity.GetTableName()!, linkEntity.GetSchema());
             string login = $"\"{rows.RuntimeOptions.Username}\"";
-            foreach (string table in tables)
-                await seed.Database.ExecuteSqlRawAsync($"GRANT SELECT, UPDATE (id) ON {table} TO {login}");
-            await seed.Database.ExecuteSqlRawAsync(
-                $"GRANT {PostgresMachineMutationAuthorityContract.RuntimeRole} TO {login} WITH INHERIT TRUE, SET FALSE");
-            return new(fixture, rows, key, groupId, linkId, tables[^2], tables[^1], tables);
+            bool ownsPurposeMembership = !await rows.HasDirectPurposeMembershipAsync(
+                seed, PostgresMachineMutationAuthorityContract.RuntimeRole);
+            if (ownsPurposeMembership)
+                await seed.Database.ExecuteSqlRawAsync(
+                    $"GRANT {PostgresMachineMutationAuthorityContract.RuntimeRole} TO {login} WITH INHERIT TRUE, SET FALSE");
+            return new(fixture, rows, key, groupId, linkId, groupTable, linkTable, ownsPurposeMembership);
         }
 
         internal ExploreDbContext Context(IInterceptor? interceptor = null)
@@ -435,7 +479,9 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, rows.RuntimeOptions);
             options.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
             if (interceptor is not null) options.AddInterceptors(interceptor);
-            return new ExploreDbContext(options.Options) { TenantContext = new TenantScope(rows.A) };
+            var context = new ExploreDbContext(options.Options) { TenantContext = new TenantScope(rows.A) };
+            context.BindTenantLease();
+            return context;
         }
 
         internal MachineMutationCommitAuthority Authority(ExploreDbContext context, TimeProvider clock)
@@ -458,12 +504,11 @@ public sealed class PostgresMachineMutationAuthorityTests(PostgreSqlContainerFix
 
         public async ValueTask DisposeAsync()
         {
+            if (!ownsPurposeMembership) return;
             await using var administration = fixture.CreateDbContext();
             string login = $"\"{rows.RuntimeOptions.Username}\"";
             await administration.Database.ExecuteSqlRawAsync(
                 $"REVOKE {PostgresMachineMutationAuthorityContract.RuntimeRole} FROM {login}");
-            foreach (string table in tables)
-                await administration.Database.ExecuteSqlRawAsync($"REVOKE SELECT, UPDATE (id) ON {table} FROM {login}");
         }
 
         private sealed record TenantScope(Guid TenantId) : Explore.Application.Contracts.Infrastructure.ITenantContext;

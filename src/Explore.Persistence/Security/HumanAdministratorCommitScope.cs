@@ -15,7 +15,8 @@ public enum HumanAdministratorCommitPurpose
     EmailTenant = 4,
     ConfigurationImport = 5,
     MixedSettingsInstance = 6,
-    MixedSettingsTenant = 7
+    MixedSettingsTenant = 7,
+    TenantCreation = 8
 }
 
 /// <summary>

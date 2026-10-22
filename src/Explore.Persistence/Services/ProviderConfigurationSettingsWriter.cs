@@ -217,7 +217,11 @@ public sealed class ProviderConfigurationSettingsWriter(ExploreDbContext context
         if (!observed!.Same(await ReadAsync(token)))
             throw new UnauthorizedAccessException("The original source changed between validation and fixed writing.");
         if (enrollment is not null)
+        {
             await PostgresProviderConfigurationContract.WriteAsync(context, enrollment, mutation, token);
+            foreach (var effect in mutation.Effects)
+                await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, effect.Key, effect.ToEntity(), token);
+        }
         else
         {
             foreach (var effect in mutation.Effects)

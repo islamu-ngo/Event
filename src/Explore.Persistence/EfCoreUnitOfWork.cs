@@ -216,6 +216,7 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
                     await _dbContext.ValidateTrustedSetupSettingsSourcesAsync(ct);
                     await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
                     _dbContext.ValidateTrustedSetupSettingsTimes();
+                    AdmissionTargetTransaction.RequireCurrentIfHeld(_dbContext);
                     commitAttempted = true;
                     await transaction.CommitAsync(ct);
                     commitAcknowledged = true;

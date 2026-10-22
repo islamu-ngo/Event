@@ -9,6 +9,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Explore.Secrets.Database;
@@ -86,14 +87,11 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
         await using var rows = await AuthenticationRows.CreateAsync(fixture);
         await using var own = rows.Context(rows.A);
         await rows.AssertOrdinaryRoleAsync(own);
-        var ownDenied = await Assert.ThrowsAsync<PostgresException>(() =>
-            own.AdmissionScannerCapabilities.AnyAsync(row => row.Id == rows.Scanner.Id));
-        await Assert.That(ownDenied.SqlState).IsEqualTo("42501");
+        await Assert.That(await own.AdmissionScannerCapabilities.AnyAsync(row => row.Id == rows.Scanner.Id)).IsTrue();
         await using var request = rows.Context(rows.B);
         await rows.AssertOrdinaryRoleAsync(request);
-        var foreignDenied = await Assert.ThrowsAsync<PostgresException>(() =>
-            request.AdmissionScannerCapabilities.IgnoreQueryFilters().AnyAsync(row => row.Id == rows.Scanner.Id));
-        await Assert.That(foreignDenied.SqlState).IsEqualTo("42501");
+        await Assert.That(await request.AdmissionScannerCapabilities.IgnoreQueryFilters()
+            .AnyAsync(row => row.Id == rows.Scanner.Id)).IsFalse();
         await using var global = await AuthenticationGlobalAuthority.CreateAsync(fixture);
         var repository = new AdmissionScannerAuthenticationRepository(global.Factory, fixture.NativeQueueEnrollment);
         string otherDigest = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -154,8 +152,7 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
         }
         await using var request = rows.Context(rows.A);
         await rows.AssertOrdinaryRoleAsync(request);
-        var denied = await Assert.ThrowsAsync<PostgresException>(() => request.AdmissionScannerCapabilities.CountAsync());
-        await Assert.That(denied.SqlState).IsEqualTo("42501");
+        await Assert.That(await request.AdmissionScannerCapabilities.CountAsync()).IsEqualTo(1);
         await using var global = await AuthenticationGlobalAuthority.CreateAsync(fixture);
         var repository = new AdmissionScannerAuthenticationRepository(global.Factory, fixture.NativeQueueEnrollment);
 
@@ -179,14 +176,9 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
         await Assert.That(await request.ExternalApiKeys.AnyAsync(key => key.Id == rows.KeyA.Id)).IsTrue();
         if (purpose == "membership")
         {
-            await using var command = request.Database.GetDbConnection().CreateCommand();
-            command.CommandText = $"SELECT * FROM {PostgresUserTenantMembershipContract.FunctionSql(request)}(@user)";
-            var user = command.CreateParameter();
-            user.ParameterName = "user";
-            user.Value = rows.UserId;
-            command.Parameters.Add(user);
-            var denied = await Assert.ThrowsAsync<PostgresException>(async () => { await command.ExecuteScalarAsync(); });
-            await Assert.That(denied.SqlState).IsEqualTo("42501");
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                Explore.Persistence.Schema.PostgresUserTenantMembershipReadPermissions.RequireReadyAsync(
+                    request, fixture.NativeQueueEnrollment));
             return;
         }
         await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
@@ -285,11 +277,52 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
     }
 
     [Test]
+    public async Task IntegrationDiscoveryRejectsDelegatedGlobalAuthorityWithoutRepair()
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var migrator = new ExploreDbContext(options.Options);
+        migrator.BindTenantLease();
+        await PostgresIntegrationSyncReadPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+        await migrator.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await migrator.Database.BeginTransactionAsync();
+            var names = new HumanPrincipalSourceSql(migrator);
+            string global = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
+            string outsiderName = "integration_delegate_" + Guid.CreateVersion7().ToString("N");
+            string outsider = names.Quote(outsiderName);
+            await migrator.Database.ExecuteSqlRawAsync($"""
+                CREATE ROLE {outsider} NOLOGIN;
+                GRANT {global} TO {outsider} WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;
+                """);
+            await transaction.CreateSavepointAsync("original_integration_identity");
+            await migrator.Database.ExecuteSqlRawAsync($"SET LOCAL SESSION AUTHORIZATION {global}");
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresIntegrationSyncReadPermissions.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment));
+            await transaction.RollbackToSavepointAsync("original_integration_identity");
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                PostgresIntegrationSyncReadPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment));
+            await using var edge = migrator.Database.GetDbConnection().CreateCommand();
+            edge.Transaction = transaction.GetDbTransaction();
+            edge.CommandText = """
+                SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members
+                    WHERE roleid=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=@global)
+                        AND member=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=@outsider)
+                        AND admin_option AND NOT set_option AND NOT inherit_option)
+                """;
+            edge.Parameters.Add(new NpgsqlParameter("global", fixture.NativeQueueEnrollment.GlobalLogin));
+            edge.Parameters.Add(new NpgsqlParameter("outsider", outsiderName));
+            await Assert.That(await edge.ExecuteScalarAsync()).IsEqualTo(true);
+            await transaction.RollbackAsync();
+        });
+        await PostgresIntegrationSyncReadPermissions.ApplyAsync(migrator, fixture.NativeQueueEnrollment);
+    }
+
+    [Test]
     [Arguments("instance")]
     [Arguments("tenant")]
     [Arguments("organization")]
     [Arguments("group")]
-    [Arguments("integration")]
     [Arguments("health")]
     public async Task NativeObservationRejectsUnknownExecutorBeforeReplacement(string purpose)
     {
@@ -312,11 +345,6 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
                 PostgresAdministrativeAuthorityContract.GlobalRole,
                 $"SELECT * FROM {PostgresAdministrativeAuthorityContract.GroupFunctionSql(migrator)}(@subject, NULL)", 1,
                 context => PostgresAdministrativeAuthorityContract.ApplyAsync(context)),
-            "integration" => (PostgresIntegrationSyncDiscoveryContract.FunctionSql(migrator) +
-                "(timestamp with time zone, timestamp with time zone, integer)",
-                PostgresIntegrationSyncDiscoveryContract.RuntimeRole,
-                $"SELECT * FROM {PostgresIntegrationSyncDiscoveryContract.FunctionSql(migrator)}(@now, @stale, 1)", 2,
-                context => PostgresIntegrationSyncDiscoveryContract.ApplyAsync(context)),
             "health" => (PostgresQueueDrainHealthContract.FunctionSql(migrator) +
                 "(timestamp with time zone, timestamp with time zone)",
                 PostgresQueueDrainHealthContract.GlobalRole,
@@ -436,7 +464,7 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
                     probe.CommandText = $"SELECT 1 FROM {table} LIMIT 1";
                     await probe.ExecuteScalarAsync();
                 }
-                foreach (Type type in new[] { typeof(TenantUser), typeof(UserPii) })
+                foreach (Type type in new[] { typeof(UserPii) })
                 {
                     var entity = metadata.Model.FindEntityType(type)!;
                     string table = $"\"{entity.GetSchema()}\".\"{entity.GetTableName()}\"";
@@ -596,6 +624,16 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
             await Assert.That(reader.GetBoolean(1)).IsFalse();
             await Assert.That(reader.GetBoolean(2)).IsFalse();
         }
+
+        internal Task<bool> HasDirectPurposeMembershipAsync(ExploreDbContext administration, string purposeRole)
+            => administration.Database.SqlQuery<bool>($"""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_auth_members membership
+                    JOIN pg_catalog.pg_roles purpose ON purpose.oid = membership.roleid
+                    JOIN pg_catalog.pg_roles login ON login.oid = membership.member
+                    WHERE purpose.rolname = {purposeRole} AND login.rolname = {RuntimeOptions.Username}
+                ) AS "Value"
+                """).SingleAsync();
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 

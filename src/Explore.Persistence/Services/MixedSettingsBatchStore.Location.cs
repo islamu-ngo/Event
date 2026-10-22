@@ -119,7 +119,7 @@ public sealed partial class MixedSettingsBatchStore
             }))
             throw new UnauthorizedAccessException("An unrelated row cannot join the private mixed location correction set.");
         await EmitAsync("settings", [key], entries.Select(entry => (entry.Entity, entry.State)).ToImmutableArray(), false, token);
-        if ((RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
+        if (discovery is null && (RelationalProviderClassifier.Classify(context.Database) == RelationalProvider.PostgreSql))
             context.DisclosureMutations.Enlist(corrections.Select(correction => correction.Before.TenantId));
     }
 

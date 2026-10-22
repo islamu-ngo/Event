@@ -48,6 +48,10 @@ internal sealed partial class LocalIdentityCredentialStateStore
             return LocalCredentialCreateResult.Rejected(LocalCredentialCreateOutcome.Invalid);
         var created = Row(native.Expected, nameof(LocalIdentityCredentialOperation), request.OperationId.Value)
             ?? throw new UnauthorizedAccessException("The complete pending credential operation is absent.");
+        var createdReceipt = NativeReceipt(created);
+        await AddEligibilityAsync(createdReceipt.LocalSubjectId, createdReceipt.OperationId,
+            createdReceipt.PersonalActorId, createdReceipt.ExternalLoginId,
+            created.GetProperty("CreatedAt").GetDateTimeOffset().UtcDateTime, token);
         _nativeIssued = new(_administrationAttempt!.Invocation, native.OriginalRequest, native.Expected, null);
         return LocalCredentialCreateResult.Created(NativeReceipt(created), password);
     }
@@ -105,6 +109,9 @@ internal sealed partial class LocalIdentityCredentialStateStore
         var operation = Row(native.Expected, nameof(LocalIdentityCredentialOperation), request.OperationId.Value)
             ?? throw new UnauthorizedAccessException("The complete reset credential operation is absent.");
         var reset = NativeResetReceipt(operation);
+        await ChangeEligibilityAsync(request.LocalSubjectId.Value, request.ExpectedCurrentOperationId.Value,
+            row => row.Reset(row.Generation, request.ExpectedCurrentOperationId.Value, request.OperationId.Value,
+                operation.GetProperty("CreatedAt").GetDateTimeOffset().UtcDateTime), token);
         _nativeIssued = new(_administrationAttempt!.Invocation, native.OriginalRequest, native.Expected,
             request.LocalSubjectId == request.ActorId ? reset : null);
         return LocalCredentialResetResult.Reset(reset, password);
@@ -164,6 +171,12 @@ internal sealed partial class LocalIdentityCredentialStateStore
             IdentityConcurrencyStamp: Guid.CreateVersion7().ToString("N"),
             SecurityStamp: Guid.CreateVersion7().ToString("N")), token);
         await native.ApplyAsync(token);
+        if (!activated)
+        {
+            var after = Row(native.Expected, nameof(LocalIdentityCredentialOperation), operationId)!.Value;
+            await ChangeEligibilityAsync(snapshot.Receipt.LocalSubjectId, operationId,
+                row => row.Activate(row.Generation, operationId, after.GetProperty("UpdatedAt").GetDateTimeOffset().UtcDateTime), token);
+        }
         AdvanceIssuedImage(native);
         return activated ? LocalCredentialActivationOutcome.AlreadyActivated : LocalCredentialActivationOutcome.Activated;
     }

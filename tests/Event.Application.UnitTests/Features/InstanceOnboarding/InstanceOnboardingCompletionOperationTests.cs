@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -326,7 +327,8 @@ internal sealed class OnboardingCompletionScenario
             new Explore.Application.Services.IdentityEmailSynchronizationOperation(emails),
             SystemSettings, [new RejectionSource(this)], secret, audit, DeploymentModeProvider, jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork, GenerationReader, HostConfiguration,
-            new Explore.Application.Services.PrivacyIdentityFenceOperation(new Services.FenceTestAuthority()));
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(new Services.FenceTestAuthority()), unitOfWork,
+            new UnexpectedLocalReceiptSource());
     }
 
     public Guid UserId { get; }
@@ -407,9 +409,28 @@ internal sealed class OnboardingCompletionScenario
                 : null);
     }
 
-    private sealed class ReadOnlyUnitOfWork : IUnitOfWork
+    private sealed class ReadOnlyUnitOfWork : IUnitOfWork, IEventDiscoveryEnrollmentGate
     {
         public bool InTransaction { get; private set; }
+        private bool enrollmentHeld;
+
+        public Task<IAsyncDisposable> AcquireAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (InTransaction || enrollmentHeld)
+                throw new InvalidOperationException("Enrollment must precede the original transaction and cannot reenter.");
+            enrollmentHeld = true;
+            return Task.FromResult<IAsyncDisposable>(new EnrollmentLease(this));
+        }
+
+        public void RequireCurrent()
+        {
+            if (!enrollmentHeld)
+                throw new InvalidOperationException("The original enrollment lease is required.");
+        }
+
+        public bool TryRequireCurrent() => enrollmentHeld;
+
         public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default) =>
             throw new NotSupportedException("This scenario only observes pre-write admission.");
         public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
@@ -418,10 +439,41 @@ internal sealed class OnboardingCompletionScenario
             ExecuteSerializableAsync(operation, ct);
         public async Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default)
         {
+            RequireCurrent();
             InTransaction = true;
             try { return await operation(ct); }
             finally { InTransaction = false; }
         }
+
+        private sealed class EnrollmentLease(ReadOnlyUnitOfWork owner) : IAsyncDisposable
+        {
+            private bool disposed;
+
+            public ValueTask DisposeAsync()
+            {
+                if (disposed)
+                    return ValueTask.CompletedTask;
+                if (owner.InTransaction)
+                    throw new InvalidOperationException("Enrollment cannot end before original transaction settlement.");
+                owner.enrollmentHeld = false;
+                disposed = true;
+                return ValueTask.CompletedTask;
+            }
+        }
+    }
+
+    private sealed class UnexpectedLocalReceiptSource : ILocalBootstrapReceiptSource
+    {
+        public void RequireHeld(ILocalBootstrapReceiptLease lease, LocalCredentialProvisioningSnapshot expected) =>
+            throw new InvalidOperationException("A non-Local completion must not consume credential receipt authority.");
+
+        public Task<ILocalBootstrapReceiptLease> AcquireAsync(
+            LocalCredentialProvisioningSnapshot expected, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("A non-Local completion must not select credential receipt authority.");
+
+        public Task RequireCurrentAsync(ILocalBootstrapReceiptLease lease,
+            LocalCredentialProvisioningSnapshot expected, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("A non-Local completion must not consume credential receipt authority.");
     }
 
     internal sealed class ReadOnlyDeploymentModeProvider(List<string> effects) : IDeploymentModeProvider

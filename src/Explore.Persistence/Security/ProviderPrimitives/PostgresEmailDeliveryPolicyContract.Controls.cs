@@ -78,7 +78,40 @@ public static partial class PostgresEmailDeliveryPolicyContract
             throw new InvalidOperationException("Email controls require the setting mutation's original transaction.");
     }
 
-    private static string BuildControlsSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    private static string BuildControlsSql(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        CompileControls(context, enrollment).Installation;
+
+    /// <summary>Recognizes only the existing setting capture trigger compiled by this owner.</summary>
+    internal static string SettingCapturePredicate(ExploreDbContext context,
+        PostgresNativeQueueEnrollment enrollment, Type sourceType)
+    {
+        if (sourceType != typeof(TenantSetting) && sourceType != typeof(SystemSetting)) return "false";
+        var entity = context.Model.FindEntityType(sourceType)!;
+        string table = context.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, Schema(context));
+        string arguments = sourceType == typeof(TenantSetting) ? "74656e616e7400" : "696e7374616e636500";
+        return $$"""
+            t.tgrelid=pg_catalog.to_regclass({{LoginLiteral(table)}})
+            AND t.tgname='email_policy_control_custody' AND t.tgenabled='O' AND NOT t.tgisinternal
+            AND t.tgtype=31 AND t.tgnargs=1 AND pg_catalog.encode(t.tgargs,'hex')={{LoginLiteral(arguments)}}
+            AND t.tgattr=''::int2vector AND t.tgqual IS NULL AND t.tgconstraint=0
+            AND t.tgconstrrelid=0 AND t.tgconstrindid=0 AND NOT t.tgdeferrable AND NOT t.tginitdeferred
+            AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL
+            AND EXISTS (SELECT 1 FROM pg_catalog.pg_proc f JOIN pg_catalog.pg_language lang ON lang.oid=f.prolang
+                WHERE f.oid=t.tgfoid AND f.oid=pg_catalog.to_regprocedure({{LoginLiteral(ControlsFunction(context, "_capture") + "()")}})
+                    AND f.proowner=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={{LoginLiteral(OwnerRole)}})
+                    AND lang.lanname='plpgsql' AND f.prokind='f' AND f.prorettype='trigger'::regtype
+                    AND f.pronargs=0 AND f.pronargdefaults=0 AND f.proargmodes IS NULL AND f.proallargtypes IS NULL
+                    AND f.prosecdef AND NOT f.proleakproof AND NOT f.proisstrict AND f.provolatile='v' AND f.proparallel='u'
+                    AND NOT f.proretset AND f.proconfig=ARRAY['search_path=pg_catalog']::text[]
+                    AND f.prosrc={{LoginLiteral(CompileControls(context, enrollment).CaptureBody)}}
+                    AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(COALESCE(f.proacl,pg_catalog.acldefault('f',f.proowner))) acl
+                        WHERE acl.grantee<>f.proowner OR acl.grantor<>f.proowner
+                            OR acl.privilege_type<>'EXECUTE' OR acl.is_grantable))
+            """;
+    }
+
+    private static (string Installation, string CaptureBody) CompileControls(
+        ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = context.GetService<ISqlGenerationHelper>();
         var entity = context.Model.FindEntityType(typeof(EmailDispatchTenantControl))!;
@@ -124,7 +157,7 @@ public static partial class PostgresEmailDeliveryPolicyContract
                 RAISE EXCEPTION 'email policy mutation purpose required' USING ERRCODE = '42501';
             END IF;
             """;
-        return $$"""
+        string installationPrefix = $$"""
             CREATE TABLE IF NOT EXISTS {{receipts}} (
                 tenant_id uuid PRIMARY KEY,
                 mutation_xid xid8 NOT NULL,
@@ -158,6 +191,8 @@ public static partial class PostgresEmailDeliveryPolicyContract
                 EXECUTE $ddl$ CREATE OR REPLACE FUNCTION {{capture}}()
                 RETURNS trigger LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog
                 AS $body$
+            """;
+        string captureBody = "\n" + $$"""
                 DECLARE v_source uuid; v_actor uuid; v_key text; v_instance boolean := TG_ARGV[0] = 'instance';
                 BEGIN
                     {{guard}}
@@ -275,7 +310,10 @@ public static partial class PostgresEmailDeliveryPolicyContract
                         actor_id = EXCLUDED.actor_id;
                     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
                     RETURN NEW;
-                END $body$ $ddl$;
+                END
+            """ + " ";
+        string installationSuffix = $$"""
+            $body$ $ddl$;
                 EXECUTE $ddl$ CREATE OR REPLACE FUNCTION {{require}}(p_tenant uuid)
                 RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog
                 AS $body$
@@ -454,5 +492,6 @@ public static partial class PostgresEmailDeliveryPolicyContract
                 FOR EACH ROW EXECUTE FUNCTION {{capture}}('tenant');
             REVOKE CREATE ON SCHEMA {{schema}} FROM {{OwnerRole}};
             """;
+        return (installationPrefix + captureBody + installationSuffix, captureBody);
     }
 }

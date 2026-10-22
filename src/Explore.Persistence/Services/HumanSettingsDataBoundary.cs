@@ -1,7 +1,9 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Domain;
 using Explore.Domain.Settings;
 using Explore.Persistence.Database;
+using Explore.Persistence.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Persistence.Services;
@@ -47,6 +49,20 @@ public sealed class HumanSettingsDataBoundary(IServiceProvider selectedServices)
         // The private writer checks the exact effect and current sources immediately before SQL.
         return OrdinaryStore;
     }
+
+    internal Task<SystemSetting?> ReadOrdinarySystemAsync(
+        ExploreDbContext dataOwner, IOrdinarySettingsSource source, string key, CancellationToken cancellationToken) =>
+        RequireOriginalOrdinaryReader(dataOwner, source).ReadCurrentSystemAsync(source, key, cancellationToken);
+
+    internal Task<TenantSetting?> ReadOrdinaryTenantAsync(
+        ExploreDbContext dataOwner, IOrdinarySettingsSource source, Guid tenantId, string key,
+        CancellationToken cancellationToken) =>
+        RequireOriginalOrdinaryReader(dataOwner, source).ReadCurrentTenantAsync(source, tenantId, key, cancellationToken);
+
+    private OrdinarySettingsMutationStore RequireOriginalOrdinaryReader(
+        ExploreDbContext dataOwner, IOrdinarySettingsSource source) =>
+        RequireOriginalOrdinaryWriter(dataOwner, source, auditActorId: null) as OrdinarySettingsMutationStore
+        ?? throw new UnauthorizedAccessException("Ordinary reads require the concrete original source issuer.");
 
     private ExploreDbContextExecutionLease RequireOriginalOwner(ExploreDbContext dataOwner, Guid? auditActorId)
     {

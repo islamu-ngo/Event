@@ -182,7 +182,8 @@ public sealed partial class ManagedProviderProvisioningOrchestrationTests
             services.GetRequiredService<IHumanManagedProviderProvisioningPreparation>(),
             services.GetRequiredService<PrivacyIdentityFenceOperation>(), owner,
             services.GetRequiredService<ISettingMutationLock>(),
-            Options.Create(new ManagedControlPlaneOptions { Enabled = capacityEnforced, MaximumTenantCount = 1 }));
+            Options.Create(new ManagedControlPlaneOptions { Enabled = capacityEnforced, MaximumTenantCount = 1 }),
+            () => services.GetRequiredService<IEventDiscoveryEnrollmentGate>());
         var handler = ActivatorUtilities.CreateInstance<EnsureManagedProviderClientProvisionedCommandHandler>(services, coordinator);
         return handler.ExecuteAsync(command, default);
     }

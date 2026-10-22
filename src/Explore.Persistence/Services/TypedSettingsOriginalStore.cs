@@ -320,6 +320,8 @@ public sealed partial class TypedSettingsOriginalStore(
                 new JsonArray(change).ToJsonString(), token);
         else
             await TypedSettingsSqliteWriter.WriteAsync(context, transaction, type, id, old, after, token);
+        if (type == typeof(SystemSetting))
+            await RecordProvisioningPolicyAsync(effect.Key, after, token);
         if (old is not null) rows.Remove(old);
         if (after is not null) rows.Add(after);
         expected[type.Name] = new JsonArray(rows.OfType<JsonObject>().OrderBy(row => row["Id"]!.ToString(), StringComparer.Ordinal)
@@ -329,6 +331,14 @@ public sealed partial class TypedSettingsOriginalStore(
         return unchangedPublication || old is null && after is null ? null
             : new(effect.Key, old?["Value"]?.GetValue<string>(), effect.Value);
     }
+
+    private Task RecordProvisioningPolicyAsync(string key, JsonObject? after, CancellationToken token) =>
+        ManagedTenantProvisioningPolicyProjection.RecordAsync(context, key, after is null ? null : new SystemSetting
+        {
+            SettingKey = key,
+            Value = after[nameof(SystemSetting.Value)]!.GetValue<string>(),
+            IsLocked = after[nameof(SystemSetting.IsLocked)]!.GetValue<bool>()
+        }, token);
 
     public async Task VerifyAsync(TypedSettingsOriginal request, CancellationToken token)
     {

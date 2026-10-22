@@ -295,7 +295,7 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
 
     [Test]
     public Task NativeInstanceApplyCommitsSelectedSettingSessionReceiptAndBoundEffectTogether() =>
-        ExecuteNativeImportAsync(apply: true);
+        ExecuteNativeImportAsync(apply: true, preserveFederation: true);
 
     [Test]
     public Task NativeInstanceResourceImportPreservesExactNotificationBytesAndCommittedDigest() =>
@@ -303,7 +303,7 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
 
     [Test]
     public Task NativeInstanceFailureAfterPersistedEffectRollsBackWritesAndKeepsSanitizedReceipt() =>
-        ExecuteNativeImportAsync(apply: true, failAfterEffect: true);
+        ExecuteNativeImportAsync(apply: true, failAfterEffect: true, preserveFederation: true);
 
     [Test]
     public Task NativeInstanceReceiptHistoryAndForwardRollbackUseDedicatedOwner() =>
@@ -363,7 +363,8 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
         ConfigurationManifestExportView exportView = ConfigurationManifestExportView.Overrides,
         LegalDocumentLifecycleState? legalRevision = null, bool failAfterEffect = false,
         bool rejectCeiling = false, bool receiptAndRollback = false, bool stateFences = false,
-        bool nativeStagingRoutes = false, bool rollbackCancellation = false, bool resourceSettings = false)
+        bool nativeStagingRoutes = false, bool rollbackCancellation = false, bool resourceSettings = false,
+        bool preserveFederation = false)
     {
         LegalDocumentKind importedLegalKind = tenantLegal
             ? LegalDocumentKind.TenantTerms : LegalDocumentKind.TermsOfService;
@@ -375,6 +376,10 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
         await using var rows =
             await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.CreateAsync(fixture);
         await SeedExportStateAsync(rows);
+        FederationManifestStorageSnapshot? originalFederation = preserveFederation
+            ? await FederationManifestStorageSnapshot.SeedAsync(
+                fixture, [rows.A, rows.B, rows.Inactive], rows.UserId, TestContext.Current!.Execution.CancellationToken)
+            : null;
         await using (var seed = fixture.CreateDbContext())
         {
             if (rejectCeiling)
@@ -478,6 +483,8 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
             await rows.AssertOrdinaryRoleAsync(context);
             var executor = scope.ServiceProvider.GetRequiredService<IConfigurationInstanceImportExecutor>();
             var snapshot = await executor.ReadSnapshotAsync(exportView, default);
+            if (originalFederation is not null)
+                await FederationManifestStorageSnapshot.AssertPublicExclusionAsync(snapshot.Utf8Json);
             var sessions = scope.ServiceProvider.GetRequiredService<ConfigurationImportSessionApplicationService>();
             byte[] sourceBytes = snapshot.Utf8Json.ToArray();
             if (apply)
@@ -691,6 +698,12 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
                         var original = await failedObserver.SystemSettings.AsNoTracking().SingleAsync(
                             row => row.SettingKey == EventSettingDefinitions.RequireApproval.Key);
                         await Assert.That(JsonSerializer.Deserialize<bool>(original.Value)).IsFalse();
+                        if (originalFederation is not null)
+                        {
+                            await using var federationObserver = FederationManifestStorageSnapshot.OpenMigrator(fixture);
+                            await originalFederation.AssertUnchangedAsync(federationObserver,
+                                TestContext.Current!.Execution.CancellationToken);
+                        }
                         return;
                     }
                     var persistedSession = await failedObserver.Set<ConfigurationImportSession>().AsNoTracking()
@@ -765,6 +778,12 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
                 await Assert.That(operation.Status).IsEqualTo(ConfigurationImportOperationStatus.Applied);
                 await Assert.That(operation.FidelityVerified).IsTrue();
                 await using var observer = fixture.CreateDbContext();
+                if (originalFederation is not null)
+                {
+                    await using var federationObserver = FederationManifestStorageSnapshot.OpenMigrator(fixture);
+                    await originalFederation.AssertUnchangedAsync(federationObserver,
+                        TestContext.Current!.Execution.CancellationToken);
+                }
                 if (importLegal)
                 {
                     var legal = await observer.LegalDocuments.AsNoTracking()

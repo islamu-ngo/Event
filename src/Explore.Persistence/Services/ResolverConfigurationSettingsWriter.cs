@@ -153,6 +153,13 @@ public sealed class ResolverConfigurationSettingsWriter(
         {
             RequireOwner();
             await PostgresResolverConfigurationContract.WriteAsync(context, nativeEnrollment, mutation, cancellationToken);
+            foreach (var effect in mutation.Effects)
+                await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, effect.Key, new SystemSetting
+                {
+                    SettingKey = effect.Key,
+                    Value = effect.Value,
+                    IsLocked = effect.IsLocked
+                }, cancellationToken);
         }
         else
         {

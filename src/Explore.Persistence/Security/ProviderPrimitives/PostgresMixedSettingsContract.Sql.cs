@@ -163,7 +163,9 @@ public static partial class PostgresMixedSettingsContract
     private static string CompileBody(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
     {
         var sql = new HumanPrincipalSourceSql(context);
-        string definitions = string.Join(",", SettingRegistry.All.OrderBy(definition => definition.Key, StringComparer.Ordinal)
+        string definitions = string.Join(",", SettingRegistry.All
+            .Where(definition => !AtprotoFederationSettingPolicy.IsDedicatedKey(definition.Key))
+            .OrderBy(definition => definition.Key, StringComparer.Ordinal)
             .Select(definition => $"({Text(definition.Key)},{Text(definition.Category)},{(int)definition.MinScope},{(int)definition.MaxScope},"
                 + Text(definition.ValueType switch
                 {

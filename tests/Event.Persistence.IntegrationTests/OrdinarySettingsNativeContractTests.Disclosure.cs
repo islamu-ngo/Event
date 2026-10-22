@@ -1,11 +1,19 @@
 using System.Data;
+using System.Data.Common;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Domain.Settings;
+using Explore.Persistence;
 using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace Event.Persistence.IntegrationTests;
@@ -18,7 +26,7 @@ public sealed partial class OrdinarySettingsNativeContractTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task GlobalDisclosureSettlesOnceWithoutAdvancingIdentity(bool immediate)
+    public async Task NativeCompletionDoesNotAdvanceOrCreateManagedDisclosureEpochs(bool immediate)
     {
         await fixture.ResetAsync();
         await InstallAsync();
@@ -26,13 +34,14 @@ public sealed partial class OrdinarySettingsNativeContractTests
         await using var migration = fixture.CreateDbContext();
         migration.Tenants.AddRange(Tenant(first), Tenant(second));
         await migration.SaveChangesAsync();
-        migration.Set<EventDiscoveryRevision>().Add(new EventDiscoveryRevision
+        var seeded = await migration.Set<EventDiscoveryRevision>().SingleOrDefaultAsync(row => row.TenantId == first);
+        if (seeded is null)
         {
-            Id = Guid.CreateVersion7(),
-            TenantId = first,
-            DisclosureEpoch = 4,
-            IdentityEpoch = 31
-        });
+            seeded = new EventDiscoveryRevision { Id = Guid.CreateVersion7(), TenantId = first };
+            migration.Add(seeded);
+        }
+        seeded.DisclosureEpoch = 4;
+        seeded.IdentityEpoch = 31;
         await migration.SaveChangesAsync();
         var epochs = await migration.Set<EventDiscoveryRevision>().AsNoTracking()
             .ToDictionaryAsync(row => row.TenantId, row => (row.DisclosureEpoch, row.IdentityEpoch));
@@ -68,19 +77,23 @@ public sealed partial class OrdinarySettingsNativeContractTests
         var revisions = await migration.Set<EventDiscoveryRevision>().AsNoTracking().ToListAsync();
         foreach (Guid tenant in allTenants)
         {
-            var row = revisions.Single(value => value.TenantId == tenant);
-            await Assert.That(row.DisclosureEpoch).IsEqualTo(epochs.GetValueOrDefault(tenant).DisclosureEpoch + 1);
-            await Assert.That(row.IdentityEpoch).IsEqualTo(epochs.GetValueOrDefault(tenant).IdentityEpoch);
+            var row = revisions.SingleOrDefault(value => value.TenantId == tenant);
+            await Assert.That(row is not null).IsEqualTo(epochs.ContainsKey(tenant));
+            if (row is not null)
+            {
+                await Assert.That(row.DisclosureEpoch).IsEqualTo(epochs[tenant].DisclosureEpoch);
+                await Assert.That(row.IdentityEpoch).IsEqualTo(epochs[tenant].IdentityEpoch);
+            }
         }
         await Assert.That(JsonNode.DeepEquals(expected, (await ReadAsync(caller, keys: request["Keys"]))["Image"])).IsTrue();
     }
 
     [Test]
-    [Arguments(SettingScope.Tenant, TenantDisclosureKey, "true", true)]
-    [Arguments(SettingScope.User, "federation.atproto_publish_my_events", "true", false)]
-    [Arguments(SettingScope.Instance, Key, "\"native-contract\"", false)]
-    public async Task ClassificationInvalidatesOnlyCanonicalNonUserDisclosureEffects(
-        SettingScope scope, string key, string value, bool invalidates)
+    [Arguments(SettingScope.Tenant, TenantDisclosureKey, "true")]
+    [Arguments(SettingScope.User, "federation.atproto_publish_my_events", "true")]
+    [Arguments(SettingScope.Instance, Key, "\"native-contract\"")]
+    public async Task NativeEffectsCannotIndependentlyFinalizeAnyDisclosureClassification(
+        SettingScope scope, string key, string value)
     {
         await InstallAsync();
         Guid own = Guid.CreateVersion7(), foreign = Guid.CreateVersion7(), user = Guid.CreateVersion7();
@@ -127,10 +140,9 @@ public sealed partial class OrdinarySettingsNativeContractTests
         {
             var previous = epochs.GetValueOrDefault(id);
             var current = persisted.GetValueOrDefault(id);
-            await Assert.That(current.DisclosureEpoch).IsEqualTo(previous.DisclosureEpoch + (invalidates && id == own ? 1 : 0));
+            await Assert.That(current.DisclosureEpoch).IsEqualTo(previous.DisclosureEpoch);
             await Assert.That(current.IdentityEpoch).IsEqualTo(previous.IdentityEpoch);
-            if (!invalidates || id != own)
-                await Assert.That(persisted.ContainsKey(id)).IsEqualTo(epochs.ContainsKey(id));
+            await Assert.That(persisted.ContainsKey(id)).IsEqualTo(epochs.ContainsKey(id));
         }
     }
 
@@ -165,43 +177,205 @@ public sealed partial class OrdinarySettingsNativeContractTests
     [Arguments(false, "identity")]
     [Arguments(false, "deletion")]
     [Arguments(true, "disclosure")]
-    public async Task NativePendingMarkerSealsAndCannotMixMutationOwners(bool nativeFirst, string genericOwner)
+    public async Task OriginalPreparedOrdinarySourceCannotMixGenericMutationOwners(bool nativeFirst, string genericOwner)
     {
-        await InstallAsync();
-        await using var caller = Open(PrimaryDatabaseRole.Global);
-        await using (var transaction = await caller.Database.BeginTransactionAsync(IsolationLevel.Serializable))
+        var injection = new GenericDisclosureInjection(genericOwner);
+        await using var authentication = await CreateManagedDisclosureOwnerAsync(injection);
+        bool entered = false;
+        async Task ExecuteAsync() => await authentication.RunAsync(null, async session =>
         {
-            var pending = caller.DisclosureMutations;
-            if (nativeFirst)
-            {
-                pending.EnlistNativeOrdinarySettings();
-                Assert.Throws<InvalidOperationException>(() => pending.Enlist([Guid.CreateVersion7()]));
-                Assert.Throws<InvalidOperationException>(() => pending.EnlistIdentityRevision(Guid.CreateVersion7()));
-                Assert.Throws<InvalidOperationException>(() => pending.RecordTenantDeletion(Guid.CreateVersion7()));
-                await pending.FlushAsync(CancellationToken.None);
-                await pending.FlushAsync(CancellationToken.None);
-                Assert.Throws<InvalidOperationException>(pending.EnlistNativeOrdinarySettings);
-            }
-            else
-            {
-                switch (genericOwner)
+            var prepared = await session.Preparation.PrepareAsync(
+                new UpdateSettingCommand { Key = TenantDisclosureKey, Scope = SettingScope.Instance, Value = "true" }, "true");
+            if (!nativeFirst) injection.Arm(session.Context);
+            return await session.MutationLock.ExecuteOrderedGroupsAsync([[TenantDisclosureKey]],
+                token => session.Preparation.ExecutePreparedAsync(prepared, async (_, ownerToken) =>
                 {
-                    case "disclosure": pending.Enlist([Guid.CreateVersion7()]); break;
-                    case "identity": pending.EnlistIdentityRevision(Guid.CreateVersion7()); break;
-                    case "deletion": pending.RecordTenantDeletion(Guid.CreateVersion7()); break;
-                    default: throw new ArgumentOutOfRangeException(nameof(genericOwner));
-                }
-                Assert.Throws<InvalidOperationException>(pending.EnlistNativeOrdinarySettings);
-            }
-            await transaction.RollbackAsync();
-        }
-        await using (var transaction = await caller.Database.BeginTransactionAsync(IsolationLevel.Serializable))
+                    entered = true;
+                    await Assert.That(session.Preparation.CurrentOrdinarySource).IsNotNull();
+                    var pending = session.Context.DisclosureMutations;
+                    Assert.Throws<InvalidOperationException>(() => pending.Enlist([Guid.CreateVersion7()]));
+                    Assert.Throws<InvalidOperationException>(() => pending.EnlistIdentityRevision(Guid.CreateVersion7()));
+                    Assert.Throws<InvalidOperationException>(() => pending.RecordTenantDeletion(Guid.CreateVersion7()));
+                    await WriteManagedDisclosureAsync(session, ownerToken);
+                    return true;
+                }, token));
+        });
+        if (nativeFirst)
         {
-            caller.DisclosureMutations.EnlistNativeOrdinarySettings();
-            await caller.DisclosureMutations.FlushAsync(CancellationToken.None);
-            await transaction.RollbackAsync();
+            await ExecuteAsync();
+            await Assert.That(entered).IsTrue();
+        }
+        else
+        {
+            var rejected = await Assert.ThrowsAsync<InvalidOperationException>(ExecuteAsync);
+            await Assert.That(rejected!.Message).Contains("cannot mix discovery mutation owners");
+            await Assert.That(injection.Injected).IsTrue();
+            await Assert.That(entered).IsFalse();
+        }
+        await using var observer = Open(PrimaryDatabaseRole.Migrator);
+        await Assert.That(await observer.SystemSettings.Where(row => row.SettingKey == TenantDisclosureKey)
+            .Select(row => row.Value).SingleAsync()).IsEqualTo(nativeFirst ? "true" : "false");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ManagedOrdinaryRootFinalizesEveryStatusOnceAndRollsBackAtomically(bool rollback)
+    {
+        var commit = new ManagedDisclosureCommitProbe(rollback);
+        await using var authentication = await CreateManagedDisclosureOwnerAsync(commit);
+        await using var observer = Open(PrimaryDatabaseRole.Migrator);
+        var before = await observer.Set<EventDiscoveryRevision>().AsNoTracking()
+            .ToDictionaryAsync(row => row.TenantId, row => (row.Id, row.DisclosureEpoch, row.IdentityEpoch));
+        var tenants = await observer.Tenants.AsNoTracking().ToListAsync();
+        await Assert.That(tenants.Any(row => row.TenantStatusId == (int)TenantStatusEnum.Suspended)).IsTrue();
+        await Assert.That(before.Keys.Order().ToArray()).IsEquivalentTo(tenants.Select(row => row.Id).Order().ToArray());
+        async Task ExecuteAsync() => await authentication.RunAsync(null, async session =>
+        {
+            var prepared = await session.Preparation.PrepareAsync(
+                new UpdateSettingCommand { Key = TenantDisclosureKey, Scope = SettingScope.Instance, Value = "true" }, "true");
+            commit.Arm(session.Context);
+            return await session.MutationLock.ExecuteOrderedGroupsAsync([[TenantDisclosureKey]],
+                token => session.Preparation.ExecutePreparedAsync(prepared, async (_, ownerToken) =>
+                {
+                    await Assert.That(session.Preparation.CurrentOrdinarySource).IsNotNull();
+                    await WriteManagedDisclosureAsync(session, ownerToken);
+                    return true;
+                }, token));
+        });
+        if (rollback) await Assert.ThrowsAsync<ManagedDisclosureRollbackException>(ExecuteAsync);
+        else await ExecuteAsync();
+        await Assert.That(commit.Reached).IsTrue();
+        var after = await observer.Set<EventDiscoveryRevision>().AsNoTracking()
+            .ToDictionaryAsync(row => row.TenantId, row => (row.Id, row.DisclosureEpoch, row.IdentityEpoch));
+        await Assert.That(after.Count).IsEqualTo(before.Count);
+        foreach (var (id, previous) in before)
+        {
+            await Assert.That(after[id].Id).IsEqualTo(previous.Id);
+            await Assert.That(after[id].IdentityEpoch).IsEqualTo(previous.IdentityEpoch);
+            await Assert.That(after[id].DisclosureEpoch).IsEqualTo(previous.DisclosureEpoch + (rollback ? 0 : 1));
+        }
+        await Assert.That(await observer.SystemSettings.Where(row => row.SettingKey == TenantDisclosureKey)
+            .Select(row => row.Value).SingleAsync()).IsEqualTo(rollback ? "false" : "true");
+    }
+
+    private async Task<AuthenticatedSettingsFixture> CreateManagedDisclosureOwnerAsync(IInterceptor interceptor)
+    {
+        await fixture.ResetAsync();
+        var authentication = await AuthenticatedSettingsFixture.CreateAsync(
+            () => Open(PrimaryDatabaseRole.Migrator), fixture, interceptor);
+        try
+        {
+            await using var seed = Open(PrimaryDatabaseRole.Migrator);
+            var suspended = Tenant(Guid.CreateVersion7());
+            suspended.TenantStatusId = (int)TenantStatusEnum.Suspended;
+            seed.Tenants.AddRange(Tenant(Guid.CreateVersion7()), suspended);
+            await seed.SaveChangesAsync();
+            var setting = await seed.SystemSettings.SingleOrDefaultAsync(row => row.SettingKey == TenantDisclosureKey);
+            if (setting is null)
+            {
+                var definition = SettingRegistry.Get(TenantDisclosureKey)
+                    ?? throw new InvalidOperationException("The ordinary disclosure fixture requires its registered setting.");
+                setting = new SystemSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = TenantDisclosureKey,
+                    Value = "false",
+                    ValueType = definition.ValueType,
+                    Description = definition.Description,
+                    Category = definition.Category,
+                    AllowedValues = definition.AllowedValues is null ? null : JsonSerializer.Serialize(definition.AllowedValues),
+                    CreatedAt = Instant
+                };
+                seed.SystemSettings.Add(setting);
+            }
+            setting.Value = "false";
+            setting.IsLocked = false;
+            var revisions = await seed.Set<EventDiscoveryRevision>().ToListAsync();
+            foreach (Guid tenant in await seed.Tenants.Select(row => row.Id).ToArrayAsync())
+            {
+                var revision = revisions.SingleOrDefault(row => row.TenantId == tenant);
+                if (revision is null)
+                {
+                    revision = new EventDiscoveryRevision { Id = Guid.CreateVersion7(), TenantId = tenant };
+                    seed.Add(revision);
+                }
+                revision.DisclosureEpoch = 4;
+                revision.IdentityEpoch = 31;
+            }
+            await seed.SaveChangesAsync();
+            return authentication;
+        }
+        catch
+        {
+            await authentication.DisposeAsync();
+            throw;
         }
     }
+
+    private static async Task WriteManagedDisclosureAsync(AuthenticatedSettingsFixture.Session session, CancellationToken token)
+    {
+        var repository = session.Services.GetRequiredService<ISystemSettingRepository>();
+        var setting = await repository.GetByKey(TenantDisclosureKey, token)
+            ?? throw new InvalidOperationException("The seeded ordinary disclosure setting is missing.");
+        setting.Value = "true";
+        setting.UpdatedBy = session.ActorId;
+        setting.UpdatedAt = DateTime.UtcNow;
+        await repository.UpsertInCurrentTransactionAsync(setting, token);
+    }
+
+    // Inject a competing real accumulator only after the real owner's transaction exists;
+    // no SQL matching or fabricated Settings source is used to schedule the conflict.
+    private sealed class GenericDisclosureInjection(string owner) : DbCommandInterceptor
+    {
+        private ExploreDbContext? selected;
+        internal bool Injected { get; private set; }
+        internal void Arm(ExploreDbContext context) => selected = context;
+        private void Inject(CommandEventData data)
+        {
+            if (Injected || selected is null || !ReferenceEquals(data.Context, selected)
+                || selected.Database.CurrentTransaction is null || !selected.HumanCommitAttemptOwnsTransaction) return;
+            Injected = true;
+            var pending = selected.DisclosureMutations;
+            switch (owner)
+            {
+                case "disclosure": pending.Enlist([Guid.CreateVersion7()]); break;
+                case "identity": pending.EnlistIdentityRevision(Guid.CreateVersion7()); break;
+                case "deletion": pending.RecordTenantDeletion(Guid.CreateVersion7()); break;
+                default: throw new ArgumentOutOfRangeException(nameof(owner));
+            }
+        }
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        { Inject(eventData); return ValueTask.FromResult(result); }
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        { Inject(eventData); return ValueTask.FromResult(result); }
+        public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
+        { Inject(eventData); return ValueTask.FromResult(result); }
+    }
+
+    private sealed class ManagedDisclosureCommitProbe(bool rollback) : DbTransactionInterceptor
+    {
+        private ExploreDbContext? selected;
+        internal bool Reached { get; private set; }
+        internal void Arm(ExploreDbContext context) => selected = context;
+        public override async ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
+            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        {
+            if (selected is null || !ReferenceEquals(eventData.Context, selected)) return result;
+            // Production completion and the first UoW flush have already run at this point.
+            await selected.DisclosureMutations.FlushAsync(cancellationToken);
+            await selected.DisclosureMutations.FlushAsync(cancellationToken);
+            Assert.Throws<InvalidOperationException>(() => selected.DisclosureMutations.Enlist([Guid.CreateVersion7()]));
+            Reached = true;
+            if (rollback) throw new ManagedDisclosureRollbackException();
+            return result;
+        }
+    }
+
+    private sealed class ManagedDisclosureRollbackException : Exception;
 
     [Test]
     [Arguments(HumanSettingsMutationKind.SetLock)]
@@ -213,6 +387,9 @@ public sealed partial class OrdinarySettingsNativeContractTests
         await using var migration = fixture.CreateDbContext();
         migration.Tenants.Add(Tenant(tenant));
         await migration.SaveChangesAsync();
+        var originalRevision = await migration.Set<EventDiscoveryRevision>().AsNoTracking()
+            .Where(row => row.TenantId == tenant)
+            .Select(row => new { row.Id, row.DisclosureEpoch, row.IdentityEpoch }).SingleOrDefaultAsync();
         await migration.SystemSettings.Where(row => row.SettingKey == TenantDisclosureKey)
             .ExecuteUpdateAsync(set => set.SetProperty(row => row.IsLocked, false));
         await using var caller = Open(PrimaryDatabaseRole.Runtime, tenant);
@@ -230,7 +407,10 @@ public sealed partial class OrdinarySettingsNativeContractTests
             await transaction.CommitAsync();
         }
         await Assert.That(JsonNode.DeepEquals(before["Image"], (await ReadAsync(caller, tenant, keys: request["Keys"]))["Image"])).IsTrue();
-        await Assert.That(await migration.Set<EventDiscoveryRevision>().AnyAsync(row => row.TenantId == tenant)).IsFalse();
+        var persistedRevision = await migration.Set<EventDiscoveryRevision>().AsNoTracking()
+            .Where(row => row.TenantId == tenant)
+            .Select(row => new { row.Id, row.DisclosureEpoch, row.IdentityEpoch }).SingleOrDefaultAsync();
+        await Assert.That(persistedRevision).IsEqualTo(originalRevision);
     }
 
     [Test]

@@ -87,7 +87,7 @@ internal sealed class ConfigurationManifestBootstrapTestHost : IAsyncDisposable
                 return new HierarchicalSettingsReader(SystemSettingRepository.CreateReadOnly(context, locks),
                     TenantSettingRepository.CreateReadOnly(context, locks), new OrganizationSettingRepository(context),
                     new GroupSettingRepository(context), UserPreferenceRepository.CreateReadOnly(context),
-                    provider.GetRequiredService<IMemoryCache>());
+                    provider.GetRequiredService<IMemoryCache>(), new AtprotoFederationSettingRepository(context, null));
             });
             services.AddScoped<ITypedSettingsDocumentResolver>(provider =>
                 new TypedSettingsDocumentResolver(new TenantSettingsDocumentRepository(provider.GetRequiredService<ExploreDbContext>()),
@@ -169,7 +169,7 @@ internal sealed class ConfigurationManifestBootstrapTestHost : IAsyncDisposable
             PrimaryDatabaseProviderComposition.ConfigureApplication(builder, target);
             if (model is not null) builder.UseModel(model);
             if (target.Provider == PrimaryDatabaseProvider.PostgreSql)
-                builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+                builder.AddInterceptors(PostgresTenantSessionInterceptor.ForGlobalLogin(target.Username!));
             var context = new ExploreDbContext(builder.Options);
             context.ClearTenantFilterBypass();
             context.TenantContext = null;

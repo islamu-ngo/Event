@@ -1,6 +1,7 @@
 using Explore.Application.Caching;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
@@ -26,7 +27,8 @@ public sealed class PrivacyErasureApplier(
     HybridCache cache,
     TimeProvider timeProvider,
     ILogger<PrivacyErasureApplier> logger,
-    IOptions<PrivacyErasureOptions> options)
+    IOptions<PrivacyErasureOptions> options,
+    ILocalIdentityEligibilityRevocation localEligibility)
 {
     private readonly PrivacyErasureOptions _options = options.Value;
 
@@ -60,6 +62,7 @@ public sealed class PrivacyErasureApplier(
         IPrivacyErasureAuthority authority,
         CancellationToken cancellationToken)
     {
+        await localEligibility.InvalidateInCurrentTransactionAsync(intent, cancellationToken);
         ISubjectPrivacyErasureSettlement? native = erasureRepository.NativeSettlement;
         IReadOnlyList<PrivacyErasureProviderCandidate>? nativeCandidates = null;
         if (native is not null)

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Exceptions;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -7,7 +8,10 @@ using Explore.Domain.Settings;
 using Explore.Domain.Services.Scheduling;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +24,104 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 public sealed class EventDiscoveryDisclosureMutationTests
 {
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(15);
+
+    [Test]
+    public async Task Missing_canonical_revision_is_unavailable_and_never_recreated_by_acquire_current()
+    {
+        await using var store = await Store.CreateAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        Guid revisionId;
+        Guid otherRevisionId;
+        long identityEpoch;
+        long disclosureEpoch;
+        long otherIdentityEpoch;
+        long otherDisclosureEpoch;
+        string tenantName;
+        int tenantStatusId;
+        int auditCount;
+        int outboxCount;
+        await using (var before = store.Open())
+        {
+            var revision = await before.Set<EventDiscoveryRevision>().AsNoTracking()
+                .SingleAsync(row => row.TenantId == store.TenantId, token);
+            revisionId = revision.Id;
+            identityEpoch = revision.IdentityEpoch;
+            disclosureEpoch = revision.DisclosureEpoch;
+            var other = await before.Set<EventDiscoveryRevision>().AsNoTracking()
+                .IgnoreQueryFilters([QueryFilterNames.Tenant])
+                .SingleAsync(row => row.TenantId == store.OtherTenantId, token);
+            otherRevisionId = other.Id;
+            otherIdentityEpoch = other.IdentityEpoch;
+            otherDisclosureEpoch = other.DisclosureEpoch;
+            var tenant = await before.Tenants.AsNoTracking()
+                .SingleAsync(row => row.Id == store.TenantId, token);
+            tenantName = tenant.FullName;
+            tenantStatusId = tenant.TenantStatusId;
+            auditCount = await before.AuditLogs.CountAsync(token);
+            outboxCount = await before.Set<OutboxMessage>().CountAsync(token);
+        }
+
+        await using (var healthy = store.Open())
+        await using (var gate = new EventDiscoveryEnrollmentGate(healthy))
+        await using (var custody = await gate.AcquireAsync(token))
+        {
+            var current = await new EfCoreUnitOfWork(healthy).ExecuteSerializableAsync(async ct =>
+            {
+                gate.RequireCurrent();
+                return await new EventDiscoveryDisclosureRepository(healthy)
+                    .AcquireCurrentAsync(store.TenantId, ct);
+            }, token);
+            gate.RequireCurrent();
+            await Assert.That(current.Id).IsEqualTo(revisionId);
+            await Assert.That(current.TenantId).IsEqualTo(store.TenantId);
+            await Assert.That(current.IdentityEpoch).IsEqualTo(identityEpoch);
+            await Assert.That(current.DisclosureEpoch).IsEqualTo(disclosureEpoch);
+        }
+
+        // Deliberate independent corruption, not a tenant-creation or revision-repair workflow.
+        await using (var corruption = store.Open())
+        {
+            int deleted = await corruption.Set<EventDiscoveryRevision>()
+                .Where(row => row.Id == revisionId && row.TenantId == store.TenantId)
+                .ExecuteDeleteAsync(token);
+            await Assert.That(deleted).IsEqualTo(1);
+            await Assert.That(await corruption.Set<EventDiscoveryRevision>()
+                .AnyAsync(row => row.TenantId == store.TenantId, token)).IsFalse();
+            await Assert.That(await corruption.Tenants.AnyAsync(row => row.Id == store.TenantId, token))
+                .IsTrue();
+        }
+
+        await using (var missing = store.Open())
+        await using (var gate = new EventDiscoveryEnrollmentGate(missing))
+        await using (var custody = await gate.AcquireAsync(token))
+        {
+            await Assert.ThrowsAsync<EventDiscoveryUnavailableException>(async () =>
+                await new EfCoreUnitOfWork(missing).ExecuteSerializableAsync(async ct =>
+                {
+                    gate.RequireCurrent();
+                    return await new EventDiscoveryDisclosureRepository(missing)
+                        .AcquireCurrentAsync(store.TenantId, ct);
+                }, token));
+            gate.RequireCurrent();
+        }
+
+        await using var after = store.Open();
+        await Assert.That(await after.Set<EventDiscoveryRevision>()
+            .AnyAsync(row => row.TenantId == store.TenantId, token)).IsFalse();
+        var unchanged = await after.Set<EventDiscoveryRevision>().AsNoTracking()
+            .IgnoreQueryFilters([QueryFilterNames.Tenant])
+            .SingleAsync(row => row.TenantId == store.OtherTenantId, token);
+        await Assert.That(unchanged.Id).IsEqualTo(otherRevisionId);
+        await Assert.That(unchanged.IdentityEpoch).IsEqualTo(otherIdentityEpoch);
+        await Assert.That(unchanged.DisclosureEpoch).IsEqualTo(otherDisclosureEpoch);
+        var unchangedTenant = await after.Tenants.AsNoTracking()
+            .SingleAsync(row => row.Id == store.TenantId, token);
+        await Assert.That(unchangedTenant.FullName).IsEqualTo(tenantName);
+        await Assert.That(unchangedTenant.TenantStatusId).IsEqualTo(tenantStatusId);
+        await Assert.That(await after.AuditLogs.CountAsync(token)).IsEqualTo(auditCount);
+        await Assert.That(await after.Set<OutboxMessage>().CountAsync(token)).IsEqualTo(outboxCount);
+    }
 
     [Test]
     [Arguments(false)]
@@ -117,9 +219,6 @@ public sealed class EventDiscoveryDisclosureMutationTests
     public async Task Every_fanout_parent_is_fenced_before_any_revision_command()
     {
         await using var store = await Store.CreateAsync();
-        await using (var seed = store.Open())
-            await seed.Set<EventDiscoveryRevision>().IgnoreQueryFilters()
-                .Where(row => row.TenantId == store.OtherTenantId).ExecuteDeleteAsync();
         var ordering = new ParentBeforeEpoch([store.TenantId, store.OtherTenantId]);
         await using (var writer = store.Open(ordering))
             await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async token =>
@@ -684,9 +783,14 @@ public sealed class EventDiscoveryDisclosureMutationTests
         public Guid TenantId { get; } = Guid.CreateVersion7();
         public Guid OtherTenantId { get; } = Guid.CreateVersion7();
 
-        public ExploreDbContext Open(params IInterceptor[] interceptors) =>
-            new(new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptors).Options)
+        public ExploreDbContext Open(params IInterceptor[] interceptors)
+        {
+            var context = new ExploreDbContext(
+                new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptors).Options)
             { TenantContext = new TenantScope(TenantId) };
+            context.BindTenantLease();
+            return context;
+        }
 
         public static async Task<Store> CreateAsync()
         {
@@ -702,10 +806,15 @@ public sealed class EventDiscoveryDisclosureMutationTests
                 .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,
                     SqliteProjectionLockTransactionInterceptor.Instance)
                 .Options;
-            await using var seed = store.Open();
+            await using var seed = new ExploreDbContext(store._options);
+            seed.BindTenantLease();
             await seed.Database.EnsureCreatedAsync();
             await SqliteDatabaseInitializer.InitializeAsync(seed, CancellationToken.None);
             store._options = TestDbContextOptions.Create(store._options).UseModel(seed.Model).Options;
+            await using var humanGate = new HumanSecuritySourceGate(seed);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(seed);
+            await using var discovery = await discoveryGate.AcquireAsync();
             seed.Set<TenantStatus>().AddRange(
                 new TenantStatus
                 {

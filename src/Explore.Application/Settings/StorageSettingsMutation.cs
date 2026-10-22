@@ -120,13 +120,19 @@ public sealed class StorageSettingsMutation : IAsyncDisposable
             PatchTenantStorageSettingsCommand command => await preparation.PrepareAsync(command, this, token),
             _ => throw new UnauthorizedAccessException()
         };
-        await services.GetRequiredService<ISettingMutationLock>().ExecuteOrderedGroupsAsync(
-            [StorageConfigurationState.Keys], ct => preparation.ExecutePreparedAsync(proof,
-                (owner, inner) => preparation.ExecuteStorageJoinedAsync(owner, this, async (_, joined) =>
-                {
-                    await writer.ExecuteAsync(this, joined);
-                    return true;
-                }, inner), ct), token);
+        Exception? primaryFailure = null;
+        try
+        {
+            await services.GetRequiredService<ISettingMutationLock>().ExecuteOrderedGroupsAsync(
+                [StorageConfigurationState.Keys], ct => preparation.ExecutePreparedAsync(proof,
+                    (owner, inner) => preparation.ExecuteStorageJoinedAsync(owner, this, async (_, joined) =>
+                    {
+                        await writer.ExecuteAsync(this, joined);
+                        return true;
+                    }, inner), ct), token);
+        }
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await preparation.CloseAsync(proof, primaryFailure); }
         // The owning attempt has acknowledged physical settlement, and every ordered
         // source wrapper has returned. Direct service calls share this activation path.
         services.GetRequiredService<IHierarchicalSettingsResolver>()

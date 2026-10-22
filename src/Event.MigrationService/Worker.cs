@@ -1,6 +1,5 @@
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
-using Microsoft.EntityFrameworkCore;
 using Explore.Secrets.Database;
 
 namespace Event.MigrationService;
@@ -27,7 +26,8 @@ public sealed class Worker(IServiceProvider serviceProvider, IHostApplicationLif
         if (externalIdentity is not null)
         {
             logger.LogInformation("Applying external Local Identity database migrations.");
-            await externalIdentity.Database.MigrateAsync(stoppingToken);
+            await ExternalIdentityDatabaseMigrator.MigrateAsync(
+                externalIdentity, configuration, stoppingToken);
         }
 
         await ExploreDatabaseMigrator.MigrateAndSeedAsync(

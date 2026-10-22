@@ -702,7 +702,31 @@ public static class InfrastructureServicesRegistration
             () => provider.GetRequiredService<IHumanSupportAccessSourceFactory>(),
             () => provider.GetRequiredService<IPolicySourceSetFence>(),
             () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
-            () => provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISerializableAttemptOwner>()));
+            () => provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>()));
+        services.AddScoped<IManagedTenantWorkerCreationPort, ManagedTenantWorkerCreationPort>();
+        services.AddScoped<IHumanTenantCreationPort>(provider => new HumanTenantCreationPort(
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanOriginalCredentialCustody>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+            provider.GetRequiredService<Explore.Application.Authentication.IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Identity.IMachinePrincipalAccessor>(),
+            provider.GetRequiredService<ITenantContext>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<CerbosAuthorizationService>(),
+            provider.GetRequiredService<IOptions<AuthorizationProviderDeploymentOptions>>(),
+            provider.GetRequiredService<IOptions<CerbosSettings>>(),
+            provider.GetRequiredService<IOptions<Explore.Application.Management.ManagedControlPlaneOptions>>(),
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>(),
+            () => provider.GetRequiredService<IHumanAuthorizationRouteSource>(),
+            () => provider.GetRequiredService<IHumanSupportAccessSourceFactory>(),
+            () => provider.GetRequiredService<IPolicySourceSetFence>(),
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
+            () => provider.GetRequiredService<Explore.Application.Authorization.AuthorizationResourceContextResolver>(),
+            () => provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>(),
+            () => provider.GetRequiredService<ISettingMutationLock>(),
+            () => provider.GetRequiredService<IHumanTenantCreationGraphWriter>()));
         services.AddScoped<FallbackAuthorizationService>();
         services.AddScoped<ICerbosConfigResolver, CerbosConfigResolver>();
         services.AddScoped<EventResourceProviderControlPlane>();

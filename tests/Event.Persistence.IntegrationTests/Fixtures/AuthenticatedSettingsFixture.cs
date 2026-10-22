@@ -1,4 +1,6 @@
 using Explore.Persistence.Services;
+using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -8,6 +10,7 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Features.Settings.Requests.Commands;
@@ -28,6 +31,7 @@ using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -71,7 +75,10 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
 
     private static async Task<AuthenticatedSettingsFixture> CreateCoreAsync(
         Func<ExploreDbContext> createDatabase, IInterceptor? interceptor,
-        Func<ExploreDbContext, Dictionary<string, string?>, Task>? configurePostgres)
+        Func<ExploreDbContext, Dictionary<string, string?>, Task>? configurePostgres,
+        Action<SanitizedRequestFailure>? requestFailureObserver = null,
+        Action<Dictionary<string, string?>>? configure = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         await EnvironmentOwner.WaitAsync(TestContext.Current!.Execution.CancellationToken);
         var fixture = new AuthenticatedSettingsFixture(createDatabase);
@@ -177,7 +184,13 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                     "AUTHENTICATION_LOCAL_JWT_KEY"));
             await seed.SaveChangesAsync();
 
-            fixture.host = new SettingsHost(configuration, createDatabase, interceptor);
+            configure?.Invoke(configuration);
+            SanitizedRequestFailure? observedFailure = null;
+            fixture.host = new SettingsHost(configuration, createDatabase, interceptor, failure =>
+            {
+                observedFailure = failure;
+                requestFailureObserver?.Invoke(failure);
+            }, configureServices);
             await using (var scope = fixture.host.Services.CreateAsyncScope())
             {
                 await using DbContext authority = configurePostgres is null
@@ -204,7 +217,10 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             var login = await fixture.CreateLocalAdministratorAsync(bootstrapActor);
             using var response = await fixture.client.PostAsJsonAsync("/api/auth/local/login", login);
             if (response.StatusCode != HttpStatusCode.OK)
-                throw new InvalidOperationException($"Real Local settings login failed: {response.StatusCode}.");
+                throw new InvalidOperationException($"Real Local settings login failed: {response.StatusCode}; "
+                    + $"types: {string.Join(",", observedFailure?.ExceptionTypes ?? [])}; "
+                    + $"SQL states: {string.Join(",", observedFailure?.SqlStates ?? [])}; "
+                    + $"methods: {string.Join(",", observedFailure?.Methods ?? [])}.");
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             if (!body.RootElement.GetProperty("success").GetBoolean())
                 throw new InvalidOperationException("Real Local settings login was rejected.");
@@ -237,6 +253,7 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         ActorId = receipt.LocalSubjectId;
         await using (var seed = createDatabase())
         {
+            seed.BindTenantLease();
             seed.Users.Add(new User
             {
                 Id = ActorId,
@@ -305,6 +322,11 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         if (tenantId is { } tenant)
         {
             await using var seed = createDatabase();
+            seed.BindTenantLease();
+            await using var humanGate = new HumanSecuritySourceGate(seed);
+            await using var humanLease = await humanGate.AcquireAsync(cancellationToken);
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(seed);
+            await using var discoveryLease = await discoveryGate.AcquireAsync(cancellationToken);
             if (!await seed.TenantUsers.IgnoreQueryFilters().AnyAsync(row => row.TenantId == tenant && row.UserId == ActorId))
             {
                 var membership = new TenantUser
@@ -339,6 +361,9 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         accessor.HttpContext = context;
         try
         {
+            if (tenantId is { } executionTenant)
+                request.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
+                    .BindExecutionTenant(executionTenant);
             context.Request.Headers.Authorization = "Bearer " + accessToken;
             var authenticated = await context.AuthenticateAsync();
             if (!authenticated.Succeeded)
@@ -446,7 +471,8 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
 
     private sealed class SettingsHost(
         Dictionary<string, string?> configuration, Func<ExploreDbContext> createDatabase,
-        IInterceptor? interceptor) : WebApplicationFactory<Program>
+        IInterceptor? interceptor, Action<SanitizedRequestFailure>? requestFailureObserver,
+        Action<IServiceCollection>? configureServices) : WebApplicationFactory<Program>
     {
         internal bool RuntimeRequests { get; set; }
 
@@ -459,6 +485,9 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
             builder.ConfigureAppConfiguration((_, settings) => settings.AddInMemoryCollection(configuration));
             builder.ConfigureTestServices(services =>
             {
+                configureServices?.Invoke(services);
+                if (requestFailureObserver is not null)
+                    services.Insert(0, ServiceDescriptor.Singleton<IExceptionHandler>(new RequestFailureObserver(requestFailureObserver)));
                 services.RemoveAll<IExternalDataProtectionSource>();
                 services.AddSingleton<IExternalDataProtectionSource>(new ExternalDataProtectionTestAuthority("api"));
                 services.RemoveAll<IDistributedCache>();
@@ -483,7 +512,10 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                         ? new ExploreDbContext(provider.GetRequiredService<DbContextOptions<ExploreDbContext>>())
                         : createDatabase();
                     context.ClearTenantFilterBypass();
-                    context.TenantContext = provider.GetService<ITenantContext>();
+                    if (RuntimeRequests)
+                        context.TenantContext = provider.GetService<ITenantContext>();
+                    else if (context.TenantFilterTenantId.HasValue)
+                        throw new InvalidOperationException("Settings authentication bootstrap requires an instance-owned context.");
                     context.CurrentUserService = provider.GetService<ICurrentUserService>();
                     context.BindTenantLease();
                     return context;
@@ -494,6 +526,29 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                         or "Explore.Infrastructure.Authentication.LocalIdentityLifecycleDeliveryWorker").ToArray())
                     services.Remove(descriptor);
             });
+        }
+    }
+
+    internal sealed record SanitizedRequestFailure(
+        ImmutableArray<string> ExceptionTypes, ImmutableArray<string> SqlStates, ImmutableArray<string> Methods);
+
+    private sealed class RequestFailureObserver(Action<SanitizedRequestFailure> observe) : IExceptionHandler
+    {
+        public ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken cancellationToken)
+        {
+            var chain = new List<Exception>();
+            for (Exception? current = exception; current is not null && chain.Count < 8; current = current.InnerException)
+                chain.Add(current);
+            observe(new SanitizedRequestFailure(
+                [.. chain.Select(error => error.GetType().FullName ?? error.GetType().Name)],
+                [.. chain.OfType<Npgsql.PostgresException>().Select(error => error.SqlState).Distinct(StringComparer.Ordinal)],
+                [.. chain.SelectMany(error => new StackTrace(error, fNeedFileInfo: false).GetFrames() ?? [])
+                    .Select(frame => frame.GetMethod())
+                    .Where(method => method is not null)
+                    .Select(method => $"{method!.DeclaringType?.FullName}.{method.Name}")
+                    .Distinct(StringComparer.Ordinal).Take(64)]));
+            // The actual production exception handler still owns classification, response and logging.
+            return ValueTask.FromResult(false);
         }
     }
 
@@ -516,7 +571,10 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                 : PrimaryDatabaseConfiguration.BindGlobal(configuration);
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, database);
             if (database.Provider == PrimaryDatabaseProvider.PostgreSql)
-                options.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+                options.AddInterceptors(database.Role == PrimaryDatabaseRole.Global
+                    ? PostgresTenantSessionInterceptor.ForGlobalLogin(database.Username
+                        ?? throw new InvalidOperationException("Observed Global contexts require an explicit enrolled login."))
+                    : PostgresTenantSessionInterceptor.RuntimeInstance);
             options.AddInterceptors(interceptor);
             var context = new ExploreDbContext(options.Options)
             {

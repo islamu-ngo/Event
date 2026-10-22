@@ -2,12 +2,12 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Notifications;
 using Explore.Domain.Enums;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Infrastructure.Authentication;
 
 public sealed class LocalIdentityLifecycleEmailService(
-    ILocalIdentityLifecycleStore lifecycle,
-    ILocalIdentityLifecycleDeliveryStore deliveries) : IAccountAuthorityLifecycleEmailProvider
+    ILocalIdentityExecutionScopeFactory scopes) : IAccountAuthorityLifecycleEmailProvider
 {
     public AccountAuthorityKind Kind => AccountAuthorityKind.LocalIdentity;
 
@@ -25,6 +25,9 @@ public sealed class LocalIdentityLifecycleEmailService(
             AccountAuthorityLifecycleEmailAction.PasswordReset => LocalIdentityLifecyclePurpose.PasswordRecovery,
             _ => throw new ArgumentOutOfRangeException(nameof(action))
         };
+        await using var identity = await scopes.CreateAsync(cancellationToken);
+        var lifecycle = identity.Services.GetRequiredService<ILocalIdentityLifecycleStore>();
+        var deliveries = identity.Services.GetRequiredService<ILocalIdentityLifecycleDeliveryStore>();
         LocalIdentityLifecycleRequest? nativeRequest;
         try
         {

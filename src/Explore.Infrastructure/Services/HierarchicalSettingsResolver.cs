@@ -22,8 +22,7 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Resolves settings through a 5-tier hierarchy with batch loading.
-/// Loads all settings for requested scopes in ≤2 queries (system + scoped),
-/// then merges with lock precedence.
+/// Batches requested keys by storage family and scope, then merges with lock precedence.
 /// </summary>
 public class HierarchicalSettingsResolver : HierarchicalSettingsReader, IHierarchicalSettingsResolver
 {
@@ -47,9 +46,10 @@ public class HierarchicalSettingsResolver : HierarchicalSettingsReader, IHierarc
         ILogger<HierarchicalSettingsResolver> logger,
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IEventResourceSettingsWriter eventResourceSettingsWriter,
+        IAtprotoFederationSettingRepository federationSettings,
         IInstanceTenantSettingsReader? instanceTenantReader = null)
         : base(systemSettingRepository, tenantSettingRepository, organizationSettingRepository,
-            groupSettingRepository, userPreferenceRepository, cache, instanceTenantReader)
+            groupSettingRepository, userPreferenceRepository, cache, federationSettings, instanceTenantReader)
     {
         _groupTenantRepository = groupTenantRepository;
         _tenantContext = tenantContext;

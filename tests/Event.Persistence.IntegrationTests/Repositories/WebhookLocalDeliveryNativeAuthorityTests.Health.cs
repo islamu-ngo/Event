@@ -274,6 +274,7 @@ public sealed partial class WebhookLocalDeliveryNativeAuthorityTests
         meters.Create(Arg.Any<System.Diagnostics.Metrics.MeterOptions>())
             .Returns(new System.Diagnostics.Metrics.Meter(BusinessMetrics.MeterName));
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddSingleton(factory);
         services.AddScoped<IWebhookLocalDeliveryHealthObserver, WebhookLocalDeliveryHealthObserver>();
         services.AddSingleton<IOptions<WebhookDeliveryProcessorSettings>>(Options.Create(new WebhookDeliveryProcessorSettings()));

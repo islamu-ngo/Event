@@ -19,6 +19,9 @@ internal static class EmailDispatchSqliteFixture
     internal static async Task CreateDatabaseAsync(string databasePath)
     {
         await using ExploreDbContext context = CreateContext(databasePath);
+        // Initialization owns this fresh instance-wide lease. Readiness and Save
+        // must validate an existing owner rather than minting one implicitly.
+        context.BindTenantLease();
         await context.Database.EnsureCreatedAsync();
         await SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedAsync(context, CancellationToken.None);

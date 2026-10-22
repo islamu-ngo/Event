@@ -58,14 +58,7 @@ public static partial class PostgresDiscoveryTraversalContract
             "revision_read" => $"RETURN QUERY SELECT r.* FROM {revisions} r WHERE r.{revisionTenant} = p_tenant;",
             "revision_acquire" => $"""
                 {transaction}
-                IF p_id IS NULL OR p_id = '00000000-0000-0000-0000-000000000000'::uuid
-                THEN RAISE EXCEPTION 'discovery_traversal_revision_id' USING ERRCODE = '22023'; END IF;
                 UPDATE {revisions} SET {disclosure} = {disclosure} WHERE {revisionTenant} = p_tenant;
-                PERFORM 1 FROM {revisions} r WHERE r.{revisionTenant} = p_tenant FOR UPDATE;
-                IF NOT FOUND THEN
-                    INSERT INTO {revisions} ({C<EventDiscoveryRevision>("Id")},{revisionTenant},{identity},{disclosure})
-                        VALUES (p_id,p_tenant,0,0);
-                END IF;
                 RETURN QUERY SELECT r.* FROM {revisions} r WHERE r.{revisionTenant} = p_tenant FOR UPDATE;
                 """,
             "revision_write" => $"""

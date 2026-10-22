@@ -50,7 +50,8 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
         _setupWriter = new InternalEmailDeliverySettingsWriter(context, MutationLock, new EfCoreUnitOfWork(context));
         Settings = new HierarchicalSettingsReader(_systemSettings, _tenantSettings,
             new OrganizationSettingRepository(context), new GroupSettingRepository(context),
-            UserPreferenceRepository.CreateReadOnly(context), _cache);
+            UserPreferenceRepository.CreateReadOnly(context), _cache,
+            new AtprotoFederationSettingRepository(context, null));
         Capabilities = new EmailDeliveryCapabilityResolver(Settings, Secrets, _bindings);
         Smtp = new SmtpConfigResolver(Capabilities, this, Settings);
         Secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())

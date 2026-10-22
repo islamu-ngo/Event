@@ -12,25 +12,26 @@ namespace Explore.Application.Services.Federation;
 public sealed class AtprotoPdsRecoveryPolicyResolver(
     ITenantRepository tenantRepository,
     ISystemSettingRepository systemSettingRepository,
-    IAtprotoGovernanceSettingRepository tenantSettingRepository)
+    IAtprotoFederationGlobalReadRepository federationSettings)
 {
     public async Task<AtprotoPdsRecoveryPolicy> ResolveAsync(CancellationToken cancellationToken)
     {
         SystemSetting? deploymentMode = await systemSettingRepository.GetByKey(
             GovernanceSettingKeys.Deployment.Mode,
             cancellationToken);
-        SystemSetting? enabledSetting = await systemSettingRepository.GetByKey(
+        string[] keys =
+        [
             GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled,
-            cancellationToken);
-        SystemSetting? modeSetting = await systemSettingRepository.GetByKey(
-            GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode,
-            cancellationToken);
-        List<TenantSetting> enabledOverrides = await tenantSettingRepository.GetOverridesAsync(
-            GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled,
-            cancellationToken);
-        List<TenantSetting> modeOverrides = await tenantSettingRepository.GetOverridesAsync(
-            GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode,
-            cancellationToken);
+            GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode
+        ];
+        IReadOnlyList<AtprotoFederationInstanceSetting> instanceSettings =
+            await federationSettings.GetInstanceAsync(keys, cancellationToken);
+        AtprotoFederationInstanceSetting? enabledSetting = instanceSettings.SingleOrDefault(
+            setting => setting.SettingKey == GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled);
+        AtprotoFederationInstanceSetting? modeSetting = instanceSettings.SingleOrDefault(
+            setting => setting.SettingKey == GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode);
+        IReadOnlyList<AtprotoFederationTenantSetting> tenantSettings =
+            await federationSettings.GetOverridesAsync(keys, cancellationToken);
         IReadOnlyList<Tenant> tenants = await tenantRepository.GetActiveAsNoTrackingAsync(cancellationToken);
 
         bool instanceEnabled = SettingValueSerializer.DeserializeBool(enabledSetting?.Value, false);
@@ -43,8 +44,12 @@ public sealed class AtprotoPdsRecoveryPolicyResolver(
             StringComparison.OrdinalIgnoreCase);
         bool enabledOverridesApply = !isMultiTenant || enabledSetting?.IsLocked != true;
         bool modeOverridesApply = !isMultiTenant || modeSetting?.IsLocked != true;
-        IReadOnlyDictionary<Guid, TenantSetting> enabledByTenant = ToLatestByTenant(enabledOverrides);
-        IReadOnlyDictionary<Guid, TenantSetting> modeByTenant = ToLatestByTenant(modeOverrides);
+        Dictionary<Guid, AtprotoFederationTenantSetting> enabledByTenant = tenantSettings
+            .Where(setting => setting.SettingKey == GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled)
+            .ToDictionary(setting => setting.TenantId);
+        Dictionary<Guid, AtprotoFederationTenantSetting> modeByTenant = tenantSettings
+            .Where(setting => setting.SettingKey == GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode)
+            .ToDictionary(setting => setting.TenantId);
 
         var effective = tenants
             .Select(tenant => ResolveTenant(
@@ -79,13 +84,13 @@ public sealed class AtprotoPdsRecoveryPolicyResolver(
         string instanceMode,
         bool enabledOverridesApply,
         bool modeOverridesApply,
-        IReadOnlyDictionary<Guid, TenantSetting> enabledByTenant,
-        IReadOnlyDictionary<Guid, TenantSetting> modeByTenant)
+        IReadOnlyDictionary<Guid, AtprotoFederationTenantSetting> enabledByTenant,
+        IReadOnlyDictionary<Guid, AtprotoFederationTenantSetting> modeByTenant)
     {
-        bool enabled = enabledOverridesApply && enabledByTenant.TryGetValue(tenantId, out TenantSetting? enabledOverride)
+        bool enabled = enabledOverridesApply && enabledByTenant.TryGetValue(tenantId, out AtprotoFederationTenantSetting? enabledOverride)
             ? SettingValueSerializer.DeserializeBool(enabledOverride.Value, instanceEnabled)
             : instanceEnabled;
-        string mode = modeOverridesApply && modeByTenant.TryGetValue(tenantId, out TenantSetting? modeOverride)
+        string mode = modeOverridesApply && modeByTenant.TryGetValue(tenantId, out AtprotoFederationTenantSetting? modeOverride)
             ? NormalizeMode(SettingValueSerializer.DeserializeString(modeOverride.Value, instanceMode))
             : instanceMode;
         return new(
@@ -95,11 +100,6 @@ public sealed class AtprotoPdsRecoveryPolicyResolver(
                 ? AtprotoPdsRecoveryMode.Full
                 : AtprotoPdsRecoveryMode.DowntimeOnly);
     }
-
-    private static IReadOnlyDictionary<Guid, TenantSetting> ToLatestByTenant(IEnumerable<TenantSetting> settings) =>
-        settings
-            .GroupBy(setting => setting.TenantId)
-            .ToDictionary(group => group.Key, group => group.OrderByDescending(setting => setting.UpdatedAt).First());
 
     private static string NormalizeMode(string mode) =>
         string.Equals(mode, AtprotoFederationSettingGroup.FullBackfillMode, StringComparison.OrdinalIgnoreCase)

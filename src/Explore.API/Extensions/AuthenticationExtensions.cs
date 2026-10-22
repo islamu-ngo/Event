@@ -15,6 +15,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Management;
 using Explore.Domain.Constants;
@@ -246,7 +247,9 @@ public static class AuthenticationExtensions
                             context.Fail("Local session authority is invalid.");
                             return;
                         }
-                        var authentication = context.HttpContext.RequestServices.GetRequiredService<ILocalIdentityAuthService>();
+                        await using var identityScope = await context.HttpContext.RequestServices
+                            .GetRequiredService<ILocalIdentityExecutionScopeFactory>().CreateAsync(cancellationToken);
+                        var authentication = identityScope.Services.GetRequiredService<ILocalIdentityAuthService>();
                         LocalSessionValidationOutcome outcome = await authentication.ValidateSessionAsync(authority, cancellationToken)
                             .ConfigureAwait(false);
                         cancellationToken.ThrowIfCancellationRequested();
@@ -480,22 +483,7 @@ public static class AuthenticationExtensions
             return RandomNumberGenerator.GetBytes(32);
         }
 
-        byte[] key;
-        try
-        {
-            key = Convert.FromBase64String(configured);
-        }
-        catch (FormatException exception)
-        {
-            throw new InvalidOperationException(
-                "Local Identity JWT validation authority is invalid.",
-                exception);
-        }
-
-        return key.Length >= 32
-            ? key
-            : throw new InvalidOperationException(
-                "Local Identity JWT validation authority does not meet the 256-bit minimum.");
+        return LocalIdentityOptions.DecodeJwtKey(configured);
     }
 
     private static bool ApiKeyCallerHasMcpReadAndEventReadAuthorityOrIsUser(ClaimsPrincipal principal)

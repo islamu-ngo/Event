@@ -17,6 +17,60 @@ namespace Event.Persistence.IntegrationTests;
 public sealed partial class SupportAdministrationNativeContractTests
 {
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task FixedTenantParentReadCoexistsWithSupportButExtraOrPartialStorageAuthorityDoesNot(bool partial)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        CancellationToken token = timeout.Token;
+        await using var migrator = MembershipMigrator();
+        await migrator.Database.OpenConnectionAsync(token);
+        await Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token);
+        await Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
+        var names = new HumanPrincipalSourceSql(migrator);
+        string tenants = names.Table(typeof(Tenant));
+        string periods = names.Table(typeof(ExternalApiKeyCreditPeriod));
+        string runtime = fixture.NativeQueueEnrollment.RuntimeLogin;
+        string tenantId = names.ColumnName(typeof(Tenant), nameof(Tenant.Id));
+        string fullName = names.ColumnName(typeof(Tenant), nameof(Tenant.FullName));
+        string periodId = names.ColumnName(typeof(ExternalApiKeyCreditPeriod), nameof(ExternalApiKeyCreditPeriod.Id));
+        await Assert.That(await migrator.Database.SqlQuery<bool>($"""
+            SELECT pg_catalog.has_column_privilege({runtime},{tenants},{tenantId},'SELECT')
+                AND NOT pg_catalog.has_column_privilege({runtime},{tenants},{fullName},'SELECT')
+                AND pg_catalog.has_column_privilege({runtime},{periods},{periodId},'SELECT') AS "Value"
+            """).SingleAsync(token)).IsTrue();
+
+        string attack = partial
+            ? $"REVOKE SELECT ({names.Quote(periodId)}) ON {periods} FROM {names.Quote(runtime)}"
+            : $"GRANT SELECT ({names.Quote(fullName)}) ON {tenants} TO {names.Quote(runtime)}";
+        string restore = partial
+            ? $"GRANT SELECT ({names.Quote(periodId)}) ON {periods} TO {names.Quote(runtime)}"
+            : $"REVOKE SELECT ({names.Quote(fullName)}) ON {tenants} FROM {names.Quote(runtime)}";
+        await migrator.Database.ExecuteSqlRawAsync(attack, token);
+        try
+        {
+            string tenantBefore = await MembershipAclImageAsync(migrator, tenants);
+            string periodBefore = await MembershipAclImageAsync(migrator, periods);
+            var readiness = await Assert.ThrowsAsync<PostgresException>(() =>
+                Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token));
+            await Assert.That(readiness.SqlState).IsEqualTo("55000");
+            await Assert.That(readiness.MessageText).IsEqualTo("support_administration_ambient_scalar_authority");
+            var installation = await Assert.ThrowsAsync<PostgresException>(() =>
+                Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token));
+            await Assert.That(installation.SqlState).IsEqualTo("55000");
+            await Assert.That(installation.MessageText).IsEqualTo("support_administration_ambient_scalar_authority");
+            await Assert.That(await MembershipAclImageAsync(migrator, tenants)).IsEqualTo(tenantBefore);
+            await Assert.That(await MembershipAclImageAsync(migrator, periods)).IsEqualTo(periodBefore);
+        }
+        finally
+        {
+            await migrator.Database.ExecuteSqlRawAsync(restore, CancellationToken.None);
+        }
+        await Native.RequireReadyAsync(migrator, fixture.NativeQueueEnrollment, token);
+        await Native.ApplyAsync(migrator, fixture.NativeQueueEnrollment, token);
+    }
+
+    [Test]
     [Arguments(true, false)]
     [Arguments(false, true)]
     [Arguments(true, true)]
@@ -183,15 +237,24 @@ public sealed partial class SupportAdministrationNativeContractTests
     [Arguments("Audits")]
     [Arguments("Targets")]
     [Arguments("Members")]
-    public async Task RuntimeHasExecuteOnlyDataAuthorityWithoutScalarReadsOrWrites(string target)
+    public async Task RuntimeAllowsOnlyApprovedStorageReadsWithoutPrivateDisclosureOrBroadWrites(string target)
     {
         var source = await SeedAsync();
         await using var caller = Open(PrimaryDatabaseRole.Runtime, source.Tenant);
         await caller.Database.OpenConnectionAsync();
         await Native.RequireReadyAsync(caller, fixture.NativeQueueEnrollment);
+        var names = new HumanPrincipalSourceSql(caller);
+        string protectedColumn = target switch
+        {
+            "Targets" => names.Column(typeof(Tenant), nameof(Tenant.FullName)),
+            "Members" => names.Column(typeof(TenantUser), nameof(TenantUser.ModerationNote)),
+            _ => "id"
+        };
+        if (target is "Targets" or "Members")
+            await caller.Database.ExecuteSqlRawAsync($"SELECT id FROM {Table(caller, target)} LIMIT 1");
         foreach (string statement in new[]
         {
-            $"SELECT id FROM {Table(caller, target)} LIMIT 1",
+            $"SELECT {protectedColumn} FROM {Table(caller, target)} LIMIT 1",
             $"DELETE FROM {Table(caller, target)} WHERE false",
             $"UPDATE {Table(caller, target)} SET id = id WHERE false"
         })

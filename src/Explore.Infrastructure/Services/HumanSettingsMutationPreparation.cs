@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.ExceptionServices;
 using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
@@ -52,6 +53,9 @@ public sealed partial class HumanSettingsMutationPreparation(
     public IOrdinarySettingsSource? CurrentOrdinarySource =>
         _currentOwner.Value is { Active: true } current ? current.OrdinarySource : null;
 
+    public IAtprotoFederationSettingsSource? CurrentAtprotoFederationSource =>
+        _currentOwner.Value is { Active: true } current ? current.FederationSource : null;
+
     public async Task<T> ExecuteMixedJoinedAsync<T>(MixedSettingsBatchMutation mutation,
         Func<IPreparedHumanSettingsMutation, CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default)
@@ -71,6 +75,9 @@ public sealed partial class HumanSettingsMutationPreparation(
         {
             Consumed = 1,
             Active = true,
+            OwnsLifetime = false,
+            FederationStore = mutation.FederationStore,
+            FederationSource = mutation.FederationSource,
             ValidateOwner = token =>
             {
                 mutation.RequireActive();
@@ -97,21 +104,29 @@ public sealed partial class HumanSettingsMutationPreparation(
                 HumanSettingsOperation.InstanceSettings, SettingScope.Instance, null, null,
                 effect.Key, HumanSettingsMutationKind.SetValue, effect.Value)).ToImmutableArray(),
             [], cancellationToken);
-        var writer = services.GetRequiredService<IResolverConfigurationSettingsWriter>();
-        var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
-        // Only this wrapper escapes preparation. It retains the same physical owner and
-        // original acquisition, and installs completion admission before exposing any callback.
-        // An exact-value scalar write cannot bypass the capsule's metadata/projection checks.
-        return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async token =>
+        try
         {
-            var validate = await issued.Acquire(token);
-            finalizer.Register(finalToken => writer.RequireAppliedAsync(mutation, finalToken), _ =>
+            var writer = services.GetRequiredService<IResolverConfigurationSettingsWriter>();
+            var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
+            // Only this wrapper escapes preparation. It retains the same physical owner and
+            // original acquisition, and installs completion admission before exposing any callback.
+            // An exact-value scalar write cannot bypass the capsule's metadata/projection checks.
+            return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async token =>
             {
-                mutation.RequireActive();
-                mutation.Source.RequireTime();
-            });
-            return validate;
-        });
+                var validate = await issued.Acquire(token);
+                finalizer.Register(finalToken => writer.RequireAppliedAsync(mutation, finalToken), _ =>
+                {
+                    mutation.RequireActive();
+                    mutation.Source.RequireTime();
+                });
+                return validate;
+            }).TakeCoordinationFrom(issued);
+        }
+        catch (Exception failure)
+        {
+            await FinishSettingsAttemptAsync(failure, false, issued.TakeCoordination());
+            throw;
+        }
     }
 
     public Task<IPreparedHumanSettingsMutation> PrepareAsync(SaveInstanceOperatorIdentityCommand command,
@@ -177,20 +192,28 @@ public sealed partial class HumanSettingsMutationPreparation(
             (_, _) => mutation.Values.Select(pair => new HumanSettingsMutation(OperationFor(scope), scope,
                 mutation.TenantId, null, pair.Key, HumanSettingsMutationKind.SetValue, pair.Value)).ToImmutableArray(),
             [], token);
-        var writer = services.GetRequiredService<IStorageConfigurationWriter>();
-        var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
-        return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async ct =>
+        try
         {
-            var validate = await issued.Acquire(ct);
-            // Mandatory before any caller callback can escape. An equal generic/native
-            // scalar write cannot mark this private selected writer complete.
-            finalizer.Register(final => writer.RequireAppliedAsync(mutation, final), _ =>
+            var writer = services.GetRequiredService<IStorageConfigurationWriter>();
+            var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
+            return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async ct =>
             {
-                mutation.RequireActive();
-                mutation.Source.RequireTime();
-            });
-            return validate;
-        });
+                var validate = await issued.Acquire(ct);
+                // Mandatory before any caller callback can escape. An equal generic/native
+                // scalar write cannot mark this private selected writer complete.
+                finalizer.Register(final => writer.RequireAppliedAsync(mutation, final), _ =>
+                {
+                    mutation.RequireActive();
+                    mutation.Source.RequireTime();
+                });
+                return validate;
+            }).TakeCoordinationFrom(issued);
+        }
+        catch (Exception failure)
+        {
+            await FinishSettingsAttemptAsync(failure, false, issued.TakeCoordination());
+            throw;
+        }
     }
 
     public async Task<T> ExecuteStorageJoinedAsync<T>(IPreparedHumanSettingsMutation owner,
@@ -236,18 +259,26 @@ public sealed partial class HumanSettingsMutationPreparation(
                 HumanSettingsOperation.InstanceSettings, SettingScope.Instance, null, null,
                 effect.Key, HumanSettingsMutationKind.SetValue, effect.Value)).ToImmutableArray(),
             CoordinatedKeys(mutation.Effects.Select(effect => effect.Key)), token);
-        var writer = services.GetRequiredService<IProviderConfigurationSettingsWriter>();
-        var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
-        return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async ct =>
+        try
         {
-            var validate = await issued.Acquire(ct);
-            finalizer.Register(final => writer.RequireAppliedAsync(mutation, final), _ =>
+            var writer = services.GetRequiredService<IProviderConfigurationSettingsWriter>();
+            var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
+            return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async ct =>
             {
-                mutation.RequireActive();
-                mutation.Source.RequireTime();
-            });
-            return validate;
-        });
+                var validate = await issued.Acquire(ct);
+                finalizer.Register(final => writer.RequireAppliedAsync(mutation, final), _ =>
+                {
+                    mutation.RequireActive();
+                    mutation.Source.RequireTime();
+                });
+                return validate;
+            }).TakeCoordinationFrom(issued);
+        }
+        catch (Exception failure)
+        {
+            await FinishSettingsAttemptAsync(failure, false, issued.TakeCoordination());
+            throw;
+        }
     }
 
     public async Task<T> ExecuteProviderJoinedAsync<T>(IPreparedHumanSettingsMutation owner,
@@ -447,230 +478,268 @@ public sealed partial class HumanSettingsMutationPreparation(
             _ => throw new UnauthorizedAccessException("This setting scope has no ordinary human mutation authority.")
         };
         await humanScope.PrepareAsync(token);
-        var subject = humanScope.Subject ?? throw new UnauthorizedAccessException("An original human is required.");
-        var request = httpContext.HttpContext ?? throw new UnauthorizedAccessException("An original authenticated request is required.");
-        var authenticatedPrincipal = request.User;
-        var lifetime = await lifetimeObserver.ObserveAsync(authenticatedPrincipal, token)
-            ?? throw new UnauthorizedAccessException("Original credential lifetime evidence is required.");
-        Guid ambientTenant = tenantContext.TenantId;
-        var operation = scope == SettingScope.Tenant && authority == Authority.Instance
-            ? HumanSettingsOperation.InstanceTenantSettings : OperationFor(scope);
-        if (auditActor is { } actor && actor != subject.PrincipalId
-            || lifetime.AccountKey != subject.AccountKey)
-            throw new UnauthorizedAccessException("The original setting actor and credential must agree.");
-
-        void RequireCustody()
+        SettingsCoordination? coordination = null;
+        IOrdinarySettingsMutationStore? ordinaryStore = null;
+        IAtprotoFederationSettingsMutationStore? federationStore = null;
+        IOrdinarySettingsSource? ordinarySource = null;
+        IAtprotoFederationSettingsSource? federationSource = null;
+        try
         {
-            token.ThrowIfCancellationRequested();
-            if (!ReferenceEquals(humanScope.Subject, subject) || tenantContext.TenantId != ambientTenant
-                || !ReferenceEquals(httpContext.HttpContext, request)
-                || !ReferenceEquals(request.User, authenticatedPrincipal))
-                throw new UnauthorizedAccessException("The original Settings execution custody has changed.");
-        }
-        RequireCustody();
-        // These constructors bind the context, pool lease and connection while idle. Resolving
-        // any one of them inside the Serializable callback would violate that binding contract.
-        var sourceSet = services.GetRequiredService<IPolicySourceSetFence>();
-        var principalSource = services.GetRequiredService<IHumanPrincipalSourceFence>();
-        var routeSource = selectedCheck is null && !observeRouteOnly ? null
-            : services.GetRequiredService<IHumanAuthorizationRouteSource>();
-        var supportSource = await services.GetRequiredService<IHumanSupportAccessSourceFactory>().CreateAsync(token);
-        var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
-        var owner = services.GetRequiredService<ISerializableAttemptOwner>();
-        var subjectAuthority = authority == Authority.Subject ? services.GetRequiredService<IHumanSubjectCommitAuthority>() : null;
-        var tenantAuthority = authority is Authority.Tenant or Authority.TenantOrInstance
-            ? services.GetRequiredService<ITenantAdministratorCommitAuthority>() : null;
-        var instanceAuthority = authority is Authority.Instance or Authority.TenantOrInstance
-            ? services.GetRequiredService<IInstanceAdministratorCommitAuthority>() : null;
-        var principalFacts = await principalSource.ObserveAsync(token);
-        var routeFacts = routeSource is null ? null : await routeSource.ObserveAsync(token);
-        var originalSupport = await supportSource.ObserveAsync(token);
-        // Source-owned selection, not the ambient single-tenant fallback, determines whether
-        // this is Runtime or ordinary Global. The ambient value is retained separately because
-        // it is an actual selected-provider input.
-        Guid? selectedTenant = principalFacts.SelectedTenantId;
-        if (scope == SettingScope.Instance && selectedTenant.HasValue
-            || scope == SettingScope.Tenant && selectedTenant is null
-            || scope != SettingScope.Instance && selectedTenant.HasValue && selectedTenant != ambientTenant
-            || explicitTenant.HasValue && explicitTenant != selectedTenant)
-            throw new UnauthorizedAccessException("The setting action must match its original selected owner.");
-        var effects = capture(selectedTenant, subject.PrincipalId);
-        if (effects.IsDefault || effects.Any(effect => string.IsNullOrWhiteSpace(effect.Key)
-                || effect.Operation != operation || effect.Scope != scope || effect.TenantId != selectedTenant
-                || effect.UserId != (scope == SettingScope.User ? subject.PrincipalId : (Guid?)null)
-                || !Enum.IsDefined(effect.Kind)
-                || effect.Kind == HumanSettingsMutationKind.SetValue && (effect.Value is null || effect.IsLocked.HasValue)
-                || effect.Kind == HumanSettingsMutationKind.SetLock && (effect.Value is not null || !effect.IsLocked.HasValue)
-                || effect.Kind == HumanSettingsMutationKind.Remove && (effect.Value is not null || effect.IsLocked.HasValue))
-            || effects.Select(effect => effect.Key).Distinct(StringComparer.Ordinal).Count() != effects.Length)
-            throw new ArgumentException("Settings preparation requires immutable, exact, nonduplicated storage effects.");
+            if (scope is SettingScope.Instance or SettingScope.Tenant)
+                coordination = await SettingsCoordination.AcquireAsync(services, token);
+            var subject = humanScope.Subject ?? throw new UnauthorizedAccessException("An original human is required.");
+            var request = httpContext.HttpContext ?? throw new UnauthorizedAccessException("An original authenticated request is required.");
+            var authenticatedPrincipal = request.User;
+            var lifetime = await lifetimeObserver.ObserveAsync(authenticatedPrincipal, token)
+                ?? throw new UnauthorizedAccessException("Original credential lifetime evidence is required.");
+            Guid ambientTenant = tenantContext.TenantId;
+            var operation = scope == SettingScope.Tenant && authority == Authority.Instance
+                ? HumanSettingsOperation.InstanceTenantSettings : OperationFor(scope);
+            if (auditActor is { } actor && actor != subject.PrincipalId
+                || lifetime.AccountKey != subject.AccountKey)
+                throw new UnauthorizedAccessException("The original setting actor and credential must agree.");
 
-        var ordinary = OrdinarySettingsMutation.Capture(original, effects);
-        var ordinaryStore = ordinary is null ? null : services.GetRequiredService<IOrdinarySettingsMutationStore>();
-        var ordinarySource = ordinaryStore is null ? null
-            : await ordinaryStore.ObserveAsync(ordinary!, subject, token);
-
-        void RequirePrincipal(HumanPrincipalSourceFacts facts)
-        {
-            RequireCustody();
-            HumanPrincipalSourceValidation.RequireCurrent(subject, lifetime.LocalSession, facts);
-            if (facts.SelectedTenantId != selectedTenant)
-                throw new UnauthorizedAccessException("Settings sources belong to another selected tenant.");
-        }
-        RequirePrincipal(principalFacts);
-        var supportChecks = effects.Select(effect => new SupportCheck(
-            scope == SettingScope.Instance || authority == Authority.Instance ? ResourceKinds.InstanceSetting
-                : scope == SettingScope.User ? ResourceKinds.User : ResourceKinds.TenantSetting,
-            effect.Kind switch
+            void RequireCustody()
             {
-                HumanSettingsMutationKind.Remove => AuthorizationActions.Delete,
-                HumanSettingsMutationKind.SetLock => effect.IsLocked == true ? AuthorizationActions.Lock : AuthorizationActions.Unlock,
-                _ => AuthorizationActions.Update
-            },
-            authority != Authority.Instance && selectedTenant.HasValue
-                ? new TenantScopedAuthorizationFacts(selectedTenant.Value) : InstanceScopedAuthorizationFacts.Instance))
-            .Distinct().ToImmutableArray();
-        // Empty batches still release an administrative result and must retain their boundary.
-        if (supportChecks.IsEmpty)
-            supportChecks = [new(authority == Authority.Instance ? ResourceKinds.InstanceSetting
+                token.ThrowIfCancellationRequested();
+                coordination?.RequireCurrent();
+                if (!ReferenceEquals(humanScope.Subject, subject) || tenantContext.TenantId != ambientTenant
+                    || !ReferenceEquals(httpContext.HttpContext, request)
+                    || !ReferenceEquals(request.User, authenticatedPrincipal))
+                    throw new UnauthorizedAccessException("The original Settings execution custody has changed.");
+            }
+            RequireCustody();
+            // These constructors bind the context, pool lease and connection while idle. Resolving
+            // any one of them inside the Serializable callback would violate that binding contract.
+            var sourceSet = services.GetRequiredService<IPolicySourceSetFence>();
+            var principalSource = services.GetRequiredService<IHumanPrincipalSourceFence>();
+            var routeSource = selectedCheck is null && !observeRouteOnly ? null
+                : services.GetRequiredService<IHumanAuthorizationRouteSource>();
+            var supportSource = await services.GetRequiredService<IHumanSupportAccessSourceFactory>().CreateAsync(token);
+            var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
+            var owner = services.GetRequiredService<ISerializableAttemptOwner>();
+            var subjectAuthority = authority == Authority.Subject ? services.GetRequiredService<IHumanSubjectCommitAuthority>() : null;
+            var tenantAuthority = authority is Authority.Tenant or Authority.TenantOrInstance
+                ? services.GetRequiredService<ITenantAdministratorCommitAuthority>() : null;
+            var instanceAuthority = authority is Authority.Instance or Authority.TenantOrInstance
+                ? services.GetRequiredService<IInstanceAdministratorCommitAuthority>() : null;
+            var principalFacts = await principalSource.ObserveAsync(token);
+            var routeFacts = routeSource is null ? null : await routeSource.ObserveAsync(token);
+            var originalSupport = await supportSource.ObserveAsync(token);
+            // Source-owned selection, not the ambient single-tenant fallback, determines whether
+            // this is Runtime or ordinary Global. The ambient value is retained separately because
+            // it is an actual selected-provider input.
+            Guid? selectedTenant = principalFacts.SelectedTenantId;
+            if (scope == SettingScope.Instance && selectedTenant.HasValue
+                || scope == SettingScope.Tenant && selectedTenant is null
+                || scope != SettingScope.Instance && selectedTenant.HasValue && selectedTenant != ambientTenant
+                || explicitTenant.HasValue && explicitTenant != selectedTenant)
+                throw new UnauthorizedAccessException("The setting action must match its original selected owner.");
+            var effects = capture(selectedTenant, subject.PrincipalId);
+            if (effects.IsDefault || effects.Any(effect => string.IsNullOrWhiteSpace(effect.Key)
+                    || effect.Operation != operation || effect.Scope != scope || effect.TenantId != selectedTenant
+                    || effect.UserId != (scope == SettingScope.User ? subject.PrincipalId : (Guid?)null)
+                    || !Enum.IsDefined(effect.Kind)
+                    || effect.Kind == HumanSettingsMutationKind.SetValue && (effect.Value is null || effect.IsLocked.HasValue)
+                    || effect.Kind == HumanSettingsMutationKind.SetLock && (effect.Value is not null || !effect.IsLocked.HasValue)
+                    || effect.Kind == HumanSettingsMutationKind.Remove && (effect.Value is not null || effect.IsLocked.HasValue))
+                || effects.Select(effect => effect.Key).Distinct(StringComparer.Ordinal).Count() != effects.Length)
+                throw new ArgumentException("Settings preparation requires immutable, exact, nonduplicated storage effects.");
+
+            var ordinary = OrdinarySettingsMutation.Capture(original, effects);
+            // Keep the full original envelope. Each concrete store privately derives
+            // its exact executable partition; no reconstructed command is admitted.
+            ordinaryStore = ordinary is null || !ordinary.Effects.IsEmpty
+                    && ordinary.Effects.All(effect => AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key))
+                ? null : services.GetRequiredService<IOrdinarySettingsMutationStore>();
+            federationStore = ordinary?.Effects.Any(effect => AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key)) == true
+                ? services.GetRequiredService<IAtprotoFederationSettingsMutationStore>() : null;
+            if (ordinaryStore is not null)
+                ordinarySource = await ordinaryStore.ObserveAsync(ordinary!, subject, token);
+            if (federationStore is not null)
+                federationSource = await federationStore.ObserveAsync(ordinary!, subject, token);
+
+            void RequirePrincipal(HumanPrincipalSourceFacts facts)
+            {
+                RequireCustody();
+                HumanPrincipalSourceValidation.RequireCurrent(subject, lifetime.LocalSession, facts);
+                if (facts.SelectedTenantId != selectedTenant)
+                    throw new UnauthorizedAccessException("Settings sources belong to another selected tenant.");
+            }
+            RequirePrincipal(principalFacts);
+            var supportChecks = effects.Select(effect => new SupportCheck(
+                scope == SettingScope.Instance || authority == Authority.Instance ? ResourceKinds.InstanceSetting
+                    : scope == SettingScope.User ? ResourceKinds.User : ResourceKinds.TenantSetting,
+                effect.Kind switch
+                {
+                    HumanSettingsMutationKind.Remove => AuthorizationActions.Delete,
+                    HumanSettingsMutationKind.SetLock => effect.IsLocked == true ? AuthorizationActions.Lock : AuthorizationActions.Unlock,
+                    _ => AuthorizationActions.Update
+                },
+                authority != Authority.Instance && selectedTenant.HasValue
+                    ? new TenantScopedAuthorizationFacts(selectedTenant.Value) : InstanceScopedAuthorizationFacts.Instance))
+                .Distinct().ToImmutableArray();
+            // Empty batches still release an administrative result and must retain their boundary.
+            if (supportChecks.IsEmpty)
+                supportChecks = [new(authority == Authority.Instance ? ResourceKinds.InstanceSetting
                 : scope == SettingScope.User ? ResourceKinds.User : ResourceKinds.TenantSetting,
                 AuthorizationActions.Update, authority != Authority.Instance && selectedTenant.HasValue
                     ? new TenantScopedAuthorizationFacts(selectedTenant.Value) : InstanceScopedAuthorizationFacts.Instance)];
-        if (selectedCheck is not null)
-            supportChecks = [new(selectedCheck.ResourceKind, selectedCheck.Action, selectedCheck.Facts)];
+            if (selectedCheck is not null)
+                supportChecks = [new(selectedCheck.ResourceKind, selectedCheck.Action, selectedCheck.Facts)];
 
-        void RequireTimeAndSupport(HumanSupportAccessSourceFacts current, DateTimeOffset now)
-        {
-            RequireCustody();
-            if (!lifetime.IsValidAt(now) || !SameForwarding(originalSupport.Forwarding, current.Forwarding)
-                || !ReferenceEquals(originalSupport.Forwarding.Subject, subject))
-                throw new UnauthorizedAccessException("The original Settings credential or support selection has changed.");
-            foreach (var check in supportChecks)
-            {
-                RequireSupport(originalSupport, now, check);
-                RequireSupport(current, now, check);
-            }
-        }
-        RequireTimeAndSupport(originalSupport, clock.GetUtcNow());
-
-        HumanAuthorizationRouteDeployment? deployment = null;
-        HumanAuthorizationRoute? route = null;
-        Cerbos.Api.V1.Engine.Principal? serialized = null;
-        AuthorizationDecision? acceptedDecision = null;
-        bool localInput = false;
-        if (observeRouteOnly)
-        {
-            if (routeFacts!.SelectedTenantId != selectedTenant || routeFacts.PrincipalId != subject.PrincipalId)
-                throw new UnauthorizedAccessException("The original administrative route selection changed.");
-            deployment = HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value);
-            route = HumanAuthorizationRouteProjector.Project(routeFacts, deployment, settingsGovernance: true,
-                localDecisionSourcesCoLocated: lifetime.LocalSession is null || principalFacts.LocalSession is not null);
-        }
-        if (selectedCheck is not null)
-        {
-            if (routeFacts!.SelectedTenantId != selectedTenant || routeFacts.PrincipalId != subject.PrincipalId)
-                throw new UnauthorizedAccessException("The original Settings route belongs to another actor or tenant.");
-            deployment = HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value);
-            route = HumanAuthorizationRouteProjector.Project(routeFacts, deployment, settingsGovernance: true,
-                localDecisionSourcesCoLocated: lifetime.LocalSession is null || principalFacts.LocalSession is not null);
-            var projection = CerbosPrincipalBuilder.BuildPrincipalFromSources(principalFacts);
-            serialized = CerbosPrincipalBuilder.CapturePrincipal(projection);
-            localInput = InstancePolicyInput(principalFacts);
-            if (route.Provider == HumanAuthorizationRouteProvider.Local)
-                acceptedDecision = localInput ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)
-                    : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local);
-            else if (route.Provider == HumanAuthorizationRouteProvider.CerbosInstance)
-                acceptedDecision = await cerbos.AuthorizePreparedHumanAsync(projection, selectedCheck,
-                    ambientTenant, deployment.UsePolicyScope, route.Endpoint!, token);
-            if (acceptedDecision?.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
-                throw new AuthorizationProviderUnavailableException(selectedCheck.ResourceKind, selectedCheck.Action);
-            if (acceptedDecision?.IsAllowed != true)
-                throw new AuthorizationException(selectedCheck.ResourceKind, selectedCheck.Action);
-        }
-        RequireTimeAndSupport(originalSupport, clock.GetUtcNow());
-
-        void Compare(HumanPrincipalSourceFacts facts, HumanAuthorizationRouteFacts? currentRoute)
-        {
-            RequirePrincipal(facts);
-            if (observeRouteOnly && deployment != HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value))
-                throw new UnauthorizedAccessException("The original administrative route declaration changed.");
-            if (routeSource is null) return;
-            if (selectedCheck is not null && acceptedDecision?.IsAllowed != true || currentRoute is null
-                || currentRoute.SelectedTenantId != selectedTenant || currentRoute.PrincipalId != subject.PrincipalId)
-                throw new UnauthorizedAccessException("The original selected Settings decision is required.");
-            var projected = HumanAuthorizationRouteProjector.Project(currentRoute, deployment!, settingsGovernance: true,
-                localDecisionSourcesCoLocated: lifetime.LocalSession is null || facts.LocalSession is not null);
-            bool matches = selectedCheck is null || (route!.Provider == HumanAuthorizationRouteProvider.Local
-                ? localInput == InstancePolicyInput(facts)
-                : serialized!.Equals(CerbosPrincipalBuilder.CapturePrincipal(
-                    CerbosPrincipalBuilder.BuildPrincipalFromSources(facts))));
-            if (!route!.IsSemanticallyEquivalentTo(projected) || !matches)
-                throw new UnauthorizedAccessException("The original selected Settings policy inputs have changed.");
-        }
-
-        async Task RequireAuthorityAsync(CancellationToken cancellationToken)
-        {
-            bool allowed = authority switch
-            {
-                Authority.Subject => await subjectAuthority!.IsSubjectCurrentForCommitAsync(subject.PrincipalId, cancellationToken),
-                Authority.Tenant => await tenantAuthority!.IsTenantAdministratorForCommitAsync(subject.PrincipalId, selectedTenant!.Value, cancellationToken),
-                Authority.TenantOrInstance =>
-                    await tenantAuthority!.IsTenantAdministratorForCommitAsync(subject.PrincipalId, selectedTenant!.Value, cancellationToken)
-                    || await instanceAuthority!.IsInstanceAdministratorForCommitAsync(subject.PrincipalId, cancellationToken),
-                Authority.Instance => await instanceAuthority!.IsInstanceAdministratorForCommitAsync(subject.PrincipalId, cancellationToken),
-                _ => false
-            };
-            if (!allowed)
-                throw new UnauthorizedAccessException("The original Settings action's current authority is required.");
-        }
-
-        return new Prepared(this, original, effects, coordinatedReadKeys, owner, async cancellationToken =>
-        {
-            RequireCustody();
-            var exclusion = await sourceSet.AcquireAsync(cancellationToken);
-            if (ordinarySource is not null)
-                await ordinaryStore!.AcquireAsync(ordinarySource, cancellationToken);
-            var principal = await principalSource.AcquireAsync(exclusion, cancellationToken);
-            var currentRoute = routeSource is null ? null : await routeSource.AcquireAsync(exclusion, cancellationToken);
-            var support = await supportSource.AcquireAsync(exclusion, principal, cancellationToken: cancellationToken);
-            Compare(principal.Facts, currentRoute?.Facts);
-            await RequireAuthorityAsync(cancellationToken);
-            RequireTimeAndSupport(support.Facts, clock.GetUtcNow());
-            HumanSupportAccessSourceFacts? finalSupport = null;
-
-            async Task ReadSourcesAsync(CancellationToken finalToken, bool terminal)
+            void RequireTimeAndSupport(HumanSupportAccessSourceFacts current, DateTimeOffset now)
             {
                 RequireCustody();
-                // Data awaits precede the original human-source reads and all terminal
-                // deadline checks. No callback can replace the private writer's expected image.
-                if (ordinarySource is not null)
+                if (!lifetime.IsValidAt(now) || !SameForwarding(originalSupport.Forwarding, current.Forwarding)
+                    || !ReferenceEquals(originalSupport.Forwarding.Subject, subject))
+                    throw new UnauthorizedAccessException("The original Settings credential or support selection has changed.");
+                foreach (var check in supportChecks)
                 {
-                    if (terminal)
-                        await ordinaryStore!.RequireCompleteAsync(ordinarySource, finalToken);
-                    else
-                        await ordinaryStore!.VerifyAsync(ordinarySource, finalToken);
+                    RequireSupport(originalSupport, now, check);
+                    RequireSupport(current, now, check);
                 }
-                // All of these leases are acquired here, never supplied by the caller. Each
-                // reentry enforces the original context/pool/connection/transaction identity.
-                await exclusion.ValidateAsync(finalToken);
-                var currentPrincipal = await principal.ValidateAsync(finalToken);
-                var finalRoute = currentRoute is null ? null : await currentRoute.ValidateAsync(finalToken);
-                finalSupport = await support.ValidateAsync(finalToken);
-                Compare(currentPrincipal, finalRoute);
-                await RequireAuthorityAsync(finalToken);
             }
-            finalizer.Register(token => ReadSourcesAsync(token, terminal: true), now => RequireTimeAndSupport(finalSupport
-                ?? throw new InvalidOperationException("Final Settings sources were not read."), now));
-            return async guardToken =>
+            RequireTimeAndSupport(originalSupport, clock.GetUtcNow());
+
+            HumanAuthorizationRouteDeployment? deployment = null;
+            HumanAuthorizationRoute? route = null;
+            Cerbos.Api.V1.Engine.Principal? serialized = null;
+            AuthorizationDecision? acceptedDecision = null;
+            bool localInput = false;
+            if (observeRouteOnly)
             {
-                await ReadSourcesAsync(guardToken, terminal: false);
-                RequireTimeAndSupport(finalSupport!, clock.GetUtcNow());
+                if (routeFacts!.SelectedTenantId != selectedTenant || routeFacts.PrincipalId != subject.PrincipalId)
+                    throw new UnauthorizedAccessException("The original administrative route selection changed.");
+                deployment = HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value);
+                route = HumanAuthorizationRouteProjector.Project(routeFacts, deployment, settingsGovernance: true,
+                    localDecisionSourcesCoLocated: lifetime.LocalSession is null || principalFacts.LocalSession is not null);
+            }
+            if (selectedCheck is not null)
+            {
+                if (routeFacts!.SelectedTenantId != selectedTenant || routeFacts.PrincipalId != subject.PrincipalId)
+                    throw new UnauthorizedAccessException("The original Settings route belongs to another actor or tenant.");
+                deployment = HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value);
+                route = HumanAuthorizationRouteProjector.Project(routeFacts, deployment, settingsGovernance: true,
+                    localDecisionSourcesCoLocated: lifetime.LocalSession is null || principalFacts.LocalSession is not null);
+                var projection = CerbosPrincipalBuilder.BuildPrincipalFromSources(principalFacts);
+                serialized = CerbosPrincipalBuilder.CapturePrincipal(projection);
+                localInput = InstancePolicyInput(principalFacts);
+                if (route.Provider == HumanAuthorizationRouteProvider.Local)
+                    acceptedDecision = localInput ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)
+                        : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local);
+                else if (route.Provider == HumanAuthorizationRouteProvider.CerbosInstance)
+                    acceptedDecision = await cerbos.AuthorizePreparedHumanAsync(projection, selectedCheck,
+                        ambientTenant, deployment.UsePolicyScope, route.Endpoint!, token);
+                if (acceptedDecision?.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
+                    throw new AuthorizationProviderUnavailableException(selectedCheck.ResourceKind, selectedCheck.Action);
+                if (acceptedDecision?.IsAllowed != true)
+                    throw new AuthorizationException(selectedCheck.ResourceKind, selectedCheck.Action);
+            }
+            RequireTimeAndSupport(originalSupport, clock.GetUtcNow());
+
+            void Compare(HumanPrincipalSourceFacts facts, HumanAuthorizationRouteFacts? currentRoute)
+            {
+                RequirePrincipal(facts);
+                if (observeRouteOnly && deployment != HumanAuthorizationRouteDeployment.Capture(authorizationOptions.Value, cerbosOptions.Value))
+                    throw new UnauthorizedAccessException("The original administrative route declaration changed.");
+                if (routeSource is null) return;
+                if (selectedCheck is not null && acceptedDecision?.IsAllowed != true || currentRoute is null
+                    || currentRoute.SelectedTenantId != selectedTenant || currentRoute.PrincipalId != subject.PrincipalId)
+                    throw new UnauthorizedAccessException("The original selected Settings decision is required.");
+                var projected = HumanAuthorizationRouteProjector.Project(currentRoute, deployment!, settingsGovernance: true,
+                    localDecisionSourcesCoLocated: lifetime.LocalSession is null || facts.LocalSession is not null);
+                bool matches = selectedCheck is null || (route!.Provider == HumanAuthorizationRouteProvider.Local
+                    ? localInput == InstancePolicyInput(facts)
+                    : serialized!.Equals(CerbosPrincipalBuilder.CapturePrincipal(
+                        CerbosPrincipalBuilder.BuildPrincipalFromSources(facts))));
+                if (!route!.IsSemanticallyEquivalentTo(projected) || !matches)
+                    throw new UnauthorizedAccessException("The original selected Settings policy inputs have changed.");
+            }
+
+            async Task RequireAuthorityAsync(CancellationToken cancellationToken)
+            {
+                bool allowed = authority switch
+                {
+                    Authority.Subject => await subjectAuthority!.IsSubjectCurrentForCommitAsync(subject.PrincipalId, cancellationToken),
+                    Authority.Tenant => await tenantAuthority!.IsTenantAdministratorForCommitAsync(subject.PrincipalId, selectedTenant!.Value, cancellationToken),
+                    Authority.TenantOrInstance =>
+                        await tenantAuthority!.IsTenantAdministratorForCommitAsync(subject.PrincipalId, selectedTenant!.Value, cancellationToken)
+                        || await instanceAuthority!.IsInstanceAdministratorForCommitAsync(subject.PrincipalId, cancellationToken),
+                    Authority.Instance => await instanceAuthority!.IsInstanceAdministratorForCommitAsync(subject.PrincipalId, cancellationToken),
+                    _ => false
+                };
+                if (!allowed)
+                    throw new UnauthorizedAccessException("The original Settings action's current authority is required.");
+            }
+
+            return new Prepared(this, original, effects, coordinatedReadKeys, owner, async cancellationToken =>
+            {
+                RequireCustody();
+                var exclusion = await sourceSet.AcquireAsync(cancellationToken);
+                if (ordinarySource is not null)
+                    await ordinaryStore!.AcquireAsync(ordinarySource, cancellationToken);
+                if (federationSource is not null)
+                    await federationStore!.AcquireAsync(federationSource, cancellationToken);
+                var principal = await principalSource.AcquireAsync(exclusion, cancellationToken);
+                var currentRoute = routeSource is null ? null : await routeSource.AcquireAsync(exclusion, cancellationToken);
+                var support = await supportSource.AcquireAsync(exclusion, principal, cancellationToken: cancellationToken);
+                Compare(principal.Facts, currentRoute?.Facts);
+                await RequireAuthorityAsync(cancellationToken);
+                RequireTimeAndSupport(support.Facts, clock.GetUtcNow());
+                HumanSupportAccessSourceFacts? finalSupport = null;
+
+                async Task ReadSourcesAsync(CancellationToken finalToken, bool terminal)
+                {
+                    RequireCustody();
+                    // Data awaits precede the original human-source reads and all terminal
+                    // deadline checks. No callback can replace the private writer's expected image.
+                    if (federationSource is not null)
+                    {
+                        if (terminal)
+                            await federationStore!.RequireCompleteAsync(federationSource, finalToken);
+                        else
+                            await federationStore!.VerifyAsync(federationSource, finalToken);
+                    }
+                    if (ordinarySource is not null)
+                    {
+                        if (terminal)
+                            await ordinaryStore!.RequireCompleteAsync(ordinarySource, finalToken);
+                        else
+                            await ordinaryStore!.VerifyAsync(ordinarySource, finalToken);
+                    }
+                    // All of these leases are acquired here, never supplied by the caller. Each
+                    // reentry enforces the original context/pool/connection/transaction identity.
+                    await exclusion.ValidateAsync(finalToken);
+                    var currentPrincipal = await principal.ValidateAsync(finalToken);
+                    var finalRoute = currentRoute is null ? null : await currentRoute.ValidateAsync(finalToken);
+                    finalSupport = await support.ValidateAsync(finalToken);
+                    Compare(currentPrincipal, finalRoute);
+                    await RequireAuthorityAsync(finalToken);
+                }
+                finalizer.Register(token => ReadSourcesAsync(token, terminal: true), now => RequireTimeAndSupport(finalSupport
+                    ?? throw new InvalidOperationException("Final Settings sources were not read."), now));
+                return async guardToken =>
+                {
+                    await ReadSourcesAsync(guardToken, terminal: false);
+                    RequireTimeAndSupport(finalSupport!, clock.GetUtcNow());
+                };
+            })
+            {
+                OrdinarySource = ordinarySource,
+                OrdinaryStore = ordinaryStore,
+                FederationSource = federationSource,
+                FederationStore = federationStore,
+                Coordination = coordination
             };
-        })
+        }
+        catch (Exception failure)
         {
-            OrdinarySource = ordinarySource,
-            OrdinaryStore = ordinaryStore
-        };
+            await FinishSettingsAttemptAsync(failure, false, coordination,
+                () => { if (federationSource is not null) federationStore!.Expire(federationSource); },
+                () => { if (ordinarySource is not null) ordinaryStore!.Expire(ordinarySource); });
+            throw;
+        }
     }
 
     public async Task<T> ExecutePreparedAsync<T>(IPreparedHumanSettingsMutation prepared,
@@ -679,11 +748,19 @@ public sealed partial class HumanSettingsMutationPreparation(
     {
         ArgumentNullException.ThrowIfNull(mutation);
         var issued = RequireIssued(prepared);
-        if (Interlocked.Exchange(ref issued.Consumed, 1) != 0)
-            throw new InvalidOperationException("A Settings preparation belongs to one physical attempt.");
+        lock (issued.LifetimeSync)
+        {
+            if (!issued.OwnsLifetime || issued.Consumed != 0 || issued.Cleanup is not null)
+                throw new InvalidOperationException("A Settings preparation belongs to one physical attempt.");
+            issued.Consumed = 1;
+            issued.Executing = true;
+        }
+        Exception? failure = null;
+        bool settled = false;
         try
         {
-            return await issued.Owner.ExecuteAsync(async token =>
+            issued.Coordination?.RequireCurrent();
+            var result = await issued.Owner.ExecuteAsync(async token =>
             {
                 issued.ValidateOwner = await issued.Acquire(token);
                 issued.Active = true;
@@ -692,18 +769,47 @@ public sealed partial class HumanSettingsMutationPreparation(
                 try { return await InvokeAsync(issued, mutation, token); }
                 finally { _currentOwner.Value = previous; issued.Active = false; }
             }, cancellationToken);
+            settled = true;
+            issued.Coordination?.RequireCurrent();
+            return result;
         }
+        catch (Exception exception) { failure = exception; throw; }
         finally
         {
             issued.Active = false;
             issued.ValidateOwner = null;
-            if (issued.OrdinarySource is not null)
-                issued.OrdinaryStore!.Expire(issued.OrdinarySource);
-            if (issued.TypedOriginal is not null)
-                issued.TypedStore!.Close(issued.TypedOriginal);
-            if (issued.ResourceProviderOriginal is not null)
-                issued.ResourceProviderStore!.Close(issued.ResourceProviderOriginal);
+            Task cleanup;
+            lock (issued.LifetimeSync)
+            {
+                issued.Executing = false;
+                cleanup = CloseOwnedAsync(issued, failure, settled);
+            }
+            await cleanup;
         }
+    }
+
+    public Task CloseAsync(IPreparedHumanSettingsMutation prepared, Exception? primaryFailure)
+    {
+        var issued = RequireIssued(prepared);
+        lock (issued.LifetimeSync)
+        {
+            if (!issued.OwnsLifetime || issued.Executing || issued.Active)
+                throw new UnauthorizedAccessException("Only an inactive original Settings lifetime can close.");
+            return CloseOwnedAsync(issued, primaryFailure, false);
+        }
+    }
+
+    private static Task CloseOwnedAsync(Prepared issued, Exception? failure, bool settled)
+    {
+        // The first closing owner observes every failure. An outer caller closing
+        // after ExecutePrepared must not replay that already-observed cleanup error.
+        if (issued.Cleanup?.IsCompleted == true) return Task.CompletedTask;
+        issued.Consumed = 1;
+        return issued.Cleanup ??= FinishSettingsAttemptAsync(failure, settled, issued.TakeCoordination(),
+            () => { if (issued.OrdinarySource is not null) issued.OrdinaryStore!.Expire(issued.OrdinarySource); },
+            () => { if (issued.FederationSource is not null) issued.FederationStore!.Expire(issued.FederationSource); },
+            () => { if (issued.TypedOriginal is not null) issued.TypedStore!.Close(issued.TypedOriginal); },
+            () => { if (issued.ResourceProviderOriginal is not null) issued.ResourceProviderStore!.Close(issued.ResourceProviderOriginal); });
     }
 
     public Task<T> ExecuteCurrentJoinedAsync<T>(ImmutableArray<HumanSettingsMutation> slice,
@@ -735,8 +841,11 @@ public sealed partial class HumanSettingsMutationPreparation(
         {
             Consumed = 1,
             Active = true,
+            OwnsLifetime = false,
             OrdinarySource = parent.OrdinarySource,
             OrdinaryStore = parent.OrdinaryStore,
+            FederationSource = parent.FederationSource,
+            FederationStore = parent.FederationStore,
             ValidateOwner = async token =>
             {
                 RequireActive(parent);
@@ -927,6 +1036,94 @@ public sealed partial class HumanSettingsMutationPreparation(
             throw new UnauthorizedAccessException("The original support boundary does not permit this Settings action.");
     }
 
+    // Both ordinary and mixed Settings retain these cooperative resources on their
+    // already selected owner. This does not issue human or storage authority.
+    internal sealed class SettingsCoordination(
+        IHumanSecuritySourceGate human, IEventDiscoveryEnrollmentGate discovery) : IAsyncDisposable
+    {
+        private IAsyncDisposable? _ownedHuman;
+        private IAsyncDisposable? _ownedDiscovery;
+        private readonly object _cleanupSync = new();
+        private Task? _cleanup;
+
+        internal static async Task<SettingsCoordination> AcquireAsync(IServiceProvider services, CancellationToken token)
+        {
+            var retained = new SettingsCoordination(services.GetRequiredService<IHumanSecuritySourceGate>(),
+                services.GetRequiredService<IEventDiscoveryEnrollmentGate>());
+            try
+            {
+                if (!retained.Human.TryRequireCurrent())
+                {
+                    if (retained.Discovery.TryRequireCurrent())
+                        throw new InvalidOperationException("Settings cannot acquire Human behind retained Discovery custody.");
+                    retained._ownedHuman = await retained.Human.AcquireAsync(token);
+                }
+                if (!retained.Discovery.TryRequireCurrent())
+                    retained._ownedDiscovery = await retained.Discovery.AcquireAsync(token);
+                retained.RequireCurrent();
+                return retained;
+            }
+            catch (Exception failure)
+            {
+                await FinishSettingsAttemptAsync(failure, false, retained);
+                throw;
+            }
+        }
+
+        private IHumanSecuritySourceGate Human => human;
+        private IEventDiscoveryEnrollmentGate Discovery => discovery;
+        internal void RequireCurrent()
+        {
+            human.RequireCurrent();
+            discovery.RequireCurrent();
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            lock (_cleanupSync)
+                return new ValueTask(_cleanup ??= ReleaseAsync());
+        }
+
+        private async Task ReleaseAsync()
+        {
+            var ownedDiscovery = Interlocked.Exchange(ref _ownedDiscovery, null);
+            var ownedHuman = Interlocked.Exchange(ref _ownedHuman, null);
+            List<Exception> failures = [];
+            foreach (var owned in new[] { ownedDiscovery, ownedHuman })
+            {
+                if (owned is null) continue;
+                try { await owned.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
+            }
+            if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Settings owned gate cleanup failed.", failures);
+        }
+    }
+
+    internal static async Task FinishSettingsAttemptAsync(Exception? primary, bool settled,
+        IAsyncDisposable? coordination, params Action[] closeSources)
+    {
+        List<Exception> failures = [];
+        foreach (var close in closeSources)
+        {
+            try { close(); }
+            catch (Exception failure) { failures.Add(failure); }
+        }
+        if (coordination is not null)
+        {
+            try { await coordination.DisposeAsync(); }
+            catch (Exception failure) { failures.Add(failure); }
+        }
+        if (failures.Count == 0) return;
+        if (primary is not null) failures.Insert(0, primary);
+        var combined = new AggregateException("Settings operation and cleanup evidence.", failures);
+        if (primary is HumanMutationOutcomeUnknownException)
+            throw new HumanMutationOutcomeUnknownException(combined);
+        if (settled)
+            throw new InvalidOperationException("settings_committed_cleanup_failed", combined);
+        throw combined;
+    }
+
     private enum Authority { Subject, Tenant, Instance, TenantOrInstance }
     private static HumanSettingsOperation OperationFor(SettingScope scope) => scope switch
     {
@@ -966,6 +1163,25 @@ public sealed partial class HumanSettingsMutationPreparation(
         internal Func<CancellationToken, Task>? ValidateOwner { get; set; }
         internal IOrdinarySettingsSource? OrdinarySource { get; init; }
         internal IOrdinarySettingsMutationStore? OrdinaryStore { get; init; }
+        internal IAtprotoFederationSettingsSource? FederationSource { get; init; }
+        internal IAtprotoFederationSettingsMutationStore? FederationStore { get; init; }
+        internal SettingsCoordination? Coordination { get; set; }
+        internal object LifetimeSync { get; } = new();
+        internal Task? Cleanup { get; set; }
+        internal bool Executing { get; set; }
+        internal bool OwnsLifetime { get; set; } = true;
+        internal Prepared TakeCoordinationFrom(Prepared original)
+        {
+            Coordination = original.TakeCoordination();
+            original.OwnsLifetime = false;
+            return this;
+        }
+        internal SettingsCoordination? TakeCoordination()
+        {
+            var retained = Coordination;
+            Coordination = null;
+            return retained;
+        }
         internal bool Active { get; set; }
         internal int Consumed;
     }

@@ -160,6 +160,8 @@ internal sealed partial class LocalIdentityCredentialStateStore
             CancellationToken cancellationToken, LocalCredentialProvisioningSnapshot? snapshot = null)
         {
             store.RequireHumanAdministrationOwner();
+            await using var lifecycle = await store.EnterLifecycleAsync(store.IdentityOwner, store.ApplicationOwner,
+                cancellationToken).ConfigureAwait(false);
             var owner = store._administrationSettlement ??= new OriginalOwnerSettlement(store.ApplicationOwner);
             bool committed = false;
             try
@@ -180,9 +182,15 @@ internal sealed partial class LocalIdentityCredentialStateStore
                             store.RequireIssuedImage(store._nativeAdministration);
                         }
                         await preparation.AcquireAsync(invocation, request, stage, token);
+                        lifecycle.RequireCurrent();
                         if (store._nativeAdministration is { } acquired)
                             await acquired.AcquireAsync(token);
+                        lifecycle.RequireCurrent();
                         var decision = await body(human, token);
+                        lifecycle.RequireCurrent();
+                        if (decision.Disposition == OriginalOwnerDisposition.Committed)
+                            store.ApplicationOwner.RegisterHumanCommitAdmission(
+                                _ => { lifecycle.RequireCurrent(); return Task.CompletedTask; }, lifecycle.RequireCurrent);
                         if (store._nativeAdministration is { } native
                             && decision.Disposition == OriginalOwnerDisposition.Committed)
                         {

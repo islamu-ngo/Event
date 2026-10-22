@@ -141,16 +141,16 @@ internal sealed class OriginalOwnerSettlement(ExploreDbContext context)
     private void RequireIdle()
     {
         context.ValidateTenantLease();
-        if (!context.Database.IsRelational() || !context.HasHumanCommitContextLease
+        if (!context.Database.IsRelational() || !context.HasOriginalCommitContextLease
             || context.IsTenantFilterBypassed || context.IdentityFenceOwnsTransaction
             || context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges())
-            throw new InvalidOperationException("Physical settlement requires an idle original human context lease.");
+            throw new InvalidOperationException("Physical settlement requires an idle original context lease.");
     }
 
     private void RequireContext(Attempt attempt)
     {
         context.ValidateTenantLease();
-        if (context.ContextId != attempt.ContextLease || !context.HasHumanCommitContextLease
+        if (context.ContextId != attempt.ContextLease || !context.HasOriginalCommitContextLease
             || context.TenantFilterTenantId != attempt.Tenant || context.IsTenantFilterBypassed
             || !attempt.Connection.Matches(context))
             throw new InvalidOperationException("Settlement cannot move to another context lease, tenant or connection.");

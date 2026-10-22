@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Data;
+using System.Data.Common;
 using System.Runtime.CompilerServices;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Operations;
@@ -9,9 +10,12 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Services;
@@ -20,7 +24,8 @@ namespace Explore.Persistence.Services;
 /// Projects compensation evidence without publication payloads or session envelopes.
 /// All reads and fixed writes belong to the caller's Serializable transaction.
 /// </summary>
-public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
+public sealed class AtprotoModerationCompensationStore(
+    ExploreDbContext context, PostgresNativeQueueEnrollment? enrollment)
     : IAtprotoModerationCompensationStore
 {
     private const int PageSize = 256;
@@ -32,30 +37,26 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         RequireTransaction();
+        RequireEnrollment();
         ValidateTarget(target);
+        var original = new OriginalAttempt(this, context, target, cancellationToken);
         long offset = 0;
         AtprotoPublicationLineage? after = null;
         while (true)
         {
-            RequireTransaction();
+            original.Validate(this, cancellationToken);
             var native = await PostgresAtprotoModerationCompensationContract.TryReadPageAsync(
                 context, target, offset, cancellationToken);
+            original.Validate(this, cancellationToken);
+            IReadOnlyList<SourceEvidence> evidence;
             if (native is not null)
             {
-                IReadOnlyList<AtprotoModerationDeleteCandidate> page = native;
-                foreach (AtprotoModerationDeleteCandidate candidate in page)
-                {
-                    RequireTransaction();
-                    cancellationToken.ThrowIfCancellationRequested();
-                    yield return candidate;
-                }
-                if (page.Count < PageSize)
-                    yield break;
-                offset = checked(offset + page.Count);
+                evidence = native;
             }
             else
             {
                 await RequireSubjectAsync(target, cancellationToken);
+                original.Validate(this, cancellationToken);
                 IQueryable<LineageRow> lineages = Lineages(target);
                 if (after is not null)
                 {
@@ -87,17 +88,31 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
                     .Select(value => new AtprotoPublicationLineage(value.TenantId, value.SourceEntityType,
                         value.SourceEntityId, value.UserId, value.Did, value.Collection, value.RecordKey))
                     .ToListAsync(cancellationToken);
+                original.Validate(this, cancellationToken);
+                var portable = new List<SourceEvidence>(page.Count);
                 foreach (AtprotoPublicationLineage lineage in page)
                 {
-                    RequireTransaction();
-                    yield return await ReadCandidateAsync(target, lineage, cancellationToken);
+                    portable.Add(await ReadSourceEvidenceAsync(target, lineage, original, cancellationToken));
+                    original.Validate(this, cancellationToken);
                 }
-                if (page.Count < PageSize)
-                    yield break;
+                evidence = portable;
                 // Seek paging avoids narrowing the long position to LINQ's int Skip.
-                offset = checked(offset + page.Count);
-                after = page[^1];
+                if (page.Count != 0)
+                    after = page[^1];
             }
+            if (evidence.Count == 0)
+                yield break;
+            var candidates = await CompletePageAsync(original.ObservePage(this, evidence, cancellationToken),
+                cancellationToken);
+            foreach (var candidate in candidates)
+            {
+                original.Validate(this, cancellationToken);
+                yield return candidate;
+                original.Validate(this, cancellationToken);
+            }
+            if (evidence.Count < PageSize)
+                yield break;
+            offset = checked(offset + evidence.Count);
         }
     }
 
@@ -107,6 +122,7 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
         CancellationToken cancellationToken)
     {
         RequireTransaction();
+        RequireEnrollment();
         ValidateTarget(target);
         ArgumentNullException.ThrowIfNull(write);
         ValidateLineage(write.Lineage);
@@ -120,21 +136,27 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
             return;
         }
 
+        var original = new OriginalAttempt(this, context, target, cancellationToken);
         await RequireSubjectAsync(target, cancellationToken);
-        AtprotoModerationDeleteFence fence = await ReadFenceAsync(target, write.Lineage, cancellationToken);
+        original.Validate(this, cancellationToken);
+        AtprotoModerationDeleteFence fence = await ReadFenceAsync(target, write.Lineage, original, cancellationToken);
         if (fence != write.Fence)
             throw new DbUpdateConcurrencyException("The moderation compensation fence changed.");
 
         IQueryable<PdsSyncOutbox> existing = Outboxes().Where(value => value.Id == write.SuccessorId);
-        if (await existing.AnyAsync(cancellationToken))
+        bool exists = await existing.AnyAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
+        if (exists)
         {
-            if (!await MatchingSuccessor(existing, write).AnyAsync(cancellationToken))
+            bool matches = await MatchingSuccessor(existing, write).AnyAsync(cancellationToken);
+            original.Validate(this, cancellationToken);
+            if (!matches)
                 throw new InvalidOperationException("The compensation successor identifier has conflicting contents.");
             return;
         }
 
-        AtprotoModerationDeleteCandidate candidate =
-            await ReadCandidateAsync(target, write.Lineage, cancellationToken);
+        SourceEvidence candidate = await ReadSourceEvidenceAsync(target, write.Lineage, original, cancellationToken);
+        original.ValidateEvidence(this, candidate, cancellationToken);
         ValidateWrite(candidate, write);
 
         // A real new entity is tracked; predecessors are updated through an exact
@@ -166,6 +188,7 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
         };
         context.PdsSyncOutbox.Add(successor);
         await context.SaveChangesAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         await ExactOutboxes(write.Lineage)
             .Where(value => value.Id != write.SuccessorId &&
                 value.Status != PdsSyncStatus.Completed && value.Status != PdsSyncStatus.Superseded &&
@@ -177,8 +200,10 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
                 .SetProperty(value => value.LeaseOwner, (string?)null)
                 .SetProperty(value => value.LeaseToken, (Guid?)null)
                 .SetProperty(value => value.LeaseExpiresAt, (DateTime?)null), cancellationToken);
+        original.Validate(this, cancellationToken);
         successor.Status = PdsSyncStatus.Pending;
         await context.SaveChangesAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
     }
 
     private void RequireTransaction()
@@ -187,6 +212,9 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
             transaction.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
             throw new InvalidOperationException("Moderation compensation requires an existing Serializable transaction.");
     }
+
+    private void RequireEnrollment() =>
+        PostgresAtprotoModerationCompensationContract.RequireEnrollment(context, enrollment);
 
     private static void ValidateTarget(AtprotoModerationTarget target)
     {
@@ -270,8 +298,10 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
     }
 
     private async Task<AtprotoModerationDeleteFence> ReadFenceAsync(
-        AtprotoModerationTarget target, AtprotoPublicationLineage lineage, CancellationToken cancellationToken)
+        AtprotoModerationTarget target, AtprotoPublicationLineage lineage, OriginalAttempt original,
+        CancellationToken cancellationToken)
     {
+        original.Validate(this, cancellationToken);
         if (target.Did is not null && lineage.Did != target.Did)
             throw new DbUpdateConcurrencyException("The publication DID does not match the moderated identity.");
         var source = await (
@@ -281,6 +311,7 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
                 actor.Id == target.ActorId && !actor.IsDeleted
             select new { SourceVersion = value.ConcurrencyStamp, ActorStamp = actor.ConcurrencyStamp })
             .SingleOrDefaultAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         if (source is null)
             throw new DbUpdateConcurrencyException("The publication source is not owned by the moderated actor.");
         Guid? identityStamp = await context.AtprotoIdentities.IncludeDeleted().AsNoTracking()
@@ -288,14 +319,19 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
                 (target.IdentityId == null || value.Id == target.IdentityId))
             .Select(value => (Guid?)value.ConcurrencyStamp)
             .SingleOrDefaultAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         return new(source.SourceVersion, source.ActorStamp, identityStamp);
     }
 
-    private async Task<AtprotoModerationDeleteCandidate> ReadCandidateAsync(
-        AtprotoModerationTarget target, AtprotoPublicationLineage lineage, CancellationToken cancellationToken)
+    private async Task<SourceEvidence> ReadSourceEvidenceAsync(
+        AtprotoModerationTarget target, AtprotoPublicationLineage lineage, OriginalAttempt original,
+        CancellationToken cancellationToken)
     {
+        original.Validate(this, cancellationToken);
         await RequireSubjectAsync(target, cancellationToken);
-        AtprotoModerationDeleteFence fence = await ReadFenceAsync(target, lineage, cancellationToken);
+        original.Validate(this, cancellationToken);
+        AtprotoModerationDeleteFence fence = await ReadFenceAsync(target, lineage, original, cancellationToken);
+        original.Validate(this, cancellationToken);
         AtprotoModerationSettledRecord? settled = await (
             from ownership in Ownerships()
             join record in context.AtprotoRecords.AsNoTracking() on ownership.AtprotoRecordId equals record.Id
@@ -306,6 +342,7 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
                 record.RecordKey == lineage.RecordKey && record.TombstonedAt == null && record.Cid != null
             select new AtprotoModerationSettledRecord(record.Id, record.Cid))
             .SingleOrDefaultAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         List<AtprotoModerationMutation> unsettled = await ExactOutboxes(lineage)
             .Where(value => (value.Status == PdsSyncStatus.Pending || value.Status == PdsSyncStatus.Processing) &&
                 value.SupersededAt == null && value.SupersededById == null)
@@ -314,6 +351,7 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
                 value.CreatedAt, value.NextRetryAt, value.LeaseExpiresAt, value.LeaseFence,
                 value.PdsHost, value.ExpectedCid))
             .ToListAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         var sessions = await context.UserAuthenticationTokens
             .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoGlobalActorModeration).AsNoTracking()
             .Where(value => value.TenantId == lineage.TenantId && value.UserId == lineage.UserId &&
@@ -321,20 +359,21 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
             .OrderBy(value => value.Id).Take(2)
             .Select(value => new { value.SubjectDid, value.PdsHost })
             .ToListAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         bool linked = await context.UserExternalLogins.AsNoTracking().AnyAsync(value =>
             value.UserId == lineage.UserId &&
             value.AuthenticationProviderId == (int)AuthenticationProviderKind.Atproto &&
             value.ProviderKey == lineage.Did, cancellationToken);
+        original.Validate(this, cancellationToken);
         var account = new AtprotoAccountBindingFacts(sessions.Count,
             sessions.Count == 1 ? sessions[0].SubjectDid : null,
             sessions.Count == 1 ? sessions[0].PdsHost : null, linked);
-        var policy = new AtprotoModerationPolicyFacts(
-            await ReadSettingAsync(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, lineage, cancellationToken),
-            await ReadSettingAsync(GovernanceSettingKeys.Federation.AtprotoEventValidationProfile, lineage, cancellationToken),
-            await ReadSettingAsync(GovernanceSettingKeys.Federation.AtprotoPublishMyEvents, lineage, cancellationToken));
+        var policy = new PolicyEvidence(
+            await ReadSettingAsync(GovernanceSettingKeys.Federation.AtprotoEventValidationProfile, lineage, original, cancellationToken),
+            await ReadSettingAsync(GovernanceSettingKeys.Federation.AtprotoPublishMyEvents, lineage, original, cancellationToken));
         // Portable timestamp columns store UTC clock values without preserving DateTime.Kind.
         // Restore that contract before computing the processing lease safety window.
-        return new(lineage, fence, settled, unsettled.Select(value => value with
+        var evidence = new SourceEvidence(lineage, fence, settled, unsettled.Select(value => value with
         {
             CreatedAt = DateTime.SpecifyKind(value.CreatedAt, DateTimeKind.Utc),
             NextRetryAt = value.NextRetryAt.HasValue
@@ -342,26 +381,155 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
             LeaseExpiresAt = value.LeaseExpiresAt.HasValue
                 ? DateTime.SpecifyKind(value.LeaseExpiresAt.Value, DateTimeKind.Utc) : null
         }).ToImmutableArray(), policy, account);
+        original.ValidateEvidence(this, evidence, cancellationToken);
+        return evidence;
+    }
+
+    private async Task<ImmutableArray<AtprotoModerationDeleteCandidate>> CompletePageAsync(
+        OriginalPageObservation observation, CancellationToken cancellationToken)
+    {
+        observation.Consume(this, cancellationToken);
+        PostgresAtprotoFederationSettingPermissions.ValidateModel(context);
+        await using var admission = new AtprotoFederationReadAdmission.ReadLease(context, enrollment, globalOnly: true);
+        await admission.OpenAsync(cancellationToken);
+        observation.Original.Validate(this, cancellationToken);
+        await admission.ValidateAsync(cancellationToken);
+        observation.Original.Validate(this, cancellationToken);
+        const string key = GovernanceSettingKeys.Federation.AtprotoEventsEnabled;
+        var instance = await context.Set<AtprotoFederationInstanceSetting>().AsNoTracking()
+            .SingleOrDefaultAsync(row => row.SettingKey == key, cancellationToken);
+        observation.Original.Validate(this, cancellationToken);
+        await admission.ValidateAsync(cancellationToken);
+        observation.Original.Validate(this, cancellationToken);
+        Guid[] tenantIds = observation.Evidence.Select(value => value.Lineage.TenantId).Distinct().ToArray();
+        var tenants = await context.Set<AtprotoFederationTenantSetting>()
+            .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoGlobalActorModeration).AsNoTracking()
+            .Where(row => tenantIds.Contains(row.TenantId) && row.SettingKey == key)
+            .ToDictionaryAsync(row => row.TenantId, cancellationToken);
+        observation.Original.Validate(this, cancellationToken);
+        await admission.ValidateAsync(cancellationToken);
+        observation.Original.Validate(this, cancellationToken);
+        var candidates = ImmutableArray.CreateBuilder<AtprotoModerationDeleteCandidate>(observation.Evidence.Length);
+        foreach (SourceEvidence evidence in observation.Evidence)
+        {
+            observation.Original.Validate(this, cancellationToken);
+            tenants.TryGetValue(evidence.Lineage.TenantId, out var tenant);
+            candidates.Add(new(evidence.Lineage, evidence.Fence, evidence.Settled, evidence.Unsettled,
+                new AtprotoModerationPolicyFacts(
+                    AtprotoFederationSettingFacts.Create(key, instance, tenant, evidence.Lineage.TenantId),
+                    evidence.Policy.ValidationProfile, evidence.Policy.PublishConsent), evidence.Account));
+        }
+        return candidates.MoveToImmutable();
+    }
+
+    // Native JSON is source evidence, not a complete Application policy candidate or read authority.
+    internal sealed record SourceEvidence(
+        AtprotoPublicationLineage Lineage, AtprotoModerationDeleteFence Fence,
+        AtprotoModerationSettledRecord? Settled, ImmutableArray<AtprotoModerationMutation> Unsettled,
+        PolicyEvidence Policy, AtprotoAccountBindingFacts Account);
+
+    internal sealed record PolicyEvidence(SettingMergeFacts ValidationProfile, SettingMergeFacts PublishConsent);
+
+    private sealed class OriginalAttempt
+    {
+        private readonly AtprotoModerationCompensationStore owner;
+        private readonly ExploreDbContext originalContext;
+        private readonly DbContextId contextId;
+        private readonly RelationalConnectionIdentity connection;
+        private readonly DbTransaction transaction;
+        private readonly int? backend;
+        private readonly AtprotoModerationTarget target;
+
+        internal OriginalAttempt(AtprotoModerationCompensationStore owner, ExploreDbContext context,
+            AtprotoModerationTarget target, CancellationToken cancellationToken)
+        {
+            this.owner = owner;
+            originalContext = context;
+            contextId = context.ContextId;
+            connection = RelationalConnectionIdentity.Capture(context);
+            transaction = context.Database.CurrentTransaction?.GetDbTransaction()
+                ?? throw new InvalidOperationException("Moderation source observation requires its original transaction.");
+            backend = connection.State == ConnectionState.Open ? connection.BackendProcessId : null;
+            this.target = target;
+            Validate(owner, cancellationToken);
+        }
+
+        internal void Validate(AtprotoModerationCompensationStore expected, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AtprotoFederationReadAdmission.ValidateScopedInstance(originalContext);
+            if (!ReferenceEquals(owner, expected) || !originalContext.ContextId.Equals(contextId)
+                || originalContext.TenantFilterTenantId is not null
+                || System.Transactions.Transaction.Current is not null
+                || !connection.Matches(originalContext)
+                || connection.State != ConnectionState.Open
+                || !ReferenceEquals(transaction, originalContext.Database.CurrentTransaction?.GetDbTransaction())
+                || !connection.Owns(transaction)
+                || transaction.IsolationLevel != IsolationLevel.Serializable
+                || (backend is { } originalBackend && connection.BackendProcessId != originalBackend))
+                throw new UnauthorizedAccessException("The original moderation policy observation owner changed.");
+        }
+
+        internal void ValidateEvidence(AtprotoModerationCompensationStore expected,
+            SourceEvidence evidence, CancellationToken cancellationToken)
+        {
+            Validate(expected, cancellationToken);
+            ValidateLineage(evidence.Lineage);
+            if (target.Did is not null && evidence.Lineage.Did != target.Did
+                || (target.IdentityId.HasValue ? evidence.Fence.IdentityStamp : evidence.Fence.ActorStamp) != target.SubjectStamp)
+                throw new DbUpdateConcurrencyException("The original moderation subject evidence changed.");
+        }
+
+        internal OriginalPageObservation ObservePage(AtprotoModerationCompensationStore expected,
+            IReadOnlyList<SourceEvidence> evidence, CancellationToken cancellationToken)
+        {
+            Validate(expected, cancellationToken);
+            if (evidence.Count is < 1 or > PageSize)
+                throw new UnauthorizedAccessException("A moderation policy observation requires a bounded nonempty source page.");
+            var snapshot = evidence.ToImmutableArray();
+            foreach (var row in snapshot)
+                ValidateEvidence(expected, row, cancellationToken);
+            return new(this, snapshot);
+        }
+    }
+
+    private sealed class OriginalPageObservation(OriginalAttempt original, ImmutableArray<SourceEvidence> evidence)
+    {
+        internal OriginalAttempt Original { get; } = original;
+        internal ImmutableArray<SourceEvidence> Evidence { get; } = evidence;
+        private bool consumed;
+
+        internal void Consume(AtprotoModerationCompensationStore owner, CancellationToken cancellationToken)
+        {
+            Original.Validate(owner, cancellationToken);
+            if (consumed)
+                throw new UnauthorizedAccessException("A moderation policy source observation cannot be replayed.");
+            consumed = true;
+        }
     }
 
     private async Task<SettingMergeFacts> ReadSettingAsync(
-        string key, AtprotoPublicationLineage lineage, CancellationToken cancellationToken)
+        string key, AtprotoPublicationLineage lineage, OriginalAttempt original, CancellationToken cancellationToken)
     {
+        original.Validate(this, cancellationToken);
         SystemSettingFacts? system = await context.SystemSettings.AsNoTracking()
             .Where(value => value.SettingKey == key)
             .Select(value => new SystemSettingFacts(value.Value, (SettingValueType)value.SettingValueTypeId,
                 value.IsLocked, value.Description, value.Category, value.AllowedValues))
             .SingleOrDefaultAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         TenantSettingFacts? tenant = await context.TenantSettingOverrides
             .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoGlobalActorModeration).AsNoTracking()
             .Where(value => value.TenantId == lineage.TenantId && value.SettingKey == key)
             .Select(value => new TenantSettingFacts(value.Value, value.IsLocked))
             .SingleOrDefaultAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         string? user = await context.UserPreferences
             .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoGlobalActorModeration).AsNoTracking()
             .Where(value => value.TenantId == lineage.TenantId && value.UserId == lineage.UserId &&
                 value.SettingKey == key)
             .Select(value => value.Value).SingleOrDefaultAsync(cancellationToken);
+        original.Validate(this, cancellationToken);
         return new(system, tenant, null, null, user, true, null);
     }
 
@@ -397,7 +565,7 @@ public sealed class AtprotoModerationCompensationStore(ExploreDbContext context)
             value.MaxRetries == 10);
 
     private static void ValidateWrite(
-        AtprotoModerationDeleteCandidate candidate, AtprotoModerationDeleteWrite write)
+        SourceEvidence candidate, AtprotoModerationDeleteWrite write)
     {
         if (candidate.Fence != write.Fence ||
             candidate.Settled?.RecordId != write.AtprotoRecordId ||

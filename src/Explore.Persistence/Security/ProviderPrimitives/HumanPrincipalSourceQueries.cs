@@ -8,6 +8,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -21,7 +22,7 @@ namespace Explore.Persistence.Security;
 internal sealed class HumanPrincipalSourceQueries(
     ExploreDbContext _context, HumanCommitSubject _subject, PolicySourceSetPurpose _purpose,
     LocalSessionAuthority? _local, PostgresNativeQueueEnrollment? _enrollment,
-    RelationalConnectionIdentity connection, Guid? _tenant)
+    RelationalConnectionIdentity connection, Guid? _tenant, LocalIdentityExecutionLease? selectedExecution = null)
 {
     private readonly DbConnection _connection = connection.Connection;
     private readonly HumanPrincipalSourceSql _sql = new(_context);
@@ -55,6 +56,13 @@ internal sealed class HumanPrincipalSourceQueries(
     internal async Task<HumanPrincipalSourceFacts> ReadAsync(
         DbTransaction? transaction, Action requireSelection, CancellationToken ct)
     {
+        if (selectedExecution is not null)
+        {
+            requireSelection();
+            var facts = await IdentityWriterHumanSourceQueries.ReadPrincipalAsync(selectedExecution, _subject, _local, ct);
+            requireSelection();
+            return facts;
+        }
         JsonDocument? native = null;
         try
         {

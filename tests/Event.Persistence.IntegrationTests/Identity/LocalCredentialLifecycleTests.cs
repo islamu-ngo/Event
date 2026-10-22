@@ -8,12 +8,10 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -29,7 +27,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
@@ -394,16 +391,9 @@ public sealed class LocalCredentialLifecycleTests
             await Assert.That(await application.LocalIdentityUsers.CountAsync(CancellationToken))
                 .IsEqualTo(topology == IdentityDatabaseTopology.Colocated ? 1 : 0);
             _request = new LocalAuthRequestDto(Identifier: email, Password: password);
-            var secrets = Substitute.For<ISecretResolver>();
-            secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
-                .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                    SettingKey: SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                    Value: Convert.ToBase64String(SigningKey), Source: SecretSourceType.EnvironmentVariable,
-                    Scope: SecretScope.Instance, ScopeId: null, ResolvedAt: DateTimeOffset.UtcNow)));
-            var signer = new LocalJwtTokenGenerator(secretResolver: secrets,
-                options: Options.Create(new LocalIdentityOptions()), timeProvider: TimeProvider.System);
+            var signer = new LocalJwtTokenGenerator(
+                options: Options.Create(new LocalIdentityOptions { JwtKey = Convert.ToBase64String(SigningKey) }), timeProvider: TimeProvider.System);
             _authentication = new LocalIdentityAuthService(userManager: _manager, tokenGenerator: signer,
-                systemSettings: settings,
                 credentialStates: new LocalIdentityCredentialStateStore(
                     identityDbContext: Identity, applicationDbContext: Application,
                     userManager: _manager, timeProvider: TimeProvider.System));

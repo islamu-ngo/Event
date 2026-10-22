@@ -3,6 +3,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
 
@@ -17,6 +19,12 @@ public class ExternalApiKeyRepositoryBypassTests(PostgreSqlContainerFixture fixt
     {
         await fixture.ResetAsync();
         await using var seedContext = fixture.CreateDbContext();
+        seedContext.ClearTenantFilterBypass();
+        seedContext.BindTenantLease();
+        await using var human = new HumanSecuritySourceGate(seedContext);
+        await using var humanLease = await human.AcquireAsync(default);
+        await using var enrollmentGate = new EventDiscoveryEnrollmentGate(seedContext);
+        await using var enrollmentLease = await enrollmentGate.AcquireAsync(default);
 
         var tenantA = CreateTenant("api-key-a");
         var tenantB = CreateTenant("api-key-b");

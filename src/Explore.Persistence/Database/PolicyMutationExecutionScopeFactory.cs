@@ -216,6 +216,8 @@ internal sealed class PolicyMutationExecutionScopeFactory(
             currentLease.Bind(context, context.BindTenantLease());
         var purpose = context.IsConfigurationInstanceImportOwner
             ? HumanAdministratorCommitPurpose.ConfigurationImport
+            : currentLease.PolicyPurpose == PolicyMutationPurpose.TenantCreation
+                ? HumanAdministratorCommitPurpose.TenantCreation
             : currentLease.PolicyPurpose == PolicyMutationPurpose.MixedSettings
                 ? currentLease.SelectedTenantId.HasValue
                     ? HumanAdministratorCommitPurpose.MixedSettingsTenant : HumanAdministratorCommitPurpose.MixedSettingsInstance
@@ -237,6 +239,8 @@ internal sealed class PolicyMutationExecutionScopeFactory(
     {
         if (!Enum.IsDefined(selection.Purpose))
             throw new ArgumentOutOfRangeException(nameof(selection));
+        if (selection.Purpose == PolicyMutationPurpose.TenantCreation && selection.TenantId.HasValue)
+            throw new UnauthorizedAccessException("Human tenant creation requires its original instance-owned selection.");
         if (currentLease.Context is not null)
         {
             currentLease.RequireOriginalOwner(provider.GetRequiredService<ExploreDbContext>());
@@ -254,6 +258,11 @@ internal sealed class PolicyMutationExecutionScopeFactory(
         Guid? originalAmbientTenant = provider.GetService<ITenantContextAccessor>()?.TenantId;
         var subject = await ResolveSubjectAsync(provider, cancellationToken);
         var lifetime = subject is null ? null : await ResolveLifetimeAsync(provider, cancellationToken);
+        if (selection.Purpose == PolicyMutationPurpose.TenantCreation
+            && (subject is null || lifetime is null || originalRequest is null
+                || !ReferenceEquals(originalRequest, provider.GetService<IHttpContextAccessor>()?.HttpContext)
+                || !ReferenceEquals(originalPrincipal, originalRequest.User)))
+            throw new UnauthorizedAccessException("Tenant creation requires original human request and credential custody before selection.");
         if (selection.Purpose == PolicyMutationPurpose.MixedSettings
             && (subject is null || lifetime is null || selection.TenantId == Guid.Empty
                 || selection.TenantId.HasValue && selection.TenantId != originalAmbientTenant
@@ -285,6 +294,11 @@ internal sealed class PolicyMutationExecutionScopeFactory(
                     || !ReferenceEquals(originalPrincipal, originalRequest?.User)
                     || originalAmbientTenant != parentTenant?.TenantId))
                 throw new UnauthorizedAccessException("The original mixed request changed during physical selection.");
+            if (selection.Purpose == PolicyMutationPurpose.TenantCreation
+                && (!ReferenceEquals(originalRequest, provider.GetService<IHttpContextAccessor>()?.HttpContext)
+                    || !ReferenceEquals(originalPrincipal, originalRequest?.User)
+                    || originalAmbientTenant != parentTenant?.TenantId))
+                throw new UnauthorizedAccessException("The original tenant-creation request changed during physical selection.");
             if (tenantFacts is { } tenantId)
                 scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(tenantId);
             var lease = scope.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>();
@@ -299,6 +313,7 @@ internal sealed class PolicyMutationExecutionScopeFactory(
                         ? HumanAdministratorCommitPurpose.EmailTenant : HumanAdministratorCommitPurpose.EmailInstance,
                     PolicyMutationPurpose.MixedSettings => selection.TenantId.HasValue
                         ? HumanAdministratorCommitPurpose.MixedSettingsTenant : HumanAdministratorCommitPurpose.MixedSettingsInstance,
+                    PolicyMutationPurpose.TenantCreation => HumanAdministratorCommitPurpose.TenantCreation,
                     _ => throw new ArgumentOutOfRangeException(nameof(selection))
                 };
                 lease.BindHuman(subject, purpose, context.Database.IsNpgsql()

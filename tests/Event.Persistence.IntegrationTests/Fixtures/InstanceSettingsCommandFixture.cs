@@ -10,6 +10,9 @@ internal static class InstanceSettingsCommandFixture
 {
     internal static async Task<Guid> SeedAdministratorAsync(ExploreDbContext context)
     {
+        if (context.IsTenantFilterBypassed || context.TenantFilterTenantId is not null)
+            throw new InvalidOperationException("Administrator fixture seeding requires its original instance owner.");
+        context.BindTenantLease();
         var user = new User
         {
             Id = Guid.CreateVersion7(),

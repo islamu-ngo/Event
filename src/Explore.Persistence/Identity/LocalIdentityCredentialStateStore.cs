@@ -21,9 +21,27 @@ internal sealed partial class LocalIdentityCredentialStateStore(
     DbContext identityDbContext,
     ExploreDbContext applicationDbContext,
     UserManager<LocalIdentityUser> userManager,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    LocalIdentityExecutionLease? executionLease = null)
     : ILocalCredentialAdministration
 {
+    internal Task<LocalIdentityLifecycleExecutionCustody> EnterLifecycleAsync(DbContext originalIdentity,
+        ExploreDbContext originalApplication, CancellationToken cancellationToken)
+    {
+        if (!ReferenceEquals(originalIdentity, identityDbContext) || !ReferenceEquals(originalApplication, applicationDbContext))
+            throw new UnauthorizedAccessException("Lifecycle components must retain their original selected context pair.");
+        return LocalIdentityLifecycleExecutionCustody.AcquireAsync(identityDbContext, applicationDbContext,
+            executionLease, cancellationToken);
+    }
+
+    internal void RequireSelectedLifecycleCurrent()
+    {
+        if (executionLease is null) return;
+        executionLease.RequireCurrent(applicationDbContext, identityDbContext);
+        HumanSecuritySourceGate.RequireCurrent(applicationDbContext);
+        Database.ProviderPrimitives.LocalIdentityLifecycleGateCustody.RequireHeld(identityDbContext);
+    }
+
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         AllowDuplicateProperties = false
@@ -192,6 +210,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
         CancellationToken cancellationToken,
         HumanAdministrationAttempt? human = null)
     {
+        await using var lifecycle = human is null
+            ? await EnterLifecycleAsync(identityDbContext, applicationDbContext, cancellationToken).ConfigureAwait(false) : null;
         LocalIdentityCredentialOperation? ownedOperation = null;
         DbUpdateException? uniqueFailure = null;
         try
@@ -243,6 +263,7 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                 {
                     IdentityResult validation = await validator.ValidateAsync(userManager, user, temporaryPassword)
                         .ConfigureAwait(false);
+                    RequireSelectedLifecycleCurrent();
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!validation.Succeeded)
                     {
@@ -264,7 +285,9 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                     receipt: receipt, concurrencyStamp: Guid.CreateVersion7(),
                     verifiedByApplicationUserId: previous.VerifiedByApplicationUserId, verifiedAt: previous.VerifiedAt);
                 identityDbContext.Add(ownedOperation);
+                RequireSelectedLifecycleCurrent();
                 await identityDbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                RequireSelectedLifecycleCurrent();
 
                 Guid supersededStamp = Guid.CreateVersion7();
                 string userStamp = Guid.CreateVersion7().ToString("N");
@@ -302,8 +325,11 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                         await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
                     return LocalCredentialResetResult.Rejected(LocalCredentialResetOutcome.Conflict);
                 }
+                await ChangeEligibilityAsync(request.LocalSubjectId, previous.Id,
+                    row => row.Reset(row.Generation, previous.Id, request.OperationId, createdAt), cancellationToken).ConfigureAwait(false);
                 if (ownedTransaction is not null)
-                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                    await lifecycle!.CommitAsync(transaction, cancellationToken).ConfigureAwait(false);
+                RequireSelectedLifecycleCurrent();
                 return LocalCredentialResetResult.Reset(receipt: receipt, temporaryPassword: temporaryPassword);
             }
             catch
@@ -387,6 +413,14 @@ internal sealed partial class LocalIdentityCredentialStateStore(
     {
         cancellationToken.ThrowIfCancellationRequested();
         EnsureReconciliationContextsIdle();
+        return await ReadReplacementSubjectCoreAsync(localSubjectId, expectedSecurityStamp, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<LocalCredentialReplacementSubject?> ReadReplacementSubjectCoreAsync(
+        Guid localSubjectId,
+        string expectedSecurityStamp,
+        CancellationToken cancellationToken)
+    {
         LocalCredentialStateMetadata? state = await ReadAsync(
             localSubjectId: localSubjectId,
             expectedSecurityStamp: expectedSecurityStamp,
@@ -420,6 +454,7 @@ internal sealed partial class LocalIdentityCredentialStateStore(
         LocalCredentialReplacementRequest request,
         CancellationToken cancellationToken)
     {
+        await using var lifecycle = await EnterLifecycleAsync(identityDbContext, applicationDbContext, cancellationToken).ConfigureAwait(false);
         await using var transaction = await identityDbContext.Database
             .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
         try
@@ -471,6 +506,7 @@ internal sealed partial class LocalIdentityCredentialStateStore(
             {
                 IdentityResult validation = await validator.ValidateAsync(userManager, user, request.NewPassword)
                     .ConfigureAwait(false);
+                lifecycle.RequireCurrent();
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!IsReplacementAuthorityCurrent(authority))
                 {
@@ -498,6 +534,7 @@ internal sealed partial class LocalIdentityCredentialStateStore(
             {
                 return LocalCredentialReplacementOutcome.InvalidChallenge;
             }
+            lifecycle.RequireCurrent();
             int operationRows = await identityDbContext.Set<LocalIdentityCredentialOperation>()
                 .Where(candidate => candidate.Id == operation.Id
                     && (candidate.Kind == LocalCredentialOperationKind.Create || candidate.Kind == LocalCredentialOperationKind.Reset)
@@ -532,7 +569,9 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                 await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
                 return LocalCredentialReplacementOutcome.InvalidChallenge;
             }
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            await ChangeEligibilityAsync(operation.LocalSubjectId, operation.Id,
+                row => row.ReplaceCredential(row.Generation, operation.Id, updatedAt), cancellationToken).ConfigureAwait(false);
+            await lifecycle.CommitAsync(transaction, cancellationToken).ConfigureAwait(false);
             return LocalCredentialReplacementOutcome.Replaced;
         }
         catch
@@ -612,6 +651,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
         CancellationToken cancellationToken,
         HumanAdministrationAttempt? human = null)
     {
+        await using var lifecycle = human is null
+            ? await EnterLifecycleAsync(identityDbContext, applicationDbContext, cancellationToken).ConfigureAwait(false) : null;
         await using var ownedTransaction = human is null ? await identityDbContext.Database
             .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false) : null;
         var transaction = ownedTransaction ?? human!.Transaction;
@@ -670,6 +711,7 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                 operationId: operation.Id,
                 applicationUserId: operation.ApplicationUserId));
 
+            RequireSelectedLifecycleCurrent();
             int operationRows = await identityDbContext.Set<LocalIdentityCredentialOperation>()
                 .Where(candidate => candidate.Id == operation.Id
                     && candidate.Kind == LocalCredentialOperationKind.Create
@@ -703,8 +745,11 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                 return LocalCredentialActivationOutcome.Conflict;
             }
 
+            await ChangeEligibilityAsync(operation.LocalSubjectId, operation.Id,
+                row => row.Activate(row.Generation, operation.Id, updatedAt), cancellationToken).ConfigureAwait(false);
             if (ownedTransaction is not null)
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                await lifecycle!.CommitAsync(transaction, cancellationToken).ConfigureAwait(false);
+            RequireSelectedLifecycleCurrent();
             return LocalCredentialActivationOutcome.Activated;
         }
         catch
@@ -817,6 +862,8 @@ internal sealed partial class LocalIdentityCredentialStateStore(
         LocalCredentialCreateRequest request, Guid? localSubjectId, string? password,
         CancellationToken cancellationToken, HumanAdministrationAttempt? human = null)
     {
+        await using var lifecycle = human is null
+            ? await EnterLifecycleAsync(identityDbContext, applicationDbContext, cancellationToken).ConfigureAwait(false) : null;
         List<object> ownedEntities = [];
         DbUpdateException? uniqueFailure = null;
         try
@@ -845,7 +892,9 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                 };
                 ownedEntities.Add(user);
                 string temporaryPassword = password ?? $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
+                RequireSelectedLifecycleCurrent();
                 IdentityResult creation = await userManager.CreateAsync(user, temporaryPassword).ConfigureAwait(false);
+                RequireSelectedLifecycleCurrent();
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!creation.Succeeded)
                 {
@@ -881,8 +930,12 @@ internal sealed partial class LocalIdentityCredentialStateStore(
                     ownedEntities.Add(state);
                     identityDbContext.AddRange(operation, state);
                     await identityDbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                    RequireSelectedLifecycleCurrent();
+                    await AddEligibilityAsync(receipt.LocalSubjectId, receipt.OperationId, receipt.PersonalActorId,
+                        receipt.ExternalLoginId, createdAt, cancellationToken).ConfigureAwait(false);
                     if (ownedTransaction is not null)
-                        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        await lifecycle!.CommitAsync(transaction, cancellationToken).ConfigureAwait(false);
+                    RequireSelectedLifecycleCurrent();
                     return LocalCredentialCreateResult.Created(receipt: receipt, temporaryPassword: temporaryPassword);
                 }
             }
@@ -974,59 +1027,6 @@ internal sealed partial class LocalIdentityCredentialStateStore(
         {
             // Preserve the original failure if the provider cannot acknowledge rollback.
         }
-    }
-
-    internal bool UsesNativeSessionValidation => ReferenceEquals(identityDbContext, applicationDbContext)
-        && applicationDbContext.Database.IsNpgsql();
-
-    /// <summary>
-    /// Runtime session validation consumes only current revocation facts, including the
-    /// instance email requirement. Login and password lifecycle work retain the complete
-    /// entity read below; a fact projection must never masquerade as an Identity user.
-    /// </summary>
-    internal async Task<bool> ValidateReadySessionAsync(
-        LocalSessionAuthority authority, PostgresNativeQueueEnrollment enrollment, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(authority);
-        if (!UsesNativeSessionValidation)
-            throw new InvalidOperationException("local_session_native_colocated_owner_required");
-        JsonElement image = await PostgresHumanPrincipalSourceContract.ReadSessionAsync(
-            applicationDbContext, enrollment, authority, cancellationToken).ConfigureAwait(false);
-        T[] Rows<T>(string name) => image.GetProperty(name).Deserialize<T[]>(SerializerOptions)
-            ?? throw new InvalidOperationException("local_session_native_facts_missing");
-        HumanPrincipalLocalAccountFact? account = Rows<HumanPrincipalLocalAccountFact>("l0").SingleOrDefault();
-        if (account is null || account.Id != authority.LocalSubjectId || !account.HasPassword
-            || !account.StampMatches || account.EmailConfirmed != authority.EmailVerified)
-            return false;
-        string? metadata = image.GetProperty("l1").EnumerateArray().SingleOrDefault() is { ValueKind: JsonValueKind.Object } stateRow
-            ? stateRow.GetProperty("Value").GetString() : null;
-        LocalCredentialStateMetadata? state = DeserializeMetadata(metadata);
-        if (state?.State != LocalCredentialState.Ready || state.ApplicationUserId != authority.LocalSubjectId)
-            return false;
-        HumanPrincipalLocalOperationFact? operation = Rows<HumanPrincipalLocalOperationFact>("l2")
-            .SingleOrDefault(row => row.Id == state.OperationId);
-        if (operation is null || operation.LocalSubjectId != authority.LocalSubjectId
-            || (operation.Kind != (int)LocalCredentialOperationKind.Create && operation.Kind != (int)LocalCredentialOperationKind.Reset)
-            || operation.Stage != (int)LocalCredentialOperationStage.Replaced
-            || !Rows<HumanPrincipalAccountFact>("q0").Any(row => row.Id == state.ApplicationUserId && !row.IsDeleted)
-            || !Rows<HumanPrincipalBindingFact>("q1").Any(row => row.Id == operation.ExternalLoginId
-                && row.UserId == state.ApplicationUserId
-                && row.AuthenticationProviderId == (int)AuthenticationProviderKind.Local
-                && string.Equals(row.ProviderKey, authority.LocalSubjectId.ToString("D"), StringComparison.Ordinal)))
-            return false;
-        if (!Rows<HumanPrincipalPersonalActorFact>("l3").Any(row => row.Id == operation.PersonalActorId
-                && row.UserId == state.ApplicationUserId && row.ActorTypeId == (int)ActorTypeEnum.User
-                && !row.IsDeleted && !row.IsSuspended))
-            return false;
-        if (!account.EmailConfirmed)
-        {
-            JsonElement intent = image.GetProperty("l4").EnumerateArray().SingleOrDefault();
-            if (intent.ValueKind == JsonValueKind.Object
-                && JsonSerializer.Deserialize<bool>(intent.GetProperty("Value").GetString()!))
-                return false;
-        }
-        cancellationToken.ThrowIfCancellationRequested();
-        return true;
     }
 
     public async Task<LocalIdentityUser?> ReadReadySessionAsync(

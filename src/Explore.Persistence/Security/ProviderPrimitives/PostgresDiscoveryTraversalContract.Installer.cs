@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -244,10 +245,12 @@ public static partial class PostgresDiscoveryTraversalContract
                     AND (0::oid = ANY(p.polroles) OR EXISTS (SELECT 1 FROM unnest(p.polroles) r
                         WHERE pg_catalog.pg_has_role('{OwnerRole}',r,'USAGE'))))
             THEN RAISE EXCEPTION 'discovery_traversal_owner_policy_drift' USING ERRCODE = '55000'; END IF;
-            IF pg_catalog.has_table_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(type))}::regclass,
+            IF {(type == typeof(EventDiscoveryRevision) ? $"NOT ({PostgresDiscoveryMetadataPermissions.RevisionAuthorityPredicate(context, enrollment.RuntimeLogin)})" : $"""
+                pg_catalog.has_table_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(type))}::regclass,
                     'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
                 OR pg_catalog.has_any_column_privilege({Text(enrollment.RuntimeLogin)},{Text(sql.Table(type))}::regclass,
                     'SELECT,INSERT,UPDATE,REFERENCES')
+                """)}
             THEN RAISE EXCEPTION 'discovery_traversal_runtime_table_access' USING ERRCODE = '55000'; END IF;
             """));
         return $"""

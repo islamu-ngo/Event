@@ -199,7 +199,8 @@ public sealed class HumanTenantDeletionOwnershipTests
                 options, () => principal, () => services.GetRequiredService<IHumanAuthorizationRouteSource>(),
                 () => services.GetRequiredService<IHumanSupportAccessSourceFactory>(),
                 () => exclusion,
-                () => services.GetRequiredService<IHumanActionCommitFinalizer>(), () => owner);
+                () => services.GetRequiredService<IHumanActionCommitFinalizer>(), () => owner,
+                () => services.GetRequiredService<IEventDiscoveryEnrollmentGate>());
             var repository = new TenantRepository(context, preparation);
             var handler = new DeleteTenantCommandHandler(repository,
                 services.GetRequiredService<ITenantSlugCache>(), preparation);

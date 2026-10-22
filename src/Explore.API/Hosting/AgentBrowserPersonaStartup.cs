@@ -97,7 +97,9 @@ public static class AgentBrowserPersonaStartup
                 throw Failure("bootstrap_selector");
             if (marker is not null)
             {
-                var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(scope.ServiceProvider);
+                await using var selected = await scope.ServiceProvider.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
+                    .CreateAsync(PolicyMutationScope.Instance, token);
+                var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(selected.Services);
                 var binding = await provider.GetVerifiedBindingAsync(new ProviderAccountKey(AuthenticationProviderKind.Local, Administrator.SubjectId.ToString("D")), token);
                 if (binding is null || marker.Status is not (InstanceBootstrapStatus.Pending or InstanceBootstrapStatus.Completed)
                     || (marker.Status == InstanceBootstrapStatus.Completed && marker.CompletedByUserId != Administrator.SubjectId))
@@ -132,11 +134,13 @@ public static class AgentBrowserPersonaStartup
                 {
                     string temporary = persona == Administrator ? bootstrap! : TemporaryPassword(final, persona.OperationId!.Value);
                     if (temporary == final) throw Failure("passwords_equal");
-                    await ValidatePasswordAsync(scope.ServiceProvider, persona, final, token);
-                    await ValidatePasswordAsync(scope.ServiceProvider, persona, temporary, token);
+                    await using var identity = await scope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+                        .CreateAsync(token);
+                    await ValidatePasswordAsync(identity.Services, persona, final, token);
+                    await ValidatePasswordAsync(identity.Services, persona, temporary, token);
                     if (states[persona.SubjectId] is not null)
                     {
-                        var manager = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
+                        var manager = identity.Services.GetRequiredService<UserManager<LocalIdentityUser>>();
                         var subject = await manager.FindByIdAsync(persona.SubjectId.ToString("D"));
                         if (subject is null || !await manager.CheckPasswordAsync(subject, temporary))
                             throw Failure("temporary_credential_drift");
@@ -144,7 +148,7 @@ public static class AgentBrowserPersonaStartup
                     if (states[persona.SubjectId] is null)
                     {
                         var request = Creation(persona, persona.OperationId ?? marker?.Id ?? Guid.CreateVersion7());
-                        if (!await scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>()
+                        if (!await identity.Services.GetRequiredService<ILocalCredentialAdministration>()
                             .ValidateBootstrapCreationAsync(request, temporary, token))
                             throw Failure("creation_preflight");
                     }
@@ -155,9 +159,11 @@ public static class AgentBrowserPersonaStartup
         if (marker is null)
         {
             await using var scope = services.CreateAsyncScope();
-            var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(scope.ServiceProvider);
-            await ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapStartupRunner>(scope.ServiceProvider, provider).PrepareAsync(token);
-            marker = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>().InstanceBootstrapStates.AsNoTracking().SingleAsync(token);
+            await using var selected = await scope.ServiceProvider.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
+                .CreateAsync(PolicyMutationScope.Instance, token);
+            var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(selected.Services);
+            await ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapStartupRunner>(selected.Services, provider).PrepareAsync(token);
+            marker = await selected.Services.GetRequiredService<ExploreDbContext>().InstanceBootstrapStates.AsNoTracking().SingleAsync(token);
         }
         await using (var scope = services.CreateAsyncScope())
             await Binder(scope.ServiceProvider).SeedFoundationAsync(marker.Status, token);
@@ -167,11 +173,13 @@ public static class AgentBrowserPersonaStartup
         {
             await EnsureSecretsUnchangedAsync(services, pinned, token);
             await using var scope = services.CreateAsyncScope();
-            var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(scope.ServiceProvider);
-            var secrets = new PinnedSecrets(scope.ServiceProvider.GetRequiredService<ISecretResolver>(), pinned);
-            var operation = ActivatorUtilities.CreateInstance<LocalAdministratorBootstrapOperation>(scope.ServiceProvider, secrets);
+            await using var selected = await scope.ServiceProvider.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
+                .CreateAsync(PolicyMutationScope.Instance, token);
+            var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(selected.Services);
+            var secrets = new PinnedSecrets(selected.Services.GetRequiredService<ISecretResolver>(), pinned);
+            var operation = ActivatorUtilities.CreateInstance<LocalAdministratorBootstrapOperation>(selected.Services, secrets);
             await new LocalAdministratorBootstrapRunner(provider,
-                scope.ServiceProvider.GetRequiredService<IInstanceBootstrapStateRepository>(), operation).RunAsync(token);
+                selected.Services.GetRequiredService<IInstanceBootstrapStateRepository>(), operation).RunAsync(token);
         }
         foreach (var persona in All)
         {
@@ -188,21 +196,29 @@ public static class AgentBrowserPersonaStartup
                 if (state is null)
                 {
                     await using var creationScope = services.CreateAsyncScope();
-                    var created = await creationScope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>()
+                    await using var identity = await creationScope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+                        .CreateAsync(token);
+                    var created = await identity.Services.GetRequiredService<ILocalCredentialAdministration>()
                         .CreateBootstrapPendingAsync(Creation(persona, operationId), persona.SubjectId, temporary, token);
                     if (created.Outcome is not (LocalCredentialCreateOutcome.Created or LocalCredentialCreateOutcome.Replayed))
                         throw Failure("creation_conflict");
                 }
                 LocalCredentialProvisioningSnapshot snapshot;
                 await using (var scope = services.CreateAsyncScope())
-                    snapshot = await scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>().ReadProvisioningAsync(operationId, token)
+                {
+                    await using var identity = await scope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+                        .CreateAsync(token);
+                    snapshot = await identity.Services.GetRequiredService<ILocalCredentialAdministration>().ReadProvisioningAsync(operationId, token)
                         ?? throw Failure("receipt_missing");
+                }
                 await using (var scope = services.CreateAsyncScope())
                     await Binder(scope.ServiceProvider).BindAsync(persona, snapshot, token);
                 if (snapshot.Receipt.Stage == LocalCredentialOperationStage.ProvisioningPending)
                 {
                     await using var scope = services.CreateAsyncScope();
-                    var outcome = await scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>()
+                    await using var identity = await scope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+                        .CreateAsync(token);
+                    var outcome = await identity.Services.GetRequiredService<ILocalCredentialAdministration>()
                         .ActivateChangeRequiredAsync(new LocalCredentialActivationRequest(operationId, snapshot.OperationConcurrencyStamp), token);
                     if (outcome is not (LocalCredentialActivationOutcome.Activated or LocalCredentialActivationOutcome.AlreadyActivated))
                         throw Failure("activation_failed");
@@ -228,9 +244,13 @@ public static class AgentBrowserPersonaStartup
             || configuration["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] != Administrator.SubjectId.ToString("D")
             || marker?.Status != InstanceBootstrapStatus.Completed || marker.CompletedByUserId != Administrator.SubjectId)
             throw Failure("reset_ownership");
-        var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(scope.ServiceProvider);
-        if (await provider.GetVerifiedBindingAsync(new ProviderAccountKey(AuthenticationProviderKind.Local, Administrator.SubjectId.ToString("D")), token) is null)
-            throw Failure("reset_ownership");
+        await using (var selected = await scope.ServiceProvider.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
+            .CreateAsync(PolicyMutationScope.Instance, token))
+        {
+            var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(selected.Services);
+            if (await provider.GetVerifiedBindingAsync(new ProviderAccountKey(AuthenticationProviderKind.Local, Administrator.SubjectId.ToString("D")), token) is null)
+                throw Failure("reset_ownership");
+        }
         await Binder(scope.ServiceProvider).EnsureOwnershipAsync(marker, token);
         foreach (var persona in All)
             if (!Ready(await ClassifyAsync(services, persona, persona.OperationId ?? marker.Id, token)))
@@ -265,21 +285,28 @@ public static class AgentBrowserPersonaStartup
     private static async Task<LocalCredentialOperationStatus?> ClassifyAsync(IServiceProvider services, AgentBrowserPersona persona, Guid? operationId, CancellationToken token)
     {
         await using var scope = services.CreateAsyncScope();
-        var credentials = scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>();
-        var state = operationId.HasValue ? await credentials.ReadOperationAsync(operationId.Value, token) : null;
-        await Binder(scope.ServiceProvider).ValidateReceiptGraphAsync(persona, state?.Receipt, token);
-        if (state is null) return null;
-        if (!state.IsCurrent || state.Receipt.Kind != LocalCredentialOperationKind.Create
-            || state.Receipt.LocalSubjectId != persona.SubjectId
-            || state.Receipt.InitiatingApplicationUserId != Administrator.SubjectId)
-            throw Failure("receipt_conflict");
-        if (state.CredentialState is LocalCredentialState.Ready or LocalCredentialState.ChangeRequired)
+        LocalCredentialOperationStatus? state;
+        await using (var identity = await scope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+            .CreateAsync(token))
         {
-            var binding = await credentials.ReadLinkedIdentityAsync(persona.SubjectId, token);
-            if (binding is null || binding.PersonalActorId != state.Receipt.PersonalActorId
-                || binding.ExternalLoginId != state.Receipt.ExternalLoginId || binding.CredentialState != state.CredentialState)
-                throw Failure("binding_incomplete");
+            var credentials = identity.Services.GetRequiredService<ILocalCredentialAdministration>();
+            state = operationId.HasValue ? await credentials.ReadOperationAsync(operationId.Value, token) : null;
+            if (state is not null)
+            {
+                if (!state.IsCurrent || state.Receipt.Kind != LocalCredentialOperationKind.Create
+                    || state.Receipt.LocalSubjectId != persona.SubjectId
+                    || state.Receipt.InitiatingApplicationUserId != Administrator.SubjectId)
+                    throw Failure("receipt_conflict");
+                if (state.CredentialState is LocalCredentialState.Ready or LocalCredentialState.ChangeRequired)
+                {
+                    var binding = await credentials.ReadLinkedIdentityAsync(persona.SubjectId, token);
+                    if (binding is null || binding.PersonalActorId != state.Receipt.PersonalActorId
+                        || binding.ExternalLoginId != state.Receipt.ExternalLoginId || binding.CredentialState != state.CredentialState)
+                        throw Failure("binding_incomplete");
+                }
+            }
         }
+        await Binder(scope.ServiceProvider).ValidateReceiptGraphAsync(persona, state?.Receipt, token);
         return state;
     }
 
@@ -293,9 +320,13 @@ public static class AgentBrowserPersonaStartup
         string challenge;
         await using (var scope = services.CreateAsyncScope())
         {
-            var snapshot = await scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>().ReadProvisioningAsync(operationId, token)
-                ?? throw Failure("receipt_missing");
-            username = snapshot.Username;
+            await using (var identity = await scope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+                .CreateAsync(token))
+            {
+                var snapshot = await identity.Services.GetRequiredService<ILocalCredentialAdministration>().ReadProvisioningAsync(operationId, token)
+                    ?? throw Failure("receipt_missing");
+                username = snapshot.Username;
+            }
             var login = await LoginAsync(scope.ServiceProvider, username, temporary, token);
             if (login.Outcome != LocalAuthOutcome.ReplacementRequired || login.ReplacementChallenge is null || login.Token is not null)
                 throw Failure("password_proof_failed");

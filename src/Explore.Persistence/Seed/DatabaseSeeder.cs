@@ -6,6 +6,8 @@ using Explore.Domain.Secrets;
 using Explore.Domain.Services.Lifecycle;
 using Explore.Domain.Settings.Documents;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -100,6 +102,11 @@ public static class DatabaseSeeder
         ExploreDbContext context,
         CancellationToken ct)
     {
+        await using var human = !HumanSecuritySourceGate.TryRequireCurrent(context)
+            ? new HumanSecuritySourceGate(context) : null;
+        await using var humanLease = human is not null ? await human.AcquireAsync(ct) : null;
+        await using var enrollmentGate = !EventDiscoveryEnrollmentGate.TryRequireCurrent(context)
+            ? await new EventDiscoveryEnrollmentGate(context).AcquireAsync(ct) : null;
         var foundationExists = await context.Set<Tenant>().AnyAsync(t => t.Id == SeedIds.DefaultTenantId, ct);
         if (foundationExists)
         {

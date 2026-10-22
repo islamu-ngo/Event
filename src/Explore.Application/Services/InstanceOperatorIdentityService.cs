@@ -270,22 +270,28 @@ public sealed class InstanceOperatorIdentityService(
                 _ => throw new UnauthorizedAccessException("An original operator identity command is required.")
             };
         }
-        mutation.Activate();
-        // The original editor owned Serializable directly; it did not enter the generic
-        // setting lock's replaying transaction wrapper. Preserve that physical-owner order.
-        if (source.IsHuman)
-            await preparation!.ExecutePreparedAsync(proof!, async (_, inner) =>
-            {
-                await writer.ExecuteAsync(mutation, inner);
-                return true;
-            }, cancellationToken);
-        else
-            await ((ISerializableAttemptOwner)owner).ExecuteAsync(async inner =>
-            {
-                await writer.ExecuteAsync(mutation, inner);
-                return true;
-            }, cancellationToken);
-        mutation.Dispose();
+        Exception? primaryFailure = null;
+        try
+        {
+            mutation.Activate();
+            // The original editor owned Serializable directly; it did not enter the generic
+            // setting lock's replaying transaction wrapper. Preserve that physical-owner order.
+            if (source.IsHuman)
+                await preparation!.ExecutePreparedAsync(proof!, async (_, inner) =>
+                {
+                    await writer.ExecuteAsync(mutation, inner);
+                    return true;
+                }, cancellationToken);
+            else
+                await ((ISerializableAttemptOwner)owner).ExecuteAsync(async inner =>
+                {
+                    await writer.ExecuteAsync(mutation, inner);
+                    return true;
+                }, cancellationToken);
+            mutation.Dispose();
+        }
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { if (proof is not null) await preparation!.CloseAsync(proof, primaryFailure); }
         // The notification observes acknowledged settlement, never provisional writer success.
         await selected.GetServices<INotificationHandler<SettingChangedNotification>>().HandleAsync(
             new(InstanceOperatorIdentitySettingKeys.OperatorIdentity, setting?.Value, value,

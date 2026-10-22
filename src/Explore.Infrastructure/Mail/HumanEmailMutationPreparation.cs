@@ -36,9 +36,12 @@ public sealed partial class HumanEmailMutationPreparation(
     CerbosAuthorizationService cerbos,
     IOptions<AuthorizationProviderDeploymentOptions> authorizationOptions,
     IOptions<CerbosSettings> cerbosOptions,
-    IServiceProvider services) : IHumanEmailMutationPreparation
+    Func<IHumanSecuritySourceGate> securityGates,
+    IServiceProvider services) : IHumanEmailMutationPreparation, IAsyncDisposable
 {
     private readonly AsyncLocal<Prepared?> _current = new();
+    private readonly HashSet<Prepared> _issued = [];
+    private bool _disposed;
 
     public Task<IPreparedHumanEmailMutation> PreparePreviewAsync(
         Guid? tenantId, CancellationToken cancellationToken = default) =>
@@ -79,12 +82,41 @@ public sealed partial class HumanEmailMutationPreparation(
         ImmutableArray<EmailDeliverySettingMutation> effects, EmailDeliveryDisableConfirmation? confirmation,
         Guid? auditActor, AuthorizationRequest? selectedCheck, CancellationToken token)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (target == Guid.Empty || auditActor == Guid.Empty || effects.IsDefault
             || effects.Any(effect => effect is null || !EmailDeliverySettingKeys.Contains(effect.Key)
                 || effect.TenantId == Guid.Empty || !Enum.IsDefined(effect.Kind))
             || effects.Select(effect => (effect.TenantId, effect.Key)).Distinct().Count() != effects.Length)
             throw new ArgumentException("Email admission requires an exact immutable original effect.");
         await humanScope.PrepareAsync(token);
+        var securityGate = securityGates();
+        var ownedSecurityGate = securityGate.TryRequireCurrent()
+            ? null : await securityGate.AcquireAsync(token);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            securityGate.RequireCurrent();
+            var prepared = await PrepareRetainedAsync(operation, target, effects, confirmation,
+                auditActor, selectedCheck, securityGate, ownedSecurityGate, token);
+            lock (_issued)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                _issued.Add(prepared);
+            }
+            return prepared;
+        }
+        catch
+        {
+            if (ownedSecurityGate is not null) await ownedSecurityGate.DisposeAsync();
+            throw;
+        }
+    }
+
+    private async Task<Prepared> PrepareRetainedAsync(Operation operation, Guid? target,
+        ImmutableArray<EmailDeliverySettingMutation> effects, EmailDeliveryDisableConfirmation? confirmation,
+        Guid? auditActor, AuthorizationRequest? selectedCheck, IHumanSecuritySourceGate securityGate,
+        IAsyncDisposable? ownedSecurityGate, CancellationToken token)
+    {
         var source = await sources.CreateAsync(token);
         var subject = source.Subject;
         var lifetime = source.Lifetime;
@@ -107,6 +139,7 @@ public sealed partial class HumanEmailMutationPreparation(
 
         void RequireCustody()
         {
+            securityGate.RequireCurrent();
             if (!ReferenceEquals(humanScope.Subject, subject) || tenantContext.TenantId != ambientTenant
                 || !ReferenceEquals(httpContext.HttpContext, request) || !ReferenceEquals(request.User, principal))
                 throw new UnauthorizedAccessException("The original Email request custody has changed.");
@@ -204,7 +237,8 @@ public sealed partial class HumanEmailMutationPreparation(
                 throw new UnauthorizedAccessException("The original Email action's administrator authority is required.");
         }
 
-        return new Prepared(this, operation, selectedTenant, subject.PrincipalId, effects, confirmation, async ct =>
+        return new Prepared(this, operation, selectedTenant, subject.PrincipalId, effects, confirmation,
+            securityGate, ownedSecurityGate, async ct =>
         {
             RequireCustody();
             var held = await source.AcquireAsync(preparation, ct);
@@ -235,25 +269,33 @@ public sealed partial class HumanEmailMutationPreparation(
         var issued = RequireIssued(preparation);
         if (Interlocked.Exchange(ref issued.Consumed, 1) != 0)
             throw new InvalidOperationException("Email preparation belongs to one physical attempt.");
-        return await mutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All],
-            token => owner.ExecuteAsync(async inner =>
-            {
-                issued.Validate = await issued.Acquire(inner);
-                issued.Active = true;
-                var previous = _current.Value;
-                _current.Value = issued;
-                try { return await operation(inner); }
-                catch (Exception exception) when (ContainsRollbackMarker(exception))
+        try
+        {
+            issued.SecurityGate.RequireCurrent();
+            return await mutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All],
+                token => owner.ExecuteAsync(async inner =>
                 {
-                    throw new InvalidOperationException("An Email callback cannot certify physical rollback.");
-                }
-                finally
-                {
-                    _current.Value = previous;
-                    issued.Active = false;
-                    issued.Validate = null;
-                }
-            }, token), cancellationToken);
+                    issued.Validate = await issued.Acquire(inner);
+                    issued.Active = true;
+                    var previous = _current.Value;
+                    _current.Value = issued;
+                    try { return await operation(inner); }
+                    catch (Exception exception) when (ContainsRollbackMarker(exception))
+                    {
+                        throw new InvalidOperationException("An Email callback cannot certify physical rollback.");
+                    }
+                    finally
+                    {
+                        _current.Value = previous;
+                        issued.Active = false;
+                        issued.Validate = null;
+                    }
+                }, token), cancellationToken);
+        }
+        finally
+        {
+            await ReleaseSecurityGateAsync(issued);
+        }
     }
 
     public async Task<T> ExecuteApplyAsync<T>(ImmutableArray<EmailDeliverySettingMutation> mutations,
@@ -311,9 +353,36 @@ public sealed partial class HumanEmailMutationPreparation(
         return ValidateAsync(issued, cancellationToken);
     }
 
-    private Prepared RequireIssued(IPreparedHumanEmailMutation preparation) =>
-        preparation is Prepared issued && ReferenceEquals(issued.Issuer, this)
+    private Prepared RequireIssued(IPreparedHumanEmailMutation preparation)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return preparation is Prepared issued && ReferenceEquals(issued.Issuer, this)
             ? issued : throw new UnauthorizedAccessException("The original private Email producer is required.");
+    }
+
+    private async ValueTask ReleaseSecurityGateAsync(Prepared issued)
+    {
+        lock (_issued) _issued.Remove(issued);
+        var owned = Interlocked.Exchange(ref issued.OwnedSecurityGate, null);
+        if (owned is not null) await owned.DisposeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Prepared[] abandoned;
+        lock (_issued)
+        {
+            _disposed = true;
+            abandoned = _issued.ToArray();
+        }
+        List<Exception>? failures = null;
+        foreach (var issued in abandoned)
+        {
+            try { await ReleaseSecurityGateAsync(issued); }
+            catch (Exception failure) { (failures ??= []).Add(failure); }
+        }
+        if (failures is not null) throw new AggregateException("Email source-gate cleanup failed.", failures);
+    }
 
     private Prepared RequireCurrent()
     {
@@ -346,6 +415,7 @@ public sealed partial class HumanEmailMutationPreparation(
 
     private sealed class Prepared(HumanEmailMutationPreparation issuer, Operation operation, Guid? tenant,
         Guid actor, ImmutableArray<EmailDeliverySettingMutation> effects, EmailDeliveryDisableConfirmation? confirmation,
+        IHumanSecuritySourceGate securityGate, IAsyncDisposable? ownedSecurityGate,
         Func<CancellationToken, Task<Func<CancellationToken, Task>>> acquire) : IPreparedHumanEmailMutation
     {
         internal HumanEmailMutationPreparation Issuer => issuer;
@@ -354,6 +424,8 @@ public sealed partial class HumanEmailMutationPreparation(
         internal Guid Actor => actor;
         internal ImmutableArray<EmailDeliverySettingMutation> Effects => effects;
         internal EmailDeliveryDisableConfirmation? Confirmation => confirmation;
+        internal IHumanSecuritySourceGate SecurityGate => securityGate;
+        internal IAsyncDisposable? OwnedSecurityGate = ownedSecurityGate;
         internal Func<CancellationToken, Task<Func<CancellationToken, Task>>> Acquire => acquire;
         internal Func<CancellationToken, Task>? Validate { get; set; }
         internal bool Active { get; set; }

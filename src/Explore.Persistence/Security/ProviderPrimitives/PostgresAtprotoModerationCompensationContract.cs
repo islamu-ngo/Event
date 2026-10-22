@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NpgsqlTypes;
+using SourceEvidence = Explore.Persistence.Services.AtprotoModerationCompensationStore.SourceEvidence;
 
 namespace Explore.Persistence.Security;
 
@@ -28,6 +29,14 @@ public static class PostgresAtprotoModerationCompensationContract
     public const string MigratorRole = "event_atproto_moderation_migrator";
     public const string GlobalRole = "event_atproto_moderation_global";
     public const string PolicyName = "atproto_moderation_compensation";
+
+    internal static void RequireEnrollment(ExploreDbContext context, PostgresNativeQueueEnrollment? enrollment)
+    {
+        if (!context.Database.IsNpgsql()) return;
+        if (enrollment is null)
+            throw new UnauthorizedAccessException("federation_settings_enrollment_required");
+        enrollment.Validate();
+    }
 
     public static string FunctionSql(ExploreDbContext context, string operation) =>
         context.GetService<ISqlGenerationHelper>().DelimitIdentifier(
@@ -43,7 +52,7 @@ public static class PostgresAtprotoModerationCompensationContract
         await transaction.CommitAsync(cancellationToken);
     }
 
-    internal static async Task<IReadOnlyList<AtprotoModerationDeleteCandidate>?> TryReadPageAsync(
+    internal static async Task<IReadOnlyList<SourceEvidence>?> TryReadPageAsync(
         ExploreDbContext context, AtprotoModerationTarget target, long offset,
         CancellationToken cancellationToken) =>
         context.Database.IsNpgsql() ? await ReadPageAsync(context, target, offset, cancellationToken) : null;
@@ -57,7 +66,7 @@ public static class PostgresAtprotoModerationCompensationContract
         return true;
     }
 
-    internal static async Task<IReadOnlyList<AtprotoModerationDeleteCandidate>> ReadPageAsync(
+    internal static async Task<IReadOnlyList<SourceEvidence>> ReadPageAsync(
         ExploreDbContext context, AtprotoModerationTarget target, long offset,
         CancellationToken cancellationToken)
     {
@@ -68,10 +77,10 @@ public static class PostgresAtprotoModerationCompensationContract
         command.Parameters.Add(new NpgsqlParameter("target", NpgsqlDbType.Jsonb)
         { Value = JsonSerializer.Serialize(target) });
         command.Parameters.Add(new NpgsqlParameter("offset", NpgsqlDbType.Bigint) { Value = offset });
-        var result = new List<AtprotoModerationDeleteCandidate>(256);
+        var result = new List<SourceEvidence>(256);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
-            result.Add(JsonSerializer.Deserialize<AtprotoModerationDeleteCandidate>(reader.GetString(0))
+            result.Add(JsonSerializer.Deserialize<SourceEvidence>(reader.GetString(0))
                 ?? throw new InvalidOperationException("The moderation evidence projection was null."));
         return result;
     }
@@ -143,7 +152,6 @@ public static class PostgresAtprotoModerationCompensationContract
         string functionSchema = sql.DelimitIdentifier(Schema(context, typeof(PdsSyncOutbox)));
         string[] keys =
         [
-            GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
             GovernanceSettingKeys.Federation.AtprotoEventValidationProfile,
             GovernanceSettingKeys.Federation.AtprotoPublishMyEvents
         ];
@@ -517,8 +525,8 @@ public static class PostgresAtprotoModerationCompensationContract
                                 'ExpectedCid', {O(nameof(PdsSyncOutbox.ExpectedCid))})
                                 ORDER BY {O(nameof(PdsSyncOutbox.CreatedAt))}, {O(nameof(PdsSyncOutbox.Id))})
                             FROM {T<PdsSyncOutbox>()} o WHERE {outboxLineage} AND {active}), '[]'::jsonb),
-                        'Policy', jsonb_build_object('EventsEnabled', {Policy(keys[0])},
-                            'ValidationProfile', {Policy(keys[1])}, 'PublishConsent', {Policy(keys[2])}),
+                        'Policy', jsonb_build_object('ValidationProfile', {Policy(keys[0])},
+                            'PublishConsent', {Policy(keys[1])}),
                         'Account', (SELECT jsonb_build_object('SessionCount', count(*),
                                 'SubjectDid', CASE WHEN count(*) = 1 THEN min(binding.did) END,
                                 'PdsHost', CASE WHEN count(*) = 1 THEN min(binding.pds) END,

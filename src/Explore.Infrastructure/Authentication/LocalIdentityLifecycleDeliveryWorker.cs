@@ -40,8 +40,12 @@ public sealed class LocalIdentityLifecycleDeliveryWorker(
         using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(cancellationToken);
         IReadOnlyList<LocalIdentityLifecyclePointer> pending;
         await using (var read = scopes.CreateAsyncScope())
-            pending = await read.ServiceProvider.GetRequiredService<ILocalIdentityLifecycleDeliveryStore>()
+        {
+            await using var identity = await read.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+                .CreateAsync(cancellationToken);
+            pending = await identity.Services.GetRequiredService<ILocalIdentityLifecycleDeliveryStore>()
                 .ReadPendingSynchronizationAsync(32, cancellationToken);
+        }
         // Mirror repair is independent of SMTP intent and the original public token lifetime.
         foreach (var pointer in pending)
         {
@@ -62,6 +66,8 @@ public sealed class LocalIdentityLifecycleDeliveryWorker(
             }
         }
         await using var delivery = scopes.CreateAsyncScope();
-        await delivery.ServiceProvider.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(cancellationToken);
+        await using var deliveryIdentity = await delivery.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+            .CreateAsync(cancellationToken);
+        await deliveryIdentity.Services.GetRequiredService<LocalIdentityLifecycleDeliveryProcessor>().DrainAsync(cancellationToken);
     }
 }

@@ -28,7 +28,8 @@ public sealed class SetInstanceTenantSettingCommandHandler(
     IHumanCommitScopePreparation humanCommitScope,
     IHumanSettingsMutationPreparation settingsPreparation,
     ILocationPrivacyGovernanceMutationService locationPrivacyMutations,
-    IHumanEmailMutationPreparation emailPreparation)
+    IHumanEmailMutationPreparation emailPreparation,
+    IAtprotoFederationSettingsWriter federationSettings)
     : ICommandHandler<SetInstanceTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -67,172 +68,190 @@ public sealed class SetInstanceTenantSettingCommandHandler(
 
         var prepared = EmailDeliverySettingKeys.Contains(request.Key) ? null
             : await settingsPreparation.PrepareAsync(request, serializedValue!, cancellationToken);
-        if (prepared is not null)
-            SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId);
-        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        Exception? primaryFailure = null;
+        try
         {
-            var result = await mutationLock.ExecuteOrderedGroupsAsync(
-                [Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys],
-                outerToken => settingsPreparation.ExecutePreparedAsync(prepared!, (_, token) => visitorSettings.ApplyAsync(
-                [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
-                SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
-                SettingsMutationOperation.InstanceTenantSettings,
-                actorUserId, token), outerToken), cancellationToken);
-            return await result.CompleteAsync(settingsResolver, notificationHandlers, SettingScope.Tenant, request.TenantId);
-        }
+            if (prepared is not null)
+                SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId);
+            if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+            {
+                var result = await mutationLock.ExecuteOrderedGroupsAsync(
+                    [Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                    outerToken => settingsPreparation.ExecutePreparedAsync(prepared!, (_, token) => visitorSettings.ApplyAsync(
+                    [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
+                    SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
+                    SettingsMutationOperation.InstanceTenantSettings,
+                    actorUserId, token), outerToken), cancellationToken);
+                return await result.CompleteAsync(settingsResolver, notificationHandlers, SettingScope.Tenant, request.TenantId);
+            }
 
-        if (EventResourceSettingMutationGuard.Handles(request.Key))
-        {
-            EventResourceSettingsWriteResult result = await mutationLock.ExecuteOrderedGroupsAsync(
-                [EventResourceSettingMutationGuard.Keys],
-                outerToken => settingsPreparation.ExecutePreparedAsync(prepared!, (_, token) => eventResourceSettingsWriter.ApplyAsync(
-                [new EventResourceSettingMutation(request.TenantId, request.Key,
+            if (EventResourceSettingMutationGuard.Handles(request.Key))
+            {
+                EventResourceSettingsWriteResult result = await mutationLock.ExecuteOrderedGroupsAsync(
+                    [EventResourceSettingMutationGuard.Keys],
+                    outerToken => settingsPreparation.ExecutePreparedAsync(prepared!, (_, token) => eventResourceSettingsWriter.ApplyAsync(
+                    [new EventResourceSettingMutation(request.TenantId, request.Key,
                     EventResourceSettingMutationKind.SetValue, serializedValue)],
-                SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
-                SettingsMutationOperation.InstanceTenantSettings,
-                actorUserId, token), outerToken), cancellationToken);
-            return await result.CompleteAsync(
-                settingsResolver, notificationHandlers, SettingScope.Tenant, request.TenantId);
-        }
+                    SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
+                    SettingsMutationOperation.InstanceTenantSettings,
+                    actorUserId, token), outerToken), cancellationToken);
+                return await result.CompleteAsync(
+                    settingsResolver, notificationHandlers, SettingScope.Tenant, request.TenantId);
+            }
 
-        if (EmailDeliverySettingKeys.Contains(request.Key))
-        {
-            var email = await emailPreparation.PrepareAsync(request, serializedValue!, cancellationToken);
-            EmailDeliverySettingsWriteResult result = await emailPreparation.ExecutePreparedAsync(email,
-                token => emailDeliverySettingsWriter.ApplyInstanceTenantAsync(
-                [new EmailDeliverySettingMutation(
+            if (EmailDeliverySettingKeys.Contains(request.Key))
+            {
+                var email = await emailPreparation.PrepareAsync(request, serializedValue!, cancellationToken);
+                EmailDeliverySettingsWriteResult result = await emailPreparation.ExecutePreparedAsync(email,
+                    token => emailDeliverySettingsWriter.ApplyInstanceTenantAsync(
+                    [new EmailDeliverySettingMutation(
                     TenantId: request.TenantId,
                     Key: request.Key,
                     Kind: EmailDeliverySettingMutationKind.SetValue,
                     Value: serializedValue)],
-                actorUserId,
-                token), cancellationToken);
-            if (result.IsAccepted() && !result.Changes.IsEmpty)
-            {
-                settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-                foreach (SettingChangedNotification notification in result.ToNotifications(actorUserId))
-                    await notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                    actorUserId,
+                    token), cancellationToken);
+                if (result.IsAccepted() && !result.Changes.IsEmpty)
+                {
+                    settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
+                    foreach (SettingChangedNotification notification in result.ToNotifications(actorUserId))
+                        await notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                }
+
+                return result.ToCommandResponse(request.TenantId, "Tenant setting updated.");
             }
 
-            return result.ToCommandResponse(request.TenantId, "Tenant setting updated.");
-        }
-
-        if (PublicationPolicySettingKeys.All.Contains(request.Key, StringComparer.Ordinal))
-        {
-            (BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications) outcome =
-                await mutationLock.ExecuteOrderedGroupsAsync(
-                    [PublicationPolicySettingKeys.All],
-                    outerToken => settingsPreparation.ExecutePreparedAsync(
-                    prepared!, async (_, token) =>
-                    {
-                        if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorUserId, token))
-                            return (BaseCommandResponse.Authorization<Guid>(
-                                "Current instance administrator authority is required."),
-                                (IReadOnlyList<SettingChangedNotification>)[]);
-                        DateTime occurredAtUtc = DateTime.UtcNow;
-                        PublicationPolicyMutationResult boundaryResult =
-                            await publicationPolicyMutationBoundary.ApplyTenantAsync(
-                                new PublicationPolicyTenantMutationRequest(
-                                    request.TenantId,
-                                    actorUserId,
-                                    occurredAtUtc,
-                                    [new PublicationPolicySettingMutation(
+            if (PublicationPolicySettingKeys.All.Contains(request.Key, StringComparer.Ordinal))
+            {
+                (BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications) outcome =
+                    await mutationLock.ExecuteOrderedGroupsAsync(
+                        [PublicationPolicySettingKeys.All],
+                        outerToken => settingsPreparation.ExecutePreparedAsync(
+                        prepared!, async (_, token) =>
+                        {
+                            if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorUserId, token))
+                                return (BaseCommandResponse.Authorization<Guid>(
+                                    "Current instance administrator authority is required."),
+                                    (IReadOnlyList<SettingChangedNotification>)[]);
+                            DateTime occurredAtUtc = DateTime.UtcNow;
+                            PublicationPolicyMutationResult boundaryResult =
+                                await publicationPolicyMutationBoundary.ApplyTenantAsync(
+                                    new PublicationPolicyTenantMutationRequest(
+                                        request.TenantId,
+                                        actorUserId,
+                                        occurredAtUtc,
+                                        [new PublicationPolicySettingMutation(
                                         request.Key,
                                         PublicationPolicyMutationKind.Set,
                                         serializedValue,
                                         request.TenantId,
                                         IsLocked: null)],
-                                    PublicationPolicyLockedSystemBehavior.Reject),
-                                token);
-                        if (!boundaryResult.Success)
-                        {
-                            string failureCode = string.IsNullOrWhiteSpace(boundaryResult.FailureCode)
-                                ? "event_reporting_intake_policy_invalid"
-                                : boundaryResult.FailureCode;
+                                        PublicationPolicyLockedSystemBehavior.Reject),
+                                    token);
+                            if (!boundaryResult.Success)
+                            {
+                                string failureCode = string.IsNullOrWhiteSpace(boundaryResult.FailureCode)
+                                    ? "event_reporting_intake_policy_invalid"
+                                    : boundaryResult.FailureCode;
+                                return (
+                                    InstanceTenantSettingSecurity.Failure(
+                                        request.TenantId,
+                                        failureCode,
+                                        boundaryResult.Message),
+                                    (IReadOnlyList<SettingChangedNotification>)[]);
+                            }
+
                             return (
-                                InstanceTenantSettingSecurity.Failure(
+                                BaseCommandResponse.Success(
                                     request.TenantId,
-                                    failureCode,
-                                    boundaryResult.Message),
-                                (IReadOnlyList<SettingChangedNotification>)[]);
-                        }
+                                    "Tenant setting updated."),
+                                (IReadOnlyList<SettingChangedNotification>)boundaryResult.DeferredNotifications);
+                        }, outerToken),
+                        cancellationToken);
 
-                        return (
-                            BaseCommandResponse.Success(
-                                request.TenantId,
-                                "Tenant setting updated."),
-                            (IReadOnlyList<SettingChangedNotification>)boundaryResult.DeferredNotifications);
-                    }, outerToken),
-                    cancellationToken);
-
-            if (outcome.Notifications.Count > 0)
-            {
-                settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-                foreach (SettingChangedNotification notification in outcome.Notifications)
+                if (outcome.Notifications.Count > 0)
                 {
-                    await notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                    settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
+                    foreach (SettingChangedNotification notification in outcome.Notifications)
+                    {
+                        await notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                    }
                 }
+
+                return outcome.Response;
             }
 
-            return outcome.Response;
-        }
+            IReadOnlyList<LocationPrivacyProjectionIdentity> corrected = [];
+            (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) unguardedOutcome =
+                await mutationLock.ExecuteOrderedGroupsAsync(
+                [[request.Key]],
+                outerToken => settingsPreparation.ExecutePreparedAsync<(BaseCommandResponse<Guid>, SettingChangedNotification?)>(
+                prepared!, async (_, token) =>
+                {
+                    if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorUserId, token))
+                        return (BaseCommandResponse.Authorization<Guid>(
+                            "Current instance administrator authority is required."), null);
+                    if (AtprotoFederationSettingPolicy.IsDedicatedKey(request.Key))
+                    {
+                        var written = await federationSettings.ApplyCurrentAsync(new(
+                            HumanSettingsOperation.InstanceTenantSettings, SettingScope.Tenant, request.TenantId, null,
+                            request.Key, HumanSettingsMutationKind.SetValue, serializedValue), token);
+                        if (!written.Applied)
+                            return (InstanceTenantSettingSecurity.Failure(request.TenantId,
+                                written.FailureCode ?? "federation_setting_not_applied", "The federation setting change was not applied."), null);
+                        return (BaseCommandResponse.Success(request.TenantId, "Tenant setting updated."),
+                            new SettingChangedNotification(request.Key, written.PreviousValue, written.CurrentValue,
+                                SettingSource.TenantOverride, request.TenantId, actorUserId, DateTime.UtcNow));
+                    }
+                    if (await systemSettingRepository.IsLocked(request.Key, token))
+                    {
+                        return (InstanceTenantSettingSecurity.Failure(
+                            request.TenantId, "setting_system_locked", "The setting is locked at system scope."), null);
+                    }
 
-        IReadOnlyList<LocationPrivacyProjectionIdentity> corrected = [];
-        (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) unguardedOutcome =
-            await mutationLock.ExecuteOrderedGroupsAsync(
-            [[request.Key]],
-            outerToken => settingsPreparation.ExecutePreparedAsync<(BaseCommandResponse<Guid>, SettingChangedNotification?)>(
-            prepared!, async (_, token) =>
+                    TenantSetting? existing = await repository.GetByTenantAndKey(
+                        request.TenantId, request.Key, token);
+                    if (locationPrivacyMutations.Handles(request.Key))
+                    {
+                        var location = await locationPrivacyMutations.ExecuteAsync(request.Key, serializedValue!,
+                            SettingScope.Tenant, request.TenantId, actorUserId, async persistToken =>
+                            {
+                                await repository.SetValueAsync(request.TenantId, request.Key, serializedValue!, persistToken, actorUserId);
+                                return existing?.Value;
+                            }, token);
+                        if (!location.Accepted)
+                            return (BaseCommandResponse.Validation<Guid>([location.Error!], location.Error), null);
+                        corrected = location.CorrectedProjections;
+                    }
+                    else
+                        await repository.SetValueAsync(request.TenantId, request.Key, serializedValue!, token, actorUserId);
+                    BaseCommandResponse<Guid> response = BaseCommandResponse.Success(
+                        request.TenantId,
+                        "Tenant setting updated.");
+                    var notification = new SettingChangedNotification(
+                        request.Key,
+                        existing?.Value,
+                        serializedValue,
+                        SettingSource.TenantOverride,
+                        request.TenantId,
+                        actorUserId,
+                        DateTime.UtcNow);
+                    return (response, notification);
+                }, outerToken),
+                cancellationToken);
+
+            if (unguardedOutcome.Notification is not null)
             {
-                if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorUserId, token))
-                    return (BaseCommandResponse.Authorization<Guid>(
-                        "Current instance administrator authority is required."), null);
-                if (await systemSettingRepository.IsLocked(request.Key, token))
-                {
-                    return (InstanceTenantSettingSecurity.Failure(
-                        request.TenantId, "setting_system_locked", "The setting is locked at system scope."), null);
-                }
-
-                TenantSetting? existing = await repository.GetByTenantAndKey(
-                    request.TenantId, request.Key, token);
                 if (locationPrivacyMutations.Handles(request.Key))
-                {
-                    var location = await locationPrivacyMutations.ExecuteAsync(request.Key, serializedValue!,
-                        SettingScope.Tenant, request.TenantId, actorUserId, async persistToken =>
-                        {
-                            await repository.SetValueAsync(request.TenantId, request.Key, serializedValue!, persistToken, actorUserId);
-                            return existing?.Value;
-                        }, token);
-                    if (!location.Accepted)
-                        return (BaseCommandResponse.Validation<Guid>([location.Error!], location.Error), null);
-                    corrected = location.CorrectedProjections;
-                }
-                else
-                    await repository.SetValueAsync(request.TenantId, request.Key, serializedValue!, token, actorUserId);
-                BaseCommandResponse<Guid> response = BaseCommandResponse.Success(
-                    request.TenantId,
-                    "Tenant setting updated.");
-                var notification = new SettingChangedNotification(
-                    request.Key,
-                    existing?.Value,
-                    serializedValue,
-                    SettingSource.TenantOverride,
-                    request.TenantId,
-                    actorUserId,
-                    DateTime.UtcNow);
-                return (response, notification);
-            }, outerToken),
-            cancellationToken);
+                    await locationPrivacyMutations.InvalidateMutationAsync(SettingScope.Tenant,
+                        request.TenantId, corrected, CancellationToken.None);
+                settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
+                await notificationHandlers.HandleAsync(unguardedOutcome.Notification, CancellationToken.None);
+            }
 
-        if (unguardedOutcome.Notification is not null)
-        {
-            if (locationPrivacyMutations.Handles(request.Key))
-                await locationPrivacyMutations.InvalidateMutationAsync(SettingScope.Tenant,
-                    request.TenantId, corrected, CancellationToken.None);
-            settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-            await notificationHandlers.HandleAsync(unguardedOutcome.Notification, CancellationToken.None);
+            return unguardedOutcome.Response;
         }
-
-        return unguardedOutcome.Response;
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { if (prepared is not null) await settingsPreparation.CloseAsync(prepared, primaryFailure); }
     }
 }

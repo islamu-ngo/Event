@@ -30,7 +30,8 @@ public sealed class HumanTenantMutationPreparation(
     Func<IHumanSupportAccessSourceFactory> resolveSupport,
     Func<IPolicySourceSetFence> resolveExclusion,
     Func<IHumanActionCommitFinalizer> resolveFinalizer,
-    Func<ISerializableAttemptOwner> resolveOwner) : IHumanTenantMutationPreparation
+    Func<ISerializableAttemptOwner> resolveOwner,
+    Func<IEventDiscoveryEnrollmentGate> resolveEnrollmentGate) : IHumanTenantMutationPreparation
 {
     public async Task<bool> ExecuteDeletionAsync(DeleteTenantCommand request, ITenantRepository repository,
         CancellationToken cancellationToken = default)
@@ -46,11 +47,16 @@ public sealed class HumanTenantMutationPreparation(
             if (!ReferenceEquals(httpContext.HttpContext, originalRequest)
                 || !ReferenceEquals(originalRequest.User, originalPrincipal))
                 throw new UnauthorizedAccessException("Tenant deletion cannot replace the original request on retry.");
+            await humanScope.PrepareAsync(cancellationToken);
+            var enrollmentGate = resolveEnrollmentGate();
+            await using var enrollmentLease = await enrollmentGate.AcquireAsync(cancellationToken);
             var issued = (Prepared)await PrepareAsync(HumanTenantMutationKind.Delete, request.Id, cancellationToken);
+            enrollmentGate.RequireCurrent();
             try
             {
                 return await resolveOwner().ExecuteAsync(async token =>
                 {
+                    enrollmentGate.RequireCurrent();
                     // Discovery capture/retention own this reservation before source locks.
                     // This exact deletion seam keeps that order inside the original owner.
                     await repository.AcquireHumanDeletionReservationAsync(request.Id, token);

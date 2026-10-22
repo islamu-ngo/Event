@@ -1,4 +1,6 @@
 using Explore.Application.Configuration;
+using Explore.Application.Authentication;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Services;
@@ -11,6 +13,7 @@ using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
@@ -80,6 +83,72 @@ public sealed partial class LocalBootstrapConvergenceTests
             .IsEqualTo("\"Bootstrap Operator\"");
         // A retained producer cannot be used again, even by its original consumer.
         await Assert.That(custody.ReplayAsync).Throws<UnauthorizedAccessException>();
+    }
+
+    [Test]
+    [Arguments(IdentityDatabaseTopology.Colocated)]
+    [Arguments(IdentityDatabaseTopology.External)]
+    public async Task SettingsCustodyRejectsReceiptDisposalAfterFinalSourceCheckBeforeCommit(
+        IdentityDatabaseTopology topology)
+    {
+        await using Fixture fixture = await Fixture.CreateAsync(topology);
+        await fixture.PrepareAsync();
+        string originalSettings = await fixture.ReadSettingsAsync();
+        await using var scope = fixture.Provider.CreateAsyncScope();
+        var context = fixture.Application(scope);
+        context.BindTenantLease();
+        var account = new ProviderAccountKey(AuthenticationProviderKind.Local, fixture.Subject.ToString("D"));
+        var receipts = scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
+        await using var retainedHuman = new BorrowedHumanReceiptSource(context, receipts);
+        var operation = CreateSettingsCustodyOperation(fixture, scope, out var custody,
+            receiptSource: retainedHuman);
+        bool disposedBeforeSyncGuard = false;
+        bool synchronousGuardAdmittedDisposedReceipt = false;
+        custody.AfterApply = source =>
+        {
+            var receipt = source.LocalReceiptLease
+                ?? throw new InvalidOperationException("The actual completion must retain its genuine receipt.");
+            var snapshot = source.Local
+                ?? throw new InvalidOperationException("The actual completion must retain its full snapshot.");
+            var originalTransaction = context.Database.CurrentTransaction
+                ?? throw new InvalidOperationException("The actual writer must retain its original transaction.");
+            // Appended after the actual writer's source callback: revoke only after its
+            // final async check, while its synchronous commit callback is still pending.
+            context.RegisterTrustedSetupSettingsAdmission(async token =>
+            {
+                await receipts.RequireCurrentAsync(receipt, snapshot, token);
+                await receipt.DisposeAsync();
+                HumanSecuritySourceGate.RequireCurrent(context);
+                await Assert.That(ReferenceEquals(originalTransaction, context.Database.CurrentTransaction)).IsTrue();
+                disposedBeforeSyncGuard = true;
+            }, () =>
+            {
+                // Reached only if the real synchronous guard wrongly admits the disposed
+                // receipt. Release this test-owned SQLite Human lease so the buggy path's
+                // later Local activation can finish rather than waiting on the test itself.
+                synchronousGuardAdmittedDisposedReceipt = true;
+                retainedHuman.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            });
+        };
+        Exception? failure = null;
+        try
+        {
+            await operation.CompleteConfiguredAsync(account, fixture.Token);
+        }
+        catch (Exception exception) { failure = exception; }
+
+        string persistedSettings = await fixture.ReadSettingsAsync();
+        await using var observation = fixture.Provider.CreateAsyncScope();
+        bool persistedAdministrator = await fixture.Application(observation).PlatformUserRoles.AnyAsync(fixture.Token);
+        string outcome = $"Observed exception: {failure?.ToString() ?? "<none>"}; "
+            + $"sync guard admitted disposed receipt: {synchronousGuardAdmittedDisposedReceipt}; "
+            + $"committed platform administrator: {persistedAdministrator}.";
+        await Assert.That(disposedBeforeSyncGuard).IsTrue().Because(outcome);
+        await Assert.That(context.Database.CurrentTransaction).IsNull().Because(outcome);
+        await Assert.That(persistedSettings).IsEqualTo(originalSettings).Because(outcome);
+        await Assert.That(persistedAdministrator).IsFalse().Because(outcome);
+        await Assert.That(failure is UnauthorizedAccessException).IsTrue().Because(outcome);
+        await Assert.That(synchronousGuardAdmittedDisposedReceipt).IsFalse().Because(outcome);
     }
 
     [Test]
@@ -176,7 +245,8 @@ public sealed partial class LocalBootstrapConvergenceTests
     }
 
     private static LocalAdministratorBootstrapOperation CreateSettingsCustodyOperation(
-        Fixture fixture, AsyncServiceScope scope, out SettingsCustodyProbe custody, bool replaceOwner = false)
+        Fixture fixture, AsyncServiceScope scope, out SettingsCustodyProbe custody, bool replaceOwner = false,
+        ILocalBootstrapReceiptSource? receiptSource = null)
     {
         var context = fixture.Application(scope);
         var unitOfWork = new EfCoreUnitOfWork(context);
@@ -199,14 +269,16 @@ public sealed partial class LocalBootstrapConvergenceTests
             PrivacyUrl = "https://example.test/privacy"
         });
         var provider = new ConfiguredAdministratorBootstrapProvider(fixture.Configuration, operatorOptions, bootstrap);
-        var store = fixture.Store(scope);
+        context.BindTenantLease();
+        var receipts = receiptSource ?? scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
+        var enrollment = new EventDiscoveryEnrollmentGate(context);
         var setup = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
         var deployment = scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>();
         var dispatcher = new RuntimeAuthenticationProviderDispatcher(settings,
             scope.ServiceProvider.GetRequiredService<IMemoryCache>(),
             Options.Create(new AuthenticationProviderDeploymentOptions()));
         var authority = new TrustedSetupSettingsAuthority(new HttpContextAccessor(), [],
-            setup, scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Credentials,
+            setup, receipts,
             dispatcher, [provider], TimeProvider.System);
         custody = new SettingsCustodyProbe(new TrustedSetupSettingsWriter(context, authority, mutationLock,
             replaceOwner ? new EfCoreUnitOfWork(context) : unitOfWork));
@@ -226,14 +298,16 @@ public sealed partial class LocalBootstrapConvergenceTests
             deployment, new RuntimeMetadataRefresh(), NullLogger<InstanceOnboardingCompletionOperation>.Instance,
             unitOfWork, fixture.GenerationReader(scope), fixture.Configuration,
             new PrivacyIdentityFenceOperation(Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()),
+            enrollment, receipts,
             operatorOptions, custody);
-        return new LocalAdministratorBootstrapOperation(bootstrap, provider, store, fixture.Secrets,
-            completion, setup, deployment, unitOfWork, TimeProvider.System, dispatcher);
+        return new LocalAdministratorBootstrapOperation(bootstrap, provider, new BootstrapLocalScopes(fixture), fixture.Secrets,
+            completion, setup, deployment, unitOfWork, TimeProvider.System, dispatcher, enrollment);
     }
 
     private sealed class SettingsCustodyProbe(ITrustedSetupSettingsWriter inner) : ITrustedSetupSettingsWriter
     {
         internal Action? BeforeApply { get; set; }
+        internal Action<TrustedSetupSettingsSource>? AfterApply { get; set; }
         internal IReadOnlyList<string> Keys { get; private set; } = [];
         private Func<Task>? replay;
 
@@ -244,8 +318,32 @@ public sealed partial class LocalBootstrapConvergenceTests
             Keys = apply.Effects.Select(effect => effect.Key).ToArray();
             replay = async () => { await inner.ExecuteAsync(apply, cancellationToken); };
             BeforeApply?.Invoke();
-            return await inner.ExecuteAsync(apply, cancellationToken);
+            T result = await inner.ExecuteAsync(apply, cancellationToken);
+            AfterApply?.Invoke(apply.Source);
+            return result;
         }
+    }
+
+    private sealed class BorrowedHumanReceiptSource(
+        ExploreDbContext context, ILocalBootstrapReceiptSource inner) : ILocalBootstrapReceiptSource, IAsyncDisposable
+    {
+        private readonly HumanSecuritySourceGate human = new(context);
+
+        public async Task<ILocalBootstrapReceiptLease> AcquireAsync(
+            LocalCredentialProvisioningSnapshot expected, CancellationToken cancellationToken)
+        {
+            _ = await human.AcquireAsync(cancellationToken);
+            return await inner.AcquireAsync(expected, cancellationToken);
+        }
+
+        public Task RequireCurrentAsync(ILocalBootstrapReceiptLease lease,
+            LocalCredentialProvisioningSnapshot expected, CancellationToken cancellationToken) =>
+            inner.RequireCurrentAsync(lease, expected, cancellationToken);
+
+        public void RequireHeld(ILocalBootstrapReceiptLease lease, LocalCredentialProvisioningSnapshot expected) =>
+            inner.RequireHeld(lease, expected);
+
+        public ValueTask DisposeAsync() => human.DisposeAsync();
     }
 
     /// <summary>
@@ -254,14 +352,44 @@ public sealed partial class LocalBootstrapConvergenceTests
     /// </summary>
     private sealed class SetupReceiptCustody : IAsyncDisposable
     {
-        private readonly AsyncServiceScope scope;
-        internal SetupReceiptCustody(Fixture fixture)
+        internal SetupReceiptCustody(Fixture fixture, ExploreDbContext original)
         {
-            scope = fixture.Provider.CreateAsyncScope();
-            Credentials = fixture.Store(scope);
+            using var descriptorScope = fixture.Provider.CreateScope();
+            var options = new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+            {
+                Role = Explore.Secrets.Database.PrimaryDatabaseRole.LocalIdentityWriter,
+                Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                Database = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(original.Database.GetConnectionString()).DataSource
+            };
+            var identity = descriptorScope.ServiceProvider.GetService<ExternalIdentityDbContext>();
+            var external = identity is not null
+                ? new ExternalIdentityDatabaseDescriptor(Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                    identity.Database.GetConnectionString()!,
+                    IdentityDatabaseConfiguration.DefaultSchema, null, null) : null;
+            Source = new ConfiguredLocalBootstrapReceiptSource(original, () => new LocalIdentityWriterDbContextFactory(options, external, poolSize: 1));
         }
 
-        internal LocalIdentityCredentialStateStore Credentials { get; }
+        internal ConfiguredLocalBootstrapReceiptSource Source { get; }
+        public ValueTask DisposeAsync() => Source.DisposeAsync();
+    }
+
+    private sealed class BootstrapLocalScopes(Fixture fixture) : ILocalIdentityExecutionScopeFactory
+    {
+        public ValueTask<ILocalIdentityExecutionScope> CreateAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var scope = fixture.Provider.CreateAsyncScope();
+            fixture.Application(scope).BindTenantLease();
+            return ValueTask.FromResult<ILocalIdentityExecutionScope>(new BootstrapLocalScope(scope, fixture.Store(scope)));
+        }
+    }
+
+    private sealed class BootstrapLocalScope(AsyncServiceScope scope, LocalIdentityCredentialStateStore credentials)
+        : ILocalIdentityExecutionScope, IServiceProvider
+    {
+        public IServiceProvider Services => this;
+        public object? GetService(Type serviceType) => serviceType == typeof(ILocalCredentialAdministration)
+            ? credentials : scope.ServiceProvider.GetService(serviceType);
         public ValueTask DisposeAsync() => scope.DisposeAsync();
     }
 }

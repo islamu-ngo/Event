@@ -438,6 +438,8 @@ public sealed partial class HumanSettingsMutationPreparationTests
             }, cancellationToken);
         }
         public void RequireMixedSource(IHumanMixedSettingsSource source) => inner.RequireMixedSource(source);
+        public Task CloseMixedAsync(MixedSettingsBatchMutation mutation, Exception? primaryFailure) =>
+            inner.CloseMixedAsync(mutation, primaryFailure);
         public Task<IPreparedHumanEmailMutation> PreparePreviewAsync(Guid? tenantId, CancellationToken cancellationToken = default) => inner.PreparePreviewAsync(tenantId, cancellationToken);
         public Task<IPreparedHumanEmailMutation> PrepareApplyAsync(ImmutableArray<EmailDeliverySettingMutation> mutations, Guid? actorUserId, CancellationToken cancellationToken = default) => inner.PrepareApplyAsync(mutations, actorUserId, cancellationToken);
         public Task<IPreparedHumanEmailMutation> PrepareDisableAsync(EmailDeliveryDisableConfirmation confirmation, CancellationToken cancellationToken = default) => inner.PrepareDisableAsync(confirmation, cancellationToken);

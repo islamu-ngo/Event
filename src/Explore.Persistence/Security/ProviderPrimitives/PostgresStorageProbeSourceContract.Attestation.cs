@@ -61,7 +61,9 @@ public static partial class PostgresStorageProbeSourceContract
             var tenant = tenantTables.SingleOrDefault(candidate => candidate.TableName == entity.GetTableName());
             string rls = tenant is null ? $"""
                 IF EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
-                    AND (t.relrowsecurity OR t.relforcerowsecurity))
+                    AND NOT ({(type == typeof(Explore.Domain.SystemSetting)
+                        ? PostgresLocalIdentitySystemSettingPolicies.Compatible(OwnerRole, "t")
+                        : "NOT t.relrowsecurity AND NOT t.relforcerowsecurity")}))
                 THEN RAISE EXCEPTION 'storage_probe_source_rls_drift' USING ERRCODE = '55000'; END IF;
                 """ : $"""
                 IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})

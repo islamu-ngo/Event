@@ -4,7 +4,9 @@ using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Configuration;
+using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Domain.ValueObjects;
@@ -25,6 +27,34 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 [NotInParallel("PersistenceDb")]
 public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    [Arguments(false, false, true, null, true, false)]
+    [Arguments(false, true, true, true, false, false)]
+    [Arguments(true, false, false, true, false, true)]
+    public async Task OriginalGlobalCompensationReadsDedicatedCapabilityForEachExactLineage(
+        bool instanceEnabled, bool instanceLocked, bool ownOverride, bool? foreignOverride,
+        bool expectedOwn, bool expectedForeign)
+    {
+        await using var packet = await CompensationRows.CreateAsync(fixture);
+        await packet.SetFederationPolicyAsync(instanceEnabled, instanceLocked, ownOverride, foreignOverride);
+
+        var candidates = await packet.ReadCandidatesAsync(identityOnly: false);
+
+        await Assert.That(candidates.Any(row => row.Lineage.TenantId == packet.Rows.A)).IsTrue();
+        await Assert.That(candidates.Any(row => row.Lineage.TenantId == packet.Rows.B)).IsTrue();
+        foreach (var candidate in candidates)
+        {
+            await Assert.That(candidate.Lineage.TenantId == packet.Rows.A || candidate.Lineage.TenantId == packet.Rows.B).IsTrue();
+            var capability = HierarchicalSettingMerge.Resolve(
+                GovernanceSettingKeys.Federation.AtprotoEventsEnabled, candidate.Policy.EventsEnabled);
+            await Assert.That(capability).IsNotNull();
+            await Assert.That(capability!.Value).IsEqualTo(
+                (candidate.Lineage.TenantId == packet.Rows.A ? expectedOwn : expectedForeign) ? "true" : "false");
+            await Assert.That(capability.IsLocked).IsEqualTo(instanceLocked);
+            await Assert.That(candidate.Policy.EventsEnabled.User).IsNull();
+        }
+    }
+
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -280,8 +310,9 @@ public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlConta
         private string[] _tables = [];
         private readonly string _settlementRole = "moderation_settlement_" + Guid.CreateVersion7().ToString("N");
         private GlobalExploreDbContextFactory _settlementFactory = null!;
-        private readonly string _moderationRole = "moderation_execute_" + Guid.CreateVersion7().ToString("N");
-        private GlobalExploreDbContextFactory _moderationFactory = null!;
+        private GlobalExploreDbContextFactory _globalFactory = null!;
+        private long? _ownedModerationGrantor;
+        private (string Value, bool Locked, DateTime? UpdatedAt, Guid? UpdatedBy)? _originalCapability;
 
         internal static async Task<CompensationRows> CreateAsync(PostgreSqlContainerFixture fixture)
         {
@@ -464,14 +495,11 @@ public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlConta
             await admin.OpenAsync();
             await using var grant = admin.CreateCommand();
             string settlementPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-            string moderationPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
             grant.CommandText = $"""
                 GRANT SELECT ON {string.Join(", ", packet._tables)} TO "{packet.Rows.RuntimeOptions.Username}";
                 GRANT INSERT, UPDATE ON {packet._tables[3]} TO "{packet.Rows.RuntimeOptions.Username}";
                 CREATE ROLE "{packet._settlementRole}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{settlementPassword}';
                 GRANT {PostgresPdsSettlementContract.GlobalRole} TO "{packet._settlementRole}";
-                CREATE ROLE "{packet._moderationRole}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{moderationPassword}';
-                GRANT {PostgresAtprotoModerationCompensationContract.GlobalRole} TO "{packet._moderationRole}";
                 """;
             await grant.ExecuteNonQueryAsync();
             packet.Factory = new TenantExploreDbContextFactory(packet.Rows.RuntimeOptions, poolSize: 1);
@@ -481,12 +509,9 @@ public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlConta
                 Username = packet._settlementRole,
                 Password = settlementPassword
             }, poolSize: 1);
-            packet._moderationFactory = new GlobalExploreDbContextFactory(packet.Rows.RuntimeOptions with
-            {
-                Role = PrimaryDatabaseRole.Global,
-                Username = packet._moderationRole,
-                Password = moderationPassword
-            }, poolSize: 1);
+            await packet.EnrollConfiguredGlobalAsync(admin);
+            packet._globalFactory = new GlobalExploreDbContextFactory(
+                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
             // Independent privileged oracle certifies the foreign rows exist before SUT discovery runs.
             await using var oracle = fixture.CreateDbContext();
             await Assert.That(await oracle.Events.IgnoreQueryFilters().CountAsync(row =>
@@ -522,9 +547,64 @@ public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlConta
 
         internal PdsSyncOutboxRepository OutboxRepository(ExploreDbContext context) => new(context, _settlementFactory);
 
+        internal async Task SetFederationPolicyAsync(bool instanceEnabled, bool instanceLocked,
+            bool ownOverride, bool? foreignOverride)
+        {
+            const string key = GovernanceSettingKeys.Federation.AtprotoEventsEnabled;
+            await using var seed = fixture.CreateDbContext();
+            var instance = await seed.Set<AtprotoFederationInstanceSetting>().SingleAsync(row => row.SettingKey == key);
+            _originalCapability = (instance.Value, instance.IsLocked, instance.UpdatedAt, instance.UpdatedBy);
+            instance.SetValue(instanceEnabled ? "true" : "false", Now, null);
+            instance.SetLock(instanceLocked, Now, null);
+            seed.Add(AtprotoFederationTenantSetting.Create(Rows.A, key,
+                ownOverride ? "true" : "false", false, Now, null));
+            if (foreignOverride is { } enabled)
+                seed.Add(AtprotoFederationTenantSetting.Create(Rows.B, key,
+                    enabled ? "true" : "false", false, Now, null));
+            await seed.SaveChangesAsync();
+            await Assert.That(await seed.SystemSettings.AnyAsync(row => row.SettingKey == key)).IsFalse();
+            await Assert.That(await seed.TenantSettingOverrides.IgnoreQueryFilters().AnyAsync(row => row.SettingKey == key)).IsFalse();
+        }
+
+        private async Task EnrollConfiguredGlobalAsync(NpgsqlConnection admin)
+        {
+            if (await ReadModerationMembershipAsync(admin) is not null) return;
+            await using var grant = admin.CreateCommand();
+            grant.CommandText = $"""
+                GRANT {Quote(PostgresAtprotoModerationCompensationContract.GlobalRole)}
+                TO {Quote(fixture.NativeQueueEnrollment.GlobalLogin)}
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """;
+            await grant.ExecuteNonQueryAsync();
+            _ownedModerationGrantor = await ReadModerationMembershipAsync(admin)
+                ?? throw new InvalidOperationException("The documented Global moderation membership was not created.");
+        }
+
+        private async Task<long?> ReadModerationMembershipAsync(NpgsqlConnection admin)
+        {
+            await using var command = admin.CreateCommand();
+            command.CommandText = """
+                SELECT edge.grantor::bigint, edge.inherit_option, edge.set_option, edge.admin_option
+                FROM pg_catalog.pg_auth_members edge
+                JOIN pg_catalog.pg_roles parent ON parent.oid=edge.roleid
+                JOIN pg_catalog.pg_roles member ON member.oid=edge.member
+                WHERE parent.rolname=@parent AND member.rolname=@member
+                """;
+            command.Parameters.AddWithValue("parent", PostgresAtprotoModerationCompensationContract.GlobalRole);
+            command.Parameters.AddWithValue("member", fixture.NativeQueueEnrollment.GlobalLogin);
+            await using var reader = await command.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+            long grantor = reader.GetInt64(0);
+            if (!reader.GetBoolean(1) || reader.GetBoolean(2) || reader.GetBoolean(3) || await reader.ReadAsync())
+                throw new InvalidOperationException("Unexpected Global moderation membership drift; the fixture will not normalize it.");
+            return grantor;
+        }
+
+        private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+
         internal async Task<List<AtprotoModerationDeleteCandidate>> ReadCandidatesAsync(bool identityOnly)
         {
-            await using var global = await _moderationFactory.CreateDbContextAsync();
+            await using var global = await _globalFactory.CreateDbContextAsync();
             await Assert.That(global.TenantFilterTenantId).IsNull();
             // Execute-only Global authority must not gain the caller's private table grants.
             var denied = await Assert.ThrowsAsync<PostgresException>(() =>
@@ -536,9 +616,19 @@ public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlConta
             var candidates = new List<AtprotoModerationDeleteCandidate>();
             await new EfCoreUnitOfWork(global).ExecuteSerializableAsync(async token =>
             {
-                await foreach (var candidate in new AtprotoModerationCompensationStore(global)
+                var originalId = global.ContextId;
+                var originalConnection = global.Database.GetDbConnection();
+                var originalTransaction = global.Database.CurrentTransaction!.GetDbTransaction();
+                int originalBackend = ((NpgsqlConnection)originalConnection).ProcessID;
+                await foreach (var candidate in new AtprotoModerationCompensationStore(global, fixture.NativeQueueEnrollment)
                                    .ReadDeleteCandidatesAsync(target, token))
+                {
+                    await Assert.That(global.ContextId).IsEqualTo(originalId);
+                    await Assert.That(ReferenceEquals(global.Database.GetDbConnection(), originalConnection)).IsTrue();
+                    await Assert.That(ReferenceEquals(global.Database.CurrentTransaction?.GetDbTransaction(), originalTransaction)).IsTrue();
+                    await Assert.That(((NpgsqlConnection)originalConnection).ProcessID).IsEqualTo(originalBackend);
                     candidates.Add(candidate);
+                }
                 return candidates.Count;
             }, CancellationToken.None);
             await Assert.That(global.TenantFilterTenantId).IsNull();
@@ -547,11 +637,11 @@ public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlConta
 
         internal async Task WriteForeignDeleteAsync(Guid successorId, bool rollback)
         {
-            await using var global = await _moderationFactory.CreateDbContextAsync();
+            await using var global = await _globalFactory.CreateDbContextAsync();
             var unitOfWork = new EfCoreUnitOfWork(global);
             async Task<int> Write(CancellationToken token)
             {
-                var store = new AtprotoModerationCompensationStore(global);
+                var store = new AtprotoModerationCompensationStore(global, fixture.NativeQueueEnrollment);
                 var target = new AtprotoModerationTarget(ActorId, null, null, _actorStamp);
                 AtprotoModerationDeleteCandidate? foreign = null;
                 await foreach (var candidate in store.ReadDeleteCandidatesAsync(target, token))
@@ -623,15 +713,37 @@ public sealed class PostgresModerationCompensationAuthorityTests(PostgreSqlConta
 
         public async ValueTask DisposeAsync()
         {
+            if (_originalCapability is { } original)
+            {
+                await using var seed = fixture.CreateDbContext();
+                const string key = GovernanceSettingKeys.Federation.AtprotoEventsEnabled;
+                var instance = await seed.Set<AtprotoFederationInstanceSetting>().SingleAsync(row => row.SettingKey == key);
+                instance.SetValue(original.Value, Now, null);
+                instance.SetLock(original.Locked, Now, null);
+                instance.UpdatedAt = original.UpdatedAt;
+                instance.UpdatedBy = original.UpdatedBy;
+                await seed.Set<AtprotoFederationTenantSetting>().IgnoreQueryFilters()
+                    .Where(row => row.SettingKey == key && (row.TenantId == Rows.A || row.TenantId == Rows.B)).ExecuteDeleteAsync();
+                await seed.SaveChangesAsync();
+            }
             await using var admin = new NpgsqlConnection(fixture.ConnectionString);
             await admin.OpenAsync();
+            if (_ownedModerationGrantor is { } ownedGrantor)
+            {
+                if (await ReadModerationMembershipAsync(admin) != ownedGrantor)
+                    throw new InvalidOperationException("The fixture-owned moderation membership changed; cleanup will not repair it.");
+                await using var ownedRevoke = admin.CreateCommand();
+                ownedRevoke.CommandText = $"""
+                    REVOKE {Quote(PostgresAtprotoModerationCompensationContract.GlobalRole)}
+                    FROM {Quote(fixture.NativeQueueEnrollment.GlobalLogin)} GRANTED BY CURRENT_USER
+                    """;
+                await ownedRevoke.ExecuteNonQueryAsync();
+            }
             await using var revoke = admin.CreateCommand();
             revoke.CommandText = $"""
                 REVOKE ALL ON {string.Join(", ", _tables)} FROM "{Rows.RuntimeOptions.Username}";
                 REVOKE {PostgresPdsSettlementContract.GlobalRole} FROM "{_settlementRole}";
-                REVOKE {PostgresAtprotoModerationCompensationContract.GlobalRole} FROM "{_moderationRole}";
                 DROP ROLE "{_settlementRole}";
-                DROP ROLE "{_moderationRole}";
                 """;
             await revoke.ExecuteNonQueryAsync();
             await Rows.DisposeAsync();

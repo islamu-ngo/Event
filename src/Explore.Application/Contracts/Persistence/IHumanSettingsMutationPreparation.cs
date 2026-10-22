@@ -45,10 +45,13 @@ public interface IHumanSettingsMutationPreparation
         CancellationToken cancellationToken = default);
     /// <summary>The ordinary source of this issuer's active callback, never an import or mixed source.</summary>
     IOrdinarySettingsSource? CurrentOrdinarySource { get; }
+    /// <summary>The dedicated source of this issuer's active original or joined callback.</summary>
+    IAtprotoFederationSettingsSource? CurrentAtprotoFederationSource { get; }
     TypedSettingsOriginal? CurrentTypedOriginal { get; }
     EventResourceProviderOriginal? CurrentEventResourceProviderOriginal { get; }
     void RequireEventResourceProviderSource(IEventResourceProviderOriginalSource source);
-    void CloseEventResourceProvider(IPreparedHumanSettingsMutation prepared);
+    /// <summary>Closes an inactive original preparation, including failures before its owner starts.</summary>
+    Task CloseAsync(IPreparedHumanSettingsMutation prepared, Exception? primaryFailure);
     Task<IPreparedHumanSettingsMutation> PrepareAsync(BindEventResourceProviderCommand command,
         CancellationToken cancellationToken = default);
     Task<IPreparedHumanSettingsMutation> PrepareAsync(BeginEventResourceProviderOperationCommand command,

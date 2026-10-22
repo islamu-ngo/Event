@@ -5,7 +5,9 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
+using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -17,8 +19,10 @@ using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Explore.Persistence.Schema;
 using Explore.Secrets.Database;
+using Explore.Persistence.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Data.Sqlite;
 using Explore.Persistence.Seed;
@@ -31,6 +35,250 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 [NotInParallel]
 public sealed class AuthenticationEfSourceTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    public async Task ScannerWorkflowResolvesPersonalActorWithoutPersistingTheAuthenticatedUserKey()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        Rows rows = await SeedAsync(timeout.Token);
+        Guid actorId = rows.ScannerA.IssuedByActorId;
+        await using (var source = Migrator())
+        {
+            await using var human = new HumanSecuritySourceGate(source);
+            await using var retained = await human.AcquireAsync(timeout.Token);
+            source.TenantUsers.Add(new TenantUser
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = rows.A,
+                Tenant = null!,
+                UserId = rows.UserId,
+                User = null!,
+                ActorId = actorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = Now
+            });
+            await source.SaveChangesAsync(timeout.Token);
+        }
+        await using var runtime = Runtime(rows.A);
+        var unit = new EfCoreUnitOfWork(runtime);
+        var service = new AdmissionScannerCapabilityService(
+            new AdmissionScannerCapabilityRepository(runtime), new ScannerMaterial(), unit,
+            new AdmissionTargetTransaction(runtime, unit),
+            new ActorOwnershipReader(runtime, fixture.NativeQueueEnrollment), TimeProvider.System);
+        var request = new AdmissionScannerCapabilityIssueRequest(
+            Guid.CreateVersion7(), rows.A, rows.ScannerA.EventId, rows.ScannerA.AdmissionTargetId,
+            [AdmissionCheckInAction.CheckIn], "Personal actor scanner", DateTimeOffset.UtcNow.AddHours(1), rows.UserId);
+        var issued = await service.IssueAsync(request, timeout.Token);
+        await Assert.That(issued.Outcome).IsEqualTo(AdmissionScannerCapabilityIssueOutcome.Issued);
+        await Assert.That(issued.PlaintextCapability).IsNotNull();
+        var replay = await service.IssueAsync(request, timeout.Token);
+        await Assert.That(replay.Outcome).IsEqualTo(AdmissionScannerCapabilityIssueOutcome.AlreadyIssued);
+        await Assert.That(replay.PlaintextCapability).IsNull();
+        await service.RevokeAsync(new AdmissionScannerCapabilityRevokeRequest(
+            rows.A, rows.ScannerA.EventId, issued.ScannerCapabilityId, rows.UserId, "Device retired"), timeout.Token);
+        await using var observer = Runtime(rows.A);
+        var stored = await observer.AdmissionScannerCapabilities.SingleAsync(row => row.Id == issued.ScannerCapabilityId,
+            timeout.Token);
+        await Assert.That(stored.IssuedByActorId).IsEqualTo(actorId);
+        await Assert.That(stored.IssuedByActorId).IsNotEqualTo(rows.UserId);
+        await Assert.That(stored.RevokedByActorId).IsEqualTo(actorId);
+        var rejected = await service.IssueAsync(request with
+        {
+            IssueRequestId = Guid.CreateVersion7(),
+            IssuedByUserId = Guid.CreateVersion7()
+        }, timeout.Token);
+        await Assert.That(rejected.Outcome).IsEqualTo(AdmissionScannerCapabilityIssueOutcome.Rejected);
+        await Assert.That(rejected.PlaintextCapability).IsNull();
+        await Assert.That(await observer.AdmissionScannerCapabilities.CountAsync(
+            row => row.IssueRequestId == request.IssueRequestId, timeout.Token)).IsEqualTo(1);
+    }
+
+    private sealed class ScannerMaterial : IAdmissionScannerCapabilityMaterialService
+    {
+        public Task<AdmissionScannerCapabilityMaterial> IssueAsync(AdmissionScannerCapabilityMaterialRequest request,
+            CancellationToken cancellationToken)
+        {
+            string plaintext = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            return Task.FromResult(new AdmissionScannerCapabilityMaterial(plaintext,
+                Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(plaintext))), 7));
+        }
+
+        public Task<AdmissionScannerCapabilityDigestCandidates> DigestCandidatesAsync(
+            AdmissionScannerCapabilityDigestCandidatesRequest request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("This workflow fixture only issues scanner material.");
+    }
+
+    [Test]
+    public async Task TargetReadinessRejectedInitialOpenClosesOriginalConnectorAndAllowsFreshAttempt()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        await using var migrator = Migrator();
+        var entity = migrator.Model.FindEntityType(typeof(AtprotoFederationTenantSetting))!;
+        string table = migrator.GetService<ISqlGenerationHelper>()
+            .DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+        Guid tenantId = Guid.CreateVersion7();
+        Guid targetId = Guid.CreateVersion7();
+        await using var runtime = Runtime(tenantId);
+        var connector = runtime.Database.GetDbConnection();
+        var owner = new AdmissionTargetTransaction(runtime, new EfCoreUnitOfWork(runtime));
+        bool callbackEntered = false;
+        await Assert.That(connector.State).IsEqualTo(ConnectionState.Closed);
+        InvalidOperationException? rejected = null;
+        ConnectionState stateAtRejection;
+        await migrator.Database.ExecuteSqlRawAsync($"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY", timeout.Token);
+        try
+        {
+            rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => owner.ExecuteAsync(
+                tenantId, targetId, _ => { callbackEntered = true; return Task.FromResult(true); }, timeout.Token));
+            stateAtRejection = connector.State;
+        }
+        finally
+        {
+            await migrator.Database.ExecuteSqlRawAsync($"ALTER TABLE {table} FORCE ROW LEVEL SECURITY", CancellationToken.None);
+        }
+        await Assert.That(rejected!.Message).IsEqualTo("postgres_tenant_runtime_authority_not_ready");
+        await Assert.That(callbackEntered).IsFalse();
+        await Assert.That(runtime.Database.CurrentTransaction).IsNull();
+        await Assert.That(stateAtRejection).IsEqualTo(ConnectionState.Closed);
+        await owner.ExecuteAsync(tenantId, targetId, _ =>
+        {
+            callbackEntered = true;
+            return Task.FromResult(true);
+        }, timeout.Token);
+        await Assert.That(callbackEntered).IsTrue();
+        await Assert.That(runtime.Database.GetDbConnection()).IsSameReferenceAs(connector);
+        await Assert.That(connector.State).IsEqualTo(ConnectionState.Closed);
+    }
+
+    [Test]
+    public async Task TargetCleanupFailureAfterAcknowledgedCommitDoesNotBecomeUnknownOrReplay()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        Rows rows = await SeedAsync(timeout.Token);
+        var issued = NewScanner(rows);
+        await using var runtime = Runtime(rows.A);
+        int attempts = 0;
+        var owner = new AdmissionTargetTransaction(runtime, new CloseAfterAcknowledgedCommit(runtime));
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => owner.ExecuteAsync(
+            rows.A, issued.AdmissionTargetId, async token =>
+            {
+                attempts++;
+                var stored = await new AdmissionScannerCapabilityRepository(runtime).StoreAsync(issued, token);
+                await Assert.That(stored.Created).IsTrue();
+                return true;
+            }, timeout.Token));
+        await Assert.That(failure!.Message).IsEqualTo("admission_target_committed_cleanup_failed");
+        await Assert.That(attempts).IsEqualTo(1);
+        await Assert.That(runtime.Database.CurrentTransaction).IsNull();
+        await Assert.That(runtime.Database.GetDbConnection().State).IsEqualTo(ConnectionState.Closed);
+        await using var observer = Runtime(rows.A);
+        await Assert.That(await observer.AdmissionScannerCapabilities.CountAsync(row => row.Id == issued.Id, timeout.Token))
+            .IsEqualTo(1);
+        await new AdmissionTargetTransaction(runtime, new EfCoreUnitOfWork(runtime)).ExecuteAsync(
+            rows.A, issued.AdmissionTargetId, _ => Task.FromResult(true), timeout.Token);
+    }
+
+    private sealed class CloseAfterAcknowledgedCommit(ExploreDbContext context) : ISerializableAttemptOwner
+    {
+        public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation,
+            CancellationToken cancellationToken = default)
+        {
+            T result = await ((ISerializableAttemptOwner)new EfCoreUnitOfWork(context))
+                .ExecuteAsync(operation, cancellationToken);
+            await context.Database.CloseConnectionAsync();
+            return result;
+        }
+    }
+
+    [Test]
+    public async Task ScannerIssuanceRejectsAnUncoordinatedTransaction()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        Rows rows = await SeedAsync(timeout.Token);
+        var issued = NewScanner(rows);
+        await using var runtime = Runtime(rows.A);
+        await using var transaction = await runtime.Database.BeginTransactionAsync(IsolationLevel.Serializable, timeout.Token);
+        var denied = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new AdmissionScannerCapabilityRepository(runtime).StoreAsync(issued, timeout.Token));
+        await Assert.That(denied!.Message).IsEqualTo("admission_target_owner_missing");
+        await transaction.RollbackAsync(timeout.Token);
+        await using var observer = fixture.CreateDbContext();
+        await Assert.That(await observer.AdmissionScannerCapabilities.AnyAsync(row => row.Id == issued.Id, timeout.Token))
+            .IsFalse();
+    }
+
+    [Test]
+    public async Task ScannerIssuanceCannotBorrowAnotherTargetsTransaction()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        Rows rows = await SeedAsync(timeout.Token);
+        var issued = NewScanner(rows);
+        await using var runtime = Runtime(rows.A);
+        var denied = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            new AdmissionTargetTransaction(runtime, new EfCoreUnitOfWork(runtime)).ExecuteAsync(
+                rows.A, Guid.CreateVersion7(), token =>
+                    new AdmissionScannerCapabilityRepository(runtime).StoreAsync(issued, token), timeout.Token));
+        await Assert.That(denied!.Message).IsEqualTo("admission_target_owner_mismatch");
+        await using var observer = fixture.CreateDbContext();
+        await Assert.That(await observer.AdmissionScannerCapabilities.AnyAsync(row => row.Id == issued.Id, timeout.Token))
+            .IsFalse();
+    }
+
+    private static AdmissionScannerCapability NewScanner(Rows rows) => AdmissionScannerCapability.Issue(
+        Guid.CreateVersion7(), rows.A, Guid.CreateVersion7(), rows.ScannerA.EventId,
+        rows.ScannerA.AdmissionTargetId, rows.ScannerA.LookupKeyVersion,
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), "Runtime scanner",
+        AdmissionScannerCapabilityAction.CheckIn, Now.AddHours(1), rows.ScannerA.IssuedByActorId, Now);
+
+    [Test]
+    public async Task TenantScannerStorageCoexistsWithGlobalAuthenticationWithoutCrossTenantAccess()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        CancellationToken token = timeout.Token;
+        Rows rows = await SeedAsync(token);
+        await RetireBusinessRoutinesAsync(token);
+        AdmissionScannerCapability issued = NewScanner(rows);
+        await using (var runtime = Runtime(rows.A))
+        {
+            await using var human = new HumanSecuritySourceGate(runtime);
+            await using var held = await human.AcquireAsync(token);
+            await new AdmissionTargetTransaction(runtime, new EfCoreUnitOfWork(runtime)).ExecuteAsync(
+                rows.A, issued.AdmissionTargetId, async ct =>
+            {
+                var result = await new AdmissionScannerCapabilityRepository(runtime).StoreAsync(issued, ct);
+                await Assert.That(result.Created).IsTrue();
+                return true;
+            }, token);
+        }
+        var authentication = new AdmissionScannerAuthenticationRepository(GlobalFactory(), fixture.NativeQueueEnrollment);
+        await Assert.That((await authentication.FindByDigestCandidatesAsync([Candidate(issued)], token))?.Id)
+            .IsEqualTo(issued.Id);
+        await using (var runtime = Runtime(rows.A))
+        {
+            var repository = new AdmissionScannerCapabilityRepository(runtime);
+            var stored = await repository.GetAsync(rows.A, issued.Id, token);
+            await Assert.That(stored?.Id).IsEqualTo(issued.Id);
+            await Assert.That((await repository.ListAsync(rows.A, issued.EventId, token)).Any(row => row.Id == issued.Id))
+                .IsTrue();
+            await Assert.That(await runtime.AdmissionScannerCapabilities.IgnoreQueryFilters()
+                .AnyAsync(row => row.TenantId == rows.B, token)).IsFalse();
+            Guid previousStamp = stored!.ConcurrencyStamp;
+            stored.Revoke(rows.ScannerA.IssuedByActorId, "Revoked by tenant administrator", Now.AddMinutes(1));
+            await using var human = new HumanSecuritySourceGate(runtime);
+            await using var held = await human.AcquireAsync(token);
+            await new EfCoreUnitOfWork(runtime).ExecuteSerializableAsync(async ct =>
+            {
+                await repository.UpdateAsync(stored, ct);
+                return true;
+            }, token);
+            await Assert.That(stored.ConcurrencyStamp).IsNotEqualTo(previousStamp);
+        }
+        var revoked = await authentication.FindByDigestCandidatesAsync([Candidate(issued)], token);
+        await Assert.That(revoked?.RevokedAt).IsEqualTo(Now.AddMinutes(1));
+        await using var foreign = Runtime(rows.B);
+        await Assert.That(await new AdmissionScannerCapabilityRepository(foreign).GetAsync(rows.A, issued.Id, token))
+            .IsNull();
+    }
+
     [Test]
     public async Task OrdinaryTenantKeyStorageAndAuthenticationCoexistWithoutRuntimePrivateReads()
     {
@@ -479,9 +727,8 @@ public sealed class AuthenticationEfSourceTests(PostgreSqlContainerFixture fixtu
         await RetireBusinessRoutinesAsync(token);
         var repository = new AdmissionScannerAuthenticationRepository(GlobalFactory(), fixture.NativeQueueEnrollment);
         await using var request = Runtime(rows.B);
-        var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await request.AdmissionScannerCapabilities.IgnoreQueryFilters().AnyAsync(row => row.Id == rows.ScannerA.Id, token));
-        await Assert.That(denied.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        await Assert.That(await request.AdmissionScannerCapabilities.IgnoreQueryFilters()
+            .AnyAsync(row => row.Id == rows.ScannerA.Id, token)).IsFalse();
         AdmissionScannerCapability? found = await repository.FindByDigestCandidatesAsync(
             [Candidate(rows.ScannerA)], token);
         await Assert.That(found?.Id).IsEqualTo(rows.ScannerA.Id);
@@ -1028,6 +1275,10 @@ public sealed class AuthenticationEfSourceTests(PostgreSqlContainerFixture fixtu
                 ConcurrencyStamp = Guid.CreateVersion7()
             };
             context.Events.Add(source);
+            context.EventParticipationConfigurations.Add(EventParticipationConfiguration.Create(
+                source.Id, tenant, (int)ParticipationHandlingModeEnum.PlatformManaged,
+                (int)AdvanceRegistrationObligationEnum.Required, (int)IdentityAccessModeEnum.GuestAllowed,
+                GuestRecoveryPolicyEnum.EmailOptional, Now));
             AdmissionTarget target = AdmissionTarget.Create(Guid.CreateVersion7(), tenant, source.Id, AdmissionTargetTypeEnum.Event, null, null);
             context.AdmissionTargets.Add(target);
             var scanner = AdmissionScannerCapability.Issue(Guid.CreateVersion7(), tenant, Guid.CreateVersion7(), source.Id, target.Id,
@@ -1204,7 +1455,7 @@ public sealed class AuthenticationUnusualLoginSourceTests(AuthenticationUnusualL
     }
 
     public sealed class UnusualGlobalFixture() : PostgreSqlContainerFixture(
-        globalLoginSuffix: @"\O'Reilly$")
+        IdentityDatabaseTopology.Colocated, globalLoginSuffix: @"\O'Reilly$")
     {
     }
 }

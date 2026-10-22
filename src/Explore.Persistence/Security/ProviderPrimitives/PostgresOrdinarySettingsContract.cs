@@ -145,7 +145,7 @@ public static partial class PostgresOrdinarySettingsContract
             Add(command, "request", NpgsqlDbType.Jsonb, JsonSerializer.Serialize(new
             {
                 source.Keys,
-                source.Mutation.Effects,
+                Effects = source.Mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key)),
                 source.NewIds,
                 Actor = source.Subject.PrincipalId,
                 source.OccurredAt,
@@ -253,7 +253,8 @@ public static partial class PostgresOrdinarySettingsContract
             Tenant = selection.SelectedTenantId;
             User = mutation.Effects.Any(effect => effect.Scope == SettingScope.User) ? subject.PrincipalId : null;
             Keys = OrdinarySettingsDataImage.Keys(mutation);
-            NewIds = mutation.Effects.ToImmutableDictionary(effect => effect.Key, _ => Guid.CreateVersion7(), StringComparer.Ordinal);
+            NewIds = mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key))
+                .ToImmutableDictionary(effect => effect.Key, _ => Guid.CreateVersion7(), StringComparer.Ordinal);
             var instant = clock.GetUtcNow().UtcDateTime;
             OccurredAt = instant.AddTicks(-(instant.Ticks % 10));
             connection.StateChange += Changed;

@@ -30,6 +30,7 @@ public sealed class ConfigurationManifestProviderValueNativeTests(PostgreSqlCont
             ["Slugs"] = new JsonArray(JsonValue.Create("failed-history-provider-value")),
             ["Tenants"] = new JsonArray(),
             ["CreatedTenants"] = new JsonArray(),
+            ["Revisions"] = new JsonArray(),
             ["Documents"] = new JsonArray(),
             ["Policies"] = new JsonArray(),
             ["Operations"] = new JsonArray(JsonValue.Create(operationId)),

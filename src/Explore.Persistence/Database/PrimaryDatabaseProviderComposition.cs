@@ -131,6 +131,15 @@ public static class PrimaryDatabaseProviderComposition
             : options.Schema;
         ((IDbContextOptionsBuilderInfrastructure)optionsBuilder)
             .AddOrUpdateExtension(new RelationalNamespaceOptionsExtension(modelSchema, options.Schema));
+        // Replace the evidence even when a builder is reconfigured for a different
+        // purpose. Never retain credentials or derive enrollment from the live connection.
+        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(
+            new PostgresRuntimeIdentityOptionsExtension(
+                target == PrimaryDatabaseMigrationTarget.Application
+                && options.Provider == PrimaryDatabaseProvider.PostgreSql
+                && options.Role == PrimaryDatabaseRole.Runtime
+                && !string.IsNullOrWhiteSpace(options.Username)
+                    ? options.Username : null));
 
         switch (options.Provider)
         {

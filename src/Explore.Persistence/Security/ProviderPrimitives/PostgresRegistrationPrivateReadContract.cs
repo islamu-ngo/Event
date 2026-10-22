@@ -147,7 +147,7 @@ public static partial class PostgresRegistrationPrivateReadContract
                 new(MigratorRole, enrollment.MigratorLogin, false, true, false),
                 new(RuntimeRole, enrollment.RuntimeLogin, true, false, false)]);
         string guard = PostgresPrivilegeGuard.BuildAssertSql(privileges)
-            + SourceGuard(context, s, enrollment) + PolicyGuard(s, policies) + CallerPrivileges(s, enrollment);
+            + SourceGuard(context, s, enrollment) + PolicyGuard(s, policies) + CallerPrivileges(context, s, enrollment);
         string body = $"""
             DECLARE v_order uuid; v_entry uuid; v_offer uuid; v_supply uuid; v_binding uuid;
             BEGIN

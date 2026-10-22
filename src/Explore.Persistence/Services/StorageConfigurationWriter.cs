@@ -160,7 +160,16 @@ public sealed class StorageConfigurationWriter(ExploreDbContext context, IUnitOf
             throw new UnauthorizedAccessException("Configuration cannot flush unrelated tracked changes.");
         long revision = observed.Revision;
         if (enrollment is not null)
+        {
             revision = await PostgresStorageConfigurationContract.WriteAsync(context, enrollment, mutation, token);
+            foreach (var effect in mutation.Effects.Where(effect => effect.TenantId is null))
+                await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, effect.Key, new SystemSetting
+                {
+                    SettingKey = effect.Key,
+                    Value = effect.Value,
+                    IsLocked = false
+                }, token);
+        }
         else
         {
             // Reject a substituted tracked value even if EF currently marks it Unchanged.

@@ -429,8 +429,8 @@ public static class ConfigurationExtensions
         // an independent ATProto login toggle. Explicit structured values retain precedence.
         TrySet(mappedConfig, config, "Authentication:Provider", authenticationProvider);
         TrySet(mappedConfig, config, "Authentication:AtprotoLoginEnabled", atprotoLoginEnabled);
-        TrySet(mappedConfig, config, "Authentication:Local:JwtKey",
-            ReadFirst(config, "Authentication:Local:JwtKey", "AUTHENTICATION_LOCAL_JWT_KEY"));
+        mappedConfig["Authentication:Local:JwtKey"] =
+            config["Authentication:Local:JwtKey"] ?? config["AUTHENTICATION_LOCAL_JWT_KEY"];
         TrySet(mappedConfig, config, "Authentication:Local:LockoutThreshold",
             ReadFirst(config, "Authentication:Local:LockoutThreshold", "AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD"));
         TrySet(mappedConfig, config, "Authentication:Local:LockoutDurationMinutes",

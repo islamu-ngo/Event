@@ -1,3 +1,4 @@
+using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Security;
@@ -41,16 +42,7 @@ internal sealed class EventDiscoveryDisclosureProviderOperations(ExploreDbContex
             .AsNoTracking().ToListAsync(cancellationToken);
         // MySQL may report changed rows rather than matched rows for a no-op.
         // Existence comes from the locking read, never its affected-row count.
-        if (revisions.Count == 0)
-        {
-            string insertSql =
-                $"INSERT INTO {mapping.Table} ({mapping.Id}, {mapping.Tenant}, {mapping.Identity}, {mapping.Disclosure}) VALUES ({{0}}, {{1}}, 0, 0)";
-            await context.Database.ExecuteSqlRawAsync(insertSql, [Guid.CreateVersion7(), tenantId], cancellationToken);
-            revisions = await context.Set<EventDiscoveryRevision>().FromSqlRaw(query, tenantId)
-                .IgnoreTenantFilter(TenantFilterBypassReasons.DiscoveryDisclosureMutation)
-                .AsNoTracking().ToListAsync(cancellationToken);
-        }
-        return revisions.Single();
+        return revisions.SingleOrDefault() ?? throw new EventDiscoveryUnavailableException();
     }
 
     internal Task<int> UpdateRevisionAsync(

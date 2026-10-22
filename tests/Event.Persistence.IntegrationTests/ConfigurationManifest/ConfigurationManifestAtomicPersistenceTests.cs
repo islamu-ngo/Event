@@ -16,7 +16,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 [NotInParallel("ConfigurationManifestAtomicPersistence")]
-public sealed class ConfigurationManifestAtomicPersistenceTests
+public sealed partial class ConfigurationManifestAtomicPersistenceTests
 {
     [Test]
     public async Task Bootstrap_RerunCreatesOnceThenAuditsWholesaleSkip()
@@ -107,6 +107,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             Guid existingTenantId = Guid.CreateVersion7();
             await using (ExploreDbContext seed = factory.CreateDbContext())
             {
+                seed.BindTenantLease();
                 seed.Tenants.Add(new Tenant
                 {
                     Id = existingTenantId,
@@ -461,6 +462,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
     {
         await using var context = new ExploreDbContext(options);
         context.EnableTenantFilterBypass("Configuration manifest application persistence test.");
+        context.BindTenantLease();
         await context.Database.EnsureCreatedAsync();
         await SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedAsync(context, CancellationToken.None);

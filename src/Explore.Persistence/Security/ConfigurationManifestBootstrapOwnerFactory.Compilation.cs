@@ -140,6 +140,13 @@ internal sealed partial class ConfigurationManifestBootstrapOwnerFactory
                     CreatedAt = plan.OccurredAt,
                     CreatedBy = null
                 });
+                Add(data, after, changes, new EventDiscoveryRevision
+                {
+                    Id = reserved.Revisions[tenant.PlannedTenantId],
+                    TenantId = tenant.PlannedTenantId,
+                    IdentityEpoch = 0,
+                    DisclosureEpoch = 1
+                });
                 var branding = TenantSettingsDocument.Create(tenant.PlannedTenantId, tenant.BrandingDocument.DocumentKey,
                     tenant.BrandingDocument.SchemaVersion, tenant.BrandingDocument.DefaultsVersion, tenant.BrandingDocument.PayloadJson);
                 branding.Id = tenant.BrandingDocument.DocumentId; branding.ConcurrencyStamp = Guid.CreateVersion7();

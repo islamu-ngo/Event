@@ -22,6 +22,7 @@ public class HierarchicalSettingsReader : IHierarchicalSettingsReader
     private readonly IUserPreferenceRepository _userPreferenceRepository;
     private readonly IMemoryCache _cache;
     private readonly IInstanceTenantSettingsReader? _instanceTenantReader;
+    private readonly IAtprotoFederationSettingRepository _federationSettings;
     protected readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
 
     private const string SystemCacheKey = "HierSettings:System";
@@ -37,6 +38,7 @@ public class HierarchicalSettingsReader : IHierarchicalSettingsReader
         IGroupSettingRepository groupSettingRepository,
         IUserPreferenceRepository userPreferenceRepository,
         IMemoryCache cache,
+        IAtprotoFederationSettingRepository federationSettings,
         IInstanceTenantSettingsReader? instanceTenantReader = null)
     {
         _systemSettingRepository = systemSettingRepository;
@@ -46,6 +48,7 @@ public class HierarchicalSettingsReader : IHierarchicalSettingsReader
         _userPreferenceRepository = userPreferenceRepository;
         _cache = cache;
         _instanceTenantReader = instanceTenantReader;
+        _federationSettings = federationSettings;
     }
 
     public async Task<T?> ResolveAsync<T>(string key, SettingContext context, CancellationToken ct = default)
@@ -70,6 +73,36 @@ public class HierarchicalSettingsReader : IHierarchicalSettingsReader
         var keyList = keys.ToList();
         if (keyList.Count == 0)
             return [];
+
+        string[] federationKeys = keyList.Where(AtprotoFederationSettingPolicy.IsDedicatedKey)
+            .Distinct(StringComparer.Ordinal).ToArray();
+        if (federationKeys.Length > 0)
+        {
+            var instances = (await _federationSettings.GetInstanceAsync(federationKeys, ct))
+                .ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
+            IReadOnlyList<AtprotoFederationTenantSetting> overrides = context.TenantId is { } tenantId
+                ? await _federationSettings.GetForTenantAsync(tenantId, federationKeys, ct) : [];
+            var tenants = overrides.ToDictionary(row => row.SettingKey, StringComparer.Ordinal);
+            var resolvedByKey = new Dictionary<string, ResolvedSetting>(StringComparer.Ordinal);
+            foreach (string key in federationKeys)
+            {
+                instances.TryGetValue(key, out var instance);
+                tenants.TryGetValue(key, out var tenant);
+                var facts = AtprotoFederationSettingFacts.Create(key, instance, tenant, context.TenantId);
+                resolvedByKey.Add(key, HierarchicalSettingMerge.Resolve(key, facts)
+                    ?? throw new InvalidOperationException("Dedicated federation metadata is unavailable."));
+            }
+
+            string[] ordinaryKeys = keyList.Where(key => !AtprotoFederationSettingPolicy.IsDedicatedKey(key)).ToArray();
+            if (ordinaryKeys.Length > 0)
+            {
+                // Federation has always made the entire mixed observation authoritative.
+                foreach (var resolved in await ResolveBatchAsync(ordinaryKeys,
+                    context with { RequireAuthoritativeReads = true }, ct))
+                    resolvedByKey[resolved.Key] = resolved;
+            }
+            return keyList.Where(resolvedByKey.ContainsKey).Select(key => resolvedByKey[key]).ToArray();
+        }
 
         // Current policy boundaries cannot depend on another replica invalidating this process's cache.
         var requiresAuthoritativePolicy = context.RequireAuthoritativeReads || keyList.Any(key => IsSmtpSetting(key)

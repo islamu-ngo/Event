@@ -44,7 +44,8 @@ public static class HumanManagedProviderProvisioningPreparationRegistration
                 provider.GetRequiredService<PrivacyIdentityFenceOperation>(),
                 owner,
                 provider.GetRequiredService<ISettingMutationLock>(),
-                provider.GetRequiredService<IOptions<ManagedControlPlaneOptions>>());
+                provider.GetRequiredService<IOptions<ManagedControlPlaneOptions>>(),
+                () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>());
         });
         return services;
     }

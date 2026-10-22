@@ -19,6 +19,9 @@ public static class PostgresExternalLoginReadPermissions
         nameof(UserExternalLogin.CreatedBy), nameof(UserExternalLogin.UpdatedAt), nameof(UserExternalLogin.UpdatedBy)
     ];
 
+    internal static IReadOnlyList<string> GlobalReadColumns(ExploreDbContext context) =>
+        Array.AsReadOnly(Mapping(context).Columns);
+
     public static async Task ApplyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
         CancellationToken cancellationToken = default)
     {
@@ -28,8 +31,8 @@ public static class PostgresExternalLoginReadPermissions
         var names = context.GetService<ISqlGenerationHelper>();
         string global = Text(enrollment.GlobalLogin);
         string relation = Text(table);
-        string predicate = ReadPredicate(context, global, requireComplete: false);
-        string complete = ReadPredicate(context, global, requireComplete: true);
+        string predicate = ReadPredicate(context, enrollment, global, requireComplete: false);
+        string complete = ReadPredicate(context, enrollment, global, requireComplete: true);
         string boundary = RuntimeBoundary(context, enrollment);
         string legacyFunction = names.DelimitIdentifier(
             context.Model.FindEntityType(typeof(UserExternalLogin))!.GetTableName()! + "_for_authentication", schema);
@@ -75,7 +78,7 @@ public static class PostgresExternalLoginReadPermissions
             SELECT session_user = {Text(enrollment.GlobalLogin)} AND current_user = session_user
                 AND pg_catalog.current_setting('role') IN ('none', session_user::text)
                 AND ({RuntimeBoundary(context, enrollment)})
-                AND ({ReadPredicate(context, "session_user", requireComplete: true)}) AS "Value"
+                AND ({ReadPredicate(context, enrollment, "session_user", requireComplete: true)}) AS "Value"
             """;
         if (!await context.Database.SqlQueryRaw<bool>(command).SingleAsync(cancellationToken))
             throw new UnauthorizedAccessException("external_login_read_permissions_not_ready");
@@ -98,7 +101,7 @@ public static class PostgresExternalLoginReadPermissions
             """;
     }
 
-    private static string ReadPredicate(ExploreDbContext context, string login, bool requireComplete)
+    private static string ReadPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, string login, bool requireComplete)
     {
         var (schema, table, columns) = Mapping(context);
         string relation = Text(table);
@@ -113,7 +116,7 @@ public static class PostgresExternalLoginReadPermissions
                             AND acl.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = {login})
                             AND acl.privilege_type = 'SELECT' AND NOT acl.is_grantable))
             """ : "";
-        return $"""
+        string binding = $"""
             EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = {login} AND rolcanlogin)
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                 WHERE pg_catalog.pg_has_role({login}, r.oid, 'MEMBER')
@@ -129,6 +132,7 @@ public static class PostgresExternalLoginReadPermissions
                                         AND pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'SELECT'))))))
             {complete}
             """;
+        return $"(({binding}) OR ({PostgresManagedTenantWorkerCreationPermissions.CompleteGlobalCataloguePredicate(context, enrollment)}))";
     }
 
     private static (string Schema, string Table, string[] Columns) Mapping(ExploreDbContext context)

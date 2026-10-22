@@ -47,6 +47,13 @@ public class UserRepository : GenericRepository<User, Guid>, IUserRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<User?> GetLocalIdentityBindingAsync(Guid id, CancellationToken cancellationToken) =>
+        _dbContext.Users
+            .IgnoreAutoIncludes()
+            .AsNoTracking()
+            .Include(user => user.Actor)
+            .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
+
     public async Task<User?> GetUserWithDetails(Guid id, CancellationToken cancellationToken)
     {
         return await _dbContext.Users

@@ -24,6 +24,23 @@ public sealed class LocalIdentityOptions
 
     public int AccessTokenLifetimeMinutes { get; set; } = 30;
 
+    public static byte[] DecodeJwtKey(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+            throw new InvalidOperationException("Local Identity JWT authority is unavailable.");
+        byte[] key;
+        try
+        {
+            key = Convert.FromBase64String(configured);
+        }
+        catch (FormatException exception)
+        {
+            throw new InvalidOperationException("Local Identity JWT authority is invalid.", exception);
+        }
+        return key.Length >= 32 ? key
+            : throw new InvalidOperationException("Local Identity JWT authority does not meet the 256-bit minimum.");
+    }
+
     public static bool IsValid(LocalIdentityOptions options) =>
         options.LockoutThreshold is >= 1 and <= 20
         && options.LockoutDurationMinutes is >= 1 and <= 1_440

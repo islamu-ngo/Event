@@ -4,12 +4,10 @@ using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -22,7 +20,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
@@ -58,18 +55,11 @@ public sealed class LocalCredentialCreationTests
         var settings = SystemSettingRepository.CreateReadOnly(context: application,
             mutationLock: new RelationalSettingMutationLock(dbContext: application,
                 unitOfWork: new EfCoreUnitOfWork(application)));
-        var secrets = Substitute.For<ISecretResolver>();
-        secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                SettingKey: SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                Value: Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Source: SecretSourceType.EnvironmentVariable, Scope: SecretScope.Instance,
-                ScopeId: null, ResolvedAt: DateTimeOffset.UtcNow)));
         var authentication = new LocalIdentityAuthService(
             userManager: manager,
-            tokenGenerator: new LocalJwtTokenGenerator(secretResolver: secrets,
-                options: Options.Create(new LocalIdentityOptions()), timeProvider: TimeProvider.System),
-            systemSettings: settings,
+            tokenGenerator: new LocalJwtTokenGenerator(
+                options: Options.Create(new LocalIdentityOptions
+                { JwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)) }), timeProvider: TimeProvider.System),
             credentialStates: fixture.StateStore(scope));
 
         LocalAuthResponseDto login = await authentication.AuthenticateAsync(

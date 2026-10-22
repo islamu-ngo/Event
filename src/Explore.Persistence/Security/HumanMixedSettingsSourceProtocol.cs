@@ -108,6 +108,10 @@ internal sealed class HumanMixedSettingsSourceProtocol : IHumanMixedSettingsSour
                     ["tenant_plan_selection_changed"], plan.AssignmentId));
             if (!MixedSettingsDataImage.Same(OriginalData, acquired.Data))
                 throw new UnauthorizedAccessException("Original mixed row, absence, metadata or projection sources changed.");
+            if (context.Database.IsNpgsql() && TenantId is { } selectedTenant
+                && acquired.Facts.Principal.SelectedTenantId == selectedTenant
+                && acquired.Facts.Principal.Tenants.Count(row => row.Id == selectedTenant && row.IsActiveState) == 1)
+                context.RetainNativeHumanTenantOwner(Subject, selectedTenant);
             state = 3;
             return acquired.Facts;
         }

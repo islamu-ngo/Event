@@ -29,7 +29,7 @@ public partial class ExploreDbContext
     private bool? NativeHumanTenantForeignKeyVisible(
         EntityEntry entry, IEntityType principal, IReadOnlyList<IProperty> properties, object?[] values)
     {
-        if (entry.Entity is not TenantSettingsDocument || principal.ClrType != typeof(Tenant)
+        if (entry.Entity is not (TenantSettingsDocument or AtprotoFederationTenantSetting) || principal.ClrType != typeof(Tenant)
             || _nativeHumanTenantOwner is not { } owner)
             return null;
         return Database.IsNpgsql() && !IsTenantFilterBypassed && TenantFilterTenantId == owner.TenantId

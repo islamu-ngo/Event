@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Constants;
+using Explore.Persistence.Security;
 using static Explore.Persistence.Services.EmailDeliverySettingsMutationOwner;
 
 namespace Explore.Persistence.Services;
@@ -27,7 +28,7 @@ public sealed class InternalEmailDeliverySettingsWriter(
             return Task.FromResult(Result(EmailDeliverySettingsWriteStatus.InvalidMutation));
         if (mutations.IsEmpty)
             return Task.FromResult(Result(EmailDeliverySettingsWriteStatus.NoChange));
-        return owner.ExecuteAsync(async token =>
+        return ExecuteWithHumanSourceGateAsync(async token =>
         {
             var prepared = await owner.PrepareAsync(mutations, actorUserId, token);
             if (prepared.Before is { } before && prepared.After is { } after
@@ -45,12 +46,31 @@ public sealed class InternalEmailDeliverySettingsWriter(
             throw new InvalidOperationException("Configuration import requires its original human email action.");
         if (tenantId == Guid.Empty || actorUserId == Guid.Empty)
             return Task.FromResult(Result(EmailDeliverySettingsWriteStatus.InvalidMutation));
-        return owner.ExecuteAsync(async token =>
+        return ExecuteWithHumanSourceGateAsync(async token =>
         {
             var prepared = await owner.PrepareAsync(
                 [new(tenantId, GovernanceSettingKeys.Email.DeliveryEnabled,
                     EmailDeliverySettingMutationKind.SetValue, Value: "false")], actorUserId, token);
             return await owner.PersistAsync(prepared, actorUserId, token);
+        }, cancellationToken);
+    }
+
+    private async Task<EmailDeliverySettingsWriteResult> ExecuteWithHumanSourceGateAsync(
+        Func<CancellationToken, Task<EmailDeliverySettingsWriteResult>> operation, CancellationToken cancellationToken)
+    {
+        // A caller-owned transaction must already retain the original pre-BEGIN
+        // gate and ordered SMTP keys. Never retrofit either lock inside that owner.
+        if (context.Database.CurrentTransaction is not null)
+            HumanSecuritySourceGate.RequireCurrent(context);
+        await using var human = !HumanSecuritySourceGate.TryRequireCurrent(context)
+            ? await new HumanSecuritySourceGate(context).AcquireAsync(cancellationToken) : null;
+        HumanSecuritySourceGate.RequireCurrent(context);
+        return await owner.ExecuteAsync(async token =>
+        {
+            HumanSecuritySourceGate.RequireCurrent(context);
+            var result = await operation(token);
+            HumanSecuritySourceGate.RequireCurrent(context);
+            return result;
         }, cancellationToken);
     }
 }

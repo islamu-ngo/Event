@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
@@ -17,22 +18,44 @@ internal sealed partial class AuthenticatedSettingsFixture
 {
     internal static Task<AuthenticatedSettingsFixture> CreateAsync(
         Func<ExploreDbContext> createDatabase, PostgreSqlContainerFixture? postgres,
-        IInterceptor? interceptor = null)
+        IInterceptor? interceptor = null, Action<SanitizedRequestFailure>? requestFailureObserver = null,
+        Action<Dictionary<string, string?>>? configure = null,
+        Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null)
     {
-        return CreateCoreAsync(createDatabase, interceptor, postgres is null ? null : ConfigureAsync);
+        return CreateCoreAsync(createDatabase, interceptor, postgres is null ? null : ConfigureAsync,
+            requestFailureObserver, configure, configureServices);
 
         async Task ConfigureAsync(ExploreDbContext seed, Dictionary<string, string?> configuration)
         {
+            ArgumentNullException.ThrowIfNull(postgres);
+            string schema = seed.Model.FindEntityType(typeof(SystemSetting))!.GetSchema()!;
+            if (string.Equals(schema, postgres.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator).Schema,
+                    StringComparison.Ordinal))
+            {
+                await postgres.PrepareLocalIdentityWriterAsync();
+            }
+            else
+            {
+                // The isolated policy fixture owns a different physical schema; the
+                // default-schema preparation cache cannot attest these cloned sources.
+                var enrollment = new PostgresLocalIdentityWriterEnrollment(
+                    postgres.NativeQueueEnrollment.MigratorLogin,
+                    postgres.NativeQueueEnrollment.RuntimeLogin,
+                    postgres.GetNativeQueueOptions(PrimaryDatabaseRole.LocalIdentityWriter, schema).Username!,
+                    postgres.NativeQueueEnrollment.GlobalLogin);
+                await PostgresLocalIdentityWriterPermissions.ApplyAsync(seed, enrollment,
+                    IdentityDatabaseTopology.Colocated, LocalIdentityWriterInventory.Store.Application);
+            }
             foreach (var role in new[]
             {
                 PrimaryDatabaseRole.Migrator, PrimaryDatabaseRole.Runtime, PrimaryDatabaseRole.Global,
+                PrimaryDatabaseRole.LocalIdentityWriter,
                 PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
                 PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
                 PrimaryDatabaseRole.PlatformKeyReport
             })
             {
-                var options = postgres!.GetNativeQueueOptions(role,
-                    seed.Model.FindEntityType(typeof(SystemSetting))!.GetSchema());
+                var options = postgres.GetNativeQueueOptions(role, schema);
                 configuration["Database:Provider"] = "PostgreSql";
                 configuration["Database:Host"] = options.Host;
                 configuration["Database:Port"] = options.Port?.ToString(System.Globalization.CultureInfo.InvariantCulture);

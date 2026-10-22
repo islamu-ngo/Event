@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Settings;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Security;
@@ -80,7 +81,7 @@ internal sealed record OrdinarySettingsDataImage(
     ImmutableDictionary<string, OrdinaryUserPreferenceImage?> User)
 {
     internal static string[] Keys(OrdinarySettingsMutation mutation) =>
-        mutation.Effects.Select(effect => effect.Key)
+        mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key)).Select(effect => effect.Key)
             .Concat(mutation.RequiresTenantVerificationCeiling
                 ? [GovernanceSettingKeys.Organizations.TenantCanOmitVerification] : Array.Empty<string>())
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();

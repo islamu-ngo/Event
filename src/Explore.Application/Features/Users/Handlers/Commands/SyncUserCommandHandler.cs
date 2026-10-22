@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -6,6 +7,7 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Exceptions;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -27,12 +29,14 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
     private readonly IActorRepository _actorRepository;
     private readonly ITenantContextAccessor _tenantContext;
     private readonly ITenantLifecycleAccessService _lifecycle;
-    private readonly IInstanceBootstrapStateRepository _bootstrapRepository;
+    private readonly IIdentitySynchronizationBootstrapReader _bootstrapReader;
     private readonly InstanceOnboardingCompletionOperation _onboardingCompletion;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<SyncUserCommandHandler> _logger;
     private readonly PrivacyIdentityFenceOperation _identityFence;
+    private readonly IEventDiscoveryEnrollmentGate _enrollmentGate;
+    private readonly IHumanSecuritySourceGate _humanGate;
 
     public SyncUserCommandHandler(
         IUserRepository userRepository,
@@ -43,12 +47,14 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         IActorRepository actorRepository,
         ITenantContextAccessor tenantContext,
         ITenantLifecycleAccessService lifecycle,
-        IInstanceBootstrapStateRepository bootstrapRepository,
+        IIdentitySynchronizationBootstrapReader bootstrapReader,
         InstanceOnboardingCompletionOperation onboardingCompletion,
         HybridCache cache,
         IUnitOfWork unitOfWork,
         ILogger<SyncUserCommandHandler> logger,
-        PrivacyIdentityFenceOperation identityFence)
+        PrivacyIdentityFenceOperation identityFence,
+        IEventDiscoveryEnrollmentGate enrollmentGate,
+        IHumanSecuritySourceGate humanGate)
     {
         _userRepository = userRepository;
         _userExternalLoginRepository = userExternalLoginRepository;
@@ -58,30 +64,69 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         _actorRepository = actorRepository;
         _tenantContext = tenantContext;
         _lifecycle = lifecycle;
-        _bootstrapRepository = bootstrapRepository;
+        _bootstrapReader = bootstrapReader;
         _onboardingCompletion = onboardingCompletion;
         _cache = cache;
         _unitOfWork = unitOfWork;
         _logger = logger;
         _identityFence = identityFence;
+        _enrollmentGate = enrollmentGate;
+        _humanGate = humanGate;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SyncUserCommand request, CancellationToken cancellationToken = default)
     {
+        IAsyncDisposable? human = null;
+        IAsyncDisposable? enrollment = null;
+        BaseCommandResponse<Guid>? result = null;
+        Exception? primary = null;
         try
         {
-            return await _identityFence.ExecuteEnrollmentAsync(
+            cancellationToken.ThrowIfCancellationRequested();
+            // Local execution may already own both gates before its receipt transaction.
+            // Other Sync callers establish custody before any source or identity observation.
+            if (!_humanGate.TryRequireCurrent())
+            {
+                if (_enrollmentGate.TryRequireCurrent())
+                    throw new InvalidOperationException("discovery_source_gate_order_invalid");
+                human = await _humanGate.AcquireAsync(cancellationToken);
+            }
+            if (!_enrollmentGate.TryRequireCurrent())
+                enrollment = await _enrollmentGate.AcquireAsync(cancellationToken);
+            _humanGate.RequireCurrent();
+            _enrollmentGate.RequireCurrent();
+            result = await _identityFence.ExecuteEnrollmentAsync(
                 request.AccountKey, token => ExecuteUnderFenceAsync(request, token), cancellationToken);
+            _humanGate.RequireCurrent();
+            _enrollmentGate.RequireCurrent();
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (Exception failure)
         {
-            throw;
+            primary = failure;
         }
-        catch (Exception)
+        List<Exception> failures = [];
+        if (primary is not null) failures.Add(primary);
+        foreach (IAsyncDisposable? owned in new[] { enrollment, human })
+        {
+            if (owned is null) continue;
+            try { await owned.DisposeAsync(); }
+            catch (Exception cleanup) { failures.Add(cleanup); }
+        }
+        if (primary is HumanMutationOutcomeUnknownException
+            || primary is OperationCanceledException && cancellationToken.IsCancellationRequested)
+        {
+            if (failures.Count == 1) ExceptionDispatchInfo.Capture(primary).Throw();
+            var aggregate = new AggregateException("Synchronization and owned gate cleanup failures.", failures);
+            if (primary is HumanMutationOutcomeUnknownException)
+                throw new HumanMutationOutcomeUnknownException(aggregate);
+            throw aggregate;
+        }
+        if (failures.Count != 0)
         {
             return BaseCommandResponse.Failure<Guid>(
                 "identity_enrollment_unavailable", "Identity enrollment is unavailable.");
         }
+        return result ?? throw new InvalidOperationException("Synchronization produced no outcome.");
     }
 
     private async Task<BaseCommandResponse<Guid>> ExecuteUnderFenceAsync(SyncUserCommand request, CancellationToken cancellationToken)
@@ -118,7 +163,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 return ExplicitBindingRequired();
             }
 
-            InstanceBootstrapState? bootstrap = await _bootstrapRepository.GetCurrent(cancellationToken);
+            IdentitySynchronizationBootstrapState? bootstrap = await _bootstrapReader.GetCurrentAsync(cancellationToken);
             // Local synchronization has already proved a current explicit binding above; its login
             // and lifecycle callbacks remain available privately. External signup has no such authority.
             if (providerKind != AuthenticationProviderKind.Local
@@ -158,7 +203,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
 
                 Guid claimUserId = existingLogin?.UserId
                     ?? Guid.CreateVersion7();
-                BaseCommandResponse<Guid> claim = await _onboardingCompletion.ClaimConfiguredAsync(
+                BaseCommandResponse<Guid> claim = await _onboardingCompletion.ClaimConfiguredWithinEnrollmentAsync(
                     new ClaimConfiguredInstanceAdministratorCommand
                     {
                         AuthenticatedAccount = accountKey,
@@ -326,6 +371,10 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                     () => _cache.RemoveAsync($"user:detail:{synchronization.Id}", cancellationToken).AsTask());
             return synchronization;
         }
+        catch (HumanMutationOutcomeUnknownException)
+        {
+            throw;
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
@@ -355,7 +404,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
             return false;
         }
 
-        User? user = await _userRepository.GetUserWithDetails(subjectId, cancellationToken);
+        User? user = await _userRepository.GetLocalIdentityBindingAsync(subjectId, cancellationToken);
         return user is { IsDeleted: false, Actor: { IsDeleted: false, IsSuspended: false } }
             && user.Actor.UserId == subjectId
             && user.Actor.ActorTypeId == (int)ActorTypeEnum.User

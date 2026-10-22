@@ -41,6 +41,7 @@ public class UpdateSettingBatchCommandHandler
     private readonly IHumanCommitScopePreparation _humanCommitScope;
     private readonly IHumanSettingsMutationPreparation _settingsPreparation;
     private readonly IHumanEmailMutationPreparation _emailPreparation;
+    private readonly IAtprotoFederationSettingsWriter _federationSettings;
 
     public UpdateSettingBatchCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -62,6 +63,7 @@ public class UpdateSettingBatchCommandHandler
         IHumanCommitScopePreparation humanCommitScope,
         IHumanSettingsMutationPreparation settingsPreparation,
         IHumanEmailMutationPreparation emailPreparation,
+        IAtprotoFederationSettingsWriter federationSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -86,6 +88,7 @@ public class UpdateSettingBatchCommandHandler
         _humanCommitScope = humanCommitScope;
         _settingsPreparation = settingsPreparation;
         _emailPreparation = emailPreparation;
+        _federationSettings = federationSettings;
     }
 
     public async Task<BatchUpdateResponseDto> ExecuteAsync(
@@ -103,69 +106,72 @@ public class UpdateSettingBatchCommandHandler
 
         MixedSettingsBatchMutation? mixed = MixedSettingsBatchMutation.RequiresCombinedSource(request)
                 ? await _emailPreparation.PrepareMixedAsync(request, cancellationToken) : null;
-
-        // Authorization check (applies to all keys in batch)
-        var (authorized, authError) = await SettingCommandHelper.CheckAuthorizationAsync(
-            request.Scope, _adminContext, _tenantContext, _currentUserService, cancellationToken);
-        if (!authorized)
-        {
-            return new BatchUpdateResponseDto
-            {
-                Success = false,
-                Results = request.Values.Keys
-                    .Select(k => new SettingUpdateResultDto { Key = k, Applied = false, SkipReason = authError })
-                    .ToList(),
-                Message = authError
-            };
-        }
-
-        var categoryDefinitions = SettingRegistry.GetByCategory(request.Category);
-        var categoryKeys = categoryDefinitions is not null
-            ? new HashSet<string>(categoryDefinitions.Select(definition => definition.Key))
-            : [];
-        Guid? resolvedUserId = await SettingCommandHelper.ResolveCurrentUserIdAsync(
-            _adminContext, _currentUserService, cancellationToken);
-        bool hasLocationPrivacyMutation = request.Values.Keys.Any(key =>
-            LocationPrivacySettingDefinitions.All.Any(item => item.Key == key));
-        if (hasLocationPrivacyMutation && _locationPrivacyMutations is null)
-            throw new InvalidOperationException("Location privacy settings require their governance mutation service.");
-        bool requiresSpecializedOwner = request.Values.Keys.Any(EmailDeliverySettingKeys.Contains);
-        bool emailOnly = requiresSpecializedOwner && request.Values.Keys.All(EmailDeliverySettingKeys.Contains);
-        ImmutableDictionary<string, string>? storedValues = null;
         IPreparedHumanSettingsMutation? prepared = null;
-        IPreparedHumanEmailMutation? email = null;
-        if (mixed is null && (!requiresSpecializedOwner || emailOnly))
-        {
-            var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
-            foreach (var (key, value) in request.Values)
-            {
-                var definition = SettingRegistry.Get(key);
-                if (definition is null || !categoryKeys.Contains(key) || !IsScopeAllowed(definition, request.Scope))
-                    continue;
-                var (valid, serialized, _) = SettingCommandHelper.ValidateAndSerialize(value, definition);
-                if (valid)
-                    values.Add(key, serialized!);
-            }
-            storedValues = values.ToImmutable();
-            if (emailOnly)
-                email = await _emailPreparation.PrepareApplyAsync(
-                    storedValues.Select(entry => new EmailDeliverySettingMutation(
-                        request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,
-                        entry.Key, EmailDeliverySettingMutationKind.SetValue, entry.Value)).ToImmutableArray(),
-                    resolvedUserId, cancellationToken);
-            else
-                prepared = await _settingsPreparation.PrepareAsync(request, storedValues, cancellationToken);
-            SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId);
-        }
-
-        // Resolve governance under the original owner while the ordered policy locks are held.
-        // Notifications and invalidations remain provisional until that owner settles.
-        (BatchUpdateResponseDto Response, List<SettingChangedNotification> Notifications,
-            List<Func<Task>> Invalidations) mutation;
+        Exception? primaryFailure = null;
         try
         {
-            mutation = await _mutationLock.ExecuteOrderedGroupsAsync(
-                [request.Values.Keys.Any(VisitorAccessSettingMutationGuard.Handles)
+
+            // Authorization check (applies to all keys in batch)
+            var (authorized, authError) = await SettingCommandHelper.CheckAuthorizationAsync(
+                request.Scope, _adminContext, _tenantContext, _currentUserService, cancellationToken);
+            if (!authorized)
+            {
+                return new BatchUpdateResponseDto
+                {
+                    Success = false,
+                    Results = request.Values.Keys
+                        .Select(k => new SettingUpdateResultDto { Key = k, Applied = false, SkipReason = authError })
+                        .ToList(),
+                    Message = authError
+                };
+            }
+
+            var categoryDefinitions = SettingRegistry.GetByCategory(request.Category);
+            var categoryKeys = categoryDefinitions is not null
+                ? new HashSet<string>(categoryDefinitions.Select(definition => definition.Key))
+                : [];
+            Guid? resolvedUserId = await SettingCommandHelper.ResolveCurrentUserIdAsync(
+                _adminContext, _currentUserService, cancellationToken);
+            bool hasLocationPrivacyMutation = request.Values.Keys.Any(key =>
+                LocationPrivacySettingDefinitions.All.Any(item => item.Key == key));
+            if (hasLocationPrivacyMutation && _locationPrivacyMutations is null)
+                throw new InvalidOperationException("Location privacy settings require their governance mutation service.");
+            bool requiresSpecializedOwner = request.Values.Keys.Any(EmailDeliverySettingKeys.Contains);
+            bool emailOnly = requiresSpecializedOwner && request.Values.Keys.All(EmailDeliverySettingKeys.Contains);
+            ImmutableDictionary<string, string>? storedValues = null;
+            IPreparedHumanEmailMutation? email = null;
+            if (mixed is null && (!requiresSpecializedOwner || emailOnly))
+            {
+                var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+                foreach (var (key, value) in request.Values)
+                {
+                    var definition = SettingRegistry.Get(key);
+                    if (definition is null || !categoryKeys.Contains(key) || !IsScopeAllowed(definition, request.Scope))
+                        continue;
+                    var (valid, serialized, _) = SettingCommandHelper.ValidateAndSerialize(value, definition);
+                    if (valid)
+                        values.Add(key, serialized!);
+                }
+                storedValues = values.ToImmutable();
+                if (emailOnly)
+                    email = await _emailPreparation.PrepareApplyAsync(
+                        storedValues.Select(entry => new EmailDeliverySettingMutation(
+                            request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,
+                            entry.Key, EmailDeliverySettingMutationKind.SetValue, entry.Value)).ToImmutableArray(),
+                        resolvedUserId, cancellationToken);
+                else
+                    prepared = await _settingsPreparation.PrepareAsync(request, storedValues, cancellationToken);
+                SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId);
+            }
+
+            // Resolve governance under the original owner while the ordered policy locks are held.
+            // Notifications and invalidations remain provisional until that owner settles.
+            (BatchUpdateResponseDto Response, List<SettingChangedNotification> Notifications,
+                List<Func<Task>> Invalidations) mutation;
+            try
+            {
+                mutation = await _mutationLock.ExecuteOrderedGroupsAsync(
+                    [request.Values.Keys.Any(VisitorAccessSettingMutationGuard.Handles)
                     ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
                  request.Values.Keys.Any(EventResourceSettingMutationGuard.Handles)
                     ? EventResourceSettingMutationGuard.Keys : [],
@@ -173,59 +179,66 @@ public class UpdateSettingBatchCommandHandler
                  request.Values.Keys.Any(key => PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
                     ? PublicationPolicySettingKeys.All : [],
                  request.Values.Keys],
-                token => mixed is not null
-                    ? _emailPreparation.ExecuteMixedPreparedAsync(mixed, ApplyAsync, token)
-                    : email is not null
-                    ? _emailPreparation.ExecutePreparedAsync(email, ApplyAsync, token)
-                    : prepared is null
-                    ? ((ISerializableAttemptOwner)_unitOfWork).ExecuteAsync(ApplyAsync, token)
-                    : _settingsPreparation.ExecutePreparedAsync(prepared, (_, ownerToken) => ApplyAsync(ownerToken), token),
-                cancellationToken);
-        }
-        catch (BatchRejectedException exception)
-        {
-            return exception.Response;
-        }
-
-        async Task<(BatchUpdateResponseDto Response, List<SettingChangedNotification> Notifications,
-            List<Func<Task>> Invalidations)> ApplyAsync(CancellationToken transactionToken)
-        {
-            if (mixed is null)
-                await SettingCommandHelper.RequireCommitAuthorizationAsync(
-                    request.Scope, resolvedUserId, _tenantContext.TenantId,
-                    _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, transactionToken);
-            else if (resolvedUserId != mixed.Actor)
-                throw new UnauthorizedAccessException("The mixed batch cannot substitute its original administrator.");
-            var notifications = new List<SettingChangedNotification>();
-            var invalidations = new List<Func<Task>>();
-            var response = await HandleAuthorizedAsync(
-                request, categoryKeys, resolvedUserId, notifications, invalidations, storedValues, mixed, transactionToken);
-            if (!response.Success)
-                throw new BatchRejectedException(response);
-            return (Response: response, Notifications: notifications, Invalidations: invalidations);
-        }
-
-        int appliedCount = mutation.Response.Results.Count(result => result.Applied);
-        if (appliedCount > 0)
-        {
-            if (request.Scope == SettingScope.User)
-                _resolver.InvalidateUserCache(_tenantContext.TenantId, resolvedUserId!.Value);
-            else
-            {
-                _resolver.InvalidateCache(request.Scope,
-                    request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : Guid.Empty);
-                CerbosSettingsCacheInvalidation.InvalidateIfAnyCerbosSettingChanged(
-                    _cerbosConfigResolver, mutation.Response.Results.Where(result => result.Applied)
-                        .Select(result => result.Key), request.Scope,
-                    request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : Guid.Empty);
+                    token => mixed is not null
+                        ? _emailPreparation.ExecuteMixedPreparedAsync(mixed, ApplyAsync, token)
+                        : email is not null
+                        ? _emailPreparation.ExecutePreparedAsync(email, ApplyAsync, token)
+                        : prepared is null
+                        ? ((ISerializableAttemptOwner)_unitOfWork).ExecuteAsync(ApplyAsync, token)
+                        : _settingsPreparation.ExecutePreparedAsync(prepared, (_, ownerToken) => ApplyAsync(ownerToken), token),
+                    cancellationToken);
             }
+            catch (BatchRejectedException exception)
+            {
+                return exception.Response;
+            }
+
+            async Task<(BatchUpdateResponseDto Response, List<SettingChangedNotification> Notifications,
+                List<Func<Task>> Invalidations)> ApplyAsync(CancellationToken transactionToken)
+            {
+                if (mixed is null)
+                    await SettingCommandHelper.RequireCommitAuthorizationAsync(
+                        request.Scope, resolvedUserId, _tenantContext.TenantId,
+                        _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, transactionToken);
+                else if (resolvedUserId != mixed.Actor)
+                    throw new UnauthorizedAccessException("The mixed batch cannot substitute its original administrator.");
+                var notifications = new List<SettingChangedNotification>();
+                var invalidations = new List<Func<Task>>();
+                var response = await HandleAuthorizedAsync(
+                    request, categoryKeys, resolvedUserId, notifications, invalidations, storedValues, mixed, transactionToken);
+                if (!response.Success)
+                    throw new BatchRejectedException(response);
+                return (Response: response, Notifications: notifications, Invalidations: invalidations);
+            }
+
+            int appliedCount = mutation.Response.Results.Count(result => result.Applied);
+            if (appliedCount > 0)
+            {
+                if (request.Scope == SettingScope.User)
+                    _resolver.InvalidateUserCache(_tenantContext.TenantId, resolvedUserId!.Value);
+                else
+                {
+                    _resolver.InvalidateCache(request.Scope,
+                        request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : Guid.Empty);
+                    CerbosSettingsCacheInvalidation.InvalidateIfAnyCerbosSettingChanged(
+                        _cerbosConfigResolver, mutation.Response.Results.Where(result => result.Applied)
+                            .Select(result => result.Key), request.Scope,
+                        request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : Guid.Empty);
+                }
+            }
+            foreach (var invalidate in mutation.Invalidations)
+                await invalidate();
+            foreach (var notification in mutation.Notifications)
+                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+            LogCompletedBatch(request, appliedCount, mutation.Response.Results.Count - appliedCount);
+            return mutation.Response;
         }
-        foreach (var invalidate in mutation.Invalidations)
-            await invalidate();
-        foreach (var notification in mutation.Notifications)
-            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
-        LogCompletedBatch(request, appliedCount, mutation.Response.Results.Count - appliedCount);
-        return mutation.Response;
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally
+        {
+            if (mixed is not null) await _emailPreparation.CloseMixedAsync(mixed, primaryFailure);
+            else if (prepared is not null) await _settingsPreparation.CloseAsync(prepared, primaryFailure);
+        }
     }
 
     private async Task<BatchUpdateResponseDto> HandleAuthorizedAsync(
@@ -627,7 +640,27 @@ public class UpdateSettingBatchCommandHandler
                 }
                 else
                 {
-                    if (mixed is not null)
+                    if (AtprotoFederationSettingPolicy.IsDedicatedKey(key))
+                    {
+                        var written = await _federationSettings.ApplyCurrentAsync(new(
+                            request.Scope == SettingScope.Instance ? HumanSettingsOperation.InstanceSettings : HumanSettingsOperation.TenantSettings,
+                            request.Scope, request.Scope == SettingScope.Tenant ? scopeId : null, null,
+                            key, HumanSettingsMutationKind.SetValue, serializedValue), cancellationToken);
+                        if (!written.Applied)
+                        {
+                            if (request.Mode == BatchUpdateMode.Strict || mixed is not null)
+                                return new BatchUpdateResponseDto
+                                {
+                                    Success = false,
+                                    Results = validationResults.Select(entry => new SettingUpdateResultDto
+                                    { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? written.FailureCode }).ToList(),
+                                    Message = written.FailureCode
+                                };
+                            results.Add(new SettingUpdateResultDto { Key = key, Applied = false, SkipReason = written.FailureCode });
+                            continue;
+                        }
+                    }
+                    else if (mixed is not null)
                         await mixed.Store.ApplyOrdinaryAsync(mixed, key, cancellationToken);
                     else
                         await _resolver.SetValueAsync(
@@ -792,7 +825,18 @@ public class UpdateSettingBatchCommandHandler
                 }
                 else
                 {
-                    if (mixed is not null)
+                    if (AtprotoFederationSettingPolicy.IsDedicatedKey(key))
+                    {
+                        var written = await _federationSettings.ApplyCurrentAsync(new(
+                            request.Scope == SettingScope.Instance ? HumanSettingsOperation.InstanceSettings : HumanSettingsOperation.TenantSettings,
+                            request.Scope, request.Scope == SettingScope.Tenant ? scopeId : null, null,
+                            key, HumanSettingsMutationKind.SetValue, serializedValue), token);
+                        if (!written.Applied)
+                            return GuardedBatchTransactionOutcome.Rejected(
+                                written.FailureCode ?? "federation_setting_not_applied",
+                                "The federation setting change was not applied.");
+                    }
+                    else if (mixed is not null)
                         await mixed.Store.ApplyOrdinaryAsync(mixed, key, token);
                     else
                         await _resolver.SetValueAsync(

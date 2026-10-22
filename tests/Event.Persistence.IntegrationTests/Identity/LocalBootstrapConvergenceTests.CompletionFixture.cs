@@ -9,27 +9,34 @@ using Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 using Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
+using Explore.Application.Features.Users.Handlers.Commands;
+using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Models;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Constants;
 using Explore.Domain.Settings.Documents;
 using Explore.Persistence.Identity;
 using Explore.Infrastructure.Authentication;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
+using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -40,6 +47,54 @@ namespace Event.Persistence.IntegrationTests.Identity;
 
 public sealed partial class LocalBootstrapConvergenceTests
 {
+    [Test]
+    public async Task ConfiguredSync_CoLocatedIdentityFenceRetainsEnrollmentThroughPhysicalCommit()
+    {
+        await using var scenario = await CompletionFixture.CreateAsync(colocatedIdentityFence: true);
+        if (scenario.Context.BindTenantLease() is not null)
+            throw new InvalidOperationException("Configured enrollment requires the original instance-scoped test owner.");
+        scenario.Context.Tenants.Add(new Tenant
+        {
+            Id = PlatformDefaults.DefaultTenantId,
+            FullName = "Provisioning community",
+            Slug = PlatformDefaults.DefaultTenantSlug,
+            TenantStatusId = (int)TenantStatusEnum.Provisioning,
+            TenantStatus = null!
+        });
+        scenario.Context.Set<TenantSettingsDocument>().AddRange(
+            TenantBrandingSettingsDocumentDefaults.Create(PlatformDefaults.DefaultTenantId, "Provisioning community"),
+            TenantDirectoryOperatorIdentityDocumentDefaults.Create(PlatformDefaults.DefaultTenantId));
+        await scenario.Context.SaveChangesAsync();
+        scenario.Context.ChangeTracker.Clear();
+        var gate = new EventDiscoveryEnrollmentGate(scenario.Context);
+        bool originalCommitObserved = false;
+        scenario.AfterCommit = () =>
+        {
+            gate.RequireCurrent();
+            originalCommitObserved = scenario.Context.IdentityFenceOwnsTransaction
+                && scenario.Context.Database.CurrentTransaction is not null;
+        };
+        var services = new ServiceCollection();
+        services.AddHybridCache();
+        await using var cacheServices = services.BuildServiceProvider();
+
+        var response = await scenario.SyncAsync(cacheServices.GetRequiredService<HybridCache>());
+
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(originalCommitObserved).IsTrue();
+        await Assert.That(scenario.Context.Database.CurrentTransaction).IsNull();
+        var bootstrap = await scenario.ReadBootstrapAsync();
+        await Assert.That(bootstrap!.Status).IsEqualTo(InstanceBootstrapStatus.Completed);
+        var login = await new UserExternalLoginRepository(scenario.Context).GetByProviderAndKey(scenario.Account);
+        await Assert.That(login).IsNotNull();
+        await Assert.That(login!.UserId).IsEqualTo(response.Id);
+        await Assert.That(bootstrap.CompletedByUserId).IsEqualTo(login.UserId);
+        await Assert.That(await new PlatformUserRoleRepository(scenario.Context).IsUserPlatformAdmin(login.UserId)).IsTrue();
+        await Assert.That(await scenario.CountDefaultTenantDiscoveryRevisionsAsync()).IsEqualTo(1);
+        await using var nextAttempt = await gate.AcquireAsync();
+        gate.RequireCurrent();
+    }
+
     /// <summary>
     /// The request fixture owns JWT validation; the bootstrap fixture owns the new application's
     /// database. Enrollment starts without an application user, just as a first OIDC login does.
@@ -52,6 +107,7 @@ public sealed partial class LocalBootstrapConvergenceTests
         private readonly CurrentHumanPrincipalFixture? human;
         private readonly SqliteConnection privacyConnection = new("Data Source=:memory:");
         private readonly bool interactive;
+        private readonly bool colocatedIdentityFence;
         private readonly CompletionObservation observation;
         private readonly IOptions<InstanceOperatorIdentityOptions> operatorOptions;
         private readonly List<string> events = [];
@@ -63,15 +119,17 @@ public sealed partial class LocalBootstrapConvergenceTests
         private readonly IAuthenticationProviderDispatcher dispatcher;
         private IdentityAuthorityEvidence? identityEvidence;
         private InstanceOnboardingCompletionOperation operation = null!;
+        private PrivacyIdentityFenceOperation fence = null!;
 
         private CompletionFixture(Fixture database, CompletionObservation observation,
             CurrentHumanPrincipalFixture? human, bool interactive, AuthenticationProviderKind providerKind,
-            bool legalIdentity, DeploymentMode mode)
+            bool legalIdentity, DeploymentMode mode, bool colocatedIdentityFence)
         {
             this.database = database;
             this.observation = observation;
             this.human = human;
             this.interactive = interactive;
+            this.colocatedIdentityFence = colocatedIdentityFence;
             scope = database.Provider.CreateAsyncScope();
             Context = database.Application(scope);
             owner = new EfCoreUnitOfWork(Context);
@@ -132,7 +190,8 @@ public sealed partial class LocalBootstrapConvergenceTests
 
         internal static async Task<CompletionFixture> CreateAsync(
             bool interactive = false, AuthenticationProviderKind providerKind = AuthenticationProviderKind.Keycloak,
-            bool legalIdentity = true, DeploymentMode mode = DeploymentMode.SingleTenant)
+            bool legalIdentity = true, DeploymentMode mode = DeploymentMode.SingleTenant,
+            bool colocatedIdentityFence = false)
         {
             var observation = new CompletionObservation();
             var identityObservation = new CompletionIdentityCommitObservation();
@@ -141,7 +200,8 @@ public sealed partial class LocalBootstrapConvergenceTests
             CurrentHumanPrincipalFixture? human = providerKind == AuthenticationProviderKind.Keycloak
                 ? new CurrentHumanPrincipalFixture(database.Subject, Guid.CreateVersion7())
                 : null;
-            var fixture = new CompletionFixture(database, observation, human, interactive, providerKind, legalIdentity, mode);
+            var fixture = new CompletionFixture(database, observation, human, interactive, providerKind, legalIdentity, mode,
+                colocatedIdentityFence);
             try
             {
                 await fixture.InitializeAsync();
@@ -189,28 +249,44 @@ public sealed partial class LocalBootstrapConvergenceTests
                 lifetimes = [];
             }
 
+            Context.BindTenantLease();
             if (interactive)
                 await BootstrapRepository.Create(InstanceBootstrapState.CreateInteractivePending(
                     Guid.CreateVersion7(), await deployment.GetConfiguredOnboardingModeAsync(), DateTime.UtcNow));
             else
-                await new ConfiguredAdministratorBootstrapStartupRunner(provider, BootstrapRepository, owner, TimeProvider.System)
+                await new ConfiguredAdministratorBootstrapStartupRunner(provider, BootstrapRepository, owner, TimeProvider.System,
+                    new EventDiscoveryEnrollmentGate(Context))
                     .PrepareAsync(database.Token);
             await setup.InitializeAsync(database.Token);
 
-            await privacyConnection.OpenAsync();
-            var privacyOptions = new DbContextOptionsBuilder<EmbeddedPrivacyErasureAuthorityDbContext>()
-                .UseSqlite(privacyConnection).UseSnakeCaseNamingConvention()
-                .AddInterceptors(new CompletionPrivacyCommitObservation(() => AfterCommit?.Invoke())).Options;
-            var privacyFactory = new CompletionPrivacyFactory(privacyOptions);
+            var privacyOptions = new DbContextOptionsBuilder<EmbeddedPrivacyErasureAuthorityDbContext>();
+            if (colocatedIdentityFence)
+                EmbeddedPrivacyErasureAuthorityDbContextFactory.ConfigureCoLocated(privacyOptions,
+                    new PrimaryDatabaseConnectionOptions
+                    {
+                        Provider = PrimaryDatabaseProvider.Sqlite,
+                        Role = PrimaryDatabaseRole.Runtime,
+                        Database = new SqliteConnectionStringBuilder(Context.Database.GetConnectionString()).DataSource
+                    });
+            else
+            {
+                await privacyConnection.OpenAsync();
+                privacyOptions.UseSqlite(privacyConnection).UseSnakeCaseNamingConvention();
+            }
+            privacyOptions.AddInterceptors(new CompletionPrivacyCommitObservation(() => AfterCommit?.Invoke()));
+            var privacyFactory = new CompletionPrivacyFactory(privacyOptions.Options);
             await using (var privacy = privacyFactory.CreateDbContext())
-                await privacy.Database.EnsureCreatedAsync();
-            var fence = new PrivacyIdentityFenceOperation(new EmbeddedPrivacyErasureAuthorityRepository(
-                privacyFactory, TimeProvider.System, Options.Create(new PrivacyErasureOptions())));
+            {
+                if (colocatedIdentityFence) await privacy.Database.MigrateAsync();
+                else await privacy.Database.EnsureCreatedAsync();
+            }
+            fence = new PrivacyIdentityFenceOperation(new EmbeddedPrivacyErasureAuthorityRepository(
+                privacyFactory, TimeProvider.System, Options.Create(new PrivacyErasureOptions()),
+                applicationContext: colocatedIdentityFence ? Context : null));
             var mutationLock = new RelationalSettingMutationLock(Context, owner);
-            // Native receipt reads require idle reconciliation contexts. They must not borrow
-            // the application's enrollment transaction or its pending tracked entities.
+            var receipts = scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
             var authority = new TrustedSetupSettingsAuthority(contexts, lifetimes, setup,
-                scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Credentials,
+                receipts,
                 dispatcher, [provider], TimeProvider.System);
             var writer = new TrustedSetupSettingsWriter(Context, authority, mutationLock, owner);
             var logins = new UserExternalLoginRepository(Context);
@@ -225,13 +301,46 @@ public sealed partial class LocalBootstrapConvergenceTests
                 new IdentityEmailSynchronizationOperation(emails),
                 Settings, [provider], setup, new ObservedAudit(events), deployment, metadata,
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, owner, Generation, Configuration,
-                fence, operatorOptions, writer);
+                fence, new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(Context), receipts, operatorOptions, writer);
             SaveProfile = new SaveInstanceOnboardingProfileCommandHandler(BootstrapRepository, Settings,
-                setup, new ObservedAudit(events), owner, Configuration, writer);
+                setup, new ObservedAudit(events), owner, Configuration,
+                new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(Context), writer);
             ResetObservation();
         }
 
         internal SaveInstanceOnboardingProfileCommandHandler SaveProfile { get; private set; } = null!;
+
+        internal Task<BaseCommandResponse<Guid>> SyncAsync(HybridCache cache)
+        {
+            human!.EnterRequest();
+            observation.Reset();
+            var tenantContext = new TenantContextAccessor(human.Services.GetRequiredService<IHttpContextAccessor>());
+            tenantContext.SetTenant(PlatformDefaults.DefaultTenantId);
+            var logins = new UserExternalLoginRepository(Context);
+            var emails = new UserIdentityEmailRepository(Context);
+            var lifecycle = new TenantLifecycleAccessService(new TenantRepository(Context), human.Admin,
+                BootstrapRepository, new TenantLookupSource(
+                    scope.ServiceProvider.GetRequiredService<IGlobalExploreDbContextFactory>()));
+            return new SyncUserCommandHandler(Users, logins,
+                new IdentityAccountResolver(Users, logins, emails, new PrivacyErasureStateRepository(Context),
+                    Options.Create(new IdentityCorrelationOptions())),
+                emails, new IdentityEmailSynchronizationOperation(emails), new ActorRepository(Context),
+                tenantContext, lifecycle, new Explore.Persistence.Services.IdentitySynchronizationBootstrapReader(Context), operation, cache, owner,
+                NullLogger<SyncUserCommandHandler>.Instance, fence, new EventDiscoveryEnrollmentGate(Context),
+                new Explore.Persistence.Security.HumanSecuritySourceGate(Context))
+                .ExecuteAsync(new SyncUserCommand
+                {
+                    AccountKey = Account,
+                    AuthorityEvidence = identityEvidence,
+                    UserDto = new()
+                    {
+                        Email = "adapter@example.test",
+                        FirstName = "Adapter",
+                        LastName = "User",
+                        AuthProvider = "keycloak"
+                    }
+                }, database.Token);
+        }
 
         // HttpContextAccessor uses AsyncLocal: install in the caller before returning its task.
         internal Task<BaseCommandResponse<Guid>> ClaimAsync(Guid? userId = null, CancellationToken cancellationToken = default)
@@ -251,8 +360,9 @@ public sealed partial class LocalBootstrapConvergenceTests
         }
 
         internal Task<BaseCommandResponse<Guid>> CompleteProvisionedLocalAsync() =>
-            new LocalAdministratorBootstrapOperation(BootstrapRepository, provider, database.Store(scope),
-                database.Secrets, operation, setup, deployment, owner, TimeProvider.System, dispatcher)
+            new LocalAdministratorBootstrapOperation(BootstrapRepository, provider, new BootstrapLocalScopes(database),
+                database.Secrets, operation, setup, deployment, owner, TimeProvider.System, dispatcher,
+                new EventDiscoveryEnrollmentGate(Context))
                 .CompleteConfiguredAsync(Account, database.Token);
 
         internal async Task<CompleteInstanceOnboardingCommand> InteractiveCommandAsync()
@@ -300,12 +410,25 @@ public sealed partial class LocalBootstrapConvergenceTests
         }
 
         internal Task<InstanceBootstrapState?> ReadBootstrapAsync() => BootstrapRepository.GetCurrent(database.Token);
+        internal async Task<int> CountDefaultTenantDiscoveryRevisionsAsync()
+        {
+            // Observe committed metadata through the configured Global reader; the command's
+            // original null tenant lease remains unchanged and cannot see tenant-filtered rows.
+            await using var observer = await scope.ServiceProvider.GetRequiredService<IGlobalExploreDbContextFactory>()
+                .CreateDbContextAsync(database.Token);
+            return await observer.Set<EventDiscoveryRevision>().AsNoTracking()
+                .IgnoreQueryFilters([QueryFilterNames.Tenant])
+                .CountAsync(row => row.TenantId == PlatformDefaults.DefaultTenantId, database.Token);
+        }
         internal Task<string> ReadSettingsAsync() => database.ReadSettingsAsync();
         internal Task<Tenant?> ReadTenantAsync() =>
             new TenantRepository(Context).GetById(Explore.Domain.Constants.PlatformDefaults.DefaultTenantId);
-        internal Task<LocalCredentialProvisioningSnapshot?> ReadLocalProvisioningAsync(Guid operationId) =>
-            scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Credentials
-                .ReadProvisioningAsync(operationId, database.Token);
+        internal async Task<LocalCredentialProvisioningSnapshot?> ReadLocalProvisioningAsync(Guid operationId)
+        {
+            await using var observer = database.Provider.CreateAsyncScope();
+            database.Application(observer).BindTenantLease();
+            return await database.Store(observer).ReadProvisioningAsync(operationId, database.Token);
+        }
         internal Task AssertLocalCompletedAsync() => database.AssertCompletedAsync();
 
         internal void ResetObservation()

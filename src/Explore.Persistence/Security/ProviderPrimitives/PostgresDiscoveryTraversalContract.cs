@@ -2,6 +2,7 @@ using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Domain.Services.Discovery;
 using Explore.Persistence.QueryFilters;
@@ -38,7 +39,7 @@ public static partial class PostgresDiscoveryTraversalContract
         ("tenant_fence", "uuid", "p_tenant uuid", null, "void"),
         ("reservation_fence", "uuid", "p_tenant uuid", null, "void"),
         ("revision_read", "uuid", "p_tenant uuid", typeof(EventDiscoveryRevision), ""),
-        ("revision_acquire", "uuid,uuid", "p_tenant uuid,p_id uuid", typeof(EventDiscoveryRevision), ""),
+        ("revision_acquire", "uuid", "p_tenant uuid", typeof(EventDiscoveryRevision), ""),
         ("revision_write", "uuid,bigint,bigint", "p_tenant uuid,p_identity bigint,p_disclosure bigint", null, "integer"),
         ("snapshot_get", "uuid,uuid", "p_tenant uuid,p_id uuid", typeof(EventDiscoverySnapshot), ""),
         ("snapshot_reuse", "uuid,text,bigint,bigint,timestamp with time zone",
@@ -134,9 +135,9 @@ public static partial class PostgresDiscoveryTraversalContract
     {
         RequireTenant(context, tenant);
         var rows = await context.Set<EventDiscoveryRevision>()
-            .FromSqlRaw($"SELECT * FROM {FunctionSql(context, "revision_acquire")}({{0}},{{1}})", tenant, Guid.CreateVersion7())
+            .FromSqlRaw($"SELECT * FROM {FunctionSql(context, "revision_acquire")}({{0}})", tenant)
             .AsNoTracking().ToListAsync(token);
-        return rows.Single();
+        return rows.SingleOrDefault() ?? throw new EventDiscoveryUnavailableException();
     }
 
     internal static async Task<int> UpdateRevisionAsync(

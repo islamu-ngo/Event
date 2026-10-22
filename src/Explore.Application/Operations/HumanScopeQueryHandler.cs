@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -5,11 +6,20 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Explore.Application.Operations;
 
 internal sealed class HumanScopeQueryHandler<TQuery, TResult>(
-    IServiceProvider provider, Type implementation) : IQueryHandler<TQuery, TResult>
+    IServiceProvider provider, Type implementation, bool requiresHumanPreparation) : IQueryHandler<TQuery, TResult>
     where TQuery : IQuery<TResult>
 {
     public async Task<TResult> QueryAsync(TQuery query, CancellationToken cancellationToken)
     {
+        if (LocalIdentityOperationScope.Handles(typeof(TQuery)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await using var identity = await provider.GetRequiredService<ILocalIdentityExecutionScopeFactory>()
+                .CreateAsync(cancellationToken);
+            if (requiresHumanPreparation)
+                await identity.Services.GetRequiredService<IHumanCommitScopePreparation>().PrepareAsync(cancellationToken);
+            return await QueryCoreAsync(identity.Services, query, cancellationToken);
+        }
         if (FooterOperationScope.Handles(typeof(TQuery)))
         {
             var selection = FooterOperationScope.Select(query, provider.GetService<ITenantContextAccessor>());

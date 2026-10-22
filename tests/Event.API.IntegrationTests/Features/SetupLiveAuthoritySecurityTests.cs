@@ -2380,11 +2380,11 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
         CancellationToken cancellationToken)
     {
         var root = exception.GetBaseException();
-        var methods = new StackTrace(root).GetFrames()
-            .Select(frame => frame.GetMethod())
-            .Where(method => method?.DeclaringType?.FullName?.StartsWith("Explore.", StringComparison.Ordinal) == true)
+        var methods = new StackTrace(root, fNeedFileInfo: true).GetFrames()
+            .Where(frame => frame.GetMethod()?.DeclaringType?.FullName?.StartsWith("Explore.", StringComparison.Ordinal) == true)
             .Take(12)
-            .Select(method => method!.DeclaringType?.FullName + "." + method.Name);
+            .Select(frame => frame.GetMethod()!.DeclaringType?.FullName + "." + frame.GetMethod()!.Name
+                + ":" + frame.GetFileLineNumber());
         string databaseMetadata = root is Npgsql.PostgresException postgres
             ? $"SQLSTATE={postgres.SqlState}, table={postgres.TableName ?? "unspecified"}, column={postgres.ColumnName ?? "unspecified"}"
             : "SQLSTATE=none";

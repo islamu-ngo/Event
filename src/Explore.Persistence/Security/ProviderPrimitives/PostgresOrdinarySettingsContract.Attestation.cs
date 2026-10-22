@@ -81,8 +81,9 @@ public static partial class PostgresOrdinarySettingsContract
                 IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t WHERE t.oid = pg_catalog.to_regclass({table})
                     AND t.relkind = 'r' AND t.relpersistence = 'p'
                     AND t.relowner = pg_catalog.to_regrole({Text(enrollment.MigratorLogin)})::oid
-                    AND t.relrowsecurity = {tenant.ToString().ToLowerInvariant()}
-                    AND t.relforcerowsecurity = {tenant.ToString().ToLowerInvariant()})
+                    AND ({(type == typeof(SystemSetting)
+                        ? PostgresLocalIdentitySystemSettingPolicies.Compatible(OwnerRole, "t")
+                        : $"t.relrowsecurity = {tenant.ToString().ToLowerInvariant()} AND t.relforcerowsecurity = {tenant.ToString().ToLowerInvariant()}")}))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class = pg_catalog.to_regclass({table}))
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i
                         WHERE i.inhrelid = pg_catalog.to_regclass({table}) OR i.inhparent = pg_catalog.to_regclass({table}))

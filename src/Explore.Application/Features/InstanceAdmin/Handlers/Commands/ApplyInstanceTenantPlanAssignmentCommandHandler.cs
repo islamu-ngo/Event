@@ -27,26 +27,32 @@ public sealed class ApplyInstanceTenantPlanAssignmentCommandHandler(
         try
         {
             var prepared = await preparation.PrepareAsync(request, cancellationToken);
-            var selection = prepared.PlanSelection;
-            string[] outerKeys = selection.HasStorageQuota
-                ? [.. selection.OrdinaryKeys, GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes]
-                : [.. selection.OrdinaryKeys];
+            Exception? primaryFailure = null;
+            try
+            {
+                var selection = prepared.PlanSelection;
+                string[] outerKeys = selection.HasStorageQuota
+                    ? [.. selection.OrdinaryKeys, GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes]
+                    : [.. selection.OrdinaryKeys];
 
-            Task<TenantPlanAssignmentApplication> ApplyAsync(CancellationToken token) =>
-                ((ITypedTenantPlanOriginalStore)store).ApplyPlanAsync(
-                    preparation.CurrentTypedOriginal
-                        ?? throw new UnauthorizedAccessException("The original acquired plan is required."), token);
-            Task<TenantPlanAssignmentApplication> ExecuteAsync(CancellationToken token) =>
-                preparation.ExecutePreparedAsync(prepared, (_, inner) => outerKeys.Length == 0
-                    ? ApplyAsync(inner) : mutationLock.ExecuteManyAsync(outerKeys, ApplyAsync, inner), token);
+                Task<TenantPlanAssignmentApplication> ApplyAsync(CancellationToken token) =>
+                    ((ITypedTenantPlanOriginalStore)store).ApplyPlanAsync(
+                        preparation.CurrentTypedOriginal
+                            ?? throw new UnauthorizedAccessException("The original acquired plan is required."), token);
+                Task<TenantPlanAssignmentApplication> ExecuteAsync(CancellationToken token) =>
+                    preparation.ExecutePreparedAsync(prepared, (_, inner) => outerKeys.Length == 0
+                        ? ApplyAsync(inner) : mutationLock.ExecuteManyAsync(outerKeys, ApplyAsync, inner), token);
 
-            outcome = !selection.HasEmail && !selection.HasVisitor
-                ? await ExecuteAsync(cancellationToken)
-                : await mutationLock.ExecuteOrderedGroupsAsync(
-                    [selection.HasVisitor ? VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
+                outcome = !selection.HasEmail && !selection.HasVisitor
+                    ? await ExecuteAsync(cancellationToken)
+                    : await mutationLock.ExecuteOrderedGroupsAsync(
+                        [selection.HasVisitor ? VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
                      selection.HasEmail ? EmailDeliverySettingKeys.All : [],
                      selection.HasPublication ? PublicationPolicySettingKeys.All : [],
                      outerKeys], ExecuteAsync, cancellationToken);
+            }
+            catch (Exception failure) { primaryFailure = failure; throw; }
+            finally { await preparation.CloseAsync(prepared, primaryFailure); }
         }
         catch (TenantPlanOriginalRejectedException exception)
         {

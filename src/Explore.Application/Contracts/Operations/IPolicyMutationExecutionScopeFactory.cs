@@ -27,7 +27,8 @@ public enum PolicyMutationPurpose
 {
     Standard,
     EmailDelivery,
-    MixedSettings
+    MixedSettings,
+    TenantCreation
 }
 
 /// <summary>Scope and purpose are sealed together before constructing any mutation dependencies.</summary>
@@ -36,6 +37,7 @@ public sealed record PolicyMutationScope(Guid? TenantId, PolicyMutationPurpose P
     public static PolicyMutationScope Instance { get; } = new(TenantId: null);
     public static PolicyMutationScope EmailInstance { get; } = new(null, PolicyMutationPurpose.EmailDelivery);
     public static PolicyMutationScope MixedSettingsInstance { get; } = new(null, PolicyMutationPurpose.MixedSettings);
+    public static PolicyMutationScope TenantCreation { get; } = new(null, PolicyMutationPurpose.TenantCreation);
 
     public static PolicyMutationScope MixedSettingsTenant(Guid tenantId)
     {

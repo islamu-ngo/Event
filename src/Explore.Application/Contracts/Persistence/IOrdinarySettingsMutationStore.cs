@@ -15,8 +15,9 @@ using Explore.Domain.Settings.Definitions;
 namespace Explore.Application.Contracts.Persistence;
 
 /// <summary>
-/// Original ordinary command inputs, not an authorization capability. Dedicated, mixed,
-/// import and nonhuman producers never enter this compiler or borrow its completion.
+/// Full original ordinary command inputs, not an authorization capability. The
+/// concrete stores derive disjoint dedicated/unmoved executable partitions without
+/// reconstructing this envelope. Mixed, import and nonhuman producers remain separate.
 /// </summary>
 public sealed class OrdinarySettingsMutation
 {

@@ -1,0 +1,32 @@
+Change-Id: CHG-01M58P7943Z4SP14QHVSR1YHPS
+Title: "Keep federation settings policy in the API"
+Type: feat
+Scope: federation
+Summary: "Replace the three non-secret federation settings with dedicated EF-mapped storage and API-owned policy interpretation, without exposing private generic settings."
+Group: dedicated-federation-settings
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: The three dedicated federation keys are rejected in generic settings. Existing generic rows and retired governance roles, routine or policy are not copied or repaired automatically. Use a disposable isolated development environment or arrange a reviewed retained-data transition; no compatibility path is supplied.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Dedicated non-secret columns replace the old execute-only governance read capability without exposing private generic settings. Runtime and Global receive fixed four-column revision reads and inserts and two-column epoch updates; tenantless Runtime has an INSERT-only exception without read or update visibility. Global additionally reads all tenant identifiers. C# owns canonical creation, authorization, cooperative parent-setting coordination and original-transaction completion. No privileged parent-lock routine or Runtime parent UPDATE is added. A stolen credential can tamper with or fabricate revision metadata within these privileges, and direct Global parent edits can bypass API coordination.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Generated PostgreSQL, SQLite, SQL Server and MySQL/MariaDB migrations create dedicated constrained instance and tenant relations and exclude the three keys from generic settings. Provider-model catch-up migrations are separate prerequisites, not federation storage changes. Down deletes dedicated data; MySQL/MariaDB DDL is not atomically reversible.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: No new credential pair or environment variable is added. Preserve independent configured Runtime, Global and Migrator identities; do not restore the retired governance executor grant or broaden grants to repair readiness.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: PostgreSQL roles are cluster-wide, so a fresh database alone may retain rejected governance authority. Startup checks catalogs without deleting roles, routines, policies or data. Preserve independent Identity, encryption and privacy stores; use a reviewed forward correction or matching backup rather than an unsafe downgrade.

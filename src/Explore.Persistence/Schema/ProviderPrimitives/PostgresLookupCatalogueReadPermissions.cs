@@ -157,6 +157,19 @@ public static class PostgresLookupCatalogueReadPermissions
         // Email source projections belong to their own contract; Runtime must remain unable to borrow that authority.
         string otherLogins = "ARRAY[" + string.Join(",", new[] { enrollment.GlobalLogin,
             enrollment.EmailInstanceMutationLogin, enrollment.EmailTenantMutationLogin }.Select(Text)) + "]::text[]";
+        // Recognize only the creator's fixed read columns on this owner's actual
+        // reference sources. The optional package must be wholly absent or complete.
+        var creatorReads = Lookups.SelectMany(lookup =>
+        {
+            if (!PostgresTenantCreationPermissions.TryGetGlobalColumns(context, lookup.Type, out var columns, out _))
+                return Array.Empty<string>();
+            var source = Mapping(context, lookup.Type, lookup.Properties);
+            return columns.Where(column => source.Columns.Contains(column, StringComparer.Ordinal))
+                .Select(column => $"(source.table_name={Text(source.Table)} AND a.attname={Text(column)})");
+        }).ToArray();
+        string creatorColumns = creatorReads.Length == 0 ? "false" : string.Join(" OR ", creatorReads);
+        string creatorProof = creatorReads.Length == 0 ? "true"
+            : PostgresTenantCreationPermissions.OptionalGlobalCataloguePredicate(context, enrollment);
         string complete = requireComplete ? $"""
             AND NOT EXISTS (SELECT 1 FROM ({values}) source(table_name, allowed_columns)
                 CROSS JOIN LATERAL unnest(source.allowed_columns) expected(name)
@@ -205,8 +218,18 @@ public static class PostgresLookupCatalogueReadPermissions
                                 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
                             OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                 WHERE a.attrelid = pg_catalog.to_regclass(source.table_name) AND a.attnum <> 0 AND NOT a.attisdropped
-                                    AND pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum,
-                                        'SELECT,INSERT,UPDATE,REFERENCES'))))
+                                    AND (pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'INSERT,UPDATE,REFERENCES')
+                                        OR pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'SELECT WITH GRANT OPTION')
+                                        OR (pg_catalog.has_column_privilege(r.oid, a.attrelid, a.attnum, 'SELECT')
+                                            AND NOT (a.attnum > 0 AND r.rolname={Text(enrollment.GlobalLogin)}
+                                                AND ({creatorColumns})
+                                                AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                                                    JOIN pg_catalog.pg_class owner ON owner.oid=a.attrelid
+                                                    WHERE acl.grantee=r.oid AND acl.grantor=owner.relowner
+                                                        AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
+                                                AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
+                                                    WHERE acl.grantee=0 AND acl.privilege_type='SELECT')))))))
+            AND ({creatorProof}) IS TRUE
             {complete}
             """;
     }

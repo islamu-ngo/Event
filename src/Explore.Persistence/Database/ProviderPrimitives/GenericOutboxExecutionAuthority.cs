@@ -24,6 +24,22 @@ public sealed class GenericOutboxExecutionAuthority(
     private async Task RequireAsync(
         OutboxMessage message, OutboxMessageStatus status, CancellationToken cancellationToken)
     {
+        RequireCurrentEnvelope(message, status);
+        var bound = context.GenericOutboxExecutionClaim!;
+        // A failure may change Processing to DeadLettered, but never replace its original expiry/source.
+        var persisted = await admission.ReadClaimAsync(bound.MessageId, bound.LeaseExpiresAt, status, cancellationToken);
+        if (persisted != bound with { Status = status })
+            throw Denied();
+    }
+
+    /// <summary>
+    /// Validates a freshly read original Runtime envelope without renting a second
+    /// source reader. Only the concrete worker issuer composes this with its exact
+    /// operation proof on the creator's original locked transaction.
+    /// </summary>
+    internal void RequireCurrentEnvelope(OutboxMessage message,
+        OutboxMessageStatus status = OutboxMessageStatus.Processing)
+    {
         ArgumentNullException.ThrowIfNull(message);
         var bound = context.GenericOutboxExecutionClaim;
         if (bound is null || !OwnsContext(bound) || message.Id != bound.MessageId
@@ -33,10 +49,6 @@ public sealed class GenericOutboxExecutionAuthority(
             || status == OutboxMessageStatus.Processing && bound.Status != status
             || status == OutboxMessageStatus.DeadLettered && !GenericOutboxRoutes.SupportsDeadLetter(message.EventType)
             || !string.Equals(bound.PayloadDigest, GenericOutboxAdmission.PayloadDigest(message.Payload), StringComparison.OrdinalIgnoreCase))
-            throw Denied();
-        // A failure may change Processing to DeadLettered, but never replace its original expiry/source.
-        var persisted = await admission.ReadClaimAsync(bound.MessageId, bound.LeaseExpiresAt, status, cancellationToken);
-        if (persisted != bound with { Status = status })
             throw Denied();
     }
 

@@ -34,6 +34,7 @@ public class LockSettingCommandHandler
     private readonly IHumanCommitScopePreparation _humanCommitScope;
     private readonly IHumanSettingsMutationPreparation _settingsPreparation;
     private readonly ISystemSettingRepository _systemSettings;
+    private readonly IAtprotoFederationSettingsWriter _federationSettings;
 
     public LockSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -54,6 +55,7 @@ public class LockSettingCommandHandler
         IHumanCommitScopePreparation humanCommitScope,
         IHumanSettingsMutationPreparation settingsPreparation,
         ISystemSettingRepository systemSettings,
+        IAtprotoFederationSettingsWriter federationSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null)
     {
         _resolver = resolver;
@@ -75,6 +77,7 @@ public class LockSettingCommandHandler
         _humanCommitScope = humanCommitScope;
         _settingsPreparation = settingsPreparation;
         _systemSettings = systemSettings;
+        _federationSettings = federationSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -163,93 +166,117 @@ public class LockSettingCommandHandler
         if (isGuardedPublicationPolicyMutation)
         {
             var publicationPreparation = await _settingsPreparation.PrepareAsync(request, cancellationToken);
-            SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
-            DateTime occurredAtUtc = DateTime.UtcNow;
-            PublicationPolicyMutationResult mutationResult = await _mutationLock.ExecuteOrderedGroupsAsync(
-                [PublicationPolicySettingKeys.All],
-                outerToken => _settingsPreparation.ExecutePreparedAsync(publicationPreparation, async (_, token) =>
-                {
-                    var resolved = await _systemSettings.GetByKey(request.Key, token);
-                    string value = resolved?.Value ?? definition.DefaultValue;
-                    await SettingCommandHelper.RequireCommitAuthorizationAsync(
-                        request.Scope, resolvedUserId, _tenantContext.TenantId,
-                        _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, token);
-                    return await _publicationPolicyMutationBoundary.ApplyInstanceAsync(
-                    new PublicationPolicyInstanceMutationRequest(
-                        actorId,
-                        occurredAtUtc,
-                        [new PublicationPolicySettingMutation(
+            Exception? publicationFailure = null;
+            try
+            {
+                SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
+                DateTime occurredAtUtc = DateTime.UtcNow;
+                PublicationPolicyMutationResult mutationResult = await _mutationLock.ExecuteOrderedGroupsAsync(
+                    [PublicationPolicySettingKeys.All],
+                    outerToken => _settingsPreparation.ExecutePreparedAsync(publicationPreparation, async (_, token) =>
+                    {
+                        var resolved = await _systemSettings.GetByKey(request.Key, token);
+                        string value = resolved?.Value ?? definition.DefaultValue;
+                        await SettingCommandHelper.RequireCommitAuthorizationAsync(
+                            request.Scope, resolvedUserId, _tenantContext.TenantId,
+                            _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, token);
+                        return await _publicationPolicyMutationBoundary.ApplyInstanceAsync(
+                        new PublicationPolicyInstanceMutationRequest(
+                            actorId,
+                            occurredAtUtc,
+                            [new PublicationPolicySettingMutation(
                             request.Key,
                             PublicationPolicyMutationKind.Set,
                             value,
                             TenantId: null,
                             IsLocked: true)]),
-                    token);
-                }, outerToken),
-                cancellationToken);
-            if (!mutationResult.Success)
-            {
-                string failureCode = string.IsNullOrWhiteSpace(mutationResult.FailureCode)
-                    ? "event_reporting_intake_policy_invalid"
-                    : mutationResult.FailureCode;
-                string failureMessage = string.IsNullOrWhiteSpace(mutationResult.Message)
-                    ? PublicationPolicyMutationMessages.InvalidPolicy
-                    : mutationResult.Message;
-                return BaseCommandResponse.Failure<Guid>(failureCode, failureMessage);
-            }
+                        token);
+                    }, outerToken),
+                    cancellationToken);
+                if (!mutationResult.Success)
+                {
+                    string failureCode = string.IsNullOrWhiteSpace(mutationResult.FailureCode)
+                        ? "event_reporting_intake_policy_invalid"
+                        : mutationResult.FailureCode;
+                    string failureMessage = string.IsNullOrWhiteSpace(mutationResult.Message)
+                        ? PublicationPolicyMutationMessages.InvalidPolicy
+                        : mutationResult.Message;
+                    return BaseCommandResponse.Failure<Guid>(failureCode, failureMessage);
+                }
 
-            _resolver.InvalidateCache(request.Scope, scopeId);
-            foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
-            {
-                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                _resolver.InvalidateCache(request.Scope, scopeId);
+                foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
+                {
+                    await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                }
+
+                return BaseCommandResponse.Success(
+                    scopeId,
+                    $"Setting '{request.Key}' locked at {request.Scope} scope.");
             }
+            catch (Exception failure) { publicationFailure = failure; throw; }
+            finally { await _settingsPreparation.CloseAsync(publicationPreparation, publicationFailure); }
+        }
+
+        var prepared = await _settingsPreparation.PrepareAsync(request, cancellationToken);
+        Exception? primaryFailure = null;
+        try
+        {
+            SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
+            AtprotoFederationSettingWriteResult? federationWrite = null;
+            await _mutationLock.ExecuteOrderedGroupsAsync(
+                [[request.Key]],
+                token => _settingsPreparation.ExecutePreparedAsync(prepared, async (_, transactionToken) =>
+                {
+                    if (AtprotoFederationSettingPolicy.IsDedicatedKey(request.Key))
+                    {
+                        federationWrite = await _federationSettings.ApplyCurrentAsync(new(
+                            request.Scope == SettingScope.Instance ? HumanSettingsOperation.InstanceSettings : HumanSettingsOperation.TenantSettings,
+                            request.Scope, request.Scope == SettingScope.Tenant ? scopeId : null, null,
+                            request.Key, HumanSettingsMutationKind.SetLock, IsLocked: true), transactionToken);
+                        return federationWrite.Applied;
+                    }
+                    if (request.Scope == SettingScope.Instance)
+                    {
+                        var setting = await _systemSettings.GetByKey(request.Key, transactionToken)
+                            ?? throw new InvalidOperationException($"Setting '{request.Key}' does not exist at Instance scope.");
+                        setting.IsLocked = true;
+                        setting.UpdatedAt = DateTime.UtcNow;
+                        setting.UpdatedBy = actorId;
+                        await _systemSettings.UpsertLockAsync(setting, transactionToken);
+                    }
+                    else
+                    {
+                        await _resolver.LockAsync(request.Key, request.Scope, scopeId, actorId, transactionToken);
+                    }
+                    return true;
+                }, token),
+                cancellationToken);
+
+            if (federationWrite is { Applied: false })
+                return BaseCommandResponse.Failure<Guid>(federationWrite.FailureCode ?? "federation_setting_not_applied",
+                    "The federation setting lock was not applied.");
+            _resolver.InvalidateCache(request.Scope, scopeId);
+            CerbosSettingsCacheInvalidation.InvalidateIfCerbosSettingChanged(
+                _cerbosConfigResolver, request.Key, request.Scope, scopeId);
+
+            var lockSource = request.Scope == SettingScope.Instance
+                ? SettingSource.SystemLocked
+                : SettingSource.TenantLocked;
+
+            _logger.LogInformation(
+                "Setting locked: {SettingKey} at {Scope} scope. Actor: {ActorId}",
+                request.Key, request.Scope, actorId);
+
+            await _notificationHandlers.HandleAsync(new SettingChangedNotification(
+                request.Key, null, null, lockSource,
+                _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);
 
             return BaseCommandResponse.Success(
                 scopeId,
                 $"Setting '{request.Key}' locked at {request.Scope} scope.");
         }
-
-        var prepared = await _settingsPreparation.PrepareAsync(request, cancellationToken);
-        SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
-        await _mutationLock.ExecuteOrderedGroupsAsync(
-            [[request.Key]],
-            token => _settingsPreparation.ExecutePreparedAsync(prepared, async (_, transactionToken) =>
-            {
-                if (request.Scope == SettingScope.Instance)
-                {
-                    var setting = await _systemSettings.GetByKey(request.Key, transactionToken)
-                        ?? throw new InvalidOperationException($"Setting '{request.Key}' does not exist at Instance scope.");
-                    setting.IsLocked = true;
-                    setting.UpdatedAt = DateTime.UtcNow;
-                    setting.UpdatedBy = actorId;
-                    await _systemSettings.UpsertLockAsync(setting, transactionToken);
-                }
-                else
-                {
-                    await _resolver.LockAsync(request.Key, request.Scope, scopeId, actorId, transactionToken);
-                }
-                return true;
-            }, token),
-            cancellationToken);
-
-        _resolver.InvalidateCache(request.Scope, scopeId);
-        CerbosSettingsCacheInvalidation.InvalidateIfCerbosSettingChanged(
-            _cerbosConfigResolver, request.Key, request.Scope, scopeId);
-
-        var lockSource = request.Scope == SettingScope.Instance
-            ? SettingSource.SystemLocked
-            : SettingSource.TenantLocked;
-
-        _logger.LogInformation(
-            "Setting locked: {SettingKey} at {Scope} scope. Actor: {ActorId}",
-            request.Key, request.Scope, actorId);
-
-        await _notificationHandlers.HandleAsync(new SettingChangedNotification(
-            request.Key, null, null, lockSource,
-            _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);
-
-        return BaseCommandResponse.Success(
-            scopeId,
-            $"Setting '{request.Key}' locked at {request.Scope} scope.");
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await _settingsPreparation.CloseAsync(prepared, primaryFailure); }
     }
 }

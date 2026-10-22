@@ -45,6 +45,8 @@ public static partial class PostgresConfigurationManifestBootstrapContract
         {
             "Systems" => $"{F("SettingKey")} = ANY ({Values(ConfigurationManifestBootstrapData.SystemReadKeys)})",
             "Tenants" => $"{F("Id")} IN ({tenants}) OR {F("Id")} IN ({Ids("Tenants")})",
+            ConfigurationManifestBootstrapData.RevisionTag => $"{F("TenantId")} IN ({tenants}) OR " +
+                $"{F("TenantId")} IN ({Ids("Tenants")}) OR {F("Id")} IN ({Ids(ConfigurationManifestBootstrapData.RevisionTag)})",
             "Overrides" => $"{F("SettingKey")} = ANY ({Values(ConfigurationManifestBootstrapData.CrossTenantKeys)}) OR " +
                 $"({F("TenantId")} IN ({tenants}) OR {F("TenantId")} IN ({Ids("Tenants")})) AND " +
                 $"{F("SettingKey")} = ANY ({Values(ConfigurationManifestCatalog.TenantSettings.Keys)})",
@@ -65,9 +67,9 @@ public static partial class PostgresConfigurationManifestBootstrapContract
 
     private static string ScopeCheck() => """
         IF p_scope IS NULL OR pg_catalog.jsonb_typeof(p_scope) <> 'object'
-            OR NOT (p_scope ?& ARRAY['Slugs','Tenants','CreatedTenants','Documents','Policies','Operations','Operation','Effect'])
-            OR (SELECT count(*) FROM pg_catalog.jsonb_object_keys(p_scope)) <> 8
-            OR EXISTS (SELECT 1 FROM unnest(ARRAY['Slugs','Tenants','CreatedTenants','Documents','Policies','Operations']) key
+            OR NOT (p_scope ?& ARRAY['Slugs','Tenants','CreatedTenants','Revisions','Documents','Policies','Operations','Operation','Effect'])
+            OR (SELECT count(*) FROM pg_catalog.jsonb_object_keys(p_scope)) <> 9
+            OR EXISTS (SELECT 1 FROM unnest(ARRAY['Slugs','Tenants','CreatedTenants','Revisions','Documents','Policies','Operations']) key
                 WHERE pg_catalog.jsonb_typeof(p_scope->key) <> 'array')
             OR pg_catalog.jsonb_array_length(p_scope->'Slugs') NOT BETWEEN 1 AND 256
             OR pg_catalog.jsonb_typeof(p_scope->'Operation') <> 'string'
@@ -121,6 +123,9 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             "Tenants" => InsertOnly($"{In("Id", "CreatedTenants")} AND after_row->>'Slug' IN " +
                 $"(SELECT value FROM pg_catalog.jsonb_array_elements_text(p_scope->'Slugs') value) " +
                 $"AND (after_row->>'TenantStatusId')::integer = {(int)TenantStatusEnum.Provisioning}"),
+            ConfigurationManifestBootstrapData.RevisionTag => InsertOnly($"{In("Id", ConfigurationManifestBootstrapData.RevisionTag)} " +
+                $"AND {In("TenantId", "CreatedTenants")} AND pg_catalog.substr(after_row->>'Id',15,1) = '7' " +
+                "AND after_row->'IdentityEpoch' = '0'::jsonb AND after_row->'DisclosureEpoch' = '1'::jsonb"),
             "Overrides" => InsertOnly($"{In("TenantId", "CreatedTenants")} AND after_row->>'SettingKey' = ANY " +
                 $"({Values(ConfigurationManifestCatalog.TenantSettings.Keys)}) AND after_row->'IsLocked' = 'false'::jsonb"),
             "Documents" => InsertOnly($"{In("TenantId", "CreatedTenants")} AND {In("Id", "Documents")} " +
@@ -194,6 +199,20 @@ public static partial class PostgresConfigurationManifestBootstrapContract
                 IF p_before IS NULL OR p_after IS NULL OR p_changes IS NULL OR pg_catalog.jsonb_typeof(p_changes) <> 'array'
                     OR {source}(p_scope) IS DISTINCT FROM p_before THEN
                     RAISE EXCEPTION 'manifest_bootstrap_original_changed' USING ERRCODE = '40001';
+                END IF;
+                IF EXISTS (SELECT 1 FROM pg_catalog.jsonb_array_elements(p_changes) tenant
+                    WHERE tenant->>'Tag' = 'Tenants' AND
+                        (tenant->'Before' IS DISTINCT FROM 'null'::jsonb OR
+                            (SELECT count(*) FROM pg_catalog.jsonb_array_elements(p_changes) revision
+                                WHERE revision->>'Tag' = 'Revisions' AND revision->'Before' = 'null'::jsonb
+                                    AND revision->'After'->'TenantId' = tenant->'After'->'Id') <> 1))
+                    OR EXISTS (SELECT 1 FROM pg_catalog.jsonb_array_elements(p_changes) revision
+                        WHERE revision->>'Tag' = 'Revisions' AND
+                            (revision->'Before' IS DISTINCT FROM 'null'::jsonb OR
+                                (SELECT count(*) FROM pg_catalog.jsonb_array_elements(p_changes) tenant
+                                    WHERE tenant->>'Tag' = 'Tenants' AND tenant->'Before' = 'null'::jsonb
+                                        AND tenant->'After'->'Id' = revision->'After'->'TenantId') <> 1)) THEN
+                    RAISE EXCEPTION 'manifest_bootstrap_effect_invalid' USING ERRCODE = '42501';
                 END IF;
                 FOR change IN SELECT value FROM pg_catalog.jsonb_array_elements(p_changes) value LOOP
                     IF NOT (change ?& ARRAY['Tag','Before','After']) OR (SELECT count(*) FROM pg_catalog.jsonb_object_keys(change)) <> 3 THEN

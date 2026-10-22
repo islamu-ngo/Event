@@ -22,6 +22,7 @@ public class HierarchicalSettingsResolverTests : IDisposable
 {
     private readonly ISystemSettingRepository _systemRepo;
     private readonly ITenantSettingRepository _tenantRepo;
+    private readonly IAtprotoFederationSettingRepository _federationRepo;
     private readonly IOrganizationSettingRepository _orgRepo;
     private readonly IGroupSettingRepository _groupRepo;
     private readonly IGroupTenantRepository _groupTenantRepo;
@@ -35,6 +36,11 @@ public class HierarchicalSettingsResolverTests : IDisposable
     {
         _systemRepo = Substitute.For<ISystemSettingRepository>();
         _tenantRepo = Substitute.For<ITenantSettingRepository>();
+        _federationRepo = Substitute.For<IAtprotoFederationSettingRepository>();
+        _federationRepo.GetInstanceAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<AtprotoFederationInstanceSetting>());
+        _federationRepo.GetForTenantAsync(Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<AtprotoFederationTenantSetting>());
         _systemRepo.GetAllSettings(Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new List<SystemSetting>());
         _tenantRepo.GetAllForTenant(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -61,7 +67,8 @@ public class HierarchicalSettingsResolverTests : IDisposable
             _cache,
             _logger,
             emailSettingsWriter: RejectingEmailDeliverySettingsWriter.Instance,
-            eventResourceSettingsWriter: RejectingEventResourceSettingsWriter.Instance);
+            eventResourceSettingsWriter: RejectingEventResourceSettingsWriter.Instance,
+            federationSettings: _federationRepo);
     }
 
     public void Dispose()
@@ -317,14 +324,13 @@ public class HierarchicalSettingsResolverTests : IDisposable
         bool expected)
     {
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        SetupFederationInstance(AtprotoFederationInstanceSetting.Create(
+            GovernanceSettingKeys.Federation.AtprotoEventsEnabled, instanceValue ? "true" : "false",
+            instanceLocked, DateTime.UtcNow, null));
+        SetupFederationTenant(tenantId, AtprotoFederationTenantSetting.Create(tenantId,
+            GovernanceSettingKeys.Federation.AtprotoEventsEnabled, tenantValue ? "true" : "false",
+            false, DateTime.UtcNow, null));
         SetupSystemSettings(
-            new SystemSetting
-            {
-                SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-                Value = instanceValue ? "true" : "false",
-                ValueType = SettingValueType.Boolean,
-                IsLocked = instanceLocked
-            },
             new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Federation.AtprotoEventValidationProfile,
@@ -332,13 +338,6 @@ public class HierarchicalSettingsResolverTests : IDisposable
                 ValueType = SettingValueType.String,
                 IsLocked = instanceLocked
             });
-        SetupTenantSettings(tenantId, new TenantSetting
-        {
-            TenantId = tenantId,
-            Tenant = null!,
-            SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-            Value = tenantValue ? "true" : "false"
-        });
 
         var group = await _resolver.ResolveGroupAsync<AtprotoFederationSettingGroup>(
             new SettingContext(TenantId: tenantId));
@@ -358,14 +357,9 @@ public class HierarchicalSettingsResolverTests : IDisposable
         string expected)
     {
         var tenantId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        SetupFederationInstance(AtprotoFederationInstanceSetting.Create(
+            GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "true", true, DateTime.UtcNow, null));
         SetupSystemSettings(
-            new SystemSetting
-            {
-                SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-                Value = "true",
-                ValueType = SettingValueType.Boolean,
-                IsLocked = true
-            },
             new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Federation.AtprotoEventValidationProfile,
@@ -404,37 +398,13 @@ public class HierarchicalSettingsResolverTests : IDisposable
         const string enabledKey = "federation.atproto_events_backfill_enabled";
         const string modeKey = "federation.atproto_events_backfill_mode";
         var tenantId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
-        SetupSystemSettings(
-            new SystemSetting
-            {
-                SettingKey = enabledKey,
-                Value = instanceEnabled ? "true" : "false",
-                ValueType = SettingValueType.Boolean,
-                IsLocked = instanceLocked
-            },
-            new SystemSetting
-            {
-                SettingKey = modeKey,
-                Value = $"\"{instanceMode}\"",
-                ValueType = SettingValueType.String,
-                IsLocked = instanceLocked
-            });
-        SetupTenantSettings(
+        SetupFederationInstance(
+            AtprotoFederationInstanceSetting.Create(enabledKey, instanceEnabled ? "true" : "false", instanceLocked, DateTime.UtcNow, null),
+            AtprotoFederationInstanceSetting.Create(modeKey, $"\"{instanceMode}\"", instanceLocked, DateTime.UtcNow, null));
+        SetupFederationTenant(
             tenantId,
-            new TenantSetting
-            {
-                TenantId = tenantId,
-                Tenant = null!,
-                SettingKey = enabledKey,
-                Value = tenantEnabled ? "true" : "false"
-            },
-            new TenantSetting
-            {
-                TenantId = tenantId,
-                Tenant = null!,
-                SettingKey = modeKey,
-                Value = $"\"{tenantMode}\""
-            });
+            AtprotoFederationTenantSetting.Create(tenantId, enabledKey, tenantEnabled ? "true" : "false", false, DateTime.UtcNow, null),
+            AtprotoFederationTenantSetting.Create(tenantId, modeKey, $"\"{tenantMode}\"", false, DateTime.UtcNow, null));
 
         var group = await _resolver.ResolveGroupAsync<AtprotoFederationSettingGroup>(
             new SettingContext(TenantId: tenantId));
@@ -453,32 +423,20 @@ public class HierarchicalSettingsResolverTests : IDisposable
         const string enabledKey = "federation.atproto_events_backfill_enabled";
         const string modeKey = "federation.atproto_events_backfill_mode";
         var tenantId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
-        SetupSystemSettings(
-            new SystemSetting
-            {
-                SettingKey = enabledKey,
-                Value = "false",
-                ValueType = SettingValueType.Boolean,
-                IsLocked = false
-            },
-            new SystemSetting
-            {
-                SettingKey = modeKey,
-                Value = "\"downtime_only\"",
-                ValueType = SettingValueType.String,
-                IsLocked = false
-            });
-        SetupTenantSettings(
+        SetupFederationInstance(
+            AtprotoFederationInstanceSetting.Create(enabledKey, "false", false, DateTime.UtcNow, null),
+            AtprotoFederationInstanceSetting.Create(modeKey, "\"downtime_only\"", false, DateTime.UtcNow, null));
+        SetupFederationTenant(
             tenantId,
-            new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = enabledKey, Value = "false" },
-            new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = modeKey, Value = "\"downtime_only\"" });
+            AtprotoFederationTenantSetting.Create(tenantId, enabledKey, "false", false, DateTime.UtcNow, null),
+            AtprotoFederationTenantSetting.Create(tenantId, modeKey, "\"downtime_only\"", false, DateTime.UtcNow, null));
         var context = new SettingContext(TenantId: tenantId);
 
         var initial = await _resolver.ResolveGroupAsync<AtprotoFederationSettingGroup>(context);
-        SetupTenantSettings(
+        SetupFederationTenant(
             tenantId,
-            new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = enabledKey, Value = "true" },
-            new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = modeKey, Value = "\"full\"" });
+            AtprotoFederationTenantSetting.Create(tenantId, enabledKey, "true", false, DateTime.UtcNow, null),
+            AtprotoFederationTenantSetting.Create(tenantId, modeKey, "\"full\"", false, DateTime.UtcNow, null));
         var refreshed = await _resolver.ResolveGroupAsync<AtprotoFederationSettingGroup>(context);
 
         await Assert.That(initial.EventsBackfillEnabled).IsFalse();
@@ -488,6 +446,14 @@ public class HierarchicalSettingsResolverTests : IDisposable
     }
 
     // --- Batch resolution ---
+
+    private void SetupFederationInstance(params AtprotoFederationInstanceSetting[] settings) =>
+        _federationRepo.GetInstanceAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call => settings.Where(row => call.Arg<IReadOnlyCollection<string>>().Contains(row.SettingKey)).ToArray());
+
+    private void SetupFederationTenant(Guid tenantId, params AtprotoFederationTenantSetting[] settings) =>
+        _federationRepo.GetForTenantAsync(tenantId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call => settings.Where(row => call.Arg<IReadOnlyCollection<string>>().Contains(row.SettingKey)).ToArray());
 
     [Test]
     public async Task TraversalBoundsChangeWithoutAnotherReplicaInvalidatingTheLocalCache()
@@ -625,7 +591,8 @@ public class HierarchicalSettingsResolverTests : IDisposable
             _cache,
             _logger,
             emailSettingsWriter: RejectingEmailDeliverySettingsWriter.Instance,
-            eventResourceSettingsWriter: RejectingEventResourceSettingsWriter.Instance);
+            eventResourceSettingsWriter: RejectingEventResourceSettingsWriter.Instance,
+            federationSettings: _federationRepo);
         string guardedKey = PublicationPolicySettingKeys.All[0];
         Guid tenantId = Guid.NewGuid();
         Guid actorId = Guid.NewGuid();

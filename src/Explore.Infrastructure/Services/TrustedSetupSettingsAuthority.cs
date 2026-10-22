@@ -19,7 +19,7 @@ public sealed class TrustedSetupSettingsAuthority(
     IHttpContextAccessor contextAccessor,
     IEnumerable<IHumanAuthenticationLifetimeObserver> lifetimeObservers,
     ISetupSecretProvider setupProvider,
-    ILocalCredentialAdministration credentialStore,
+    ILocalBootstrapReceiptSource receiptSource,
     IAuthenticationProviderDispatcher providerDispatcher,
     IEnumerable<IConfiguredAdministratorBootstrapProvider> bootstrapProviders,
     TimeProvider timeProvider) : ITrustedSetupSettingsAuthority
@@ -27,7 +27,7 @@ public sealed class TrustedSetupSettingsAuthority(
     private readonly IHttpContextAccessor contexts = contextAccessor;
     private readonly IEnumerable<IHumanAuthenticationLifetimeObserver> lifetimes = lifetimeObservers;
     private readonly ISetupSecretProvider setup = setupProvider;
-    private readonly ILocalCredentialAdministration credentials = credentialStore;
+    private readonly ILocalBootstrapReceiptSource receipts = receiptSource;
     private readonly IAuthenticationProviderDispatcher providers = providerDispatcher;
     private readonly IEnumerable<IConfiguredAdministratorBootstrapProvider> configuredProviders = bootstrapProviders;
     private readonly TimeProvider clock = timeProvider;
@@ -99,8 +99,9 @@ public sealed class TrustedSetupSettingsAuthority(
                     || !local.EmailVerified
                     || source.Account?.ProviderKind != AuthenticationProviderKind.Local
                     || source.Account.Value != local.Receipt.LocalSubjectId.ToString("D")
-                    || await owner.credentials.ReadProvisioningAsync(local.Receipt.OperationId, cancellationToken) != local)
+                    || source.LocalReceiptLease is null)
                     throw new UnauthorizedAccessException("The original Local provisioning receipt is no longer current.");
+                await owner.receipts.RequireCurrentAsync(source.LocalReceiptLease, local, cancellationToken);
             }
             if (source.ConfiguredAccount is { } account)
             {
@@ -120,6 +121,9 @@ public sealed class TrustedSetupSettingsAuthority(
         public void RequireCurrentTime()
         {
             RequireRequest();
+            if (source.Local is { } local)
+                owner.receipts.RequireHeld(source.LocalReceiptLease
+                    ?? throw new UnauthorizedAccessException("The original Local receipt lease is absent."), local);
             if (lifetime is not null && !lifetime.IsValidAt(owner.clock.GetUtcNow()))
                 throw new UnauthorizedAccessException("The original setup credential lifetime has ended.");
         }

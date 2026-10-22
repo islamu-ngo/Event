@@ -24,6 +24,7 @@ public sealed partial class TenantPlanCatalogueOriginalAdmissionTests
     private static async Task<Seeded> SeedAsync(LocalIdentityLifecycleHttpFixture fixture, bool support = false)
     {
         await using var context = fixture.Native.CreateDatabase();
+        context.BindTenantLease();
         DateTime now = fixture.Clock.GetUtcNow().UtcDateTime;
         var plan = new TenantPlan
         {

@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using System.Collections.Immutable;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
@@ -8,6 +9,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,10 +42,16 @@ public sealed class OrdinarySettingsMutationStore(
             services, selection, mutation, subject, clock, cancellationToken);
         var source = new Source(this, context, selection, mutation, subject, clock.GetUtcNow().UtcDateTime, native);
         sources.Add(source);
-        source.RequireSelection();
-        source.Expected = native?.Image ?? await ReadAsync(source, cancellationToken);
-        source.RequireSelection();
-        return source;
+        try
+        {
+            source.RequireSelection();
+            source.Expected = native?.Image ?? await ReadAsync(source, cancellationToken);
+            source.Discovery = await Services.SettingsDiscoveryDisclosureObservation.ObserveAsync(
+                context, selection, mutation, subject, cancellationToken);
+            source.RequireSelection();
+            return source;
+        }
+        catch { source.Dispose(); throw; }
     }
 
     public async Task AcquireAsync(IOrdinarySettingsSource source, CancellationToken cancellationToken)
@@ -61,16 +69,37 @@ public sealed class OrdinarySettingsMutationStore(
                 issued.NativeAttempt = await PostgresOrdinarySettingsContract.AcquireAsync(issued.NativeObservation, cancellationToken);
             else
                 await RequireImageAsync(issued, cancellationToken);
+            if (issued.Discovery is not null)
+            {
+                await issued.Discovery.BindAsync(cancellationToken);
+                context.DisclosureMutations.EnlistSettingsSource(this, source);
+            }
         }
         catch { issued.State = 2; throw; }
     }
 
     public async Task RequireCompleteAsync(IOrdinarySettingsSource source, CancellationToken cancellationToken)
     {
+        var issued = RequireIssued(source);
+        try
+        {
+            await RequireEffectsCompleteAsync(source, cancellationToken);
+            if (issued.Discovery is not null)
+                await context.DisclosureMutations.RequireSettingsCompleteAsync(this, source, cancellationToken);
+        }
+        catch { issued.State = 2; throw; }
+    }
+
+    private async Task RequireEffectsCompleteAsync(IOrdinarySettingsSource source, CancellationToken cancellationToken)
+    {
         await VerifyAsync(source, cancellationToken);
         var issued = RequireIssued(source);
         if (issued.NativeAttempt is not null)
             await PostgresOrdinarySettingsContract.RequireCompleteAsync(issued.NativeAttempt, issued.Expected!, cancellationToken);
+        else
+            foreach (var effect in issued.Mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key)))
+                if (!issued.CompletedKeys.Contains(effect.Key) && !ProvesRefusal(issued, effect))
+                    throw new UnauthorizedAccessException("An accepted ordinary effect has no private completion or excluded refusal.");
     }
 
     public async Task VerifyAsync(IOrdinarySettingsSource source, CancellationToken cancellationToken)
@@ -93,6 +122,57 @@ public sealed class OrdinarySettingsMutationStore(
         foreach (var source in sources) source.Dispose();
     }
 
+    internal async Task<SystemSetting?> ReadCurrentSystemAsync(
+        IOrdinarySettingsSource source, string key, CancellationToken cancellationToken)
+    {
+        var issued = await RequireCurrentImageReadAsync(source, key, cancellationToken);
+        return issued.Expected!.System[key]?.Entity();
+    }
+
+    internal async Task<TenantSetting?> ReadCurrentTenantAsync(
+        IOrdinarySettingsSource source, Guid tenantId, string key, CancellationToken cancellationToken)
+    {
+        var issued = RequireIssued(source);
+        try
+        {
+            issued.RequireAcquired();
+            if (tenantId == Guid.Empty || issued.TenantId != tenantId)
+                throw new UnauthorizedAccessException("An ordinary read cannot select another tenant.");
+            await RequireCurrentImageReadAsync(source, key, cancellationToken);
+            if (!issued.Expected!.Tenant.TryGetValue(key, out var row))
+                throw new UnauthorizedAccessException("The original ordinary tenant image does not contain this key.");
+            return row?.Entity();
+        }
+        catch { issued.State = 2; throw; }
+    }
+
+    private async Task<Source> RequireCurrentImageReadAsync(
+        IOrdinarySettingsSource source, string key, CancellationToken token)
+    {
+        var issued = RequireIssued(source);
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            RequireActive();
+            if (AtprotoFederationSettingPolicy.IsDedicatedKey(key)
+                || !issued.Keys.Contains(key, StringComparer.Ordinal)
+                || !issued.Expected!.System.ContainsKey(key))
+                throw new UnauthorizedAccessException("An ordinary read requires its original captured key.");
+            await VerifyAsync(source, token);
+            RequireActive();
+            return issued;
+        }
+        catch { issued.State = 2; throw; }
+
+        void RequireActive()
+        {
+            issued.RequireAcquired();
+            if (!ReferenceEquals(services.GetRequiredService<IHumanSettingsMutationPreparation>()
+                    .CurrentOrdinarySource, source))
+                throw new UnauthorizedAccessException("Ordinary reads require their original issuer's active callback.");
+        }
+    }
+
     public async Task<string?> WriteSystemAsync(IOrdinarySettingsSource source, SystemSetting candidate,
         HumanSettingsMutationKind kind, CancellationToken cancellationToken)
     {
@@ -108,13 +188,6 @@ public sealed class OrdinarySettingsMutationStore(
                 throw new UnauthorizedAccessException("Ordinary locking cannot create a missing system setting.");
             if (kind == HumanSettingsMutationKind.SetValue && input.Locked != (before?.Locked ?? false))
                 throw new UnauthorizedAccessException("An ordinary value cannot change the original lock.");
-            if (Services.EventDiscoveryDisclosureMutationScope.IsDisclosureSetting(input.Key))
-            {
-                if (issued.NativeAttempt is not null)
-                    context.DisclosureMutations.EnlistNativeOrdinarySettings();
-                else
-                    await context.DisclosureMutations.EnlistAllTenantsAsync(cancellationToken);
-            }
             var definition = SettingRegistry.Get(input.Key)!;
             var after = before is null
                 ? new OrdinarySystemSettingImage(issued.NewIds[input.Key], input.Key,
@@ -136,17 +209,21 @@ public sealed class OrdinarySettingsMutationStore(
                 after = effect.After!;
             }
             else if (before is null)
-                await InsertAsync(after.Entity(), cancellationToken);
+                await InsertAsync(issued, after.Entity(), cancellationToken);
             else
                 await context.SystemSettings.Where(row => row.Id == before.Id && row.SettingKey == before.Key)
                     .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Value, after.Value)
                         .SetProperty(row => row.IsLocked, after.Locked)
                         .SetProperty(row => row.UpdatedAt, after.UpdatedAt)
                         .SetProperty(row => row.UpdatedBy, after.UpdatedBy), cancellationToken);
+            if (issued.NativeAttempt is not null || before is not null)
+                await ManagedTenantProvisioningPolicyProjection.RecordAsync(
+                    context, input.Key, after.Entity(), cancellationToken);
             await CompleteWriteAsync(issued, issued.Expected with
             {
                 System = issued.Expected.System.SetItem(input.Key, after)
             }, cancellationToken);
+            RecordDisclosureEffect(issued);
             return before?.Value;
         }
         catch { issued.State = 2; throw; }
@@ -160,13 +237,6 @@ public sealed class OrdinarySettingsMutationStore(
         try
         {
             var before = issued.Expected!.Tenant[key];
-            if (Services.EventDiscoveryDisclosureMutationScope.IsDisclosureSetting(key))
-            {
-                if (issued.NativeAttempt is not null)
-                    context.DisclosureMutations.EnlistNativeOrdinarySettings();
-                else
-                    context.DisclosureMutations.Enlist([tenantId]);
-            }
             if (issued.Expected.System[key]?.Locked == true)
                 throw new SettingSystemLockedException(key);
             if (kind == HumanSettingsMutationKind.SetValue
@@ -208,7 +278,7 @@ public sealed class OrdinarySettingsMutationStore(
                     : before with { Value = value!, UpdatedAt = issued.OccurredAt, UpdatedBy = issued.Subject.PrincipalId };
                 if (issued.NativeAttempt is null)
                 {
-                    if (before is null) await InsertAsync(after.Entity(), cancellationToken);
+                    if (before is null) await InsertAsync(issued, after.Entity(), cancellationToken);
                     else
                         await context.Set<TenantSetting>().Where(row => row.Id == before.Id && row.TenantId == tenantId)
                             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Value, after.Value)
@@ -226,6 +296,7 @@ public sealed class OrdinarySettingsMutationStore(
             }
             await CompleteWriteAsync(issued, issued.Expected with { Tenant = issued.Expected.Tenant.SetItem(key, after) },
                 cancellationToken);
+            if (changed) RecordDisclosureEffect(issued);
             return changed;
         }
         catch { issued.State = 2; throw; }
@@ -263,7 +334,7 @@ public sealed class OrdinarySettingsMutationStore(
                     : before with { Value = value!, UpdatedAt = issued.OccurredAt, UpdatedBy = issued.Subject.PrincipalId };
                 if (issued.NativeAttempt is null)
                 {
-                    if (before is null) await InsertAsync(after.Entity(), cancellationToken);
+                    if (before is null) await InsertAsync(issued, after.Entity(), cancellationToken);
                     else
                         await context.UserPreferences.Where(row => row.Id == before.Id && row.TenantId == tenantId && row.UserId == userId)
                             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Value, after.Value)
@@ -300,22 +371,29 @@ public sealed class OrdinarySettingsMutationStore(
             issued.RequireAcquired();
             if (!issued.Mutation.Effects.Any(effect => effect.Scope == scope && effect.TenantId == tenantId
                 && effect.UserId == userId && effect.Key == key && effect.Kind == kind && effect.Value == value
-                && effect.IsLocked == locked) || issued.Writing || !issued.CompletedKeys.Add(key))
+                && effect.IsLocked == locked) || AtprotoFederationSettingPolicy.IsDedicatedKey(key)
+                || issued.Writing || !issued.CompletedKeys.Add(key))
                 throw new UnauthorizedAccessException("An ordinary effect must be original and privately applied once.");
             if (context.ChangeTracker.Entries().Any(entry =>
                 entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
                 throw new UnauthorizedAccessException("Ordinary Settings cannot flush caller-owned tracked mutations.");
             issued.Writing = true;
+            issued.PendingEffect = issued.Mutation.Effects.Single(effect => effect.Key == key);
             return issued;
         }
         catch { issued.State = 2; throw; }
     }
 
-    private async Task InsertAsync<TEntity>(TEntity row, CancellationToken token) where TEntity : class
+    private async Task InsertAsync<TEntity>(Source source, TEntity row, CancellationToken token) where TEntity : class
     {
+        source.PendingEntity = row;
         context.Add(row);
-        await context.SaveChangesAsync(token);
-        context.Entry(row).State = EntityState.Detached;
+        try { await context.SaveChangesAsync(token); }
+        finally
+        {
+            context.Entry(row).State = EntityState.Detached;
+            source.PendingEntity = null;
+        }
     }
 
     private async Task CompleteWriteAsync(Source source, OrdinarySettingsDataImage expected, CancellationToken token)
@@ -352,6 +430,52 @@ public sealed class OrdinarySettingsMutationStore(
         source is Source issued && ReferenceEquals(issued.Store, this) ? issued
             : throw new UnauthorizedAccessException("The original selected ordinary store must issue this source.");
 
+    internal Services.SettingsDiscoveryDisclosureObservation RequireDiscoveryObservation(IOrdinarySettingsSource source)
+    {
+        var issued = RequireIssued(source);
+        issued.RequireAcquired();
+        return issued.Discovery ?? throw new UnauthorizedAccessException("The original ordinary discovery observation is missing.");
+    }
+
+    internal bool OwnsPendingDiscoveryRow(IOrdinarySettingsSource source, object entity)
+    {
+        var issued = RequireIssued(source);
+        issued.RequireAcquired();
+        return issued.Writing && ReferenceEquals(issued.PendingEntity, entity);
+    }
+
+    internal async Task<ImmutableArray<HumanSettingsMutation>> RequireDisclosureEffectsAsync(IOrdinarySettingsSource source,
+        CancellationToken token)
+    {
+        await RequireEffectsCompleteAsync(source, token);
+        return RequireIssued(source).DisclosureEffects.ToImmutableArray();
+    }
+
+    private static void RecordDisclosureEffect(Source source)
+    {
+        var effect = source.PendingEffect ?? throw new UnauthorizedAccessException("The original private ordinary effect is missing.");
+        if (effect.Scope != SettingScope.User && Services.EventDiscoveryDisclosureMutationScope.IsDisclosureSetting(effect.Key))
+            source.DisclosureEffects.Add(effect);
+    }
+
+    private static bool ProvesRefusal(Source source, HumanSettingsMutation effect)
+    {
+        var image = source.Expected!;
+        bool absent = effect.Scope == SettingScope.Instance ? image.System.GetValueOrDefault(effect.Key) is null
+            : effect.Scope == SettingScope.Tenant ? image.Tenant.GetValueOrDefault(effect.Key) is null
+            : image.User.GetValueOrDefault(effect.Key) is null;
+        return effect.Kind == HumanSettingsMutationKind.SetValue && effect.Scope != SettingScope.Instance
+                && (image.System.GetValueOrDefault(effect.Key)?.Locked == true
+                    || effect.Scope == SettingScope.User && image.Tenant.GetValueOrDefault(effect.Key)?.Locked == true)
+            || effect.Kind == HumanSettingsMutationKind.Remove && absent
+            || effect.Kind == HumanSettingsMutationKind.SetLock && (absent
+                || effect.Scope == SettingScope.Tenant && image.Tenant.GetValueOrDefault(effect.Key)?.Locked == effect.IsLocked)
+            || effect.Kind == HumanSettingsMutationKind.SetValue && source.Mutation.RequiresTenantVerificationCeiling
+                && effect.Key == GovernanceSettingKeys.Organizations.VerificationRequired && effect.Value == "false"
+                && (!bool.TryParse(image.System.GetValueOrDefault(GovernanceSettingKeys.Organizations.TenantCanOmitVerification)?.Value,
+                    out bool canOmit) || !canOmit);
+    }
+
     private sealed class Source : IOrdinarySettingsSource, IDisposable
     {
         private readonly ExploreDbContext context;
@@ -376,7 +500,8 @@ public sealed class OrdinarySettingsMutationStore(
             contextId = context.ContextId;
             Keys = OrdinarySettingsDataImage.Keys(mutation);
             NewIds = native?.NewIds.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
-                ?? mutation.Effects.ToDictionary(effect => effect.Key, _ => Guid.CreateVersion7(), StringComparer.Ordinal);
+                ?? mutation.Effects.Where(effect => !AtprotoFederationSettingPolicy.IsDedicatedKey(effect.Key))
+                    .ToDictionary(effect => effect.Key, _ => Guid.CreateVersion7(), StringComparer.Ordinal);
             connection.StateChange += ConnectionChanged;
         }
 
@@ -389,6 +514,10 @@ public sealed class OrdinarySettingsMutationStore(
         internal Dictionary<string, Guid> NewIds { get; }
         internal HashSet<string> CompletedKeys { get; } = new(StringComparer.Ordinal);
         internal OrdinarySettingsDataImage? Expected { get; set; }
+        internal Services.SettingsDiscoveryDisclosureObservation? Discovery { get; set; }
+        internal List<HumanSettingsMutation> DisclosureEffects { get; } = [];
+        internal HumanSettingsMutation? PendingEffect { get; set; }
+        internal object? PendingEntity { get; set; }
         internal PostgresOrdinarySettingsContract.IObservation? NativeObservation { get; }
         internal PostgresOrdinarySettingsContract.IAttempt? NativeAttempt { get; set; }
         internal DbTransaction? Transaction { get; set; }

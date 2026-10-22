@@ -40,6 +40,8 @@ public class TenantSettingRepository : ITenantSettingRepository
         string key,
         CancellationToken cancellationToken = default)
     {
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+            return await boundary.ReadOrdinaryTenantAsync(_dbContext, ordinary, tenantId, key, cancellationToken);
         if (_dbContext.IsConfigurationInstanceImportOwner
             && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
             return (await native.ReadTenantSettingsAsync(tenantId, [key], cancellationToken)).SingleOrDefault();
@@ -68,11 +70,17 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+        {
+            await boundary.RequireOriginalOrdinaryWriter(_dbContext, ordinary, actorId)
+                .WriteTenantAsync(ordinary, tenantId, key, HumanSettingsMutationKind.SetValue,
+                    value, null, cancellationToken);
+            await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetValue, value, null, actorId, cancellationToken);
+            return;
+        }
+
         await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
-            if (_humanBoundary!.OrdinarySource is { } ordinary)
-                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
-                    ordinary, tenantId, key, HumanSettingsMutationKind.SetValue, value, null, token);
             DateTime now = DateTime.UtcNow;
             int updated = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
@@ -164,11 +172,17 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+        {
+            bool ordinaryChanged = await boundary.RequireOriginalOrdinaryWriter(_dbContext, ordinary, auditActorId: null)
+                .WriteTenantAsync(ordinary, tenantId, key, HumanSettingsMutationKind.Remove,
+                    null, null, cancellationToken);
+            await RequireAsync(tenantId, key, HumanSettingsMutationKind.Remove, null, null, null, cancellationToken);
+            return ordinaryChanged;
+        }
+
         bool changed = await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
-            if (_humanBoundary!.OrdinarySource is { } ordinary)
-                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
-                    ordinary, tenantId, key, HumanSettingsMutationKind.Remove, null, null, token);
             int removed = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
                 .Where(setting => setting.TenantId == tenantId && setting.SettingKey == key)
@@ -197,11 +211,17 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+        {
+            bool ordinaryChanged = await boundary.RequireOriginalOrdinaryWriter(_dbContext, ordinary, actorId)
+                .WriteTenantAsync(ordinary, tenantId, key, HumanSettingsMutationKind.SetLock,
+                    null, true, cancellationToken);
+            await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetLock, null, true, actorId, cancellationToken);
+            return ordinaryChanged;
+        }
+
         bool changed = await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
-            if (_humanBoundary!.OrdinarySource is { } ordinary)
-                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
-                    ordinary, tenantId, key, HumanSettingsMutationKind.SetLock, null, true, token);
             DateTime now = DateTime.UtcNow;
             int updated = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
@@ -237,11 +257,17 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
+        if (_humanBoundary is { OrdinarySource: { } ordinary } boundary)
+        {
+            bool ordinaryChanged = await boundary.RequireOriginalOrdinaryWriter(_dbContext, ordinary, actorId)
+                .WriteTenantAsync(ordinary, tenantId, key, HumanSettingsMutationKind.SetLock,
+                    null, false, cancellationToken);
+            await RequireAsync(tenantId, key, HumanSettingsMutationKind.SetLock, null, false, actorId, cancellationToken);
+            return ordinaryChanged;
+        }
+
         bool changed = await ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
-            if (_humanBoundary!.OrdinarySource is { } ordinary)
-                return await _humanBoundary.OrdinaryStore.WriteTenantAsync(
-                    ordinary, tenantId, key, HumanSettingsMutationKind.SetLock, null, false, token);
             DateTime now = DateTime.UtcNow;
             int updated = await _dbContext.TenantSettingOverrides
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)

@@ -17,14 +17,18 @@ internal static class EventReadProjectionSql
     /// be absent during installation; each projection retains its own complete private-source inventory.
     /// </summary>
     internal static string RuntimeCallerPrivilegeGuard(ExploreDbContext context, HumanPrincipalSourceSql names,
-        IReadOnlyCollection<Type> sources, PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix)
+        IReadOnlyCollection<Type> sources, PostgresNativeQueueEnrollment enrollment, string diagnosticPrefix,
+        bool allowLookupReferences = true)
     {
         string runtime = Text(enrollment.RuntimeLogin);
         string relations = string.Join(",", sources.Select(type => Text(names.Table(type)) + "::regclass"));
         var references = new List<string>();
-        foreach (var type in sources)
-            if (PostgresLookupCatalogueReadPermissions.TryGetRuntimeReadColumns(context, type, out var columns))
+        foreach (var type in allowLookupReferences ? sources : [])
+        {
+            PostgresLookupCatalogueReadPermissions.TryGetRuntimeReadColumns(context, type, out var columns);
+            if (columns.Count != 0)
                 references.Add($"(t.oid = {Text(names.Table(type))}::regclass AND a.attname = ANY(ARRAY[{string.Join(",", columns.Select(Text))}]::text[]))");
+        }
         string declaredReference = references.Count == 0 ? "false" : string.Join(" OR ", references);
         string referenceRead = $"""
             r.rolname = {runtime} AND a.attnum > 0 AND ({declaredReference})
@@ -34,6 +38,7 @@ internal static class EventReadProjectionSql
             AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                 WHERE acl.grantee = 0 AND acl.privilege_type = 'SELECT')
             """;
+        referenceRead = $"({referenceRead}) OR ({PostgresTenantApiKeyStoragePermissions.RuntimeParentReadPredicate(context, enrollment, "r.oid", "t.oid", "a.attname", "'SELECT'")})";
         return $"""
             IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                 WHERE pg_catalog.pg_has_role({runtime},r.oid,'MEMBER')

@@ -15,6 +15,96 @@ The work is substantially authored, but the entire SQL-to-EF programme remains i
 
 This report is the durable resume source. Older `dev/active/event-api-security-remediation/` notes are local/ignored working memory and contain superseded candidate recipes. Do not require those files or machine-local caches to understand the remaining scope. Git history and the source/test anchors below are authoritative. The appendix records every pending path at handoff; preserving a path does **not** certify its correctness.
 
+### Completion status — five separate groups, not a completion percentage
+
+**Substantial implementation and acceptance work remains. This is not technically at “push the last commit and merge a completed refactor.”** The maintainer's decision to preserve and potentially merge an incomplete checkpoint is a separate decision. A clean worktree, successful commit hooks or ready-for-review flag does not turn unfinished product work into a passing release candidate.
+
+There is no trustworthy completion percentage. The 13 workstreams have different sizes, partially implemented workflows and unequal verification coverage. Generated artifacts inflate file counts without representing independent tasks. Neither paths committed nor tests passed is a defensible denominator for programme completion.
+
+#### Group 1 — Finish the EF-first cutovers: OPEN
+
+Section 6 names all 13 SQL workstreams and their owning source families. They are **without final sign-off**, not necessarily unstarted. Sections 3–5 distinguish committed bounded outcomes, authored replacements and unverified integration. Do not discard successful existing EF work or repeat it from scratch.
+
+For each capability, completion requires all of the following:
+
+- Inventory the real production callers, selected connection/provider, source observations, writes, transaction boundaries and post-commit effects. Include inline SQL and indirect installers; counting CREATE statements alone misses business behavior.
+- Move ordinary reads/writes to EF Core/LINQ and keep authorization, business predicates, state transitions, concurrency coordination, replay and completion in C#. Controllers remain transport adapters, not the home for all business logic.
+- Preserve the original selected owner's transaction, tenant/actor identity, cancellation lifetime, optimistic concurrency/CAS, audit/outbox writes and known-versus-unknown commit outcome. Do not acquire a different privileged context mid-operation to make a query succeed.
+- Remove the retired business routine and its invocation, installer, obsolete privileges and body-attestation assumptions when their consumers are actually cut over. Renaming SQL wrappers or leaving reachable business SQL behind is not retirement.
+- Retain only documented, bounded provider primitives that EF/provider APIs cannot express appropriately: generated schema/constraints, useful RLS, fixed permission/catalog mechanics and proven small lock/claim/clock gaps. A primitive exception must state its owner, provider limitation, exact inputs/outputs, connection/transaction custody and tests.
+- Exercise real positive and adversarial behavior, update paired operator/internal guidance where applicable, and reconcile the current architecture/scanner evidence without exclusions or weakened guards.
+
+**Close this group only when:** the reachable SQL capability inventory has an explicit disposition for every family, its C# workflows and real callers are integrated, required provider evidence exists and there are no undocumented business-SQL exceptions. Individual lanes can close independently; closing one does not close all 13.
+
+#### Group 2 — Repair end-to-end integration: OPEN
+
+This is not satisfied by constructor compilation, isolated permission tests or an implementation existing on disk. Work through the concrete blockers in Section 2 and the vertical acceptance in Section 4:
+
+1. **Setup enrollment/import:** implement the missing bounded issuance-claim/enrollment storage admission, starting from the real Runtime 42501 regression. Prove actual enrollment creation/replay/rotation/revocation and the genuine HTTP enrollment→upload→preview→concurrent apply flow. Do not borrow Migrator authority, fabricate authorization or broaden private secret-binding/profile reads.
+2. **Scanner management and check-in:** finish current-image issue/list/revoke/check-in acceptance under the fixed scanner, parent and required-document permissions. Prove original-transaction admission, personal Actor linkage, foreign-tenant rejection, competing issuance/check-in and rollback. Reconcile Gitar's actual remaining finding rather than treating its successful bot execution as product approval.
+3. **Selected identity and onboarding:** prove the configured identity writer is selected before the complete handler/unit-of-work lifecycle; exercise both colocated and external-identity topologies, temporary lockout versus terminal eligibility, revocation and administrator linkage. Prove final bootstrap writes cannot consume a disposed or foreign receipt and prove startup hands durable effects to a genuinely claimed Runtime worker.
+4. **Federation policy and ordinary/mixed settings:** finish the dedicated three-key storage/read/write/hierarchy cutover with real authorization, constraints and seeds. Keep those keys out of generic settings/manifests; prove instance-parent/tenant-child ordering and positive behavior after removing the former governance routine.
+5. **Canonical revision metadata and creation:** cover every real tenant/metadata producer, exactly one canonical revision row per actual tenant creation, correct epoch effects, original-transaction rollback, no read-time repair, and concurrent source/settings changes. C# cooperative coordination must be held by the actual writer; accepted direct-credential risk does not excuse races between legitimate API workflows.
+6. **Provisioning worker/scheduler and policy projection:** acquire Human custody before protected source reads/BEGIN, then the required Local/Discovery/settings gates in order, retain custody through settlement and release only owned gates. Complete actual producer/projection/creator activation, durable outbox delivery and acknowledged-commit cleanup classification; do not normalize committed work to Unknown because later disposal failed.
+7. **Other authored EF consumers:** verify preferences, membership, retention discovery, event-read/catalogue coexistence and typed Listmonk evidence on the final composed source. Keep fleet-health snapshots coherent and private provider diagnostics out of business decisions.
+
+**Close this group only when:** genuine production-owner workflows pass their unchanged positive, negative, concurrency, replay and failure-recovery assertions. A test that fails in fixture setup has not reached the semantic assertion; a later successful build does not close the earlier runtime counterexample.
+
+#### Group 3 — Reconcile, preserve and commit local work: PACKAGING DONE; FUNCTIONAL RECONCILIATION OPEN
+
+The earlier user-supplied status described 534 changed/untracked paths:339 tracked plus 195 untracked, with the 28-path Actor slice still staged and GitHub at `12b43f2a`. Preserve that as a **historical status snapshot**, not today's dirty-tree state or a verified task count.
+
+At the later frozen handoff snapshot, there were 514 pending paths:319 tracked plus 195 untracked. Those counts belong to different checkpoints; no unsupported explanation or “20 tasks completed” inference is made from their difference. The complete 514-path manifest is retained in Section 11. Three release fragments and five durable backlog files produced the 522-path preservation range.
+
+Packaging subsequently committed and normally pushed the Actor slice as `84fc67c7`, then the six source packets, documentation packet and evidence follow-up recorded in Section 9. At the 2026-10-22T20:47:59Z inspection, local/GitHub HEAD was `4ee2a396a260a65fd026ab19587b3f4595c427a3`; fsmonitor-disabled worktree status was clean. This documentation clarification is a later small follow-up, not a revival of those staged changes.
+
+Preservation is therefore complete for the recorded pending tree, but correctness reconciliation remains:
+
+- Verify all consumers, untracked-at-handoff helpers, context partials, fixed permission intersections, composition roots, test fixtures and generated source belong to the same functioning model/owner contract.
+- Resolve drift by changing the actual C# model/configuration/workflow and regenerating unapplied development artifacts when necessary. Do not hand-edit migrations/snapshots, restore removed Configurator projects or add compatibility shims.
+- Keep future fixes independently reviewable and record actual commands/results. Do not replay the archived stash, old private indices or obsolete candidate commit packets.
+- Distinguish authored source, successful compilation, bounded test acceptance and complete workflow acceptance. The two affected Release builds passed, but source packaging did not establish the final runtime/provider matrix.
+
+**Close the remaining part of this group only when:** the committed replacement graph is operationally coherent under its real selected owners and all attributed integration failures are repaired or explicitly quarantined with untouched-base evidence. The Git housekeeping portion is already complete; do not report it as remaining 534-file cleanup.
+
+#### Group 4 — Establish final combined acceptance: OPEN
+
+The Actor slice has bounded verified evidence: 28 PostgreSQL cases, including initial connection-failure cleanup and same-context recovery after backend termination, plus 11 Application cases. Section 3 records run IDs, counts, exits, source hash and the pushed commit. Those results must not be promoted to acceptance of unrelated workflows or of the entire combined programme.
+
+Final acceptance still requires:
+
+- **Provider/model lifecycle:** actual PostgreSQL, SQLite, SQL Server, MySQL and MariaDB behavior, including application and external-identity histories and generated Up→Down→Up where supported. Ten offline model checks, four migration-project builds and the bounded SQLite lifecycle receipt are useful existing evidence, not a completed physical five-engine matrix.
+- **Real authority:** ordinary Runtime, Global, Migrator and selected identity-writer configurations; sealed current tenant, null/foreign-tenant refusal, fixed column access, nondelegation, source drift and fail-closed readiness. Useful RLS and constraints remain supporting database safeguards, not replacement business workflows.
+- **Actual endpoints/workers:** SetupLive/onboarding/import, scanner issue/check-in, identity lifecycle, federation/settings, canonical creation, policy projection, worker delivery and affected private-management/registration consumers. Include the broader native class inventory and workstream-specific tests in Sections 6 and 8.
+- **State and concurrency:** competing legitimate owners, last-slot/duplicate actions where applicable, transaction rollback, original-owner replacement, cancellation, disposed/borrowed custody, uncertain acknowledgements and recovery without duplicate effects. Resolve SQLite cross-process coordination instead of testing only threads sharing one semaphore.
+- **Architecture and layer coverage:** final Persistence capability-boundary guards and affected Domain/Application/Infrastructure/API tests. Do not absorb unrelated localization or fixture failures without attribution; preserve a concrete untouched-base reproduction if quarantining them.
+- **Candidate-bound evidence:** exact revision/artifact, provider, selected configuration/topology, test filter, nonzero expected/discovered counts, passed/failed/skipped totals, elapsed time, exit code and completed logs. Interrupted, killed, zero-selected, setup-failed, stale-image or cancelled runs are not passing evidence.
+
+Follow the approved socket, TMPDIR, shared locks and verified TUnit filters in Section 8. Do not run duplicate builds or a full provider matrix while merely editing this report. At future implementation completion, run the applicable final workstream matrix once on the final combined image and retain actual receipts.
+
+**Close this group only when:** the complete applicable matrix and end-to-end workflow union has accepted evidence for the same final candidate, with any legitimate exclusions explicitly justified. A build with zero compiler errors is not a substitute for product tests, and a provider-neutral test is not native authority proof.
+
+#### Group 5 — Resolve review/checks and independent admission: OPEN
+
+The accepted trusted-base Release Impact exception is **not** a waiver of Sonar, CodeQL, application correctness, migration/provider, security or independent review requirements. A maintainer can choose to merge this unfinished checkpoint, but that choice does not make those product-verification requirements complete.
+
+Required remaining work:
+
+- Reconcile Sonar's current analysis with the exact source revision. The historical gate was ERROR, including 4.3% duplicated new lines against a 3% maximum and independent reliability/security failures. The dated per-finding SQL audit distinguishes 136 supported false-positive recommendations from two actual literal defects, plus a later separate bootstrap literal defect; it is not an external disposition or a blanket SQL-safety certificate.
+- Obtain actual authorized false-positive dispositions where justified, and fix genuine findings in source. Preserve immutable enrollment/body checks and proper literal/identifier treatment. Do not rename sinks, hide interpolation, widen allowlists, hand-edit generated artifacts or weaken the quality gate.
+- Inspect CodeQL aggregate and language-specific jobs separately. A neutral aggregate, running C# analysis or a cancelled job is not successful analysis of the candidate; an older failure must be attributed to its own head/run before remediation or rerun.
+- Finish Gitar/manual review with the genuine workflow evidence, not merely the bot's SUCCESS status. Reconcile GitGuardian incident 38333356 and the single approved Gitleaks fingerprint without broader exclusions. Current secret/dependency check success does not independently certify private diagnostic handling, all-history findings or every accepted credential boundary.
+- Review applicable package/version advisory evidence and license/provenance. GitHub's 119 default-branch dependency warning is recorded in Section 9; a PR Dependency Review success does not by itself close every inherited advisory.
+- Obtain required review decisions and final candidate/operational admission. Keep incomplete browser/deployment, restore/keyring, independent assessment and broader security-programme contracts in Section 10 and its companion snapshot visible.
+
+Latest directly inspected rollup at `4ee2a396a2`, 2026-10-22T20:47:59Z: **OPEN, not draft, BLOCKED, REVIEW_REQUIRED**. Release Impact had completed FAILURE entries and a cancelled invocation. Build & Test, Security Integration Tests, OpenAPI Contract Guard and two C# analysis entries were IN_PROGRESS; the aggregate CodeQL entry was NEUTRAL. A CLA invocation was CANCELLED alongside successful CLA invocations. Dependency Review, Documentation Quality, Secret Scanning, Workflow Security and Gitar reported SUCCESS; GitGuardian was NEUTRAL. No SonarCloud entry appeared in that observed rollup, so it does not establish a fresh Sonar pass or analysis revision.
+
+Evidence handles: [Release Impact failure](https://github.com/islamu-ngo/Event/actions/runs/39851739627/job/120079445527), [Build & Test](https://github.com/islamu-ngo/Event/actions/runs/39851397016/job/120078934896), [Security Integration Tests](https://github.com/islamu-ngo/Event/actions/runs/39851396792/job/120078451695), [C# analysis](https://github.com/islamu-ngo/Event/actions/runs/39851396757/job/120079061449), [neutral CodeQL aggregate](https://github.com/islamu-ngo/Event/runs/120079366838). These are dated observation links, not assertions about their eventual outcomes.
+
+The earlier message's “draft, blocked, review required; Sonar/aggregate CodeQL failure; cancelled build/security runs” remains the user-provided older snapshot. Do not overwrite fresh observations with it, infer that a cancelled run passed, or infer that changing draft→ready closed review or product issues.
+
+**Close this group only when:** applicable checks and independent review have genuine current-candidate acceptance or an explicitly recorded authorized disposition for that specific requirement. Record any maintainer merge exception narrowly; do not silently extend it to unrelated failing checks.
+
 ### Accepted decisions — do not reopen routine approvals
 
 - This is clean, pre-release development. There is no retained development database/history to preserve. Breaking changes and replacement of unapplied draft migrations through EF CLI are approved. Never hand-edit generated migrations/snapshots or silently reset an actual database.

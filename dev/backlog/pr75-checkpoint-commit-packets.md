@@ -1218,3 +1218,38 @@ Changelog-Reason: Durable implementation handoff and paired technical/operator d
 git -c core.fsmonitor=false show --stat --oneline HEAD
 git -c core.fsmonitor=false diff --cached --name-only
 ```
+
+## Documentation clarification — five independent completion groups
+
+Reason for replacing the earlier documentation-only packet: the maintainer requested the five remaining-work categories explicitly and in detail, including the older534-path/staged-Actor status example. Preserve it as historical while retaining current pushed-source evidence. This change only clarifies the backlog; it neither resumes implementation nor certifies product acceptance.
+
+Exact owned paths:
+
+- `dev/backlog/pr75-remaining-implementation-handoff.md`
+- `dev/backlog/pr75-checkpoint-commit-packets.md`
+
+Commit:
+
+```text
+docs(documentation): spell out all five deferred completion groups
+
+Define the implementation, integration, source reconciliation, final acceptance and review/check closure criteria. Preserve the earlier534-path status as historical, distinguish completed packaging from unfinished runtime work, and record the observed4ee2a396a2 check rollup without claiming cancelled or running jobs passed.
+
+Changelog: skip
+Changelog-Reason: Backlog clarification only; no runtime implementation or product-verification completion is asserted.
+```
+
+Commands (clean index required, force only these intentionally tracked backlog paths):
+
+```bash
+git -c core.fsmonitor=false diff --cached --name-only
+git -c core.fsmonitor=false add -f -- dev/backlog/pr75-remaining-implementation-handoff.md dev/backlog/pr75-checkpoint-commit-packets.md
+git -c core.fsmonitor=false diff --cached --check
+git -c core.fsmonitor=false commit -m "docs(documentation): spell out all five deferred completion groups" -m "Define the implementation, integration, source reconciliation, final acceptance and review/check closure criteria. Preserve the earlier534-path status as historical, distinguish completed packaging from unfinished runtime work, and record the observed4ee2a396a2 check rollup without claiming cancelled or running jobs passed." -m $'Changelog: skip\nChangelog-Reason: Backlog clarification only; no runtime implementation or product-verification completion is asserted.'
+git -c core.fsmonitor=false show --stat --oneline HEAD
+dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll preflight-range --target develop --head HEAD
+git -c core.fsmonitor=false push origin HEAD:refs/heads/feat/event-api-security-remediation
+git -c core.fsmonitor=false status --porcelain
+```
+
+Verification is documentation-scoped: five group headings, companion-link existence, root/worktree byte parity, whitespace and release provenance. No product builds or test suites are required for this Markdown-only change.

@@ -508,6 +508,14 @@ Machine-local logs below are optional forensic handles, not prerequisites to und
 
 **Packaging completion does not close any unchecked implementation or verification task above.** The maintainer may choose to force-merge; this document preserves the actual remaining engineering work rather than representing that choice as a passing technical gate.
 
+### Post-push evidence and dependency warning
+
+The initial seven preservation packets were normally pushed through `2c5220bb3e2387dbcbc359846bb3a1a536d33549`. The remote branch returned that exact hash; fsmonitor-disabled status was empty. Final native release-range preflight at that documentation checkpoint passed with237 commits and169 Change-Ids. The two explicit path manifests were also compared: the522-path committed range exactly matched all owned packet paths, with no missing helper or extra staged file.
+
+During that successful push, GitHub reported **119 default-branch dependency vulnerabilities:92 high and27 moderate**, linking to the repository's Dependabot security view. This is a hosting-platform warning, not a fresh PR-specific dependency audit; the PR may change affected versions, and those counts must not be presented as a reviewed inventory for this candidate. Later completion must retrieve accessible advisory/package/version evidence, attribute each applicable issue and remediate or explicitly disposition it under normal license/provenance and regression rules. Do not suppress alerts or assume the final dependency/license/security scan is green.
+
+This small post-push evidence update is a documentation-only follow-up to the seven initial preservation packets. It does not implement dependency upgrades or change the known runtime blockers. The final containing hash and ready-for-review state are reported on the PR; ready-for-review is not a passing technical merge/release gate.
+
 ## 10. Broader security programme: preserve scope without restarting it
 
 The SQL/EF sections above are the current source-reviewed workstream. The older PR also contains unfinished or execution-deferred security work outside Persistence. Its unchecked boxes are not a fresh defect inventory: many source fixes were committed without reconciling every old checkbox. Do not reimplement them blindly or automatically resume the entire programme.

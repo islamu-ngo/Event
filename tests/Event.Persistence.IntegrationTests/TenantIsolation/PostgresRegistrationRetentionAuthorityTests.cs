@@ -10,6 +10,8 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
+using Explore.Persistence.Schema;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -26,6 +28,78 @@ public sealed class PostgresRegistrationRetentionAuthorityTests(PostgreSqlContai
     private static readonly DateTime Now = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
     [Test]
+    public async Task ActiveDirectoryPagesUseFixedEfReadsWithoutRegistrationDiscoveryRoutine()
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var strategyContext = new ExploreDbContext(options.Options);
+        strategyContext.BindTenantLease();
+        Guid[] ids = await strategyContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var seed = new ExploreDbContext(options.Options);
+            seed.BindTenantLease();
+            await using var gate = new EventDiscoveryEnrollmentGate(seed);
+            await using var custody = await gate.AcquireAsync();
+            Guid[] selected = [Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()];
+            seed.Tenants.AddRange(selected.Select((id, index) => new Tenant
+            {
+                Id = id,
+                FullName = "Retention directory",
+                Slug = $"retention-directory-{id:N}",
+                TenantStatusId = (int)(index == 2 ? TenantStatusEnum.Suspended : TenantStatusEnum.Active),
+                TenantStatus = null!
+            }));
+            await seed.SaveChangesAsync();
+            return selected;
+        });
+
+        var factory = new GlobalExploreDbContextFactory(
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
+        await using (var global = await factory.CreateDbContextAsync())
+        {
+            global.RequireBoundTenantLease();
+            await Assert.That(global.TenantFilterTenantId).IsNull();
+            await global.Database.OpenConnectionAsync();
+            await using var command = global.Database.GetDbConnection().CreateCommand();
+            var tenant = global.Model.FindEntityType(typeof(Tenant))!;
+            command.CommandText = """
+                SELECT pg_catalog.to_regprocedure(@routine) IS NULL
+                    AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname IN
+                        ('registration_retention_discovery_owner',
+                         'registration_retention_discovery_migrator',
+                         'registration_retention_discovery_executor'))
+                """;
+            command.Parameters.Add(new NpgsqlParameter("routine",
+                $"{Quote(tenant.GetSchema() ?? "public")}.{Quote(tenant.GetTableName() + "_registration_retention_ids")}(uuid,integer)"));
+            await Assert.That(await command.ExecuteScalarAsync()).IsEqualTo(true);
+            var eligible = await global.Tenants.IgnoreAutoIncludes().AsNoTracking()
+                .Where(row => ids.Contains(row.Id) && row.TenantStatus.IsActiveState)
+                .Select(row => row.Id).ToArrayAsync();
+            await Assert.That(eligible).IsEquivalentTo(ids.Take(2));
+            var denied = await Assert.ThrowsAsync<PostgresException>(() => global.RegistrationSensitiveAnswerValues
+                .IgnoreQueryFilters().Select(row => row.Ciphertext).ToArrayAsync());
+            await Assert.That(denied.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+        }
+
+        var discovery = new RegistrationRetentionTenantDiscoveryRepository(factory, fixture.NativeQueueEnrollment);
+        var observed = new HashSet<Guid>();
+        Guid? cursor = null;
+        while (true)
+        {
+            var page = await discovery.GetTenantIdsAsync(cursor, 1, CancellationToken.None);
+            await Assert.That(page.Count).IsLessThanOrEqualTo(1);
+            if (page.Count == 0)
+                break;
+            await Assert.That(observed.Add(page[0])).IsTrue();
+            if (cursor is { } previous)
+                await Assert.That(page[0].CompareTo(previous)).IsGreaterThan(0);
+            cursor = page[0];
+        }
+        await Assert.That(observed.Where(ids.Contains)).IsEquivalentTo(ids.Take(2));
+    }
+
+    [Test]
     public async Task FleetIdentityDiscoveryRequiresIndependentTenantLeasesForDeletion()
     {
         await using var setup = fixture.CreateDbContext();
@@ -40,7 +114,7 @@ public sealed class PostgresRegistrationRetentionAuthorityTests(PostgreSqlContai
             fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
         var runtimeFactory = new TenantExploreDbContextFactory(
             fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime), poolSize: 1);
-        var discovery = new RegistrationRetentionTenantDiscoveryRepository(globalFactory);
+        var discovery = new RegistrationRetentionTenantDiscoveryRepository(globalFactory, fixture.NativeQueueEnrollment);
         var execution = new RegistrationRetentionExecutionScopeFactory(runtimeFactory);
         var discovered = new HashSet<Guid>();
         Guid? cursor = null;
@@ -68,9 +142,9 @@ public sealed class PostgresRegistrationRetentionAuthorityTests(PostgreSqlContai
                 await global.RegistrationAnswers.IgnoreQueryFilters()
                     .Where(row => row.Id == first.ExpiredAnswerId).ExecuteDeleteAsync());
             await Assert.That(deniedDelete?.SqlState).IsEqualTo("42501");
-            await Assert.That(await global.Database.SqlQuery<bool>(
-                $"SELECT pg_has_role(session_user, {PostgresRegistrationRetentionDiscoveryContract.OwnerRole}, 'SET') AS \"Value\"")
-                .SingleAsync()).IsFalse();
+            await Assert.That(await global.Database.SqlQueryRaw<bool>(
+                "SELECT NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='registration_retention_discovery_owner') AS \"Value\"")
+                .SingleAsync()).IsTrue();
         }
 
         // The original defect: explicit predicates do not select native authority.
@@ -122,97 +196,89 @@ public sealed class PostgresRegistrationRetentionAuthorityTests(PostgreSqlContai
     }
 
     [Test]
-    [Arguments("executor")]
-    [Arguments("owner_column")]
+    [Arguments("global_table")]
+    [Arguments("grant_option")]
     [Arguments("public")]
     [Arguments("global_private")]
     [Arguments("directory_rls")]
     [Arguments("membership")]
-    public async Task DriftFailsBeforeBoundsAndReinstallPreservesTheFault(string drift)
+    public async Task DirectoryReadDriftFailsWithoutRepair(string drift)
     {
         await using var migration = fixture.CreateDbContext();
-        string function = PostgresRegistrationRetentionDiscoveryContract.FunctionSql(migration);
-        string signature = function + "(uuid,integer)";
         string tenants = Table<Tenant>(migration);
         string answers = Table<RegistrationAnswer>(migration);
         string runtime = Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
         string global = Quote(fixture.NativeQueueEnrollment.GlobalLogin);
-        string owner = PostgresRegistrationRetentionDiscoveryContract.OwnerRole;
-        string executor = PostgresRegistrationRetentionDiscoveryContract.ExecutorRole;
+        if (!PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(
+                migration, typeof(Tenant), out var tenantReadColumns))
+            throw new InvalidOperationException("The fixed Tenant read manifest is required for fault restoration.");
+        string restoreTenantReads = string.Join(", ", tenantReadColumns.Select(Quote));
         (string Inject, string Restore) fault = drift switch
         {
-            "executor" => ($"GRANT EXECUTE ON FUNCTION {signature} TO {runtime}",
-                $"REVOKE EXECUTE ON FUNCTION {signature} FROM {runtime}"),
-            "owner_column" => ($"GRANT SELECT (slug) ON {tenants} TO {owner}",
-                $"REVOKE SELECT (slug) ON {tenants} FROM {owner}"),
+            // Table-level REVOKE also removes the original column SELECT grants.
+            "global_table" => ($"GRANT SELECT ON {tenants} TO {global}",
+                $"REVOKE SELECT ON {tenants} FROM {global}; GRANT SELECT ({restoreTenantReads}) ON {tenants} TO {global}"),
+            "grant_option" => ($"GRANT SELECT (id) ON {tenants} TO {global} WITH GRANT OPTION",
+                $"REVOKE GRANT OPTION FOR SELECT (id) ON {tenants} FROM {global}"),
             "public" => ($"GRANT SELECT (id) ON {tenants} TO PUBLIC",
                 $"REVOKE SELECT (id) ON {tenants} FROM PUBLIC"),
             "global_private" => ($"GRANT SELECT ON {answers} TO {global}",
                 $"REVOKE SELECT ON {answers} FROM {global}"),
             "directory_rls" => ($"ALTER TABLE {tenants} ENABLE ROW LEVEL SECURITY",
                 $"ALTER TABLE {tenants} DISABLE ROW LEVEL SECURITY"),
-            "membership" => ($"GRANT {executor} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
-                $"REVOKE {executor} FROM {runtime}"),
+            "membership" => ($"GRANT {global} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
+                $"REVOKE {global} FROM {runtime}"),
             _ => throw new ArgumentOutOfRangeException(nameof(drift))
         };
-        long oid = await migration.Database.SqlQuery<long>(
-            $"SELECT to_regprocedure({signature})::oid::bigint AS \"Value\"").SingleAsync();
+        var globalFactory = new GlobalExploreDbContextFactory(
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
+        var discovery = new RegistrationRetentionTenantDiscoveryRepository(globalFactory, fixture.NativeQueueEnrollment);
+        await discovery.GetTenantIdsAsync(null, 1, CancellationToken.None);
         await migration.Database.ExecuteSqlRawAsync(fault.Inject);
         try
         {
-            var globalFactory = new GlobalExploreDbContextFactory(
-                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
-            await using var globalContext = await globalFactory.CreateDbContextAsync();
-            var entry = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await globalContext.Database.ExecuteSqlRawAsync($"SELECT * FROM {function}(NULL::uuid, 0)"));
-            await Assert.That(entry?.SqlState).IsEqualTo("55000");
-            var reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
-            await Assert.That(reinstall?.SqlState).IsEqualTo("55000");
-            await Assert.That(await migration.Database.SqlQuery<long>(
-                $"SELECT to_regprocedure({signature})::oid::bigint AS \"Value\"").SingleAsync()).IsEqualTo(oid);
-            // Rejection, not silent normalization: the fault still blocks a second entry.
-            var repeated = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await globalContext.Database.ExecuteSqlRawAsync($"SELECT * FROM {function}(NULL::uuid, 1)"));
-            await Assert.That(repeated?.SqlState).IsEqualTo("55000");
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                discovery.GetTenantIdsAsync(null, 1, CancellationToken.None));
+            // Read admission must leave the fault intact, not normalize it for another attempt.
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                discovery.GetTenantIdsAsync(null, 1, CancellationToken.None));
         }
         finally
         {
             await migration.Database.ExecuteSqlRawAsync(fault.Restore);
         }
-        await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
-        await PostgresRegistrationRetentionDiscoveryContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+        await discovery.GetTenantIdsAsync(null, 1, CancellationToken.None);
     }
 
     [Test]
-    public async Task NativeDiscoveryRejectsOversizedPagesAndTenantBoundGlobalSessions()
+    public async Task DirectoryDiscoveryRejectsInvalidPagesAndTenantBoundGlobalOwners()
     {
         var factory = new GlobalExploreDbContextFactory(
             fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
-        await using var global = await factory.CreateDbContextAsync();
-        string function = PostgresRegistrationRetentionDiscoveryContract.FunctionSql(global);
-        var bounds = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await global.Database.ExecuteSqlRawAsync(
-                $"SELECT * FROM {function}(NULL::uuid, {{0}})", IRegistrationRetentionTenantDiscoveryRepository.PageSize + 1));
-        await Assert.That(bounds?.SqlState).IsEqualTo("22023");
+        var discovery = new RegistrationRetentionTenantDiscoveryRepository(factory, fixture.NativeQueueEnrollment);
+        foreach (int limit in new[] { 0, IRegistrationRetentionTenantDiscoveryRepository.PageSize + 1 })
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                discovery.GetTenantIdsAsync(null, limit, CancellationToken.None));
+        var selected = new RegistrationRetentionTenantDiscoveryRepository(
+            new TenantSelectedGlobalFactory(factory, Guid.CreateVersion7()), fixture.NativeQueueEnrollment);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => selected.GetTenantIdsAsync(null, 1, CancellationToken.None));
 
-        // Raw native session tests cannot be masked by EF's immutable-lease admission.
-        await using var connection = new NpgsqlConnection(
-            PrimaryDatabaseConfiguration.BuildConnectionString(
-                fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)).ConnectionString);
-        await connection.OpenAsync();
-        await using var transaction = await connection.BeginTransactionAsync();
-        await using var bind = connection.CreateCommand();
-        bind.Transaction = transaction;
-        bind.CommandText = "SELECT set_config('app.current_tenant_id', @tenant, true)";
-        bind.Parameters.AddWithValue("tenant", Guid.CreateVersion7().ToString());
-        await bind.ExecuteNonQueryAsync();
-        await using var call = connection.CreateCommand();
-        call.Transaction = transaction;
-        call.CommandText = $"SELECT * FROM {function}(NULL::uuid, 1)";
-        var selected = await Assert.ThrowsAsync<PostgresException>(async () => await call.ExecuteNonQueryAsync());
-        await Assert.That(selected?.SqlState).IsEqualTo("42501");
-        await transaction.RollbackAsync();
+        // The native session must independently agree with the original null-bound EF owner.
+        await using var global = await factory.CreateDbContextAsync();
+        await global.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await global.Database.OpenConnectionAsync();
+            try
+            {
+                await using var transaction = await global.Database.BeginTransactionAsync();
+                await global.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_catalog.set_config('app.current_tenant_id', {Guid.CreateVersion7().ToString()}, true)");
+                await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    PostgresRegistrationRetentionReadPermissions.RequireReadyAsync(global, fixture.NativeQueueEnrollment, default));
+                await transaction.RollbackAsync();
+            }
+            finally { await global.Database.CloseConnectionAsync(); }
+        });
     }
 
     [Test]
@@ -280,6 +346,7 @@ public sealed class PostgresRegistrationRetentionAuthorityTests(PostgreSqlContai
     private static async Task<Graph> SeedAsync(
         ExploreDbContext context, TenantStatusEnum status, bool withProviderClaim = false)
     {
+        context.BindTenantLease();
         DateTime created = Now.AddDays(-10);
         var tenant = new Tenant
         {
@@ -441,6 +508,12 @@ public sealed class PostgresRegistrationRetentionAuthorityTests(PostgreSqlContai
     }
 
     private sealed record TenantIdentity(Guid TenantId) : ITenantContext;
+    private sealed class TenantSelectedGlobalFactory(GlobalExploreDbContextFactory factory, Guid tenantId)
+        : IGlobalExploreDbContextFactory
+    {
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+            ((IMixedSettingsDbContextFactory)factory).CreateMixedSettingsAsync(tenantId, cancellationToken);
+    }
     private sealed record SessionAuthority(Guid TenantId, string Login);
 
     private sealed class RetentionTransactionBoundary : DbTransactionInterceptor

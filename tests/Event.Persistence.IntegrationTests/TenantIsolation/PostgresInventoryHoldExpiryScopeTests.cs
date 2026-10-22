@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Services;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -9,9 +10,11 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,7 +32,7 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
     public async Task FrozenNullRuntimeRefusesAmbientMutationWhileFreshScopesExpireOnlyOwnedCurrentInventoryOnce()
     {
         await fixture.ResetAsync();
-        await using var setup = fixture.CreateDbContext();
+        await using var setup = OpenMigrator();
         await InstallAsync(setup);
         var a = CreateOrder(Guid.CreateVersion7());
         var b = CreateOrder(Guid.CreateVersion7());
@@ -41,10 +44,17 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
         string schema = Identifier(HoldTableSchema(setup));
         string holds = Table<RegistrationInventoryHold>(setup), orders = Table<RegistrationOrder>(setup);
         string attempts = Table<PaymentAttempt>(setup);
+        var names = new HumanPrincipalSourceSql(setup);
+        string holdStatuses = Table<RegistrationInventoryHoldStatus>(setup);
+        string orderStatuses = Table<RegistrationOrderStatus>(setup);
+        string holdStatusId = names.Column(typeof(RegistrationInventoryHoldStatus), nameof(RegistrationInventoryHoldStatus.Id));
+        string orderStatusId = names.Column(typeof(RegistrationOrderStatus), nameof(RegistrationOrderStatus.Id));
         await setup.Database.ExecuteSqlRawAsync($"""
             GRANT USAGE ON SCHEMA {schema} TO {runtime};
             GRANT SELECT, UPDATE ON {holds}, {orders} TO {runtime};
             GRANT SELECT ON {attempts} TO {runtime};
+            GRANT SELECT ({holdStatusId}) ON {holdStatuses} TO {runtime};
+            GRANT SELECT ({orderStatusId}) ON {orderStatuses} TO {runtime};
             """);
         try
         {
@@ -100,6 +110,8 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
             await setup.Database.ExecuteSqlRawAsync($"""
                 REVOKE SELECT, UPDATE ON {holds}, {orders} FROM {runtime};
                 REVOKE SELECT ON {attempts} FROM {runtime};
+                REVOKE SELECT ({holdStatusId}) ON {holdStatuses} FROM {runtime};
+                REVOKE SELECT ({orderStatusId}) ON {orderStatuses} FROM {runtime};
                 """);
         }
     }
@@ -108,7 +120,7 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
     public async Task GlobalDiscoveryExportsOnlyBoundedIdentitiesAndRejectsBusinessReadsRuntimeAndInvalidBounds()
     {
         await fixture.ResetAsync();
-        await using var setup = fixture.CreateDbContext();
+        await using var setup = OpenMigrator();
         await InstallAsync(setup);
         await InstallAsync(setup);
         var a = CreateOrder(Guid.CreateVersion7());
@@ -119,25 +131,34 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
         b.TryBeginHoldExpiryRecovery(Now);
         await SeedAsync(setup, a, b, aDue, bDue, live);
         var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
-        var discovery = new InventoryHoldExpiryDiscovery(factory);
+        var discovery = new InventoryHoldExpiryDiscovery(factory, fixture.NativeQueueEnrollment);
         var targets = await discovery.GetTargetsAsync(Now, 100, CancellationToken.None);
         await Assert.That(targets).IsEquivalentTo([
             new InventoryHoldExpiryTarget(a.TenantId, a.Id, aDue.Id),
             new InventoryHoldExpiryTarget(b.TenantId, b.Id, bDue.Id),
             new InventoryHoldExpiryTarget(b.TenantId, b.Id, null)]);
-        await Assert.That((await discovery.GetTargetsAsync(Now, 1, CancellationToken.None)).Count).IsEqualTo(2);
+        var limited = await discovery.GetTargetsAsync(Now, 1, CancellationToken.None);
+        await Assert.That(limited.Count).IsEqualTo(2);
+        await Assert.That(limited[0]).IsEqualTo(new InventoryHoldExpiryTarget(a.TenantId, a.Id, aDue.Id));
+        await Assert.That(limited[1]).IsEqualTo(new InventoryHoldExpiryTarget(b.TenantId, b.Id, null));
         await using var global = await factory.CreateDbContextAsync();
         await global.Database.OpenConnectionAsync();
-        await using var command = global.Database.GetDbConnection().CreateCommand();
-        command.CommandText = $"SELECT * FROM {PostgresInventoryHoldExpiryDiscoveryContract.FunctionSql(global)}(@now, @take)";
-        command.Parameters.Add(new NpgsqlParameter("now", Now));
-        command.Parameters.Add(new NpgsqlParameter("take", 100));
-        await using (var reader = await command.ExecuteReaderAsync())
+        await PostgresInventoryHoldExpiryReadPermissions.RequireReadyAsync(global, fixture.NativeQueueEnrollment);
+        using (var probe = new DiscoveryQueryProbe(global))
         {
-            await Assert.That(reader.FieldCount).IsEqualTo(3);
-            await Assert.That(Enumerable.Range(0, reader.FieldCount).Select(reader.GetName))
-                .IsEquivalentTo(["TenantId", "OrderId", "HoldId"]);
+            var observed = await InventoryHoldExpiryQuery.ReadAsync(global, Now, 100, CancellationToken.None);
+            await Assert.That(observed).IsEquivalentTo(targets);
+            await Assert.That(probe.Commands).IsEqualTo(1);
         }
+        await using var command = global.Database.GetDbConnection().CreateCommand();
+        command.CommandText = """
+            SELECT NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+                WHERE n.nspname=@schema AND p.proname='inventory_hold_expiry_targets')
+                AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname IN
+                    ('hold_expiry_discovery_owner','hold_expiry_discovery_migrator','hold_expiry_discovery_executor'))
+            """;
+        command.Parameters.Add(new NpgsqlParameter("schema", HoldTableSchema(setup)));
+        await Assert.That(await command.ExecuteScalarAsync()).IsEqualTo(true);
         foreach (string table in new[] { Table<RegistrationInventoryHold>(setup), Table<RegistrationOrder>(setup) })
         {
             var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
@@ -148,27 +169,28 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
         await using var runtime = await runtimeFactory.CreateDbContextAsync(a.TenantId);
         foreach (var caller in new[] { runtime, setup })
         {
-            var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await caller.Database.ExecuteSqlRawAsync(
-                    $"SELECT * FROM {PostgresInventoryHoldExpiryDiscoveryContract.FunctionSql(setup)}({{0}}, {{1}})", [Now, 1]));
-            await Assert.That(denied?.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+            await caller.Database.OpenConnectionAsync();
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresInventoryHoldExpiryReadPermissions.RequireReadyAsync(caller, fixture.NativeQueueEnrollment));
         }
-        var invalid = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await global.Database.ExecuteSqlRawAsync(
-                $"SELECT * FROM {PostgresInventoryHoldExpiryDiscoveryContract.FunctionSql(global)}({{0}}, {{1}})", [Now, 101]));
-        await Assert.That(invalid?.SqlState).IsEqualTo(PostgresErrorCodes.InvalidParameterValue);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            discovery.GetTargetsAsync(Now, 101, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            discovery.GetTargetsAsync(Now, 0, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            discovery.GetTargetsAsync(DateTime.SpecifyKind(Now, DateTimeKind.Unspecified), 1, CancellationToken.None));
     }
 
     [Test]
-    public async Task DiscoveryFailsClosedOnUndeclaredNativeExecutorAndSourceReadDrift()
+    public async Task DiscoveryFailsClosedOnGlobalDelegationAndSourceReadDrift()
     {
-        await using var setup = fixture.CreateDbContext();
+        await using var setup = OpenMigrator();
         await InstallAsync(setup);
-        // Runtime is deliberately NOT an enrolled executor. These two independent
-        // faults must each fail reinstall instead of becoming an implicit allowlist.
+        // Runtime cannot acquire the Global identity, and Global cannot acquire
+        // whole business records. Neither fault may be normalized by reinstallation.
         foreach (string fault in new[]
         {
-            $"GRANT EXECUTE ON FUNCTION {PostgresInventoryHoldExpiryDiscoveryContract.FunctionSql(setup)}(timestamp with time zone, integer) TO {Identifier(fixture.NativeQueueEnrollment.RuntimeLogin)}",
+            $"GRANT {Identifier(fixture.NativeQueueEnrollment.GlobalLogin)} TO {Identifier(fixture.NativeQueueEnrollment.RuntimeLogin)} WITH INHERIT FALSE, SET FALSE, ADMIN TRUE",
             $"GRANT SELECT ON {Table<RegistrationInventoryHold>(setup)} TO {Identifier(fixture.NativeQueueEnrollment.GlobalLogin)}"
         })
         {
@@ -176,10 +198,9 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
             {
                 await using var transaction = await setup.Database.BeginTransactionAsync();
                 await setup.Database.ExecuteSqlRawAsync(fault);
-                var denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-                    await setup.Database.ExecuteSqlRawAsync(
-                        PostgresInventoryHoldExpiryDiscoveryContract.BuildSql(setup, fixture.NativeQueueEnrollment)));
-                await Assert.That(denied?.SqlState).IsEqualTo(PostgresErrorCodes.ObjectNotInPrerequisiteState);
+                var denied = await Assert.ThrowsAsync<InvalidOperationException>(() => InstallAsync(setup));
+                await Assert.That(denied.Message).IsEqualTo("hold_expiry_read_permissions_drift");
+                await Assert.ThrowsAsync<InvalidOperationException>(() => InstallAsync(setup));
                 await transaction.RollbackAsync();
             });
         }
@@ -187,7 +208,16 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
     }
 
     private Task InstallAsync(ExploreDbContext context) =>
-        PostgresInventoryHoldExpiryDiscoveryContract.ApplyAsync(context, fixture.NativeQueueEnrollment);
+        PostgresInventoryHoldExpiryReadPermissions.ApplyAsync(context, fixture.NativeQueueEnrollment);
+
+    private ExploreDbContext OpenMigrator()
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        var context = new ExploreDbContext(options.Options);
+        context.BindTenantLease();
+        return context;
+    }
 
     private ServiceProvider Services()
     {
@@ -196,6 +226,7 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
             new TenantExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime)));
         services.AddSingleton<IGlobalExploreDbContextFactory>(
             new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global)));
+        services.AddSingleton(fixture.NativeQueueEnrollment);
         services.AddHttpContextAccessor();
         services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
         services.AddInventoryHoldExpiryWorker();
@@ -241,5 +272,40 @@ public sealed class PostgresInventoryHoldExpiryScopeTests(PostgreSqlContainerFix
     private sealed record TenantFacts(ITenantContextAccessor Accessor) : Explore.Application.Contracts.Infrastructure.ITenantContext
     {
         public Guid TenantId => Accessor.TenantId ?? Guid.Empty;
+    }
+
+    private sealed class DiscoveryQueryProbe : IObserver<DiagnosticListener>,
+        IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly ExploreDbContext context;
+        private readonly DbContextId contextId;
+        private readonly IDisposable listeners;
+        private readonly System.Collections.Concurrent.ConcurrentBag<IDisposable> subscriptions = [];
+        public DiscoveryQueryProbe(ExploreDbContext selected)
+        {
+            context = selected;
+            contextId = selected.ContextId;
+            listeners = DiagnosticListener.AllListeners.Subscribe(this);
+        }
+        public int Commands { get; private set; }
+        public void OnNext(DiagnosticListener listener)
+        {
+            if (listener.Name == "Microsoft.EntityFrameworkCore")
+                subscriptions.Add(listener.Subscribe(this, name => name == RelationalEventId.CommandExecuted.Name));
+        }
+        public void OnNext(KeyValuePair<string, object?> diagnostic)
+        {
+            if (diagnostic.Value is CommandExecutedEventData command
+                && ReferenceEquals(command.Context, context) && command.Context?.ContextId == contextId
+                && command.ExecuteMethod == DbCommandMethod.ExecuteReader)
+                Commands++;
+        }
+        public void OnCompleted() { }
+        public void OnError(Exception error) => throw error;
+        public void Dispose()
+        {
+            listeners.Dispose();
+            foreach (var subscription in subscriptions) subscription.Dispose();
+        }
     }
 }

@@ -7,6 +7,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
@@ -21,61 +22,59 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    [Arguments("executor")]
+    [Arguments("grant-option")]
     [Arguments("column")]
     [Arguments("public")]
-    public async Task RetentionDriftFailsBeforeBoundsAndBeforeFunctionReplacement(string drift)
+    public async Task RetentionSourcePrivilegeDriftIsRejectedWithoutAutomaticRepair(string drift)
     {
-        await using var migration = fixture.CreateDbContext();
-        string function = PostgresEventResourceAuditRetentionContract.FunctionSql(migration);
-        string signature = function + "(uuid,integer)";
-        var tenant = migration.Model.FindEntityType(typeof(Tenant))!;
-        string table = migration.GetService<ISqlGenerationHelper>().DelimitIdentifier(tenant.GetTableName()!, tenant.GetSchema());
-        string runtime = "\"" + fixture.NativeQueueEnrollment.RuntimeLogin.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        await using var migration = CreateMigrator();
+        await InstallProfileAsync(migration);
+        var entity = migration.Model.FindEntityType(typeof(EventResourceAuditEntry))!;
+        var mapping = Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        var names = migration.GetService<ISqlGenerationHelper>();
+        string table = names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+        string tenant = names.DelimitIdentifier(entity.FindProperty(nameof(EventResourceAuditEntry.TenantId))!.GetColumnName(mapping)!);
+        string attribution = names.DelimitIdentifier(entity.FindProperty(nameof(EventResourceAuditEntry.ResponsibleManagerUserId))!.GetColumnName(mapping)!);
+        string globalLogin = names.DelimitIdentifier(fixture.NativeQueueEnrollment.GlobalLogin);
         string inject = drift switch
         {
-            "executor" => $"GRANT EXECUTE ON FUNCTION {signature} TO {runtime}",
-            "column" => $"GRANT SELECT (slug) ON {table} TO {PostgresEventResourceAuditRetentionContract.OwnerRole}",
-            "public" => $"GRANT SELECT (id) ON {table} TO PUBLIC",
+            "grant-option" => $"GRANT SELECT ({tenant}) ON {table} TO {globalLogin} WITH GRANT OPTION",
+            "column" => $"GRANT SELECT ({attribution}) ON {table} TO {globalLogin}",
+            "public" => $"GRANT SELECT ({tenant}) ON {table} TO PUBLIC",
             _ => throw new ArgumentOutOfRangeException(nameof(drift))
         };
         string restore = drift switch
         {
-            "executor" => $"REVOKE EXECUTE ON FUNCTION {signature} FROM {runtime}",
-            "column" => $"REVOKE SELECT (slug) ON {table} FROM {PostgresEventResourceAuditRetentionContract.OwnerRole}",
-            _ => $"REVOKE SELECT (id) ON {table} FROM PUBLIC"
+            "grant-option" => $"REVOKE GRANT OPTION FOR SELECT ({tenant}) ON {table} FROM {globalLogin}",
+            "column" => $"REVOKE SELECT ({attribution}) ON {table} FROM {globalLogin}",
+            _ => $"REVOKE SELECT ({tenant}) ON {table} FROM PUBLIC"
         };
-        long originalOid = await migration.Database.SqlQuery<long>(
-            $"SELECT pg_catalog.to_regprocedure({signature})::oid::bigint AS \"Value\"").SingleAsync();
         await migration.Database.ExecuteSqlRawAsync(inject);
         try
         {
+            string injectedImage = await ReadAuditAclAsync(migration, table);
             var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global), poolSize: 1);
             await using var global = await factory.CreateDbContextAsync();
-            PostgresException? entry = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await global.Database.ExecuteSqlRawAsync($"SELECT * FROM {function}(NULL::uuid, 0)"));
-            await Assert.That(entry?.SqlState).IsEqualTo("55000");
-            PostgresException? reinstall = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await PostgresEventResourceAuditRetentionContract.ApplyAsync(migration, fixture.NativeQueueEnrollment));
-            await Assert.That(reinstall?.SqlState).IsEqualTo("55000");
-            await Assert.That(await migration.Database.SqlQuery<long>(
-                $"SELECT pg_catalog.to_regprocedure({signature})::oid::bigint AS \"Value\"").SingleAsync()).IsEqualTo(originalOid);
-            if (drift == "executor")
-                await Assert.That(await migration.Database.SqlQuery<bool>(
-                    $"SELECT pg_catalog.has_function_privilege({fixture.NativeQueueEnrollment.RuntimeLogin}, {signature}, 'EXECUTE') AS \"Value\"")
-                    .SingleAsync()).IsTrue();
+            await global.Database.OpenConnectionAsync();
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresEventResourceAuditReadPermissions.RequireReadyAsync(global, fixture.NativeQueueEnrollment));
+            var reinstall = await Assert.ThrowsAsync<InvalidOperationException>(() => InstallProfileAsync(migration));
+            await Assert.That(reinstall.Message).IsEqualTo("event_resource_audit_read_permissions_drift");
+            await Assert.That(await ReadAuditAclAsync(migration, table)).IsEqualTo(injectedImage);
         }
         finally
         {
             await migration.Database.ExecuteSqlRawAsync(restore);
         }
-        await PostgresEventResourceAuditRetentionContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
-        await PostgresEventResourceAuditRetentionContract.ApplyAsync(migration, fixture.NativeQueueEnrollment);
+        await InstallProfileAsync(migration);
+        await InstallProfileAsync(migration);
     }
 
     [Test]
     public async Task GlobalOwnerDiscoveryMustDeleteThroughIndependentOrdinaryTenantAuthority()
     {
+        await using (var migration = CreateMigrator())
+            await InstallProfileAsync(migration);
         DateTime now = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         Guid[] owners = [Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()];
         Array.Sort(owners);
@@ -84,6 +83,7 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
         string globalRole = fixture.NativeQueueEnrollment.GlobalLogin;
         string schema;
         string auditTable;
+        string auditTenantColumn;
         string tenantTable;
         string[] policyTables;
         await using (var model = fixture.CreateDbContext())
@@ -91,6 +91,9 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
             var audit = model.Model.FindEntityType(typeof(EventResourceAuditEntry))!;
             schema = audit.GetSchema()!;
             auditTable = $"\"{schema}\".\"{audit.GetTableName()}\"";
+            var auditMapping = Microsoft.EntityFrameworkCore.Metadata.StoreObjectIdentifier.Table(audit.GetTableName()!, schema);
+            auditTenantColumn = model.GetService<ISqlGenerationHelper>().DelimitIdentifier(
+                audit.FindProperty(nameof(EventResourceAuditEntry.TenantId))!.GetColumnName(auditMapping)!);
             var tenant = model.Model.FindEntityType(typeof(Tenant))!;
             tenantTable = $"\"{tenant.GetSchema()}\".\"{tenant.GetTableName()}\"";
             policyTables = new[] { typeof(SystemSetting), typeof(TenantSetting) }.Select(type =>
@@ -106,7 +109,6 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
             grant.CommandText = $"""
                 GRANT USAGE ON SCHEMA "{schema}" TO "{runtimeRole}";
                 GRANT SELECT, DELETE ON {auditTable} TO "{runtimeRole}";
-                GRANT SELECT ON {tenantTable} TO "{runtimeRole}";
                 GRANT SELECT ON {string.Join(", ", policyTables)} TO "{runtimeRole}";
                 """;
             await grant.ExecuteNonQueryAsync();
@@ -152,8 +154,12 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
         ];
         try
         {
-            await using (var seed = fixture.CreateDbContext())
+            await using (var seed = CreateMigrator())
             {
+                await using var humanGate = new HumanSecuritySourceGate(seed);
+                await using var human = await humanGate.AcquireAsync();
+                await using var gate = new EventDiscoveryEnrollmentGate(seed);
+                await using var enrollment = await gate.AcquireAsync();
                 seed.Tenants.AddRange(owners.Select(owner => new Tenant
                 {
                     Id = owner,
@@ -248,7 +254,8 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
             await using var global = await globalFactory.CreateDbContextAsync();
             await AssertAuthorityAsync(global, globalRole);
             PostgresException? denied = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await global.Set<EventResourceAuditEntry>().IgnoreQueryFilters().CountAsync());
+                await global.Set<EventResourceAuditEntry>().IgnoreQueryFilters()
+                    .Select(row => row.ResponsibleManagerUserId).ToArrayAsync());
             await Assert.That(denied?.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
             PostgresException? deniedDelete = await Assert.ThrowsAsync<PostgresException>(async () =>
                 await global.Set<EventResourceAuditEntry>().IgnoreQueryFilters()
@@ -258,22 +265,18 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
                 $"SELECT has_table_privilege(current_user, '{auditTable}', 'SELECT') AS \"Value\"")
                 .SingleAsync()).IsFalse();
             await Assert.That(await global.Database.SqlQueryRaw<bool>(
-                $"SELECT pg_has_role(current_user, '{PostgresEventResourceAuditRetentionContract.OwnerRole}', 'MEMBER') AS \"Value\"")
-                .SingleAsync()).IsFalse();
+                "SELECT NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='event_resource_audit_retention_owner') AS \"Value\"")
+                .SingleAsync()).IsTrue();
             await Assert.That(await global.Database.SqlQueryRaw<bool>(
                 $"SELECT has_table_privilege(current_user, '{tenantTable}', 'SELECT') AS \"Value\"")
                 .SingleAsync()).IsFalse();
-            PostgresException? invalidBounds = await Assert.ThrowsAsync<PostgresException>(async () =>
-                await global.Database.ExecuteSqlRawAsync(
-                    $"SELECT * FROM {PostgresEventResourceAuditRetentionContract.FunctionSql(global)}({{0}}, {{1}})",
-                    [owners[0], EventResourceAuditRetentionService.TenantPageSize + 1]));
-            await Assert.That(invalidBounds?.SqlState).IsEqualTo(PostgresErrorCodes.InvalidParameterValue);
-
-            var repository = new EventResourceAuditOwnerDiscoveryRepository(globalFactory);
+            var repository = new EventResourceAuditOwnerDiscoveryRepository(globalFactory, fixture.NativeQueueEnrollment);
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repository.GetTenantIdsWithAuditAsync(
+                owners[0], EventResourceAuditRetentionService.TenantPageSize + 1, CancellationToken.None));
             await global.Database.OpenConnectionAsync();
             await using (var command = global.Database.GetDbConnection().CreateCommand())
             {
-                command.CommandText = $"SELECT * FROM {PostgresEventResourceAuditRetentionContract.FunctionSql(global)}(NULL, 1)";
+                command.CommandText = $"SELECT {auditTenantColumn} AS tenant_id FROM {auditTable} LIMIT 1";
                 await using var reader = await command.ExecuteReaderAsync();
                 await Assert.That(reader.FieldCount).IsEqualTo(1);
                 await Assert.That(reader.GetName(0)).IsEqualTo("tenant_id");
@@ -327,7 +330,6 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
             await using var revoke = administration.CreateCommand();
             revoke.CommandText = $"""
                 REVOKE SELECT, DELETE ON {auditTable} FROM "{runtimeRole}";
-                REVOKE SELECT ON {tenantTable} FROM "{runtimeRole}";
                 REVOKE SELECT ON {string.Join(", ", policyTables)} FROM "{runtimeRole}";
                 REVOKE USAGE ON SCHEMA "{schema}" FROM "{runtimeRole}";
                 """;
@@ -366,6 +368,33 @@ public sealed class PostgresEventResourceAuditRetentionLeaseTests(PostgreSqlCont
         EventResourceAuditEntry.Create(resource.TenantId, resource.Id, Guid.CreateVersion7(),
             EventResourceAuditAction.UpdateMetadata, EventResourceAuditOutcome.Succeeded,
             EventResourceAuditReason.OrganizerMutation, timestamp);
+
+    private ExploreDbContext CreateMigrator()
+    {
+        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        var context = new ExploreDbContext(options.Options);
+        context.BindTenantLease();
+        return context;
+    }
+
+    private Task InstallProfileAsync(ExploreDbContext context) =>
+        context.Database.CreateExecutionStrategy().ExecuteAsync(() =>
+            PostgresEventResourceAuditReadPermissions.ApplyAsync(context, fixture.NativeQueueEnrollment));
+
+    private static async Task<string> ReadAuditAclAsync(ExploreDbContext context, string table)
+    {
+        if (context.Database.GetDbConnection().State != System.Data.ConnectionState.Open)
+            await context.Database.OpenConnectionAsync();
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.CommandText = """
+            SELECT COALESCE(string_agg(a.attnum::text || ':' || COALESCE(a.attacl::text,''),',' ORDER BY a.attnum),'')
+            FROM pg_catalog.pg_attribute a
+            WHERE a.attrelid=pg_catalog.to_regclass(@table) AND a.attnum>0 AND NOT a.attisdropped
+            """;
+        command.Parameters.Add(new NpgsqlParameter("table", table));
+        return (string)(await command.ExecuteScalarAsync())!;
+    }
 
     private static async Task AssertAuthorityAsync(ExploreDbContext context, string expected)
     {

@@ -1,9 +1,9 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Domain.Enums;
+using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
-using NpgsqlTypes;
 
 namespace Explore.Persistence.Security;
 
@@ -11,46 +11,40 @@ namespace Explore.Persistence.Security;
 internal static class HumanTenantPreferenceDataOperations
 {
     internal static async Task<bool> WriteAsync(
-        ExploreDbContext context, IServiceProvider services, IHumanTenantPreferenceMutation mutation, CancellationToken token)
+        ExploreDbContext context, IServiceProvider services, IHumanTenantPreferenceMutation mutation,
+        Action requireOriginal, CancellationToken token)
     {
-        if (context.Database.IsNpgsql())
-        {
-            await PostgresTenantPreferenceContract.RequireReadyAsync(context,
-                services.GetRequiredService<PostgresNativeQueueEnrollment>(), token);
-            return await ExecuteNativeAsync(context, PostgresTenantPreferenceContract.FunctionSql(context), mutation, token);
-        }
-
-        return await context.Users.Where(user => user.Id == mutation.SubjectId && !user.IsDeleted)
+        requireOriginal();
+        var enrollment = services.GetService<PostgresNativeQueueEnrollment>();
+        await PostgresTenantPreferencePermissions.RequireReadyAsync(context, enrollment, token);
+        requireOriginal();
+        await PostgresUserTenantMembershipReadPermissions.RequireReadyAsync(context, enrollment, token);
+        requireOriginal();
+        bool written = await context.Users.IgnoreAutoIncludes().Where(user => user.Id == mutation.SubjectId && !user.IsDeleted
+                && context.TenantUsers.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant }).Any(member =>
+                    member.UserId == mutation.SubjectId && member.TenantId == mutation.TenantId
+                    && !member.IsDeleted && member.StatusId == (int)TenantUserStatusEnum.Active
+                    && context.Tenants.Any(tenant => tenant.Id == member.TenantId)))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(user => user.LastActiveTenantId, mutation.TenantId)
                 .SetProperty(user => user.UpdatedAt, mutation.UpdatedAt)
                 .SetProperty(user => user.UpdatedBy, mutation.SubjectId), token) == 1;
+        requireOriginal();
+        return written;
     }
 
     internal static async Task<bool> MatchesAsync(
-        ExploreDbContext context, IServiceProvider services, IHumanTenantPreferenceMutation mutation, CancellationToken token)
+        ExploreDbContext context, IServiceProvider services, IHumanTenantPreferenceMutation mutation,
+        Action requireOriginal, CancellationToken token)
     {
-        if (context.Database.IsNpgsql())
-        {
-            await PostgresTenantPreferenceContract.RequireReadyAsync(context,
-                services.GetRequiredService<PostgresNativeQueueEnrollment>(), token);
-            return await ExecuteNativeAsync(context, PostgresTenantPreferenceContract.ImageFunctionSql(context), mutation, token);
-        }
-
-        return await context.Users.AsNoTracking().AnyAsync(user => user.Id == mutation.SubjectId
+        requireOriginal();
+        await PostgresTenantPreferencePermissions.RequireReadyAsync(context,
+            services.GetService<PostgresNativeQueueEnrollment>(), token);
+        requireOriginal();
+        bool matches = await context.Users.IgnoreAutoIncludes().AsNoTracking().AnyAsync(user => user.Id == mutation.SubjectId
             && !user.IsDeleted && user.LastActiveTenantId == mutation.TenantId
             && user.UpdatedAt == mutation.UpdatedAt && user.UpdatedBy == mutation.SubjectId, token);
-    }
-
-    private static async Task<bool> ExecuteNativeAsync(
-        ExploreDbContext context, string function, IHumanTenantPreferenceMutation mutation, CancellationToken token)
-    {
-        await using var command = context.Database.GetDbConnection().CreateCommand();
-        command.Transaction = context.Database.CurrentTransaction!.GetDbTransaction();
-        command.CommandText = $"SELECT {function}(@subject, @tenant, @updated_at)";
-        command.Parameters.Add(new NpgsqlParameter("subject", NpgsqlDbType.Uuid) { Value = mutation.SubjectId });
-        command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid) { Value = mutation.TenantId });
-        command.Parameters.Add(new NpgsqlParameter("updated_at", NpgsqlDbType.TimestampTz) { Value = mutation.UpdatedAt });
-        return await command.ExecuteScalarAsync(token) is true;
+        requireOriginal();
+        return matches;
     }
 }

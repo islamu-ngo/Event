@@ -1,13 +1,15 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
-using NpgsqlTypes;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class RegistrationRetentionTenantDiscoveryRepository(IGlobalExploreDbContextFactory globalFactory)
+public sealed class RegistrationRetentionTenantDiscoveryRepository(
+    IGlobalExploreDbContextFactory globalFactory,
+    PostgresNativeQueueEnrollment? enrollment)
     : IRegistrationRetentionTenantDiscoveryRepository
 {
     public async Task<IReadOnlyList<Guid>> GetTenantIdsAsync(
@@ -18,21 +20,51 @@ public sealed class RegistrationRetentionTenantDiscoveryRepository(IGlobalExplor
         await using var context = await globalFactory.CreateDbContextAsync(cancellationToken);
         if (!context.Database.IsRelational())
             throw new NotSupportedException("registration_retention_discovery_requires_relational_provider");
-        if (context.IsTenantFilterBypassed || context.BindTenantLease() is not null)
-            throw new InvalidOperationException("registration_retention_discovery_requires_unbound_global");
-        if (!context.Database.IsNpgsql())
+        return await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            var directory = context.Tenants.AsNoTracking().Where(tenant => tenant.TenantStatus.IsActiveState);
-            if (afterTenantId is { } cursor)
-                directory = directory.Where(tenant => tenant.Id.CompareTo(cursor) > 0);
-            return await directory.OrderBy(tenant => tenant.Id).Select(tenant => tenant.Id)
-                .Take(limit).ToArrayAsync(cancellationToken);
-        }
-
-        string query = $"SELECT tenant_id AS \"Value\" FROM {PostgresRegistrationRetentionDiscoveryContract.FunctionSql(context)}" +
-            "(@after_tenant, @take)";
-        return await context.Database.SqlQueryRaw<Guid>(query,
-            new NpgsqlParameter("after_tenant", NpgsqlDbType.Uuid) { Value = (object?)afterTenantId ?? DBNull.Value },
-            new NpgsqlParameter("take", limit)).ToArrayAsync(cancellationToken);
+            context.RequireBoundTenantLease();
+            if (context.TenantFilterTenantId is not null || context.IsTenantFilterBypassed
+                || context.IsConfigurationInstanceImportOwner || context.Database.CurrentTransaction is not null)
+                throw new UnauthorizedAccessException("registration_retention_discovery_requires_unbound_global");
+            await context.Database.OpenConnectionAsync(cancellationToken);
+            var connection = RelationalConnectionIdentity.Capture(context);
+            var contextId = context.ContextId;
+            int? backend = connection.BackendProcessId;
+            bool interrupted = false;
+            void Changed(object? sender, System.Data.StateChangeEventArgs change)
+            {
+                if (change.CurrentState != System.Data.ConnectionState.Open) interrupted = true;
+            }
+            void RequireOriginal()
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                context.RequireBoundTenantLease();
+                if (context.ContextId != contextId || context.TenantFilterTenantId is not null
+                    || context.IsTenantFilterBypassed || context.IsConfigurationInstanceImportOwner
+                    || context.Database.CurrentTransaction is not null || interrupted || !connection.Matches(context)
+                    || connection.State != System.Data.ConnectionState.Open || connection.BackendProcessId != backend)
+                    throw new UnauthorizedAccessException("registration_retention_discovery_original_owner_changed");
+            }
+            connection.StateChange += Changed;
+            try
+            {
+                RequireOriginal();
+                await PostgresRegistrationRetentionReadPermissions.RequireReadyAsync(context, enrollment, cancellationToken);
+                RequireOriginal();
+                var directory = context.Tenants.IgnoreAutoIncludes().AsNoTracking()
+                    .Where(tenant => tenant.TenantStatus.IsActiveState);
+                if (afterTenantId is { } cursor)
+                    directory = directory.Where(tenant => tenant.Id.CompareTo(cursor) > 0);
+                var page = await directory.OrderBy(tenant => tenant.Id).Select(tenant => tenant.Id)
+                    .Take(limit).ToArrayAsync(cancellationToken);
+                RequireOriginal();
+                return page;
+            }
+            finally
+            {
+                connection.StateChange -= Changed;
+                await context.Database.CloseConnectionAsync();
+            }
+        });
     }
 }

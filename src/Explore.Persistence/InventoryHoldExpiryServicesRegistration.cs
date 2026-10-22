@@ -2,6 +2,7 @@ using Explore.Persistence.Services;
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -13,7 +14,9 @@ public static class InventoryHoldExpiryServicesRegistration
     public static IServiceCollection AddInventoryHoldExpiryWorker(this IServiceCollection services)
     {
         services.TryAddScoped<InventoryHoldExpiryExecutionLease>();
-        services.TryAddScoped<IInventoryHoldExpiryDiscovery, InventoryHoldExpiryDiscovery>();
+        services.TryAddScoped<IInventoryHoldExpiryDiscovery>(provider => new InventoryHoldExpiryDiscovery(
+            provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+            provider.GetService<PostgresNativeQueueEnrollment>()));
         services.TryAddScoped<IInventoryHoldExpiryExecutionScopeFactory, InventoryHoldExpiryExecutionScopeFactory>();
         return services;
     }

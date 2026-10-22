@@ -3,13 +3,11 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
-using Npgsql;
 
 namespace Event.Persistence.IntegrationTests.TenantIsolation;
 
@@ -18,131 +16,170 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public sealed class TenantPreferenceContractTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    public async Task ReadinessParsesDollarQuotedLoginBeforeRejectingChangedEnrollment()
+    public async Task QuotedDifferentGlobalEnrollmentCannotReplaceTheActualCaller()
     {
-        await using var context = fixture.CreateDbContext();
-        await using var transaction = await context.Database.BeginTransactionAsync();
-        string login = "rt$guard$$install$$body$$ddl$'\\" + Guid.CreateVersion7().ToString("N")[..12];
-        var enrollment = fixture.NativeQueueEnrollment with { RuntimeLogin = login };
-        using var identifiers = new NpgsqlCommandBuilder();
-        string original = identifiers.QuoteIdentifier(fixture.NativeQueueEnrollment.RuntimeLogin);
-        string renamed = identifiers.QuoteIdentifier(login);
-        await context.Database.ExecuteSqlRawAsync($"ALTER ROLE {original} RENAME TO {renamed}");
+        await using var context = Open(PrimaryDatabaseRole.Global);
+        await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await PostgresTenantPreferencePermissions.RequireReadyAsync(context, fixture.NativeQueueEnrollment);
+            var different = fixture.NativeQueueEnrollment with
+            {
+                GlobalLogin = "Other$guard$'\\" + Guid.CreateVersion7().ToString("N")[..12]
+            };
+            var denied = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresTenantPreferencePermissions.RequireReadyAsync(context, different));
+            await Assert.That(denied.Message).IsEqualTo("tenant_preference_wrong_identity");
+            await PostgresTenantPreferencePermissions.RequireReadyAsync(context, fixture.NativeQueueEnrollment);
+            await transaction.RollbackAsync();
+        });
+    }
 
-        // Login text must survive the outer dollar-quoted guard. The original
-        // installed body must still reject the changed enrollment identity.
+    [Test]
+    [Arguments(PrimaryDatabaseRole.Runtime)]
+    [Arguments(PrimaryDatabaseRole.Migrator)]
+    public async Task ASerializableTransactionDoesNotSubstituteForTheConfiguredGlobal(PrimaryDatabaseRole role)
+    {
+        await using var context = Open(role);
+        await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var denied = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresTenantPreferencePermissions.RequireReadyAsync(context, fixture.NativeQueueEnrollment));
+            await Assert.That(denied.Message).IsEqualTo("tenant_preference_wrong_identity");
+            await transaction.RollbackAsync();
+        });
+    }
+
+    [Test]
+    public async Task GlobalRequiresTheOriginalSerializableTransactionAndExplicitEnrollment()
+    {
+        await using var context = Open(PrimaryDatabaseRole.Global);
+        await context.Database.OpenConnectionAsync();
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            PostgresTenantPreferenceContract.RequireReadyAsync(context, enrollment, CancellationToken.None));
-
-        await transaction.RollbackAsync();
+            PostgresTenantPreferencePermissions.RequireReadyAsync(context, fixture.NativeQueueEnrollment));
+        await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await PostgresTenantPreferencePermissions.RequireReadyAsync(context, fixture.NativeQueueEnrollment);
+            var missing = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresTenantPreferencePermissions.RequireReadyAsync(context, null));
+            await Assert.That(missing.Message).IsEqualTo("tenant_preference_enrollment_required");
+            await Assert.That(ReferenceEquals(transaction, context.Database.CurrentTransaction)).IsTrue();
+            await transaction.RollbackAsync();
+        });
     }
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task SameBodyWithReversedUuidArgumentNamesCannotPassReadiness(bool image)
-    {
-        await using var context = Open();
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        string function = image ? PostgresTenantPreferenceContract.ImageFunctionSql(context)
-            : PostgresTenantPreferenceContract.FunctionSql(context);
-        string signature = function + "(uuid,uuid,timestamp with time zone)";
-        await using var source = context.Database.GetDbConnection().CreateCommand();
-        source.Transaction = transaction.GetDbTransaction();
-        source.CommandText = "SELECT prosrc FROM pg_catalog.pg_proc WHERE oid = pg_catalog.to_regprocedure(@signature)";
-        source.Parameters.Add(new NpgsqlParameter("signature", signature));
-        string originalBody = (string)(await source.ExecuteScalarAsync())!;
-        string schema = context.GetService<ISqlGenerationHelper>().DelimitIdentifier(
-            context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema
-                ?? context.Model.FindEntityType(typeof(User))!.GetSchema() ?? "public");
-        await context.Database.ExecuteSqlRawAsync($"""
-            GRANT CREATE ON SCHEMA {schema} TO {PostgresTenantPreferenceContract.OwnerRole};
-            SET LOCAL ROLE {PostgresTenantPreferenceContract.OwnerRole};
-            DROP FUNCTION {signature};
-            CREATE FUNCTION {function}(p_tenant uuid, p_user uuid, p_updated_at timestamp with time zone)
-            RETURNS boolean LANGUAGE plpgsql {(image ? "STABLE" : "VOLATILE")}
-            SECURITY DEFINER SET search_path = pg_catalog AS $body${originalBody}$body$;
-            REVOKE ALL ON FUNCTION {signature} FROM PUBLIC;
-            GRANT EXECUTE ON FUNCTION {signature} TO {PostgresTenantPreferenceContract.GlobalRole};
-            RESET ROLE;
-            REVOKE CREATE ON SCHEMA {schema} FROM {PostgresTenantPreferenceContract.OwnerRole};
-            """);
-
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
-            await PostgresTenantPreferenceContract.RequireReadyAsync(context, fixture.NativeQueueEnrollment, default));
-    }
-
-    [Test]
-    [Arguments("executor")]
+    [Arguments("global-private")]
+    [Arguments("global-write")]
+    [Arguments("runtime-write")]
     [Arguments("runtime-via-login")]
-    [Arguments("global-column")]
-    [Arguments("runtime-column")]
-    [Arguments("owner-column")]
-    public async Task EffectivePrivilegeDriftFailsEntryAndInstallerWithoutRepair(string drift)
+    [Arguments("grant-option")]
+    [Arguments("system-column")]
+    [Arguments("public")]
+    [Arguments("admin-only")]
+    [Arguments("partial")]
+    [Arguments("rls")]
+    public async Task EffectivePrivilegeDriftFailsOriginalEntryAndInstallerWithoutRepair(string attack)
     {
-        await using var context = Open();
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var enrollment = fixture.NativeQueueEnrollment;
-        var entity = context.Model.FindEntityType(typeof(User))!;
-        var sql = context.GetService<ISqlGenerationHelper>();
-        string schema = context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema
-            ?? entity.GetSchema() ?? "public";
-        string table = sql.DelimitIdentifier(entity.GetTableName()!, schema);
-        string property = drift == "owner-column" ? nameof(User.IsDeleted) : nameof(User.LastActiveTenantId);
-        string column = sql.DelimitIdentifier(entity.FindProperty(property)!
-            .GetColumnName(StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!);
-        string recipient = drift switch
+        await using var strategy = Open(PrimaryDatabaseRole.Migrator);
+        await strategy.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            "global-column" => enrollment.GlobalLogin,
-            "owner-column" => PostgresTenantPreferenceContract.OwnerRole,
-            _ => enrollment.RuntimeLogin
-        };
-        string parent = drift == "runtime-via-login" ? sql.DelimitIdentifier(enrollment.GlobalLogin) : PostgresTenantPreferenceContract.GlobalRole;
-        string grant = drift is "executor" or "runtime-via-login"
-            ? $"GRANT {parent} TO {sql.DelimitIdentifier(recipient)} WITH INHERIT {(drift == "executor" ? "TRUE" : "FALSE")}, SET {(drift == "executor" ? "FALSE" : "TRUE")}, ADMIN FALSE"
-            : $"GRANT UPDATE ({column}) ON {table} TO {sql.DelimitIdentifier(recipient)}";
-        await context.Database.ExecuteSqlRawAsync(grant);
-        await transaction.CreateSavepointAsync("before_entry");
-        await using (var entry = context.Database.GetDbConnection().CreateCommand())
-        {
-            entry.Transaction = transaction.GetDbTransaction();
-            entry.CommandText = $"SELECT {PostgresTenantPreferenceContract.FunctionSql(context)}(@subject,@tenant,@now)";
-            entry.Parameters.Add(new NpgsqlParameter("subject", Guid.CreateVersion7()));
-            entry.Parameters.Add(new NpgsqlParameter("tenant", Guid.CreateVersion7()));
-            entry.Parameters.Add(new NpgsqlParameter("now", DateTime.UtcNow));
-            var denied = await Assert.ThrowsAsync<PostgresException>(async () => { await entry.ExecuteScalarAsync(); });
-            await Assert.That(denied.SqlState).IsEqualTo("55000");
-            await Assert.That(denied.MessageText is "native_privilege_guard_not_ready"
-                or "native_tenant_preference_effective_privilege_drift").IsTrue();
-        }
-        await transaction.RollbackToSavepointAsync("before_entry");
-        await transaction.CreateSavepointAsync("before_install");
-        var install = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await PostgresTenantPreferenceContract.ApplyAsync(context, enrollment));
-        await Assert.That(install.SqlState).IsEqualTo("55000");
-        await transaction.RollbackToSavepointAsync("before_install");
-        await using var remaining = context.Database.GetDbConnection().CreateCommand();
-        remaining.Transaction = transaction.GetDbTransaction();
-        remaining.CommandText = drift is "executor" or "runtime-via-login"
-            ? "SELECT pg_catalog.pg_has_role(@role,@parent,'MEMBER')"
-            : "SELECT pg_catalog.has_column_privilege(@role,@table,@column,'UPDATE')";
-        remaining.Parameters.Add(new NpgsqlParameter("role", recipient));
-        if (drift is "executor" or "runtime-via-login")
-            remaining.Parameters.Add(new NpgsqlParameter("parent", drift == "executor"
-                ? PostgresTenantPreferenceContract.GlobalRole : enrollment.GlobalLogin));
-        else
-        {
-            remaining.Parameters.Add(new NpgsqlParameter("table", table));
-            remaining.Parameters.Add(new NpgsqlParameter("column", entity.FindProperty(property)!
-                .GetColumnName(StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!));
-        }
-        await Assert.That(await remaining.ExecuteScalarAsync()).IsEqualTo(true);
+            await using var context = Open(PrimaryDatabaseRole.Migrator);
+            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var names = new HumanPrincipalSourceSql(context);
+            string table = names.Table(typeof(User));
+            string global = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
+            string runtime = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
+            string preference = names.Quote(names.ColumnName(typeof(User), nameof(User.LastActiveTenantId)));
+            string audit = names.Quote(names.ColumnName(typeof(User), nameof(User.UpdatedBy)));
+            string other = names.Quote("preference_drift_" + Guid.CreateVersion7().ToString("N"));
+            string useGlobal = $"SET LOCAL SESSION AUTHORIZATION {global}";
+            await transaction.CreateSavepointAsync("healthy_identity");
+            await context.Database.ExecuteSqlRawAsync(useGlobal);
+            await PostgresTenantPreferencePermissions.RequireReadyAsync(context, fixture.NativeQueueEnrollment);
+            await transaction.RollbackToSavepointAsync("healthy_identity");
+
+            string change = attack switch
+            {
+                "global-private" => $"GRANT SELECT ({names.Quote(names.ColumnName(typeof(User), nameof(User.CreatedAt)))}) ON {table} TO {global}",
+                "global-write" => $"GRANT UPDATE ({names.Quote(names.ColumnName(typeof(User), nameof(User.IsDeleted)))}) ON {table} TO {global}",
+                "runtime-write" => $"GRANT UPDATE ({preference}) ON {table} TO {runtime}",
+                "runtime-via-login" => $"GRANT {global} TO {runtime} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE",
+                "grant-option" => $"GRANT UPDATE ({preference}) ON {table} TO {global} WITH GRANT OPTION",
+                "system-column" => $"GRANT SELECT (xmin) ON {table} TO {global}",
+                "public" => $"GRANT SELECT ({preference}) ON {table} TO PUBLIC",
+                "admin-only" => $"CREATE ROLE {other} NOLOGIN; GRANT UPDATE ({preference}) ON {table} TO {other}; GRANT {other} TO {global} WITH INHERIT FALSE, SET FALSE, ADMIN TRUE",
+                "partial" => $"REVOKE UPDATE ({audit}) ON {table} FROM {global}",
+                "rls" => $"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
+                _ => throw new ArgumentOutOfRangeException(nameof(attack))
+            };
+            await context.Database.ExecuteSqlRawAsync(change);
+            string before = await CatalogueAsync(context);
+            await transaction.CreateSavepointAsync("runtime_identity");
+            await context.Database.ExecuteSqlRawAsync(useGlobal);
+            var denied = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                PostgresTenantPreferencePermissions.RequireReadyAsync(context, fixture.NativeQueueEnrollment));
+            await Assert.That(denied.Message).IsEqualTo("tenant_preference_permissions_drift");
+            await transaction.RollbackToSavepointAsync("runtime_identity");
+            var install = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                PostgresTenantPreferencePermissions.ApplyAsync(context, fixture.NativeQueueEnrollment));
+            await Assert.That(install.Message).IsEqualTo("tenant_preference_permissions_drift");
+            await Assert.That(await CatalogueAsync(context)).IsEqualTo(before);
+            await transaction.RollbackAsync();
+        });
     }
 
-    private ExploreDbContext Open()
+    [Test]
+    public async Task ReapplicationKeepsTheOriginalTransactionAndNoBusinessRoutinesOrCapabilityRoles()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
-        return new ExploreDbContext(options.Options);
+        await using var context = Open(PrimaryDatabaseRole.Migrator);
+        await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            string before = await CatalogueAsync(context);
+            await PostgresTenantPreferencePermissions.ApplyAsync(context, fixture.NativeQueueEnrollment);
+            await PostgresTenantPreferencePermissions.ApplyAsync(context, fixture.NativeQueueEnrollment);
+            await Assert.That(ReferenceEquals(transaction, context.Database.CurrentTransaction)).IsTrue();
+            await Assert.That(await CatalogueAsync(context)).IsEqualTo(before);
+            bool absent = await context.Database.SqlQuery<bool>($"""
+                SELECT NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc WHERE proname IN
+                    ('human_tenant_preference_write','human_tenant_preference_image'))
+                    AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname IN
+                        ('event_tenant_preference_owner','event_tenant_preference_global','event_tenant_preference_migrator')) AS "Value"
+                """).SingleAsync();
+            await Assert.That(absent).IsTrue();
+            await transaction.RollbackAsync();
+        });
+    }
+
+    private ExploreDbContext Open(PrimaryDatabaseRole role)
+    {
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, fixture.GetNativeQueueOptions(role));
+        var context = new ExploreDbContext(options.Options);
+        context.BindTenantLease();
+        return context;
+    }
+
+    private static async Task<string> CatalogueAsync(ExploreDbContext context)
+    {
+        var names = new HumanPrincipalSourceSql(context);
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.Transaction = context.Database.CurrentTransaction!.GetDbTransaction();
+        command.CommandText = """
+            SELECT jsonb_build_object('columns',(SELECT jsonb_agg(jsonb_build_array(a.attnum,a.attacl::text) ORDER BY a.attnum)
+                FROM pg_catalog.pg_attribute a WHERE a.attrelid=pg_catalog.to_regclass(@table)),
+                'table',(SELECT jsonb_build_array(c.relacl::text,c.relrowsecurity,c.relforcerowsecurity,c.relowner)
+                    FROM pg_catalog.pg_class c WHERE c.oid=pg_catalog.to_regclass(@table)),
+                'memberships',(SELECT jsonb_agg(jsonb_build_array(roleid,member,grantor,admin_option,inherit_option,set_option) ORDER BY roleid,member,grantor)
+                    FROM pg_catalog.pg_auth_members))::text
+            """;
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "table";
+        parameter.Value = names.Table(typeof(User));
+        command.Parameters.Add(parameter);
+        return (string)(await command.ExecuteScalarAsync())!;
     }
 }

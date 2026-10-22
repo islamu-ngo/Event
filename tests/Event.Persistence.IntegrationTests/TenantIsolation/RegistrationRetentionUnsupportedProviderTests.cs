@@ -4,6 +4,7 @@ using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,7 @@ public sealed class RegistrationRetentionUnsupportedProviderTests
         await using (var setup = new ExploreDbContext(options))
         {
             await setup.Database.EnsureCreatedAsync();
+            setup.BindTenantLease();
             setup.TenantStatuses.AddRange(
                 new TenantStatus { Id = 1, MasterCode = "ACTIVE", FullName = "Active", IsActiveState = true },
                 new TenantStatus { Id = 2, MasterCode = "SUSPENDED", FullName = "Suspended", IsActiveState = false });
@@ -38,9 +40,13 @@ public sealed class RegistrationRetentionUnsupportedProviderTests
             setup.Tenants.AddRange(
                 new Tenant { Id = active, FullName = "Active tenant", Slug = $"active-{active:N}", TenantStatusId = 1, TenantStatus = null! },
                 new Tenant { Id = suspended, FullName = "Suspended tenant", Slug = $"suspended-{suspended:N}", TenantStatusId = 2, TenantStatus = null! });
-            await setup.SaveChangesAsync();
+            await using (var gate = new EventDiscoveryEnrollmentGate(setup))
+            {
+                await using var custody = await gate.AcquireAsync();
+                await setup.SaveChangesAsync();
+            }
             var factory = new UnsupportedContextFactory(options);
-            var discovery = new RegistrationRetentionTenantDiscoveryRepository(factory);
+            var discovery = new RegistrationRetentionTenantDiscoveryRepository(factory, null);
             await Assert.That(await discovery.GetTenantIdsAsync(null, 1, CancellationToken.None)).IsEquivalentTo([active]);
             await Assert.That((await discovery.GetTenantIdsAsync(active, 1, CancellationToken.None)).Count).IsEqualTo(0);
             await using var scope = await new RegistrationRetentionExecutionScopeFactory(factory)
@@ -55,7 +61,7 @@ public sealed class RegistrationRetentionUnsupportedProviderTests
     {
         var factory = new UnsupportedContextFactory(options);
         await Assert.ThrowsAsync<NotSupportedException>(async () =>
-            await new RegistrationRetentionTenantDiscoveryRepository(factory)
+            await new RegistrationRetentionTenantDiscoveryRepository(factory, null)
                 .GetTenantIdsAsync(null, 1, CancellationToken.None));
         await Assert.ThrowsAsync<NotSupportedException>(async () =>
         {
@@ -68,8 +74,12 @@ public sealed class RegistrationRetentionUnsupportedProviderTests
     private sealed class UnsupportedContextFactory(DbContextOptions<ExploreDbContext> options)
         : IGlobalExploreDbContextFactory, ITenantExploreDbContextFactory
     {
-        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ExploreDbContext(options));
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+        {
+            var context = new ExploreDbContext(options);
+            context.BindTenantLease();
+            return Task.FromResult(context);
+        }
 
         public Task<ExploreDbContext> CreateDbContextAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ExploreDbContext(options) { TenantContext = new TenantIdentity(tenantId) });

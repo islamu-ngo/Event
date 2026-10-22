@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -16,10 +17,9 @@ public sealed class AdmissionTargetOperationsRepository(ExploreDbContext dbConte
     {
         if (dbContext.Database.CurrentTransaction is not null)
         {
-            await RelationalEntityRowFence.AcquireAsync<AdmissionTarget>(
+            await AdmissionTargetTransaction.RequireCurrentAsync(
                 dbContext,
                 tenantId,
-                target => target.Id,
                 targetId,
                 cancellationToken);
             return await dbContext.AdmissionTargets.SingleOrDefaultAsync(target =>
@@ -41,7 +41,11 @@ public sealed class AdmissionTargetOperationsRepository(ExploreDbContext dbConte
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
-        dbContext.AdmissionTargets.Update(target);
+        AdmissionTargetTransaction.RequireCurrent(dbContext, target.TenantId, target.Id);
+        var entry = dbContext.Entry(target);
+        if (entry.State == EntityState.Detached) dbContext.AdmissionTargets.Attach(target);
+        entry.Property(value => value.AdmissionOperationalStatusId).IsModified = true;
+        entry.Property(value => value.ConcurrencyStamp).IsModified = true;
         return Task.FromResult(target);
     }
 }

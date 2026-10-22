@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Explore.Persistence.Schema;
 
 /// <summary>
-/// Fixed tenant-key storage permissions. Issuance, disclosure, management and revocation remain application workflows.
+/// Fixed tenant credential storage permissions. Issuance, disclosure, management and revocation remain application workflows.
 /// Runtime can insert a new hash but cannot select hashes or usage IP addresses.
 /// </summary>
 public static class PostgresTenantApiKeyStoragePermissions
@@ -49,6 +49,30 @@ public static class PostgresTenantApiKeyStoragePermissions
         nameof(ExternalApiKeyIssuanceReceipt.Id), nameof(ExternalApiKeyIssuanceReceipt.OperationFingerprint),
         nameof(ExternalApiKeyIssuanceReceipt.InputDigest), nameof(ExternalApiKeyIssuanceReceipt.TenantId),
         nameof(ExternalApiKeyIssuanceReceipt.ExternalApiKeyId), nameof(ExternalApiKeyIssuanceReceipt.CreatedAtUtc)
+    ];
+    private static readonly string[] ScannerColumns =
+    [
+        nameof(AdmissionScannerCapability.Id), nameof(AdmissionScannerCapability.TenantId),
+        nameof(AdmissionScannerCapability.IssueRequestId), nameof(AdmissionScannerCapability.EventId),
+        nameof(AdmissionScannerCapability.AdmissionTargetId), nameof(AdmissionScannerCapability.LookupKeyVersion),
+        nameof(AdmissionScannerCapability.LookupDigest), nameof(AdmissionScannerCapability.DeviceLabel),
+        nameof(AdmissionScannerCapability.Actions), nameof(AdmissionScannerCapability.ExpiresAt),
+        nameof(AdmissionScannerCapability.IssuedByActorId), nameof(AdmissionScannerCapability.IssuedAt),
+        nameof(AdmissionScannerCapability.RevokedByActorId), nameof(AdmissionScannerCapability.RevokedAt),
+        nameof(AdmissionScannerCapability.RevocationReason), nameof(AdmissionScannerCapability.ConcurrencyStamp)
+    ];
+    private static readonly string[] ScannerUpdates =
+    [
+        nameof(AdmissionScannerCapability.Id), nameof(AdmissionScannerCapability.RevokedByActorId),
+        nameof(AdmissionScannerCapability.RevokedAt), nameof(AdmissionScannerCapability.RevocationReason),
+        nameof(AdmissionScannerCapability.ConcurrencyStamp)
+    ];
+    private static readonly string[] TargetColumns =
+    [
+        nameof(AdmissionTarget.Id), nameof(AdmissionTarget.TenantId), nameof(AdmissionTarget.EventId),
+        nameof(AdmissionTarget.AdmissionTargetTypeId), nameof(AdmissionTarget.AdmissionOperationalStatusId),
+        nameof(AdmissionTarget.ScopeId), nameof(AdmissionTarget.EventDayId), nameof(AdmissionTarget.EventSessionId),
+        nameof(AdmissionTarget.ConcurrencyStamp)
     ];
 
     /// <summary>Installs a fresh complete descriptor or verifies it without repairing partial or widened grants.</summary>
@@ -130,9 +154,9 @@ public static class PostgresTenantApiKeyStoragePermissions
 
     /// <summary>Exact declared Runtime column intersection for another owner-local catalogue proof.</summary>
     internal static string RuntimeColumnException(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
-        string roleOid, string relationOid, string columnName, string privilege)
+        string roleOid, string relationOid, string columnName, string privilege, Type? sourceType = null)
     {
-        Source source = Sources(context).Single(source => source.Type == typeof(ExternalApiKey));
+        Source source = Sources(context).Single(source => source.Type == (sourceType ?? typeof(ExternalApiKey)));
         string expected = string.Join(',', source.Grants.Select(grant => $"({Text(grant.Column)},{Text(grant.Privilege)})"));
         return $"""
             ({roleOid}={Role(enrollment.RuntimeLogin)} AND {relationOid}=pg_catalog.to_regclass({Text(source.Table)})
@@ -141,38 +165,32 @@ public static class PostgresTenantApiKeyStoragePermissions
                 AND EXISTS (SELECT 1 FROM pg_catalog.pg_attribute declared_column CROSS JOIN LATERAL pg_catalog.aclexplode(declared_column.attacl) acl
                     WHERE declared_column.attrelid={relationOid} AND declared_column.attname={columnName}
                         AND acl.grantee={Role(enrollment.RuntimeLogin)} AND acl.grantor={Role(enrollment.MigratorLogin)}
-                        AND acl.privilege_type={privilege} AND NOT acl.is_grantable))
+                        AND acl.privilege_type={privilege} AND NOT acl.is_grantable)
+                AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute declared_column CROSS JOIN LATERAL pg_catalog.aclexplode(declared_column.attacl) acl
+                    WHERE declared_column.attrelid={relationOid} AND declared_column.attname={columnName}
+                        AND acl.grantee=0 AND acl.privilege_type={privilege}))
             """;
     }
 
     internal static string CompleteManifest(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
         Manifest(context, Sources(context), enrollment, complete: true);
 
-    /// <summary>Only the fixed parent existence key, never tenant descriptive data or user information.</summary>
+    /// <summary>Fixed parent identity, visibility and participation-mode references; no descriptive or private content.</summary>
     internal static IReadOnlyList<string> RuntimeParentReadColumns(ExploreDbContext context, Type type) =>
-        type == typeof(Tenant)
-            ? Sources(context).Single(source => source.Type == typeof(Tenant)).Grants
+        IsParentReference(type)
+            ? Sources(context).Single(source => source.Type == type).Grants
                 .Where(grant => grant.Privilege == "SELECT").Select(grant => grant.Column).ToArray()
             : [];
+
+    private static bool IsParentReference(Type type) =>
+        type == typeof(Tenant) || type == typeof(Event) || type == typeof(EventParticipationConfiguration);
 
     internal static string RuntimeParentReadPredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment,
         string roleOid, string relationOid, string columnName, string privilege)
     {
-        Source parent = Sources(context).Single(source => source.Type == typeof(Tenant));
-        string id = RuntimeParentReadColumns(context, typeof(Tenant)).Single();
-        return $"""
-            ({roleOid}={Role(enrollment.RuntimeLogin)} AND {relationOid}=pg_catalog.to_regclass({Text(parent.Table)})
-                AND {columnName}={Text(id)} AND {privilege}='SELECT'
-                AND EXISTS (SELECT 1 FROM pg_catalog.pg_attribute parent_column
-                    CROSS JOIN LATERAL pg_catalog.aclexplode(parent_column.attacl) acl
-                    WHERE parent_column.attrelid={relationOid} AND parent_column.attnum>0 AND NOT parent_column.attisdropped
-                        AND parent_column.attname={columnName} AND acl.grantee={Role(enrollment.RuntimeLogin)}
-                        AND acl.grantor={Role(enrollment.MigratorLogin)} AND acl.privilege_type='SELECT' AND NOT acl.is_grantable)
-                AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute parent_column
-                    CROSS JOIN LATERAL pg_catalog.aclexplode(parent_column.attacl) acl
-                    WHERE parent_column.attrelid={relationOid} AND parent_column.attname={columnName}
-                        AND acl.grantee=0 AND acl.privilege_type='SELECT'))
-            """;
+        return string.Join(" OR ", Sources(context).Where(source => IsParentReference(source.Type))
+            .Select(source => RuntimeColumnException(context, enrollment,
+                roleOid, relationOid, columnName, privilege, source.Type)));
     }
 
     private static string Manifest(ExploreDbContext context, Source[] sources, PostgresNativeQueueEnrollment enrollment, bool complete)
@@ -261,7 +279,7 @@ public static class PostgresTenantApiKeyStoragePermissions
                 WHERE c.oid=pg_catalog.to_regclass({Text(source.Table)}) AND c.relkind='r' AND c.relpersistence='p'
                     AND NOT c.relispartition AND c.relowner={Role(enrollment.MigratorLogin)} AND n.nspowner={Role(enrollment.MigratorLogin)}
                     AND {isolation})
-            AND (SELECT count(*)={source.Columns.Length} FROM pg_catalog.pg_attribute
+            AND (SELECT count(*)={source.ModelColumnCount} FROM pg_catalog.pg_attribute
                 WHERE attrelid=pg_catalog.to_regclass({Text(source.Table)}) AND attnum>0 AND NOT attisdropped)
             AND ({shape})
             AND ({policy})
@@ -287,6 +305,13 @@ public static class PostgresTenantApiKeyStoragePermissions
     private static Source[] Sources(ExploreDbContext context) =>
     [
         Map(context, typeof(ExternalApiKey), KeyColumns, MetadataColumns, KeyColumns, UpdateColumns),
+        Map(context, typeof(AdmissionScannerCapability), ScannerColumns, ScannerColumns, ScannerColumns, ScannerUpdates),
+        Map(context, typeof(AdmissionTarget), TargetColumns, TargetColumns, TargetColumns,
+            [nameof(AdmissionTarget.AdmissionOperationalStatusId), nameof(AdmissionTarget.ConcurrencyStamp)]),
+        MapReference(context, typeof(Event), [nameof(Event.Id), nameof(Event.TenantId), nameof(Event.IsDeleted)]),
+        MapReference(context, typeof(EventParticipationConfiguration),
+            [nameof(EventParticipationConfiguration.Id), nameof(EventParticipationConfiguration.TenantId),
+                nameof(EventParticipationConfiguration.IsDeleted), nameof(EventParticipationConfiguration.ParticipationHandlingModeId)]),
         Map(context, typeof(ExternalApiKeyIssuanceReceipt), ReceiptColumns, ReceiptColumns, ReceiptColumns, []),
         Map(context, typeof(ExternalApiKeyCreditPeriod),
             [nameof(ExternalApiKeyCreditPeriod.Id), nameof(ExternalApiKeyCreditPeriod.MasterCode),
@@ -306,10 +331,14 @@ public static class PostgresTenantApiKeyStoragePermissions
                 nameof(Tenant.UpdatedAt), nameof(Tenant.UpdatedBy)], [nameof(Tenant.Id)], [], [])
     ];
 
-    private static Source Map(ExploreDbContext context, Type type, string[] properties, string[] reads, string[] inserts, string[] updates)
+    private static Source MapReference(ExploreDbContext context, Type type, string[] reads) =>
+        Map(context, type, reads, reads, [], [], completeInventory: false);
+
+    private static Source Map(ExploreDbContext context, Type type, string[] properties, string[] reads, string[] inserts,
+        string[] updates, bool completeInventory = true)
     {
         var entity = context.Model.FindEntityType(type) ?? throw new InvalidOperationException(Drift);
-        if (!entity.GetProperties().Select(property => property.Name).ToHashSet(StringComparer.Ordinal).SetEquals(properties)
+        if ((completeInventory && !entity.GetProperties().Select(property => property.Name).ToHashSet(StringComparer.Ordinal).SetEquals(properties))
             || entity.BaseType is not null || entity.GetDerivedTypes().Any())
             throw new InvalidOperationException("tenant_api_key_storage_fixed_inventory_changed");
         var mapped = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
@@ -322,7 +351,7 @@ public static class PostgresTenantApiKeyStoragePermissions
             .Concat(inserts.Select(property => new Grant(Name(property), "INSERT")))
             .Concat(updates.Select(property => new Grant(Name(property), "UPDATE"))).ToArray();
         return new(type, schema, mapped.Name, context.GetService<ISqlGenerationHelper>().DelimitIdentifier(mapped.Name, schema),
-            entity.FindProperty("TenantId") is null ? null : Name("TenantId"), columns, grants);
+            entity.FindProperty("TenantId") is null ? null : Name("TenantId"), columns, grants, entity.GetProperties().Count());
     }
 
     private static string Role(string login) => $"(SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(login)})";
@@ -337,5 +366,6 @@ public static class PostgresTenantApiKeyStoragePermissions
     }
     private sealed record Column(string Property, string Name, string StoreType, bool Nullable);
     private sealed record Grant(string Column, string Privilege);
-    private sealed record Source(Type Type, string Schema, string Name, string Table, string? TenantColumn, Column[] Columns, Grant[] Grants);
+    private sealed record Source(Type Type, string Schema, string Name, string Table, string? TenantColumn,
+        Column[] Columns, Grant[] Grants, int ModelColumnCount);
 }

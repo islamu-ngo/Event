@@ -48,13 +48,8 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
         await using var request = Open(PrimaryDatabaseRole.Runtime);
         request.BindTenantLease();
         await request.Database.OpenConnectionAsync();
-        var entity = request.Model.FindEntityType(typeof(AdmissionScannerCapability))!;
-        await using (var direct = request.Database.GetDbConnection().CreateCommand())
-        {
-            direct.CommandText = $"SELECT * FROM \"{entity.GetSchema()}\".\"{entity.GetTableName()}\"";
-            var denied = await Assert.ThrowsAsync<PostgresException>(async () => { await direct.ExecuteScalarAsync(); });
-            await Assert.That(denied.SqlState).IsEqualTo("42501");
-        }
+        // Fixed scanner storage is tenant-bound even without EF's query filter.
+        await Assert.That(await request.AdmissionScannerCapabilities.IgnoreQueryFilters().AnyAsync()).IsFalse();
         var factory = new GlobalExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global));
         var repository = new AdmissionScannerAuthenticationRepository(factory, fixture.NativeQueueEnrollment);
         string differentDigest = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -111,7 +106,7 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
     }
 
     [Test]
-    [Arguments("runtime-select")]
+    [Arguments("runtime-select-grant-option")]
     [Arguments("runtime-executor")]
     [Arguments("runtime-via-global-login")]
     [Arguments("runtime-via-migrator-login")]
@@ -152,7 +147,7 @@ public sealed class ScannerAuthenticationReadPortTests(PostgreSqlContainerFixtur
         await PostgresAdmissionScannerAuthenticationContract.RequireReadyAsync(selected, enrollment);
         (string apply, string undo) = drift switch
         {
-            "runtime-select" => ($"GRANT SELECT ({column}) ON {table} TO {runtime}", $"REVOKE SELECT ({column}) ON {table} FROM {runtime}"),
+            "runtime-select-grant-option" => ($"GRANT SELECT ({column}) ON {table} TO {runtime} WITH GRANT OPTION", $"REVOKE GRANT OPTION FOR SELECT ({column}) ON {table} FROM {runtime}"),
             "runtime-update" => ($"GRANT UPDATE ({column}) ON {table} TO {runtime}", $"REVOKE UPDATE ({column}) ON {table} FROM {runtime}"),
             "runtime-executor" => ($"GRANT {executor} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE", $"REVOKE {executor} FROM {runtime}"),
             "runtime-via-global-login" => ($"GRANT {global} TO {runtime} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE", $"REVOKE {global} FROM {runtime}"),

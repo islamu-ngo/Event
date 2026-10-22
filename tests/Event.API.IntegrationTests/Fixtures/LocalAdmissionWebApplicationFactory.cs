@@ -45,6 +45,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private const string SigningKeyVariable = "AUTHENTICATION_LOCAL_JWT_KEY";
     private const string ExternalAudience = "islamu-event-api";
     private readonly AuthenticationProviderKind _primaryProvider;
+    private readonly TimeProvider? _timeProvider;
     private readonly RSA? _externalSigningKey;
     private readonly ECDsa? _atprotoOAuthKey;
     private readonly ECDsa? _atprotoSessionKey;
@@ -60,7 +61,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         Path.GetTempPath(), $"local-admission-passwords-{Guid.CreateVersion7():N}.json");
     private string? _passwordBlocklistHash;
     private readonly Dictionary<string, string?> _previousEnvironment = [];
-    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority;
     private string? _connectionString;
     private IInterceptor? _persistenceInterceptor;
     private ILoggerProvider? _logCapture;
@@ -72,7 +73,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
     public string SetupSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
-    private LocalAdmissionWebApplicationFactory(AuthenticationProviderKind primaryProvider, bool enableAtproto)
+    private LocalAdmissionWebApplicationFactory(AuthenticationProviderKind primaryProvider, bool enableAtproto,
+        TimeProvider? timeProvider)
     {
         if (primaryProvider is not (AuthenticationProviderKind.Local or AuthenticationProviderKind.Keycloak
             or AuthenticationProviderKind.Atproto))
@@ -81,6 +83,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         }
 
         _primaryProvider = primaryProvider;
+        _timeProvider = timeProvider;
+        _dataProtectionAuthority = new("api", timeProvider);
         _externalSigningKey = primaryProvider == AuthenticationProviderKind.Keycloak ? RSA.Create(2048) : null;
         if (primaryProvider == AuthenticationProviderKind.Atproto || enableAtproto)
         {
@@ -107,9 +111,10 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         bool incompleteSetup = false,
         bool enableRateLimiting = false,
         bool enableAtproto = false,
-        string? postgreSqlConnectionString = null)
+        string? postgreSqlConnectionString = null,
+        TimeProvider? timeProvider = null)
     {
-        var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto)
+        var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto, timeProvider)
         {
             _persistenceInterceptor = persistenceInterceptor,
             _logCapture = logCapture,
@@ -180,6 +185,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 ["SecretProvider:Provider"] = "Environment",
                 ["PrivacyErasure:Authority:Topology"] = "CoLocated",
                 ["Database:Provider"] = "Sqlite",
+                ["Database:Host"] = null,
+                ["Database:Port"] = null,
                 ["Database:Database"] = _databasePath,
                 ["Database:Runtime:Database"] = _databasePath,
                 ["SETUP_SECRET_FILE"] = _databasePath + ".setup",
@@ -211,6 +218,11 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         });
         builder.ConfigureTestServices(services =>
         {
+            if (_timeProvider is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<TimeProvider>(_timeProvider);
+            }
             services.RemoveAll<IExternalDataProtectionSource>();
             services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             services.RemoveExploreDbContextRegistrations();
@@ -236,6 +248,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 context.TenantContext = provider.GetService<ITenantContext>();
                 context.CurrentUserService = provider.GetService<ICurrentUserService>();
                 context.ClearTenantFilterBypass();
+                context.BindTenantLease();
                 return context;
             });
             if (_externalSigningKey is not null)
@@ -435,6 +448,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         var manager = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
         var credentials = scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>();
         var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
         Guid initiatorId = (await database.InstanceBootstrapStates.SingleAsync()).CompletedByUserId!.Value;
         string email = $"local-{Guid.CreateVersion7():N}@example.test";
         string password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
@@ -446,7 +460,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             throw new InvalidOperationException($"The native Identity fixture could not create its account: {created.Outcome}.");
         }
         LocalCredentialOperationReceipt receipt = created.Receipt!;
-        DateTime createdAt = DateTime.UtcNow;
+        DateTime createdAt = clock.GetUtcNow().UtcDateTime;
         var applicationUser = new User
         {
             Id = receipt.LocalSubjectId,
@@ -485,7 +499,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             throw new InvalidOperationException("The native Identity fixture could not activate its exact account binding.");
         }
         LocalIdentityUser user = (await manager.FindByIdAsync(receipt.LocalSubjectId.ToString("D")))!;
-        DateTimeOffset issuedAt = DateTimeOffset.UtcNow;
+        DateTimeOffset issuedAt = clock.GetUtcNow();
         LocalCredentialReplacementOutcome replaced = await credentials.ReplaceAsync(new LocalCredentialReplacementRequest(
             authority: new LocalCredentialReplacementAuthority(
                 subject: new LocalCredentialReplacementSubject(localSubjectId: user.Id,
@@ -581,6 +595,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private async Task SeedDatabaseAsync()
     {
         await using ExploreDbContext database = CreateDatabase();
+        database.BindTenantLease();
         await database.Database.EnsureCreatedAsync();
         if (_postgreSqlConnectionString is null)
         {
@@ -599,7 +614,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript());
         }
         await LookupTableSeeder.SeedAsync(database);
-        DateTime now = DateTime.UtcNow;
+        DateTime now = (_timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
         var bootstrapUser = new User
         {
             Id = Guid.CreateVersion7(),

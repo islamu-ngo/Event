@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -19,10 +20,9 @@ public sealed class AdmissionScannerCapabilityRepository(ExploreDbContext dbCont
         ArgumentNullException.ThrowIfNull(capability);
         RequireTransaction();
 
-        await RelationalEntityRowFence.AcquireAsync<AdmissionTarget>(
+        await AdmissionTargetTransaction.RequireCurrentAsync(
             dbContext,
             capability.TenantId,
-            target => target.Id,
             capability.AdmissionTargetId,
             cancellationToken);
         AdmissionTarget? target = await dbContext.AdmissionTargets
@@ -136,11 +136,14 @@ public sealed class AdmissionScannerCapabilityRepository(ExploreDbContext dbCont
         {
             dbContext.AdmissionScannerCapabilities.Attach(capability);
             entry = dbContext.Entry(capability);
-            entry.State = EntityState.Modified;
         }
 
+        entry.Property(value => value.RevokedByActorId).IsModified = true;
+        entry.Property(value => value.RevokedAt).IsModified = true;
+        entry.Property(value => value.RevocationReason).IsModified = true;
         entry.Property(value => value.ConcurrencyStamp).OriginalValue = originalConcurrencyStamp;
         capability.ConcurrencyStamp = Guid.CreateVersion7();
+        entry.Property(value => value.ConcurrencyStamp).IsModified = true;
         await dbContext.SaveChangesAsync(cancellationToken);
         return capability;
     }

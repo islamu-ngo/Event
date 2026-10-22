@@ -191,6 +191,8 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                 var evidence = new AggregateException("Setting operation and coordination cleanup evidence.", cleanup);
                 if (primary is HumanMutationOutcomeUnknownException)
                     throw new HumanMutationOutcomeUnknownException(evidence);
+                if (primary is TransactionCommittedCleanupException)
+                    throw new TransactionCommittedCleanupException(evidence);
                 throw evidence;
             }
             if (primary is not null) ExceptionDispatchInfo.Capture(primary).Throw();

@@ -83,6 +83,8 @@ public sealed partial class SetupLiveApplicationService
             Exception evidence = primary is null ? cleanup : new AggregateException(primary, cleanup);
             if (primary is HumanMutationOutcomeUnknownException)
                 throw new HumanMutationOutcomeUnknownException(evidence);
+            if (primary is TransactionCommittedCleanupException)
+                throw new TransactionCommittedCleanupException(evidence);
             throw new ConfigurationImportCoordinationCleanupException(evidence);
         }
         if (primary is not null) ExceptionDispatchInfo.Capture(primary).Throw();

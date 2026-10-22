@@ -31,9 +31,11 @@ internal sealed class ResourceVisitorAuthenticatedFixture : IAsyncDisposable
         Lifetime = lifetime;
     }
 
-    internal static async Task<ResourceVisitorAuthenticatedFixture> CreateAsync(IInterceptor? interceptor = null)
+    internal static async Task<ResourceVisitorAuthenticatedFixture> CreateAsync(IInterceptor? interceptor = null,
+        Action<IServiceCollection>? configureServices = null)
     {
-        var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(interceptor: interceptor);
+        var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(interceptor: interceptor,
+            configureServices: configureServices);
         var request = new ResourceVisitorImportConsumptionTests.AuthenticatedRequest(fixture.Host.Services);
         try
         {

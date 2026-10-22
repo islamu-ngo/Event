@@ -29,6 +29,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Event.Testing;
 
 namespace Event.Api.IntegrationTests.Authentication;
 
@@ -47,10 +48,21 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
     public Task SetupImportAcknowledgedCommitRetainsAppliedHistoryWhenCoordinationReleaseFails(bool failGenerationRelease) =>
         VerifySetupCommitAsync(loseCommitAcknowledgement: false, failGenerationRelease);
 
-    private static async Task VerifySetupCommitAsync(bool loseCommitAcknowledgement, bool failGenerationRelease)
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public Task SetupImportOriginalTransactionDisposalRetainsSettlementAndEveryCleanupCause(bool loseCommitAcknowledgement) =>
+        VerifySetupCommitAsync(loseCommitAcknowledgement, failGenerationRelease: true, failTransactionCleanup: true);
+
+    private static async Task VerifySetupCommitAsync(bool loseCommitAcknowledgement, bool failGenerationRelease,
+        bool failTransactionCleanup = false)
     {
-        var lostAcknowledgement = new SetupImportLostAcknowledgement();
-        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(lostAcknowledgement);
+        var transactionCleanup = new TransactionCleanupFault(loseAcknowledgement: false,
+            new IOException("Original import transaction cleanup failed after real disposal."));
+        var lostAcknowledgement = new SetupImportLostAcknowledgement(failTransactionCleanup ? transactionCleanup : null);
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(lostAcknowledgement,
+            failTransactionCleanup ? services => services.ConfigureDbContext<ExploreDbContext>(options =>
+                options.ReplaceService<IRelationalTransactionFactory, TransactionCleanupFault.Factory>()) : null);
         fixture.Context.PlatformUserRoles.Add(new PlatformUserRole
         {
             Id = Guid.CreateVersion7(),
@@ -140,10 +152,14 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
         catch (Exception observed) { failure = observed; }
         await Assert.That(failure).IsNotNull();
         await Assert.That(failure is HumanMutationOutcomeUnknownException).IsEqualTo(loseCommitAcknowledgement);
+        await Assert.That(failure is TransactionCommittedCleanupException)
+            .IsEqualTo(failTransactionCleanup && !loseCommitAcknowledgement);
         await Assert.That(lostAcknowledgement.FaultCount).IsEqualTo(loseCommitAcknowledgement ? 1 : 0);
         await Assert.That(ContainsCause(failure!, lostAcknowledgement.Failure)).IsEqualTo(loseCommitAcknowledgement);
         await Assert.That(ContainsCause(failure!, coordinator.Failure)).IsEqualTo(failGenerationRelease);
         await Assert.That(ContainsCause(failure!, settingRelease.Failure)).IsEqualTo(settingRelease.Armed);
+        await Assert.That(ContainsCause(failure!, transactionCleanup.CleanupFailure)).IsEqualTo(failTransactionCleanup);
+        await Assert.That(transactionCleanup.DisposalFailures).IsEqualTo(failTransactionCleanup ? 1 : 0);
         await using var observer = fixture.CreateIndependentContext();
         var operation = await observer.ConfigurationImportOperations.AsNoTracking()
             .SingleAsync(row => row.SessionId == created.SessionId);
@@ -158,11 +174,21 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
             .Select(row => row.FullName).SingleAsync()).IsEqualTo(desiredName);
     }
 
-    private sealed class SetupImportLostAcknowledgement : DbTransactionInterceptor
+    private sealed class SetupImportLostAcknowledgement(TransactionCleanupFault? cleanup = null) : DbTransactionInterceptor
     {
         internal bool Armed { get; set; }
         internal int FaultCount { get; private set; }
         internal IOException Failure { get; } = new("Lost setup import commit acknowledgement after physical commit.");
+
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
+            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        {
+            if (cleanup is not null && eventData.Context is ExploreDbContext context
+                && context.ChangeTracker.Entries<ConfigurationImportOperation>()
+                    .Any(entry => entry.Entity.Status == ConfigurationImportOperationStatus.Applied))
+                cleanup.Arm(context, transaction);
+            return ValueTask.FromResult(result);
+        }
 
         public override Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
             CancellationToken cancellationToken = default)

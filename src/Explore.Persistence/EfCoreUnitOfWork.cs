@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using System.Runtime.ExceptionServices;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Persistence.Database.ProviderPrimitives;
@@ -172,79 +173,108 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
         var strategy = allowReplay ? _createExecutionStrategy() : new SingleAttemptExecutionStrategy(_dbContext);
         return await strategy.ExecuteAsync(async () =>
         {
-            await using var transaction = isolationLevel.HasValue
+            var transaction = isolationLevel.HasValue
                 ? await _dbContext.Database.BeginTransactionAsync(isolationLevel.Value, ct)
                 : await _beginTransaction(ct);
-            DbTransaction physicalTransaction = transaction.GetDbTransaction();
-            bool commitAttempted = false;
+            bool commitAcknowledged = false;
+            Exception? primary = null;
+            T completedResult = default!;
             try
             {
-                _dbContext.HumanCommitAttemptOwnsTransaction = !allowReplay;
-                var result = await operation(ct);
-                if (_dbContext.StorageReferenceTransactionFailed)
-                    throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
-                        "The storage reference transaction has failed.");
-                await _dbContext.FlushDisclosureAsync(ct);
-                await _dbContext.ValidateTrustedSetupSettingsSourcesAsync(ct);
-                await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
-                _dbContext.ValidateTrustedSetupSettingsTimes();
-                commitAttempted = true;
-                await transaction.CommitAsync(ct);
-                return result;
+                completedResult = await ExecuteOwnedTransactionAsync();
             }
-            catch (Exception ex) when (!allowReplay && commitAttempted
-                && (!IsSerializableRetryConflict(ex)
-                    || !RelationalConnectionIdentity.Capture(_dbContext).Owns(physicalTransaction)))
+            catch (Exception failure)
             {
-                // A completed/ended provider transaction cannot be certified as rolled back
-                // by a later exception or rollback call. Retain unknown settlement explicitly.
-                await RollbackAndClearTrackingAsync(transaction);
-                throw new HumanMutationOutcomeUnknownException(ex);
+                primary = failure;
             }
-            catch (DbUpdateConcurrencyException ex)
+            try { await transaction.DisposeAsync(); }
+            catch (Exception cleanup)
             {
-                var translatedException = TranslateConcurrencyException(ex);
-                if (!allowReplay)
-                {
-                    if (!await RollbackAndClearTrackingAsync(transaction, confirmRollback: true))
-                        throw new HumanMutationOutcomeUnknownException(ex);
-                    throw translatedException;
-                }
-                await RollbackAndClearTrackingAsync(transaction);
-                throw translatedException;
-            }
-            catch (Exception ex) when (
-                isolationLevel == IsolationLevel.Serializable
-                && IsProviderWriteConflict(ex))
-            {
-                if (!allowReplay && IsSerializableRetryConflict(ex))
-                {
-                    bool acknowledged = await RollbackAndClearTrackingAsync(transaction, confirmRollback: true);
-                    if (acknowledged)
-                        throw new HumanMutationAttemptRolledBackException(ex);
-                    throw new HumanMutationOutcomeUnknownException(ex);
-                }
-                await RollbackAndClearTrackingAsync(transaction);
-                throw new ConcurrencyConflictException(
-                    ConcurrencyConflictException.ConcurrentUpdate,
-                    "A concurrent writer changed the serializable transaction.",
-                    innerException: ex);
-            }
-            catch (Exception ex)
-            {
-                if (!allowReplay)
-                {
-                    if (!await RollbackAndClearTrackingAsync(transaction, confirmRollback: true))
-                        throw new HumanMutationOutcomeUnknownException(ex);
-                    throw;
-                }
-                await RollbackAndClearTrackingAsync(transaction);
+                Exception evidence = primary is null ? cleanup : new AggregateException(primary, cleanup);
+                if (commitAcknowledged)
+                    throw new TransactionCommittedCleanupException(evidence);
+                if (primary is HumanMutationOutcomeUnknownException)
+                    throw new HumanMutationOutcomeUnknownException(evidence);
+                if (primary is not null) throw evidence;
                 throw;
             }
-            finally
+            if (primary is not null) ExceptionDispatchInfo.Capture(primary).Throw();
+            return completedResult;
+
+            async Task<T> ExecuteOwnedTransactionAsync()
             {
-                _dbContext.ResetHumanCommitAdmissions();
-                _dbContext.ResetTrustedSetupSettingsAdmissions();
+                DbTransaction physicalTransaction = transaction.GetDbTransaction();
+                bool commitAttempted = false;
+                try
+                {
+                    _dbContext.HumanCommitAttemptOwnsTransaction = !allowReplay;
+                    var result = await operation(ct);
+                    if (_dbContext.StorageReferenceTransactionFailed)
+                        throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
+                            "The storage reference transaction has failed.");
+                    await _dbContext.FlushDisclosureAsync(ct);
+                    await _dbContext.ValidateTrustedSetupSettingsSourcesAsync(ct);
+                    await _dbContext.ValidateHumanCommitAdmissionsAsync(ct);
+                    _dbContext.ValidateTrustedSetupSettingsTimes();
+                    commitAttempted = true;
+                    await transaction.CommitAsync(ct);
+                    commitAcknowledged = true;
+                    return result;
+                }
+                catch (Exception ex) when (!allowReplay && commitAttempted
+                    && (!IsSerializableRetryConflict(ex)
+                        || !RelationalConnectionIdentity.Capture(_dbContext).Owns(physicalTransaction)))
+                {
+                    // A completed/ended provider transaction cannot be certified as rolled back
+                    // by a later exception or rollback call. Retain unknown settlement explicitly.
+                    await RollbackAndClearTrackingAsync(transaction);
+                    throw new HumanMutationOutcomeUnknownException(ex);
+                }
+                catch (DbUpdateConcurrencyException ex)
+                {
+                    var translatedException = TranslateConcurrencyException(ex);
+                    if (!allowReplay)
+                    {
+                        if (!await RollbackAndClearTrackingAsync(transaction, confirmRollback: true))
+                            throw new HumanMutationOutcomeUnknownException(ex);
+                        throw translatedException;
+                    }
+                    await RollbackAndClearTrackingAsync(transaction);
+                    throw translatedException;
+                }
+                catch (Exception ex) when (
+                    isolationLevel == IsolationLevel.Serializable
+                    && IsProviderWriteConflict(ex))
+                {
+                    if (!allowReplay && IsSerializableRetryConflict(ex))
+                    {
+                        bool acknowledged = await RollbackAndClearTrackingAsync(transaction, confirmRollback: true);
+                        if (acknowledged)
+                            throw new HumanMutationAttemptRolledBackException(ex);
+                        throw new HumanMutationOutcomeUnknownException(ex);
+                    }
+                    await RollbackAndClearTrackingAsync(transaction);
+                    throw new ConcurrencyConflictException(
+                        ConcurrencyConflictException.ConcurrentUpdate,
+                        "A concurrent writer changed the serializable transaction.",
+                        innerException: ex);
+                }
+                catch (Exception ex)
+                {
+                    if (!allowReplay)
+                    {
+                        if (!await RollbackAndClearTrackingAsync(transaction, confirmRollback: true))
+                            throw new HumanMutationOutcomeUnknownException(ex);
+                        throw;
+                    }
+                    await RollbackAndClearTrackingAsync(transaction);
+                    throw;
+                }
+                finally
+                {
+                    _dbContext.ResetHumanCommitAdmissions();
+                    _dbContext.ResetTrustedSetupSettingsAdmissions();
+                }
             }
         });
     }
@@ -323,6 +353,8 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)
         {
+            if (current is TransactionCommittedCleanupException or HumanMutationOutcomeUnknownException)
+                return false;
             if (current is SqliteException { SqliteErrorCode: 5 or 6 }
                 || current is SqliteException
                 {
@@ -348,6 +380,8 @@ public sealed partial class EfCoreUnitOfWork : IUnitOfWork, ISerializableAttempt
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)
         {
+            if (current is TransactionCommittedCleanupException or HumanMutationOutcomeUnknownException)
+                return false;
             if (current is SqliteException { SqliteErrorCode: 5 or 6 }
                 || current is PostgresException
                 {

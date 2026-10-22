@@ -417,6 +417,10 @@ public sealed class ConfigurationImportApplyService(
         {
             throw;
         }
+        catch (TransactionCommittedCleanupException)
+        {
+            throw;
+        }
         catch (ConfigurationImportCoordinationCleanupException)
         {
             throw;

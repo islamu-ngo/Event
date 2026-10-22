@@ -286,6 +286,9 @@ release error after an acknowledged commit also does not undo the import:
 investigate the existing applied receipt and pending effect rather than retrying.
 If acknowledgement and cleanup both fail, the API retains both causes and keeps
 the commit outcome classified as unknown; a cleanup error is not rollback proof.
+This also applies when closing the original database transaction fails: an
+acknowledged commit remains committed, and closing errors never authorize an
+automatic retry or a second failed import receipt.
 
 * **[White-Labeling & Branding](../administration-and-branding/white-labeling.md)** — Customize colors, logos, and typography via manifests.
 * **[First-Run Administration Guide](../administration-and-branding/admin-guide.md)** — Manage instance and tenant configuration through the web UI.

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5JDDQ51S6XFZ9QHHJHWTHHR
+Title: "Preserve transaction outcomes when cleanup fails"
+Type: fix
+Scope: database
+Summary: "Keep acknowledged commits and uncertain commit outcomes distinct when disposing the original transaction fails, without replaying configuration imports or appending contradictory failure receipts."
+Group: transaction-settlement
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Transaction disposal preserves original settlement and cleanup causes. Conflict-shaped cleanup errors cannot authorize replay after an acknowledged commit or an uncertain original single attempt.
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Inspect the original import session, operation and pending effect after a transaction cleanup error. A closing error does not undo committed configuration or justify repeating the import.

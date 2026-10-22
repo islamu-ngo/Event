@@ -55,6 +55,8 @@ internal static class ConfigurationImportCoordination
             var combined = new AggregateException("Import operation and coordination cleanup evidence.", cleanup);
             if (primary is HumanMutationOutcomeUnknownException)
                 throw new HumanMutationOutcomeUnknownException(combined);
+            if (primary is TransactionCommittedCleanupException)
+                throw new TransactionCommittedCleanupException(combined);
             throw new ConfigurationImportCoordinationCleanupException(combined);
         }
         if (primary is not null)

@@ -999,6 +999,13 @@ Effect delivery starts only after outer generation and coordination leases end.
 After commit is acknowledged, cleanup or receipt-mapping failure is a committed
 operation requiring investigation, not an unknown commit or failed apply. Never
 append a second failed receipt or replay it to conceal the cleanup failure.
+The original EF transaction owner also preserves that distinction during
+`DisposeAsync`: `TransactionCommittedCleanupException` means COMMIT returned
+success before disposal failed. It is not a retryable provider conflict, even
+when its cleanup cause resembles one. If acknowledgement was lost instead,
+transaction disposal and later coordination releases retain the original
+`HumanMutationOutcomeUnknownException` and every cleanup cause. Import handling
+must propagate either classification before its failed-history catch path.
 
 Instance administrators import a v1alpha2 `ConfigurationManifest`; tenant
 administrators import a v1alpha2 `TenantConfigurationPackage` into the tenant

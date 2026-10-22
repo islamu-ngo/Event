@@ -6,11 +6,90 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
+using Event.Testing;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Event.Persistence.IntegrationTests.UnitOfWork;
 
 public sealed class HumanCommitFinalAdmissionTests
 {
+    [Test]
+    [Arguments(false, "prepared")]
+    [Arguments(true, "prepared")]
+    [Arguments(false, "serializable")]
+    [Arguments(false, "bootstrap")]
+    public async Task TransactionDisposalCannotEraseTheOriginalCommitOutcome(bool loseAcknowledgement, string ownerKind)
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var fault = new TransactionCleanupFault(loseAcknowledgement,
+            new SqliteException("Transaction cleanup failed after real disposal.", 5));
+        await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseSqlite(connection).UseSnakeCaseNamingConvention()
+            .ReplaceService<IRelationalTransactionFactory, TransactionCleanupFault.Factory>()
+            .AddInterceptors(fault).Options);
+        await CreateDatabaseAsync(context);
+        fault.Arm(context);
+        string key = $"commit-{Guid.CreateVersion7():N}";
+        int attempts = 0;
+        Exception? failure = null;
+        try
+        {
+            async Task<bool> WriteAsync(CancellationToken token)
+            {
+                attempts++;
+                context.Set<SettingValueTypeLookup>().Add(new SettingValueTypeLookup
+                {
+                    Id = 900_001,
+                    MasterCode = key,
+                    FullName = "Committed transaction evidence"
+                });
+                await context.SaveChangesAsync(token);
+                return true;
+            }
+            var owner = new EfCoreUnitOfWork(context);
+            _ = await (ownerKind switch
+            {
+                "prepared" => ((ISerializableAttemptOwner)owner).ExecuteAsync(WriteAsync, default),
+                "serializable" => owner.ExecuteSerializableAsync(WriteAsync),
+                "bootstrap" => owner.ExecuteBootstrapConvergenceAsync(WriteAsync),
+                _ => throw new InvalidOperationException("Unknown test owner.")
+            });
+        }
+        catch (Exception observed) { failure = observed; }
+        await Assert.That(fault.PhysicalCommitObserved).IsTrue();
+        await using var observer = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseSqlite(connection).UseSnakeCaseNamingConvention().Options);
+        await Assert.That(await observer.Set<SettingValueTypeLookup>().AsNoTracking()
+            .Where(row => row.Id == 900_001).Select(row => row.MasterCode).SingleAsync()).IsEqualTo(key);
+        await Assert.That(failure).IsNotNull();
+        await Assert.That(failure is HumanMutationOutcomeUnknownException).IsEqualTo(loseAcknowledgement);
+        await Assert.That(failure is TransactionCommittedCleanupException).IsEqualTo(!loseAcknowledgement);
+        await Assert.That(HasCause(failure!, fault.CleanupFailure)).IsTrue();
+        await Assert.That(HasCause(failure!, fault.CommitFailure)).IsEqualTo(loseAcknowledgement);
+        await Assert.That(attempts).IsEqualTo(1);
+        await Assert.That(fault.DisposalFailures).IsEqualTo(1);
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+    }
+
+    private static async Task CreateDatabaseAsync(ExploreDbContext context)
+    {
+        await context.Database.EnsureCreatedAsync();
+        context.Set<SettingValueTypeLookup>().Add(new SettingValueTypeLookup
+        {
+            Id = (int)SettingValueType.String,
+            MasterCode = "string",
+            FullName = "String"
+        });
+        await context.SaveChangesAsync();
+    }
+
+    private static bool HasCause(Exception failure, Exception expected) =>
+        ReferenceEquals(failure, expected)
+        || (failure is AggregateException aggregate
+            ? aggregate.InnerExceptions.Any(inner => HasCause(inner, expected))
+            : failure.InnerException is { } inner && HasCause(inner, expected));
+
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -20,8 +99,8 @@ public sealed class HumanCommitFinalAdmissionTests
         await connection.OpenAsync();
         var interceptor = new LostCommitAcknowledgement(conflictShapedException);
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
-            .UseSqlite(connection).AddInterceptors(interceptor).Options);
-        await context.Database.EnsureCreatedAsync();
+            .UseSqlite(connection).UseSnakeCaseNamingConvention().AddInterceptors(interceptor).Options);
+        await CreateDatabaseAsync(context);
         ISerializableAttemptOwner owner = new EfCoreUnitOfWork(context);
         string key = $"human-lost-ack-{Guid.NewGuid():N}";
         int attempts = 0;
@@ -37,7 +116,7 @@ public sealed class HumanCommitFinalAdmissionTests
         await Assert.That(context.Database.CurrentTransaction).IsNull();
         await Assert.That(context.ChangeTracker.HasChanges()).IsFalse();
         await using var observer = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
-            .UseSqlite(connection).Options);
+            .UseSqlite(connection).UseSnakeCaseNamingConvention().Options);
         await Assert.That((await observer.SystemSettings.AsNoTracking().SingleAsync(row => row.SettingKey == key)).Value)
             .IsEqualTo("committed");
     }
@@ -68,17 +147,17 @@ public sealed class HumanCommitFinalAdmissionTests
             Mode = SqliteOpenMode.Memory,
             Cache = SqliteCacheMode.Shared,
             Pooling = false,
-            DefaultTimeout = 0
+            DefaultTimeout = 1
         }.ToString();
         await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
-            .UseSqlite(connection).Options);
-        await context.Database.EnsureCreatedAsync();
+            .UseSqlite(connection).UseSnakeCaseNamingConvention().Options);
+        await CreateDatabaseAsync(context);
         await using var other = new SqliteConnection(connectionString);
         await other.OpenAsync();
         await using var reader = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
-            .UseSqlite(other).Options);
+            .UseSqlite(other).UseSnakeCaseNamingConvention().Options);
         await using var readTransaction = other.BeginTransaction(System.Data.IsolationLevel.Serializable, deferred: true);
         await reader.Database.UseTransactionAsync(readTransaction);
         await reader.SystemSettings.AsNoTracking().CountAsync();
@@ -114,8 +193,8 @@ public sealed class HumanCommitFinalAdmissionTests
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
-            .UseSqlite(connection).Options);
-        await context.Database.EnsureCreatedAsync();
+            .UseSqlite(connection).UseSnakeCaseNamingConvention().Options);
+        await CreateDatabaseAsync(context);
         ISerializableAttemptOwner unitOfWork = new EfCoreUnitOfWork(context);
         var key = $"human-final-{Guid.NewGuid():N}";
         var attempts = 0;
@@ -146,8 +225,8 @@ public sealed class HumanCommitFinalAdmissionTests
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
-            .UseSqlite(connection).Options);
-        await context.Database.EnsureCreatedAsync();
+            .UseSqlite(connection).UseSnakeCaseNamingConvention().Options);
+        await CreateDatabaseAsync(context);
         ISerializableAttemptOwner unitOfWork = new EfCoreUnitOfWork(context);
         var sourcesValidated = false;
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => unitOfWork.ExecuteAsync(token =>

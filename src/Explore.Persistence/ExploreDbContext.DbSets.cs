@@ -415,6 +415,8 @@ public partial class ExploreDbContext
 
     // ===== Settings =====
     public DbSet<SystemSetting> SystemSettings { get; set; }
+    public DbSet<AtprotoFederationInstanceSetting> AtprotoFederationInstanceSettings { get; set; }
+    public DbSet<AtprotoFederationTenantSetting> AtprotoFederationTenantSettings { get; set; }
     public DbSet<SettingScopeLookup> SettingScopes { get; set; }
     public DbSet<SettingValueTypeLookup> SettingValueTypes { get; set; }
     public DbSet<TenantSetting> TenantSettingOverrides { get; set; }

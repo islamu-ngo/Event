@@ -28,6 +28,7 @@ public class IntegrationSyncOutbox : ITenantEntity, IAuditableEntity, ISoftDelet
     public bool PreconfirmSubscriptions { get; set; } = true;
 
     public IntegrationSyncStatus Status { get; set; } = IntegrationSyncStatus.Pending;
+    public IntegrationSyncEvidenceKind EvidenceKind { get; set; }
     public int AttemptCount { get; set; }
     public int MaxAttempts { get; set; } = 5;
     public DateTime? NextAttemptAt { get; set; }
@@ -46,6 +47,33 @@ public class IntegrationSyncOutbox : ITenantEntity, IAuditableEntity, ISoftDelet
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public Guid? DeletedBy { get; set; }
+
+    /// <summary>Validates typed lifecycle evidence without interpreting private diagnostic text.</summary>
+    public void RequireValidEvidence()
+    {
+        bool valid = EvidenceKind switch
+        {
+            IntegrationSyncEvidenceKind.None => Enum.IsDefined(Status),
+            IntegrationSyncEvidenceKind.ProviderHandoffInDoubt => Status == IntegrationSyncStatus.Processing,
+            IntegrationSyncEvidenceKind.ProviderOutcomeAmbiguous => Status == IntegrationSyncStatus.DeadLettered,
+            IntegrationSyncEvidenceKind.OperatorConfirmedAccepted => Status == IntegrationSyncStatus.Completed,
+            IntegrationSyncEvidenceKind.OperatorRetryDefinitelyNotAccepted => Status == IntegrationSyncStatus.RetryScheduled,
+            IntegrationSyncEvidenceKind.OperatorDeadLettered => Status == IntegrationSyncStatus.DeadLettered,
+            _ => false
+        };
+        if (!valid)
+            throw new InvalidOperationException("integration_sync_evidence_invalid");
+    }
+}
+
+public enum IntegrationSyncEvidenceKind
+{
+    None = 0,
+    ProviderHandoffInDoubt = 1,
+    ProviderOutcomeAmbiguous = 2,
+    OperatorConfirmedAccepted = 3,
+    OperatorRetryDefinitelyNotAccepted = 4,
+    OperatorDeadLettered = 5
 }
 
 public enum IntegrationKind

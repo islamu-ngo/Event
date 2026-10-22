@@ -3018,6 +3018,142 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.ToTable("ie_assignment_statuses", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.AtprotoFederationInstanceSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("(UTC_TIMESTAMP())");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_locked");
+
+                    b.Property<string>("SettingKey")
+                        .IsRequired()
+                        .HasMaxLength(42)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(42)")
+                        .HasColumnName("setting_key")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("SettingKey"), "ascii");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("updated_by");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(15)")
+                        .HasColumnName("value")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("Value"), "ascii");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_atproto_federation_instance_settings");
+
+                    b.HasIndex("SettingKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_federation_instance_settings_setting_key");
+
+                    b.ToTable("ie_atproto_federation_instance_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_atproto_federation_instance_settings_key", "(setting_key = 'federation.atproto_events_enabled' AND length(setting_key) = 33)\nOR (setting_key = 'federation.atproto_events_backfill_enabled' AND length(setting_key) = 42)\nOR (setting_key = 'federation.atproto_events_backfill_mode' AND length(setting_key) = 39)");
+
+                            t.HasCheckConstraint("ck_atproto_federation_instance_settings_value", "(setting_key IN ('federation.atproto_events_enabled', 'federation.atproto_events_backfill_enabled')\n    AND ((value = 'true' AND length(value) = 4) OR (value = 'false' AND length(value) = 5)))\nOR (setting_key = 'federation.atproto_events_backfill_mode'\n    AND ((lower(value) = '\"downtime_only\"' AND length(value) = 15)\n        OR (lower(value) = '\"full\"' AND length(value) = 6)))");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.AtprotoFederationTenantSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("(UTC_TIMESTAMP())");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_locked");
+
+                    b.Property<string>("SettingKey")
+                        .IsRequired()
+                        .HasMaxLength(42)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(42)")
+                        .HasColumnName("setting_key")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("SettingKey"), "ascii");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("updated_by");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(15)")
+                        .HasColumnName("value")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("Value"), "ascii");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_atproto_federation_tenant_settings");
+
+                    b.HasIndex("TenantId", "SettingKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_federation_tenant_settings_tenant_id_setting_key");
+
+                    b.ToTable("ie_atproto_federation_tenant_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_atproto_federation_tenant_settings_key", "(setting_key = 'federation.atproto_events_enabled' AND length(setting_key) = 33)\nOR (setting_key = 'federation.atproto_events_backfill_enabled' AND length(setting_key) = 42)\nOR (setting_key = 'federation.atproto_events_backfill_mode' AND length(setting_key) = 39)");
+
+                            t.HasCheckConstraint("ck_atproto_federation_tenant_settings_value", "(setting_key IN ('federation.atproto_events_enabled', 'federation.atproto_events_backfill_enabled')\n    AND ((value = 'true' AND length(value) = 4) OR (value = 'false' AND length(value) = 5)))\nOR (setting_key = 'federation.atproto_events_backfill_mode'\n    AND ((lower(value) = '\"downtime_only\"' AND length(value) = 15)\n        OR (lower(value) = '\"full\"' AND length(value) = 6)))");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.AtprotoIdentity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -16813,6 +16949,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("event_id");
 
+                    b.Property<int>("EvidenceKind")
+                        .HasColumnType("int")
+                        .HasColumnName("evidence_kind");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_deleted");
@@ -16929,7 +17069,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasDatabaseName("ix_ie_integration_sync_outbox_tenant_id_source_type_sou_f31a653e")
                         .HasFilter("is_deleted = false");
 
-                    b.ToTable("ie_integration_sync_outbox", (string)null);
+                    b.ToTable("ie_integration_sync_outbox", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_integration_sync_outbox_evidence_kind", "evidence_kind BETWEEN 0 AND 5");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.Keycloak.KeycloakOperation", b =>
@@ -17382,6 +17525,69 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                             t.HasCheckConstraint("ck_legal_document_versions_state", "state >= 1 AND state <= 6");
 
                             t.HasCheckConstraint("ck_legal_document_versions_version", "version > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.LocalIdentityEligibility", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CurrentOperationId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("current_operation_id");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<long>("Generation")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<DateTime?>("LockoutUntilUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("lockout_until_utc");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<int>("State")
+                        .HasColumnType("int")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_local_identity_eligibilities");
+
+                    b.HasIndex("CurrentOperationId")
+                        .HasDatabaseName("ix_local_identity_eligibilities_current_operation_id");
+
+                    b.HasIndex("LocalSubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_local_identity_eligibilities_local_subject_id");
+
+                    b.ToTable("ie_local_identity_eligibilities", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_local_identity_eligibility_audit", "updated_at IS NULL OR updated_at >= created_at");
+
+                            t.HasCheckConstraint("ck_local_identity_eligibility_generation", "generation > 0");
+
+                            t.HasCheckConstraint("ck_local_identity_eligibility_state", "state BETWEEN 1 AND 5");
                         });
                 });
 
@@ -18349,6 +18555,58 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                             t.HasCheckConstraint("ck_managed_tenant_provisioning_request_snapshot", "(status IN ('Pending', 'Processing')) = (request_json IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_managed_tenant_provisioning_terminal_result", "(status = 'Succeeded') = (tenant_id IS NOT NULL AND tenant_administrator_user_id IS NOT NULL AND completed_at IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ManagedTenantProvisioningPolicySetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_locked");
+
+                    b.Property<bool>("IsPresent")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_present");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("SettingKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(256)")
+                        .HasColumnName("setting_key")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("SettingKey"), "ascii");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("longtext")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_managed_tenant_provisioning_policy_settings");
+
+                    b.HasIndex("SettingKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_managed_tenant_provisioning_policy_settings_setting_key");
+
+                    b.ToTable("ie_managed_tenant_provisioning_policy_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_provisioning_policy_absence", "is_present = true OR (is_locked = false AND value IS NULL)");
+
+                            t.HasCheckConstraint("ck_provisioning_policy_revision", "revision >= 0");
+
+                            t.HasCheckConstraint("ck_provisioning_policy_value", "value IS NULL OR setting_key IN ('deployment.mode','tenants.white_labeling_enabled','storage.default_tenant_quota_bytes','domains.allow_tenant_custom_domain')");
                         });
                 });
 
@@ -32233,7 +32491,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.HasIndex("SettingValueTypeId")
                         .HasDatabaseName("ix_system_settings_setting_value_type_id");
 
-                    b.ToTable("ie_system_settings", (string)null);
+                    b.ToTable("ie_system_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_system_settings_no_dedicated_atproto_federation", "setting_key NOT IN ('federation.atproto_events_enabled', 'federation.atproto_events_backfill_enabled', 'federation.atproto_events_backfill_mode')");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.Tag", b =>
@@ -33368,7 +33629,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_tenant_setting_overrides_tenant_id_setting_key");
 
-                    b.ToTable("ie_tenant_setting_overrides", (string)null);
+                    b.ToTable("ie_tenant_setting_overrides", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_settings_no_dedicated_atproto_federation", "setting_key NOT IN ('federation.atproto_events_enabled', 'federation.atproto_events_backfill_enabled', 'federation.atproto_events_backfill_mode')");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.TenantStatus", b =>
@@ -39830,6 +40094,18 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Explore.Domain.AtprotoFederationTenantSetting", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_atproto_federation_tenant_settings_tenants_tenant_id");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("Explore.Domain.AtprotoIdentity", b =>
                 {
                     b.HasOne("Explore.Domain.Actor", "Actor")
@@ -43353,6 +43629,23 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasConstraintName("fk_ie_legal_document_versions_ie_legal_documents_legal__5ca7f0d4");
 
                     b.Navigation("LegalDocument");
+                });
+
+            modelBuilder.Entity("Explore.Domain.LocalIdentityEligibility", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityCredentialOperation", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_local_identity_eligibilities_ie_local_identity_cr_1f0b67f3");
+
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_local_identity_eligibilities_ie_local_identity_us_20823c25");
                 });
 
             modelBuilder.Entity("Explore.Domain.LocalStorageQuarantine", b =>

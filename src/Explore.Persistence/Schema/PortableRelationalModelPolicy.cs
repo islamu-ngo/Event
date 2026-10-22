@@ -382,8 +382,17 @@ internal static partial class PortableRelationalModelPolicy
 
             if (providerName == SqlServerProvider)
             {
+                // These finite ASCII values require exact lengths. LEN ignores
+                // trailing spaces on SQL Server; DATALENGTH preserves that proof.
+                bool finiteFederation =
+                    (entityType.ClrType == typeof(AtprotoFederationInstanceSetting)
+                        && constraintName is "ck_atproto_federation_instance_settings_key"
+                            or "ck_atproto_federation_instance_settings_value")
+                    || (entityType.ClrType == typeof(AtprotoFederationTenantSetting)
+                        && constraintName is "ck_atproto_federation_tenant_settings_key"
+                            or "ck_atproto_federation_tenant_settings_value");
                 sql = NonnegativeCursor().Replace(
-                    sql.Replace("length(", "len(", StringComparison.OrdinalIgnoreCase),
+                    sql.Replace("length(", finiteFederation ? "DATALENGTH(" : "len(", StringComparison.OrdinalIgnoreCase),
                     "[cursor] >= 0");
                 sql = NormalizeSqlServerBooleanPredicates(entityType, sql);
 

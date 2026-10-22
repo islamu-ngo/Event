@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5D3N71ES2PKP3818HDN69K2
+Title: "Keep authorization current during membership and tenant-status changes"
+Type: fix
+Scope: access
+Summary: "Coordinate membership removal and tenant-status transitions in C# before observing authorization or beginning a transaction, retaining the original owner's custody through atomic settlement."
+Group: human-source-producer-coordination
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/adr/ADR-application-owned-persistence.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Waiting operations recheck current authorization before changing membership or tenant status. Caller-owned transactions must already hold the original application's cooperative Human gate; repositories do not acquire it late or dispose borrowed custody. Direct database edits outside the application protocol can bypass C# rules.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: not-applicable

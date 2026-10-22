@@ -5,6 +5,8 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Security;
+using Explore.Persistence.Schema;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -13,16 +15,21 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
 {
     private readonly ExploreDbContext _dbContext;
     private readonly IHumanTenantMutationPreparation? _humanPreparation;
+    private readonly PostgresNativeQueueEnrollment? _enrollment;
 
     public TenantRepository(ExploreDbContext dbContext,
-        IHumanTenantMutationPreparation? humanPreparation = null) : base(dbContext)
+        IHumanTenantMutationPreparation? humanPreparation = null,
+        PostgresNativeQueueEnrollment? enrollment = null) : base(dbContext)
     {
         _dbContext = dbContext;
         _humanPreparation = humanPreparation;
+        _enrollment = enrollment;
     }
 
     public override async Task Delete(Tenant entity)
     {
+        await using var enrollmentGate = !EventDiscoveryEnrollmentGate.TryRequireCurrent(_dbContext)
+            ? await new EventDiscoveryEnrollmentGate(_dbContext).AcquireAsync(CancellationToken.None) : null;
         await new EfCoreUnitOfWork(_dbContext).ExecuteSerializableAsync(async cancellationToken =>
         {
             await AcquireDeletionReservationAsync(entity.Id, cancellationToken);
@@ -225,6 +232,8 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
     {
         return await _dbContext.ExecuteDisclosureMutationAsync(async token =>
         {
+            HumanSecuritySourceGate.RequireCurrent(_dbContext);
+            await PostgresTenantMembershipMutationPermissions.RequireCurrentAsync(_dbContext, _enrollment, token);
             _dbContext.DisclosureMutations.Enlist([]);
             var affectedRows = await _dbContext.Tenants
                 .Where(tenant => tenant.Id == id && tenant.TenantStatusId == expectedStatusId)
@@ -232,6 +241,8 @@ public class TenantRepository : GenericRepository<Tenant, Guid>, ITenantReposito
                     .SetProperty(tenant => tenant.TenantStatusId, newStatusId)
                     .SetProperty(tenant => tenant.UpdatedAt, updatedAt)
                     .SetProperty(tenant => tenant.UpdatedBy, updatedBy), token);
+            HumanSecuritySourceGate.RequireCurrent(_dbContext);
+            await PostgresTenantMembershipMutationPermissions.RequireCurrentAsync(_dbContext, _enrollment, token);
 
             if (affectedRows == 1)
                 _dbContext.DisclosureMutations.Enlist([id]);

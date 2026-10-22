@@ -1,3 +1,4 @@
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.TenantUsers.Handlers.Commands;
 using Explore.Application.Features.TenantUsers.Requests.Commands;
@@ -8,16 +9,13 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Schema;
-using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Npgsql;
-using Testcontainers.PostgreSql;
 using TUnit.Assertions;
 using TUnit.Core;
-using TUnit.Core.Interfaces;
 
 namespace Event.Persistence.IntegrationTests.Privacy;
 
@@ -71,9 +69,11 @@ public sealed class TenantMembershipRemovalTests(TenantMembershipRemovalPostgreS
     {
         var scenario = await SeedTwoTenantScenarioAsync("cancel");
         await using var context = fixture.CreateTenantContext(scenario.TenantAId, scenario.UserId);
-        var repository = new TenantUserRepository(context);
+        var repository = new TenantUserRepository(context, fixture.NativeQueueEnrollment);
         var unitOfWork = new EfCoreUnitOfWork(context);
         using var cancellation = new CancellationTokenSource();
+        await using var humanGate = new HumanSecuritySourceGate(context);
+        await using var heldHuman = await humanGate.AcquireAsync(cancellation.Token);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
@@ -101,17 +101,22 @@ public sealed class TenantMembershipRemovalTests(TenantMembershipRemovalPostgreS
         Guid currentUserId)
     {
         return new RemoveTenantMembershipCommandHandler(
-            new TenantUserRepository(context),
+            new TenantUserRepository(context, fixture.NativeQueueEnrollment),
             new TenantUserRoleGrantRepository(context),
             new EfCoreUnitOfWork(context),
             new TestTenantContext(tenantId),
             new TestCurrentUserService(currentUserId),
-            new FixedTimeProvider(RemovedAt));
+            new FixedTimeProvider(RemovedAt),
+            () => new HumanSecuritySourceGate(context));
     }
 
     private async Task<MembershipScenario> SeedTwoTenantScenarioAsync(string discriminator)
     {
         await using var context = fixture.CreateSeedContext();
+        await using var humanGate = new HumanSecuritySourceGate(context);
+        await using var humanLease = await humanGate.AcquireAsync();
+        await using var discoveryGate = new EventDiscoveryEnrollmentGate(context);
+        await using var discoveryLease = await discoveryGate.AcquireAsync();
         var tenantA = CreateTenant($"membership-{discriminator}-a");
         var tenantB = CreateTenant($"membership-{discriminator}-b");
         var user = CreateUser($"membership-{discriminator}");
@@ -317,62 +322,24 @@ public sealed class TenantMembershipRemovalTests(TenantMembershipRemovalPostgreS
     }
 }
 
-public sealed class TenantMembershipRemovalPostgreSqlFixture : IAsyncInitializer, IAsyncDisposable
+public sealed class TenantMembershipRemovalPostgreSqlFixture : PostgreSqlContainerFixture
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
-        .WithDatabase("tenant_membership_removal_test")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
-        .Build();
-    public async Task InitializeAsync()
-    {
-        await _container.StartAsync();
-
-        await using var context = CreateSeedContext();
-        await context.Database.MigrateAsync();
-        await LookupTableSeeder.SeedAsync(context);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _container.StopAsync();
-        await _container.DisposeAsync();
-        GC.SuppressFinalize(this);
-    }
-
     public ExploreDbContext CreateSeedContext()
     {
-        var context = CreateContext();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        var context = new ExploreDbContext(builder.Options);
         context.EnableTenantFilterBypass("Tenant membership removal integration-test seed and verification context.");
+        context.BindTenantLease();
         return context;
     }
 
     public ExploreDbContext CreateTenantContext(Guid tenantId, Guid currentUserId)
     {
-        var context = CreateContext();
-        context.TenantContext = new TestTenantContext(tenantId);
+        var context = CreateEnrolledTenantDbContext(new TestTenantContext(tenantId));
         context.CurrentUserService = new TestCurrentUserService(currentUserId);
+        context.BindTenantLease();
         return context;
-    }
-
-    private ExploreDbContext CreateContext()
-    {
-        var connection = new NpgsqlConnectionStringBuilder(_container.GetConnectionString());
-        var database = new PrimaryDatabaseConnectionOptions
-        {
-            Role = PrimaryDatabaseRole.Runtime,
-            Provider = PrimaryDatabaseProvider.PostgreSql,
-            Host = connection.Host,
-            Port = connection.Port,
-            Database = connection.Database,
-            Schema = RelationalModelNamespace.DefaultSchema,
-            Username = connection.Username,
-            Password = connection.Password,
-            TlsMode = PrimaryDatabaseTlsMode.Disabled,
-        };
-        var builder = TestDbContextOptions.Create<ExploreDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, database);
-        return new ExploreDbContext(builder.Options);
     }
 
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;

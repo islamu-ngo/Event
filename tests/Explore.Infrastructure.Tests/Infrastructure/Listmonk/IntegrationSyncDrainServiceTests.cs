@@ -174,7 +174,7 @@ public sealed class IntegrationSyncDrainServiceTests
         outbox.Status = IntegrationSyncStatus.Processing;
         outbox.ProcessingLeaseToken = Guid.CreateVersion7();
         outbox.ProcessingStartedAt = DateTime.UtcNow.AddMinutes(-10);
-        outbox.LastError = IntegrationSyncFailureCodes.ProviderHandoffInDoubt;
+        outbox.EvidenceKind = IntegrationSyncEvidenceKind.ProviderHandoffInDoubt;
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
         fixture.ConfigureCandidate(outbox);
 

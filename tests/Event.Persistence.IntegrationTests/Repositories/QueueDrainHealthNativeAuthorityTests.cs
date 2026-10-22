@@ -31,6 +31,7 @@ public sealed class QueueDrainHealthNativeAuthorityTests(PostgreSqlContainerFixt
     {
         await fixture.ResetAsync();
         await using var seed = fixture.CreateDbContext();
+        seed.BindTenantLease();
         await SeedTenantAsync(seed, "queue-health-a");
         await SeedTenantAsync(seed, "queue-health-b");
         var expected = new QueueDrainHealthSnapshot(8, 4, 2, 8, 4, 2, 2, 8, 4, 6, 8, 2, 6);
@@ -158,6 +159,7 @@ public sealed class QueueDrainHealthNativeAuthorityTests(PostgreSqlContainerFixt
         (Type Type, string Predicate, string Private)[] columns =
         [
             (typeof(IntegrationSyncOutbox), nameof(IntegrationSyncOutbox.Status), nameof(IntegrationSyncOutbox.SubscriberEmail)),
+            (typeof(IntegrationSyncOutbox), nameof(IntegrationSyncOutbox.EvidenceKind), nameof(IntegrationSyncOutbox.LastError)),
             (typeof(IncomingWebhookMessage), nameof(IncomingWebhookMessage.StatusId), nameof(IncomingWebhookMessage.PayloadHash)),
             (typeof(WebhookBulkReplayOperation), nameof(WebhookBulkReplayOperation.StatusId), nameof(WebhookBulkReplayOperation.RequestHash)),
             (typeof(WebhookProviderPublication), nameof(WebhookProviderPublication.StatusId), nameof(WebhookProviderPublication.CredentialReference)),
@@ -329,7 +331,10 @@ public sealed class QueueDrainHealthNativeAuthorityTests(PostgreSqlContainerFixt
                     Status = status,
                     NextAttemptAt = Boundary(index, ObservedAt),
                     ProcessingStartedAt = Boundary(index, StaleBefore),
-                    LastError = index == 0 ? IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous : "other_failure",
+                    EvidenceKind = status == IntegrationSyncStatus.DeadLettered && index == 0
+                        ? IntegrationSyncEvidenceKind.ProviderOutcomeAmbiguous
+                        : IntegrationSyncEvidenceKind.None,
+                    LastError = index == 0 ? null : "other_failure",
                     CreatedAt = ObservedAt
                 });
             }

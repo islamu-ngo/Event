@@ -111,7 +111,7 @@ public sealed class IntegrationSyncDrainService(
         }
 
         if (outbox.Status == IntegrationSyncStatus.Processing &&
-            outbox.LastError == IntegrationSyncFailureCodes.ProviderHandoffInDoubt &&
+            outbox.EvidenceKind == IntegrationSyncEvidenceKind.ProviderHandoffInDoubt &&
             outbox.ProcessingLeaseToken is Guid inDoubtToken &&
             outbox.ProcessingStartedAt is DateTime inDoubtStartedAt)
         {

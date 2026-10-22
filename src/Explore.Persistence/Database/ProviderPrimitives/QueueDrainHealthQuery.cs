@@ -43,7 +43,7 @@ internal static class QueueDrainHealthQuery
             (outbox.ProcessingStartedAt == null || outbox.ProcessingStartedAt <= integrationStaleBefore), cancellationToken);
         int integrationAmbiguous = await integration.CountAsync(outbox =>
             outbox.Status == IntegrationSyncStatus.DeadLettered &&
-            outbox.LastError == IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous, cancellationToken);
+            outbox.EvidenceKind == IntegrationSyncEvidenceKind.ProviderOutcomeAmbiguous, cancellationToken);
 
         IQueryable<IncomingWebhookMessage> incoming = dbContext.IncomingWebhookMessages
             .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookWorkerCrossTenantQueue);

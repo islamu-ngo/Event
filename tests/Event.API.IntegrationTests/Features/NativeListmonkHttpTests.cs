@@ -183,13 +183,13 @@ public sealed class NativeListmonkHttpTests
 
     [Test]
     [Arguments(IntegrationSyncRecoveryDecision.ConfirmAccepted, IntegrationSyncStatus.Completed,
-        IntegrationSyncFailureCodes.OperatorConfirmedAccepted)]
+        IntegrationSyncEvidenceKind.OperatorConfirmedAccepted)]
     [Arguments(IntegrationSyncRecoveryDecision.RetryDefinitelyNotAccepted, IntegrationSyncStatus.RetryScheduled,
-        IntegrationSyncFailureCodes.OperatorRetryDefinitelyNotAccepted)]
+        IntegrationSyncEvidenceKind.OperatorRetryDefinitelyNotAccepted)]
     [Arguments(IntegrationSyncRecoveryDecision.DeadLetter, IntegrationSyncStatus.DeadLettered,
-        IntegrationSyncFailureCodes.OperatorDeadLettered)]
+        IntegrationSyncEvidenceKind.OperatorDeadLettered)]
     public async Task AmbiguityResolution_FencesTenantAuthorityAndOneDecisionWithoutProviderReplay(
-        IntegrationSyncRecoveryDecision decision, IntegrationSyncStatus expectedStatus, string expectedCode)
+        IntegrationSyncRecoveryDecision decision, IntegrationSyncStatus expectedStatus, IntegrationSyncEvidenceKind expectedEvidence)
     {
         await using var factory = await ListmonkFactory.CreateAsync();
         var data = await SeedAsync(factory);
@@ -222,15 +222,16 @@ public sealed class NativeListmonkHttpTests
         // There is no application detail query for parked queue rows.
         var row = await db.IntegrationSyncOutbox.SingleAsync(item => item.Id == outboxId);
         await Assert.That(row.Status).IsEqualTo(expectedStatus);
-        await Assert.That(row.LastError).IsEqualTo(expectedCode);
+        await Assert.That(row.EvidenceKind).IsEqualTo(expectedEvidence);
+        await Assert.That(row.LastError).IsNull();
         await Assert.That(row.UpdatedBy).IsEqualTo(data.AdminId);
         await Assert.That(row.CorrelationId).IsEqualTo("incident-reviewed");
         await Assert.That(row.CompletedAt.HasValue).IsEqualTo(decision == IntegrationSyncRecoveryDecision.ConfirmAccepted);
         await Assert.That(row.NextAttemptAt.HasValue).IsEqualTo(decision == IntegrationSyncRecoveryDecision.RetryDefinitelyNotAccepted);
         await Assert.That(row.DeadLetteredAt.HasValue).IsEqualTo(decision == IntegrationSyncRecoveryDecision.DeadLetter);
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(data.OtherTenantId);
-        await Assert.That((await db.IntegrationSyncOutbox.SingleAsync(item => item.Id == foreignId)).LastError)
-            .IsEqualTo(IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous);
+        await Assert.That((await db.IntegrationSyncOutbox.SingleAsync(item => item.Id == foreignId)).EvidenceKind)
+            .IsEqualTo(IntegrationSyncEvidenceKind.ProviderOutcomeAmbiguous);
         await Assert.That(factory.Transport.Requests).IsEmpty();
     }
 
@@ -291,7 +292,7 @@ public sealed class NativeListmonkHttpTests
             SubscriberPayloadJson = "{}",
             ListmonkListId = 1,
             Status = IntegrationSyncStatus.DeadLettered,
-            LastError = IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous,
+            EvidenceKind = IntegrationSyncEvidenceKind.ProviderOutcomeAmbiguous,
             AttemptCount = 1,
             MaxAttempts = 5,
             CreatedAt = DateTime.UtcNow,

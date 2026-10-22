@@ -56,7 +56,7 @@ public static class PostgresQueueDrainHealthContract
         [
             (typeof(IntegrationSyncOutbox), [nameof(IntegrationSyncOutbox.Status),
                 nameof(IntegrationSyncOutbox.NextAttemptAt), nameof(IntegrationSyncOutbox.ProcessingStartedAt),
-                nameof(IntegrationSyncOutbox.LastError), nameof(IntegrationSyncOutbox.IsDeleted)]),
+                nameof(IntegrationSyncOutbox.EvidenceKind), nameof(IntegrationSyncOutbox.IsDeleted)]),
             (typeof(IncomingWebhookMessage), [nameof(IncomingWebhookMessage.StatusId),
                 nameof(IncomingWebhookMessage.NextAttemptAt), nameof(IncomingWebhookMessage.ProcessingLeaseExpiresAt)]),
             (typeof(WebhookBulkReplayOperation), [nameof(WebhookBulkReplayOperation.StatusId)]),
@@ -148,7 +148,7 @@ public static class PostgresQueueDrainHealthContract
                                 AND (q.{C<IntegrationSyncOutbox>(nameof(IntegrationSyncOutbox.ProcessingStartedAt))} IS NULL
                                      OR q.{C<IntegrationSyncOutbox>(nameof(IntegrationSyncOutbox.ProcessingStartedAt))} <= p_integration_stale_before)))::integer AS stale,
                             (count(*) FILTER (WHERE q.{C<IntegrationSyncOutbox>(nameof(IntegrationSyncOutbox.Status))} = {(int)IntegrationSyncStatus.DeadLettered}
-                                AND q.{C<IntegrationSyncOutbox>(nameof(IntegrationSyncOutbox.LastError))} = '{IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous}'))::integer AS ambiguous
+                                AND q.{C<IntegrationSyncOutbox>(nameof(IntegrationSyncOutbox.EvidenceKind))} = {(int)IntegrationSyncEvidenceKind.ProviderOutcomeAmbiguous}))::integer AS ambiguous
                         FROM {Table(typeof(IntegrationSyncOutbox))} AS q
                         WHERE NOT q.{C<IntegrationSyncOutbox>(nameof(IntegrationSyncOutbox.IsDeleted))}
                     ) AS integration

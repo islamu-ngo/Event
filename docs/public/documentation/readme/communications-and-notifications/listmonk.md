@@ -30,6 +30,10 @@ Operators configure Listmonk parameters via [Environment Variables](../configura
 * **Health Probes**: The worker registers a dedicated readiness check at `/health` to verify connectivity to the Listmonk API without echoing authentication tokens (see [Health Check Endpoints](../configuration-and-operations/troubleshooting-and-health.md#health-check-endpoints-reference)).
 * **Dead-Letter Handling**: If Listmonk is temporarily unreachable, sync tasks enter a bounded retry queue with exponential backoff before landing in dead-letter storage for manual operator review.
 
+If Event cannot establish whether Listmonk accepted a request, the task is parked rather than automatically sent again. An authorized operator must establish acceptance, establish definite non-acceptance before requesting a retry, or retain the dead letter. A timeout alone is not evidence of non-acceptance. Event records this decision separately from provider error text, together with its actor, evidence reference and time; changing an error message cannot make a task eligible for recovery.
+
+This pre-release change introduces typed delivery evidence. Reprovision development databases containing old Listmonk queue work; do not convert old error messages into recovery decisions or blindly replay uncertain deliveries. Stop dispatch before a schema change or restore. To roll back, restore a matching application/database backup: dropping the new column loses recovery evidence and is not a safe live-queue downgrade.
+
 ---
 
 ## 3. Privacy & Consent Governance

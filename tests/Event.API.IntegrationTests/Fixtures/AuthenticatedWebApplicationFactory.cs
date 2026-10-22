@@ -76,6 +76,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
             options, _database.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
         var context = new ExploreDbContext(options.Options);
         context.EnableTenantFilterBypass("API integration test arrangement and observation.");
+        context.BindTenantLease();
         return context;
     }
 

@@ -6,6 +6,7 @@ using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Persistence.Security;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -112,9 +113,14 @@ internal sealed class ConfigurationInstanceImportExecutor(
             var lease = scope.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>();
             lease.Bind(context, null);
             if (subject is not null)
+            {
                 lease.BindHuman(subject, HumanAdministratorCommitPurpose.ConfigurationImport,
                     context.Database.IsNpgsql()
                         ? PostgresNativeQueueEnrollment.Bind(provider.GetRequiredService<IConfiguration>()) : null, lifetime);
+                if (lifetime is not null)
+                    lease.BindOriginalCredential(provider.GetRequiredService<IHttpContextAccessor>().HttpContext
+                        ?? throw new UnauthorizedAccessException("The original authenticated request is missing."));
+            }
             _ = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             captured = true;
             return scope;

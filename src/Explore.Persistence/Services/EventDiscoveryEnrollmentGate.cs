@@ -31,6 +31,8 @@ public sealed class EventDiscoveryEnrollmentGate : IEventDiscoveryEnrollmentGate
 
     public void RequireCurrent() => EventDiscoveryEnrollmentGateCustody.RequireCurrent(_context);
 
+    public bool TryRequireCurrent() => EventDiscoveryEnrollmentGateCustody.TryRequireCurrent(_context);
+
     internal static void RequireCurrent(ExploreDbContext context) =>
         EventDiscoveryEnrollmentGateCustody.RequireCurrent(context);
 

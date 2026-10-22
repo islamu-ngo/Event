@@ -840,6 +840,13 @@ public static class PersistenceServicesRegistration
         services.AddScoped<HumanSettingsDataBoundary>();
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IOrdinarySettingsMutationStore, OrdinarySettingsMutationStore>();
+        services.AddScoped<IHumanSecuritySourceGate>(provider =>
+            new HumanSecuritySourceGate(provider.GetRequiredService<ExploreDbContext>()));
+        services.AddScoped<Func<IHumanSecuritySourceGate>>(provider =>
+            () => provider.GetRequiredService<IHumanSecuritySourceGate>());
+        services.AddScoped<IEventDiscoveryEnrollmentGate, EventDiscoveryEnrollmentGate>();
+        services.AddScoped<Func<IEventDiscoveryEnrollmentGate>>(provider =>
+            () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>());
         services.AddScoped<ITenantSettingRepository, TenantSettingRepository>();
         services.AddScoped<IManagedTenantDomainRepository, ManagedTenantDomainRepository>();
         services.AddScoped<IAtprotoGovernanceSettingRepository, AtprotoGovernanceSettingRepository>();

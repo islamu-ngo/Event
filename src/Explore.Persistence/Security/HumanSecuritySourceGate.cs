@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.Security.ProviderPrimitives;
 
 namespace Explore.Persistence.Security;
@@ -6,7 +7,7 @@ namespace Explore.Persistence.Security;
 /// Retains the original application's cooperative security-source gate before BEGIN and
 /// through settlement. It is not human authorization or a replacement for SQLite's writer reservation.
 /// </summary>
-internal sealed class HumanSecuritySourceGate : IAsyncDisposable
+internal sealed class HumanSecuritySourceGate : IHumanSecuritySourceGate, IAsyncDisposable
 {
     private readonly ExploreDbContext _context;
     private readonly object _lifecycle = new();
@@ -37,6 +38,13 @@ internal sealed class HumanSecuritySourceGate : IAsyncDisposable
     /// <summary>Only absent custody returns false; a recorded invalid or pending owner remains a refusal.</summary>
     internal static bool TryRequireCurrent(ExploreDbContext context) =>
         HumanSecuritySourceGateCustody.TryRequireCurrent(context);
+
+    Task<IAsyncDisposable> IHumanSecuritySourceGate.AcquireAsync(CancellationToken cancellationToken) =>
+        AcquireAsync(cancellationToken);
+
+    void IHumanSecuritySourceGate.RequireCurrent() => RequireCurrent();
+
+    bool IHumanSecuritySourceGate.TryRequireCurrent() => TryRequireCurrent(_context);
 
     public ValueTask DisposeAsync()
     {

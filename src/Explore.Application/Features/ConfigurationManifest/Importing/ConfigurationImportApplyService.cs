@@ -66,7 +66,7 @@ public sealed class ConfigurationImportApplyService(
     ConfigurationImportArtifactParser parser,
     ConfigurationImportSectionApplier sectionApplier,
     ISettingMutationLock mutationLock,
-    IUnitOfWork unitOfWork,
+    ISerializableAttemptOwner setupAttemptOwner,
     IConfigurationImportEffectOutboxRepository outbox,
     IConfigurationImportEffectDelivery effectDelivery,
     ConfigurationManagedApplyScheduleService managedSchedules,
@@ -76,10 +76,12 @@ public sealed class ConfigurationImportApplyService(
     IHumanCommitScopePreparation humanScope,
     IPolicyMutationExecutionScopeFactory selectedScopeFactory,
     IHumanConfigurationImportAdmission importAdmission,
-    IInstanceAdministratorCommitAuthority instanceCommitAuthority,
-    ITenantAdministratorCommitAuthority tenantCommitAuthority,
-    IHumanActionCommitFinalizer commitFinalizer,
-    IConfigurationManagedApplyScheduleRepository scheduleRepository)
+    Func<IInstanceAdministratorCommitAuthority> instanceCommitAuthorityFactory,
+    Func<ITenantAdministratorCommitAuthority> tenantCommitAuthorityFactory,
+    Func<IHumanActionCommitFinalizer> commitFinalizerFactory,
+    IConfigurationManagedApplyScheduleRepository scheduleRepository,
+    Func<IHumanSecuritySourceGate> humanGateFactory,
+    Func<IEventDiscoveryEnrollmentGate> discoveryGateFactory)
 {
     public Task<ConfigurationImportOperationResult> ApplyInstanceAsync(
         Guid sessionId,
@@ -128,6 +130,19 @@ public sealed class ConfigurationImportApplyService(
         CancellationToken cancellationToken) =>
         ApplyAsync(sessionId, target, accessToken, request, subject: null,
             sourceOperationId: null, managedScheduleId: null, setupLive: true, cancellationToken);
+
+    internal async Task<ConfigurationImportOperationResult> DeliverSetupLiveEffectsAsync(
+        ConfigurationImportOperationResult committed, CancellationToken cancellationToken)
+    {
+        if (committed.Status != ConfigurationImportOperationStatus.Applied
+            || committed.TargetScope != ConfigurationImportScope.Tenant || committed.TargetTenantId is not { } tenantId)
+            throw new InvalidOperationException("Setup effect delivery requires its committed tenant import.");
+        var operation = await operations.GetByIdAsync(committed.OperationId,
+            ConfigurationImportTarget.ForTenant(tenantId).AuthorityKey, cancellationToken)
+            ?? throw new InvalidOperationException("The acknowledged import operation is unavailable.");
+        await DeliverEffectsAsync(operation, cancellationToken);
+        return await MapAsync(operation, cancellationToken);
+    }
 
     public Task<ConfigurationImportRollbackSessionCreatedResult>
         CreateRollbackSessionAsync(
@@ -278,12 +293,12 @@ public sealed class ConfigurationImportApplyService(
         }
         IInstanceAdministratorCommitAuthority? instanceAuthority = !setupLive
             && target.Scope == ConfigurationImportScope.Instance
-                ? instanceCommitAuthority : null;
+                ? instanceCommitAuthorityFactory() : null;
         ITenantAdministratorCommitAuthority? tenantAuthority = !setupLive
             && target.Scope == ConfigurationImportScope.Tenant
-                ? tenantCommitAuthority : null;
+                ? tenantCommitAuthorityFactory() : null;
         IHumanActionCommitFinalizer? finalizer = !setupLive
-            ? commitFinalizer : null;
+            ? commitFinalizerFactory() : null;
         Guid actorUserId = setupLive ? Actor() : subject!.PrincipalId;
         DateTime startedAt = UtcNow();
         Guid operationId = Guid.CreateVersion7();
@@ -294,78 +309,93 @@ public sealed class ConfigurationImportApplyService(
             : await ExecuteObservationAsync(target, HumanConfigurationImportObservationAccess.Read,
                 (owner, token) => sessionManager.ReadArtifactForPreviewAsync(
                     owner, sessionId, target, sessionAccessToken, startedAt, token), cancellationToken);
-        var originalLocks =
-            await sectionApplier.CaptureLockGroupsAsync(
-                target,
-                initial.Bytes,
-                request,
-                parser,
-                cancellationToken);
-        IReadOnlyList<IReadOnlyList<string>> lockGroups = originalLocks.Groups;
-        IPreparedHumanConfigurationImport? prepared = setupLive ? null
-            : await importAdmission
-                .PrepareAsync(subject!, target, null, cancellationToken);
-        var invocation = setupLive ? null : new HumanApplyInvocation(
-            operationId, sessionId, target, subject!, initial.Digest,
-            ConfigurationImportSessionManager.DigestToken(sessionAccessToken), request,
-            sourceOperationId, managedScheduleId, startedAt);
+        IPreparedHumanConfigurationImport? prepared = null;
+        bool setupCommitAcknowledged = false;
         try
         {
-            Task<HumanApplyAttempt> ApplyAttemptAsync(CancellationToken token) =>
-                ApplyInsideTransactionAsync(
-                    operationId, sessionId, target, accessToken, request, subject,
-                    sourceOperationId, managedScheduleId, setupLive, actorUserId, startedAt,
-                    instanceAuthority, tenantAuthority, finalizer, invocation, prepared, originalLocks, token);
-            ConfigurationImportOperation operation;
-            if (setupLive)
+            var outcome = await ConfigurationImportCoordination.ExecuteAsync(
+                humanGateFactory, discoveryGateFactory, async (requireCurrent, coordinatedToken) =>
             {
-                var applied = await mutationLock.ExecuteOrderedGroupsAsync(
-                    lockGroups,
-                    token => unitOfWork.ExecuteSerializableAsync(ApplyAttemptAsync, token),
-                    cancellationToken);
-                operation = applied.Operation!;
-            }
-            else
-            {
-                var owner = ImportOwnerFactory().GetImportSettlementBoundary(prepared!.Authority.Lifetime);
-                var settlement = await mutationLock.ExecuteOrderedGroupsAsync(
-                    lockGroups, token => owner.ExecuteAsync(invocation!, async ownedToken =>
-                    {
-                        await prepared.AcquireAsync(ownedToken);
-                        var applied = await ApplyAttemptAsync(ownedToken);
-                        if (applied.Rejection is { } refusal)
-                            return OriginalOwnerDecision<HumanApplySettlement>.RollBack(new(null, refusal));
-                        if (applied.Operation!.Id != invocation!.OperationId)
-                            throw new InvalidOperationException("Import must retain its original operation identity.");
-                        return OriginalOwnerDecision<HumanApplySettlement>.Commit(new(applied.Operation.Id, null));
-                    }, token), cancellationToken);
-                // The public disposition chooses a validation branch; it never grants eligibility.
-                var settled = owner.Consume(invocation!, settlement, settlement.Disposition);
-                if (settled.Rejection is { } rejection)
+                var originalLocks =
+                    await sectionApplier.CaptureLockGroupsAsync(
+                        target,
+                        initial.Bytes,
+                        request,
+                        parser,
+                        cancellationToken);
+                IReadOnlyList<IReadOnlyList<string>> lockGroups = originalLocks.Groups;
+                prepared = setupLive ? null
+                    : await importAdmission
+                        .PrepareAsync(subject!, target, null, cancellationToken);
+                var invocation = setupLive ? null : new HumanApplyInvocation(
+                    operationId, sessionId, target, subject!, initial.Digest,
+                    ConfigurationImportSessionManager.DigestToken(sessionAccessToken), request,
+                    sourceOperationId, managedScheduleId, startedAt);
+                Task<HumanApplyAttempt> ApplyAttemptAsync(CancellationToken token) =>
+                    ApplyInsideTransactionAsync(
+                        operationId, sessionId, target, accessToken, request, subject,
+                        sourceOperationId, managedScheduleId, setupLive, actorUserId, startedAt,
+                        instanceAuthority, tenantAuthority, finalizer, invocation, prepared, originalLocks, token);
+                ConfigurationImportOperation committedOperation;
+                if (setupLive)
                 {
-                    if (settlement.Disposition != OriginalOwnerDisposition.WholeTransactionRolledBack
-                        || !ReferenceEquals(rejection.Invocation, invocation) || settled.OperationId is not null)
-                        throw new InvalidOperationException("Import rejection requires its original whole rollback.");
-                    await RecordHumanRejectionAsync(rejection, prepared.Authority, cancellationToken);
-                    throw new ConfigurationImportSessionException(rejection.FailureCode);
+                    var applied = await mutationLock.ExecuteOrderedGroupsOnceAsync(
+                        lockGroups,
+                        async token =>
+                        {
+                            var applied = await setupAttemptOwner.ExecuteAsync(async attemptToken =>
+                            {
+                                requireCurrent();
+                                var applied = await ApplyAttemptAsync(attemptToken);
+                                requireCurrent();
+                                return applied;
+                            }, token);
+                            setupCommitAcknowledged = true;
+                            return applied;
+                        },
+                        cancellationToken);
+                    committedOperation = applied.Operation!;
                 }
-                if (settlement.Disposition != OriginalOwnerDisposition.Committed || settled.OperationId is not { } committedId)
-                    throw new InvalidOperationException("Import success requires its original commit.");
-                operation = await operations.GetByIdAsync(committedId, target.AuthorityKey, cancellationToken)
-                    ?? throw new InvalidOperationException("The acknowledged import operation is unavailable.");
-            }
-            try
+                else
+                {
+                    var owner = ImportOwnerFactory().GetImportSettlementBoundary(prepared!.Authority.Lifetime);
+                    var settlement = await mutationLock.ExecuteOrderedGroupsAsync(
+                        lockGroups, token => owner.ExecuteAsync(invocation!, async ownedToken =>
+                        {
+                            requireCurrent();
+                            await prepared.AcquireAsync(ownedToken);
+                            var applied = await ApplyAttemptAsync(ownedToken);
+                            requireCurrent();
+                            if (applied.Rejection is { } refusal)
+                                return OriginalOwnerDecision<HumanApplySettlement>.RollBack(new(null, refusal));
+                            if (applied.Operation!.Id != invocation!.OperationId)
+                                throw new InvalidOperationException("Import must retain its original operation identity.");
+                            return OriginalOwnerDecision<HumanApplySettlement>.Commit(new(applied.Operation.Id, null));
+                        }, token), cancellationToken);
+                    // The public disposition chooses a validation branch; it never grants eligibility.
+                    var settled = owner.Consume(invocation!, settlement, settlement.Disposition);
+                    if (settled.Rejection is { } rejection)
+                    {
+                        if (settlement.Disposition != OriginalOwnerDisposition.WholeTransactionRolledBack
+                            || !ReferenceEquals(rejection.Invocation, invocation) || settled.OperationId is not null)
+                            throw new InvalidOperationException("Import rejection requires its original whole rollback.");
+                        return new HumanApplyAttempt(null, rejection);
+                    }
+                    if (settlement.Disposition != OriginalOwnerDisposition.Committed || settled.OperationId is not { } committedId)
+                        throw new InvalidOperationException("Import success requires its original commit.");
+                    committedOperation = await operations.GetByIdAsync(committedId, target.AuthorityKey, cancellationToken)
+                        ?? throw new InvalidOperationException("The acknowledged import operation is unavailable.");
+                }
+                return new HumanApplyAttempt(committedOperation, null);
+            }, cancellationToken);
+            if (outcome.Rejection is { } rejection)
             {
-                if (operation.EffectOutboxId is { } messageId)
-                    await effectDelivery.DeliverAsync(messageId, cancellationToken);
+                await RecordHumanRejectionAsync(rejection, prepared!.Authority, cancellationToken);
+                throw new ConfigurationImportSessionException(rejection.FailureCode);
             }
-            catch (Exception exception)
-            {
-                logger.LogWarning(
-                    "Configuration import operation {OperationId} committed with pending effect type {ExceptionType}.",
-                    operation.Id,
-                    exception.GetType().Name);
-            }
+            ConfigurationImportOperation operation = outcome.Operation!;
+            // Setup's outer generation owner releases its gates before attempting delivery.
+            if (!setupLive) await DeliverEffectsAsync(operation, cancellationToken);
             return await MapAsync(operation, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -382,6 +412,18 @@ public sealed class ConfigurationImportApplyService(
             // Only the original owner can acknowledge this rollback. A caller must restart
             // the complete import admission; never replay the old callback or preview decision.
             throw;
+        }
+        catch (HumanMutationOutcomeUnknownException)
+        {
+            throw;
+        }
+        catch (ConfigurationImportCoordinationCleanupException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (setupCommitAcknowledged)
+        {
+            throw new ConfigurationImportCoordinationCleanupException(exception);
         }
         catch (Exception) when (!setupLive)
         {
@@ -423,6 +465,21 @@ public sealed class ConfigurationImportApplyService(
                 cancellationToken);
             throw new ConfigurationImportSessionException(
                 ConfigurationImportFailureCodes.ApplyFailed);
+        }
+    }
+
+    private async Task DeliverEffectsAsync(ConfigurationImportOperation operation, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (operation.EffectOutboxId is { } messageId)
+                await effectDelivery.DeliverAsync(messageId, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                "Configuration import operation {OperationId} committed with pending effect type {ExceptionType}.",
+                operation.Id, exception.GetType().Name);
         }
     }
 
@@ -671,13 +728,17 @@ public sealed class ConfigurationImportApplyService(
         var prepared = await importAdmission
             .PrepareAsync(invocation.Subject, invocation.Target, authority, cancellationToken);
         var owner = ImportOwnerFactory().GetImportSettlementBoundary(authority.Lifetime);
-        var finalizer = commitFinalizer;
+        var finalizer = commitFinalizerFactory();
+        var instanceAuthority = invocation.Target.Scope == ConfigurationImportScope.Instance
+            ? instanceCommitAuthorityFactory() : null;
+        var tenantAuthority = invocation.Target.Scope == ConfigurationImportScope.Tenant
+            ? tenantCommitAuthorityFactory() : null;
         async Task RequireAuthorityAsync(CancellationToken token)
         {
             bool allowed = invocation.Target.Scope == ConfigurationImportScope.Instance
-                ? await instanceCommitAuthority
+                ? await instanceAuthority!
                     .IsInstanceAdministratorForCommitAsync(invocation.Subject.PrincipalId, token)
-                : await tenantCommitAuthority
+                : await tenantAuthority!
                     .IsTenantAdministratorForCommitAsync(invocation.Subject.PrincipalId,
                         invocation.Target.TenantId!.Value, token);
             if (!allowed)

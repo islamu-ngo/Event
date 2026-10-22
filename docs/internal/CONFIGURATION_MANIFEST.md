@@ -975,6 +975,31 @@ secrets, outbox state, audit history, or provider state.
 
 ## Day 2 Import And Tenant Migration
 
+Import application owns cooperative coordination before opening its transaction:
+`ConfigurationImportCoordination` retains Human then Discovery custody on the
+selected context through settlement. Setup acquires those gates before its
+enrollment-generation lock; compatible inner calls borrow rather than reacquire.
+Failure history is written only after an acknowledged rollback and after owned
+gates are released, using the original request credential binding.
+
+Setup apply uses `ISettingMutationLock.ExecuteOrderedGroupsOnceAsync` around
+`ISerializableAttemptOwner`, not a replaying lock or unit-of-work entrypoint.
+This selects execution behavior only: it does not bind a human-authority scope
+or convert internal Setup writers into human mutation writers. Human-only commit
+authorities are resolved lazily on the selected human scope before BEGIN; simply
+constructing the shared import service never fabricates that scope for Setup.
+Setting leases
+are all released in reverse order even if one release fails. Generation and
+outer coordination cleanup retain the primary exception and cleanup causes.
+If commit acknowledgement is lost, the result remains
+`HumanMutationOutcomeUnknownException`: do not retry the prepared operation,
+persist a contradictory failed receipt, or deliver effects from that attempt.
+Committed configuration, consumed session, receipt and outbox remain atomic.
+Effect delivery starts only after outer generation and coordination leases end.
+After commit is acknowledged, cleanup or receipt-mapping failure is a committed
+operation requiring investigation, not an unknown commit or failed apply. Never
+append a second failed receipt or replay it to conceal the cleanup failure.
+
 Instance administrators import a v1alpha2 `ConfigurationManifest`; tenant
 administrators import a v1alpha2 `TenantConfigurationPackage` into the tenant
 selected by the authenticated route. Source tenant names and instance metadata

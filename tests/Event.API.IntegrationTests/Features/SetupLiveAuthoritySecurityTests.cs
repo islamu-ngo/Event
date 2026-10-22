@@ -13,6 +13,7 @@ using System.Text;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
+using Event.Testing.DataProtection;
 using Explore.API.Attributes;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
@@ -23,6 +24,7 @@ using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -1727,8 +1729,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
 
     private async Task<SetupSecretBindingOperation> LoadOperation(Guid operationKey)
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext db = fixture.Factory.CreateMigratorContext();
         return await db.Set<SetupSecretBindingOperation>()
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -1767,8 +1768,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
 
     private async Task AssertClaimCount(Guid operationKey, int expected)
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext db = fixture.Factory.CreateMigratorContext();
         IEntityType entity = db.Model.FindEntityType(IssuanceClaimEntityName)
             ?? throw new InvalidOperationException(
                 $"missing-final-d1-entity:{IssuanceClaimEntityName}");
@@ -1785,8 +1785,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         bool revoked,
         DateTimeOffset? expectedExpiresAt = null)
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext db = fixture.Factory.CreateMigratorContext();
         IEntityType entity = db.Model.FindEntityType(EnrollmentEntityName)
             ?? throw new InvalidOperationException(
                 $"missing-final-d1-entity:{EnrollmentEntityName}");
@@ -1809,8 +1808,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
 
     private async Task<int> EntityCount(string entityName)
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext db = fixture.Factory.CreateMigratorContext();
         IEntityType entity = db.Model.FindEntityType(entityName)
             ?? throw new InvalidOperationException($"missing-final-d1-entity:{entityName}");
         IEnumerable set = SetFor(db, entity.ClrType);
@@ -1820,8 +1818,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
     private async Task AssertStoredRowsDoNotContain(
         IReadOnlyList<string?> canaries, params string[] entityNames)
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext db = fixture.Factory.CreateMigratorContext();
         foreach (string entityName in entityNames)
         {
             IEntityType entity = db.Model.FindEntityType(entityName)
@@ -1841,8 +1838,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
 
     private async Task AssertNoDispatchableOperation(Guid enrollmentId)
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext db = fixture.Factory.CreateMigratorContext();
         IEntityType entity = db.Model.FindEntityType(OperationEntityName)
             ?? throw new InvalidOperationException(
                 $"missing-final-d1-entity:{OperationEntityName}");
@@ -1936,6 +1932,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
 
 public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisposable
 {
+    private TestDatabaseReset? _databaseReset;
     public StubAuthorizationProvider Authorization { get; } = new() { AllowAll = true };
     public ManualSetupTimeProvider Clock { get; } = new();
     public SetupLiveCapture Capture { get; } = new();
@@ -1980,9 +1977,11 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         Clock.Reset();
         Capture.Reset();
         await using AsyncServiceScope scope = Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        await db.Database.EnsureDeletedAsync();
-        await db.Database.EnsureCreatedAsync();
+        await using ExploreDbContext db = Factory.CreateMigratorContext();
+        _databaseReset ??= await TestDatabaseReset.CreateAsync(
+            db.Database.GetConnectionString()
+            ?? throw new InvalidOperationException("The setup fixture requires its migrator connection."));
+        await _databaseReset.ResetAsync();
         IHostEnvironment environment =
             scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         await DatabaseSeeder.SeedAsync(db, environment);
@@ -1998,8 +1997,7 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
     {
         binding.Id = Guid.CreateVersion7();
         binding.CreatedAt = Clock.GetUtcNow().UtcDateTime;
-        await using AsyncServiceScope scope = Factory.Services.CreateAsyncScope();
-        ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext db = Factory.CreateMigratorContext();
         db.SecretBindings.Add(binding);
         await db.SaveChangesAsync();
         return binding.Id;
@@ -2018,8 +2016,9 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         Capture.Dispose();
         CommitmentAuthority.Dispose();
         Coordinator.Dispose();
-        Client.Dispose();
-        await Factory.DisposeAsync();
+        Client?.Dispose();
+        if (Factory is not null)
+            await Factory.DisposeAsync();
     }
 }
 
@@ -2033,12 +2032,16 @@ public sealed class SetupLiveAuthorityWebApplicationFactory(
     UnreadBodyProbe bodyProbe)
     : AuthenticatedWebApplicationFactory
 {
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api", clock);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<TimeProvider>();
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             services.RemoveAll<ISetupSecretBindingWriter>();
             services.RemoveAll<ISetupSecretBindingReadinessReader>();
             services.RemoveAll<ISetupSecretBindingCommitmentAuthority>();
@@ -2051,6 +2054,7 @@ public sealed class SetupLiveAuthorityWebApplicationFactory(
             services.AddSingleton<ISetupSecretBindingCommitBarrier>(commitBarrier);
             services.AddSingleton<ISetupSecretBindingOperationCoordinator>(coordinator);
             services.AddSingleton<ILoggerProvider>(capture.LoggerProvider);
+            services.Insert(0, ServiceDescriptor.Singleton<Microsoft.AspNetCore.Diagnostics.IExceptionHandler>(capture));
             services.AddSingleton<IStartupFilter>(
                 new UnreadBodyStartupFilter(bodyProbe));
         });
@@ -2367,8 +2371,28 @@ public sealed class ManualSetupTimeProvider : TimeProvider
     public void Reset() => _current = _initial;
 }
 
-public sealed class SetupLiveCapture : IDisposable
+public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnostics.IExceptionHandler
 {
+    private string failureMetadata = "No request exception metadata was observed.";
+    public string FailureMetadata => Volatile.Read(ref failureMetadata);
+
+    public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
+        CancellationToken cancellationToken)
+    {
+        var root = exception.GetBaseException();
+        var methods = new StackTrace(root).GetFrames()
+            .Select(frame => frame.GetMethod())
+            .Where(method => method?.DeclaringType?.FullName?.StartsWith("Explore.", StringComparison.Ordinal) == true)
+            .Take(12)
+            .Select(method => method!.DeclaringType?.FullName + "." + method.Name);
+        string databaseMetadata = root is Npgsql.PostgresException postgres
+            ? $"SQLSTATE={postgres.SqlState}, table={postgres.TableName ?? "unspecified"}, column={postgres.ColumnName ?? "unspecified"}"
+            : "SQLSTATE=none";
+        Volatile.Write(ref failureMetadata, root.GetType().FullName + " " + databaseMetadata
+            + ": " + string.Join(" -> ", methods));
+        return ValueTask.FromResult(false);
+    }
+
     public const string SourceName = "ISLAMU.Event.Setup.Live";
     private readonly ConcurrentQueue<string> _values = new();
     private readonly ConcurrentQueue<string> _setupValues = new();
@@ -2440,6 +2464,7 @@ public sealed class SetupLiveCapture : IDisposable
         while (_setupValues.TryDequeue(out _))
         {
         }
+        Volatile.Write(ref failureMetadata, "No request exception metadata was observed.");
     }
 
     public string[] Snapshot() => _values.ToArray();

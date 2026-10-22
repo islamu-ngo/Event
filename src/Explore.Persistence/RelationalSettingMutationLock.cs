@@ -1,5 +1,7 @@
 using System.Data;
+using System.Runtime.ExceptionServices;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Domain.Constants;
@@ -105,7 +107,20 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
     public Task<T> ExecuteOrderedGroupsAsync<T>(
         IEnumerable<IEnumerable<string>> settingKeyGroups,
         Func<CancellationToken, Task<T>> operation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ExecuteOrderedGroupsCoreAsync(settingKeyGroups, operation, allowReplay: true, cancellationToken);
+
+    public Task<T> ExecuteOrderedGroupsOnceAsync<T>(
+        IEnumerable<IEnumerable<string>> settingKeyGroups,
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken = default) =>
+        ExecuteOrderedGroupsCoreAsync(settingKeyGroups, operation, allowReplay: false, cancellationToken);
+
+    private Task<T> ExecuteOrderedGroupsCoreAsync<T>(
+        IEnumerable<IEnumerable<string>> settingKeyGroups,
+        Func<CancellationToken, Task<T>> operation,
+        bool allowReplay,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settingKeyGroups);
         ArgumentNullException.ThrowIfNull(operation);
@@ -124,13 +139,15 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                 "Ordered setting-lock groups must be acquired before the caller-owned transaction begins.");
         }
 
-        return _dbContext.HasHumanCommitContextLease
+        return !allowReplay || _dbContext.HasHumanCommitContextLease
             ? ExecuteOnceAsync()
             : _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(ExecuteOnceAsync);
 
         async Task<T> ExecuteOnceAsync()
         {
             var leases = new List<IAsyncDisposable>(orderedKeys.Length);
+            Exception? primary = null;
+            T result = default!;
             try
             {
                 foreach (string settingKey in orderedKeys)
@@ -154,20 +171,30 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                     orderedKeys.ToHashSet(StringComparer.Ordinal);
                 try
                 {
-                    return await operation(cancellationToken);
+                    result = await operation(cancellationToken);
                 }
                 finally
                 {
                     _outerOrderedKeys.Value = previousKeys;
                 }
             }
-            finally
+            catch (Exception failure) { primary = failure; }
+            List<Exception> cleanup = [];
+            for (int index = leases.Count - 1; index >= 0; index--)
             {
-                for (int index = leases.Count - 1; index >= 0; index--)
-                {
-                    await leases[index].DisposeAsync();
-                }
+                try { await leases[index].DisposeAsync(); }
+                catch (Exception failure) { cleanup.Add(failure); }
             }
+            if (cleanup.Count != 0)
+            {
+                if (primary is not null) cleanup.Insert(0, primary);
+                var evidence = new AggregateException("Setting operation and coordination cleanup evidence.", cleanup);
+                if (primary is HumanMutationOutcomeUnknownException)
+                    throw new HumanMutationOutcomeUnknownException(evidence);
+                throw evidence;
+            }
+            if (primary is not null) ExceptionDispatchInfo.Capture(primary).Throw();
+            return result;
         }
     }
 

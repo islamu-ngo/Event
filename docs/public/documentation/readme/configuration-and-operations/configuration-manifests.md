@@ -273,6 +273,20 @@ changes through cache refresh or another reader.
 
 ## Related Guides & Next Steps
 
+If an import loses its database commit acknowledgement, its outcome is unknown,
+not necessarily failed. Do not repeat the import or treat an error response as
+proof of rollback. Inspect the existing import session and operation history:
+the configuration, consumed session, applied receipt and pending effect may
+already be committed together. Recover the existing pending effect through the
+outbox worker rather than applying the configuration a second time. Ordinary
+and Setup imports coordinate concurrent application work before starting their
+transaction; direct database edits outside that protocol can bypass these rules.
+Setup application does not automatically replay its transaction. A coordination
+release error after an acknowledged commit also does not undo the import:
+investigate the existing applied receipt and pending effect rather than retrying.
+If acknowledgement and cleanup both fail, the API retains both causes and keeps
+the commit outcome classified as unknown; a cleanup error is not rollback proof.
+
 * **[White-Labeling & Branding](../administration-and-branding/white-labeling.md)** — Customize colors, logos, and typography via manifests.
 * **[First-Run Administration Guide](../administration-and-branding/admin-guide.md)** — Manage instance and tenant configuration through the web UI.
 * **[Secrets Management](secrets.md)** — Separate credentials from declarative configuration manifests.

@@ -1,6 +1,7 @@
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
@@ -54,6 +55,12 @@ public static class ConfigurationManifestApplicationServicesRegistration
             ConfigurationImportTenantIdentityMutationBoundary>();
         services.TryAddScoped<ConfigurationImportSectionApplier>();
         services.TryAddScoped<ConfigurationImportApplyService>();
+        services.TryAddScoped<Func<IInstanceAdministratorCommitAuthority>>(provider =>
+            () => provider.GetRequiredService<IInstanceAdministratorCommitAuthority>());
+        services.TryAddScoped<Func<ITenantAdministratorCommitAuthority>>(provider =>
+            () => provider.GetRequiredService<ITenantAdministratorCommitAuthority>());
+        services.TryAddScoped<Func<IHumanActionCommitFinalizer>>(provider =>
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>());
         services.TryAddScoped<ConfigurationManagedApplyScheduleService>();
         services.TryAddScoped<ConfigurationDirectTransferService>();
         services.TryAddScoped<IConfigurationImportEffectDelivery,

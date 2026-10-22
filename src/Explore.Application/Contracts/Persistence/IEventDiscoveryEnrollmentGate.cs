@@ -9,4 +9,7 @@ public interface IEventDiscoveryEnrollmentGate
 
     /// <summary>Validates an already active lease belonging to this original owner.</summary>
     void RequireCurrent();
+
+    /// <summary>Returns false only for absent custody; pending, released or changed custody throws.</summary>
+    bool TryRequireCurrent();
 }

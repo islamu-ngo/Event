@@ -16,6 +16,8 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -123,8 +125,18 @@ internal sealed class CurrentHumanPrincipalFixture : IAsyncDisposable
         await Context.Database.EnsureCreatedAsync();
         if (_ownsDatabase)
         {
-            await SqliteDatabaseInitializer.InitializeAsync(Context, CancellationToken.None);
-            await LookupTableSeeder.SeedAsync(Context, CancellationToken.None);
+            await using (var initialization = await Services.GetRequiredService<IGlobalExploreDbContextFactory>()
+                .CreateDbContextAsync(CancellationToken.None))
+            {
+                await SqliteDatabaseInitializer.InitializeAsync(initialization, CancellationToken.None);
+                await using var human = new HumanSecuritySourceGate(initialization);
+                await using var humanLease = await human.AcquireAsync(CancellationToken.None);
+                await using var enrollmentGate = new EventDiscoveryEnrollmentGate(initialization);
+                await using var enrollment = await enrollmentGate.AcquireAsync(CancellationToken.None);
+                await using var transaction = await initialization.Database.BeginTransactionAsync(CancellationToken.None);
+                await LookupTableSeeder.SeedAsync(initialization, CancellationToken.None);
+                await transaction.CommitAsync(CancellationToken.None);
+            }
             Context.Users.Add(new User
             {
                 Id = UserId,

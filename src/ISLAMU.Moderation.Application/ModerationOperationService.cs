@@ -75,7 +75,10 @@ public sealed class ModerationOperationService(
                 }
 
                 if (moderationCase.Id != proposal.CaseId || moderationCase.Subject != operation.Subject
-                    || moderationCase.Scope != operation.Target)
+                    || moderationCase.Scope != operation.Target
+                        && (moderationCase.AttributionSourceId is null
+                            || operation.Target.Kind != ModerationScopeKind.Resource
+                            || moderationCase.Scope != operation.Target.Parent))
                 {
                     return ModerationOperationResult.Denied();
                 }
@@ -125,13 +128,34 @@ public sealed class ModerationOperationService(
                     decision.RecordResponse(operation.ExpectedRevision, now);
                     break;
                 case ModerationOperationKind.AcceptFinding:
-                    if (decision.State != ModerationDecisionState.AwaitingFinding)
+                {
+                    if (decision.State is not (ModerationDecisionState.Proposed or ModerationDecisionState.AwaitingFinding))
                     {
                         return ModerationOperationResult.Conflict();
                     }
+                    var finding = await session.FindFindingAsync(
+                        operation.ReferenceId, operation.Subject, operation.Target, token);
+                    now = clock.GetUtcNow();
+                    if (now < decision.UpdatedAt)
+                    {
+                        return ModerationOperationResult.Conflict();
+                    }
+                    var purpose = decision.State == ModerationDecisionState.Proposed
+                        ? ModerationFindingEvidencePurpose.QualifiedUrgency : ModerationFindingEvidencePurpose.Response;
+                    if (finding is not { State: ModerationFindingState.Final }
+                        || finding.Id != operation.ReferenceId || finding.CaseId != decision.CaseId
+                        || finding.Subject != decision.Subject || finding.Scope != decision.Scope
+                        || finding.Rule != decision.Rule || finding.EvidencePurpose != purpose
+                        || finding.Adjudicator.Kind != ModerationSubjectKind.Human
+                        || finding.Adjudicator.Id == decision.Issuer.Id || finding.FinalizedAt > now)
+                        return ModerationOperationResult.Denied();
 
-                    decision.AcceptFinding(operation.ReferenceId, operation.ExpectedRevision, now);
+                    if (purpose == ModerationFindingEvidencePurpose.QualifiedUrgency)
+                        decision.AcceptUrgentFinding(finding, operation.ExpectedRevision, now);
+                    else
+                        decision.AcceptFinding(finding.Id, operation.ExpectedRevision, now);
                     break;
+                }
                 case ModerationOperationKind.Approve:
                     if (decision.State != ModerationDecisionState.AwaitingApproval)
                     {

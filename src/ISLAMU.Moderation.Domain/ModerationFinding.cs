@@ -85,6 +85,8 @@ public sealed class ModerationFinding
     public Guid CaseOccurrenceId { get; private set; }
     public long CaseRevision { get; private set; }
     public DateTimeOffset CaseCreatedAt { get; private set; }
+    public Guid? AttributionSourceId { get; private set; }
+    public long AttributionGeneration { get; private set; }
     public ModerationSubjectKind SubjectKind { get; private set; }
     public Guid SubjectId { get; private set; }
     public ModerationScopeKind SubjectOriginKind { get; private set; }
@@ -96,6 +98,7 @@ public sealed class ModerationFinding
     public Guid? SubjectOriginResourceId { get; private set; }
     public Guid? SubjectOriginEventId { get; private set; }
     public ModerationScopeKind ScopeKind { get; private set; }
+    public Guid ScopeId { get; private set; }
     public Guid ScopeTrustDomainId { get; private set; }
     public Guid? ScopeSolutionId { get; private set; }
     public Guid? ScopeInstanceId { get; private set; }
@@ -106,6 +109,9 @@ public sealed class ModerationFinding
     public Guid RuleOwnerId { get; private set; }
     public string RuleCode { get; private set; } = string.Empty;
     public long RuleRevision { get; private set; }
+    public Guid ReasonOwnerId { get; private set; }
+    public string ReasonCode { get; private set; } = string.Empty;
+    public long ReasonRevision { get; private set; }
     public ModerationSubjectKind AdjudicatorKind { get; private set; }
     public Guid AdjudicatorId { get; private set; }
     public ModerationScopeKind AdjudicatorOriginKind { get; private set; }
@@ -157,14 +163,24 @@ public sealed class ModerationFinding
     {
         get => AuthorityScope.FromCoordinates(ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
             ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId);
-        private set => (ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
-            ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId) = value.Coordinates;
+        private set
+        {
+            (ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
+                ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId) = value.Coordinates;
+            ScopeId = value.Id;
+        }
     }
 
     public ModerationRuleReference Rule
     {
         get => ModerationRuleReference.Create(RuleOwnerId, RuleCode, RuleRevision);
         private set => (RuleOwnerId, RuleCode, RuleRevision) = (value.OwnerId, value.Code, value.Revision);
+    }
+
+    public ModerationRuleReference Reason
+    {
+        get => ModerationRuleReference.Create(ReasonOwnerId, ReasonCode, ReasonRevision);
+        private set => (ReasonOwnerId, ReasonCode, ReasonRevision) = (value.OwnerId, value.Code, value.Revision);
     }
 
     public SubjectReference Adjudicator
@@ -201,13 +217,17 @@ public sealed class ModerationFinding
         var scope = Scope;
         RequireIndependentHuman(Adjudicator, subject, scope);
         _ = Rule;
+        _ = Reason;
         var evidence = Evidence;
         var reversedBy = ReversedBy;
         RequireJustification(Justification);
         if (Id == Guid.Empty || Id.Version != 7 || Id.Variant is < 8 or > 11
             || CaseId == Guid.Empty || CaseOccurrenceId == Guid.Empty || CaseRevision != 1
             || subject.TrustDomainId != scope.TrustDomainId
+            || ScopeId != scope.Id
             || CaseCreatedAt == default || FinalizedAt == default
+            || (AttributionSourceId is null ? AttributionGeneration != 0 : AttributionGeneration < 1)
+            || AttributionSourceId == Guid.Empty
             || evidence.RecordedAt < CaseCreatedAt || evidence.RecordedAt > FinalizedAt
             || UpdatedAt < FinalizedAt)
         {
@@ -233,17 +253,37 @@ public sealed class ModerationFinding
     }
 
     /// <summary>
-    /// Finalizes against an actual current open case and the exact adopted rule identity supplied by the fenced writer.
-    /// Neither a reference nor matching rule identity proves actual permission, conflict clearance or adoption.
+    /// Checks retained case ancestry, including closed proceedings and an originally narrower action scope.
+    /// This neither selects a particular resource nor proves current permission or native attribution authority.
+    /// </summary>
+    public bool MatchesRetainedCase(ModerationCase owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        owner.ValidatePersistedState();
+        ValidatePersistedState();
+        return CaseId == owner.Id && Subject == owner.Subject && CaseOccurrenceId == owner.OccurrenceId
+            && CaseCreatedAt == owner.CreatedAt && CaseRevision <= owner.Revision
+            && (owner.AttributionSourceId is null) == (AttributionSourceId is null)
+            && owner.Scope.Contains(Scope);
+    }
+
+    /// <summary>
+    /// Finalizes against an actual current open case and the exact adopted rule and reason supplied by the fenced writer.
+    /// Matching references do not prove actual permission, conflict clearance or adoption.
     /// </summary>
     public static ModerationFinding Finalize(
-        Guid id, ModerationCase moderationCase, long expectedCaseRevision, ModerationRuleReference rule,
-        ModerationRuleReference adoptedRule, SubjectReference adjudicator,
+        Guid id, ModerationCase moderationCase, long expectedCaseRevision, AuthorityScope scope,
+        Guid? attributionSourceId, long? attributionGeneration, ModerationRuleReference rule,
+        ModerationRuleReference adoptedRule, ModerationRuleReference reason,
+        ModerationRuleReference adoptedReason, SubjectReference adjudicator,
         ModerationFindingEvidenceReference evidence, string justification, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(moderationCase);
+        ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(rule);
         ArgumentNullException.ThrowIfNull(adoptedRule);
+        ArgumentNullException.ThrowIfNull(reason);
+        ArgumentNullException.ThrowIfNull(adoptedReason);
         ArgumentNullException.ThrowIfNull(adjudicator);
         ArgumentNullException.ThrowIfNull(evidence);
         moderationCase.ValidatePersistedState();
@@ -254,14 +294,19 @@ public sealed class ModerationFinding
             throw new InvalidOperationException("Finalization requires the current open case revision.");
         }
 
-        if (id == Guid.Empty || id.Version != 7 || id.Variant is < 8 or > 11 || rule != adoptedRule
+        if (id == Guid.Empty || id.Version != 7 || id.Variant is < 8 or > 11
+            || rule != adoptedRule || reason != adoptedReason
+            || !moderationCase.Scope.Contains(scope)
+            || (moderationCase.AttributionSourceId is null) != (attributionSourceId is null)
+            || (attributionSourceId is null) != (attributionGeneration is null)
+            || attributionSourceId == Guid.Empty || attributionGeneration is < 1
             || evidence.CaseId != moderationCase.Id || evidence.CaseRevision != expectedCaseRevision
             || evidence.RecordedAt < moderationCase.CreatedAt || evidence.RecordedAt > now)
         {
-            throw new ArgumentException("Finding identity, exact adopted rule and case-bound evidence are required.");
+            throw new ArgumentException("Finding identity, exact adopted rule and reason, and case-bound evidence are required.");
         }
 
-        RequireIndependentHuman(adjudicator, subject, moderationCase.Scope);
+        RequireIndependentHuman(adjudicator, subject, scope);
         RequireJustification(justification);
         var finding = new ModerationFinding
         {
@@ -270,9 +315,12 @@ public sealed class ModerationFinding
             CaseOccurrenceId = moderationCase.OccurrenceId,
             CaseRevision = moderationCase.Revision,
             CaseCreatedAt = moderationCase.CreatedAt,
+            AttributionSourceId = attributionSourceId,
+            AttributionGeneration = attributionGeneration ?? 0,
             Subject = subject,
-            Scope = moderationCase.Scope,
+            Scope = scope,
             Rule = rule,
+            Reason = reason,
             Adjudicator = adjudicator,
             EvidencePurpose = evidence.Purpose,
             EvidenceReferenceId = evidence.ReferenceId,

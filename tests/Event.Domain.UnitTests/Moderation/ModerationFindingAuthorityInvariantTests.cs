@@ -7,6 +7,8 @@ public class ModerationFindingAuthorityInvariantTests
     private static readonly DateTimeOffset OpenedAt = new(2026, 10, 8, 12, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset FinalizedAt = OpenedAt.AddHours(1);
     private static readonly DateTimeOffset ReversedAt = FinalizedAt.AddHours(1);
+    private static readonly ModerationRuleReference Reason = ModerationRuleReference.Create(
+        Guid.Parse("01234567-89ab-7cde-8fab-0123456789ab"), "Established.Reason", 3);
 
     [Test]
     [Arguments(false)]
@@ -26,6 +28,8 @@ public class ModerationFindingAuthorityInvariantTests
         await Assert.That(finding.Subject).IsEqualTo(allegation.Subject);
         await Assert.That(finding.Scope).IsEqualTo(allegation.Scope);
         await Assert.That(finding.Rule).IsEqualTo(rule);
+        await Assert.That(finding.Reason).IsEqualTo(Reason);
+        await Assert.That(finding.Reason == finding.Rule).IsFalse();
         await Assert.That(finding.Adjudicator).IsEqualTo(adjudicator);
         await Assert.That(finding.Evidence).IsEqualTo(evidence);
         await Assert.That(finding.State).IsEqualTo(ModerationFindingState.Final);
@@ -45,7 +49,8 @@ public class ModerationFindingAuthorityInvariantTests
     {
         var allegation = Case();
         await Assert.That(() => ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, expectedRevision,
-            Rule(), Rule(), Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
+            allegation.Scope, null, null,
+            Rule(), Rule(), Reason, Reason, Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
             .Throws<InvalidOperationException>();
     }
 
@@ -58,7 +63,8 @@ public class ModerationFindingAuthorityInvariantTests
         var rule = Rule();
 
         await Assert.That(() => ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 2,
-            rule, rule, Human(allegation.Scope), evidence, "Established violation.", FinalizedAt))
+            allegation.Scope, null, null,
+            rule, rule, Reason, Reason, Human(allegation.Scope), evidence, "Established violation.", FinalizedAt))
             .Throws<InvalidOperationException>();
     }
 
@@ -76,8 +82,29 @@ public class ModerationFindingAuthorityInvariantTests
             difference == 2 ? 2 : rule.Revision);
 
         await Assert.That(() => ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1,
-            rule, adopted, Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
+            allegation.Scope, null, null,
+            rule, adopted, Reason, Reason, Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
             .Throws<ArgumentException>();
+    }
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
+    [Arguments(3)]
+    public async Task AdoptedReasonMustMatchOwnerCodeAndRevisionWithoutSubstitutingRule(int difference)
+    {
+        var allegation = Case();
+        var rule = Rule();
+        var requestedReason = difference == 3 ? rule : ModerationRuleReference.Create(
+            difference == 0 ? rule.OwnerId : Reason.OwnerId,
+            difference == 1 ? "Different.Reason" : Reason.Code,
+            difference == 2 ? Reason.Revision + 1 : Reason.Revision);
+
+        await Assert.That(() => ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1,
+            allegation.Scope, null, null,
+            rule, rule, requestedReason, Reason, Human(allegation.Scope), Evidence(allegation),
+            "Established violation.", FinalizedAt)).Throws<ArgumentException>();
     }
 
     [Test]
@@ -166,13 +193,15 @@ public class ModerationFindingAuthorityInvariantTests
     {
         var allegation = Case();
         var rule = Rule();
-        await Assert.That(() => ModerationFinding.Finalize(Guid.Empty, allegation, 1, rule, rule,
-            Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
+        await Assert.That(() => ModerationFinding.Finalize(Guid.Empty, allegation, 1,
+            allegation.Scope, null, null, rule, rule,
+            Reason, Reason, Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
             .Throws<ArgumentException>();
         foreach (var justification in new[] { "", "  ", new string('x', 4001) })
         {
-            await Assert.That(() => ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1, rule, rule,
-                Human(allegation.Scope), Evidence(allegation), justification, FinalizedAt))
+            await Assert.That(() => ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1,
+                allegation.Scope, null, null, rule, rule,
+                Reason, Reason, Human(allegation.Scope), Evidence(allegation), justification, FinalizedAt))
                 .Throws<ArgumentException>();
         }
     }
@@ -184,8 +213,9 @@ public class ModerationFindingAuthorityInvariantTests
     {
         var allegation = Case();
         var rule = Rule();
-        await Assert.That(() => ModerationFinding.Finalize(Guid.Parse(value), allegation, 1, rule, rule,
-            Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
+        await Assert.That(() => ModerationFinding.Finalize(Guid.Parse(value), allegation, 1,
+            allegation.Scope, null, null, rule, rule,
+            Reason, Reason, Human(allegation.Scope), Evidence(allegation), "Established violation.", FinalizedAt))
             .Throws<ArgumentException>();
     }
 
@@ -218,6 +248,7 @@ public class ModerationFindingAuthorityInvariantTests
         await Assert.That(finding.Subject).IsEqualTo(allegation.Subject);
         await Assert.That(finding.Scope).IsEqualTo(allegation.Scope);
         await Assert.That(finding.Rule).IsEqualTo(rule);
+        await Assert.That(finding.Reason).IsEqualTo(Reason);
         await Assert.That(finding.Adjudicator).IsEqualTo(adjudicator);
         await Assert.That(finding.Evidence).IsEqualTo(evidence);
         await Assert.That(() => finding.Reverse(Guid.CreateVersion7(), adjudicator, "Another review.", 2,
@@ -251,8 +282,8 @@ public class ModerationFindingAuthorityInvariantTests
     public async Task InvalidReversalCannotPartiallyWriteAudit(int defect)
     {
         var allegation = Case();
-        var finding = Finalize(allegation, Rule(), Human(allegation.Scope), Evidence(allegation));
         var subject = allegation.Subject ?? throw new InvalidOperationException("The fixture requires an attributed case.");
+        var finding = Finalize(allegation, Rule(), Human(allegation.Scope), Evidence(allegation));
         var reverser = defect == 2 ? subject : defect == 3
             ? Human(AuthorityScope.TrustDomain(Guid.CreateVersion7())) : Human(allegation.Scope);
         if (defect == 4)
@@ -323,6 +354,34 @@ public class ModerationFindingAuthorityInvariantTests
     }
 
     [Test]
+    [Arguments(false, 0)]
+    [Arguments(false, 1)]
+    [Arguments(false, 2)]
+    [Arguments(true, 0)]
+    [Arguments(true, 1)]
+    [Arguments(true, 2)]
+    public async Task InvalidRetainedReasonCannotBecomeHydratedFindingAuthority(bool reversed, int defect)
+    {
+        var allegation = Case();
+        var finding = Finalize(allegation, Rule(), Human(allegation.Scope), Evidence(allegation));
+        if (reversed)
+            finding.Reverse(Guid.CreateVersion7(), Human(allegation.Scope), "Review.", 1, ReversedAt);
+        var (property, value) = defect switch
+        {
+            0 => (nameof(ModerationFinding.ReasonOwnerId), (object)Guid.Empty),
+            1 => (nameof(ModerationFinding.ReasonCode), " "),
+            _ => (nameof(ModerationFinding.ReasonRevision), 0L)
+        };
+        typeof(ModerationFinding).GetProperty(property)!.SetValue(finding, value);
+
+        await Assert.That(finding.ValidatePersistedState).Throws<ArgumentException>();
+        await Assert.That(() => finding.Reverse(Guid.CreateVersion7(), Human(allegation.Scope),
+            "Review.", finding.Revision, ReversedAt)).Throws<ArgumentException>();
+        await Assert.That(finding.State).IsEqualTo(reversed
+            ? ModerationFindingState.Reversed : ModerationFindingState.Final);
+    }
+
+    [Test]
     public async Task CorruptCaseCannotSeedOtherwisePlausibleFinding()
     {
         var allegation = Case();
@@ -384,7 +443,7 @@ public class ModerationFindingAuthorityInvariantTests
 
     private static ModerationFinding Finalize(ModerationCase allegation, ModerationRuleReference rule,
         SubjectReference adjudicator, ModerationFindingEvidenceReference evidence) =>
-        ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1, rule,
+        ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1, allegation.Scope, null, null, rule,
             ModerationRuleReference.Create(rule.OwnerId, rule.Code, rule.Revision),
-            adjudicator, evidence, "Established violation.", FinalizedAt);
+            Reason, Reason, adjudicator, evidence, "Established violation.", FinalizedAt);
 }

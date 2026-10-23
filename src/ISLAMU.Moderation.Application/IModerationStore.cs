@@ -19,11 +19,19 @@ public interface IModerationStore
 /// <summary>Entity access within the store-owned authority fence; never an unfenced or lasting authorization permit.</summary>
 public interface IModerationSession
 {
+    /// <summary>
+    /// Adjudication access requires the complete subject and requested action scope. An
+    /// attributed tenant-owned case may contain a separately qualified resource action;
+    /// its custody scope is not permission for that action. Target-only allegations are excluded.
+    /// </summary>
     Task<ModerationCase?> FindCaseAsync(
-        Guid caseId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken);
+        Guid caseId, SubjectReference subject, AuthorityScope actionScope, CancellationToken cancellationToken);
 
     Task<ModerationDecision?> FindDecisionAsync(
         Guid decisionId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken);
+
+    Task<ModerationFinding?> FindFindingAsync(
+        Guid findingId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken);
 
     Task<ModerationSanction?> FindSanctionAsync(
         Guid sanctionId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken);

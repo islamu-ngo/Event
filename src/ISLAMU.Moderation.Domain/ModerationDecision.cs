@@ -299,6 +299,25 @@ public sealed class ModerationDecision
         Revision = nextRevision;
     }
 
+    /// <summary>Accepts a current host-qualified urgency finding without inventing a subject response.</summary>
+    public void AcceptUrgentFinding(ModerationFinding finding, long expectedRevision, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(finding);
+        RequireState(expectedRevision, now, ModerationDecisionState.Proposed);
+        finding.ValidatePersistedState();
+        if (finding.State != ModerationFindingState.Final
+            || finding.EvidencePurpose != ModerationFindingEvidencePurpose.QualifiedUrgency
+            || finding.CaseId != CaseId || finding.Subject != Subject || finding.Scope != Scope
+            || finding.Rule != Rule || finding.Adjudicator.Id == Issuer.Id || finding.FinalizedAt > now)
+            throw new InvalidOperationException("An urgent transition requires the exact qualified final finding.");
+
+        var nextRevision = checked(Revision + 1);
+        FindingId = finding.Id;
+        State = ModerationDecisionState.AwaitingApproval;
+        UpdatedAt = now.ToUniversalTime();
+        Revision = nextRevision;
+    }
+
     /// <summary>Counts canonical human controllers, never delegated keys or provider aliases as independent people.</summary>
     public void Approve(SubjectReference controller, AuthorityScope qualification, long expectedRevision, DateTimeOffset now)
     {

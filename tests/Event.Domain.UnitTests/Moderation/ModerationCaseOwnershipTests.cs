@@ -118,7 +118,7 @@ public class ModerationCaseOwnershipTests
         await Assert.That(intake.ConflictState).IsEqualTo(ModerationReviewerConflictState.Unresolved);
         await Assert.That(intake.IsQualifiedAt(Now)).IsFalse();
         await Assert.That(() => ModerationFinding.Finalize(
-            Guid.CreateVersion7(), allegation, 1, rule, rule, reviewer,
+            Guid.CreateVersion7(), allegation, 1, allegation.Scope, null, null, rule, rule, rule, rule, reviewer,
             ModerationFindingEvidenceReference.Response(Guid.CreateVersion7(), allegation.Id, 1, Now),
             "An allegation is not an attributed finding.", Now)).Throws<InvalidOperationException>();
         await Assert.That(allegation.Subject).IsNull();
@@ -133,7 +133,8 @@ public class ModerationCaseOwnershipTests
         var reviewer = SubjectReference.Create(ModerationSubjectKind.Human, Guid.CreateVersion7(), scope.Parent!);
         var rule = ModerationRuleReference.Create(Guid.CreateVersion7(), "existing-test", 1);
         var finding = ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1,
-            rule, rule, reviewer,
+            allegation.Scope, null, null,
+            rule, rule, rule, rule, reviewer,
             ModerationFindingEvidenceReference.Response(Guid.CreateVersion7(), allegation.Id, 1, Now),
             "Retained owned final finding.", Now);
 

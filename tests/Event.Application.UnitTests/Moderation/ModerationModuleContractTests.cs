@@ -170,6 +170,55 @@ public class ModerationModuleContractTests
     }
 
     [Test]
+    [Arguments("missing")]
+    [Arguments("case")]
+    [Arguments("rule")]
+    [Arguments("issuer")]
+    [Arguments("issuer-origin")]
+    [Arguments("reversed")]
+    [Arguments("future")]
+    [Arguments("purpose")]
+    public async Task Ordinary_finding_acceptance_requires_current_independent_case_bound_response(string defect)
+    {
+        var fixture = new Fixture { SeedState = ModerationDecisionState.AwaitingFinding };
+        fixture.Store.Finding = defect == "missing" ? null : fixture.FinalFinding(defect);
+        var result = await fixture.Service.ExecuteAsync(fixture.Transition(ModerationOperationKind.AcceptFinding, 2));
+
+        await Assert.That(result.Outcome).IsEqualTo(ModerationOperationOutcome.Denied);
+        await Assert.That(fixture.Store.CommittedDecision is null).IsTrue();
+        await Assert.That(fixture.Store.CommittedSanction is null).IsTrue();
+        await Assert.That(fixture.Store.CommittedEffect is null).IsTrue();
+    }
+
+    [Test]
+    public async Task Qualified_urgency_acceptance_does_not_invent_a_subject_response()
+    {
+        var fixture = new Fixture { SeedState = ModerationDecisionState.Proposed };
+        fixture.Store.Finding = fixture.FinalFinding("purpose");
+        var operation = fixture.Transition(ModerationOperationKind.AcceptFinding, 1);
+        var result = await fixture.Service.ExecuteAsync(operation);
+
+        await Assert.That(result.Outcome).IsEqualTo(ModerationOperationOutcome.Known);
+        await Assert.That(fixture.Store.CommittedDecision?.State).IsEqualTo(ModerationDecisionState.AwaitingApproval);
+        await Assert.That(fixture.Store.CommittedDecision?.FindingId).IsEqualTo(fixture.Store.Finding.Id);
+        await Assert.That(fixture.Store.CommittedDecision?.Revision).IsEqualTo(2L);
+        await Assert.That(fixture.Store.CommittedEffect?.Id).IsEqualTo(operation.EffectId);
+        await Assert.That(fixture.Store.CommittedSanction is null).IsTrue();
+    }
+
+    [Test]
+    public async Task Urgency_adjudicator_cannot_reuse_the_issuer_under_another_origin()
+    {
+        var fixture = new Fixture { SeedState = ModerationDecisionState.Proposed };
+        fixture.Store.Finding = fixture.FinalFinding("issuer-origin", true);
+        var result = await fixture.Service.ExecuteAsync(fixture.Transition(ModerationOperationKind.AcceptFinding, 1));
+
+        await Assert.That(result.Outcome).IsEqualTo(ModerationOperationOutcome.Denied);
+        await Assert.That(fixture.Store.CommittedDecision is null).IsTrue();
+        await Assert.That(fixture.Store.CommittedEffect is null).IsTrue();
+    }
+
+    [Test]
     public async Task Proposal_uses_qualified_issuer_and_grant_scope_without_creating_a_restriction()
     {
         var fixture = new Fixture { GrantParentScope = true };
@@ -627,6 +676,7 @@ public class ModerationModuleContractTests
             _rule = ModerationRuleReference.Create(Scope.TrustDomainId, "native-qualification", 1);
             Store = new InMemoryStore(StoredDecision);
             Store.Case = ModerationCase.Open(_caseId, Subject, Scope, Guid.CreateVersion7(), Now);
+            Store.Finding = FinalFinding();
             Authority = new AuthorityContext(this);
             Service = new ModerationOperationService(Store, Authority, new Planner(this), _clock);
         }
@@ -696,7 +746,33 @@ public class ModerationModuleContractTests
 
         public ModerationOperation Transition(ModerationOperationKind kind, long revision) =>
             ModerationOperation.Transition(kind, Subject, Scope, Guid.CreateVersion7(), Guid.CreateVersion7(),
-                _decisionId, revision, 1, kind == ModerationOperationKind.AcceptFinding ? Guid.CreateVersion7() : Guid.Empty);
+                _decisionId, revision, 1, kind == ModerationOperationKind.AcceptFinding ? _findingId : Guid.Empty);
+
+        public ModerationFinding FinalFinding(string? defect = null, bool urgent = false)
+        {
+            var moderationCase = defect == "case"
+                ? ModerationCase.Open(Guid.CreateVersion7(), Subject, Scope, Guid.CreateVersion7(), Now)
+                : Store.Case!;
+            var rule = defect == "rule" ? ModerationRuleReference.Create(_rule.OwnerId, _rule.Code, 2) : _rule;
+            var adjudicator = defect switch
+            {
+                "issuer" => _issuer,
+                "issuer-origin" => SubjectReference.Create(ModerationSubjectKind.Human, _issuer.Id, Scope.Parent!),
+                _ => _firstReviewer
+            };
+            var evidence = urgent || defect == "purpose"
+                ? ModerationFindingEvidenceReference.QualifiedUrgency(Guid.CreateVersion7(), Guid.CreateVersion7(),
+                    moderationCase.Id, 1, Now)
+                : ModerationFindingEvidenceReference.Response(Guid.CreateVersion7(), moderationCase.Id, 1, Now);
+            var finding = ModerationFinding.Finalize(_findingId, moderationCase, 1,
+                moderationCase.Scope, null, null, rule, rule, _rule, _rule,
+                adjudicator, evidence, "Checked evidence supports this case-specific finding.",
+                defect == "future" ? Now.AddMinutes(1) : Now);
+            if (defect == "reversed")
+                finding.Reverse(Guid.CreateVersion7(), _secondReviewer,
+                    "Independent review corrected the finding.", 1, Now);
+            return finding;
+        }
 
         public ModerationDecision ApprovedDecision() => DecisionAt(ModerationDecisionState.Approved);
         private ModerationDecision StoredDecision() => DecisionAt(SeedState);
@@ -784,6 +860,7 @@ public class ModerationModuleContractTests
         public bool ReplayBeforeCommit { get; set; }
         public bool AbortBeforeCommit { get; set; }
         public ModerationCase? Case { get; set; }
+        public ModerationFinding? Finding { get; set; }
         public ModerationDecision? Decision { get; set; }
         public IReadOnlyList<ModerationSanction> Sanctions { get; set; } = [];
         public IReadOnlyList<ModerationProtectiveMeasure> Protection { get; set; } = [];
@@ -851,6 +928,11 @@ public class ModerationModuleContractTests
             Task.FromResult(Sanctions.Where(sanction =>
                 sanction.Id == sanctionId && sanction.Subject == subject && sanction.Scope == scope)
                 .Select(Snapshot).SingleOrDefault());
+
+        public Task<ModerationFinding?> FindFindingAsync(
+            Guid findingId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken) =>
+            Task.FromResult(Finding is { } value && value.Id == findingId
+                && value.Subject == subject && value.Scope == scope ? Snapshot(value) : null);
 
         public Task<ModerationCase?> FindCaseAsync(
             Guid caseId, SubjectReference subject, AuthorityScope scope, CancellationToken cancellationToken) =>

@@ -83,6 +83,25 @@ For Markdown or GitBook documentation changes (such as edits in `docs/public/`),
 
 ---
 
+## CI evidence and real execution
+
+Security execution evidence binds the exact tested commit to registered test
+lanes, named passing TRX cases and hashes of retained artifacts. A missing,
+skipped, renamed or reused required result fails admission. The current shipped
+registration covers the two API security lanes; parser support for owned
+runtime, browser and load profiles does not certify those profiles or activate
+their CI execution. Registration requires successful physical results from the
+same compiled candidate. Harness checks and isolated browser-module tests have
+their own scope and cannot replace healthy-host journeys. Provider, database
+role and authentication remain outside the packet's attested claims.
+
+Follow the [browser guide](browser-testing.md) and
+[owned load guide](load-testing.md) for their separate runtime prerequisites and
+artifact restrictions. Keep browser state, credentials, raw page content and
+application/process logs out of uploaded evidence.
+
+---
+
 ## Related Guides & Next Steps
 
 * **[Local Development Guide](local-development.md)** — Set up your local developer tools.

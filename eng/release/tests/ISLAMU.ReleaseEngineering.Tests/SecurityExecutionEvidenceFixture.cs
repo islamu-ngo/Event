@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
@@ -11,11 +12,41 @@ internal static class SecurityExecutionEvidenceFixture
     private static readonly XNamespace TrxNamespace = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
+    internal static JsonObject OwnedRegister(string shippedRegister)
+    {
+        var register = JsonNode.Parse(File.ReadAllBytes(shippedRegister))!.AsObject();
+        JsonArray requirements = register["executionRequirements"]!.AsArray();
+        foreach ((string id, string profile) in new[]
+        {
+            ("owned-runtime", "owned-apphost-assurance"),
+            ("owned-browser-journeys", "owned-browser-assurance"),
+            ("owned-browser-security", "owned-browser-assurance"),
+            ("owned-load-control", "owned-apphost-load-assurance"),
+            ("owned-load-correctness", "owned-apphost-load-assurance")
+        })
+        {
+            requirements.Add(new JsonObject
+            {
+                ["laneId"] = id,
+                ["project"] = "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+                ["hostProfile"] = profile,
+                ["requiredTests"] = new JsonArray(new[] { "alpha", "beta" }.Select(variant => (JsonNode)new JsonObject
+                {
+                    ["className"] = "Synthetic.OwnedProfile",
+                    ["methodName"] = "SyntheticWitness",
+                    ["testName"] = $"SyntheticWitness({id}, {variant})"
+                }).ToArray())
+            });
+        }
+        return register;
+    }
+
     internal static void Write(
         string releaseDirectory,
         string candidateOid,
         string corruption = "",
-        string? repositoryPath = null)
+        string? repositoryPath = null,
+        string? registerPath = null)
     {
         if (repositoryPath is not null)
         {
@@ -28,36 +59,28 @@ internal static class SecurityExecutionEvidenceFixture
         Directory.CreateDirectory(reportDirectory);
         var lanes = new List<object>();
 
-        foreach ((string id, string category) in new[]
+        var requirements = registerPath is null ? SecurityControlRegister.ExecutionRequirements
+            : SecurityControlRegister.ReadExecutionRequirements(registerPath);
+        foreach ((string id, var requirement) in requirements)
         {
-            ("security-integration", "Security"),
-            ("cerbos-policy-contract", "PolicyContract")
-        })
-        {
-            string className = id == "security-integration"
-                ? "Event.Api.IntegrationTests.Authentication.KeycloakNativeTokenContextHttpTests"
-                : "Event.Api.IntegrationTests.Features.CerbosPolicyContractTests";
-            string[] methods = id == "security-integration"
-                ? ["NativeMetadataAndMapperProduceAccessContextButNotIdTokenAuthority"]
-                : ["RegularUser_ShouldBeDenied_UpdateInstanceSettings", "TenantAdmin_ShouldBeDenied_ModifyInstanceSettings"];
-            int count = string.Equals(corruption, "zero-tests", StringComparison.Ordinal) ? 0 : methods.Length;
+            int count = string.Equals(corruption, "zero-tests", StringComparison.Ordinal) ? 0 : requirement.Tests.Count;
             string reportPath = Path.Combine(reportDirectory, id + ".trx");
             var results = new XElement(TrxNamespace + "Results");
             var definitions = new XElement(TrxNamespace + "TestDefinitions");
-            foreach (string method in methods.Take(count))
+            foreach (var test in requirement.Tests.Take(count))
             {
                 string testId = Guid.NewGuid().ToString("D");
                 string executionId = Guid.NewGuid().ToString("D");
                 results.Add(new XElement(TrxNamespace + "UnitTestResult",
                     new XAttribute("testId", testId),
                     new XAttribute("executionId", executionId),
-                    new XAttribute("testName", method),
+                    new XAttribute("testName", test.TestName),
                     new XAttribute("outcome", "Passed")));
                 definitions.Add(new XElement(TrxNamespace + "UnitTest",
-                    new XAttribute("id", testId), new XAttribute("name", method),
+                    new XAttribute("id", testId), new XAttribute("name", test.TestName),
                     new XElement(TrxNamespace + "Execution", new XAttribute("id", executionId)),
                     new XElement(TrxNamespace + "TestMethod",
-                        new XAttribute("className", className), new XAttribute("name", method))));
+                        new XAttribute("className", test.ClassName), new XAttribute("name", test.MethodName))));
             }
 
             var report = new XDocument(new XElement(TrxNamespace + "TestRun",
@@ -77,19 +100,12 @@ internal static class SecurityExecutionEvidenceFixture
                         new XAttribute("notExecuted", 0)))));
             report.Save(reportPath);
 
-            string selector = "/*/*/*/*[Category=" + category + "]";
-            const string project = "tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj";
             lanes.Add(new
             {
                 id,
-                project,
-                selector,
-                command = "dotnet test --project " + project +
-                    " --configuration Release --no-build --verbosity minimal -- --treenode-filter \"" + selector +
-                    "\" --minimum-expected-tests 1" +
-                    (id == "security-integration" ? " --maximum-parallel-tests 1" : string.Empty) +
-                    " --no-progress --report-trx --report-trx-filename " +
-                    (id == "security-integration" ? "security-integration-tests.trx" : "cerbos-policy-contract-tests.trx"),
+                project = requirement.Project,
+                selector = requirement.Selector,
+                command = SecurityExecutionEvidence.Command(id, requirement),
                 runId = "42",
                 runAttempt = 1,
                 outcome = "passed",
@@ -98,8 +114,8 @@ internal static class SecurityExecutionEvidenceFixture
                 executionContext = new
                 {
                     kind = "test-host",
-                    environment = "Testing",
-                    hostProfile = "dedicated-api-test-host",
+                    environment = requirement.Environment,
+                    hostProfile = requirement.HostProfile,
                     databaseProvider = "not-attested",
                     databaseRole = "not-attested",
                     authenticationScheme = "not-attested"

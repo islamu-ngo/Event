@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
@@ -6,6 +7,147 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 
 public sealed class SecurityExecutionEvidenceTests
 {
+    [Test]
+    public async Task CompleteValidatedOwnedRegistrationAdmitsItsExactSyntheticWitnesses()
+    {
+        using var fixture = new EvidenceFixture(owned: true);
+        bool accepted = SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid,
+            fixture.RegisterPath!, out string? digest, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(digest).IsNotNull();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    public async Task ProducerAndValidatorUseTheSameValidatedOwnedRegistration()
+    {
+        using var fixture = new EvidenceFixture(owned: true);
+        string repository = fixture.ReportRepository();
+        string destination = Path.Combine(repository, "artifacts", "security-tests");
+        using var output = new StringWriter();
+        int code = SecurityExecutionEvidence.Run(
+            ["produce-security-execution", destination, fixture.CandidateOid, "42", "1", "push"],
+            output, repository, fixture.RegisterPath!);
+        await Assert.That(code).IsEqualTo(Program.Success);
+        await Assert.That(SecurityExecutionEvidence.TryValidate(destination, fixture.CandidateOid,
+            fixture.RegisterPath!, out _, out _)).IsTrue();
+        var packet = JsonNode.Parse(File.ReadAllBytes(Path.Combine(destination, SecurityExecutionEvidence.PacketFileName)))!;
+        await Assert.That(packet["lanes"]!.AsArray().Count).IsEqualTo(7);
+    }
+
+    [Test]
+    public async Task OwnedProfilesCannotBeAdmittedByTheShippedTwoLaneRegistration()
+    {
+        using var fixture = new EvidenceFixture(owned: true);
+        await Assert.That(SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid,
+            out _, out _)).IsFalse();
+    }
+
+    [Test]
+    [Arguments("wrong-profile")]
+    [Arguments("unknown-profile")]
+    [Arguments("wrong-environment")]
+    [Arguments("claimed-provider")]
+    [Arguments("claimed-role")]
+    [Arguments("claimed-authentication")]
+    [Arguments("missing-lane")]
+    [Arguments("extra-lane")]
+    [Arguments("zero-tests")]
+    [Arguments("skipped-test")]
+    [Arguments("wrong-candidate")]
+    [Arguments("wrong-digest")]
+    [Arguments("wrong-command")]
+    [Arguments("wrong-selector")]
+    [Arguments("missing-named-variant")]
+    [Arguments("renamed-variant")]
+    [Arguments("reused-named-variant")]
+    [Arguments("unregistered-passing-variant")]
+    [Arguments("reused-report")]
+    [Arguments("contradictory-register")]
+    [Arguments("invalid-register")]
+    public async Task OwnedEvidenceRejectsProfileAndWitnessContradictions(string failure)
+    {
+        using var fixture = new EvidenceFixture(owned: true);
+        JsonObject packet = fixture.Packet();
+        JsonArray lanes = packet["lanes"]!.AsArray();
+        JsonObject lane = lanes[2]!.AsObject();
+        string candidate = fixture.CandidateOid;
+        switch (failure)
+        {
+            case "wrong-profile": lane["executionContext"]!["hostProfile"] = "owned-browser-assurance"; break;
+            case "unknown-profile": lane["executionContext"]!["hostProfile"] = "production"; break;
+            case "wrong-environment": lane["executionContext"]!["environment"] = "Testing"; break;
+            case "claimed-provider": lane["executionContext"]!["databaseProvider"] = "PostgreSql"; break;
+            case "claimed-role": lane["executionContext"]!["databaseRole"] = "Runtime"; break;
+            case "claimed-authentication": lane["executionContext"]!["authenticationScheme"] = "Local"; break;
+            case "missing-lane": lanes.RemoveAt(lanes.Count - 1); break;
+            case "extra-lane": var extra = lane.DeepClone(); extra["id"] = "unregistered-owned"; lanes.Add(extra); break;
+            case "zero-tests": lane["counts"]!["selected"] = 0; break;
+            case "skipped-test": lane["counts"]!["skipped"] = 1; break;
+            case "wrong-candidate": candidate = new string('b', 40); break;
+            case "wrong-digest": lane["artifacts"]![0]!["sha256"] = new string('b', 64); break;
+            case "wrong-command": lane["command"] = "dotnet test unrelated.csproj"; break;
+            case "wrong-selector": lane["selector"] = "/*/*/*/*[Category=Harness]"; break;
+            case "reused-report": lanes[3]!["artifacts"] = lane["artifacts"]!.DeepClone(); break;
+            case "contradictory-register":
+            case "invalid-register":
+                JsonObject register = JsonNode.Parse(File.ReadAllBytes(fixture.RegisterPath!))!.AsObject();
+                if (failure == "contradictory-register")
+                    register["executionRequirements"]![2]!["hostProfile"] = "owned-browser-assurance";
+                else register["schemaVersion"] = 999;
+                await File.WriteAllTextAsync(fixture.RegisterPath!, register.ToJsonString());
+                break;
+            default:
+                XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+                JsonNode artifact = lane["artifacts"]![0]!;
+                string reportPath = Path.Combine(fixture.DirectoryPath, artifact["path"]!.GetValue<string>());
+                XDocument report = XDocument.Load(reportPath);
+                var results = report.Root!.Element(ns + "Results")!.Elements().ToArray();
+                var definitions = report.Root!.Element(ns + "TestDefinitions")!.Elements().ToArray();
+                if (failure == "unregistered-passing-variant")
+                {
+                    string testId = Guid.NewGuid().ToString("D");
+                    string executionId = Guid.NewGuid().ToString("D");
+                    var extraResult = new XElement(results[1]);
+                    extraResult.SetAttributeValue("testId", testId);
+                    extraResult.SetAttributeValue("executionId", executionId);
+                    extraResult.SetAttributeValue("testName", "SyntheticWitness(unregistered)");
+                    results[1].Parent!.Add(extraResult);
+                    var extraDefinition = new XElement(definitions[1]);
+                    extraDefinition.SetAttributeValue("id", testId);
+                    extraDefinition.SetAttributeValue("name", "SyntheticWitness(unregistered)");
+                    extraDefinition.Element(ns + "Execution")!.SetAttributeValue("id", executionId);
+                    definitions[1].Parent!.Add(extraDefinition);
+                    var counters = report.Root.Element(ns + "ResultSummary")!.Element(ns + "Counters")!;
+                    foreach (string field in new[] { "total", "executed", "passed" }) counters.SetAttributeValue(field, 3);
+                    foreach (string field in new[] { "selected", "executed", "passed" }) lane["counts"]![field] = 3;
+                }
+                else if (failure == "missing-named-variant")
+                {
+                    results[1].Remove(); definitions[1].Remove();
+                    var counters = report.Root.Element(ns + "ResultSummary")!.Element(ns + "Counters")!;
+                    foreach (string field in new[] { "total", "executed", "passed" }) counters.SetAttributeValue(field, 1);
+                    foreach (string field in new[] { "selected", "executed", "passed" }) lane["counts"]![field] = 1;
+                }
+                else
+                {
+                    string name = failure == "reused-named-variant"
+                        ? (string)results[0].Attribute("testName")! : "SyntheticWitness(renamed)";
+                    results[1].SetAttributeValue("testName", name);
+                    definitions[1].SetAttributeValue("name", name);
+                }
+                report.Save(reportPath);
+                artifact["sha256"] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(reportPath))).ToLowerInvariant();
+                break;
+        }
+
+        await File.WriteAllTextAsync(fixture.PacketPath, packet.ToJsonString());
+        await Assert.That(SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, candidate,
+            fixture.RegisterPath!, out string? digest, out string diagnostic)).IsFalse();
+        await Assert.That(digest).IsNull();
+        await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+    }
+
     [Test]
     public async Task AcceptedPacketDigestMatchesExactRetainedBytes()
     {
@@ -307,16 +449,24 @@ public sealed class SecurityExecutionEvidenceTests
 
     private sealed class EvidenceFixture : IDisposable
     {
-        internal EvidenceFixture()
+        internal EvidenceFixture(bool owned = false, [CallerFilePath] string sourcePath = "")
         {
             Root = Path.Combine(Path.GetTempPath(), "security-evidence-" + Guid.NewGuid().ToString("N"));
             DirectoryPath = Path.Combine(Root, "evidence");
             Directory.CreateDirectory(DirectoryPath);
-            SecurityExecutionEvidenceFixture.Write(DirectoryPath, CandidateOid);
+            if (owned)
+            {
+                RegisterPath = Path.Combine(Root, "register.json");
+                string shipped = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourcePath)!, "..", "..", "..",
+                    "security", "security-control-register.json"));
+                File.WriteAllText(RegisterPath, SecurityExecutionEvidenceFixture.OwnedRegister(shipped).ToJsonString());
+            }
+            SecurityExecutionEvidenceFixture.Write(DirectoryPath, CandidateOid, registerPath: RegisterPath);
         }
 
         internal string Root { get; }
         internal string DirectoryPath { get; }
+        internal string? RegisterPath { get; }
         internal string PacketPath => Path.Combine(DirectoryPath, SecurityExecutionEvidenceFixture.PacketFileName);
         internal string CandidateOid { get; } = new('a', 40);
 
@@ -326,12 +476,15 @@ public sealed class SecurityExecutionEvidenceTests
         internal string ReportRepository()
         {
             string repository = Path.Combine(Root, "repository");
-            string reports = Path.Combine(repository, "tests", "Event.API.IntegrationTests", "TestResults");
-            Directory.CreateDirectory(reports);
-            File.Copy(Path.Combine(DirectoryPath, "security-execution-reports", "security-integration.trx"),
-                Path.Combine(reports, "security-integration-tests.trx"));
-            File.Copy(Path.Combine(DirectoryPath, "security-execution-reports", "cerbos-policy-contract.trx"),
-                Path.Combine(reports, "cerbos-policy-contract-tests.trx"));
+            foreach (JsonNode? lane in Packet()["lanes"]!.AsArray())
+            {
+                string project = lane!["project"]!.GetValue<string>();
+                string id = lane["id"]!.GetValue<string>();
+                string reports = Path.Combine(repository, Path.GetDirectoryName(project)!, "TestResults");
+                Directory.CreateDirectory(reports);
+                File.Copy(Path.Combine(DirectoryPath, "security-execution-reports", id + ".trx"),
+                    Path.Combine(reports, id + "-tests.trx"));
+            }
             return repository;
         }
 

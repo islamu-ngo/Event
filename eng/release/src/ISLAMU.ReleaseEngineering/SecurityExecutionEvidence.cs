@@ -11,15 +11,29 @@ public static partial class SecurityExecutionEvidence
     public const string PacketFileName = "security-execution.v1.json";
     private const int MaximumPacketBytes = 262_144;
     private const int MaximumReportBytes = 16_777_216;
-    private const string ProjectPath = "tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj";
     private static readonly XNamespace TrxNamespace = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
     private static readonly JsonDocumentOptions DocumentOptions = new() { MaxDepth = 16 };
+
+    internal static bool TryValidate(string directory, string candidateOid, string registerPath,
+        out string? packetSha256, out string diagnostic) =>
+        Validate(directory, candidateOid, registerPath, out packetSha256, out diagnostic);
+
+    internal static string Command(string id, SecurityControlRegister.ExecutionRequirement requirement) =>
+        "dotnet test --project " + requirement.Project +
+        " --configuration Release --no-build --verbosity minimal -- --treenode-filter \"" + requirement.Selector +
+        "\" --minimum-expected-tests " + (id.StartsWith("owned-", StringComparison.Ordinal)
+            ? requirement.Tests.Count.ToString(CultureInfo.InvariantCulture) : "1") +
+        (id == "cerbos-policy-contract" ? string.Empty : " --maximum-parallel-tests 1") +
+        " --no-progress --report-trx --report-trx-filename " + requirement.ReportFileName;
 
     public static bool TryValidate(
         string directory,
         string candidateOid,
         out string? packetSha256,
-        out string diagnostic)
+        out string diagnostic) => Validate(directory, candidateOid, null, out packetSha256, out diagnostic);
+
+    private static bool Validate(string directory, string candidateOid, string? registerPath,
+        out string? packetSha256, out string diagnostic)
     {
         packetSha256 = null;
         diagnostic = "invalid_packet";
@@ -32,6 +46,8 @@ public static partial class SecurityExecutionEvidence
 
         try
         {
+            var requirements = registerPath is null ? SecurityControlRegister.ExecutionRequirements
+                : SecurityControlRegister.ReadExecutionRequirements(registerPath);
             byte[] packetBytes = ReadBoundedFile(ResolveArtifact(directory, PacketFileName), MaximumPacketBytes);
             using JsonDocument document = JsonDocument.Parse(packetBytes, DocumentOptions);
             JsonElement packet = document.RootElement;
@@ -82,17 +98,10 @@ public static partial class SecurityExecutionEvidence
                     return false;
                 }
 
-                string category = id switch
-                {
-                    "security-integration" => "Security",
-                    "cerbos-policy-contract" => "PolicyContract",
-                    _ => string.Empty
-                };
-                string selector = "/*/*/*/*[Category=" + category + "]";
-                if (!SecurityControlRegister.ExecutionRequirements.TryGetValue(id, out var requirement) ||
-                    category.Length == 0 || Text(lane, "project") != requirement.Project ||
-                    Text(lane, "selector") != selector ||
-                    Text(lane, "command") != Command(id, category) ||
+                if (!requirements.TryGetValue(id, out var requirement) ||
+                    Text(lane, "project") != requirement.Project ||
+                    Text(lane, "selector") != requirement.Selector ||
+                    Text(lane, "command") != Command(id, requirement) ||
                     Text(lane, "runId") != runId ||
                     lane.GetProperty("runAttempt").GetInt32() != runAttempt)
                 {
@@ -110,7 +119,7 @@ public static partial class SecurityExecutionEvidence
                 }
 
                 JsonElement context = lane.GetProperty("executionContext");
-                if (Text(context, "kind") != "test-host" || Text(context, "environment") != "Testing" ||
+                if (Text(context, "kind") != "test-host" || Text(context, "environment") != requirement.Environment ||
                     Text(context, "hostProfile") != requirement.HostProfile ||
                     Text(context, "databaseProvider") != "not-attested" ||
                     Text(context, "databaseRole") != "not-attested" ||
@@ -163,7 +172,10 @@ public static partial class SecurityExecutionEvidence
                             return false;
                         }
                         executionIds.UnionWith(measured.Executions);
-                        if (!requirement.Tests.IsSubsetOf(measured.Tests))
+                        bool namedTestsMatch = id.StartsWith("owned-", StringComparison.Ordinal)
+                            ? requirement.Tests.SetEquals(measured.Tests)
+                            : requirement.Tests.IsSubsetOf(measured.Tests);
+                        if (!namedTestsMatch)
                         {
                             diagnostic = "required_test_missing";
                             return false;
@@ -178,8 +190,7 @@ public static partial class SecurityExecutionEvidence
                 }
             }
 
-            if (laneIds.Count != 2 || !laneIds.Contains("security-integration") ||
-                !laneIds.Contains("cerbos-policy-contract"))
+            if (!laneIds.SetEquals(requirements.Keys))
             {
                 diagnostic = "required_lane_missing";
                 return false;
@@ -195,18 +206,6 @@ public static partial class SecurityExecutionEvidence
             diagnostic = "invalid_packet";
             return false;
         }
-    }
-
-    private static string Command(string id, string category)
-    {
-        string filename = id == "security-integration"
-            ? "security-integration-tests.trx"
-            : "cerbos-policy-contract-tests.trx";
-        return "dotnet test --project " + ProjectPath +
-            " --configuration Release --no-build --verbosity minimal -- --treenode-filter \"/*/*/*/*[Category=" +
-            category + "]\" --minimum-expected-tests 1" +
-            (id == "security-integration" ? " --maximum-parallel-tests 1" : string.Empty) +
-            " --no-progress --report-trx --report-trx-filename " + filename;
     }
 
     private static string Text(JsonElement element, string name) =>

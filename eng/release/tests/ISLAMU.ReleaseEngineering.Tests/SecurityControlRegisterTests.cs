@@ -6,6 +6,43 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SecurityControlRegisterTests
 {
     [Test]
+    [Arguments("complete", true)]
+    [Arguments("partial-group", false)]
+    [Arguments("unknown-lane", false)]
+    [Arguments("unknown-profile", false)]
+    [Arguments("contradictory-profile", false)]
+    [Arguments("wrong-project", false)]
+    [Arguments("empty-tests", false)]
+    [Arguments("duplicate-variant", false)]
+    public async Task OwnedProfilesRequireACompleteClosedRegistration(string variant, bool expected)
+    {
+        JsonObject register = SecurityExecutionEvidenceFixture.OwnedRegister(RegisterPath());
+        JsonArray requirements = register["executionRequirements"]!.AsArray();
+        JsonObject runtime = requirements[2]!.AsObject();
+        switch (variant)
+        {
+            case "partial-group": requirements.RemoveAt(requirements.Count - 1); break;
+            case "unknown-lane": runtime["laneId"] = "future-unreviewed-profile"; break;
+            case "unknown-profile": runtime["hostProfile"] = "production"; break;
+            case "contradictory-profile": runtime["hostProfile"] = "owned-browser-assurance"; break;
+            case "wrong-project": runtime["project"] = requirements[0]!["project"]!.GetValue<string>(); break;
+            case "empty-tests": runtime["requiredTests"] = new JsonArray(); break;
+            case "duplicate-variant": runtime["requiredTests"]![1] = runtime["requiredTests"]![0]!.DeepClone(); break;
+        }
+
+        string directory = Path.Combine(Path.GetTempPath(), $"owned-register-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string path = Path.Combine(directory, "register.json");
+            await File.WriteAllTextAsync(path, register.ToJsonString());
+            bool accepted = SecurityControlRegister.TryValidate(path, out _);
+            await Assert.That(accepted).IsEqualTo(expected);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
     public async Task CompleteShippedSourceInventoryIsNotRuntimeCertification()
     {
         bool accepted = SecurityControlRegister.TryValidate(RegisterPath(), out string diagnostic);

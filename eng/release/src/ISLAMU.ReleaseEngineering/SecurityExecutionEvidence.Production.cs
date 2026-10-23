@@ -7,11 +7,17 @@ namespace ISLAMU.ReleaseEngineering;
 
 public static partial class SecurityExecutionEvidence
 {
+    internal static int Run(string[] args, TextWriter output, string repositoryRoot, string registerPath) =>
+        RunCore(args, output, repositoryRoot, registerPath);
+
     /// <summary>
     /// Retains reports from both successfully completed CI lanes for the tested checkout.
     /// Invocation arguments come from that execution's GitHub environment, not a release target.
     /// </summary>
-    public static int Run(string[] args, TextWriter output, string repositoryRoot)
+    public static int Run(string[] args, TextWriter output, string repositoryRoot) =>
+        RunCore(args, output, repositoryRoot, null);
+
+    private static int RunCore(string[] args, TextWriter output, string repositoryRoot, string? registerPath)
     {
         if (args.Length != 6)
         {
@@ -28,6 +34,9 @@ public static partial class SecurityExecutionEvidence
             Directory.CreateDirectory(directory);
             packetPath = ResolveArtifact(directory, PacketFileName);
             File.Delete(packetPath);
+            diagnostic = "invalid_register";
+            var requirements = registerPath is null ? SecurityControlRegister.ExecutionRequirements
+                : SecurityControlRegister.ReadExecutionRequirements(registerPath);
 
             if (!int.TryParse(args[4], NumberStyles.None, CultureInfo.InvariantCulture, out int runAttempt))
             {
@@ -35,14 +44,11 @@ public static partial class SecurityExecutionEvidence
                 return Program.ToolchainRejected;
             }
 
-            string projectDirectory = ResolveArtifact(repositoryRoot, Path.GetDirectoryName(ProjectPath)!.Replace('\\', '/'));
             var lanes = new List<object>();
-            foreach ((string id, string category, string filename) in new[]
+            foreach ((string id, var requirement) in requirements)
             {
-                ("security-integration", "Security", "security-integration-tests.trx"),
-                ("cerbos-policy-contract", "PolicyContract", "cerbos-policy-contract-tests.trx")
-            })
-            {
+                string projectDirectory = ResolveArtifact(repositoryRoot, Path.GetDirectoryName(requirement.Project)!.Replace('\\', '/'));
+                string filename = requirement.ReportFileName;
                 diagnostic = "report_inventory_invalid";
                 string[] reports = Directory.EnumerateFiles(projectDirectory, filename, new EnumerationOptions
                 {
@@ -92,9 +98,9 @@ public static partial class SecurityExecutionEvidence
                 lanes.Add(new
                 {
                     id,
-                    project = ProjectPath,
-                    selector = "/*/*/*/*[Category=" + category + "]",
-                    command = Command(id, category),
+                    project = requirement.Project,
+                    selector = requirement.Selector,
+                    command = Command(id, requirement),
                     runId = args[3],
                     runAttempt,
                     outcome = "passed",
@@ -110,8 +116,8 @@ public static partial class SecurityExecutionEvidence
                     executionContext = new
                     {
                         kind = "test-host",
-                        environment = "Testing",
-                        hostProfile = "dedicated-api-test-host",
+                        environment = requirement.Environment,
+                        hostProfile = requirement.HostProfile,
                         databaseProvider = "not-attested",
                         databaseRole = "not-attested",
                         authenticationScheme = "not-attested"
@@ -134,7 +140,7 @@ public static partial class SecurityExecutionEvidence
             diagnostic = "invalid_packet";
             if (packetBytes.Length > MaximumPacketBytes) throw new InvalidDataException();
             File.WriteAllBytes(packetPath, packetBytes);
-            if (!TryValidate(directory, args[2], out string? packetSha256, out diagnostic))
+            if (!Validate(directory, args[2], registerPath, out string? packetSha256, out diagnostic))
             {
                 output.WriteLine("security_execution_rejected: " + diagnostic);
                 return Program.ToolchainRejected;

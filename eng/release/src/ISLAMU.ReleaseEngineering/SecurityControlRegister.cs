@@ -392,6 +392,13 @@ public static class SecurityControlRegister
         }
     }
 
+    internal static IReadOnlyDictionary<string, ExecutionRequirement> ReadExecutionRequirements(string path)
+    {
+        if (!TryValidate(path, out _)) throw new InvalidDataException("invalid_register");
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(path), DocumentOptions);
+        return ReadExecutionRequirements(document.RootElement);
+    }
+
     private static IReadOnlyDictionary<string, ExecutionRequirement> ReadExecutionRequirements(JsonElement register)
     {
         var requirements = new Dictionary<string, ExecutionRequirement>(StringComparer.Ordinal);
@@ -400,9 +407,20 @@ public static class SecurityControlRegister
             string lane = requirement.GetProperty("laneId").GetString() ?? string.Empty;
             string project = requirement.GetProperty("project").GetString() ?? string.Empty;
             string profile = requirement.GetProperty("hostProfile").GetString() ?? string.Empty;
-            if (lane is not ("security-integration" or "cerbos-policy-contract") ||
-                project != "tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj" ||
-                profile != "dedicated-api-test-host") throw new InvalidDataException();
+            const string apiProject = "tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj";
+            const string ownedProject = "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj";
+            (string expectedProject, string expectedProfile, string selector) = lane switch
+            {
+                "security-integration" => (apiProject, "dedicated-api-test-host", "/*/*/*/*[Category=Security]"),
+                "cerbos-policy-contract" => (apiProject, "dedicated-api-test-host", "/*/*/*/*[Category=PolicyContract]"),
+                "owned-runtime" => (ownedProject, "owned-apphost-assurance", "/*/*/*/*[Category=Distributed]"),
+                "owned-browser-journeys" => (ownedProject, "owned-browser-assurance", "/*/*/BrowserJourneyTests/*"),
+                "owned-browser-security" => (ownedProject, "owned-browser-assurance", "/*/*/BrowserSecurityVectorTests/*"),
+                "owned-load-control" => (ownedProject, "owned-apphost-load-assurance", "/*/*/*/*[Category=LoadControl]"),
+                "owned-load-correctness" => (ownedProject, "owned-apphost-load-assurance", "/*/*/*/*[Category=Load]"),
+                _ => throw new InvalidDataException()
+            };
+            if (project != expectedProject || profile != expectedProfile) throw new InvalidDataException();
 
             var tests = new HashSet<RequiredTest>();
             foreach (JsonElement test in requirement.GetProperty("requiredTests").EnumerateArray())
@@ -415,15 +433,26 @@ public static class SecurityControlRegister
                     throw new InvalidDataException();
             }
 
-            if (tests.Count is < 1 or > 1024 || !requirements.TryAdd(lane, new ExecutionRequirement(project, profile, tests)))
+            if (tests.Count is < 1 or > 1024 || !requirements.TryAdd(lane, new ExecutionRequirement(project, profile, tests)
+            {
+                Environment = project == apiProject ? "Testing" : "Assurance",
+                Selector = selector,
+                ReportFileName = lane + "-tests.trx"
+            }))
                 throw new InvalidDataException();
         }
 
-        if (requirements.Count != 2) throw new InvalidDataException();
+        if (!requirements.ContainsKey("security-integration") || !requirements.ContainsKey("cerbos-policy-contract") ||
+            requirements.Count is not (2 or 7)) throw new InvalidDataException();
         return requirements;
     }
 
-    internal sealed record ExecutionRequirement(string Project, string HostProfile, IReadOnlySet<RequiredTest> Tests);
+    internal sealed record ExecutionRequirement(string Project, string HostProfile, IReadOnlySet<RequiredTest> Tests)
+    {
+        internal string Environment { get; init; } = "Testing";
+        internal string Selector { get; init; } = string.Empty;
+        internal string ReportFileName { get; init; } = string.Empty;
+    }
     internal readonly record struct RequiredTest(string ClassName, string MethodName, string TestName);
 
     private static HashSet<string> Identities(JsonElement entries, string prefix, int count, int digits)

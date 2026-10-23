@@ -34,6 +34,29 @@ separate runtime evidence and are never inferred from Harness results.
 
 ## Security integration fixture execution
 
+The existing `security-execution.v1.json` packet is governed by the embedded
+`executionRequirements` in `eng/security/security-control-register.json`.
+Producer and validator derive each registered lane's project, closed host
+profile, environment, selector, command and report filename from the same
+validated requirements. Admission requires every registered lane and its exact
+named TRX variants, with no missing/skipped results or reused report/execution
+identities. Candidate, run/attempt and retained artifact byte hashes must agree.
+Provider, database role and authentication remain `not-attested`.
+
+The API lanes require their registered key witnesses within the complete
+category report. Owned lanes require equality between registered and observed
+named variants, so adding an unregistered passing case also rejects admission
+until the registration is refreshed against its compiled candidate.
+
+The shipped registration currently requires the two dedicated API test-host
+lanes. The parser also supports a complete closed owned group for runtime,
+browser journeys, browser security vectors, native load control and load
+correctness. Partial or contradictory registration fails. Supporting that
+contract does not register or certify those profiles: their final names and
+counts require compiled same-candidate discovery and successful physical TRX
+before the register and workflow activate together. Synthetic parser fixtures
+and isolated browser-module controls never certify a healthy owned host.
+
 The security workflow runs the complete `Category=Security` selection with
 `--maximum-parallel-tests 1`. Each case may still exercise concurrent HTTP
 requests and independent database connections inside its own fixture; this

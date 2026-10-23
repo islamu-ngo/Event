@@ -115,7 +115,14 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         ProviderAccountKey accountKey = dto.LocalIdentity is not null
             ? new ProviderAccountKey(AuthenticationProviderKind.Local, normalizedSubject)
             : CreateManagedProviderAccountKey(normalizedIdentityProvider, identityAuthority!, normalizedSubject);
-        return await identityFence.ExecuteEnrollmentAsync(accountKey, async cancellationToken =>
+        return managementRequest is null
+            ? await ExecuteFencedAsync(cancellationToken)
+            : await mutationLock.ExecuteOrderedGroupsAsync(
+                [EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp)],
+                ExecuteFencedAsync, cancellationToken);
+
+        Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> ExecuteFencedAsync(CancellationToken outerToken) =>
+            identityFence.ExecuteEnrollmentAsync(accountKey, async cancellationToken =>
         {
             ManagedTenantProvisioningOperation? managedOperation = null;
             if (managementRequest is not null)
@@ -251,6 +258,8 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             var organizerMembershipId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
             async Task<ManagedProviderClientProvisioningResultDto> ProvisionAsync(CancellationToken ct)
             {
+                await identityFence.MatchAndBindAsync(accountKey, userId, localBinding?.ExternalLoginId ?? userExternalLoginId, null,
+                    replacementProvisioning: existingLogin is null && localBinding is null, ct);
                 ManagementTenantProvisioningBlockerDto? currentAuthority = await EvaluateAuthorityAsync(managedOperation, ct);
                 if (currentAuthority is not null)
                     throw new AdministratorLinkageException(currentAuthority.Code, currentAuthority.Message);
@@ -501,7 +510,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     {
                         (ManagedProviderClientProvisioningResultDto? Result,
                             BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) ordinaryOutcome =
-                            await mutationLock.ExecuteAsync<(
+                            await unitOfWork.ExecuteRecognitionEnrollmentAsync(transactionToken => mutationLock.ExecuteAsync<(
                                 ManagedProviderClientProvisioningResultDto? Result,
                                 BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
                                 GovernanceSettingKeys.Deployment.Mode,
@@ -518,7 +527,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                                             capacity.Error!,
                                             capacity.FailureCode));
                                 },
-                                cancellationToken);
+                                transactionToken), identityFence.EnsureCurrentAsync, cancellationToken);
                         if (ordinaryOutcome.Failure is not null)
                         {
                             return ordinaryOutcome.Failure;
@@ -528,15 +537,15 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     }
                     else
                     {
-                        result = await unitOfWork.ExecuteInTransactionAsync(ProvisionAsync, cancellationToken);
+                        result = await unitOfWork.ExecuteRecognitionEnrollmentAsync(
+                            ProvisionAsync, identityFence.EnsureCurrentAsync, cancellationToken);
                     }
                 }
                 else
                 {
                     (ManagedProviderClientProvisioningResultDto? Result,
                         BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) outcome =
-                        await mutationLock.ExecuteOrderedGroupsAsync(
-                        [EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp)],
+                        await unitOfWork.ExecuteRecognitionEnrollmentAsync(
                         policyToken => mutationLock.ExecuteManyAsync<(
                             ManagedProviderClientProvisioningResultDto? Result,
                             BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
@@ -587,7 +596,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                             resolvedBootstrap = recheck.Resolved!;
                             return (await ProvisionAsync(ct), null);
                         },
-                        policyToken), cancellationToken);
+                        policyToken), identityFence.EnsureCurrentAsync, cancellationToken);
 
                     if (outcome.Failure is not null)
                     {
@@ -632,7 +641,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             return BaseCommandResponse.Success(
                 result,
                 "Managed provider client provisioned successfully.");
-        }, cancellationToken);
+        }, outerToken);
     }
 
     private async Task<ManagementTenantProvisioningBlockerDto?> EvaluateAuthorityAsync(
@@ -663,7 +672,6 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         Guid userId,
         CancellationToken cancellationToken)
     {
-        await identityFence.EnsureSubjectMayEnrollAsync(existingUser?.Id ?? userId, cancellationToken);
         if (existingUser != null)
         {
             if (admin.EmailVerified && existingUser.EmailVerified != true)

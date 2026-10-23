@@ -9,12 +9,22 @@ namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
 {
     private readonly AsyncLocal<EmbeddedPrivacyErasureAuthorityDbContext?> _identityGate = new();
+    private readonly AsyncLocal<PrivacyErasureRecoveryGate?> _recoveryGate = new();
 
-    public async Task<T> ExecuteSerializedAsync<T>(
-        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    public Task<T> ExecuteSerializedAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken) =>
+        _identityGate.Value is not null
+            ? operation(cancellationToken)
+            : ExecuteEnrollmentSerializedAsync(operation, _ => Task.CompletedTask, cancellationToken);
+
+    public async Task<T> ExecuteEnrollmentSerializedAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforePrimaryCommit,
+        CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(beforePrimaryCommit);
         if (_identityGate.Value is not null)
-            return await operation(cancellationToken);
+            throw new InvalidOperationException("Nested enrollment must reuse its outer identity operation.");
 
         await EnsureStorageReadyAsync(cancellationToken);
         await using EmbeddedPrivacyErasureAuthorityDbContext db =
@@ -34,9 +44,12 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
                 applicationContext.IdentityFenceOwnsTransaction = true;
                 applicationContext.IdentityFenceTransactionFailed = false;
             }
-            _ = await ReadOrInitializeIdentityCounterAsync(db, cancellationToken);
+            PrivacyErasureCounter counter = await ReadOrInitializeIdentityCounterAsync(db, cancellationToken);
+            using var recoveryGate = new PrivacyErasureRecoveryGate(db,
+                db.Entry(counter).State == EntityState.Added ? null : counter.GetRecoveryState());
             await db.SaveChangesAsync(cancellationToken);
             _identityGate.Value = db;
+            _recoveryGate.Value = recoveryGate;
             T result = await operation(cancellationToken);
             if (applicationContext?.IdentityFenceTransactionFailed == true)
                 throw new InvalidOperationException("The identity enrollment transaction has failed.");
@@ -45,6 +58,7 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
                 if (applicationContext!.StorageReferenceTransactionFailed)
                     throw new InvalidOperationException("The storage reference transaction has failed.");
                 await applicationContext.FlushDisclosureAsync(cancellationToken);
+                await beforePrimaryCommit(cancellationToken);
             }
             await transaction.CommitAsync(cancellationToken);
             storage?.HardenCompanionFiles();
@@ -62,6 +76,7 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
         finally
         {
             _identityGate.Value = null;
+            _recoveryGate.Value = null;
             if (applicationEnlistment is not null)
             {
                 applicationContext!.IdentityFenceOwnsTransaction = false;
@@ -69,6 +84,18 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
                 await applicationEnlistment.DisposeAsync();
             }
         }
+    }
+
+    public async Task<PrivacyErasureRecoveryState> AcquireRecoveryStateAsync(CancellationToken cancellationToken)
+    {
+        PrivacyErasureRecoveryGate gate = _recoveryGate.Value
+            ?? throw new InvalidOperationException("privacy_erasure_recovery_gate_required");
+        gate.RequireActive();
+        EmbeddedPrivacyErasureAuthorityDbContext db = _identityGate.Value!;
+        if (db.ChangeTracker.HasChanges())
+            throw new InvalidOperationException("privacy_erasure_recovery_state_uncommitted");
+        PrivacyErasureCounter counter = await db.AuthorityCounters.AsNoTracking().SingleAsync(cancellationToken);
+        return gate.Acquire(counter.GetRecoveryState());
     }
 
     public async Task ValidateKeyAsync(string keyId, string verificationTag, CancellationToken cancellationToken)

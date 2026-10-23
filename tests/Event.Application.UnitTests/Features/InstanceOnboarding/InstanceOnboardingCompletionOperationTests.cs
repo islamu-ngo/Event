@@ -828,7 +828,9 @@ internal sealed class OnboardingCompletionScenario
             _unitOfWork,
             GenerationReader, HostConfiguration,
             new Explore.Application.Services.PrivacyIdentityFenceOperation(
-                new Event.Application.UnitTests.Services.FenceTestAuthority()));
+                new Event.Application.UnitTests.Services.FenceTestAuthority(),
+                new Event.Application.UnitTests.Services.EmptyRecognitionInventory(), TimeProvider.System,
+                externalLogins));
     }
 
     public CompleteInstanceOnboardingRequest Configuration { get; set; } = Settings();
@@ -1020,8 +1022,17 @@ internal sealed class OnboardingCompletionScenario
         }
     }
 
-    private sealed class StatefulUnitOfWork(OnboardingCompletionScenario owner) : IUnitOfWork
+    private sealed class StatefulUnitOfWork(OnboardingCompletionScenario owner) : IUnitOfWork, IPrivacyIdentityEnrollmentTransaction
     {
+        public Task<T> ExecuteRecognitionEnrollmentAsync<T>(Func<CancellationToken, Task<T>> operation,
+            Func<CancellationToken, Task> beforeCommit, CancellationToken ct = default) =>
+            ExecuteSerializableAsync(async token =>
+            {
+                T result = await operation(token);
+                await beforeCommit(token);
+                return result;
+            }, ct);
+
         private readonly List<string> _workingWrites = [];
         public bool InTransaction { get; private set; }
         public int? FailAtWrite { get; set; }

@@ -19,11 +19,39 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace Event.Persistence.IntegrationTests.Privacy;
 
 [NotInParallel("RetainedIdentityFence")]
-public sealed class RetainedIdentityFenceTests
+public sealed partial class RetainedIdentityFenceTests
 {
     private static CancellationToken Token => TestContext.Current!.Execution.CancellationToken;
     private static ProviderAccountKey Account(string subject = "OpaqueSubject") =>
         PlatformIdentityPrincipalExtensions.CreateOidcAccountKey("https://identity.example.test/realm", subject);
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExpiredNativeCommitLeaseRollsBackTheOriginalPrimaryOwner(bool colocated)
+    {
+        await using var fixture = await Fixture.CreateAsync(colocated);
+        DateTimeOffset until = fixture.Clock.Now.AddMinutes(1);
+        Guid userId = Guid.CreateVersion7();
+        Task Validate(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (fixture.Clock.Now >= until) throw new InvalidOperationException("expired_identity_lease");
+            return Task.CompletedTask;
+        }
+
+        await Assert.That(() => fixture.Authority.ExecuteEnrollmentSerializedAsync(token =>
+            new EfCoreUnitOfWork(fixture.Primary).ExecuteRecognitionEnrollmentAsync(async inner =>
+            {
+                await fixture.WriteUserAsync(fixture.Primary, Account(), userId);
+                fixture.Clock.Now = until;
+                return userId;
+            }, Validate, token), Validate, Token)).Throws<InvalidOperationException>();
+
+        await using var observer = fixture.CreatePrimary();
+        await Assert.That(await observer.Users.AnyAsync(row => row.Id == userId, Token)).IsFalse();
+        await Assert.That(await observer.UserExternalLogins.AnyAsync(row => row.UserId == userId, Token)).IsFalse();
+    }
 
     [Test]
     public async Task AppendFailureRollsBackBothIntentAndFingerprint()
@@ -387,14 +415,12 @@ public sealed class RetainedIdentityFenceTests
             fixture.AuthorityFactory = fixture.CreateAuthorityFactory();
             await using (var authority = fixture.AuthorityFactory.CreateDbContext())
             {
-                if (colocated)
-                    await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript(), Token);
-                else
+                if (!colocated)
                     await authority.Database.EnsureCreatedAsync(Token);
             }
             fixture.Authority = new(fixture.AuthorityFactory, fixture.Clock,
                 Microsoft.Extensions.Options.Options.Create(fixture.Options), applicationContext: fixture.Primary);
-            fixture.Operation = new(fixture.Authority);
+            fixture.Operation = NativeIdentityRecognitionBoundary.Create(fixture.Primary, fixture.Authority, fixture.Clock);
             return fixture;
         }
 
@@ -422,7 +448,8 @@ public sealed class RetainedIdentityFenceTests
                 Microsoft.Extensions.Options.Options.Create(Options), applicationContext: primary);
 
         public PrivacyIdentityFenceOperation CreateOperation(ExploreDbContext primary,
-            DbTransactionInterceptor? interceptor = null) => new(CreateAuthority(primary, interceptor));
+            DbTransactionInterceptor? interceptor = null) =>
+            NativeIdentityRecognitionBoundary.Create(primary, CreateAuthority(primary, interceptor), Clock);
 
         public async Task<PrivacyErasureIntent> AppendFingerprintAsync(PrivacyErasureRequest request)
         {

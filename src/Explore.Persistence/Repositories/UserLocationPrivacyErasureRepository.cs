@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbContext)
+public sealed partial class UserLocationPrivacyErasureRepository(ExploreDbContext dbContext)
     : IUserLocationPrivacyErasureRepository, IUserPrivacyErasureRepository
 {
     public Task FenceSubjectAsync(Guid subjectId, CancellationToken cancellationToken) =>

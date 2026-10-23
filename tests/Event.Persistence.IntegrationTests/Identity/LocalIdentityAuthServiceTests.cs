@@ -288,6 +288,8 @@ public sealed class LocalIdentityAuthServiceTests
     {
         private readonly SqliteConnection _connection =
             new(new SqliteConnectionStringBuilder { DataSource = ":memory:" }.ToString());
+        private readonly SqliteConnection _recognitionConnection =
+            new(new SqliteConnectionStringBuilder { DataSource = ":memory:" }.ToString());
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
 
         private ServiceProvider? _provider;
@@ -331,6 +333,8 @@ public sealed class LocalIdentityAuthServiceTests
                 var context = scopedServices.GetRequiredService<ExploreDbContext>();
                 await context.Database.EnsureCreatedAsync(fixture.CancellationToken);
                 fixture.Context = context;
+                await NativeIdentityRecognitionBoundary.InitializeExternalMemoryAsync(context,
+                    fixture._recognitionConnection, new FixedTimeProvider(Now), fixture.CancellationToken);
                 await LookupTableSeeder.SeedAsync(context, fixture.CancellationToken);
                 fixture._systemSettings = new SystemSettingRepository(context,
                     new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
@@ -344,7 +348,8 @@ public sealed class LocalIdentityAuthServiceTests
                         identityDbContext: context,
                         applicationDbContext: context,
                         userManager: fixture.UserManager,
-                        timeProvider: new FixedTimeProvider(Now)));
+                        timeProvider: new FixedTimeProvider(Now),
+                        identityFence: NativeIdentityRecognitionBoundary.For(context, new FixedTimeProvider(Now))));
                 return fixture;
             }
             catch
@@ -368,7 +373,8 @@ public sealed class LocalIdentityAuthServiceTests
             await Context.SaveChangesAsync(CancellationToken);
             var credentials = new LocalIdentityCredentialStateStore(
                 identityDbContext: Context, applicationDbContext: Context,
-                userManager: UserManager, timeProvider: new FixedTimeProvider(Now));
+                userManager: UserManager, timeProvider: new FixedTimeProvider(Now),
+                identityFence: NativeIdentityRecognitionBoundary.For(Context, new FixedTimeProvider(Now)));
             LocalCredentialCreateResult created = await credentials.CreatePendingAsync(new LocalCredentialCreateRequest(
                 operationId: Guid.CreateVersion7(), initiatingApplicationUserId: initiator.Id,
                 email: "local@example.test", firstName: "Local", lastName: "User"), CancellationToken);
@@ -476,6 +482,7 @@ public sealed class LocalIdentityAuthServiceTests
             }
 
             await _connection.DisposeAsync();
+            await _recognitionConnection.DisposeAsync();
             _timeout.Dispose();
         }
     }

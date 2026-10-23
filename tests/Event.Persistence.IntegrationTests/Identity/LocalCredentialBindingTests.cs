@@ -1,6 +1,7 @@
 
 using System.Data.Common;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
@@ -29,6 +30,33 @@ namespace Event.Persistence.IntegrationTests.Identity;
 [Timeout(180_000)]
 public sealed class LocalCredentialBindingTests
 {
+    [Test]
+    [Arguments(IdentityDatabaseTopology.Colocated)]
+    [Arguments(IdentityDatabaseTopology.External)]
+    public async Task Received_privacy_request_blocks_Local_binding_without_changing_credentials(IdentityDatabaseTopology topology)
+    {
+        await using Fixture fixture = await Fixture.CreateAsync(topology);
+        LocalIdentityUser before = await fixture.ReadIdentityUserAsync();
+        await using (AsyncServiceScope intake = fixture.Provider.CreateAsyncScope())
+        {
+            ExploreDbContext context = fixture.Application(intake);
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            context.Set<ModerationRecognitionPending>().Add(ModerationRecognitionPending.Receive(
+                Guid.CreateVersion7(), fixture.Receipt.ApplicationUserId, 1, PrivacyErasureReasonCode.AccountDeletion,
+                Guid.CreateVersion7(), Guid.CreateVersion7(), now, now.AddHours(2), now.AddHours(1),
+                RandomNumberGenerator.GetBytes(32), now.AddHours(3)));
+            await context.SaveChangesAsync(fixture.CancellationToken);
+        }
+
+        await Assert.That(() => fixture.ReconcileAsync()).Throws<InvalidOperationException>();
+
+        await fixture.AssertNoGraphAsync();
+        LocalIdentityUser after = await fixture.ReadIdentityUserAsync();
+        await Assert.That(after.PasswordHash).IsEqualTo(before.PasswordHash);
+        await Assert.That(after.SecurityStamp).IsEqualTo(before.SecurityStamp);
+        await fixture.AssertStateAsync(LocalCredentialState.ProvisioningPending);
+    }
+
     public enum RejectedAuthority
     {
         TenantAdministrator,
@@ -493,7 +521,8 @@ public sealed class LocalCredentialBindingTests
             ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope);
         internal LocalIdentityCredentialStateStore StateStore(AsyncServiceScope scope) => new(
             identityDbContext: Identity(scope), applicationDbContext: Application(scope),
-            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: TimeProvider.System);
+            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: TimeProvider.System,
+            identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
 
         internal AdminContext Admin(AsyncServiceScope scope, ClaimsPrincipal? principal = null)
         {
@@ -521,7 +550,8 @@ public sealed class LocalCredentialBindingTests
             unitOfWork: new EfCoreUnitOfWork(Application(scope)),
             userRepository: new UserRepository(Application(scope)),
             actorRepository: new ActorRepository(Application(scope)),
-            externalLoginRepository: new UserExternalLoginRepository(Application(scope)));
+            externalLoginRepository: new UserExternalLoginRepository(Application(scope)),
+            identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
 
         internal async Task<BaseCommandResponse<Guid>> ReconcileAsync()
         {

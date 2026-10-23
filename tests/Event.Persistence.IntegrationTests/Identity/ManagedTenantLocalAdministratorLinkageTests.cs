@@ -232,7 +232,8 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         internal DbContext Identity(AsyncServiceScope scope) => _topology == IdentityDatabaseTopology.External
             ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope);
         internal LocalIdentityCredentialStateStore Store(AsyncServiceScope scope) => new(Identity(scope), Application(scope),
-            scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
+            scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System,
+            NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
         internal AdminContext Admin(AsyncServiceScope scope) => new(new HttpContextAccessor
         { HttpContext = PrincipalContext(_currentUserId) },
             new PlatformUserRoleRepository(Application(scope)), new TenantUserRoleGrantRepository(Application(scope)),
@@ -297,8 +298,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(app), tenants,
                     new ManagedTenantProvisioningOperationRepository(app), _managedOptions), _managedOptions,
                 mutation, unit, NullLogger<EnsureManagedProviderClientProvisionedCommandHandler>.Instance,
-                new PrivacyIdentityFenceOperation(
-                    NSubstitute.Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>()));
+                NativeIdentityRecognitionBoundary.For(app, TimeProvider.System));
         }
 
         internal async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> EnsureAsync()

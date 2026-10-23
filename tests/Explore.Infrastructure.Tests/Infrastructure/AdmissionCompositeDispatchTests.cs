@@ -350,7 +350,8 @@ public sealed class AdmissionCompositeDispatchTests
             Substitute.For<ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>>(),
             NullLogger<CompositeOutboxMessageDispatcher>.Instance,
             Substitute.For<IConfigurationManifestEffectDispatcher>(),
-            Substitute.For<IConfigurationImportEffectDelivery>());
+            Substitute.For<IConfigurationImportEffectDelivery>(),
+            Substitute.For<IModerationEffectDispatcher>());
     }
 
     private static NotificationFanoutOccurrenceHandoffService CreateNotificationHandoff()

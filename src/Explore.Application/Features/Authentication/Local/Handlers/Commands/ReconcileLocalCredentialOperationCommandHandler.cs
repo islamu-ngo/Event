@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 
@@ -17,7 +18,8 @@ public sealed class ReconcileLocalCredentialOperationCommandHandler(
     IUnitOfWork unitOfWork,
     IUserRepository userRepository,
     IActorRepository actorRepository,
-    IUserExternalLoginRepository externalLoginRepository)
+    IUserExternalLoginRepository externalLoginRepository,
+    PrivacyIdentityFenceOperation identityFence)
     : ICommandHandler<ReconcileLocalCredentialOperationCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -48,8 +50,10 @@ public sealed class ReconcileLocalCredentialOperationCommandHandler(
             return BaseCommandResponse.Conflict(id: request.OperationId);
         }
 
-        BaseCommandResponse<Guid> binding = await unitOfWork.ExecuteSerializableAsync(async ct =>
+        BaseCommandResponse<Guid> binding = await identityFence.ExecuteIdentityMutationAsync(token =>
+            unitOfWork.ExecuteRecognitionEnrollmentAsync(async ct =>
         {
+            await identityFence.EnsureSubjectMayEnrollAsync(receipt.ApplicationUserId, ct);
             Guid? currentActor = await LocalCredentialAdministrator.ResolveAsync(
                 adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: ct)
                 .ConfigureAwait(false);
@@ -57,7 +61,7 @@ public sealed class ReconcileLocalCredentialOperationCommandHandler(
                 return BaseCommandResponse.Authorization<Guid>();
 
             return await BindAsync(snapshot, ct).ConfigureAwait(false);
-        }, cancellationToken).ConfigureAwait(false);
+        }, identityFence.EnsureCurrentAsync, token), cancellationToken).ConfigureAwait(false);
         if (!binding.IsSuccess)
             return binding;
 

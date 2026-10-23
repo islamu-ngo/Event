@@ -74,8 +74,10 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             Application.TenantContext = this;
             Identity = fixture.Native.Identity(_scope);
             var states = fixture.Native.StateStore(_scope);
-            Lifecycle = new(Identity, Application, _scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Native.Clock, states);
-            Deliveries = new(Identity, Application, states, fixture.Native.Clock);
+            Lifecycle = new(Identity, Application, _scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Native.Clock, states,
+                NativeIdentityRecognitionBoundary.For(Application, fixture.Native.Clock));
+            Deliveries = new(Identity, Application, states, fixture.Native.Clock,
+                NativeIdentityRecognitionBoundary.For(Application, fixture.Native.Clock));
             MutationLock = new(Application, new EfCoreUnitOfWork(Application), beforeLock);
             var writer = EmailDispatchSqliteFixture.CreateEmailSettingsWriter(Application, MutationLock);
             var settings = new HierarchicalSettingsResolver(new SystemSettingRepository(Application, MutationLock),

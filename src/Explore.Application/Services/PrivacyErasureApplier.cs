@@ -1,5 +1,6 @@
 using Explore.Application.Caching;
 using Explore.Application.Configuration;
+using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
@@ -25,7 +26,8 @@ public sealed class PrivacyErasureApplier(
     HybridCache cache,
     TimeProvider timeProvider,
     ILogger<PrivacyErasureApplier> logger,
-    IOptions<PrivacyErasureOptions> options)
+    IOptions<PrivacyErasureOptions> options,
+    IModerationRecognitionErasure recognition)
 {
     private readonly PrivacyErasureOptions _options = options.Value;
 
@@ -58,6 +60,9 @@ public sealed class PrivacyErasureApplier(
         PreparedErasure prepared,
         CancellationToken cancellationToken)
     {
+        // Verify the independently committed complete capture before any irreversible local
+        // operation. Its native authority takes all subject/source anchors in writer order.
+        await recognition.VerifyPurgeAsync(intent, cancellationToken);
         await erasureRepository.FenceSubjectAsync(intent.SubjectId, cancellationToken);
         PrivacyErasureReplayCheckpoint? current =
             await checkpointRepository.GetLatestAsync(cancellationToken);
@@ -90,6 +95,7 @@ public sealed class PrivacyErasureApplier(
                     prepared.CheckpointId),
             _ => null
         };
+        await privacyErasureRepository.EraseModerationCaseNarrativesAsync(intent, cancellationToken);
         IReadOnlyList<Location> homes = await erasureRepository.GetOwnedPrivateHomesAsync(
             intent.SubjectId,
             cancellationToken);

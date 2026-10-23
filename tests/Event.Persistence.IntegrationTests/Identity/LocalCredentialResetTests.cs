@@ -467,7 +467,8 @@ public sealed class LocalCredentialResetTests
             : scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         internal LocalIdentityCredentialStateStore StateStore(AsyncServiceScope scope) => new(
             identityDbContext: Identity(scope), applicationDbContext: scope.ServiceProvider.GetRequiredService<ExploreDbContext>(),
-            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: Clock);
+            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: Clock,
+            identityFence: NativeIdentityRecognitionBoundary.For(scope.ServiceProvider.GetRequiredService<ExploreDbContext>(), Clock));
         internal LocalCredentialResetRequest Request(Snapshot current) => new(
             operationId: Guid.CreateVersion7(), initiatingApplicationUserId: ResetActorId,
             localSubjectId: OriginalReceipt.LocalSubjectId, expectedCurrentOperationId: current.Metadata.OperationId,

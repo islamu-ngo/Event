@@ -693,7 +693,8 @@ public sealed class LocalCredentialFirstUseTests
 
         internal LocalIdentityCredentialStateStore StateStore(AsyncServiceScope scope) => new(
             identityDbContext: Identity(scope), applicationDbContext: scope.ServiceProvider.GetRequiredService<ExploreDbContext>(),
-            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: Clock);
+            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: Clock,
+            identityFence: NativeIdentityRecognitionBoundary.For(scope.ServiceProvider.GetRequiredService<ExploreDbContext>(), Clock));
 
         // Store tests receive nominal authenticated authority; only the issuance test proves JWT cryptography.
         internal LocalCredentialReplacementAuthority Authority(Snapshot snapshot) => new(

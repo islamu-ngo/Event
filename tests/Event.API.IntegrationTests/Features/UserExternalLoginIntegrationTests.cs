@@ -677,10 +677,27 @@ public class UserExternalLoginIntegrationTests
         }
 
         var fenceAuthority = Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>();
-        fenceAuthority.ExecuteSerializedAsync(
+        fenceAuthority.ExecuteEnrollmentSerializedAsync(
+                Arg.Any<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>(),
+                Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>()(
+                call.Arg<CancellationToken>()));
+        var recognition = Substitute.For<Explore.Application.Contracts.Moderation.IModerationRecognitionContinuity>();
+        recognition.ExecuteWithRecognitionLockAsync(
                 Arg.Any<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>()(
                 call.Arg<CancellationToken>()));
+        recognition.MatchAndBindAsync(
+                Arg.Any<Explore.Application.Contracts.Moderation.ModerationRecognitionContinuityRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new Explore.Application.Contracts.Moderation.ModerationRecognitionContinuityResult
+            {
+                ActionFailure = ModerationRecognitionContinuityFailure.None,
+                AdmissionFailure = ModerationRecognitionContinuityFailure.None,
+                AdmissionExcluded = false,
+                ActionRecoveryStaged = false,
+                Actions = []
+            });
         return new BootstrapAtprotoSessionCommandHandler(
             gateway,
             tokenIssuer,
@@ -701,7 +718,9 @@ public class UserExternalLoginIntegrationTests
             tenantContext,
             configuration,
             TimeProvider.System,
-            new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority));
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority, recognition,
+                TimeProvider.System, logins),
+            null!); // These legacy scenarios exercise Person login; membership participants have native-store coverage.
     }
 
     private async Task EnsureUserExistsAsync(Guid userId, string? email = null)
@@ -757,8 +776,16 @@ public class UserExternalLoginIntegrationTests
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
     }
 
-    private sealed class InlineUnitOfWork : IUnitOfWork
+    private sealed class InlineUnitOfWork : IUnitOfWork, IPrivacyIdentityEnrollmentTransaction
     {
+        public async Task<T> ExecuteRecognitionEnrollmentAsync<T>(Func<CancellationToken, Task<T>> operation,
+            Func<CancellationToken, Task> beforeCommit, CancellationToken ct = default)
+        {
+            T result = await operation(ct);
+            await beforeCommit(ct);
+            return result;
+        }
+
         public Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
 

@@ -2,6 +2,7 @@
 using System.Data;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Models;
+using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
@@ -14,7 +15,8 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
     DbContext identityDbContext,
     ExploreDbContext applicationDbContext,
     LocalIdentityCredentialStateStore credentialStates,
-    TimeProvider timeProvider) : ILocalIdentityLifecycleDeliveryStore
+    TimeProvider timeProvider,
+    PrivacyIdentityFenceOperation identityFence) : ILocalIdentityLifecycleDeliveryStore
 {
     public async Task<LocalIdentityLifecycleRequest?> ReadRequestAsync(Guid localSubjectId, Guid externalLoginId,
         LocalIdentityLifecyclePurpose purpose, string? proposedAddress, string? expectedSecurityStamp,
@@ -100,11 +102,14 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
 
     public Task<Guid?> TryAdmitAsync(LocalIdentityLifecyclePointer operation, CancellationToken cancellationToken) =>
         identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => AdmitAttemptAsync(operation, cancellationToken), cancellationToken));
+            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => identityFence.ExecuteIdentityMutationAsync(
+                token => AdmitAttemptAsync(operation, token), cancellationToken), cancellationToken));
 
     private async Task<Guid?> AdmitAttemptAsync(LocalIdentityLifecyclePointer pointer, CancellationToken cancellationToken)
     {
-        await using var transaction = await identityDbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(
+            identityDbContext, applicationDbContext, identityFence, cancellationToken);
+        await identityFence.EnsureSubjectMayEnrollAsync(pointer.LocalSubjectId, cancellationToken);
         var row = await Exact(pointer).AsNoTracking().SingleOrDefaultAsync(cancellationToken);
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         if (row is null || row.DeliveryState != LocalIdentityLifecycleDeliveryState.Pending

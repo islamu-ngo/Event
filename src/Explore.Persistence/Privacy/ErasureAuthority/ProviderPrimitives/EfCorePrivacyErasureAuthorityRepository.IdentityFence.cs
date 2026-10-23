@@ -1,6 +1,7 @@
 using System.Data;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Persistence.Privacy.ErasureAuthority.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -12,6 +13,18 @@ public sealed partial class EfCorePrivacyErasureAuthorityRepository
     private const string FactColumns =
         "authority_sequence, intent_id, subject_kind, subject_id, reason_code, policy_version, requested_at_utc, recorded_at_utc, retention_expires_at_utc, is_legal_hold_pseudonymized";
     private readonly AsyncLocal<bool> _identityGate = new();
+    private readonly AsyncLocal<PrivacyErasureRecoveryGate?> _recoveryGate = new();
+
+    public Task<T> ExecuteEnrollmentSerializedAsync<T>(
+        Func<CancellationToken, Task<T>> operation, Func<CancellationToken, Task> beforePrimaryCommit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(beforePrimaryCommit);
+        if (_identityGate.Value)
+            throw new InvalidOperationException("Nested enrollment must reuse its outer identity operation.");
+        // The primary database retains its own transaction and pre-commit validation.
+        return ExecuteSerializedAsync(operation, cancellationToken);
+    }
 
     public async Task<T> ExecuteSerializedAsync<T>(
         Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
@@ -23,7 +36,10 @@ public sealed partial class EfCorePrivacyErasureAuthorityRepository
         await using (NpgsqlCommand command = CreateCommand(
             "SELECT privacy_erasure_authority.lock_identity_fence(NULL, NULL)"))
             await command.ExecuteNonQueryAsync(cancellationToken);
+        using var recoveryGate = new PrivacyErasureRecoveryGate(dbContext,
+            await ReadRecoveryStateAsync(cancellationToken));
         _identityGate.Value = true;
+        _recoveryGate.Value = recoveryGate;
         try
         {
             T result = await operation(cancellationToken);
@@ -33,7 +49,30 @@ public sealed partial class EfCorePrivacyErasureAuthorityRepository
         finally
         {
             _identityGate.Value = false;
+            _recoveryGate.Value = null;
         }
+    }
+
+    public async Task<PrivacyErasureRecoveryState> AcquireRecoveryStateAsync(CancellationToken cancellationToken)
+    {
+        PrivacyErasureRecoveryGate gate = _recoveryGate.Value
+            ?? throw new InvalidOperationException("privacy_erasure_recovery_gate_required");
+        gate.RequireActive();
+        RequireIdentityGate();
+        return gate.Acquire(await ReadRecoveryStateAsync(cancellationToken));
+    }
+
+    private async Task<PrivacyErasureRecoveryState> ReadRecoveryStateAsync(CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command = CreateCommand(
+            "SELECT store_id, revision, recovery_generation, high_water_sequence, retained_floor_sequence, identity_key_id, identity_key_verification_tag FROM privacy_erasure_authority.read_locked_recovery_state()");
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            throw new InvalidOperationException("privacy_erasure_recovery_state_unavailable");
+        return new PrivacyErasureRecoveryState(reader.GetGuid(0), reader.GetInt64(1), reader.GetInt64(2),
+            new PrivacyErasureAuthorityState(reader.GetInt64(3), reader.GetInt64(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6)));
     }
 
     public async Task ValidateKeyAsync(string keyId, string verificationTag, CancellationToken cancellationToken)

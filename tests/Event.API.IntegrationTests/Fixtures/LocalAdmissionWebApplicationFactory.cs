@@ -63,6 +63,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private bool _incompleteSetup;
     private bool _enableRateLimiting;
     private string? _postgreSqlConnectionString;
+    private readonly PrimaryDatabaseConnectionOptions? _measurementDatabase;
+    private readonly Dictionary<string, string?>? _measurementDatabaseSettings;
 
     public string SetupSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -75,6 +77,23 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         }
 
         _primaryProvider = primaryProvider;
+        if (Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1")
+        {
+            if (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") != "Testing"
+                || Environment.GetEnvironmentVariable("SECRET_PROVIDER") != "Environment")
+                throw new InvalidOperationException("Resource measurement requires the launcher-selected testing authority.");
+            var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+            using var configurationOwner = (IDisposable)configuration;
+            _measurementDatabase = PrimaryDatabaseConfiguration.BindRuntime(configuration);
+            _measurementDatabaseSettings = configuration.GetSection("Database").AsEnumerable()
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+            foreach (var key in new[]
+                {
+                    "Database:Provider", "Database:Host", "Database:Port", "Database:Database",
+                    "Database:Runtime:TlsMode", "Database:Runtime:TrustServerCertificate"
+                })
+                _measurementDatabaseSettings.TryAdd(key, null);
+        }
         _externalSigningKey = primaryProvider == AuthenticationProviderKind.Keycloak ? RSA.Create(2048) : null;
         if (primaryProvider == AuthenticationProviderKind.Atproto || enableAtproto)
         {
@@ -84,9 +103,12 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         SetEnvironment("SECRET_PROVIDER", "Environment");
         SetEnvironment("SecretProvider__Provider", "Environment");
         SetEnvironment("PrivacyErasure__Authority__Topology", "CoLocated");
-        SetEnvironment("Database__Provider", "Sqlite");
-        SetEnvironment("Database__Database", _databasePath);
-        SetEnvironment("Database__Runtime__Database", _databasePath);
+        if (_measurementDatabase is null)
+        {
+            SetEnvironment("Database__Provider", "Sqlite");
+            SetEnvironment("Database__Database", _databasePath);
+            SetEnvironment("Database__Runtime__Database", _databasePath);
+        }
         SetEnvironment("Authentication__Local__JwtKey", null);
         SetEnvironment(SigningKeyVariable, Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)));
         SetEnvironment("PRIVACY_ERASURE_IDENTITY_FENCE_KEY_ID", Guid.CreateVersion7().ToString("N"));
@@ -114,6 +136,10 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         };
         try
         {
+            if (factory._measurementDatabase is not null
+                && (postgreSqlConnectionString is not null || identityTopology != IdentityDatabaseTopology.Colocated
+                    || incompleteSetup || primaryProvider != AuthenticationProviderKind.Local || enableAtproto))
+                throw new InvalidOperationException("Measurement primary composition cannot be replaced by fixture overrides.");
             if (postgreSqlConnectionString is not null)
             {
                 var databaseSettings = new Dictionary<string, string?>();
@@ -185,6 +211,9 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 settings["PublicBaseUrl"] = "https://example.test";
             }
 
+            if (_measurementDatabaseSettings is not null)
+                foreach (var setting in _measurementDatabaseSettings)
+                    settings[setting.Key] = setting.Value;
             if (_postgreSqlConnectionString is not null)
                 TestDatabaseConfiguration.AddPostgreSql(settings, _postgreSqlConnectionString);
             configuration.AddInMemoryCollection(settings);
@@ -193,17 +222,24 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         {
             services.RemoveExploreDbContextRegistrations();
             services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
-            if (_postgreSqlConnectionString is null)
+            if ((_postgreSqlConnectionString is null && _measurementDatabase is null)
+                || _measurementDatabase?.Provider == PrimaryDatabaseProvider.Sqlite)
             {
                 services.RemoveAll<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>();
                 services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>(options =>
                     EmbeddedPrivacyErasureAuthorityDbContextFactory.ConfigureCoLocated(options,
-                        new PrimaryDatabaseConnectionOptions
+                        _measurementDatabase ?? new PrimaryDatabaseConnectionOptions
                         {
                             Role = PrimaryDatabaseRole.Runtime,
                             Provider = PrimaryDatabaseProvider.Sqlite,
                             Database = _databasePath
                         }));
+            }
+            else if (_measurementDatabase is not null)
+            {
+                services.RemoveAll<IDbContextFactory<CoLocatedPrivacyErasureAuthorityDbContext>>();
+                services.AddDbContextFactory<CoLocatedPrivacyErasureAuthorityDbContext>(options =>
+                    PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(options, _measurementDatabase));
             }
             services.AddScoped(provider =>
             {
@@ -503,7 +539,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 Environment.SetEnvironmentVariable(name, value);
             }
 
-            if (_connectionString is not null && _postgreSqlConnectionString is null)
+            if (_measurementDatabase is null && _connectionString is not null && _postgreSqlConnectionString is null)
             {
                 using var connection = new SqliteConnection(_connectionString);
                 SqliteConnection.ClearPool(connection);
@@ -514,10 +550,13 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 SqliteConnection.ClearPool(connection);
             }
 
-            File.Delete(_databasePath);
-            File.Delete(_databasePath + "-wal");
-            File.Delete(_databasePath + "-shm");
-            File.Delete(_databasePath + ".setup");
+            if (_measurementDatabase is null)
+            {
+                File.Delete(_databasePath);
+                File.Delete(_databasePath + "-wal");
+                File.Delete(_databasePath + "-shm");
+                File.Delete(_databasePath + ".setup");
+            }
             if (_identityTopology == IdentityDatabaseTopology.External)
             {
                 File.Delete(_identityDatabasePath);
@@ -529,6 +568,13 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
     private void ConfigureDatabase(DbContextOptionsBuilder options)
     {
+        if (_measurementDatabase is not null)
+        {
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, _measurementDatabase);
+            if (_persistenceInterceptor is not null)
+                options.AddInterceptors(_persistenceInterceptor);
+            return;
+        }
         if (_postgreSqlConnectionString is not null)
         {
             var configuration = new Dictionary<string, string?>();
@@ -557,7 +603,16 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     {
         await using ExploreDbContext database = CreateDatabase();
         await database.Database.EnsureCreatedAsync();
-        if (_postgreSqlConnectionString is null)
+        if (_measurementDatabase is not null
+            && await database.Tenants.AnyAsync(row => row.Id == PlatformDefaults.DefaultTenantId))
+        {
+            if (!await database.InstanceBootstrapStates.AnyAsync(row => row.CompletedByUserId != null))
+                throw new InvalidOperationException("Measurement fixture cannot borrow an incomplete instance bootstrap.");
+            await LookupTableSeeder.SeedAsync(database);
+            return;
+        }
+        if (_measurementDatabase?.Provider == PrimaryDatabaseProvider.Sqlite
+            || _measurementDatabase is null && _postgreSqlConnectionString is null)
         {
             await SqliteDatabaseInitializer.InitializeAsync(database, CancellationToken.None);
             await using var scope = Services.CreateAsyncScope();

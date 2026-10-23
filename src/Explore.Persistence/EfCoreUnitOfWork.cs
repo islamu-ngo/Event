@@ -11,7 +11,7 @@ using Npgsql;
 
 namespace Explore.Persistence;
 
-public sealed class EfCoreUnitOfWork : IUnitOfWork
+public sealed class EfCoreUnitOfWork : IUnitOfWork, IPrivacyIdentityEnrollmentTransaction
 {
     private const int BootstrapConvergenceAttemptLimit = 4;
     private const int SqliteConstraintPrimaryKey = 1555;
@@ -83,11 +83,33 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             ? ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct)
             : ExecuteBootstrapConflictRetryAsync(() => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct), ct);
 
+    public Task<T> ExecuteRecognitionEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforeCommit,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(beforeCommit);
+        return _dbContext.IdentityFenceOwnsTransaction
+            ? ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct, beforeCommit)
+            : ExecuteBootstrapConflictRetryAsync(
+                () => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct, beforeCommit), ct);
+    }
+
     public Task<T> ExecuteReadCommittedAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct = default) =>
         ExecuteCoreAsync(operation,
             _dbContext.Database.IsSqlite() ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted, ct);
+
+    // Receipt-owning callers reconcile the previous outcome before replaying the whole privacy/primary unit.
+    internal Task<T> ExecuteRecognitionEnrollmentAttemptAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforeCommit,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(beforeCommit);
+        return ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct, beforeCommit);
+    }
 
     internal static async Task<T> ExecuteBootstrapConflictRetryAsync<T>(
         Func<Task<T>> operation, CancellationToken ct)
@@ -111,7 +133,8 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
     private async Task<T> ExecuteCoreAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         IsolationLevel? isolationLevel,
-        CancellationToken ct)
+        CancellationToken ct,
+        Func<CancellationToken, Task>? beforeCommit = null)
     {
         // Co-located SQLite shares the authority write transaction: the gate
         // commits both contexts after this operation returns.
@@ -122,6 +145,8 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             try
             {
                 var result = await operation(ct);
+                if (beforeCommit is not null)
+                    await _dbContext.SaveChangesAsync(ct);
                 if (_dbContext.StorageReferenceTransactionFailed)
                     throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                         "The storage reference transaction has failed.");
@@ -148,7 +173,13 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         {
             try
             {
-                return await operation(ct);
+                var result = await operation(ct);
+                if (beforeCommit is not null)
+                {
+                    await _dbContext.SaveChangesAsync(ct);
+                    await beforeCommit(ct);
+                }
+                return result;
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -165,10 +196,14 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             try
             {
                 var result = await operation(ct);
+                if (beforeCommit is not null)
+                    await _dbContext.SaveChangesAsync(ct);
                 if (_dbContext.StorageReferenceTransactionFailed)
                     throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
                         "The storage reference transaction has failed.");
                 await _dbContext.FlushDisclosureAsync(ct);
+                if (beforeCommit is not null)
+                    await beforeCommit(ct);
                 await transaction.CommitAsync(ct);
                 return result;
             }

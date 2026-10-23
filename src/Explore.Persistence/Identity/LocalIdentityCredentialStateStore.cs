@@ -7,6 +7,7 @@ using System.Text.Json;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Services;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Microsoft.AspNetCore.Identity;
@@ -19,7 +20,8 @@ internal sealed class LocalIdentityCredentialStateStore(
     DbContext identityDbContext,
     ExploreDbContext applicationDbContext,
     UserManager<LocalIdentityUser> userManager,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    PrivacyIdentityFenceOperation identityFence)
     : ILocalCredentialAdministration
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -182,7 +184,8 @@ internal sealed class LocalIdentityCredentialStateStore(
             throw new InvalidOperationException("Credential reset requires relational stores.");
         }
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(
-            () => ResetAttemptAsync(request, cancellationToken));
+            () => identityFence.ExecuteIdentityMutationAsync(
+                token => ResetAttemptAsync(request, token), cancellationToken));
     }
 
     private async Task<LocalCredentialResetResult> ResetAttemptAsync(
@@ -193,8 +196,9 @@ internal sealed class LocalIdentityCredentialStateStore(
         DbUpdateException? uniqueFailure = null;
         try
         {
-            await using var transaction = await identityDbContext.Database
-                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+            await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(
+                identityDbContext, applicationDbContext, identityFence, cancellationToken).ConfigureAwait(false);
+            await identityFence.EnsureSubjectMayEnrollAsync(request.LocalSubjectId, cancellationToken);
             try
             {
                 LocalCredentialResetResult? replay = await ResolveResetReplayAsync(request, cancellationToken)
@@ -366,7 +370,8 @@ internal sealed class LocalIdentityCredentialStateStore(
             throw new InvalidOperationException("Credential replacement requires relational stores.");
         }
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(
-            () => ReplaceAttemptAsync(request, cancellationToken));
+            () => identityFence.ExecuteIdentityMutationAsync(
+                token => ReplaceAttemptAsync(request, token), cancellationToken));
     }
 
     public async Task<LocalCredentialReplacementSubject?> ReadReplacementSubjectAsync(
@@ -409,8 +414,9 @@ internal sealed class LocalIdentityCredentialStateStore(
         LocalCredentialReplacementRequest request,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await identityDbContext.Database
-            .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+        await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(
+            identityDbContext, applicationDbContext, identityFence, cancellationToken).ConfigureAwait(false);
+        await identityFence.EnsureSubjectMayEnrollAsync(request.Authority.Subject.LocalSubjectId, cancellationToken);
         try
         {
             LocalCredentialReplacementAuthority authority = request.Authority;
@@ -589,15 +595,16 @@ internal sealed class LocalIdentityCredentialStateStore(
             throw new InvalidOperationException("Credential activation requires relational stores.");
 
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(
-            () => ActivateAttemptAsync(request, cancellationToken));
+            () => identityFence.ExecuteIdentityMutationAsync(
+                token => ActivateAttemptAsync(request, token), cancellationToken));
     }
 
     private async Task<LocalCredentialActivationOutcome> ActivateAttemptAsync(
         LocalCredentialActivationRequest request,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await identityDbContext.Database
-            .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+        await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(
+            identityDbContext, applicationDbContext, identityFence, cancellationToken).ConfigureAwait(false);
         try
         {
             LocalIdentityCredentialOperation? operation = await identityDbContext
@@ -606,6 +613,8 @@ internal sealed class LocalIdentityCredentialStateStore(
                 .ConfigureAwait(false);
             if (operation is null)
                 return LocalCredentialActivationOutcome.NotFound;
+
+            await identityFence.EnsureSubjectMayEnrollAsync(operation.LocalSubjectId, cancellationToken);
 
             IdentityUserToken<Guid>? token = await identityDbContext.Set<IdentityUserToken<Guid>>().AsNoTracking()
                 .SingleOrDefaultAsync(candidate => candidate.UserId == operation.LocalSubjectId
@@ -792,7 +801,8 @@ internal sealed class LocalIdentityCredentialStateStore(
 
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(
             () => EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(
-                () => CreateAttemptAsync(request, localSubjectId, password, cancellationToken), cancellationToken));
+                () => identityFence.ExecuteIdentityMutationAsync(
+                    token => CreateAttemptAsync(request, localSubjectId, password, token), cancellationToken), cancellationToken));
     }
 
     private async Task<LocalCredentialCreateResult> CreateAttemptAsync(
@@ -803,8 +813,8 @@ internal sealed class LocalIdentityCredentialStateStore(
         DbUpdateException? uniqueFailure = null;
         try
         {
-            await using var transaction = await identityDbContext.Database
-                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+            await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(
+                identityDbContext, applicationDbContext, identityFence, cancellationToken).ConfigureAwait(false);
             try
             {
                 LocalCredentialCreateResult? existing = await ResolveExistingAsync(request, localSubjectId, cancellationToken)
@@ -824,6 +834,7 @@ internal sealed class LocalIdentityCredentialStateStore(
                     LockoutEnabled = true,
                     CreatedAt = createdAt
                 };
+                await identityFence.EnsureSubjectMayEnrollAsync(user.Id, cancellationToken);
                 ownedEntities.Add(user);
                 string temporaryPassword = password ?? $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
                 IdentityResult creation = await userManager.CreateAsync(user, temporaryPassword).ConfigureAwait(false);
@@ -937,7 +948,7 @@ internal sealed class LocalIdentityCredentialStateStore(
             createdAt: operation.CreatedAt));
     }
 
-    private static async Task RollbackBestEffortAsync(IDbContextTransaction transaction)
+    private static async Task RollbackBestEffortAsync(LocalIdentityMutationTransaction transaction)
     {
         try
         {

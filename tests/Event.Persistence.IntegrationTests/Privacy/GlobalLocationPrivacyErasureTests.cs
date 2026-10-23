@@ -613,8 +613,10 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
 
     internal static ErasureRuntime CreateRuntime(
         ExploreDbContext context,
-        IPrivacyErasureAuthority authority)
+        IPrivacyErasureAuthority authority,
+        TimeProvider? clock = null)
     {
+        var time = clock ?? TimeProvider.System;
         var services = new ServiceCollection();
         services.AddHybridCache();
         ServiceProvider cacheProvider = services.BuildIsolatedServiceProvider();
@@ -625,6 +627,24 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         var checkpointRepository = new PrivacyErasureReplayCheckpointRepository(context);
         var outboxRepository = new OutboxRepository(context);
         var stateRepository = new PrivacyErasureStateRepository(context);
+        var identity = (IPrivacyIdentityFenceAuthority)authority;
+        var unitOfWork = new EfCoreUnitOfWork(context);
+        var recognitionLifecycle = new ModerationRecognitionKeyLifecycleRepository(context, identity, authority,
+            new ModerationRecognitionKeyLifecycleReplicaOwner(), time);
+        var recognitionRepository = new ModerationRecognitionErasureRepository(context,
+            NSubstitute.Substitute.For<Explore.Application.Contracts.Moderation.IModerationRecognitionKeyRingProvider>(),
+            time, identity, authority, recognitionLifecycle);
+        var recognition = new Explore.Application.Services.Moderation.ModerationRecognitionErasure(
+            recognitionRepository,
+            identity, authority, new RelationalSettingMutationLock(context, unitOfWork));
+        var recoverySettings = new RelationalSettingMutationLock(context, unitOfWork);
+        var recoveryNotifications = new Explore.Application.Services.Moderation.ModerationRecognitionRecoveryNotifications(
+            new Explore.Application.Notifications.DefaultNotificationOwnershipResolver(
+                Options.Create(new Explore.Application.Notifications.NotificationRoutingOptions())),
+            new Explore.Application.Notifications.RecipientNotificationMaterializer(
+                new NotificationIntentRepository(context, recoverySettings, time), unitOfWork, recoverySettings, stateRepository));
+        var recoveryScheduler = new Explore.Application.Services.Moderation.ModerationRecognitionRecoveryScheduler(
+            recognitionRepository, recognitionRepository, recoveryNotifications, recoverySettings, time, recognitionLifecycle);
         HybridCache cache = cacheProvider.GetRequiredService<HybridCache>();
         var applier = new PrivacyErasureApplier(
             userRepository,
@@ -639,17 +659,20 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             stateRepository,
             outboxRepository,
             cache,
-            TimeProvider.System,
+            time,
             NullLogger<PrivacyErasureApplier>.Instance,
-            Options.Create(new PrivacyErasureOptions()));
+            Options.Create(new PrivacyErasureOptions()),
+            recognition);
         var service = new RetainedAuthorityPrivacyErasureWorkflow(
             checkpointRepository,
             stateRepository,
             authority,
-            new EfCoreUnitOfWork(context),
+            unitOfWork,
             applier,
             Options.Create(new PrivacyErasureOptions()),
-            TimeProvider.System);
+            time,
+            recognition,
+            recoveryScheduler);
         return new ErasureRuntime(
             service,
             new PrivacyErasureReplayService(service),

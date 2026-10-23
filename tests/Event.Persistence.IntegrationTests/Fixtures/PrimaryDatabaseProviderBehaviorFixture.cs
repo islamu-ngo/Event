@@ -22,12 +22,14 @@ internal sealed class PrimaryDatabaseProviderBehaviorFixture
         PrimaryDatabaseConnectionOptions databaseOptions, IConfiguration? configuration = null)
     {
         _databaseOptions = databaseOptions;
+        PurposeConfiguration = configuration;
         ReceiptEnrollment = databaseOptions.Provider == PrimaryDatabaseProvider.PostgreSql && configuration is not null
             ? PostgresNativeQueueEnrollment.Bind(configuration) : null;
     }
 
     public PrimaryDatabaseProvider Provider => _databaseOptions.Provider;
     public PostgresNativeQueueEnrollment? ReceiptEnrollment { get; }
+    public IConfiguration? PurposeConfiguration { get; }
 
     public static PrimaryDatabaseProviderBehaviorFixture Create()
     {
@@ -58,6 +60,18 @@ internal sealed class PrimaryDatabaseProviderBehaviorFixture
         var context = CreateContext(interceptors);
         context.TenantContext = tenantId.HasValue ? new TestTenantContext(tenantId.Value) : null;
         return context;
+    }
+
+    /// <summary>Uses the existing Migrator credential for arrangement, never the Runtime request identity.</summary>
+    public ExploreDbContext CreateMigratorContext()
+    {
+        var configuration = PurposeConfiguration
+            ?? throw new InvalidOperationException("Migrator arrangement requires the original structured purpose configuration.");
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, PrimaryDatabaseConfiguration.BindMigrator(configuration));
+        using var runtimeModel = CreateContext([]);
+        builder.UseModel(runtimeModel.Model);
+        return new ExploreDbContext(builder.Options);
     }
 
     public ExploreDbContext CreateReceiptContext(Guid tenantId)

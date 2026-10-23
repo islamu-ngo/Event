@@ -1,17 +1,18 @@
-using System.Security.Claims;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Event.Persistence.IntegrationTests.Moderation;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Infrastructure.Identity;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using Microsoft.AspNetCore.Http;
+using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -118,28 +119,39 @@ public sealed partial class EventAuthorityPlanningProviderTests
         await using var writer = fixture.CreateTenantContext(tenant.Id, beforeWriterTenant);
         await using var owner = fixture.CreateTenantContext(tenant.Id, beforeOwnerActor);
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
-        var http = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, manager.Id.ToString("D"))], "window-source-witness"))
-            }
-        };
-        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(owner)),
-            new OrganizationMemberRepository(owner), new GroupMemberRepository(owner), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(owner), null), NullLogger<AdminContext>.Instance);
-        var machine = new MachinePrincipalAccessor(http);
         var provider = new EventOwnershipTransferMutationTests.Provider(owner);
-        var boundary = new EventRoleAssignmentMutationBoundary(owner, privacy.Authority(owner, TimeProvider.System),
-            new UserContext(http), identity, machine, provider, TimeProvider.System, ModerationRecognitionResourceFixture.Reader(owner));
-        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new UpdateEventRoleAssignmentWindowCommandHandler(new EventRoleAssignmentRepository(owner), new EventRepository(owner),
-            new EventRoleAuthorityCeilingService(new EventAuthoritySnapshotService(owner), new RoleRepository(owner), new PermissionRepository(owner)),
+        await using var human = new CurrentHumanPrincipalFixture(manager.Id, tenant.Id, borrowedContext: owner,
+            configureServices: services => services.AddSingleton<IPrivacyIdentityFenceAuthority>(
+                privacy.Authority(owner, TimeProvider.System)).AddSingleton<IAuthorizationProvider>(provider),
+            timeProvider: TimeProvider.System,
+            purposeConfiguration: fixture.Provider == PrimaryDatabaseProvider.PostgreSql ? fixture.PurposeConfiguration : null,
+            seedBinding: fixture.Provider == PrimaryDatabaseProvider.PostgreSql ? async binding =>
+            {
+                await using var migrator = fixture.CreateMigratorContext();
+                migrator.UserExternalLogins.Add(binding);
+                await migrator.SaveChangesAsync(token);
+            }
+        : null);
+        await human.InitializeAsync();
+        await human.PrepareAsync(token);
+        var identity = human.Admin;
+        var machine = human.Machine;
+        var boundary = new EventRoleAssignmentMutationBoundary(owner, human.Services.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+            human.Services.GetRequiredService<Explore.Application.Contracts.Identity.IUserContext>(), identity, machine, provider,
+            TimeProvider.System, ModerationRecognitionResourceFixture.Reader(owner),
+            human.Services.GetRequiredService<IHumanActionCommitFinalizer>());
+        var metrics = human.Services.GetRequiredService<BusinessMetrics>();
+        IPrivateEventManagementReader PrivateReader() => human.Services.GetRequiredService<IPrivateEventManagementReader>();
+        var assignments = new EventRoleAssignmentRepository(owner, PrivateReader);
+        var events = new EventRepository(owner, privateManagement: PrivateReader);
+        var ceiling = new EventRoleAuthorityCeilingService(new EventAuthoritySnapshotService(owner, PrivateReader),
+            new RoleRepository(owner), new PermissionRepository(owner));
+        var handler = new UpdateEventRoleAssignmentWindowCommandHandler(assignments, events,
+            ceiling,
             new AuditLogRepository(owner), metrics, NullLogger<UpdateEventRoleAssignmentWindowCommandHandler>.Instance,
             identity, machine, owner.TenantContext!, provider, boundary);
-        var creator = new AssignEventRoleCommandHandler(new EventRoleAssignmentRepository(owner), new EventRepository(owner), new UserRepository(owner),
-            new EventRoleAuthorityCeilingService(new EventAuthoritySnapshotService(owner), new RoleRepository(owner), new PermissionRepository(owner)),
+        var creator = new AssignEventRoleCommandHandler(assignments, events, new UserRepository(owner),
+            human.Services.GetRequiredService<IHumanEventTeamActionPreparation>(),
             new AuditLogRepository(owner), metrics, NullLogger<AssignEventRoleCommandHandler>.Instance,
             identity, machine, owner.TenantContext!, provider, boundary);
         Task write = new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>

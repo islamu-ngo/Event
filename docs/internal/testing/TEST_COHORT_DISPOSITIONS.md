@@ -42,7 +42,50 @@ Add-on replacement proof: `ordinary-addons/` passed all twelve mapped identities
 
 `Explore.slnx` already includes `Event.Domain.UnitTests` and omits both wrappers. `.github/workflows/_build-test.yml` executes that ordinary project. Repository-wide non-Markdown executable/configuration search found no wrapper consumer beyond each wrapper's own project/configuration. No solution/workflow/package change is required.
 
-The unchanged Domain baseline build passed with 184 pre-existing analyzer warnings and zero errors. No warnings are suppressed or repaired by this slice. Final named-case reconciliation, final Domain/architecture gates and candidate identity remain pending. Provider/migration, HTTP/authentication, UI/BFF/accessibility, AppHost/enabled workers, external protection, browser, load/benchmark and trusted CI admission remain owned by the deferred programme.
+The unchanged Domain baseline build passed with 184 pre-existing analyzer warnings and zero errors. No warnings are suppressed or repaired by this slice. Provider/migration, HTTP/authentication, UI/BFF/accessibility, AppHost/enabled workers, external protection, browser, load/benchmark and trusted CI admission remain owned by the deferred programme.
+
+## Final Candidate Verification
+
+Tested code candidate: `b56e6e9b42566ffc76601abde9c76fa719109251` on base `fefcea5f16e3bd723e22076d505a65c696c4e40b`. Later documentation commits do not change those tested inputs.
+
+| Check | Actual outcome |
+| --- | --- |
+| Release solution build | Exit 0; 0 errors, 3,892 warnings across existing code; 2m54.26s |
+| Complete ordinary Domain suite | Exit 0; 1,872 passed, 0 failed, 0 skipped; 1.463s |
+| Named-case reconciliation | XML queries confirm each of the original nineteen identities passed exactly once in the final Domain TRX; zero non-passing results |
+| Complete architecture suite | Exit 2; 667 passed, 4 failed, 0 skipped; 46.059s; all four failures individually reproduced on untouched base |
+| Changed-file whitespace formatting | Exit 0 for both C# destinations |
+| Independent semantic/adversarial review | Approved after immediate unchanged-state and pause-closure checks; no unresolved assertion-preservation finding |
+
+Exact final commands, run from the implementation worktree with the approved NVMe `TMPDIR`:
+
+```bash
+dotnet build Explore.slnx --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build --verbosity quiet -- --minimum-expected-tests 1 --report-trx --results-directory "$TMPDIR/testing-assurance-modernization/final-domain"
+dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build --verbosity quiet -- --minimum-expected-tests 1 --report-trx --results-directory "$TMPDIR/testing-assurance-modernization/final-architecture"
+dotnet format whitespace tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --no-restore --verify-no-changes --include tests/Event.Domain.UnitTests/Entities/EventAddOnLifecycleTests.cs tests/Event.Domain.UnitTests/Entities/TicketingRecoveryInvariantTests.cs --verbosity quiet
+```
+
+Each reference/phase/sensitivity invocation has a distinct TRX directory in the same evidence root. The following architecture failures are **quarantined baseline issues**, not repaired by this slice. Their tests and inspected production paths are unchanged by this branch. They keep the architecture gate red and the PR in draft; they must not be represented as successful checks.
+
+| Baseline class / exact method | Observed failure on candidate and clean base | Base runner duration |
+| --- | --- | --- |
+| CleanArchitectureTests / Persistence_ShouldNotHaveDependencyOn_ApplicationDtos | ManagedTenantWorkerCreationOwnerFactory, ManagedTenantWorkerCreationGraphWriter and ManagedTenantProvisioningSchedulingPort violate the Application DTO dependency rule | 470ms |
+| LegacyDecentralizationRetirementContractTests / CurrentSchema_MustRetireLegacyDecentralizationColumnsAndSettingRows | Current setting-seeder content fails the legacy-setting retirement assertion | 367ms |
+| LocalizationResilienceTests / InfrastructureRegistration_DoesNotUseAddHttpMessageHandler_ForTmsClients | TMS registration still has an HTTP message handler rejected by the resilience policy assertion | 268ms |
+| NamingConventionTests / Repositories_ShouldEndWith_Repository | ActorOwnershipReader violates the repository naming rule | 383ms |
+
+Differential baseline: an untouched detached worktree at `fefcea5f16e3bd723e22076d505a65c696c4e40b`, with empty tracked/untracked status before and after. Its targeted architecture Release build exited 0 (1,015 warnings, 0 errors; 1m38.75s). Each exact method below was selected separately and failed once with exit 2, 0 passing and 0 skipped. Distinct `baseline-<Class>/` TRX directories preserve these results.
+
+```bash
+dotnet build tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
+dotnet run --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/CleanArchitectureTests/Persistence_ShouldNotHaveDependencyOn_ApplicationDtos" --minimum-expected-tests 1 --report-trx --results-directory "$TMPDIR/testing-assurance-modernization/baseline-CleanArchitectureTests"
+dotnet run --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/LegacyDecentralizationRetirementContractTests/CurrentSchema_MustRetireLegacyDecentralizationColumnsAndSettingRows" --minimum-expected-tests 1 --report-trx --results-directory "$TMPDIR/testing-assurance-modernization/baseline-LegacyDecentralizationRetirementContractTests"
+dotnet run --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/LocalizationResilienceTests/InfrastructureRegistration_DoesNotUseAddHttpMessageHandler_ForTmsClients" --minimum-expected-tests 1 --report-trx --results-directory "$TMPDIR/testing-assurance-modernization/baseline-LocalizationResilienceTests"
+dotnet run --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/NamingConventionTests/Repositories_ShouldEndWith_Repository" --minimum-expected-tests 1 --report-trx --results-directory "$TMPDIR/testing-assurance-modernization/baseline-NamingConventionTests"
+```
+
+Release metadata hooks and final contributor self-review apply to the branch. No product configuration, deployment, migration or rollback action is required. If an assertion is later found missing, forward-fix its ordinary Domain owner in a focused commit; do not recreate an isolated compatibility wrapper. Local artifacts and the anonymized review summary are retained in the ignored `.omo/evidence/20261023-testing-assurance-modernization/` directory; the tracked record above provides durable commands, identities, outcomes and limitations independently of those machine-local files.
 
 ## Documentation Research And Provenance
 

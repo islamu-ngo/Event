@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M5G4WTZNDBYSN1BKPX5N7Q
+Title: "Qualify human publication at the owning commit"
+Type: feat
+Scope: events
+Summary: "Apply current human tenant publication restrictions without replacing ordinary permission, lifecycle approval or readiness."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Qualified nonadoption preserves ordinary rules; adopted denial or unavailable authority blocks human publication at entry and both actual commit owners. Compilation is not provider conformance."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

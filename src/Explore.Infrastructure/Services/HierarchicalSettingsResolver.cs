@@ -106,6 +106,10 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             || key == GovernanceSettingKeys.TenantDelegation.LockSmtp
             || key.StartsWith("public_experience.", StringComparison.Ordinal)
             || key.StartsWith("event_discovery.", StringComparison.Ordinal)
+            || key is GovernanceSettingKeys.Events.UserSubmissionEnabled
+                or GovernanceSettingKeys.Events.OrganizationSubmissionEnabled
+                or GovernanceSettingKeys.Events.GroupSubmissionEnabled
+                or GovernanceSettingKeys.Events.RequireApproval
             || key.StartsWith("federation.", StringComparison.Ordinal));
         var systemSettings = requiresAuthoritativePolicy
             ? await _systemSettingRepository.GetAllSettings(cancellationToken: ct)

@@ -1,60 +1,24 @@
+using System.Text;
+
 namespace ISLAMU.ReleaseEngineering;
 
 public static class SecurityChangeSelection
 {
-    private static readonly string[] Prefixes =
-    [
-        "cerbos/",
-        "docker/keycloak/",
-        "eng/security/",
-        "eng/release/",
-        "src/Explore.Application/Authorization/",
-        "src/Explore.API/Extensions/",
-        "src/Explore.API/Hosting/",
-        "src/Explore.API/Authentication/",
-        "src/Explore.API/Middleware/",
-        "src/Event.Standalone/",
-        "src/Event.Web.BffHosting/",
-        "src/Explore.Blazor/Services/",
-        "src/Explore.Blazor/Yarp/",
-        "tests/Event.API.IntegrationTests/Fixtures/",
-        "tests/Event.API.IntegrationTests/Hosting/",
-        "tests/Event.Standalone.IntegrationTests/",
-        "tests/Explore.Blazor.IntegrationTests/Hosting/",
-        "tests/Event.API.IntegrationTests/Features/Security",
-        "tests/Event.API.IntegrationTests/Features/Cerbos",
-        "tests/Event.API.IntegrationTests/Features/Token",
-        "tests/Event.API.IntegrationTests/Features/Authorization",
-        "tests/Event.API.IntegrationTests/Features/Cloud"
-    ];
-
-    private static readonly string[] ExactPaths =
-    [
-        "src/Explore.API/Program.cs",
-        "src/Explore.Blazor/Program.cs",
-        "src/Explore.ServiceDefaults/Diagnostics/EndpointSecurityInventory.cs",
-        "src/Explore.Infrastructure/Services/CerbosAuthorizationService.cs",
-        "src/Explore.Infrastructure/Services/CerbosPrincipalBuilder.cs",
-        "src/Explore.Infrastructure/Services/RuntimeAuthorizationProvider.cs",
-        "src/Explore.Infrastructure/Services/LocalAuthorizationProvider.cs",
-        "docs/SECURITY-MODEL.md",
-        "docs/AUTHORIZATION.md",
-        ".github/workflows/security-tests.yml"
-    ];
-
     public static bool RequiresExecution(IEnumerable<string> changedPaths)
     {
         bool anyPath = false;
         foreach (string path in changedPaths)
         {
-            if (path.Length == 0)
-            {
-                continue;
-            }
-
             anyPath = true;
-            if (ExactPaths.Contains(path, StringComparer.Ordinal) ||
-                Prefixes.Any(prefix => path.StartsWith(prefix, StringComparison.Ordinal)))
+            // Only known public prose can skip; new or ambiguous paths must run.
+            if (string.IsNullOrWhiteSpace(path)
+                || path != path.Trim()
+                || path.Any(char.IsControl)
+                || path.Contains('\\', StringComparison.Ordinal)
+                || path.Split('/').Any(segment => segment is "" or "." or "..")
+                || !(path == "README.md"
+                    || (path.StartsWith("docs/public/", StringComparison.Ordinal)
+                        && path.EndsWith(".md", StringComparison.Ordinal))))
             {
                 return true;
             }
@@ -67,20 +31,24 @@ public static class SecurityChangeSelection
     {
         if (args.Length != 2)
         {
-            output.WriteLine("invalid_arguments: select-security-changes requires a changed-paths file");
-            return Program.UsageError;
+            output.WriteLine("run-tests=true");
+            return Program.Success;
         }
 
         bool selected;
         try
         {
-            selected = RequiresExecution(File.ReadLines(args[1]));
+            selected = RequiresExecution(File.ReadLines(args[1], new UTF8Encoding(false, true)));
         }
         catch (IOException)
         {
             selected = true;
         }
         catch (UnauthorizedAccessException)
+        {
+            selected = true;
+        }
+        catch (ArgumentException)
         {
             selected = true;
         }

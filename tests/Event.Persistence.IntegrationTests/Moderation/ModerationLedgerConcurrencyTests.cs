@@ -1,6 +1,9 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
+using Explore.Application.Models.InternalEvents;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -15,6 +18,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NSubstitute;
+using System.Text.Json;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
 
@@ -22,6 +26,131 @@ namespace Event.Persistence.IntegrationTests.Moderation;
 [NotInParallel("PersistenceDb")]
 public sealed class ModerationLedgerConcurrencyTests(PostgreSqlContainerFixture fixture)
 {
+    private static readonly TimeProvider Clock = new CaptureClock();
+
+    [Test]
+    public async Task Inert_proposal_captures_original_state_atomically_without_disclosure_or_completion()
+    {
+        var seed = await SeedAsync();
+        var operation = await ProposalAsync(seed);
+        await using var context = BoundContext(seed.Scope);
+        await using var privacyFixture = await ModerationNoticePrivacyFixture.CreateAsync();
+        var privacyAuthority = privacyFixture.Authority(context, Clock);
+        var authority = new RoleAuthority(context, seed);
+        var result = await Service(context, authority, privacyAuthority).ExecuteAsync(operation);
+        await Assert.That(result.Outcome).IsEqualTo(ModerationOperationOutcome.Known);
+
+        context.ModerationTrustDomainId = seed.Scope.TrustDomainId;
+        var original = await context.ModerationNoticeSources.AsNoTracking().SingleAsync();
+        var captured = JsonSerializer.Deserialize<ModerationNoticeCaptureSnapshot>(original.SnapshotJson)!;
+        await Assert.That(captured.HasNoSubstantiveWork).IsTrue();
+        await Assert.That(captured.Decision.Revision).IsEqualTo(1);
+        await Assert.That(captured.Notice).IsNull();
+        await Assert.That(await context.ModerationNotices.AnyAsync()).IsFalse();
+        await Assert.That((await context.ModerationEffectIntents.AsNoTracking().SingleAsync()).CompletedAt).IsNull();
+        await Assert.That(await context.ModerationOperationReceipts.CountAsync()).IsEqualTo(1);
+        context.ModerationTrustDomainId = null;
+
+        var response = ModerationOperation.Transition(ModerationOperationKind.RecordResponse,
+            seed.Subject, seed.Scope, Guid.CreateVersion7(), Guid.CreateVersion7(),
+            operation.DecisionId, 1, 1, Guid.Empty);
+        await Assert.That((await Service(context, authority, privacyAuthority).ExecuteAsync(response)).Outcome)
+            .IsEqualTo(ModerationOperationOutcome.Known);
+        await Assert.That((await Service(context, authority, privacyAuthority).ExecuteAsync(operation)).Revision).IsEqualTo(1);
+        context.ModerationTrustDomainId = seed.Scope.TrustDomainId;
+        var retained = await context.ModerationNoticeSources.AsNoTracking()
+            .SingleAsync(row => row.EffectId == operation.EffectId);
+        await Assert.That(retained.SnapshotJson).IsEqualTo(original.SnapshotJson);
+        await Assert.That(await context.ModerationEffectIntents.CountAsync()).IsEqualTo(2);
+        await Assert.That(await context.ModerationNoticeSources.CountAsync()).IsEqualTo(2);
+        await Assert.That(await context.OutboxMessages.CountAsync(row =>
+            row.EventType == ModerationEffectOutboxMessageFactory.EventType)).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task Abort_after_capture_and_shared_flush_rolls_back_every_writer_artifact()
+    {
+        var seed = await SeedAsync();
+        var operation = await ProposalAsync(seed);
+        await using var context = BoundContext(seed.Scope);
+        await using var privacyFixture = await ModerationNoticePrivacyFixture.CreateAsync();
+        var privacyAuthority = privacyFixture.Authority(context, Clock);
+        var authority = new RoleAuthority(context, seed);
+        var capture = ModerationLedgerPersistenceTests.Capture(context, privacyAuthority, authority, Clock);
+        var store = new ModerationStore(context, authority, Clock, privacyAuthority, capture);
+        var result = await store.ExecuteAsync(operation, async (session, token) =>
+        {
+            var grant = (await authority.ResolveAsync(session, operation, token)).Grant!;
+            var proposal = operation.Proposal!;
+            var decision = ModerationDecision.Propose(operation.DecisionId, proposal.CaseId,
+                seed.Subject, grant.Principal, seed.Scope, seed.Scope, proposal.Rule, proposal.Capabilities,
+                proposal.StartsAt, proposal.EndsAt, proposal.ReviewAt, proposal.RequiredApprovals, Clock.GetUtcNow());
+            var effect = new ChangePointer().Plan(operation, decision, null, null);
+            await session.SaveAsync(decision, null, null, grant, effect, token);
+            var first = context.ModerationNoticeSources.Local.Single();
+            var repeated = await capture.CaptureInCurrentTransactionAsync(session, effect.Id, grant, token);
+            await Assert.That(repeated!.SnapshotHash).IsEqualTo(first.SnapshotHash);
+            await context.SaveChangesAsync(token);
+            return ModerationOperationResult.Unavailable();
+        }, CancellationToken.None);
+        await Assert.That(result.Outcome).IsEqualTo(ModerationOperationOutcome.Unavailable);
+        context.ModerationTrustDomainId = seed.Scope.TrustDomainId;
+        await Assert.That(await context.ModerationDecisions.AnyAsync()).IsFalse();
+        await Assert.That(await context.ModerationEffectIntents.AnyAsync()).IsFalse();
+        await Assert.That(await context.ModerationOperationReceipts.AnyAsync()).IsFalse();
+        await Assert.That(await context.ModerationNoticeSources.AnyAsync()).IsFalse();
+        await Assert.That(await context.OutboxMessages.AnyAsync()).IsFalse();
+    }
+
+    [Test]
+    public async Task A_finding_bearing_transition_without_an_owned_finding_is_denied_before_capture()
+    {
+        var seed = await SeedAsync();
+        var proposal = await ProposalAsync(seed);
+        await using var context = BoundContext(seed.Scope);
+        await using var privacyFixture = await ModerationNoticePrivacyFixture.CreateAsync();
+        var privacyAuthority = privacyFixture.Authority(context, Clock);
+        var authority = new RoleAuthority(context, seed);
+        await Assert.That((await Service(context, authority, privacyAuthority).ExecuteAsync(proposal)).Outcome)
+            .IsEqualTo(ModerationOperationOutcome.Known);
+        var response = ModerationOperation.Transition(ModerationOperationKind.RecordResponse,
+            seed.Subject, seed.Scope, Guid.CreateVersion7(), Guid.CreateVersion7(), proposal.DecisionId, 1, 1, Guid.Empty);
+        await Assert.That((await Service(context, authority, privacyAuthority).ExecuteAsync(response)).Outcome)
+            .IsEqualTo(ModerationOperationOutcome.Known);
+        var finding = ModerationOperation.Transition(ModerationOperationKind.AcceptFinding,
+            seed.Subject, seed.Scope, Guid.CreateVersion7(), Guid.CreateVersion7(),
+            proposal.DecisionId, 2, 1, Guid.CreateVersion7());
+        await Assert.That((await Service(context, authority, privacyAuthority).ExecuteAsync(finding)).Outcome)
+            .IsEqualTo(ModerationOperationOutcome.Denied);
+        context.ModerationTrustDomainId = seed.Scope.TrustDomainId;
+        var retained = await context.ModerationDecisions.AsNoTracking().SingleAsync();
+        await Assert.That(retained.State).IsEqualTo(ModerationDecisionState.AwaitingFinding);
+        await Assert.That(retained.FindingId).IsNull();
+        await Assert.That(await context.ModerationOperationReceipts.AnyAsync(row => row.Id == finding.OperationId)).IsFalse();
+        await Assert.That(await context.ModerationEffectIntents.AnyAsync(row => row.Id == finding.EffectId)).IsFalse();
+    }
+
+    [Test]
+    public async Task Receipt_without_original_capture_cannot_replay_as_a_complete_writer_commit()
+    {
+        var seed = await SeedAsync();
+        var operation = await ProposalAsync(seed);
+        await using var context = BoundContext(seed.Scope);
+        await using var privacyFixture = await ModerationNoticePrivacyFixture.CreateAsync();
+        var privacyAuthority = privacyFixture.Authority(context, Clock);
+        var authority = new RoleAuthority(context, seed);
+        await Assert.That((await Service(context, authority, privacyAuthority).ExecuteAsync(operation)).Outcome)
+            .IsEqualTo(ModerationOperationOutcome.Known);
+        context.ModerationTrustDomainId = seed.Scope.TrustDomainId;
+        await context.ModerationNoticeSources.Where(row => row.EffectId == operation.EffectId).ExecuteDeleteAsync();
+        context.ModerationTrustDomainId = null;
+        await Assert.That((await Service(context, authority, privacyAuthority).ExecuteAsync(operation)).Outcome)
+            .IsEqualTo(ModerationOperationOutcome.Unavailable);
+        context.ModerationTrustDomainId = seed.Scope.TrustDomainId;
+        await Assert.That(await context.ModerationNoticeSources.AnyAsync()).IsFalse();
+        await Assert.That((await context.ModerationEffectIntents.AsNoTracking().SingleAsync()).CompletedAt).IsNull();
+    }
+
     [Test]
     public async Task Native_qualification_row_remains_locked_through_the_owner_transaction()
     {
@@ -29,8 +158,10 @@ public sealed class ModerationLedgerConcurrencyTests(PostgreSqlContainerFixture 
         await using var owner = BoundContext(seed.Scope);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var privacyFixture = await ModerationNoticePrivacyFixture.CreateAsync();
+        var privacyAuthority = privacyFixture.Authority(owner, Clock);
         var authority = new RoleAuthority(owner, seed, entered, release);
-        var service = Service(owner, authority);
+        var service = Service(owner, authority, privacyAuthority);
         var operation = service.ExecuteAsync(
             ModerationOperation.Evaluate(seed.Subject, seed.Scope, ModerationCapability.Publish));
         try
@@ -75,7 +206,7 @@ public sealed class ModerationLedgerConcurrencyTests(PostgreSqlContainerFixture 
         await repository.Update(grant);
         await using var nextOwner = BoundContext(seed.Scope);
         var nextAuthority = new RoleAuthority(nextOwner, seed);
-        var next = await Service(nextOwner, nextAuthority).ExecuteAsync(
+        var next = await Service(nextOwner, nextAuthority, privacyFixture.Authority(nextOwner, Clock)).ExecuteAsync(
             ModerationOperation.Evaluate(seed.Subject, seed.Scope, ModerationCapability.Publish));
         await Assert.That(next.Outcome).IsEqualTo(ModerationOperationOutcome.Denied);
     }
@@ -85,9 +216,11 @@ public sealed class ModerationLedgerConcurrencyTests(PostgreSqlContainerFixture 
     {
         var seed = await SeedAsync();
         await using var owner = BoundContext(seed.Scope);
+        await using var privacyFixture = await ModerationNoticePrivacyFixture.CreateAsync();
+        var privacyAuthority = privacyFixture.Authority(owner, Clock);
         var authority = new RoleAuthority(owner, seed);
         var operation = ModerationOperation.Evaluate(seed.Subject, seed.Scope, ModerationCapability.Publish);
-        await Assert.That((await Service(owner, authority).ExecuteAsync(operation)).Outcome)
+        await Assert.That((await Service(owner, authority, privacyAuthority).ExecuteAsync(operation)).Outcome)
             .IsEqualTo(ModerationOperationOutcome.Known);
         await using (var writer = BoundContext(seed.Scope))
         {
@@ -96,12 +229,28 @@ public sealed class ModerationLedgerConcurrencyTests(PostgreSqlContainerFixture 
             grant.RevokedAt = new DateTime(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc);
             await repository.Update(grant);
         }
-        await Assert.That((await Service(owner, authority).ExecuteAsync(operation)).Outcome)
+        await Assert.That((await Service(owner, authority, privacyAuthority).ExecuteAsync(operation)).Outcome)
             .IsEqualTo(ModerationOperationOutcome.Denied);
     }
 
-    private ModerationOperationService Service(ExploreDbContext context, RoleAuthority authority) =>
-        new(new ModerationStore(context, authority, TimeProvider.System), authority, new ChangePointer(), TimeProvider.System);
+    private ModerationOperationService Service(
+        ExploreDbContext context, RoleAuthority authority, IPrivacyIdentityFenceAuthority privacy) =>
+        new(new ModerationStore(context, authority, Clock, privacy, ModerationLedgerPersistenceTests.Capture(context, privacy, authority, Clock)),
+            authority, new ChangePointer(), Clock);
+
+    private async Task<ModerationOperation> ProposalAsync(Seed seed)
+    {
+        var now = Clock.GetUtcNow();
+        var moderationCase = ModerationCase.Open(Guid.CreateVersion7(), seed.Subject, seed.Scope, Guid.CreateVersion7(), now);
+        await using var context = BoundContext(seed.Scope);
+        context.ModerationTrustDomainId = seed.Scope.TrustDomainId;
+        context.ModerationCases.Add(moderationCase);
+        await context.SaveChangesAsync();
+        return ModerationOperation.Propose(seed.Subject, seed.Scope, Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), 1, 1, new ModerationProposal(moderationCase.Id,
+                ModerationRuleReference.Create(seed.Scope.Id, "capture-rule", 1),
+                [ModerationCapability.Publish], now, now.AddDays(1), null, 1));
+    }
 
     private ExploreDbContext BoundContext(AuthorityScope scope)
     {
@@ -144,12 +293,24 @@ public sealed class ModerationLedgerConcurrencyTests(PostgreSqlContainerFixture 
         };
         await using var context = fixture.CreateDbContext();
         context.AddRange(user, tenant, membership, grant);
+        var service = new ServicePrincipal
+        {
+            Id = Guid.CreateVersion7(), Code = $"capture-{scope.Id:N}", DisplayName = "Capture integration test"
+        };
+        var host = ModerationHostBinding.Establish(Guid.CreateVersion7(),
+            scope.TrustDomainId, scope.Parent!.Parent!.Id, scope.Parent.Id, service.Id);
+        context.AddRange(service, host, ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), host, tenant));
         await context.SaveChangesAsync();
         return new Seed(scope, SubjectReference.Create(ModerationSubjectKind.Human, principalId, scope),
             grant.Id, membership.Id);
     }
 
     private sealed record Seed(AuthorityScope Scope, SubjectReference Subject, Guid GrantId, Guid MembershipId);
+
+    private sealed class CaptureClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);
+    }
 
     private sealed class RoleAuthority(
         ExploreDbContext context, Seed seed, TaskCompletionSource? entered = null,

@@ -61,7 +61,7 @@ public sealed class ModerationEffectIntent
             || (supersededSanctionRevision is not null && supersededSanctionRevision < 1)
             || (operationKind == 10) != (supersededSanctionId is not null)
             || supersededSanctionId is not null && (sanctionId is null || supersededSanctionId == sanctionId)
-            || scopeKind is < 1 or > 6 || subjectKind is < 1 or > 4 || operationKind is < 1 or > 10)
+            || scopeKind is < 1 or > 7 || subjectKind is < 1 or > 4 || operationKind is < 1 or > 10)
         {
             throw new ArgumentException("A durable effect requires an exact qualified changed aggregate.", nameof(id));
         }

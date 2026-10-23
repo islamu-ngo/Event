@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M63CRZ6YVGE4RRPYP9KX8J
+Title: "Retain attributed action scopes in native model contracts"
+Type: feat
+Scope: access
+Summary: "Checkpoint exact finding, event and resource authority coordinates and structural constraints; native host enforcement and the cumulative schema checkpoint remain separate commits."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Source constraints retain exact attribution, finding and event/resource action coordinates; native permission owners are separate and no security or provider execution is certified."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Entity mappings require the separate cumulative schema checkpoint. No model build, migration generation, application or provider validation was run."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "Integrate native action owners, shared context filters and generated history before deployment; this model source checkpoint is not independently deployable."

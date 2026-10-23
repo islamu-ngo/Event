@@ -50,6 +50,6 @@ public sealed class ModerationQualificationEvidenceConfiguration :
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(entity => new { entity.TrustDomainId, entity.TenantId, entity.SourceKind, entity.SourceId });
         builder.ToTable(table => table.HasCheckConstraint("ck_moderation_qualification_receipt_result",
-            "source_kind BETWEEN 1 AND 5 AND result_revision > 0 AND qualification_revision > 0"));
+            "source_kind BETWEEN 1 AND 44 AND result_revision > 0 AND qualification_revision > 0"));
     }
 }

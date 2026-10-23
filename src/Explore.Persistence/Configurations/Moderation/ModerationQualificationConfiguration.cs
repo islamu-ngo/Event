@@ -16,17 +16,23 @@ public sealed class ModerationQualificationConfiguration :
         builder.Ignore(entity => entity.Subject);
         builder.Ignore(entity => entity.Scope);
         builder.Ignore(entity => entity.Rule);
+        builder.Ignore(entity => entity.Reason);
         builder.Ignore(entity => entity.Adjudicator);
         builder.Ignore(entity => entity.Evidence);
         builder.Ignore(entity => entity.ReversedBy);
         ModerationLedgerConfiguration.ConfigureSubject(builder, "adjudicator");
         ModerationLedgerConfiguration.ConfigureSubject(builder, "reversed_by", optional: true);
         builder.Property(entity => entity.RuleCode).HasMaxLength(100).IsRequired();
+        builder.Property(entity => entity.ReasonCode).HasMaxLength(100).IsRequired();
         builder.Property(entity => entity.Justification).HasMaxLength(4000).IsRequired();
         builder.Property(entity => entity.ReversalJustification).HasMaxLength(4000);
         builder.HasOne<ModerationCase>().WithMany().HasForeignKey(entity => entity.CaseId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(entity => new { entity.CaseId, entity.RuleOwnerId, entity.RuleCode, entity.RuleRevision })
+        builder.HasIndex(entity => new
+        {
+            entity.CaseId, entity.RuleOwnerId, entity.RuleCode, entity.RuleRevision,
+            entity.ScopeKind, entity.ScopeId, entity.AttributionGeneration
+        })
             .IsUnique();
         builder.ToTable(table =>
         {
@@ -37,7 +43,7 @@ public sealed class ModerationQualificationConfiguration :
                 "AND reversed_by_id IS NOT NULL AND reversal_justification IS NOT NULL " +
                 "AND reversed_at >= finalized_at AND updated_at = reversed_at)");
             table.HasCheckConstraint("ck_moderation_finding_evidence",
-                "case_revision = 1 AND rule_revision > 0 AND evidence_recorded_at >= case_created_at " +
+                "case_revision = 1 AND rule_revision > 0 AND reason_revision > 0 AND evidence_recorded_at >= case_created_at " +
                 "AND evidence_recorded_at <= finalized_at AND finalized_at >= case_created_at " +
                 "AND ((evidence_purpose = 1 AND urgency_qualification_id IS NULL) " +
                 "OR (evidence_purpose = 2 AND urgency_qualification_id IS NOT NULL " +
@@ -45,6 +51,9 @@ public sealed class ModerationQualificationConfiguration :
             table.HasCheckConstraint("ck_moderation_finding_adjudicator",
                 "adjudicator_kind = 1 AND adjudicator_id <> subject_id " +
                 "AND adjudicator_origin_trust_domain_id = scope_trust_domain_id");
+            table.HasCheckConstraint("ck_moderation_finding_attribution",
+                "(attribution_source_id IS NULL AND attribution_generation = 0) OR " +
+                "(attribution_source_id IS NOT NULL AND attribution_generation > 0)");
         });
     }
 
@@ -102,7 +111,8 @@ public sealed class ModerationQualificationConfiguration :
                 "jurisdiction_id = CASE jurisdiction_kind " +
                 "WHEN 1 THEN jurisdiction_trust_domain_id WHEN 2 THEN jurisdiction_solution_id " +
                 "WHEN 3 THEN jurisdiction_instance_id WHEN 4 THEN jurisdiction_tenant_id " +
-                "WHEN 5 THEN jurisdiction_community_id WHEN 6 THEN jurisdiction_resource_id END");
+                "WHEN 5 THEN jurisdiction_community_id WHEN 6 THEN jurisdiction_resource_id " +
+                "WHEN 7 THEN jurisdiction_event_id END");
         });
     }
 

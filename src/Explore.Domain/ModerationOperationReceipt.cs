@@ -32,7 +32,7 @@ public sealed class ModerationOperationReceipt
         ArgumentException.ThrowIfNullOrWhiteSpace(principalDigest);
         if (operationId == Guid.Empty || trustDomainId == Guid.Empty || scopeId == Guid.Empty
             || subjectId == Guid.Empty || principalId == Guid.Empty || decisionId == Guid.Empty
-            || sanctionId == Guid.Empty || scopeKind is < 1 or > 6 || subjectKind is < 1 or > 4
+            || sanctionId == Guid.Empty || scopeKind is < 1 or > 7 || subjectKind is < 1 or > 4
             || requestDigest.Length != 64 || !requestDigest.All(char.IsAsciiHexDigit)
             || principalDigest.Length != 64 || !principalDigest.All(char.IsAsciiHexDigit)
             || resultRevision < 1 || policyRevision < 1 || qualificationRevision < 1)
